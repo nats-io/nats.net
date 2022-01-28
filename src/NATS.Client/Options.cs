@@ -44,7 +44,7 @@ namespace NATS.Client
         int reconnectJitterTLS = Defaults.ReconnectJitterTLS;
 
         internal X509Certificate2Collection certificates = null;
-
+ 
         /// <summary>
         /// Represents the method that will handle an event raised 
         /// when a connection is closed.
@@ -79,6 +79,14 @@ namespace NATS.Client
         /// </summary>
         public EventHandler<ErrEventArgs> AsyncErrorEventHandler;
         public EventHandler<ErrEventArgs> AsyncErrorEventHandlerOrDefault => AsyncErrorEventHandler ?? DefaultAsyncErrorEventHandler();
+
+        /// <summary>
+        /// Represents the method that will handle an event raised
+        /// when a slow consumer was detected
+        /// </summary>
+        public EventHandler<SlowConsumerEventArgs> SlowConsumerEventHandler;
+
+        public EventHandler<SlowConsumerEventArgs> SlowConsumerEventHandlerOrDefault => SlowConsumerEventHandler ?? DefaultSlowConsumerEventHandler(this);
 
         /// <summary>
         /// Represents the method that will handle an event raised
@@ -254,6 +262,7 @@ namespace NATS.Client
         {
             allowReconnect = o.allowReconnect;
             AsyncErrorEventHandler = o.AsyncErrorEventHandler;
+            SlowConsumerEventHandler = o.SlowConsumerEventHandler;
             HeartbeatAlarmEventHandler = o.HeartbeatAlarmEventHandler;
             UnhandledStatusEventHandler = o.UnhandledStatusEventHandler;
             FlowControlProcessedEventHandler = o.FlowControlProcessedEventHandler;
@@ -784,6 +793,7 @@ namespace NATS.Client
             sb.AppendFormat("AllowReconnect={0};", allowReconnect);
 
             appendEventHandler(sb, "AsyncErrorEventHandler", AsyncErrorEventHandler);
+            appendEventHandler(sb, nameof(SlowConsumerEventHandler), SlowConsumerEventHandler);
             appendEventHandler(sb, "HeartbeatAlarmEventHandler", HeartbeatAlarmEventHandler);
             appendEventHandler(sb, "UnhandledStatusEventHandler", UnhandledStatusEventHandler);
             appendEventHandler(sb, "FlowControlProcessedEventHandler", FlowControlProcessedEventHandler);

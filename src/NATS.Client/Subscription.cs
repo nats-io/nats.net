@@ -142,10 +142,15 @@ namespace NATS.Client
             return true;
         }
 
-        private void handleSlowConsumer(Msg msg)
+        protected virtual void handleSlowConsumer(Msg msg)
         {
             dropped++;
-            conn.processSlowConsumer(this);
+            if (!sc)
+            {
+                sc = true;
+                conn.processSlowConsumer(this, msg);
+            }
+
             pMsgs--;
             pBytes -= msg.Data.Length;
         }
@@ -211,13 +216,40 @@ namespace NATS.Client
                     }
                     else
                     {
-                        sc = false;
                         mch.add(msg);
                     }
                 }
+
+                RecoverFromSlowConsumer(maxCount);
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// If buffered messages drop below 80% of the limits clear slow consumer status.
+        /// </summary>
+        protected void RecoverFromSlowConsumer()
+        {
+            RecoverFromSlowConsumer(conn.Opts.SubChannelLength);
+        }
+        /// <summary>
+        /// If buffered messages drop below 80% of the limits clear slow consumer status.
+        /// </summary>
+        /// <param name="maxCount">max message channel size</param>
+        protected void RecoverFromSlowConsumer(int maxCount)
+        {
+            //Recover from slow consumer.
+            //Wait for some more free capacity in the buffers before clearing the sc flag to avoid firing too many slow consumer events. 
+            const float maxBufferUsageToClearSlowConsumer = 0.8f;
+            if (sc
+                && (pMsgsLimit <= 0 || pMsgs < Math.Max(1, pMsgsLimit * maxBufferUsageToClearSlowConsumer))
+                && (pBytesLimit <= 0 || pBytes < Math.Max(1, pBytesLimit * maxBufferUsageToClearSlowConsumer))
+                && (mch == null || mch.Count < Math.Max(1, maxCount * maxBufferUsageToClearSlowConsumer))
+            )
+            {
+                sc = false;
+            }
         }
 
         /// <summary>

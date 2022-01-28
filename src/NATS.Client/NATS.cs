@@ -191,6 +191,23 @@ namespace NATS.Client
         public static EventHandler<ErrEventArgs> DefaultAsyncErrorEventHandler() => 
             (sender, e) => WriteError("AsyncErrorEvent", e);
 
+        public static EventHandler<SlowConsumerEventArgs> DefaultSlowConsumerEventHandler(Options opts) =>
+            (sender, e) =>
+            {
+               if (opts.SlowConsumerEventHandler == null)
+               {
+                   //If the user does not care about slow consumers (has not registered an event handler) propagate the situation as error to gain backward compatibility.
+                   e.Conn.lastEx = new NATSSlowConsumerException();
+                   opts.AsyncErrorEventHandlerOrDefault(sender, new ErrEventArgs(e.Conn, e.Sub, "Slow Consumer"));
+               }
+               var pairs = Array.Empty<object>();
+               if (e.FirstDroppedMessage.IsJetStream)
+               {                                                                                                                                                             
+                   pairs = new object[] { "FirstDroppedStreamSequence", e.FirstDroppedMessage.MetaData?.StreamSequence, "FirstDroppedConsumerSequence", e.FirstDroppedMessage.MetaData?.ConsumerSequence };
+               }
+               WriteEvent("SlowConsumer", e, pairs);
+            };
+
         public static EventHandler<ReconnectDelayEventArgs> DefaultReconnectDelayHandler() => (sender, e) =>
         {
             Console.Error.WriteLine($"ReconnectDelay Attempts: {e.Attempts}");
@@ -269,6 +286,23 @@ namespace NATS.Client
         /// </summary>
         /// <example>Could be an exception causing the connection to get disconnected.</example>
         public Exception Error { get; }
+    }
+
+    /// <summary>
+    /// Provides the details when a client side slow consumer in <see cref="Client.Subscription"/> was detected
+    /// and messages are dropped. 
+    /// </summary>
+    public class SlowConsumerEventArgs : ConnJsSubEventArgs
+   {
+        internal SlowConsumerEventArgs(Connection c, Subscription s, Msg m): base(c,s)
+        {
+            FirstDroppedMessage = m;
+        }
+        /// <summary>
+        /// The first <see cref="Msg"/> that has been dropped
+        /// because the <see cref="Subscription"/>s buffers went full. 
+        /// </summary>
+        public Msg FirstDroppedMessage { get; }
     }
 
     /// <summary>

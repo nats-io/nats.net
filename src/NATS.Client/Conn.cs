@@ -2205,16 +2205,9 @@ namespace NATS.Client
 
         // processSlowConsumer will set SlowConsumer state and fire the
         // async error handler if registered.
-        internal void processSlowConsumer(Subscription s)
+        internal void processSlowConsumer(Subscription s, Msg m)
         {
-            lastEx = new NATSSlowConsumerException();
-            if (!s.sc)
-            {
-                callbackScheduler.Add(
-                    () => { opts.AsyncErrorEventHandlerOrDefault(this, new ErrEventArgs(this, s, "Slow Consumer")); }
-                );
-            }
-            s.sc = true;
+            callbackScheduler.Add(()=> opts.SlowConsumerEventHandlerOrDefault(this, new SlowConsumerEventArgs(this, s, m)));
         }
 
         private void kickFlusher()
