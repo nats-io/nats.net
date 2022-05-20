@@ -2,14 +2,13 @@
 using AlterNats.Internal;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
-using System.Net.Sockets;
 using System.Threading.Channels;
 
 namespace AlterNats;
 
 internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
 {
-    readonly TcpConnection socket;
+    readonly ISocketConnection socketConnection;
     readonly WriterState state;
     readonly ObjectPool pool;
     readonly ConnectionStatsCounter counter;
@@ -21,9 +20,9 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
     readonly CancellationTokenSource cancellationTokenSource;
     int disposed;
 
-    public NatsPipeliningWriteProtocolProcessor(TcpConnection socket, WriterState state, ObjectPool pool, ConnectionStatsCounter counter)
+    public NatsPipeliningWriteProtocolProcessor(ISocketConnection socketConnection, WriterState state, ObjectPool pool, ConnectionStatsCounter counter)
     {
-        this.socket = socket;
+        this.socketConnection = socketConnection;
         this.state = state;
         this.pool = pool;
         this.counter = counter;
@@ -72,7 +71,7 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
                         while (memory.Length > 0)
                         {
                             stopwatch.Restart();
-                            var sent = await socket.SendAsync(memory, SocketFlags.None).ConfigureAwait(false);
+                            var sent = await socketConnection.SendAsync(memory).ConfigureAwait(false);
                             stopwatch.Stop();
                             if (isEnabledTraceLogging)
                             {
@@ -84,7 +83,7 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
                     }
                     catch (Exception ex)
                     {
-                        socket.SignalDisconnected(ex);
+                        socketConnection.SignalDisconnected(ex);
                         foreach (var item in promiseList)
                         {
                             item.SetException(ex); // signal failed
@@ -140,7 +139,7 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
                         while (memory.Length != 0)
                         {
                             stopwatch.Restart();
-                            var sent = await socket.SendAsync(memory, SocketFlags.None).ConfigureAwait(false);
+                            var sent = await socketConnection.SendAsync(memory).ConfigureAwait(false);
                             stopwatch.Stop();
                             if (isEnabledTraceLogging)
                             {
@@ -168,7 +167,7 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
                         // when error, command is dequeued and written buffer is still exists in state.BufferWriter
                         // store current pending promises to state.
                         state.PendingPromises.AddRange(promiseList);
-                        socket.SignalDisconnected(ex);
+                        socketConnection.SignalDisconnected(ex);
                         return; // when socket closed, finish writeloop.
                     }
                 }
@@ -195,7 +194,7 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
             {
                 if (bufferWriter.WrittenMemory.Length != 0)
                 {
-                    await socket.SendAsync(bufferWriter.WrittenMemory, SocketFlags.None).ConfigureAwait(false);
+                    await socketConnection.SendAsync(bufferWriter.WrittenMemory).ConfigureAwait(false);
                 }
             }
             catch { }

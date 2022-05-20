@@ -1,36 +1,20 @@
 ﻿using System.Net.Sockets;
+using System.Net.WebSockets;
 using System.Runtime.CompilerServices;
 
 namespace AlterNats.Internal;
 
-internal sealed class SocketClosedException : Exception
+internal sealed class WebSocketConnection : ISocketConnection
 {
-    public SocketClosedException(Exception? innerException)
-        : base("Socket has been closed.", innerException)
-    {
-
-    }
-}
-
-internal sealed class TcpConnection : ISocketConnection
-{
-    readonly Socket socket;
+    readonly ClientWebSocket socket;
     readonly TaskCompletionSource<Exception> waitForClosedSource = new();
     int disposed;
 
     public Task<Exception> WaitForClosed => waitForClosedSource.Task;
 
-    public TcpConnection()
+    public WebSocketConnection()
     {
-        this.socket = new Socket(Socket.OSSupportsIPv6 ? AddressFamily.InterNetworkV6 : AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        if (Socket.OSSupportsIPv6)
-        {
-            socket.DualMode = true;
-        }
-
-        socket.NoDelay = true;
-        socket.SendBufferSize = 0;
-        socket.ReceiveBufferSize = 0;
+        this.socket = new ClientWebSocket();
     }
 
     // CancellationToken is not used, operation lifetime is completely same as socket.
@@ -44,20 +28,20 @@ internal sealed class TcpConnection : ISocketConnection
     // return ValueTask directly for performance, not care exception and signal-disconected.
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public ValueTask ConnectAsync(string host, int port, CancellationToken cancellationToken)
+    public Task ConnectAsync(Uri uri, CancellationToken cancellationToken)
     {
-        return socket.ConnectAsync(host, port, cancellationToken);
+        return socket.ConnectAsync(uri, cancellationToken);
     }
 
     /// <summary>
     /// Connect with Timeout. When failed, Dispose this connection.
     /// </summary>
-    public async ValueTask ConnectAsync(string host, int port, TimeSpan timeout)
+    public async ValueTask ConnectAsync(Uri uri, TimeSpan timeout)
     {
         using var cts = new CancellationTokenSource(timeout);
         try
         {
-            await socket.ConnectAsync(host, port, cts.Token).ConfigureAwait(false);
+            await socket.ConnectAsync(uri, cts.Token).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -74,20 +58,23 @@ internal sealed class TcpConnection : ISocketConnection
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public ValueTask<int> SendAsync(ReadOnlyMemory<byte> buffer)
+    public async ValueTask<int> SendAsync(ReadOnlyMemory<byte> buffer)
     {
-        return socket.SendAsync(buffer, SocketFlags.None, CancellationToken.None);
+        await socket.SendAsync(buffer, WebSocketMessageType.Binary, WebSocketMessageFlags.EndOfMessage, CancellationToken.None).ConfigureAwait(false);
+        return buffer.Length;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public ValueTask<int> ReceiveAsync(Memory<byte> buffer)
+    public async ValueTask<int> ReceiveAsync(Memory<byte> buffer)
     {
-        return socket.ReceiveAsync(buffer, SocketFlags.None, CancellationToken.None);
+        var wsRead = await socket.ReceiveAsync(buffer, CancellationToken.None).ConfigureAwait(false);
+        return wsRead.Count;
     }
 
     public ValueTask AbortConnectionAsync(CancellationToken cancellationToken)
     {
-        return socket.DisconnectAsync(false, cancellationToken);
+        socket.Abort();
+        return ValueTask.CompletedTask;
     }
 
     public ValueTask DisposeAsync()

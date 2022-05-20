@@ -35,6 +35,14 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MinimumWebApp", "sandbox\Mi
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleApp1", "sandbox\ConsoleApp1\ConsoleApp1.csproj", "{8B335047-D294-4606-AA24-27FF9F0E8B46}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "BlazorWasm", "BlazorWasm", "{E0A65976-553E-4F7D-8C7E-0AAE7EF7EA67}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BlazorWasm.Client", "sandbox\BlazorWasm\Client\BlazorWasm.Client.csproj", "{B9709E38-677D-446D-843F-AE96A958A0DC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BlazorWasm.Server", "sandbox\BlazorWasm\Server\BlazorWasm.Server.csproj", "{5A9E4F27-8D58-41CB-850B-4E7E2AA0D15A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BlazorWasm.Shared", "sandbox\BlazorWasm\Shared\BlazorWasm.Shared.csproj", "{4FA4670C-02B5-4353-9744-8189EC8C9107}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
