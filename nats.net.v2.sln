@@ -33,6 +33,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AlterNats.Hosting", "src\Al
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MinimumWebApp", "sandbox\MinimumWebApp\MinimumWebApp.csproj", "{44881DEE-8B49-44EA-B0BA-8BDA4F706E1A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleApp1", "sandbox\ConsoleApp1\ConsoleApp1.csproj", "{8B335047-D294-4606-AA24-27FF9F0E8B46}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -71,6 +73,10 @@ Global
 		{44881DEE-8B49-44EA-B0BA-8BDA4F706E1A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{44881DEE-8B49-44EA-B0BA-8BDA4F706E1A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{44881DEE-8B49-44EA-B0BA-8BDA4F706E1A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8B335047-D294-4606-AA24-27FF9F0E8B46}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8B335047-D294-4606-AA24-27FF9F0E8B46}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8B335047-D294-4606-AA24-27FF9F0E8B46}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8B335047-D294-4606-AA24-27FF9F0E8B46}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -84,6 +90,7 @@ Global
 		{7B518D4A-93EA-4E5E-956A-CCC34C005AD4} = {4827B3EC-73D8-436D-AE2A-5E29AC95FD0C}
 		{D3F09B30-1ED5-48C2-81CD-A2AD88E751AC} = {4827B3EC-73D8-436D-AE2A-5E29AC95FD0C}
 		{44881DEE-8B49-44EA-B0BA-8BDA4F706E1A} = {95A69671-16CA-4133-981C-CC381B7AAA30}
+		{8B335047-D294-4606-AA24-27FF9F0E8B46} = {95A69671-16CA-4133-981C-CC381B7AAA30}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {8CBB7278-D093-448E-B3DE-B5991209A1AA}
