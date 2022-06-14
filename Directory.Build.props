@@ -9,14 +9,18 @@
 
         <!-- NuGet Packaging -->
         <PackageVersion>$(Version)</PackageVersion>
-        <Company>Cysharp</Company>
-        <Authors>Cysharp</Authors>
-        <Copyright>© Cysharp, Inc.</Copyright>
-        <PackageProjectUrl>https://github.com/Cysharp/AlterNats</PackageProjectUrl>
+        <Company>CNCF</Company>
+        <Authors>The NATS Authors</Authors>
+        <Copyright>Copyright © The NATS Authors 2016-$([System.DateTime]::Now.ToString(yyyy))</Copyright>
+        <PackageProjectUrl>https://github.com/nats-io/nats.net.v2</PackageProjectUrl>
         <RepositoryUrl>$(PackageProjectUrl)</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
-        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageLicenseFile>LICENSE</PackageLicenseFile>
         <PackageIcon>Icon.png</PackageIcon>
         <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)opensource.snk</AssemblyOriginatorKeyFile>
     </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="LICENSE" Pack="true" PackagePath=""/>
+    </ItemGroup>
 </Project>
