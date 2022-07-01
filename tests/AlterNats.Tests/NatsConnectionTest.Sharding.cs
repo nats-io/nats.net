@@ -3,10 +3,11 @@
 public partial class NatsConnectionTest
 {
     // TODO:do.
-    [Fact]
-    public async Task ConnectionPoolTest()
+    [Theory]
+    [ClassData(typeof(TransportTypeGenerator))]
+    public async Task ConnectionPoolTest(TransportType transportType)
     {
-        await using var server = new NatsServer(output);
+        await using var server = new NatsServer(output, transportType);
 
         var conn = server.CreatePooledClientConnection();
 
@@ -20,15 +21,16 @@ public partial class NatsConnectionTest
         conn.GetConnections().ToArray().Length.ShouldBe(4);
         new[] { a, b, c, d, e }.Distinct().Count().Should().Be(4);
     }
-
-    [Fact]
-    public async Task ShardingConnectionTest()
+    [Theory]
+    [ClassData(typeof(TransportTypeGenerator))]
+    public async Task ShardingConnectionTest(TransportType transportType)
     {
-        await using var server1 = new NatsServer(output);
-        await using var server2 = new NatsServer(output);
-        await using var server3 = new NatsServer(output);
+        await using var server1 = new NatsServer(output, transportType);
+        await using var server2 = new NatsServer(output, transportType);
+        await using var server3 = new NatsServer(output, transportType);
 
-        var urls = new[] { server1.Port, server2.Port, server3.Port }.Select(x => $"nats://localhost:{x}").ToArray();
+        var urls = new[] { server1.Ports.ServerPort, server2.Ports.ServerPort, server3.Ports.ServerPort }
+            .Select(x => $"nats://localhost:{x}").ToArray();
         var shardedConnection = new NatsShardingConnection(1, NatsOptions.Default, urls);
 
 

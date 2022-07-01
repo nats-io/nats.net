@@ -1,13 +1,4 @@
-﻿using Cysharp.Diagnostics;
-using MessagePack;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Sockets;
-using System.Runtime.InteropServices;
-using System.Threading;
-using System.Threading.Tasks;
-using Xunit.Abstractions;
+﻿using MessagePack;
 
 namespace AlterNats.Tests;
 
@@ -20,10 +11,11 @@ public partial class NatsConnectionTest
         this.output = output;
     }
 
-    [Fact]
-    public async Task SimplePubSubTest()
+    [Theory]
+    [ClassData(typeof(TransportTypeGenerator))]
+    public async Task SimplePubSubTest(TransportType transportType)
     {
-        await using var server = new NatsServer(output);
+        await using var server = new NatsServer(output, transportType);
 
         await using var subConnection = server.CreateClientConnection();
         await using var pubConnection = server.CreateClientConnection();
@@ -53,10 +45,11 @@ public partial class NatsConnectionTest
         list.ShouldEqual(0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
     }
 
-    [Fact]
-    public async Task EncodingTest()
+    [Theory]
+    [ClassData(typeof(TransportTypeGenerator))]
+    public async Task EncodingTest(TransportType transportType)
     {
-        await using var server = new NatsServer(output);
+        await using var server = new NatsServer(output, transportType);
 
         var serializer1 = NatsOptions.Default.Serializer;
         var serializer2 = new MessagePackNatsSerializer();
@@ -91,10 +84,11 @@ public partial class NatsConnectionTest
         }
     }
 
-    [Fact]
-    public async Task RequestTest()
+    [Theory]
+    [ClassData(typeof(TransportTypeGenerator))]
+    public async Task RequestTest(TransportType transportType)
     {
-        await using var server = new NatsServer(output);
+        await using var server = new NatsServer(output, transportType);
 
         var options = NatsOptions.Default with { RequestTimeout = TimeSpan.FromSeconds(5) };
         await using var subConnection = server.CreateClientConnection(options);
@@ -126,10 +120,16 @@ public partial class NatsConnectionTest
         });
     }
 
-    [Fact]
-    public async Task ReconnectSingleTest()
+    [Theory]
+    [ClassData(typeof(TransportTypeGenerator))]
+    public async Task ReconnectSingleTest(TransportType transportType)
     {
-        await using var server = new NatsServer(output);
+        using var ports = new NatsServerPorts(new NatsServerPortOptions
+        {
+            WebSocket = transportType == TransportType.WebSocket,
+            ServerDisposeReturnsPorts = false
+        });
+        await using var server = new NatsServer(output, transportType, ports);
         var key = Guid.NewGuid().ToString();
 
         await using var subConnection = server.CreateClientConnection();
@@ -172,7 +172,7 @@ public partial class NatsConnectionTest
 
         // start new nats server on same port
         output.WriteLine("START NEW SERVER");
-        await using var newServer = new NatsServer(output, server.Port);
+        await using var newServer = new NatsServer(output, transportType, ports);
         await subConnection.ConnectAsync(); // wait open again
         await pubConnection.ConnectAsync(); // wait open again
 
@@ -184,10 +184,11 @@ public partial class NatsConnectionTest
         list.ShouldEqual(100, 200, 300, 400, 500);
     }
 
-    [Fact(Timeout = 15000)]
-    public async Task ReconnectClusterTest()
+    [Theory(Timeout = 15000)]
+    [ClassData(typeof(TransportTypeGenerator))]
+    public async Task ReconnectClusterTest(TransportType transportType)
     {
-        await using var cluster = new NatsCluster(output);
+        await using var cluster = new NatsCluster(output, transportType);
         await Task.Delay(TimeSpan.FromSeconds(5)); // wait for cluster completely connected.
 
         var key = Guid.NewGuid().ToString();
@@ -233,13 +234,13 @@ public partial class NatsConnectionTest
 
         var disconnectSignal = connection1.ConnectionDisconnectedAsAwaitable(); // register disconnect before kill
 
-        output.WriteLine($"TRY KILL SERVER1 Port:{cluster.Server1.Port}");
+        output.WriteLine($"TRY KILL SERVER1 Port:{cluster.Server1.Ports.ServerPort}");
         await cluster.Server1.DisposeAsync(); // process kill
         await disconnectSignal;
 
         await connection1.ConnectAsync(); // wait for reconnect complete.
 
-        connection1.ServerInfo!.Port.Should().BeOneOf(cluster.Server2.Port, cluster.Server3.Port);
+        connection1.ServerInfo!.Port.Should().BeOneOf(cluster.Server2.Ports.ServerPort, cluster.Server3.Ports.ServerPort);
 
         await connection2.PublishAsync(key, 400);
         await connection2.PublishAsync(key, 500);

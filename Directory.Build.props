@@ -2,25 +2,9 @@
     <PropertyGroup>
         <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>
-        <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <NoWarn>$(NoWarn);CS1591</NoWarn>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <SignAssembly>true</SignAssembly>
         <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)opensource.snk</AssemblyOriginatorKeyFile>
-
-        <!-- NuGet Packaging -->
-        <PackageVersion>$(Version)</PackageVersion>
-        <Company>CNCF</Company>
-        <Authors>The NATS Authors</Authors>
-        <Copyright>Copyright © The NATS Authors 2016-$([System.DateTime]::Now.ToString(yyyy))</Copyright>
-        <PackageProjectUrl>https://github.com/nats-io/nats.net.v2</PackageProjectUrl>
-        <RepositoryUrl>$(PackageProjectUrl)</RepositoryUrl>
-        <RepositoryType>git</RepositoryType>
-        <PackageLicenseFile>LICENSE</PackageLicenseFile>
-        <PackageIcon>Icon.png</PackageIcon>
-        <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)opensource.snk</AssemblyOriginatorKeyFile>
     </PropertyGroup>
-
-    <ItemGroup>
-        <None Include="LICENSE" Pack="true" PackagePath=""/>
-    </ItemGroup>
 </Project>

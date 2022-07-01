@@ -153,7 +153,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
 
                 if (uri.IsWebSocket)
                 {
-                    logger.LogInformation("Try to connect NATS {0}", uri.Uri);
+                    logger.LogInformation("Try to connect NATS ws://{0}:{1}", uri.Host, uri.Port);
                     var conn = new WebSocketConnection();
                     await conn.ConnectAsync(uri.Uri, Options.ConnectTimeout).ConfigureAwait(false);
                     this.socket = conn;
@@ -171,7 +171,14 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Fail to connect NATS {0}:{1}.", uri.Host, uri.Port);
+                if (uri.IsWebSocket)
+                {
+                    logger.LogInformation("Fail to connect NATS ws://{0}:{1}", uri.Host, uri.Port);
+                }
+                else
+                {
+                    logger.LogError(ex, "Fail to connect NATS {0}:{1}.", uri.Host, uri.Port);
+                }
             }
         }
         if (this.socket == null)
@@ -289,9 +296,19 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
             await socket.DisposeAsync().ConfigureAwait(false);
 
             NatsUri[] urls = Array.Empty<NatsUri>();
+            var scheme = "";
+            if (this.currentConnectUri?.IsWebSocket == true)
+            {
+                scheme = this.currentConnectUri.IsSecure switch
+                {
+                    true => "wss://",
+                    false => "ws://"
+                };
+            }
+
             if (Options.NoRandomize)
             {
-                urls = this.ServerInfo?.ClientConnectUrls?.Select(x => new NatsUri(x)).Distinct().ToArray() ?? Array.Empty<NatsUri>();
+                urls = this.ServerInfo?.ClientConnectUrls?.Select(x => new NatsUri(scheme + x)).Distinct().ToArray() ?? Array.Empty<NatsUri>();
                 if (urls.Length == 0)
                 {
                     urls = Options.GetSeedUris();
@@ -299,7 +316,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
             }
             else
             {
-                urls = this.ServerInfo?.ClientConnectUrls?.Select(x => new NatsUri(x)).OrderBy(_ => Guid.NewGuid()).Distinct().ToArray() ?? Array.Empty<NatsUri>();
+                urls = this.ServerInfo?.ClientConnectUrls?.Select(x => new NatsUri(scheme + x)).OrderBy(_ => Guid.NewGuid()).Distinct().ToArray() ?? Array.Empty<NatsUri>();
                 if (urls.Length == 0)
                 {
                     urls = Options.GetSeedUris();
