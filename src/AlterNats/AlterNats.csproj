@@ -9,6 +9,7 @@
         <!-- NuGet Packaging -->
         <PackageTags>pubsub;messaging</PackageTags>
         <Description>An alternative high performance NATS client for .NET.</Description>
+        <IsPackable>true</IsPackable>
     </PropertyGroup>
 
     <ItemGroup>

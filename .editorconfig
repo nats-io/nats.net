@@ -1,10 +1,15 @@
 ﻿root = true
 
 [*]
+indent_style = space
 insert_final_newline = true
 indent_style = space
-indent_size = 4
 trim_trailing_whitespace = true
+
+[*.{sh,yaml,yml,rules}]
+charset = utf-8
+indent_size = 2
+end_of_line = lf
 
 [*{_AssemblyInfo.cs,.notsupported.cs}]
 generated_code = true
@@ -12,6 +17,7 @@ generated_code = true
 # C# files
 [*.cs]
 charset = utf-8-bom
+indent_size = 4
 
 csharp_style_namespace_declarations = file_scoped
 dotnet_style_require_accessibility_modifiers = never

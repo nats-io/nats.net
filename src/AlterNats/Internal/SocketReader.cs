@@ -1,7 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using System.Buffers;
 using System.Diagnostics;
-using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 
 namespace AlterNats.Internal;
@@ -9,7 +8,7 @@ namespace AlterNats.Internal;
 // When socket is closed/disposed, operation throws SocketClosedException
 internal sealed class SocketReader
 {
-    TcpConnection socket;
+    ISocketConnection socketConnection;
 
     Memory<byte> availableMemory;
     readonly int minimumBufferSize;
@@ -19,9 +18,9 @@ internal sealed class SocketReader
     readonly ILogger<SocketReader> logger;
     readonly bool isTraceLogging;
 
-    public SocketReader(TcpConnection socket, int minimumBufferSize, ConnectionStatsCounter counter, ILoggerFactory loggerFactory)
+    public SocketReader(ISocketConnection socketConnection, int minimumBufferSize, ConnectionStatsCounter counter, ILoggerFactory loggerFactory)
     {
-        this.socket = socket;
+        this.socketConnection = socketConnection;
         this.minimumBufferSize = minimumBufferSize;
         this.counter = counter;
         this.logger = loggerFactory.CreateLogger<SocketReader>();
@@ -43,11 +42,11 @@ internal sealed class SocketReader
             int read;
             try
             {
-                read = await socket.ReceiveAsync(availableMemory, SocketFlags.None).ConfigureAwait(false);
+                read = await socketConnection.ReceiveAsync(availableMemory).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                socket.SignalDisconnected(ex);
+                socketConnection.SignalDisconnected(ex);
                 throw new SocketClosedException(ex);
             }
 
@@ -60,7 +59,7 @@ internal sealed class SocketReader
             if (read == 0)
             {
                 var ex = new SocketClosedException(null);
-                socket.SignalDisconnected(ex);
+                socketConnection.SignalDisconnected(ex);
                 throw ex;
             }
             totalRead += read;
@@ -86,11 +85,11 @@ internal sealed class SocketReader
             int read;
             try
             {
-                read = await socket.ReceiveAsync(availableMemory, SocketFlags.None).ConfigureAwait(false);
+                read = await socketConnection.ReceiveAsync(availableMemory).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                socket.SignalDisconnected(ex);
+                socketConnection.SignalDisconnected(ex);
                 throw new SocketClosedException(ex);
             }
 
@@ -103,7 +102,7 @@ internal sealed class SocketReader
             if (read == 0)
             {
                 var ex = new SocketClosedException(null);
-                socket.SignalDisconnected(ex);
+                socketConnection.SignalDisconnected(ex);
                 throw ex;
             }
 
