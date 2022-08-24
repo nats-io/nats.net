@@ -12,7 +12,7 @@ internal sealed class SocketClosedException : Exception
     }
 }
 
-internal sealed class TcpConnection : IAsyncDisposable
+internal sealed class TcpConnection : ISocketConnection
 {
     readonly Socket socket;
     readonly TaskCompletionSource<Exception> waitForClosedSource = new();
@@ -74,15 +74,15 @@ internal sealed class TcpConnection : IAsyncDisposable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public ValueTask<int> SendAsync(ReadOnlyMemory<byte> buffer, SocketFlags socketFlags)
+    public ValueTask<int> SendAsync(ReadOnlyMemory<byte> buffer)
     {
-        return socket.SendAsync(buffer, socketFlags, CancellationToken.None);
+        return socket.SendAsync(buffer, SocketFlags.None, CancellationToken.None);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public ValueTask<int> ReceiveAsync(Memory<byte> buffer, SocketFlags socketFlags)
+    public ValueTask<int> ReceiveAsync(Memory<byte> buffer)
     {
-        return socket.ReceiveAsync(buffer, socketFlags, CancellationToken.None);
+        return socket.ReceiveAsync(buffer, SocketFlags.None, CancellationToken.None);
     }
 
     public ValueTask AbortConnectionAsync(CancellationToken cancellationToken)

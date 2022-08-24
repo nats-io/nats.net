@@ -7,6 +7,7 @@
         <!-- NuGet Packaging -->
         <PackageTags>pubsub;messaging</PackageTags>
         <Description>MessagePack serialization support for AlterNats.</Description>
+        <IsPackable>true</IsPackable>
     </PropertyGroup>
 
     <ItemGroup>

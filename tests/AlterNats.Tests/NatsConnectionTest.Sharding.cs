@@ -1,12 +1,12 @@
 ﻿namespace AlterNats.Tests;
 
-public partial class NatsConnectionTest
+public abstract partial class NatsConnectionTest
 {
     // TODO:do.
     [Fact]
     public async Task ConnectionPoolTest()
     {
-        await using var server = new NatsServer(output);
+        await using var server = new NatsServer(output, transportType);
 
         var conn = server.CreatePooledClientConnection();
 
@@ -24,11 +24,12 @@ public partial class NatsConnectionTest
     [Fact]
     public async Task ShardingConnectionTest()
     {
-        await using var server1 = new NatsServer(output);
-        await using var server2 = new NatsServer(output);
-        await using var server3 = new NatsServer(output);
+        await using var server1 = new NatsServer(output, transportType);
+        await using var server2 = new NatsServer(output, transportType);
+        await using var server3 = new NatsServer(output, transportType);
 
-        var urls = new[] { server1.Port, server2.Port, server3.Port }.Select(x => $"nats://localhost:{x}").ToArray();
+        var urls = new[] { server1.Ports.ServerPort, server2.Ports.ServerPort, server3.Ports.ServerPort }
+            .Select(x => $"nats://localhost:{x}").ToArray();
         var shardedConnection = new NatsShardingConnection(1, NatsOptions.Default, urls);
 
 

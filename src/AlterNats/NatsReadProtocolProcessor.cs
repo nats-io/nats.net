@@ -13,7 +13,7 @@ namespace AlterNats;
 
 internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
 {
-    readonly TcpConnection socket;
+    readonly ISocketConnection socketConnection;
     readonly NatsConnection connection;
     readonly SocketReader socketReader;
     readonly Task readLoop;
@@ -24,16 +24,16 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
     readonly bool isEnabledTraceLogging;
     int disposed;
 
-    public NatsReadProtocolProcessor(TcpConnection socket, NatsConnection connection, TaskCompletionSource waitForInfoSignal, TaskCompletionSource waitForPongOrErrorSignal)
+    public NatsReadProtocolProcessor(ISocketConnection socketConnection, NatsConnection connection, TaskCompletionSource waitForInfoSignal, TaskCompletionSource waitForPongOrErrorSignal)
     {
-        this.socket = socket;
+        this.socketConnection = socketConnection;
         this.connection = connection;
         this.logger = connection.Options.LoggerFactory.CreateLogger<NatsReadProtocolProcessor>();
         this.isEnabledTraceLogging = logger.IsEnabled(LogLevel.Trace);
         this.waitForInfoSignal = waitForInfoSignal;
         this.waitForPongOrErrorSignal = waitForPongOrErrorSignal;
         this.pingCommands = new ConcurrentQueue<AsyncPingCommand>();
-        this.socketReader = new SocketReader(socket, connection.Options.ReaderBufferSize, connection.counter, connection.Options.LoggerFactory);
+        this.socketReader = new SocketReader(socketConnection, connection.Options.ReaderBufferSize, connection.counter, connection.Options.LoggerFactory);
         this.readLoop = Task.Run(ReadLoopAsync);
     }
 
@@ -134,7 +134,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                             if (payloadSlice.Length < (payloadLength + 2)) // slice required \r\n
                             {
                                 socketReader.AdvanceTo(payloadBegin);
-                                buffer = await socketReader.ReadAtLeastAsync(payloadLength + 2).ConfigureAwait(false); // payload + \r\n
+                                buffer = await socketReader.ReadAtLeastAsync(payloadLength - (int)payloadSlice.Length + 2).ConfigureAwait(false); // payload + \r\n
                                 payloadSlice = buffer.Slice(0, payloadLength);
                             }
                             else
