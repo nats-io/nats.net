@@ -25,7 +25,7 @@ internal sealed class WebSocketConnection : ISocketConnection
     // socket is disposed:
     //  throws DisposedException
 
-    // return ValueTask directly for performance, not care exception and signal-disconected.
+    // return ValueTask directly for performance, not care exception and signal-disconnected.
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Task ConnectAsync(Uri uri, CancellationToken cancellationToken)
@@ -73,8 +73,10 @@ internal sealed class WebSocketConnection : ISocketConnection
 
     public ValueTask AbortConnectionAsync(CancellationToken cancellationToken)
     {
+        // ClientWebSocket.Abort() doesn't accept a cancellation token, so check at the beginning of this method
+        cancellationToken.ThrowIfCancellationRequested();
         socket.Abort();
-        return ValueTask.CompletedTask;
+        return default;
     }
 
     public ValueTask DisposeAsync()

@@ -354,6 +354,7 @@ public sealed record NatsOptions
 (
     string Url,
     ConnectOptions ConnectOptions,
+    TlsOptions: TlsOptions,
     INatsSerializer Serializer,
     ILoggerFactory LoggerFactory,
     int WriterBufferSize,
@@ -373,6 +374,7 @@ public sealed record NatsOptions
 public static NatsOptions Default = new NatsOptions(
     Url: "nats://localhost:4222",
     ConnectOptions: ConnectOptions.Default,
+    TlsOptions: TlsOptions.Default,
     Serializer: new JsonNatsSerializer(new JsonSerializerOptions() { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull }),
     LoggerFactory: NullLoggerFactory.Instance,
     WriterBufferSize: 65534,
@@ -465,6 +467,31 @@ public sealed record ConnectOptions
     public bool NoResponders { get; init; } = false;
 }
 ```
+
+TlsOptions
+---
+TlsOptions are options for TLS connections.  These options do not apply to WebSocket connections.
+
+```csharp
+public sealed record ConnectOptions
+{
+    /// <summary>Path to PEM-encoded X509 Certificate</summary>
+    public string? CertFile { get; init; }
+
+    /// <summary>Path to PEM-encoded Private Key</summary>
+    public string? KeyFile { get; init; }
+
+    /// <summary>Path to PEM-encoded X509 CA Certificate</summary>
+    public string? CaFile { get; init; }
+
+    /// <summary>When true, disable TLS</summary>
+    public bool Disabled { get; init; }
+
+    /// <summary>When true, skip remote certificate verification and accept any server certificate</summary>
+    public bool InsecureSkipVerify { get; init; }
+}
+```
+
 
 Serialization
 ---
@@ -629,7 +656,6 @@ Limitation
 ---
 Currently, AlterNats is not oriented toward compatibility and comprehensiveness, specializes in performance against Core NATS. Therefore, these features are not supported.
 
-* TLS
 * JetStream
 * Header
 

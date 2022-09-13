@@ -1,11 +1,7 @@
 ﻿using AlterNats.Commands;
 using AlterNats.Internal;
 using Microsoft.Extensions.Logging;
-using System.Buffers;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Channels;
 
 namespace AlterNats;
 
@@ -312,13 +308,13 @@ public partial class NatsConnection : INatsCommand
             RequestAsyncCommand<TRequest, TResponse?> command;
             if (ConnectionState == NatsConnectionState.Open)
             {
-                command = await requestResponseManager.AddAsync<TRequest, TResponse>(key, indBoxPrefix, request, token).ConfigureAwait(false);
+                command = await requestResponseManager.AddAsync<TRequest, TResponse>(key, inboxPrefix, request, token).ConfigureAwait(false);
             }
             else
             {
                 command = await WithConnectAsync(key, request, token, static (self, key, request, token) =>
                 {
-                    return self.requestResponseManager.AddAsync<TRequest, TResponse>(key, self.indBoxPrefix, request, token);
+                    return self.requestResponseManager.AddAsync<TRequest, TResponse>(key, self.inboxPrefix, request, token);
                 }).ConfigureAwait(false);
             }
 

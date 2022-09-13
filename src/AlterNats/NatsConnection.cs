@@ -50,8 +50,9 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
     readonly ILogger<NatsConnection> logger;
     readonly ObjectPool pool;
     readonly string name;
+    readonly TimeSpan socketComponentDisposeTimeout = TimeSpan.FromSeconds(5);
     internal readonly ConnectionStatsCounter counter; // allow to call from external sources
-    internal readonly ReadOnlyMemory<byte> indBoxPrefix;
+    internal readonly ReadOnlyMemory<byte> inboxPrefix;
 
     int pongCount;
     bool isDisposed;
@@ -60,9 +61,11 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
     ISocketConnection? socket;
     CancellationTokenSource? pingTimerCancellationTokenSource;
     NatsUri? currentConnectUri;
+    NatsUri? lastSeedConnectUri;
     NatsReadProtocolProcessor? socketReader;
     NatsPipeliningWriteProtocolProcessor? socketWriter;
     TaskCompletionSource waitForOpenConnection;
+    TlsCerts? tlsCerts;
 
     public NatsOptions Options { get; }
     public NatsConnectionState ConnectionState { get; private set; }
@@ -85,18 +88,18 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
 
     public NatsConnection(NatsOptions options)
     {
-        this.Options = options;
-        this.ConnectionState = NatsConnectionState.Closed;
-        this.waitForOpenConnection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        this.pool = new ObjectPool(options.CommandPoolSize);
-        this.name = options.ConnectOptions.Name ?? "";
-        this.counter = new ConnectionStatsCounter();
-        this.writerState = new WriterState(options);
-        this.commandWriter = writerState.CommandBuffer.Writer;
-        this.subscriptionManager = new SubscriptionManager(this);
-        this.requestResponseManager = new RequestResponseManager(this, pool);
-        this.indBoxPrefix = Encoding.ASCII.GetBytes($"{options.InboxPrefix}{Guid.NewGuid()}.");
-        this.logger = options.LoggerFactory.CreateLogger<NatsConnection>();
+        Options = options;
+        ConnectionState = NatsConnectionState.Closed;
+        waitForOpenConnection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        pool = new ObjectPool(options.CommandPoolSize);
+        name = options.ConnectOptions.Name ?? "";
+        counter = new ConnectionStatsCounter();
+        writerState = new WriterState(options);
+        commandWriter = writerState.CommandBuffer.Writer;
+        subscriptionManager = new SubscriptionManager(this);
+        requestResponseManager = new RequestResponseManager(this, pool);
+        inboxPrefix = Encoding.ASCII.GetBytes($"{options.InboxPrefix}{Guid.NewGuid()}.");
+        logger = options.LoggerFactory.CreateLogger<NatsConnection>();
     }
 
     /// <summary>
@@ -104,7 +107,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
     /// </summary>
     public async ValueTask ConnectAsync()
     {
-        if (this.ConnectionState == NatsConnectionState.Open) return;
+        if (ConnectionState == NatsConnectionState.Open) return;
 
         TaskCompletionSource? waiter = null;
         lock (gate)
@@ -140,6 +143,11 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
         Debug.Assert(ConnectionState == NatsConnectionState.Connecting);
 
         var uris = Options.GetSeedUris();
+        if (Options.TlsOptions.Disabled && uris.Any(u => u.IsTls))
+            throw new NatsException($"URI {uris.First(u => u.IsTls)} requires TLS but TlsOptions.Disabled is set to true");
+        if (Options.TlsOptions.Required)
+            tlsCerts = new TlsCerts(Options.TlsOptions);
+
         foreach (var uri in uris)
         {
             try
@@ -156,16 +164,16 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
                 {
                     var conn = new WebSocketConnection();
                     await conn.ConnectAsync(uri.Uri, Options.ConnectTimeout).ConfigureAwait(false);
-                    this.socket = conn;
+                    socket = conn;
                 }
                 else
                 {
                     var conn = new TcpConnection();
                     await conn.ConnectAsync(target.Host, target.Port, Options.ConnectTimeout).ConfigureAwait(false);
-                    this.socket = conn;
+                    socket = conn;
                 }
 
-                this.currentConnectUri = uri;
+                currentConnectUri = uri;
                 break;
             }
             catch (Exception ex)
@@ -173,60 +181,34 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
                 logger.LogError(ex, "Fail to connect NATS {0}", uri);
             }
         }
-        if (this.socket == null)
+        if (socket == null)
         {
             var exception = new NatsException("can not connect uris: " + String.Join(",", uris.Select(x => x.ToString())));
             lock (gate)
             {
-                this.ConnectionState = NatsConnectionState.Closed; // allow retry connect
+                ConnectionState = NatsConnectionState.Closed; // allow retry connect
                 waitForOpenConnection.TrySetException(exception); // throw for waiter
-                this.waitForOpenConnection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                waitForOpenConnection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             }
 
             throw exception;
         }
 
         // Connected completely but still ConnectionState is Connecting(require after receive INFO).
-
-        // add CONNECT and PING command to priority lane
-        var connectCommand = AsyncConnectCommand.Create(pool, Options.ConnectOptions);
-        writerState.PriorityCommands.Add(connectCommand);
-        writerState.PriorityCommands.Add(PingCommand.Create(pool));
-
-        // Run Reader/Writer LOOP start
-        var waitForInfoSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var waitForPongOrErrorSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        this.socketWriter = new NatsPipeliningWriteProtocolProcessor(socket, writerState, pool, counter);
-        this.socketReader = new NatsReadProtocolProcessor(socket, this, waitForInfoSignal, waitForPongOrErrorSignal);
-
         try
         {
-            // before send connect, wait INFO.
-            await waitForInfoSignal.Task.ConfigureAwait(false);
-            // send COMMAND and PING
-            await connectCommand.AsValueTask().ConfigureAwait(false);
-            // receive COMMAND response(PONG or ERROR)
-            await waitForPongOrErrorSignal.Task.ConfigureAwait(false);
+            await SetupReaderWriterAsync(false).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            // can not start reader/writer
             var uri = currentConnectUri;
-
-            await socketWriter!.DisposeAsync().ConfigureAwait(false);
-            await socketReader!.DisposeAsync().ConfigureAwait(false);
-            await socket!.DisposeAsync().ConfigureAwait(false);
-            socket = null;
-            socketWriter = null;
-            socketReader = null;
             currentConnectUri = null;
-
             var exception = new NatsException("can not start to connect nats server: " + uri, ex);
             lock (gate)
             {
-                this.ConnectionState = NatsConnectionState.Closed; // allow retry connect
+                ConnectionState = NatsConnectionState.Closed; // allow retry connect
                 waitForOpenConnection.TrySetException(exception); // throw for waiter
-                this.waitForOpenConnection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                waitForOpenConnection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             }
             throw exception;
         }
@@ -235,12 +217,104 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
         {
             var url = currentConnectUri;
             logger.LogInformation("Connect succeed {0}, NATS {1}", name, url);
-            this.ConnectionState = NatsConnectionState.Open;
-            this.pingTimerCancellationTokenSource = new CancellationTokenSource();
+            ConnectionState = NatsConnectionState.Open;
+            pingTimerCancellationTokenSource = new CancellationTokenSource();
             StartPingTimer(pingTimerCancellationTokenSource.Token);
-            this.waitForOpenConnection.TrySetResult();
-            Task.Run(ReconnectLoop);
+            waitForOpenConnection.TrySetResult();
+            _ = Task.Run(ReconnectLoop);
             ConnectionOpened?.Invoke(this, url?.ToString() ?? "");
+        }
+    }
+
+    async ValueTask SetupReaderWriterAsync(bool reconnect)
+    {
+        if (currentConnectUri!.IsSeed)
+            lastSeedConnectUri = currentConnectUri;
+
+        // add CONNECT and PING command to priority lane
+        writerState.PriorityCommands.Clear();
+        var connectCommand = AsyncConnectCommand.Create(pool, Options.ConnectOptions);
+        writerState.PriorityCommands.Add(connectCommand);
+        writerState.PriorityCommands.Add(PingCommand.Create(pool));
+
+        if (reconnect)
+        {
+            // Add SUBSCRIBE command to priority lane
+            var subscribeCommand =
+                AsyncSubscribeBatchCommand.Create(pool, subscriptionManager.GetExistingSubscriptions());
+            writerState.PriorityCommands.Add(subscribeCommand);
+        }
+
+        // create the socket reader
+        var waitForInfoSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var waitForPongOrErrorSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var infoParsedSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        socketReader = new NatsReadProtocolProcessor(socket!, this, waitForInfoSignal, waitForPongOrErrorSignal, infoParsedSignal.Task);
+
+        try
+        {
+            // wait for INFO
+            await waitForInfoSignal.Task.ConfigureAwait(false);
+
+            // check to see if we should upgrade to TLS
+            if (socket is TcpConnection tcpConnection)
+            {
+                if (Options.TlsOptions.Disabled && ServerInfo!.TlsRequired)
+                    throw new NatsException(
+                        $"Server {currentConnectUri} requires TLS but TlsOptions.Disabled is set to true");
+
+                if (Options.TlsOptions.Required && !ServerInfo!.TlsRequired && !ServerInfo.TlsAvailable)
+                    throw new NatsException(
+                        $"Server {currentConnectUri} does not support TLS but TlsOptions.Disabled is set to true");
+
+                if (Options.TlsOptions.Required || ServerInfo!.TlsRequired || ServerInfo.TlsAvailable)
+                {
+                    // do TLS upgrade
+                    // if the current URI is not a seed URI and is not a DNS hostname, check the server cert against the
+                    // last seed hostname if it was a DNS hostname
+                    var targetHost = currentConnectUri.Host;
+                    if (!currentConnectUri.IsSeed
+                        && Uri.CheckHostName(targetHost) != UriHostNameType.Dns
+                        && Uri.CheckHostName(lastSeedConnectUri!.Host) == UriHostNameType.Dns)
+                    {
+                        targetHost = lastSeedConnectUri.Host;
+                    }
+
+                    logger.LogDebug("Perform TLS Upgrade to " + targetHost);
+
+                    // cancel INFO parsed signal and dispose current socket reader
+                    infoParsedSignal.SetCanceled();
+                    await socketReader!.DisposeAsync().ConfigureAwait(false);
+                    socketReader = null;
+
+                    // upgrade TcpConnection to SslConnection
+                    var sslConnection = tcpConnection.UpgradeToSslStreamConnection(Options.TlsOptions, tlsCerts);
+                    await sslConnection.AuthenticateAsClientAsync(targetHost).ConfigureAwait(false);
+                    socket = sslConnection;
+
+                    // create new socket reader
+                    waitForPongOrErrorSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                    infoParsedSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                    socketReader = new NatsReadProtocolProcessor(socket, this, waitForInfoSignal, waitForPongOrErrorSignal, infoParsedSignal.Task);
+                }
+            }
+
+            // mark INFO as parsed
+            infoParsedSignal.SetResult();
+
+            // create the socket writer
+            socketWriter = new NatsPipeliningWriteProtocolProcessor(socket!, writerState, pool, counter);
+
+            // wait for COMMAND to send
+            await connectCommand.AsValueTask().ConfigureAwait(false);
+            // receive COMMAND response (PONG or ERROR)
+            await waitForPongOrErrorSignal.Task.ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            infoParsedSignal.TrySetCanceled();
+            await DisposeSocketAsync(true).ConfigureAwait(false);
+            throw;
         }
     }
 
@@ -254,63 +328,30 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
             logger.LogTrace($"Detect connection {name} closed, start to cleanup current connection and start to reconnect.");
             lock (gate)
             {
-                this.ConnectionState = NatsConnectionState.Reconnecting;
-                this.waitForOpenConnection.TrySetCanceled();
-                this.waitForOpenConnection = new TaskCompletionSource();
-                this.pingTimerCancellationTokenSource?.Cancel();
-                this.requestResponseManager.Reset();
+                ConnectionState = NatsConnectionState.Reconnecting;
+                waitForOpenConnection.TrySetCanceled();
+                waitForOpenConnection = new TaskCompletionSource();
+                pingTimerCancellationTokenSource?.Cancel();
+                requestResponseManager.Reset();
             }
 
             // Invoke after state changed
             ConnectionDisconnected?.Invoke(this, currentConnectUri?.ToString() ?? "");
 
-            // Cleanup current reader/writer
-            {
-                // reader is not share state, can dispose asynchronously.
-                var reader = socketReader!;
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        await reader.DisposeAsync().ConfigureAwait(false);
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogError(ex, "Error occured when disposing socket reader loop.");
-                    }
-                });
+            // Cleanup current socket
+            await DisposeSocketAsync(true).ConfigureAwait(false);
 
-                // writer's internal buffer/channel is not thread-safe, must wait complete.
-                await socketWriter!.DisposeAsync().ConfigureAwait(false);
-            }
 
-            // Dispose current and create new
-            await socket.DisposeAsync().ConfigureAwait(false);
+            var defaultScheme = currentConnectUri!.Uri.Scheme;
+            var urls = (Options.NoRandomize
+                ? ServerInfo?.ClientConnectUrls?.Select(x => new NatsUri(x, false, defaultScheme)).Distinct().ToArray()
+                : ServerInfo?.ClientConnectUrls?.Select(x => new NatsUri(x, false, defaultScheme)).OrderBy(_ => Guid.NewGuid()).Distinct().ToArray())
+                    ?? Array.Empty<NatsUri>();
+            if (urls.Length == 0)
+                urls = Options.GetSeedUris();
 
-            NatsUri[] urls;
-            var defaultScheme = currentConnectUri?.Uri.Scheme ?? NatsUri.DefaultScheme;
-            if (Options.NoRandomize)
-            {
-                urls = this.ServerInfo?.ClientConnectUrls?.Select(x => new NatsUri(x, defaultScheme)).Distinct().ToArray() ?? Array.Empty<NatsUri>();
-                if (urls.Length == 0)
-                {
-                    urls = Options.GetSeedUris();
-                }
-            }
-            else
-            {
-                urls = this.ServerInfo?.ClientConnectUrls?.Select(x => new NatsUri(x, defaultScheme)).OrderBy(_ => Guid.NewGuid()).Distinct().ToArray() ?? Array.Empty<NatsUri>();
-                if (urls.Length == 0)
-                {
-                    urls = Options.GetSeedUris();
-                }
-            }
-
-            if (this.currentConnectUri != null)
-            {
-                // add last.
-                urls = urls.Where(x => x != currentConnectUri).Append(currentConnectUri).ToArray();
-            }
+            // add last.
+            urls = urls.Where(x => x != currentConnectUri).Append(currentConnectUri).ToArray();
 
             currentConnectUri = null;
             var urlEnumerator = urls.AsEnumerable().GetEnumerator();
@@ -333,42 +374,25 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
                     {
                         var conn = new WebSocketConnection();
                         await conn.ConnectAsync(url.Uri, Options.ConnectTimeout).ConfigureAwait(false);
-                        this.socket = conn;
+                        socket = conn;
                     }
                     else
                     {
                         var conn = new TcpConnection();
                         await conn.ConnectAsync(target.Host, target.Port, Options.ConnectTimeout).ConfigureAwait(false);
-                        this.socket = conn;
+                        socket = conn;
                     }
 
-                    this.currentConnectUri = url;
+                    currentConnectUri = url;
                 }
                 else
                 {
+                    urlEnumerator.Dispose();
                     urlEnumerator = urls.AsEnumerable().GetEnumerator();
                     goto CONNECT_AGAIN;
                 }
 
-                // add CONNECT and PING command to priority lane
-                var connectCommand = AsyncConnectCommand.Create(pool, Options.ConnectOptions);
-                writerState.PriorityCommands.Add(connectCommand);
-                writerState.PriorityCommands.Add(PingCommand.Create(pool));
-
-                // Add SUBSCRIBE command to priority lane
-                var subscribeCommand = AsyncSubscribeBatchCommand.Create(pool, subscriptionManager.GetExistingSubscriptions());
-                writerState.PriorityCommands.Add(subscribeCommand);
-
-                // Run Reader/Writer LOOP start
-                var waitForInfoSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                var waitForPongOrErrorSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                this.socketWriter = new NatsPipeliningWriteProtocolProcessor(socket, writerState, pool, counter);
-                this.socketReader = new NatsReadProtocolProcessor(socket, this, waitForInfoSignal, waitForPongOrErrorSignal);
-
-                await waitForInfoSignal.Task.ConfigureAwait(false);
-                await connectCommand.AsValueTask().ConfigureAwait(false);
-                await waitForPongOrErrorSignal.Task.ConfigureAwait(false);
-                await subscribeCommand.AsValueTask().ConfigureAwait(false);
+                await SetupReaderWriterAsync(true).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -376,23 +400,6 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
                 {
                     logger.LogError(ex, "Fail to connect NATS {0}", url);
                 }
-
-                if (socketWriter != null)
-                {
-                    await socketWriter.DisposeAsync().ConfigureAwait(false);
-                }
-                if (socketReader != null)
-                {
-                    await socketReader.DisposeAsync().ConfigureAwait(false);
-                }
-                if (socket != null)
-                {
-                    await socket.DisposeAsync().ConfigureAwait(false);
-                }
-                socket = null;
-                socketWriter = null;
-                socketReader = null;
-                writerState.PriorityCommands.Clear();
 
                 ReconnectFailed?.Invoke(this, url?.ToString() ?? "");
                 await WaitWithJitterAsync().ConfigureAwait(false);
@@ -402,11 +409,11 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
             lock (gate)
             {
                 logger.LogInformation("Connect succeed {0}, NATS {1}", name, url);
-                this.ConnectionState = NatsConnectionState.Open;
-                this.pingTimerCancellationTokenSource = new CancellationTokenSource();
+                ConnectionState = NatsConnectionState.Open;
+                pingTimerCancellationTokenSource = new CancellationTokenSource();
                 StartPingTimer(pingTimerCancellationTokenSource.Token);
-                this.waitForOpenConnection.TrySetResult();
-                Task.Run(ReconnectLoop);
+                waitForOpenConnection.TrySetResult();
+                _ = Task.Run(ReconnectLoop);
                 ConnectionOpened?.Invoke(this, url?.ToString() ?? "");
             }
         }
@@ -523,6 +530,56 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
         Interlocked.Exchange(ref pongCount, 0);
     }
 
+    // catch and log all exceptions, enforcing the socketComponentDisposeTimeout
+    async ValueTask DisposeSocketComponentAsync(IAsyncDisposable component, string description)
+    {
+        try
+        {
+            var dispose = component.DisposeAsync();
+            if (!dispose.IsCompletedSuccessfully)
+                await dispose.AsTask().WaitAsync(socketComponentDisposeTimeout).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, $"Error occured when disposing {description}.");
+        }
+    }
+
+    // Dispose Writer(Drain prepared queues -> write to socket)
+    // Close Socket
+    // Dispose Reader(Drain read buffers but no reads more)
+    async ValueTask DisposeSocketAsync(bool asyncReaderDispose)
+    {
+        // writer's internal buffer/channel is not thread-safe, must wait until complete.
+        if (socketWriter != null)
+        {
+            await DisposeSocketComponentAsync(socketWriter, "socket writer").ConfigureAwait(false);
+            socketWriter = null;
+        }
+
+        if (socket != null)
+        {
+            await DisposeSocketComponentAsync(socket, "socket").ConfigureAwait(false);
+            socket = null;
+        }
+
+        if (socketReader != null)
+        {
+            if (asyncReaderDispose)
+            {
+                // reader is not share state, can dispose asynchronously.
+                var reader = socketReader;
+                _ = Task.Run(() => DisposeSocketComponentAsync(reader, "socket reader asynchronously"));
+            }
+            else
+            {
+                await DisposeSocketComponentAsync(socketReader, "socket reader").ConfigureAwait(false);
+            }
+
+            socketReader = null;
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (!isDisposed)
@@ -530,25 +587,8 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
             isDisposed = true;
             logger.Log(LogLevel.Information, $"Disposing connection {name}.");
 
-            // Dispose Writer(Drain prepared queues -> write to socket)
-            // Close Socket
-            // Dispose Reader(Drain read buffers but no reads more)
-            if (socketWriter != null)
-            {
-                await socketWriter.DisposeAsync().ConfigureAwait(false);
-            }
-            if (socket != null)
-            {
-                await socket.DisposeAsync().ConfigureAwait(false);
-            }
-            if (socketReader != null)
-            {
-                await socketReader.DisposeAsync().ConfigureAwait(false);
-            }
-            if (pingTimerCancellationTokenSource != null)
-            {
-                pingTimerCancellationTokenSource.Cancel();
-            }
+            await DisposeSocketAsync(false).ConfigureAwait(false);
+            pingTimerCancellationTokenSource?.Cancel();
             foreach (var item in writerState.PendingPromises)
             {
                 item.SetCanceled(CancellationToken.None);

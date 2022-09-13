@@ -127,12 +127,12 @@ public abstract partial class NatsConnectionTest
     [Fact]
     public async Task ReconnectSingleTest()
     {
-        using var ports = new NatsServerPorts(new NatsServerPortOptions
+        using var options = new NatsServerOptions
         {
-            WebSocket = transportType == TransportType.WebSocket,
+            EnableWebSocket = transportType == TransportType.WebSocket,
             ServerDisposeReturnsPorts = false
-        });
-        await using var server = new NatsServer(output, transportType, ports);
+        };
+        await using var server = new NatsServer(output, transportType, options);
         var key = Guid.NewGuid().ToString();
 
         await using var subConnection = server.CreateClientConnection();
@@ -176,7 +176,7 @@ public abstract partial class NatsConnectionTest
 
         // start new nats server on same port
         output.WriteLine("START NEW SERVER");
-        await using var newServer = new NatsServer(output, transportType, ports);
+        await using var newServer = new NatsServer(output, transportType, options);
         await subConnection.ConnectAsync(); // wait open again
         await pubConnection.ConnectAsync(); // wait open again
 
@@ -211,9 +211,9 @@ public abstract partial class NatsConnectionTest
         output.WriteLine("Server3 ClientConnectUrls:" +
                          String.Join(", ", connection3.ServerInfo?.ClientConnectUrls ?? Array.Empty<string>()));
 
-        connection1.ServerInfo!.ClientConnectUrls!.Select(x => new NatsUri(x).Port).Distinct().Count().ShouldBe(3);
-        connection2.ServerInfo!.ClientConnectUrls!.Select(x => new NatsUri(x).Port).Distinct().Count().ShouldBe(3);
-        connection3.ServerInfo!.ClientConnectUrls!.Select(x => new NatsUri(x).Port).Distinct().Count().ShouldBe(3);
+        connection1.ServerInfo!.ClientConnectUrls!.Select(x => new NatsUri(x, true).Port).Distinct().Count().ShouldBe(3);
+        connection2.ServerInfo!.ClientConnectUrls!.Select(x => new NatsUri(x, true).Port).Distinct().Count().ShouldBe(3);
+        connection3.ServerInfo!.ClientConnectUrls!.Select(x => new NatsUri(x, true).Port).Distinct().Count().ShouldBe(3);
 
         var list = new List<int>();
         var waitForReceive300 = new WaitSignal();
@@ -241,14 +241,14 @@ public abstract partial class NatsConnectionTest
 
         var disconnectSignal = connection1.ConnectionDisconnectedAsAwaitable(); // register disconnect before kill
 
-        output.WriteLine($"TRY KILL SERVER1 Port:{cluster.Server1.Ports.ServerPort}");
+        output.WriteLine($"TRY KILL SERVER1 Port:{cluster.Server1.Options.ServerPort}");
         await cluster.Server1.DisposeAsync(); // process kill
         await disconnectSignal;
 
         await connection1.ConnectAsync(); // wait for reconnect complete.
 
         connection1.ServerInfo!.Port.Should()
-            .BeOneOf(cluster.Server2.Ports.ServerPort, cluster.Server3.Ports.ServerPort);
+            .BeOneOf(cluster.Server2.Options.ServerPort, cluster.Server3.Options.ServerPort);
 
         await connection2.PublishAsync(key, 400);
         await connection2.PublishAsync(key, 500);

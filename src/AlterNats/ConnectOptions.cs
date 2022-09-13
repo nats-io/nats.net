@@ -3,10 +3,13 @@ using System.Text.Json.Serialization;
 
 namespace AlterNats;
 
+// These connections options are serialized and sent to the server
+// Therefore, only options which the server understands should be added here
+// Client-only options should be added to NatsOptions.cs
 // https://github.com/nats-io/nats-server/blob/a23b1b7/server/client.go#L536
 public sealed record ConnectOptions
 {
-    public static ConnectOptions Default = new ConnectOptions();
+    public static readonly ConnectOptions Default = new();
 
     /// <summary>Optional boolean. If set to true, the server (version 1.2.0+) will not send originating messages from this connection to its own subscriptions. Clients should set this to true only for server supporting this feature, which is when proto in the INFO protocol is set to at least 1.</summary>
     [JsonPropertyName("echo")]
@@ -27,7 +30,7 @@ public sealed record ConnectOptions
     [JsonPropertyName("nkey")]
     public string? Nkey { get; init; } = null;
 
-    /// <summary>The JWT that identifies a user permissions and acccount.</summary>
+    /// <summary>The JWT that identifies a user permissions and account.</summary>
     [JsonPropertyName("jwt")]
     public string? JWT { get; init; } = null;
 

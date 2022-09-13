@@ -19,12 +19,13 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
     readonly Task readLoop;
     readonly TaskCompletionSource waitForInfoSignal;
     readonly TaskCompletionSource waitForPongOrErrorSignal;  // wait for initial connection
+    readonly Task infoParsed; // wait for an upgrade
     readonly ConcurrentQueue<AsyncPingCommand> pingCommands; // wait for pong
     readonly ILogger<NatsReadProtocolProcessor> logger;
     readonly bool isEnabledTraceLogging;
     int disposed;
 
-    public NatsReadProtocolProcessor(ISocketConnection socketConnection, NatsConnection connection, TaskCompletionSource waitForInfoSignal, TaskCompletionSource waitForPongOrErrorSignal)
+    public NatsReadProtocolProcessor(ISocketConnection socketConnection, NatsConnection connection, TaskCompletionSource waitForInfoSignal, TaskCompletionSource waitForPongOrErrorSignal, Task infoParsed)
     {
         this.socketConnection = socketConnection;
         this.connection = connection;
@@ -32,6 +33,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         this.isEnabledTraceLogging = logger.IsEnabled(LogLevel.Trace);
         this.waitForInfoSignal = waitForInfoSignal;
         this.waitForPongOrErrorSignal = waitForPongOrErrorSignal;
+        this.infoParsed = infoParsed;
         this.pingCommands = new ConcurrentQueue<AsyncPingCommand>();
         this.socketReader = new SocketReader(socketConnection, connection.Options.ReaderBufferSize, connection.counter, connection.Options.LoggerFactory);
         this.readLoop = Task.Run(ReadLoopAsync);
@@ -313,6 +315,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                 connection.ServerInfo = serverInfo;
                 logger.LogInformation("Received ServerInfo: {0}", serverInfo);
                 waitForInfoSignal.TrySetResult();
+                await infoParsed.ConfigureAwait(false);
                 return newBuffer.Slice(newBuffer.GetPosition(1, newPosition!.Value));
             }
             else
@@ -321,6 +324,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                 connection.ServerInfo = serverInfo;
                 logger.LogInformation("Received ServerInfo: {0}", serverInfo);
                 waitForInfoSignal.TrySetResult();
+                await infoParsed.ConfigureAwait(false);
                 return buffer.Slice(buffer.GetPosition(1, position.Value));
             }
         }
@@ -377,7 +381,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         {
             int? responseId = null;
             // Parse: _INBOX.RANDOM-GUID.ID
-            if (subject.StartsWith(connection.indBoxPrefix.Span))
+            if (subject.StartsWith(connection.inboxPrefix.Span))
             {
                 var lastIndex = subject.LastIndexOf((byte)'.');
                 if (lastIndex != -1)

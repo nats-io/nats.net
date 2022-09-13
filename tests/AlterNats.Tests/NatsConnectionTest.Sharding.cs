@@ -28,9 +28,9 @@ public abstract partial class NatsConnectionTest
         await using var server2 = new NatsServer(output, transportType);
         await using var server3 = new NatsServer(output, transportType);
 
-        var urls = new[] { server1.Ports.ServerPort, server2.Ports.ServerPort, server3.Ports.ServerPort }
-            .Select(x => $"nats://localhost:{x}").ToArray();
-        var shardedConnection = new NatsShardingConnection(1, NatsOptions.Default, urls);
+        var urls = new[] { server1, server2, server3 }
+            .Select(s => s.ClientUrl).ToArray();
+        var shardedConnection = new NatsShardingConnection(1, server1.ClientOptions(NatsOptions.Default), urls);
 
 
         var l1 = new List<int>();
