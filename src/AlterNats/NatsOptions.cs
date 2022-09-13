@@ -10,6 +10,7 @@ namespace AlterNats;
 /// </summary>
 /// <param name="Url"></param>
 /// <param name="ConnectOptions"></param>
+/// <param name="TlsOptions"></param>
 /// <param name="Serializer"></param>
 /// <param name="LoggerFactory"></param>
 /// <param name="WriterBufferSize"></param>
@@ -28,6 +29,7 @@ public sealed record NatsOptions
 (
     string Url,
     ConnectOptions ConnectOptions,
+    TlsOptions TlsOptions,
     INatsSerializer Serializer,
     ILoggerFactory LoggerFactory,
     int WriterBufferSize,
@@ -44,10 +46,11 @@ public sealed record NatsOptions
     TimeSpan RequestTimeout
 )
 {
-    public static NatsOptions Default = new NatsOptions(
+    public static readonly NatsOptions Default = new(
         Url: "nats://localhost:4222",
         ConnectOptions: ConnectOptions.Default,
-        Serializer: new JsonNatsSerializer(new JsonSerializerOptions() { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull }),
+        TlsOptions: TlsOptions.Default,
+        Serializer: new JsonNatsSerializer(new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull }),
         LoggerFactory: NullLoggerFactory.Instance,
         WriterBufferSize: 65534, // 32767
         ReaderBufferSize: 1048576,
@@ -66,13 +69,8 @@ public sealed record NatsOptions
     internal NatsUri[] GetSeedUris()
     {
         var urls = Url.Split(',');
-        if (NoRandomize)
-        {
-            return urls.Select(x => new NatsUri(x)).Distinct().ToArray();
-        }
-        else
-        {
-            return urls.Select(x => new NatsUri(x)).OrderBy(_ => Guid.NewGuid()).Distinct().ToArray();
-        }
+        return NoRandomize
+            ? urls.Select(x => new NatsUri(x, true)).Distinct().ToArray()
+            : urls.Select(x => new NatsUri(x, true)).OrderBy(_ => Guid.NewGuid()).Distinct().ToArray();
     }
 }

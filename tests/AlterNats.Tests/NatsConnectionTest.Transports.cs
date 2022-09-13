@@ -7,6 +7,13 @@ public class NatsConnectionTestTcp : NatsConnectionTest
     }
 }
 
+public class NatsConnectionTestTls : NatsConnectionTest
+{
+    public NatsConnectionTestTls(ITestOutputHelper output) : base(output, TransportType.Tls)
+    {
+    }
+}
+
 public class NatsConnectionTestWs : NatsConnectionTest
 {
     public NatsConnectionTestWs(ITestOutputHelper output) : base(output, TransportType.WebSocket)

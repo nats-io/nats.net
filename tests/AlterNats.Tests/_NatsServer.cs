@@ -15,43 +15,45 @@ public class NatsServer : IAsyncDisposable
     readonly Task<string[]> processOut;
     readonly Task<string[]> processErr;
     readonly TransportType transportType;
-    bool isDisposed;
+    int disposed;
 
-    public readonly NatsServerPorts Ports;
+    public readonly NatsServerOptions Options;
 
-    public NatsServer(ITestOutputHelper outputHelper, TransportType transportType, string argument = "")
-        : this(outputHelper, transportType, new NatsServerPorts(new NatsServerPortOptions
+    public NatsServer(ITestOutputHelper outputHelper, TransportType transportType)
+        : this(outputHelper, transportType, transportType switch
         {
-            WebSocket = transportType == TransportType.WebSocket
-        }), argument)
+            TransportType.Tcp => new NatsServerOptions(),
+            TransportType.Tls => new NatsServerOptions
+            {
+                EnableTls = true,
+                TlsServerCertFile = "resources/certs/server-cert.pem",
+                TlsServerKeyFile = "resources/certs/server-key.pem",
+                TlsCaFile = "resources/certs/ca-cert.pem"
+            },
+            TransportType.WebSocket => new NatsServerOptions
+            {
+                EnableWebSocket = true
+            },
+            _ => throw new ArgumentOutOfRangeException(nameof(transportType), transportType, null)
+        })
     {
     }
 
-    public NatsServer(ITestOutputHelper outputHelper, TransportType transportType, NatsServerPorts ports,
-        string argument = "")
+    public NatsServer(ITestOutputHelper outputHelper, TransportType transportType, NatsServerOptions options)
     {
         this.outputHelper = outputHelper;
         this.transportType = transportType;
-        Ports = ports;
-        var cmd = $"{natsServerPath} -p {Ports.ServerPort} {argument}".Trim();
+        Options = options;
+        configFileName = Path.GetTempFileName();
+        var config = options.ConfigFileContents;
+        File.WriteAllText(configFileName, config);
+        var cmd = $"{natsServerPath} -c {configFileName}";
 
-        if (transportType == TransportType.WebSocket)
-        {
-            configFileName = Path.GetTempFileName();
-            var contents = "";
-            contents += "websocket {" + Environment.NewLine;
-            contents += $"  port: {Ports.WebSocketPort}" + Environment.NewLine;
-            contents += "  no_tls: true" + Environment.NewLine;
-            contents += "}" + Environment.NewLine;
-            File.WriteAllText(configFileName, contents);
-            cmd = $"{cmd} -c {configFileName}";
-        }
-
-        outputHelper.WriteLine("ProcessStart: " + cmd);
-        var (p, stdout, stderror) = ProcessX.GetDualAsyncEnumerable(cmd);
+        outputHelper.WriteLine("ProcessStart: " + cmd + Environment.NewLine + config);
+        var (p, stdout, stderr) = ProcessX.GetDualAsyncEnumerable(cmd);
 
         processOut = EnumerateWithLogsAsync(stdout, cancellationTokenSource.Token);
-        processErr = EnumerateWithLogsAsync(stderror, cancellationTokenSource.Token);
+        processErr = EnumerateWithLogsAsync(stderr, cancellationTokenSource.Token);
 
         // Check for start server
         Task.Run(async () =>
@@ -61,7 +63,7 @@ public class NatsServer : IAsyncDisposable
             {
                 try
                 {
-                    await client.ConnectAsync("localhost", Ports.ServerPort, cancellationTokenSource.Token);
+                    await client.ConnectAsync("localhost", Options.ServerPort, cancellationTokenSource.Token);
                     if (client.Connected) return;
                 }
                 catch
@@ -83,42 +85,43 @@ public class NatsServer : IAsyncDisposable
             processErr.GetAwaiter().GetResult(); // throw exception
         }
 
-        outputHelper.WriteLine("OK to Process Start, Port:" + Ports.ServerPort);
+        outputHelper.WriteLine("OK to Process Start, Port:" + Options.ServerPort);
     }
 
     public async ValueTask DisposeAsync()
     {
-        if (!isDisposed)
+        if (Interlocked.Increment(ref disposed) != 1)
         {
-            isDisposed = true;
-            cancellationTokenSource.Cancel(); // trigger of process kill.
-            cancellationTokenSource.Dispose();
-            try
-            {
-                var processLogs = await processErr; // wait for process exit, nats output info to stderror
-                if (processLogs.Length != 0)
-                {
-                    outputHelper.WriteLine("Process Logs of " + Ports.ServerPort);
-                    foreach (var item in processLogs)
-                    {
-                        outputHelper.WriteLine(item);
-                    }
-                }
-            }
-            catch (OperationCanceledException)
-            {
-            }
-            finally
-            {
-                if (configFileName != null)
-                {
-                    File.Delete(configFileName);
-                }
+            return;
+        }
 
-                if (Ports.ServerDisposeReturnsPorts)
+        cancellationTokenSource.Cancel(); // trigger of process kill.
+        cancellationTokenSource.Dispose();
+        try
+        {
+            var processLogs = await processErr; // wait for process exit, nats output info to stderror
+            if (processLogs.Length != 0)
+            {
+                outputHelper.WriteLine("Process Logs of " + Options.ServerPort);
+                foreach (var item in processLogs)
                 {
-                    Ports.Dispose();
+                    outputHelper.WriteLine(item);
                 }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        finally
+        {
+            if (configFileName != null)
+            {
+                File.Delete(configFileName);
+            }
+
+            if (Options.ServerDisposeReturnsPorts)
+            {
+                Options.Dispose();
             }
         }
     }
@@ -156,8 +159,9 @@ public class NatsServer : IAsyncDisposable
 
     public string ClientUrl => transportType switch
     {
-        TransportType.Tcp => $"localhost:{Ports.ServerPort}",
-        TransportType.WebSocket => $"ws://localhost:{Ports.WebSocketPort}",
+        TransportType.Tcp => $"nats://localhost:{Options.ServerPort}",
+        TransportType.Tls => $"tls://localhost:{Options.ServerPort}",
+        TransportType.WebSocket => $"ws://localhost:{Options.WebSocketPort}",
         _ => throw new ArgumentOutOfRangeException()
     };
 
@@ -169,6 +173,14 @@ public class NatsServer : IAsyncDisposable
             //ConnectTimeout = TimeSpan.FromSeconds(1),
             //ReconnectWait = TimeSpan.Zero,
             //ReconnectJitter = TimeSpan.Zero,
+            TlsOptions = Options.EnableTls
+                ? TlsOptions.Default with
+                {
+                    CertFile = Options.TlsClientCertFile,
+                    KeyFile = Options.TlsClientKeyFile,
+                    CaFile = Options.TlsCaFile
+                }
+                : TlsOptions.Default,
             Url = ClientUrl
         };
     }
@@ -182,31 +194,30 @@ public class NatsCluster : IAsyncDisposable
 
     public NatsCluster(ITestOutputHelper outputHelper, TransportType transportType)
     {
-        var port1 = new NatsServerPorts(new NatsServerPortOptions
+        var opts1 = new NatsServerOptions
         {
-            WebSocket = transportType == TransportType.WebSocket,
-            Clustering = true
-        });
-        var port2 = new NatsServerPorts(new NatsServerPortOptions
+            EnableWebSocket = transportType == TransportType.WebSocket,
+            EnableClustering = true
+        };
+        var opts2 = new NatsServerOptions
         {
-            WebSocket = transportType == TransportType.WebSocket,
-            Clustering = true
-        });
-        var port3 = new NatsServerPorts(new NatsServerPortOptions
+            EnableWebSocket = transportType == TransportType.WebSocket,
+            EnableClustering = true
+        };
+        var opts3 = new NatsServerOptions
         {
-            WebSocket = transportType == TransportType.WebSocket,
-            Clustering = true
-        });
+            EnableWebSocket = transportType == TransportType.WebSocket,
+            EnableClustering = true
+        };
+        var routes = new[] { opts1, opts2, opts3 };
+        foreach (var opt in routes)
+        {
+            opt.SetRoutes(routes);
+        }
 
-        var baseArgument =
-            $"--cluster_name test-cluster -routes nats://localhost:{port1.ClusteringPort},nats://localhost:{port2.ClusteringPort},nats://localhost:{port3.ClusteringPort}";
-
-        Server1 = new NatsServer(outputHelper, transportType, port1,
-            $"{baseArgument} -cluster nats://localhost:{port1.ClusteringPort}");
-        Server2 = new NatsServer(outputHelper, transportType, port2,
-            $"{baseArgument} -cluster nats://localhost:{port2.ClusteringPort}");
-        Server3 = new NatsServer(outputHelper, transportType, port3,
-            $"{baseArgument} -cluster nats://localhost:{port3.ClusteringPort}");
+        Server1 = new NatsServer(outputHelper, transportType, opts1);
+        Server2 = new NatsServer(outputHelper, transportType, opts2);
+        Server3 = new NatsServer(outputHelper, transportType, opts3);
     }
 
     public async ValueTask DisposeAsync()

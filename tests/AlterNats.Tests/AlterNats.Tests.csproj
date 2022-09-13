@@ -32,4 +32,10 @@
         <ProjectReference Include="..\..\src\AlterNats\AlterNats.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+        <Content Include="resources\**\*">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
+
 </Project>

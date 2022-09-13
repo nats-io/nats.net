@@ -5,13 +5,15 @@ internal sealed class NatsUri : IEquatable<NatsUri>
     public const string DefaultScheme = "nats";
 
     public readonly Uri Uri;
-    public readonly bool IsSecure;
+    public readonly bool IsSeed;
+    public readonly bool IsTls;
     public readonly bool IsWebSocket;
     public string Host => Uri.Host;
     public int Port => Uri.Port;
 
-    public NatsUri(string urlString, string defaultScheme = DefaultScheme)
+    public NatsUri(string urlString, bool isSeed, string defaultScheme = DefaultScheme)
     {
+        IsSeed = isSeed;
         if (!urlString.Contains("://"))
         {
             urlString = $"{defaultScheme}://{urlString}";
@@ -25,6 +27,9 @@ internal sealed class NatsUri : IEquatable<NatsUri>
 
         switch (uriBuilder.Scheme)
         {
+            case "tls":
+                IsTls = true;
+                goto case "nats";
             case "nats":
                 if (uriBuilder.Port == -1)
                 {
@@ -36,7 +41,6 @@ internal sealed class NatsUri : IEquatable<NatsUri>
                 break;
             case "wss":
                 IsWebSocket = true;
-                IsSecure = true;
                 break;
             default:
                 throw new ArgumentException($"unsupported scheme {uriBuilder.Scheme} in nats URL {urlString}", urlString);

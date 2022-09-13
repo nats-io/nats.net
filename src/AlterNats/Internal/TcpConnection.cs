@@ -1,4 +1,5 @@
-﻿using System.Net.Sockets;
+﻿using System.Net.Security;
+using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 
 namespace AlterNats.Internal;
@@ -8,7 +9,6 @@ internal sealed class SocketClosedException : Exception
     public SocketClosedException(Exception? innerException)
         : base("Socket has been closed.", innerException)
     {
-
     }
 }
 
@@ -41,7 +41,7 @@ internal sealed class TcpConnection : ISocketConnection
     // socket is disposed:
     //  throws DisposedException
 
-    // return ValueTask directly for performance, not care exception and signal-disconected.
+    // return ValueTask directly for performance, not care exception and signal-disconnected.
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ValueTask ConnectAsync(string host, int port, CancellationToken cancellationToken)
@@ -108,5 +108,21 @@ internal sealed class TcpConnection : ISocketConnection
     public void SignalDisconnected(Exception exception)
     {
         waitForClosedSource.TrySetResult(exception);
+    }
+
+    // NetworkStream will own the Socket, so mark as disposed
+    // in order to skip socket.Dispose() in DisposeAsync
+    public SslStreamConnection UpgradeToSslStreamConnection(TlsOptions tlsOptions, TlsCerts? tlsCerts)
+    {
+        if (Interlocked.Increment(ref disposed) == 1)
+        {
+            return new SslStreamConnection(
+                new SslStream(new NetworkStream(socket, true)),
+                tlsOptions,
+                tlsCerts,
+                waitForClosedSource);
+        }
+
+        throw new ObjectDisposedException(nameof(TcpConnection));
     }
 }
