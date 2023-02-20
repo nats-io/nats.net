@@ -15,12 +15,8 @@
         <PackageProjectUrl>https://github.com/nats-io/nats.net.v2</PackageProjectUrl>
         <RepositoryUrl>$(PackageProjectUrl)</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
-        <PackageLicenseFile>LICENSE</PackageLicenseFile>
+        <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
         <PackageIcon>Icon.png</PackageIcon>
         <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)opensource.snk</AssemblyOriginatorKeyFile>
     </PropertyGroup>
-
-    <ItemGroup>
-        <None Include="LICENSE" Pack="true" PackagePath=""/>
-    </ItemGroup>
 </Project>

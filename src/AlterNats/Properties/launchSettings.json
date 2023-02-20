@@ -1,9 +1,0 @@
-{
-    "profiles": {
-        "AlterNats": {
-            "commandName": "Project",
-            "environmentVariables": {
-            }
-        }
-    }
-}

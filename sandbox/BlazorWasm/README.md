@@ -21,7 +21,7 @@ docker run --rm \
     -p 4222:4222 \
     -p 4280:4280 \
     -v "$(pwd)/nats-server.conf:/etc/nats/nats-server.conf" \
-    nats
+    nats:alpine
 ```
 
 ## Run the Project

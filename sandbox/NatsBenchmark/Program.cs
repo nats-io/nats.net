@@ -1,5 +1,4 @@
-﻿using AlterNats;
-using AlterNats.Commands;
+﻿using NATS.Client.Core;
 using MessagePack;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -7,7 +6,6 @@ using NATS.Client;
 using NatsBenchmark;
 using System.Diagnostics;
 using System.Runtime;
-using System.Runtime.CompilerServices;
 using System.Text;
 using ZLogger;
 
@@ -18,7 +16,6 @@ Console.WriteLine(new { GCSettings.IsServerGC, GCSettings.LatencyMode });
 ThreadPool.SetMinThreads(1000, 1000);
 
 var key = new NatsKey("foo");
-var serializer = new MessagePackNatsSerializer();
 //var p = PublishCommand<Vector3>.Create(key, new Vector3(), serializer);
 //(p as ICommand).Return();
 
@@ -51,7 +48,7 @@ namespace NatsBenchmark
 {
     partial class Benchmark
     {
-        void RunPubSubAlterNats(string testName, long testCount, long testSize, bool disableShow = false)
+        void RunPubSubBenchmark(string testName, long testCount, long testSize, bool disableShow = false)
         {
             var provider = new ServiceCollection()
                 .AddLogging(x =>
@@ -78,8 +75,8 @@ namespace NatsBenchmark
 
             byte[] payload = generatePayload(testSize);
 
-            var pubConn = new AlterNats.NatsConnection(options);
-            var subConn = new AlterNats.NatsConnection(options);
+            var pubConn = new NATS.Client.Core.NatsConnection(options);
+            var subConn = new NATS.Client.Core.NatsConnection(options);
 
             pubConn.ConnectAsync().AsTask().Wait();
             subConn.ConnectAsync().AsTask().Wait();
@@ -130,7 +127,7 @@ namespace NatsBenchmark
             subConn.DisposeAsync().AsTask().Wait();
         }
 
-        void RunPubSubAlterNatsBatch(string testName, long testCount, long testSize, bool disableShow = false)
+        void RunPubSubBenchmarkBatch(string testName, long testCount, long testSize, bool disableShow = false)
         {
             var provider = new ServiceCollection()
                 .AddLogging(x =>
@@ -157,8 +154,8 @@ namespace NatsBenchmark
 
             byte[] payload = generatePayload(testSize);
 
-            var pubConn = new AlterNats.NatsConnection(options);
-            var subConn = new AlterNats.NatsConnection(options);
+            var pubConn = new NATS.Client.Core.NatsConnection(options);
+            var subConn = new NATS.Client.Core.NatsConnection(options);
 
             pubConn.ConnectAsync().AsTask().Wait();
             subConn.ConnectAsync().AsTask().Wait();
@@ -216,7 +213,7 @@ namespace NatsBenchmark
         }
 
 
-        void ProfilingRunPubSubAlterNatsAsync(string testName, long testCount, long testSize, bool disableShow = false)
+        void ProfilingRunPubSubBenchmarkAsync(string testName, long testCount, long testSize, bool disableShow = false)
         {
             var provider = new ServiceCollection()
                 .AddLogging(x =>
@@ -243,8 +240,8 @@ namespace NatsBenchmark
 
             byte[] payload = generatePayload(testSize);
 
-            var pubConn = new AlterNats.NatsConnection(options);
-            var subConn = new AlterNats.NatsConnection(options);
+            var pubConn = new NATS.Client.Core.NatsConnection(options);
+            var subConn = new NATS.Client.Core.NatsConnection(options);
 
             pubConn.ConnectAsync().AsTask().Wait();
             subConn.ConnectAsync().AsTask().Wait();
@@ -300,7 +297,7 @@ namespace NatsBenchmark
             subConn.DisposeAsync().AsTask().Wait();
         }
 
-        void RunPubSubAlterNatsBatchRaw(string testName, long testCount, long testSize, int batchSize = 1000, bool disableShow = false)
+        void RunPubSubBenchmarkBatchRaw(string testName, long testCount, long testSize, int batchSize = 1000, bool disableShow = false)
         {
             var provider = new ServiceCollection()
                 .AddLogging(x =>
@@ -327,8 +324,8 @@ namespace NatsBenchmark
 
             byte[] payload = generatePayload(testSize);
 
-            var pubConn = new AlterNats.NatsConnection(options);
-            var subConn = new AlterNats.NatsConnection(options);
+            var pubConn = new NATS.Client.Core.NatsConnection(options);
+            var subConn = new NATS.Client.Core.NatsConnection(options);
 
             pubConn.ConnectAsync().AsTask().Wait();
             subConn.ConnectAsync().AsTask().Wait();
@@ -353,7 +350,7 @@ namespace NatsBenchmark
             }).AsTask().Result;
 
 
-            var command = new AlterNats.Commands.DirectWriteCommand(BuildCommand(testSize), batchSize);
+            var command = new NATS.Client.Core.Commands.DirectWriteCommand(BuildCommand(testSize), batchSize);
 
             GC.Collect();
             GC.WaitForPendingFinalizers();
@@ -402,7 +399,7 @@ namespace NatsBenchmark
             return sb.ToString();
         }
 
-        void RunPubSubAlterNatsPubSub2(string testName, long testCount, long testSize, bool disableShow = false)
+        void RunPubSubBenchmarkPubSub2(string testName, long testCount, long testSize, bool disableShow = false)
         {
             var provider = new ServiceCollection()
                 .AddLogging(x =>
@@ -432,10 +429,10 @@ namespace NatsBenchmark
 
             byte[] payload = generatePayload(testSize);
 
-            var pubConn = new AlterNats.NatsConnection(options);
-            var subConn = new AlterNats.NatsConnection(options);
-            var pubConn2 = new AlterNats.NatsConnection(options);
-            var subConn2 = new AlterNats.NatsConnection(options);
+            var pubConn = new NATS.Client.Core.NatsConnection(options);
+            var subConn = new NATS.Client.Core.NatsConnection(options);
+            var pubConn2 = new NATS.Client.Core.NatsConnection(options);
+            var subConn2 = new NATS.Client.Core.NatsConnection(options);
 
             pubConn.ConnectAsync().AsTask().Wait();
             subConn.ConnectAsync().AsTask().Wait();
@@ -521,7 +518,7 @@ namespace NatsBenchmark
             subConn.DisposeAsync().AsTask().Wait();
         }
 
-        void RunPubSubAlterNatsVector3(string testName, long testCount, bool disableShow = false)
+        void RunPubSubBenchmarkVector3(string testName, long testCount, bool disableShow = false)
         {
             var provider = new ServiceCollection()
                 .AddLogging(x =>
@@ -538,7 +535,6 @@ namespace NatsBenchmark
             var options = NatsOptions.Default with
             {
                 // LoggerFactory = loggerFactory,
-                Serializer = new MessagePackNatsSerializer(),
                 UseThreadPoolCallback = false,
                 ConnectOptions = ConnectOptions.Default with { Echo = false, Verbose = false }
             };
@@ -549,8 +545,8 @@ namespace NatsBenchmark
 
             // byte[] payload = generatePayload(testSize);
 
-            var pubConn = new AlterNats.NatsConnection(options);
-            var subConn = new AlterNats.NatsConnection(options);
+            var pubConn = new NATS.Client.Core.NatsConnection(options);
+            var subConn = new NATS.Client.Core.NatsConnection(options);
 
             var key = new NatsKey(subject);
 
@@ -748,24 +744,24 @@ namespace NatsBenchmark
 
         void runSuite()
         {
-            //RunPubSubAlterNats("AlterNats8b", 10000000, 8, disableShow: true);
-            //RunPubSubAlterNatsVector3("AlterNatsV3", 10000000, disableShow: true);
+            //RunPubSubBenchmark("Benchmark8b", 10000000, 8, disableShow: true);
+            //RunPubSubBenchmarkVector3("BenchmarkV3", 10000000, disableShow: true);
 
-            //ProfilingRunPubSubAlterNatsAsync("AlterNatsProfiling", 10000000, 0);
+            //ProfilingRunPubSubBenchmarkAsync("BenchmarkProfiling", 10000000, 0);
 
             //
-            //RunPubSubAlterNatsBatchRaw("AlterNats", 10000000, 8, disableShow: true); // warmup
-            //RunPubSubAlterNatsBatchRaw("AlterNats", 500000, 1024 * 4, disableShow: true); // warmup
-            //RunPubSubAlterNatsBatchRaw("AlterNats", 100000, 1024 * 8, disableShow: true); // warmup
-            //RunPubSubAlterNatsBatchRaw("AlterNats8b_Opt", 10000000, 8);
-            //RunPubSubAlterNatsBatchRaw("AlterNats4k_Opt", 500000, 1024 * 4);
-            RunPubSubAlterNatsBatchRaw("AlterNats8k_Opt", 100000, 1024 * 8, batchSize: 10, disableShow: true);
-            RunPubSubAlterNatsBatchRaw("AlterNats8k_Opt", 100000, 1024 * 8, batchSize: 10);
-            RunPubSubAlterNats("AlterNats8k", 100000, 1024 * 8, disableShow: true);
-            RunPubSubAlterNats("AlterNats8k", 100000, 1024 * 8);
+            //RunPubSubBenchmarkBatchRaw("Benchmark", 10000000, 8, disableShow: true); // warmup
+            //RunPubSubBenchmarkBatchRaw("Benchmark", 500000, 1024 * 4, disableShow: true); // warmup
+            //RunPubSubBenchmarkBatchRaw("Benchmark", 100000, 1024 * 8, disableShow: true); // warmup
+            //RunPubSubBenchmarkBatchRaw("Benchmark8b_Opt", 10000000, 8);
+            //RunPubSubBenchmarkBatchRaw("Benchmark4k_Opt", 500000, 1024 * 4);
+            RunPubSubBenchmarkBatchRaw("Benchmark8k_Opt", 100000, 1024 * 8, batchSize: 10, disableShow: true);
+            RunPubSubBenchmarkBatchRaw("Benchmark8k_Opt", 100000, 1024 * 8, batchSize: 10);
+            RunPubSubBenchmark("Benchmark8k", 100000, 1024 * 8, disableShow: true);
+            RunPubSubBenchmark("Benchmark8k", 100000, 1024 * 8);
 
-            //RunPubSubAlterNats("AlterNats8b", 10000000, 8, disableShow: true);
-            //RunPubSubAlterNats("AlterNats8b", 10000000, 8);
+            //RunPubSubBenchmark("Benchmark8b", 10000000, 8, disableShow: true);
+            //RunPubSubBenchmark("Benchmark8b", 10000000, 8);
 
 
             //runPubSubVector3("PubSubVector3", 10000000);
@@ -785,19 +781,19 @@ namespace NatsBenchmark
 
 
 
-            //RunPubSubAlterNatsVector3("AlterNatsV3", 10000000);
-            //RunPubSubAlterNats("AlterNatsNo", 10000000, 0);
-            //RunPubSubAlterNats("AlterNats8b", 10000000, 8);
-            //RunPubSubAlterNatsBatch("AlterNats8bBatch", 10000000, 8);
-            //RunPubSubAlterNatsPubSub2("AlterNats8b 2", 10000000, 8);
+            //RunPubSubBenchmarkVector3("BenchmarkV3", 10000000);
+            //RunPubSubBenchmark("BenchmarkNo", 10000000, 0);
+            //RunPubSubBenchmark("Benchmark8b", 10000000, 8);
+            //RunPubSubBenchmarkBatch("Benchmark8bBatch", 10000000, 8);
+            //RunPubSubBenchmarkPubSub2("Benchmark8b 2", 10000000, 8);
 
-            //RunPubSubAlterNats("AlterNats32b", 10000000, 32);
-            //RunPubSubAlterNats("AlterNats100b", 10000000, 100);
-            //RunPubSubAlterNats("AlterNats256b", 10000000, 256);
-            //RunPubSubAlterNats("AlterNats512b", 500000, 512);
-            //RunPubSubAlterNats("AlterNats1k", 500000, 1024);
-            //RunPubSubAlterNats("AlterNats4k", 500000, 1024 * 4);
-            //RunPubSubAlterNats("AlterNats8k", 100000, 1024 * 8);
+            //RunPubSubBenchmark("Benchmark32b", 10000000, 32);
+            //RunPubSubBenchmark("Benchmark100b", 10000000, 100);
+            //RunPubSubBenchmark("Benchmark256b", 10000000, 256);
+            //RunPubSubBenchmark("Benchmark512b", 500000, 512);
+            //RunPubSubBenchmark("Benchmark1k", 500000, 1024);
+            //RunPubSubBenchmark("Benchmark4k", 500000, 1024 * 4);
+            //RunPubSubBenchmark("Benchmark8k", 100000, 1024 * 8);
 
             // Redis?
             // RunPubSubRedis("StackExchange.Redis", 10000000, 8);

@@ -1,0 +1,7 @@
+<Project>
+    <Import Project="..\Directory.Build.props" />
+
+    <ItemGroup>
+        <None Include="..\LICENSE" Pack="true" PackagePath=""/>
+    </ItemGroup>
+</Project>

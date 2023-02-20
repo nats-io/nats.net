@@ -1,5 +1,5 @@
 ﻿using System.Diagnostics;
-using AlterNats;
+using NATS.Client.Core;
 
 // await using
     var conn = new NatsConnection();
