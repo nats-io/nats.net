@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+
+        <!-- NuGet Packaging -->
+        <PackageTags>pubsub;messaging</PackageTags>
+        <Description>ASP.NET Core and Generic Host support for NATS.Client.</Description>
+        <IsPackable>true</IsPackable>
+    </PropertyGroup>
+
+
+    <ItemGroup>
+        <None Include="../../Icon.png" Pack="true" PackagePath="/" />
+    </ItemGroup>
+
+
+    <ItemGroup>
+      <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="6.0.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\NATS.Client.Core\NATS.Client.Core.csproj" />
+    </ItemGroup>
+
+</Project>

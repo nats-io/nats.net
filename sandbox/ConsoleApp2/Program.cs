@@ -1,4 +1,4 @@
-﻿using AlterNats;
+﻿using NATS.Client.Core;
 #pragma warning disable CS4014
 
 var natsKey1 = new NatsKey("subject1");

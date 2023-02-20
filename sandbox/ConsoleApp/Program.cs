@@ -1,15 +1,7 @@
-﻿using AlterNats;
-using AlterNats.Commands;
-using Cysharp.Diagnostics;
-using MessagePack;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+﻿using NATS.Client.Core;
 using Microsoft.Extensions.Logging;
-using System.Buffers;
 using System.Net.Http.Json;
-using System.Runtime.InteropServices;
-using System.Text;
-using ZLogger;
+using NATS.Client.Hosting;
 
 var builder = ConsoleApp.CreateBuilder(args);
 builder.ConfigureServices(services =>
@@ -64,7 +56,6 @@ var options = NatsOptions.Default with
 {
     Url = "nats://127.0.0.1:9999",
     LoggerFactory = new MinimumConsoleLoggerFactory(LogLevel.Information),
-    Serializer = new MessagePackNatsSerializer(),
     ConnectOptions = ConnectOptions.Default with
     {
         Echo = true,

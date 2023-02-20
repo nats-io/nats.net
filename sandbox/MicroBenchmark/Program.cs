@@ -1,6 +1,6 @@
 ﻿#pragma warning disable IDE0044
 
-using AlterNats;
+using NATS.Client.Core;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Diagnosers;
@@ -22,7 +22,7 @@ BenchmarkDotNet.Running.BenchmarkRunner.Run<DefaultRun>(config, args);
 
 //var run = new DefaultRun();
 //await run.SetupAsync();
-//await run.RunAlterNats();
+//await run.RunBenchmark();
 //await run.RunStackExchangeRedis();
 
 //await run.CleanupAsync();
@@ -59,7 +59,7 @@ public class DefaultRun
             ConnectOptions = ConnectOptions.Default with { Echo = true, Verbose = false }
         };
 
-        connection = new AlterNats.NatsConnection(options);
+        connection = new NATS.Client.Core.NatsConnection(options);
         key = new NatsKey("foobar");
         await connection.ConnectAsync();
         gate = new object();
@@ -94,7 +94,7 @@ public class DefaultRun
     }
 
     //[Benchmark]
-    public void RunAlterNats()
+    public void RunBenchmark()
     {
         const int count = 10000;
         handler.gate = gate;

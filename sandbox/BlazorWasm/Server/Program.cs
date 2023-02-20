@@ -1,5 +1,6 @@
-using AlterNats;
+using NATS.Client.Core;
 using BlazorWasm.Server.NatsServices;
+using NATS.Client.Hosting;
 
 var builder = WebApplication.CreateBuilder(args);
 

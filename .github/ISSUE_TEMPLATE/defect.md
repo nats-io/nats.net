@@ -10,7 +10,7 @@ Make sure that these boxes are checked before submitting your issue -- thank you
 
  - [ ] Included a [Minimal, Complete, and Verifiable example] (https://stackoverflow.com/help/mcve)
 
-#### Versions of `NATS.Client` and `nats-server`:
+#### Versions of `NATS.Client.Core` and `nats-server`:
 
 #### OS/Container environment:
 

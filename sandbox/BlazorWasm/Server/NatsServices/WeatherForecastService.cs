@@ -1,4 +1,4 @@
-using AlterNats;
+using NATS.Client.Core;
 using BlazorWasm.Shared;
 
 namespace BlazorWasm.Server.NatsServices;

@@ -19,9 +19,8 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\src\AlterNats.Hosting\AlterNats.Hosting.csproj" />
-        <ProjectReference Include="..\..\src\AlterNats.MessagePack\AlterNats.MessagePack.csproj" />
-        <ProjectReference Include="..\..\src\AlterNats\AlterNats.csproj" />
+        <ProjectReference Include="..\..\src\NATS.Client.Hosting\NATS.Client.Hosting.csproj" />
+        <ProjectReference Include="..\..\src\NATS.Client.Core\NATS.Client.Core.csproj" />
     </ItemGroup>
 
 </Project>
