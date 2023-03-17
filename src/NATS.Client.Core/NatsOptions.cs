@@ -52,7 +52,7 @@ public sealed record NatsOptions
     public static readonly NatsOptions Default = new(
         Url: "nats://localhost:4222",
         Name: "NATS .Net Client",
-        Echo: false,
+        Echo: true,
         Verbose: false,
         AuthOptions: NatsAuthOptions.Default,
         TlsOptions: TlsOptions.Default,
