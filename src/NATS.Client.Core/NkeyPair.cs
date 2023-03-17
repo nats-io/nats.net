@@ -363,22 +363,27 @@ public class Nkeys
 // Borrowed from:  https://stackoverflow.com/a/7135008
 internal class Base32
 {
-    public static byte[] Decode(string input)
+    public static byte[] Decode(ReadOnlySpan<char> input)
     {
-        if (string.IsNullOrEmpty(input))
+        if (input == null || input.Length == 0)
         {
-            throw new ArgumentNullException("input");
+            throw new ArgumentNullException(nameof(input));
         }
 
-        input = input.TrimEnd('='); //remove padding characters
+        // input = input.TrimEnd('='); //remove padding characters
+        var indexOf = input.IndexOf('=');
+        if (indexOf > 0)
+            input = input.Slice(0, indexOf);
+
         int byteCount = input.Length * 5 / 8; //this must be TRUNCATED
         byte[] returnArray = new byte[byteCount];
 
         byte curByte = 0, bitsRemaining = 8;
         int mask = 0, arrayIndex = 0;
 
-        foreach (char c in input)
+        for (var index = 0; index < input.Length; index++)
         {
+            var c = input[index];
             int cValue = CharToValue(c);
 
             if (bitsRemaining > 5)

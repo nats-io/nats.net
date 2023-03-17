@@ -28,7 +28,10 @@ namespace NATS.Client.Core;
 public sealed record NatsOptions
 (
     string Url,
-    ConnectOptions ConnectOptions,
+    string Name,
+    bool Echo,
+    bool Verbose,
+    NatsAuthOptions AuthOptions,
     TlsOptions TlsOptions,
     INatsSerializer Serializer,
     ILoggerFactory LoggerFactory,
@@ -48,7 +51,10 @@ public sealed record NatsOptions
 {
     public static readonly NatsOptions Default = new(
         Url: "nats://localhost:4222",
-        ConnectOptions: ConnectOptions.Default,
+        Name: "NATS .Net Client",
+        Echo: false,
+        Verbose: false,
+        AuthOptions: NatsAuthOptions.Default,
         TlsOptions: TlsOptions.Default,
         Serializer: new JsonNatsSerializer(new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull }),
         LoggerFactory: NullLoggerFactory.Instance,

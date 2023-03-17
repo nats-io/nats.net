@@ -8,7 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
-builder.Services.AddNats(configureOptions: opt => opt with { Url = "localhost:4222", ConnectOptions = ConnectOptions.Default with { Name = "BlazorServer" } });
+builder.Services.AddNats(configureOptions: opt => opt with { Url = "localhost:4222", Name = "BlazorServer" });
 builder.Services.AddHostedService<WeatherForecastService>();
 
 var app = builder.Build();

@@ -4,17 +4,14 @@ using NATS.Client.Core;
 var options = NatsOptions.Default with
 {
     Url = "nats://10.10.2.2:4222",
-    ConnectOptions = ConnectOptions.Default with { Name = "my client" }
-    // LoggerFactory = new MinimumConsoleLoggerFactory(LogLevel.Information),
-    // ConnectOptions = ConnectOptions.Default with
-    // {
-    //     Echo = true,
-    //     Username = "foo",
-    //     Password = "bar",
-    // },
+    Name = "my client",
+    AuthOptions = NatsAuthOptions.Default with
+    {
+        CredsFile = @"C:\Users\User\user_a.creds"
+    }
 };
 
-await using var conn = new NatsConnection(options, UserCredentials.LoadFromFile(@"C:\Users\User\user_a.creds"));
+await using var conn = new NatsConnection(options);
 
 // subscribe
 // var subscription = await conn.SubscribeAsync<Person>("foo", x =>

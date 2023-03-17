@@ -1,15 +1,22 @@
 ﻿using System.Reflection;
 using System.Text.Json.Serialization;
 
-namespace NATS.Client.Core;
+namespace NATS.Client.Core.Internal;
 
-// These connections options are serialized and sent to the server
-// Therefore, only options which the server understands should be added here
-// Client-only options should be added to NatsOptions.cs
+// These connections options are serialized and sent to the server.
 // https://github.com/nats-io/nats-server/blob/a23b1b7/server/client.go#L536
-public sealed record ConnectOptions
+internal sealed class ClientOptions
 {
-    public static readonly ConnectOptions Default = new();
+    public ClientOptions(NatsOptions options)
+    {
+        Name = options.Name;
+        Echo = options.Echo;
+        Verbose = options.Verbose;
+        Username = options.AuthOptions.Username;
+        Password = options.AuthOptions.Password;
+        AuthToken = options.AuthOptions.Token;
+        JWT = options.AuthOptions.Jwt;
+    }
 
     /// <summary>Optional boolean. If set to true, the server (version 1.2.0+) will not send originating messages from this connection to its own subscriptions. Clients should set this to true only for server supporting this feature, which is when proto in the INFO protocol is set to at least 1.</summary>
     [JsonPropertyName("echo")]
@@ -32,11 +39,11 @@ public sealed record ConnectOptions
 
     /// <summary>The JWT that identifies a user permissions and account.</summary>
     [JsonPropertyName("jwt")]
-    public string? JWT { get; init; } = null;
+    public string? JWT { get; set; } = null;
 
     /// <summary>In case the server has responded with a nonce on INFO, then a NATS client must use this field to reply with the signed nonce.</summary>
     [JsonPropertyName("sig")]
-    public string? Sig { get; init; } = null;
+    public string? Sig { get; set; } = null;
 
     /// <summary>Client authorization token (if auth_required is set)</summary>
     [JsonPropertyName("auth_token")]
@@ -80,7 +87,7 @@ public sealed record ConnectOptions
 
     static string GetAssemblyVersion()
     {
-        var asm = typeof(ConnectOptions);
+        var asm = typeof(ClientOptions);
         var version = "1.0.0";
         var infoVersion = asm!.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
         if (infoVersion != null)

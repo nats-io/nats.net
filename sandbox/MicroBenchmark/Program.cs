@@ -56,7 +56,8 @@ public class DefaultRun
         var options = NatsOptions.Default with
         {
             LoggerFactory = loggerFactory,
-            ConnectOptions = ConnectOptions.Default with { Echo = true, Verbose = false }
+            Echo = true,
+            Verbose = false
         };
 
         connection = new NATS.Client.Core.NatsConnection(options);

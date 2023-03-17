@@ -66,9 +66,10 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
     NatsPipeliningWriteProtocolProcessor? socketWriter;
     TaskCompletionSource waitForOpenConnection;
     TlsCerts? tlsCerts;
+    ClientOptions clientOptions;
+    UserCredentials? userCredentials;
 
     public NatsOptions Options { get; }
-    public UserCredentials UserCredentials { get; }
     public NatsConnectionState ConnectionState { get; private set; }
     public ServerInfo? ServerInfo { get; internal set; } // server info is set when received INFO
 
@@ -83,23 +84,17 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
     public event EventHandler<string>? ReconnectFailed;
 
     public NatsConnection()
-        : this(NatsOptions.Default, UserCredentials.Anonymous)
+        : this(NatsOptions.Default)
     {
     }
 
     public NatsConnection(NatsOptions options)
-        : this(options, UserCredentials.Anonymous)
-    {
-    }
-
-    public NatsConnection(NatsOptions options, UserCredentials userCredentials)
     {
         Options = options;
-        UserCredentials = userCredentials;
         ConnectionState = NatsConnectionState.Closed;
         waitForOpenConnection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         pool = new ObjectPool(options.CommandPoolSize);
-        name = options.ConnectOptions.Name ?? "";
+        name = options.Name;
         counter = new ConnectionStatsCounter();
         writerState = new WriterState(options);
         commandWriter = writerState.CommandBuffer.Writer;
@@ -107,6 +102,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
         requestResponseManager = new RequestResponseManager(this, pool);
         inboxPrefix = Encoding.ASCII.GetBytes($"{options.InboxPrefix}{Guid.NewGuid()}.");
         logger = options.LoggerFactory.CreateLogger<NatsConnection>();
+        clientOptions = new ClientOptions(Options);
     }
 
     /// <summary>
@@ -154,6 +150,11 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
             throw new NatsException($"URI {uris.First(u => u.IsTls)} requires TLS but TlsOptions.Disabled is set to true");
         if (Options.TlsOptions.Required)
             tlsCerts = new TlsCerts(Options.TlsOptions);
+
+        if (!Options.AuthOptions.IsAnonymous)
+        {
+            userCredentials = new UserCredentials(Options.AuthOptions);
+        }
 
         foreach (var uri in uris)
         {
@@ -296,11 +297,11 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
             infoParsedSignal.SetResult();
 
             // Authentication
-            var connectOptions = UserCredentials.Authenticate(Options.ConnectOptions, ServerInfo);
+            userCredentials?.Authenticate(clientOptions, ServerInfo);
 
             // add CONNECT and PING command to priority lane
             writerState.PriorityCommands.Clear();
-            var connectCommand = AsyncConnectCommand.Create(pool, connectOptions);
+            var connectCommand = AsyncConnectCommand.Create(pool, clientOptions);
             writerState.PriorityCommands.Add(connectCommand);
             writerState.PriorityCommands.Add(PingCommand.Create(pool));
 
