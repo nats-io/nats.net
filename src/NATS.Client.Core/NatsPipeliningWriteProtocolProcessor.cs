@@ -50,7 +50,7 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
                 if (firstCommands.Count != 0)
                 {
                     var count = firstCommands.Count;
-                    var tempBuffer = new FixedArrayBufferWriter(1024);
+                    var tempBuffer = new FixedArrayBufferWriter();
                     var tempWriter = new ProtocolWriter(tempBuffer);
                     foreach (var command in firstCommands)
                     {

@@ -68,6 +68,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
     TlsCerts? tlsCerts;
 
     public NatsOptions Options { get; }
+    public UserCredentials UserCredentials { get; }
     public NatsConnectionState ConnectionState { get; private set; }
     public ServerInfo? ServerInfo { get; internal set; } // server info is set when received INFO
 
@@ -82,13 +83,19 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
     public event EventHandler<string>? ReconnectFailed;
 
     public NatsConnection()
-        : this(NatsOptions.Default)
+        : this(NatsOptions.Default, UserCredentials.Anonymous)
     {
     }
 
     public NatsConnection(NatsOptions options)
+        : this(options, UserCredentials.Anonymous)
+    {
+    }
+
+    public NatsConnection(NatsOptions options, UserCredentials userCredentials)
     {
         Options = options;
+        UserCredentials = userCredentials;
         ConnectionState = NatsConnectionState.Closed;
         waitForOpenConnection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         pool = new ObjectPool(options.CommandPoolSize);
@@ -231,20 +238,6 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
         if (currentConnectUri!.IsSeed)
             lastSeedConnectUri = currentConnectUri;
 
-        // add CONNECT and PING command to priority lane
-        writerState.PriorityCommands.Clear();
-        var connectCommand = AsyncConnectCommand.Create(pool, Options.ConnectOptions);
-        writerState.PriorityCommands.Add(connectCommand);
-        writerState.PriorityCommands.Add(PingCommand.Create(pool));
-
-        if (reconnect)
-        {
-            // Add SUBSCRIBE command to priority lane
-            var subscribeCommand =
-                AsyncSubscribeBatchCommand.Create(pool, subscriptionManager.GetExistingSubscriptions());
-            writerState.PriorityCommands.Add(subscribeCommand);
-        }
-
         // create the socket reader
         var waitForInfoSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var waitForPongOrErrorSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -301,6 +294,23 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
 
             // mark INFO as parsed
             infoParsedSignal.SetResult();
+
+            // Authentication
+            var connectOptions = UserCredentials.Authenticate(Options.ConnectOptions, ServerInfo);
+
+            // add CONNECT and PING command to priority lane
+            writerState.PriorityCommands.Clear();
+            var connectCommand = AsyncConnectCommand.Create(pool, connectOptions);
+            writerState.PriorityCommands.Add(connectCommand);
+            writerState.PriorityCommands.Add(PingCommand.Create(pool));
+
+            if (reconnect)
+            {
+                // Add SUBSCRIBE command to priority lane
+                var subscribeCommand =
+                    AsyncSubscribeBatchCommand.Create(pool, subscriptionManager.GetExistingSubscriptions());
+                writerState.PriorityCommands.Add(subscribeCommand);
+            }
 
             // create the socket writer
             socketWriter = new NatsPipeliningWriteProtocolProcessor(socket!, writerState, pool, counter);
