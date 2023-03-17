@@ -7,10 +7,10 @@ public class UserCredentials
 {
     public static readonly UserCredentials Anonymous = new(null, null);
 
-    public UserCredentials(string? jwt, NkeyPair? nkeyPair)
+    public UserCredentials(string? jwt, string? seed)
     {
         Jwt = jwt;
-        NkeyPair = nkeyPair;
+        Seed = seed;
     }
 
     public static UserCredentials LoadFromFile(string path)
@@ -37,20 +37,21 @@ public class UserCredentials
             }
         }
 
-        NkeyPair? nkeyPair = seed != null ? Nkeys.FromSeed(seed) : null;
-
-        return new UserCredentials(jwt, nkeyPair);
+        return new UserCredentials(jwt, seed);
     }
 
     public string? Jwt { get; }
 
-    public NkeyPair? NkeyPair { get; }
+    public string? Seed { get; }
 
     public string? Sign(string? nonce)
     {
-        if (NkeyPair == null || nonce == null) return null;
-        byte[] bytes = NkeyPair.Sign(Encoding.ASCII.GetBytes(nonce));
+        if (Seed == null || nonce == null) return null;
+
+        using var kp = Nkeys.FromSeed(Seed);
+        byte[] bytes = kp.Sign(Encoding.ASCII.GetBytes(nonce));
         var sig = CryptoBytes.ToBase64String(bytes);
+
         return sig;
     }
 
