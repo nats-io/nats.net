@@ -21,22 +21,7 @@ public class NatsServer : IAsyncDisposable
     public readonly NatsServerOptions Options;
 
     public NatsServer(ITestOutputHelper outputHelper, TransportType transportType)
-        : this(outputHelper, transportType, transportType switch
-        {
-            TransportType.Tcp => new NatsServerOptions(),
-            TransportType.Tls => new NatsServerOptions
-            {
-                EnableTls = true,
-                TlsServerCertFile = "resources/certs/server-cert.pem",
-                TlsServerKeyFile = "resources/certs/server-key.pem",
-                TlsCaFile = "resources/certs/ca-cert.pem"
-            },
-            TransportType.WebSocket => new NatsServerOptions
-            {
-                EnableWebSocket = true
-            },
-            _ => throw new ArgumentOutOfRangeException(nameof(transportType), transportType, null)
-        })
+        : this(outputHelper, transportType, new NatsServerOptionsBuilder().UseTransport(transportType).Build())
     {
     }
 

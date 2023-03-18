@@ -39,8 +39,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BlazorWasm.Server", "sandbo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BlazorWasm.Shared", "sandbox\BlazorWasm\Shared\BlazorWasm.Shared.csproj", "{35D141D0-F80A-4E9B-A2AA-A1AEA925C9C2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UserAuthApp", "sandbox\UserAuthApp\UserAuthApp.csproj", "{CDA7F004-B493-441F-B2D1-D53D28421B63}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -87,10 +85,6 @@ Global
 		{35D141D0-F80A-4E9B-A2AA-A1AEA925C9C2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{35D141D0-F80A-4E9B-A2AA-A1AEA925C9C2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{35D141D0-F80A-4E9B-A2AA-A1AEA925C9C2}.Release|Any CPU.Build.0 = Release|Any CPU
-		{CDA7F004-B493-441F-B2D1-D53D28421B63}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{CDA7F004-B493-441F-B2D1-D53D28421B63}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{CDA7F004-B493-441F-B2D1-D53D28421B63}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{CDA7F004-B493-441F-B2D1-D53D28421B63}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -107,7 +101,6 @@ Global
 		{EFBCEF7F-51AA-4717-8E3E-304B6506F1AC} = {326017A7-18B3-4567-B9F9-5521E4467198}
 		{36B9F490-681F-432D-B8FA-64440EC076D9} = {326017A7-18B3-4567-B9F9-5521E4467198}
 		{35D141D0-F80A-4E9B-A2AA-A1AEA925C9C2} = {326017A7-18B3-4567-B9F9-5521E4467198}
-		{CDA7F004-B493-441F-B2D1-D53D28421B63} = {95A69671-16CA-4133-981C-CC381B7AAA30}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {8CBB7278-D093-448E-B3DE-B5991209A1AA}

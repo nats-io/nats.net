@@ -4,6 +4,50 @@ using System.Text;
 
 namespace NATS.Client.Core.Tests;
 
+public sealed class NatsServerOptionsBuilder
+{
+    readonly List<string> _extraConfigs = new();
+    bool _enableWebSocket;
+    bool _enableTls;
+    string? _tlsServerCertFile;
+    string? _tlsServerKeyFile;
+    string? _tlsCaFile;
+    public NatsServerOptions Build()
+    {
+        return new NatsServerOptions
+        {
+            EnableWebSocket = _enableWebSocket,
+            EnableTls = _enableTls,
+            TlsServerCertFile = _tlsServerCertFile,
+            TlsServerKeyFile = _tlsServerKeyFile,
+            TlsCaFile = _tlsCaFile,
+            ExtraConfigs = _extraConfigs,
+        };
+    }
+
+    public NatsServerOptionsBuilder UseTransport(TransportType transportType)
+    {
+        if (transportType == TransportType.Tls)
+        {
+            _enableTls = true;
+            _tlsServerCertFile = "resources/certs/server-cert.pem";
+            _tlsServerKeyFile = "resources/certs/server-key.pem";
+            _tlsCaFile = "resources/certs/ca-cert.pem";
+        }
+        else if (transportType == TransportType.WebSocket)
+        {
+            _enableWebSocket = true;
+        }
+        return this;
+    }
+
+    public NatsServerOptionsBuilder AddServerConfig(string config)
+    {
+        _extraConfigs.Add(File.ReadAllText(config));
+        return this;
+    }
+}
+
 public sealed class NatsServerOptions : IDisposable
 {
     public bool EnableClustering { get; init; }
@@ -15,6 +59,7 @@ public sealed class NatsServerOptions : IDisposable
     public string? TlsServerCertFile { get; init; }
     public string? TlsServerKeyFile { get; init; }
     public string? TlsCaFile { get; init; }
+    public List<string> ExtraConfigs { get; init; } = new();
 
     int disposed;
     string routes = "";
@@ -104,6 +149,9 @@ public sealed class NatsServerOptions : IDisposable
                 }
                 sb.AppendLine("}");
             }
+
+            foreach (var config in ExtraConfigs)
+                sb.AppendLine(config);
 
             return sb.ToString();
         }
