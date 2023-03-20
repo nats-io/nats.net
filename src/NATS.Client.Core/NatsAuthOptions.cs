@@ -12,6 +12,8 @@ public record NatsAuthOptions
 
     public string? Jwt { get; init; }
 
+    public string? Nkey { get; init; }
+
     public string? Seed { get; init; }
 
     public string? CredsFile { get; init; }

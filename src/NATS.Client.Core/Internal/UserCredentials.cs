@@ -9,13 +9,17 @@ internal class UserCredentials
     {
         Jwt = authOptions.Jwt;
         Seed = authOptions.Seed;
+        Nkey = authOptions.Nkey;
+        Token = authOptions.Token;
+
         if (!string.IsNullOrEmpty(authOptions.CredsFile))
         {
             (Jwt, Seed) = LoadCredsFile(authOptions.CredsFile);
         }
+
         if (!string.IsNullOrEmpty(authOptions.NKeyFile))
         {
-            Seed = LoadNKeyFile(authOptions.NKeyFile);
+            (Seed, Nkey) = LoadNKeyFile(authOptions.NKeyFile);
         }
     }
 
@@ -47,9 +51,10 @@ internal class UserCredentials
         return (jwt, seed);
     }
 
-    string LoadNKeyFile(string path)
+    (string, string) LoadNKeyFile(string path)
     {
         string? seed = null;
+        string? nkey = null;
 
         using var reader = new StreamReader(path);
         while (reader.ReadLine()?.Trim() is { } line)
@@ -58,17 +63,27 @@ internal class UserCredentials
             {
                 seed = line;
             }
+            else if (line.StartsWith("U"))
+            {
+                nkey = line;
+            }
         }
 
         if (seed == null)
-            throw new NatsException($"Can't find NKEY seed while loading creds file ${path}");
+            throw new NatsException($"Can't find seed while loading NKEY file ${path}");
+        if (nkey == null)
+            throw new NatsException($"Can't find public key while loading NKEY file ${path}");
 
-        return seed;
+        return (seed, nkey);
     }
 
     public string? Jwt { get; }
 
     public string? Seed { get; }
+
+    public string? Nkey { get; }
+
+    public string? Token { get; }
 
     public string? Sign(string? nonce)
     {
@@ -84,6 +99,8 @@ internal class UserCredentials
     internal void Authenticate(ClientOptions options, ServerInfo? info)
     {
         options.JWT = Jwt;
+        options.Nkey = Nkey;
+        options.AuthToken = Token;
         options.Sig = info is { AuthRequired: true, Nonce: { } } ? Sign(info.Nonce) : null;
     }
 }

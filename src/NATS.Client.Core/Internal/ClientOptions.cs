@@ -35,7 +35,7 @@ internal sealed class ClientOptions
     public bool TLSRequired { get; init; }
 
     [JsonPropertyName("nkey")]
-    public string? Nkey { get; init; } = null;
+    public string? Nkey { get; set; }
 
     /// <summary>The JWT that identifies a user permissions and account.</summary>
     [JsonPropertyName("jwt")]
@@ -47,7 +47,7 @@ internal sealed class ClientOptions
 
     /// <summary>Client authorization token (if auth_required is set)</summary>
     [JsonPropertyName("auth_token")]
-    public string? AuthToken { get; init; } = null;
+    public string? AuthToken { get; set; }
 
     /// <summary>Connection username (if auth_required is set)</summary>
     [JsonPropertyName("user")]
