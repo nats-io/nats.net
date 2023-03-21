@@ -6,7 +6,11 @@ indent_style = space
 indent_size = 2
 trim_trailing_whitespace = true
 insert_final_newline = true
-end_of_line = lf
+
+# Causing issues with Windows git clones when git is set to
+# automatically handle line endings, which is the default
+# i.e. git config --global core.autocrlf true
+#end_of_line = lf
 
 [src/NATS.Client.Core/NaCl/**.cs]
 generated_code = true
