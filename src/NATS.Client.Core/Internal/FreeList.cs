@@ -33,7 +33,8 @@ internal sealed class FreeList<T> : IDisposable
     {
         lock (_gate)
         {
-            if (_isDisposed) throw new ObjectDisposedException(nameof(FreeList<T>));
+            if (_isDisposed)
+                throw new ObjectDisposedException(nameof(FreeList<T>));
 
             if (_freeIndex.Count != 0)
             {
@@ -48,7 +49,7 @@ internal sealed class FreeList<T> : IDisposable
                 var newValues = new T[_values.Length * 2];
                 Array.Copy(_values, 0, newValues, 0, _values.Length);
                 _freeIndex.EnsureNewCapacity(newValues.Length);
-                for (int i = _values.Length; i < newValues.Length; i++)
+                for (var i = _values.Length; i < newValues.Length; i++)
                 {
                     _freeIndex.Enqueue(i);
                 }
@@ -66,10 +67,12 @@ internal sealed class FreeList<T> : IDisposable
     {
         lock (_gate)
         {
-            if (_isDisposed) return; // do nothing
+            if (_isDisposed)
+                return; // do nothing
 
             ref var v = ref _values[index];
-            if (v == null) throw new KeyNotFoundException($"key index {index} is not found.");
+            if (v == null)
+                throw new KeyNotFoundException($"key index {index} is not found.");
 
             v = null;
             _freeIndex.Enqueue(index);
@@ -105,7 +108,8 @@ internal sealed class FreeList<T> : IDisposable
     {
         lock (_gate)
         {
-            if (_isDisposed) return;
+            if (_isDisposed)
+                return;
             _isDisposed = true;
 
             _freeIndex = null!;
@@ -118,7 +122,7 @@ internal sealed class FreeList<T> : IDisposable
     private void Initialize()
     {
         _freeIndex = new FastQueue<int>(InitialCapacity);
-        for (int i = 0; i < InitialCapacity; i++)
+        for (var i = 0; i < InitialCapacity; i++)
         {
             _freeIndex.Enqueue(i);
         }

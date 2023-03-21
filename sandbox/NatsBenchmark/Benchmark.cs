@@ -47,23 +47,23 @@ namespace NatsBenchmark
 
             switch (_btype)
             {
-                case BenchType.SUITE:
-                    RunSuite();
-                    break;
-                case BenchType.PUB:
-                    RunPub("PUB", _count, _payloadSize);
-                    break;
-                case BenchType.PUBSUB:
-                    RunPubSub("PUBSUB", _count, _payloadSize);
-                    break;
-                case BenchType.REQREPLY:
-                    RunReqReply("REQREP", _count, _payloadSize);
-                    break;
-                case BenchType.REQREPLYASYNC:
-                    RunReqReplyAsync("REQREPASYNC", _count, _payloadSize).Wait();
-                    break;
-                default:
-                    throw new Exception("Invalid Type.");
+            case BenchType.SUITE:
+                RunSuite();
+                break;
+            case BenchType.PUB:
+                RunPub("PUB", _count, _payloadSize);
+                break;
+            case BenchType.PUBSUB:
+                RunPubSub("PUBSUB", _count, _payloadSize);
+                break;
+            case BenchType.REQREPLY:
+                RunReqReply("REQREP", _count, _payloadSize);
+                break;
+            case BenchType.REQREPLYASYNC:
+                RunReqReplyAsync("REQREPASYNC", _count, _payloadSize).Wait();
+                break;
+            default:
+                throw new Exception("Invalid Type.");
             }
         }
 
@@ -80,25 +80,25 @@ namespace NatsBenchmark
         {
             switch (value)
             {
-                case "PUB":
-                    _btype = BenchType.PUB;
-                    break;
-                case "PUBSUB":
-                    _btype = BenchType.PUBSUB;
-                    break;
-                case "REQREP":
-                    _btype = BenchType.REQREPLY;
-                    break;
-                case "REQREPASYNC":
-                    _btype = BenchType.REQREPLYASYNC;
-                    break;
-                case "SUITE":
-                    _btype = BenchType.SUITE;
-                    break;
-                default:
-                    _btype = BenchType.PUB;
-                    Console.WriteLine("No type specified.  Defaulting to PUB.");
-                    break;
+            case "PUB":
+                _btype = BenchType.PUB;
+                break;
+            case "PUBSUB":
+                _btype = BenchType.PUBSUB;
+                break;
+            case "REQREP":
+                _btype = BenchType.REQREPLY;
+                break;
+            case "REQREPASYNC":
+                _btype = BenchType.REQREPLYASYNC;
+                break;
+            case "SUITE":
+                _btype = BenchType.SUITE;
+                break;
+            default:
+                _btype = BenchType.PUB;
+                Console.WriteLine("No type specified.  Defaulting to PUB.");
+                break;
             }
         }
 
@@ -125,7 +125,7 @@ namespace NatsBenchmark
 
                 IDictionary<string, string> strArgs = new Dictionary<string, string>();
 
-                for (int i = 0; i < args.Length; i++)
+                for (var i = 0; i < args.Length; i++)
                 {
                     if (i + 1 > args.Length)
                         throw new Exception("Missing argument after " + args[i]);
@@ -167,7 +167,7 @@ namespace NatsBenchmark
 
         private void PrintResults(string testPrefix, Stopwatch sw, long testCount, long msgSize)
         {
-            int msgRate = (int)(testCount / sw.Elapsed.TotalSeconds);
+            var msgRate = (int)(testCount / sw.Elapsed.TotalSeconds);
 
             Console.WriteLine(
                 "{0}\t{1,10}\t{2,10} msgs/s\t{3,8} kb/s",
@@ -185,7 +185,7 @@ namespace NatsBenchmark
                 return null;
 
             data = new byte[size];
-            for (int i = 0; i < size; i++)
+            for (var i = 0; i < size; i++)
             {
                 data[i] = (byte)'a';
             }
@@ -195,7 +195,7 @@ namespace NatsBenchmark
 
         private void RunPub(string testName, long testCount, long testSize)
         {
-            byte[] payload = GeneratePayload(testSize);
+            var payload = GeneratePayload(testSize);
 
             var opts = ConnectionFactory.GetDefaultOptions();
             opts.Url = _url;
@@ -204,11 +204,11 @@ namespace NatsBenchmark
                 opts.SetUserCredentials(_creds);
             }
 
-            using (IConnection c = new ConnectionFactory().CreateConnection(opts))
+            using (var c = new ConnectionFactory().CreateConnection(opts))
             {
                 Stopwatch sw = sw = Stopwatch.StartNew();
 
-                for (int i = 0; i < testCount; i++)
+                for (var i = 0; i < testCount; i++)
                 {
                     c.Publish(_subject, payload);
                 }
@@ -221,15 +221,15 @@ namespace NatsBenchmark
 
         private void RunPubSub(string testName, long testCount, long testSize)
         {
-            object pubSubLock = new object();
-            bool finished = false;
-            int subCount = 0;
+            var pubSubLock = new object();
+            var finished = false;
+            var subCount = 0;
 
-            byte[] payload = GeneratePayload(testSize);
+            var payload = GeneratePayload(testSize);
 
-            ConnectionFactory cf = new ConnectionFactory();
+            var cf = new ConnectionFactory();
 
-            Options o = ConnectionFactory.GetDefaultOptions();
+            var o = ConnectionFactory.GetDefaultOptions();
             o.ClosedEventHandler = (_, __) => { };
             o.DisconnectedEventHandler = (_, __) => { };
 
@@ -245,10 +245,10 @@ namespace NatsBenchmark
                 Console.WriteLine("Error: " + obj.Error);
             };
 
-            IConnection subConn = cf.CreateConnection(o);
-            IConnection pubConn = cf.CreateConnection(o);
+            var subConn = cf.CreateConnection(o);
+            var pubConn = cf.CreateConnection(o);
 
-            IAsyncSubscription s = subConn.SubscribeAsync(_subject, (sender, args) =>
+            var s = subConn.SubscribeAsync(_subject, (sender, args) =>
             {
                 subCount++;
                 if (subCount == testCount)
@@ -266,9 +266,9 @@ namespace NatsBenchmark
             GC.Collect();
             GC.WaitForPendingFinalizers();
             GC.Collect();
-            Stopwatch sw = Stopwatch.StartNew();
+            var sw = Stopwatch.StartNew();
 
-            for (int i = 0; i < testCount; i++)
+            for (var i = 0; i < testCount; i++)
             {
                 pubConn.Publish(_subject, payload);
             }
@@ -301,14 +301,14 @@ namespace NatsBenchmark
 
         private void RunPubSubLatency(string testName, long testCount, long testSize)
         {
-            object subcriberLock = new object();
-            bool subscriberDone = false;
+            var subcriberLock = new object();
+            var subscriberDone = false;
 
-            List<long> measurements = new List<long>((int)testCount);
+            var measurements = new List<long>((int)testCount);
 
-            byte[] payload = GeneratePayload(testSize);
+            var payload = GeneratePayload(testSize);
 
-            ConnectionFactory cf = new ConnectionFactory();
+            var cf = new ConnectionFactory();
             var opts = ConnectionFactory.GetDefaultOptions();
             opts.Url = _url;
             if (_creds != null)
@@ -316,12 +316,12 @@ namespace NatsBenchmark
                 opts.SetUserCredentials(_creds);
             }
 
-            IConnection subConn = cf.CreateConnection(opts);
-            IConnection pubConn = cf.CreateConnection(opts);
+            var subConn = cf.CreateConnection(opts);
+            var pubConn = cf.CreateConnection(opts);
 
-            Stopwatch sw = new Stopwatch();
+            var sw = new Stopwatch();
 
-            IAsyncSubscription subs = subConn.SubscribeAsync(_subject, (sender, args) =>
+            var subs = subConn.SubscribeAsync(_subject, (sender, args) =>
             {
                 sw.Stop();
 
@@ -336,7 +336,7 @@ namespace NatsBenchmark
 
             subConn.Flush();
 
-            for (int i = 0; i < testCount; i++)
+            for (var i = 0; i < testCount; i++)
             {
                 lock (subcriberLock)
                 {
@@ -360,9 +360,9 @@ namespace NatsBenchmark
                 }
             }
 
-            double latencyAvg = measurements.Average();
+            var latencyAvg = measurements.Average();
 
-            double stddev = Math.Sqrt(
+            var stddev = Math.Sqrt(
                 measurements.Average(
                     v => Math.Pow(v - latencyAvg, 2)));
 
@@ -381,9 +381,9 @@ namespace NatsBenchmark
 
         private void RunReqReply(string testName, long testCount, long testSize)
         {
-            byte[] payload = GeneratePayload(testSize);
+            var payload = GeneratePayload(testSize);
 
-            ConnectionFactory cf = new ConnectionFactory();
+            var cf = new ConnectionFactory();
 
             var opts = ConnectionFactory.GetDefaultOptions();
             opts.Url = _url;
@@ -393,15 +393,15 @@ namespace NatsBenchmark
                 opts.SetUserCredentials(_creds);
             }
 
-            IConnection subConn = cf.CreateConnection(opts);
-            IConnection pubConn = cf.CreateConnection(opts);
+            var subConn = cf.CreateConnection(opts);
+            var pubConn = cf.CreateConnection(opts);
 
-            Thread t = new Thread(() =>
+            var t = new Thread(() =>
             {
-                ISyncSubscription s = subConn.SubscribeSync(_subject);
-                for (int i = 0; i < testCount; i++)
+                var s = subConn.SubscribeSync(_subject);
+                for (var i = 0; i < testCount; i++)
                 {
-                    Msg m = s.NextMessage();
+                    var m = s.NextMessage();
                     subConn.Publish(m.Reply, payload);
                     subConn.Flush();
                 }
@@ -412,7 +412,7 @@ namespace NatsBenchmark
             Thread.Sleep(1000);
 
             var sw = Stopwatch.StartNew();
-            for (int i = 0; i < testCount; i++)
+            for (var i = 0; i < testCount; i++)
             {
                 pubConn.Request(_subject, payload);
             }
@@ -427,9 +427,9 @@ namespace NatsBenchmark
 
         private async Task RunReqReplyAsync(string testName, long testCount, long testSize)
         {
-            byte[] payload = GeneratePayload(testSize);
+            var payload = GeneratePayload(testSize);
 
-            ConnectionFactory cf = new ConnectionFactory();
+            var cf = new ConnectionFactory();
 
             var opts = ConnectionFactory.GetDefaultOptions();
             opts.Url = _url;
@@ -439,15 +439,15 @@ namespace NatsBenchmark
                 opts.SetUserCredentials(_creds);
             }
 
-            IConnection subConn = cf.CreateConnection(opts);
-            IConnection pubConn = cf.CreateConnection(opts);
+            var subConn = cf.CreateConnection(opts);
+            var pubConn = cf.CreateConnection(opts);
 
-            Thread t = new Thread(() =>
+            var t = new Thread(() =>
             {
-                ISyncSubscription s = subConn.SubscribeSync(_subject);
-                for (int i = 0; i < testCount; i++)
+                var s = subConn.SubscribeSync(_subject);
+                for (var i = 0; i < testCount; i++)
                 {
-                    Msg m = s.NextMessage();
+                    var m = s.NextMessage();
                     subConn.Publish(m.Reply, payload);
                     subConn.Flush();
                 }
@@ -458,7 +458,7 @@ namespace NatsBenchmark
             Thread.Sleep(1000);
 
             var sw = Stopwatch.StartNew();
-            for (int i = 0; i < testCount; i++)
+            for (var i = 0; i < testCount; i++)
             {
                 await pubConn.RequestAsync(_subject, payload).ConfigureAwait(false);
             }

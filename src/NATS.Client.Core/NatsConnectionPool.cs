@@ -29,7 +29,7 @@ public sealed class NatsConnectionPool : IAsyncDisposable
     {
         poolSize = Math.Max(1, poolSize);
         _connections = new NatsConnection[poolSize];
-        for (int i = 0; i < _connections.Length; i++)
+        for (var i = 0; i < _connections.Length; i++)
         {
             var name = (options.Name == null) ? $"#{i}" : $"{options.Name}#{i}";
             var conn = new NatsConnection(options with { Name = name });

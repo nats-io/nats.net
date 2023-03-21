@@ -1,7 +1,6 @@
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using Cysharp.Diagnostics;
-using NATS.Client.Core;
 
 namespace NATS.Client.Core.Tests;
 
@@ -48,7 +47,8 @@ public class NatsServer : IAsyncDisposable
                 try
                 {
                     await client.ConnectAsync("localhost", Options.ServerPort, _cancellationTokenSource.Token);
-                    if (client.Connected) return;
+                    if (client.Connected)
+                        return;
                 }
                 catch
                 {

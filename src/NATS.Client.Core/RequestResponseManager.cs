@@ -80,7 +80,8 @@ internal sealed class RequestResponseManager : IDisposable
 
     public void Dispose()
     {
-        if (_isDisposed) return;
+        if (_isDisposed)
+            return;
         _isDisposed = true;
         _cancellationTokenSource.Cancel();
 
@@ -113,8 +114,10 @@ internal sealed class RequestResponseManager : IDisposable
 
         lock (_gate)
         {
-            if (_isDisposed) throw new NatsException("Connection is closed.");
-            if (_globalSubscription == null) throw new NatsException("Connection is disconnected.");
+            if (_isDisposed)
+                throw new NatsException("Connection is closed.");
+            if (_globalSubscription == null)
+                throw new NatsException("Connection is disconnected.");
             _responseBoxes.Add(id, (typeof(TResponse), command));
         }
 

@@ -92,7 +92,8 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
     /// </summary>
     public async ValueTask ConnectAsync()
     {
-        if (ConnectionState == NatsConnectionState.Open) return;
+        if (ConnectionState == NatsConnectionState.Open)
+            return;
 
         TaskCompletionSource? waiter = null;
         lock (_gate)
@@ -496,7 +497,8 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
         }
         catch (Exception ex)
         {
-            if (ex is OperationCanceledException) return;
+            if (ex is OperationCanceledException)
+                return;
             _logger.LogError(ex, "Unknown error, loop stopped and connection is invalid state.");
         }
     }
@@ -514,7 +516,8 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
 
     private async void StartPingTimer(CancellationToken cancellationToken)
     {
-        if (Options.PingInterval == TimeSpan.Zero) return;
+        if (Options.PingInterval == TimeSpan.Zero)
+            return;
 
         var periodicTimer = new PeriodicTimer(Options.PingInterval);
         ResetPongCount();
@@ -603,7 +606,8 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
 
     private void ThrowIfDisposed()
     {
-        if (_isDisposed) throw new ObjectDisposedException(null);
+        if (_isDisposed)
+            throw new ObjectDisposedException(null);
     }
 
     private async void WithConnect(Action<NatsConnection> core)

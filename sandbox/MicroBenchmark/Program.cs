@@ -85,7 +85,7 @@ public class DefaultRun
     [Benchmark]
     public async Task PublishAsync()
     {
-        for (int i = 0; i < 1; i++)
+        for (var i = 0; i < 1; i++)
         {
             await _connection.PublishAsync(_key, default(MyVector3));
         }
@@ -94,7 +94,7 @@ public class DefaultRun
     // [Benchmark]
     public async Task PublishAsyncRedis()
     {
-        for (int i = 0; i < 1; i++)
+        for (var i = 0; i < 1; i++)
         {
             await _redis.GetDatabase().PublishAsync(_key.Key, JsonSerializer.Serialize(default(MyVector3)));
         }
@@ -108,7 +108,7 @@ public class DefaultRun
         _handler.Called = 0;
         _handler.Max = count;
 
-        for (int i = 0; i < count; i++)
+        for (var i = 0; i < count; i++)
         {
             _connection.PostPublish(_key, default(MyVector3));
         }

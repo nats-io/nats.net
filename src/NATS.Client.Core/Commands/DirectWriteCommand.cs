@@ -12,7 +12,8 @@ public sealed class DirectWriteCommand : ICommand
     /// <param name="repeatCount">repeating count.</param>
     public DirectWriteCommand(string protocol, int repeatCount)
     {
-        if (repeatCount < 1) throw new ArgumentException("repeatCount should >= 1, repeatCount:" + repeatCount);
+        if (repeatCount < 1)
+            throw new ArgumentException("repeatCount should >= 1, repeatCount:" + repeatCount);
 
         if (repeatCount == 1)
         {
@@ -23,7 +24,7 @@ public sealed class DirectWriteCommand : ICommand
             var bin = Encoding.UTF8.GetBytes(protocol + "\r\n");
             _protocol = new byte[bin.Length * repeatCount];
             var span = _protocol.AsSpan();
-            for (int i = 0; i < repeatCount; i++)
+            for (var i = 0; i < repeatCount; i++)
             {
                 bin.CopyTo(span);
                 span = span.Slice(bin.Length);

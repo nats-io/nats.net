@@ -67,11 +67,11 @@ namespace NatsBenchmark
                 Verbose = false,
             };
 
-            object pubSubLock = new object();
-            bool finished = false;
-            int subCount = 0;
+            var pubSubLock = new object();
+            var finished = false;
+            var subCount = 0;
 
-            byte[] payload = GeneratePayload(testSize);
+            var payload = GeneratePayload(testSize);
 
             var pubConn = new NATS.Client.Core.NatsConnection(options);
             var subConn = new NATS.Client.Core.NatsConnection(options);
@@ -99,9 +99,9 @@ namespace NatsBenchmark
             GC.Collect();
             GC.WaitForPendingFinalizers();
             GC.Collect();
-            Stopwatch sw = Stopwatch.StartNew();
+            var sw = Stopwatch.StartNew();
 
-            for (int i = 0; i < testCount; i++)
+            for (var i = 0; i < testCount; i++)
             {
                 pubConn.PostPublish(key, payload);
             }
@@ -144,11 +144,11 @@ namespace NatsBenchmark
                 Verbose = false,
             };
 
-            object pubSubLock = new object();
-            bool finished = false;
-            int subCount = 0;
+            var pubSubLock = new object();
+            var finished = false;
+            var subCount = 0;
 
-            byte[] payload = GeneratePayload(testSize);
+            var payload = GeneratePayload(testSize);
 
             var pubConn = new NATS.Client.Core.NatsConnection(options);
             var subConn = new NATS.Client.Core.NatsConnection(options);
@@ -180,10 +180,10 @@ namespace NatsBenchmark
             GC.Collect();
             GC.WaitForPendingFinalizers();
             GC.Collect();
-            Stopwatch sw = Stopwatch.StartNew();
+            var sw = Stopwatch.StartNew();
 
             var to = testCount / data.Length;
-            for (int i = 0; i < to; i++)
+            for (var i = 0; i < to; i++)
             {
                 pubConn.PostPublishBatch(data!);
             }
@@ -226,11 +226,11 @@ namespace NatsBenchmark
                 Verbose = false,
             };
 
-            object pubSubLock = new object();
-            bool finished = false;
-            int subCount = 0;
+            var pubSubLock = new object();
+            var finished = false;
+            var subCount = 0;
 
-            byte[] payload = GeneratePayload(testSize);
+            var payload = GeneratePayload(testSize);
 
             var pubConn = new NATS.Client.Core.NatsConnection(options);
             var subConn = new NATS.Client.Core.NatsConnection(options);
@@ -262,9 +262,9 @@ namespace NatsBenchmark
             JetBrains.Profiler.Api.MemoryProfiler.ForceGc();
             JetBrains.Profiler.Api.MemoryProfiler.CollectAllocations(true);
             JetBrains.Profiler.Api.MemoryProfiler.GetSnapshot("Before");
-            Stopwatch sw = Stopwatch.StartNew();
+            var sw = Stopwatch.StartNew();
 
-            for (int i = 0; i < testCount; i++)
+            for (var i = 0; i < testCount; i++)
             {
                 pubConn.PostPublish(key, payload);
             }
@@ -308,11 +308,11 @@ namespace NatsBenchmark
                 Verbose = false,
             };
 
-            object pubSubLock = new object();
-            bool finished = false;
-            int subCount = 0;
+            var pubSubLock = new object();
+            var finished = false;
+            var subCount = 0;
 
-            byte[] payload = GeneratePayload(testSize);
+            var payload = GeneratePayload(testSize);
 
             var pubConn = new NATS.Client.Core.NatsConnection(options);
             var subConn = new NATS.Client.Core.NatsConnection(options);
@@ -343,10 +343,10 @@ namespace NatsBenchmark
             GC.WaitForPendingFinalizers();
             GC.Collect();
 
-            Stopwatch sw = Stopwatch.StartNew();
+            var sw = Stopwatch.StartNew();
 
             var to = testCount / batchSize;
-            for (int i = 0; i < to; i++)
+            for (var i = 0; i < to; i++)
             {
                 pubConn.PostDirectWrite(command);
             }
@@ -378,7 +378,7 @@ namespace NatsBenchmark
             if (testSize > 0)
             {
                 sb.AppendLine();
-                for (int i = 0; i < testSize; i++)
+                for (var i = 0; i < testSize; i++)
                 {
                     sb.Append('a');
                 }
@@ -408,14 +408,14 @@ namespace NatsBenchmark
                 Verbose = false,
             };
 
-            object pubSubLock = new object();
-            object pubSubLock2 = new object();
-            bool finished = false;
-            bool finished2 = false;
-            int subCount = 0;
-            int subCount2 = 0;
+            var pubSubLock = new object();
+            var pubSubLock2 = new object();
+            var finished = false;
+            var finished2 = false;
+            var subCount = 0;
+            var subCount2 = 0;
 
-            byte[] payload = GeneratePayload(testSize);
+            var payload = GeneratePayload(testSize);
 
             var pubConn = new NATS.Client.Core.NatsConnection(options);
             var subConn = new NATS.Client.Core.NatsConnection(options);
@@ -461,10 +461,10 @@ namespace NatsBenchmark
             GC.Collect();
             GC.WaitForPendingFinalizers();
             GC.Collect();
-            Stopwatch sw = Stopwatch.StartNew();
-            Stopwatch sw2 = Stopwatch.StartNew();
+            var sw = Stopwatch.StartNew();
+            var sw2 = Stopwatch.StartNew();
             var publishCount = testCount / 2;
-            for (int i = 0; i < publishCount; i++)
+            for (var i = 0; i < publishCount; i++)
             {
                 pubConn.PostPublish(key, payload);
                 pubConn2.PostPublish(key, payload);
@@ -527,9 +527,9 @@ namespace NatsBenchmark
                 Verbose = false,
             };
 
-            object pubSubLock = new object();
-            bool finished = false;
-            int subCount = 0;
+            var pubSubLock = new object();
+            var finished = false;
+            var subCount = 0;
 
             // byte[] payload = generatePayload(testSize);
             var pubConn = new NATS.Client.Core.NatsConnection(options);
@@ -562,12 +562,12 @@ namespace NatsBenchmark
             GC.Collect();
             GC.WaitForPendingFinalizers();
             GC.Collect();
-            Stopwatch sw = Stopwatch.StartNew();
+            var sw = Stopwatch.StartNew();
 
             // JetBrains.Profiler.Api.MemoryProfiler.ForceGc();
             // JetBrains.Profiler.Api.MemoryProfiler.CollectAllocations(true);
             // JetBrains.Profiler.Api.MemoryProfiler.GetSnapshot("Before");
-            for (int i = 0; i < testCount; i++)
+            for (var i = 0; i < testCount; i++)
             {
                 pubConn.PostPublish(key, default(Vector3));
             }
@@ -591,14 +591,14 @@ namespace NatsBenchmark
 
         private void RunPubSubVector3(string testName, long testCount)
         {
-            object pubSubLock = new object();
-            bool finished = false;
-            int subCount = 0;
+            var pubSubLock = new object();
+            var finished = false;
+            var subCount = 0;
 
             // byte[] payload = generatePayload(testSize);
-            ConnectionFactory cf = new ConnectionFactory();
+            var cf = new ConnectionFactory();
 
-            Options o = ConnectionFactory.GetDefaultOptions();
+            var o = ConnectionFactory.GetDefaultOptions();
             o.ClosedEventHandler = (_, __) => { };
             o.DisconnectedEventHandler = (_, __) => { };
 
@@ -614,10 +614,10 @@ namespace NatsBenchmark
                 Console.WriteLine("Error: " + obj.Error);
             };
 
-            IConnection subConn = cf.CreateConnection(o);
-            IConnection pubConn = cf.CreateConnection(o);
+            var subConn = cf.CreateConnection(o);
+            var pubConn = cf.CreateConnection(o);
 
-            IAsyncSubscription s = subConn.SubscribeAsync(_subject, (sender, args) =>
+            var s = subConn.SubscribeAsync(_subject, (sender, args) =>
             {
                 MessagePackSerializer.Deserialize<Vector3>(args.Message.Data);
 
@@ -639,9 +639,9 @@ namespace NatsBenchmark
             GC.Collect();
             GC.WaitForPendingFinalizers();
             GC.Collect();
-            Stopwatch sw = Stopwatch.StartNew();
+            var sw = Stopwatch.StartNew();
 
-            for (int i = 0; i < testCount; i++)
+            for (var i = 0; i < testCount; i++)
             {
                 pubConn.Publish(_subject, MessagePackSerializer.Serialize(default(Vector3)));
             }
@@ -676,11 +676,11 @@ namespace NatsBenchmark
             var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
             var logger = loggerFactory.CreateLogger<ILogger<Benchmark>>();
 
-            object pubSubLock = new object();
-            bool finished = false;
-            int subCount = 0;
+            var pubSubLock = new object();
+            var finished = false;
+            var subCount = 0;
 
-            byte[] payload = GeneratePayload(testSize);
+            var payload = GeneratePayload(testSize);
 
             var pubConn = StackExchange.Redis.ConnectionMultiplexer.Connect("localhost");
             var subConn = StackExchange.Redis.ConnectionMultiplexer.Connect("localhost");
@@ -700,9 +700,9 @@ namespace NatsBenchmark
                 }
             });
 
-            Stopwatch sw = Stopwatch.StartNew();
+            var sw = Stopwatch.StartNew();
 
-            for (int i = 0; i < testCount; i++)
+            for (var i = 0; i < testCount; i++)
             {
                 _ = pubConn.GetDatabase().PublishAsync(_subject, payload, StackExchange.Redis.CommandFlags.FireAndForget);
             }

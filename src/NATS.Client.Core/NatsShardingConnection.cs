@@ -75,7 +75,7 @@ public sealed class NatsShardingConnection : IAsyncDisposable
     {
         poolSize = Math.Max(1, poolSize);
         _pools = new NatsConnectionPool[urls.Length];
-        for (int i = 0; i < urls.Length; i++)
+        for (var i = 0; i < urls.Length; i++)
         {
             _pools[i] = new NatsConnectionPool(poolSize, options with { Url = urls[i] }, configureConnection);
         }

@@ -16,7 +16,8 @@ await using var conn = new NatsConnection();
 conn.OnConnectingAsync = async x =>
 {
     var health = await new HttpClient().GetFromJsonAsync<NatsHealth>($"http://{x.Host}:8222/healthz");
-    if (health == null || health.Status != "ok") throw new Exception();
+    if (health == null || health.Status != "ok")
+        throw new Exception();
 
     return x;
 };

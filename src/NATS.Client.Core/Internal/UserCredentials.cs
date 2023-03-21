@@ -33,10 +33,11 @@ internal class UserCredentials
 
     public string? Sign(string? nonce)
     {
-        if (Seed == null || nonce == null) return null;
+        if (Seed == null || nonce == null)
+            return null;
 
         using var kp = Nkeys.FromSeed(Seed);
-        byte[] bytes = kp.Sign(Encoding.ASCII.GetBytes(nonce));
+        var bytes = kp.Sign(Encoding.ASCII.GetBytes(nonce));
         var sig = CryptoBytes.ToBase64String(bytes);
 
         return sig;
@@ -60,12 +61,14 @@ internal class UserCredentials
             if (line.StartsWith("-----BEGIN NATS USER JWT-----"))
             {
                 jwt = reader.ReadLine();
-                if (jwt == null) break;
+                if (jwt == null)
+                    break;
             }
             else if (line.StartsWith("-----BEGIN USER NKEY SEED-----"))
             {
                 seed = reader.ReadLine();
-                if (seed == null) break;
+                if (seed == null)
+                    break;
             }
         }
 

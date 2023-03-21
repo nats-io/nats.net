@@ -77,7 +77,8 @@ internal sealed class SeqeunceBuilder
             t.Return(); // return to pool.
         }
 
-        if (target == null) throw new InvalidOperationException("failed to find next segment.");
+        if (target == null)
+            throw new InvalidOperationException("failed to find next segment.");
 
         _length -= (int)target.RunningIndex + index;
         target.SetMemory(target.Memory.Slice(index));

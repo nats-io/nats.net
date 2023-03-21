@@ -20,7 +20,7 @@ public class NkeyPair : IDisposable
         if (userSeed == null)
             throw new NatsException("seed cannot be null");
 
-        int len = userSeed.Length;
+        var len = userSeed.Length;
         if (len != Ed25519.PrivateKeySeedSize)
             throw new NatsException("invalid seed length");
 
@@ -61,7 +61,7 @@ public class NkeyPair : IDisposable
     /// <returns>The signature.</returns>
     public byte[] Sign(byte[] src)
     {
-        byte[] rv = Ed25519.Sign(src, _expandedPrivateKey);
+        var rv = Ed25519.Sign(src, _expandedPrivateKey);
         CryptoBytes.Wipe(_expandedPrivateKey);
         return rv;
     }
@@ -128,12 +128,12 @@ public class Nkeys
     /// <returns></returns>
     public static byte[] Decode(string src)
     {
-        byte[] raw = Base32.Decode(src);
-        ushort crc = (ushort)(raw[raw.Length - 2] | raw[raw.Length - 1] << 8);
+        var raw = Base32.Decode(src);
+        var crc = (ushort)(raw[raw.Length - 2] | raw[raw.Length - 1] << 8);
 
         // trim off the CRC16
-        int len = raw.Length - 2;
-        byte[] data = new byte[len];
+        var len = raw.Length - 2;
+        var data = new byte[len];
         Buffer.BlockCopy(raw, 0, data, 0, len);
 
         if (crc != Crc16.Checksum(data))
@@ -169,7 +169,7 @@ public class Nkeys
     /// <returns>A NATS Ed25519 Keypair</returns>
     public static NkeyPair FromSeed(string seed)
     {
-        byte[] userSeed = DecodeSeed(seed);
+        var userSeed = DecodeSeed(seed);
         try
         {
             var kp = new NkeyPair(userSeed);
@@ -215,23 +215,23 @@ public class Nkeys
     /// <returns>A the public key corresponding to Seed</returns>
     public static string PublicKeyFromSeed(string seed)
     {
-        byte[] s = Nkeys.Decode(seed);
+        var s = Nkeys.Decode(seed);
         if ((s[0] & (31 << 3)) != PrefixByteSeed)
         {
             throw new NatsException("Not a seed");
         }
 
         // reconstruct prefix byte
-        byte prefixByte = (byte)((s[0] & 7) << 5 | ((s[1] >> 3) & 31));
-        byte[] pubKey = Ed25519.PublicKeyFromSeed(DecodeSeed(s));
+        var prefixByte = (byte)((s[0] & 7) << 5 | ((s[1] >> 3) & 31));
+        var pubKey = Ed25519.PublicKeyFromSeed(DecodeSeed(s));
         return Encode(prefixByte, false, pubKey);
     }
 
     internal static byte[] DecodeSeed(byte[] raw)
     {
         // Need to do the reverse here to get back to internal representation.
-        byte b1 = (byte)(raw[0] & 248);  // 248 = 11111000
-        byte b2 = (byte)((raw[0] & 7) << 5 | ((raw[1] & 248) >> 3)); // 7 = 00000111
+        var b1 = (byte)(raw[0] & 248);  // 248 = 11111000
+        var b2 = (byte)((raw[0] & 7) << 5 | ((raw[1] & 248) >> 3)); // 7 = 00000111
 
         try
         {
@@ -242,7 +242,7 @@ public class Nkeys
                 throw new NatsException("Invalid Public Prefix Byte.");
 
             // Trim off the first two bytes
-            byte[] data = new byte[raw.Length - 2];
+            var data = new byte[raw.Length - 2];
             Buffer.BlockCopy(raw, 2, data, 0, data.Length);
             return data;
         }
@@ -269,14 +269,14 @@ public class Nkeys
         if (src.Length != 32)
             throw new NatsException("Invalid seed size");
 
-        MemoryStream stream = new MemoryStream();
+        var stream = new MemoryStream();
 
         if (seed)
         {
             // In order to make this human printable for both bytes, we need to do a little
             // bit manipulation to setup for base32 encoding which takes 5 bits at a time.
-            byte b1 = (byte)(PrefixByteSeed | (prefixbyte >> 5));
-            byte b2 = (byte)((prefixbyte & 31) << 3); // 31 = 00011111
+            var b1 = (byte)(PrefixByteSeed | (prefixbyte >> 5));
+            var b2 = (byte)((prefixbyte & 31) << 3); // 31 = 00011111
 
             stream.WriteByte(b1);
             stream.WriteByte(b2);
@@ -290,7 +290,7 @@ public class Nkeys
         stream.Write(src, 0, src.Length);
 
         // Calculate and write crc16 checksum
-        byte[] checksum = BitConverter.GetBytes(Crc16.Checksum(stream.ToArray()));
+        var checksum = BitConverter.GetBytes(Crc16.Checksum(stream.ToArray()));
         stream.Write(checksum, 0, checksum.Length);
 
         return Base32.Encode(stream.ToArray());
@@ -300,12 +300,12 @@ public class Nkeys
     {
         switch (prefixByte)
         {
-            case PrefixByteServer:
-            case PrefixByteCluster:
-            case PrefixByteOperator:
-            case PrefixByteAccount:
-            case PrefixByteUser:
-                return true;
+        case PrefixByteServer:
+        case PrefixByteCluster:
+        case PrefixByteOperator:
+        case PrefixByteAccount:
+        case PrefixByteUser:
+            return true;
         }
 
         return false;
@@ -313,7 +313,7 @@ public class Nkeys
 
     private static string CreateSeed(byte prefixbyte)
     {
-        byte[] rawSeed = new byte[32];
+        var rawSeed = new byte[32];
 
         using (var rng = RandomNumberGenerator.Create())
         {
@@ -364,8 +364,8 @@ internal static class Crc16
 
     internal static ushort Checksum(byte[] data)
     {
-        int crc = 0;
-        foreach (byte b in data)
+        var crc = 0;
+        foreach (var b in data)
         {
             crc = ((crc << 8) & 0xffff) ^ crc16tab[(crc >> 8) ^ (ushort)b & 0x00FF];
         }
@@ -389,8 +389,8 @@ internal class Base32
         if (indexOf > 0)
             input = input.Slice(0, indexOf);
 
-        int byteCount = input.Length * 5 / 8; // this must be TRUNCATED
-        byte[] returnArray = new byte[byteCount];
+        var byteCount = input.Length * 5 / 8; // this must be TRUNCATED
+        var returnArray = new byte[byteCount];
 
         byte curByte = 0, bitsRemaining = 8;
         int mask = 0, arrayIndex = 0;
@@ -398,7 +398,7 @@ internal class Base32
         for (var index = 0; index < input.Length; index++)
         {
             var c = input[index];
-            int cValue = CharToValue(c);
+            var cValue = CharToValue(c);
 
             if (bitsRemaining > 5)
             {
@@ -432,13 +432,13 @@ internal class Base32
             throw new ArgumentNullException("input");
         }
 
-        int charCount = (int)Math.Ceiling(input.Length / 5d) * 8;
-        char[] returnArray = new char[charCount];
+        var charCount = (int)Math.Ceiling(input.Length / 5d) * 8;
+        var returnArray = new char[charCount];
 
         byte nextChar = 0, bitsRemaining = 5;
-        int arrayIndex = 0;
+        var arrayIndex = 0;
 
-        foreach (byte b in input)
+        foreach (var b in input)
         {
             nextChar = (byte)(nextChar | (b >> (8 - bitsRemaining)));
             returnArray[arrayIndex++] = ValueToChar(nextChar);
@@ -467,24 +467,29 @@ internal class Base32
 
     private static int CharToValue(char c)
     {
-        int value = (int)c;
+        var value = (int)c;
 
         // 65-90 == uppercase letters
-        if (value < 91 && value > 64) return value - 65;
+        if (value < 91 && value > 64)
+            return value - 65;
 
         // 50-55 == numbers 2-7
-        if (value < 56 && value > 49) return value - 24;
+        if (value < 56 && value > 49)
+            return value - 24;
 
         // 97-122 == lowercase letters
-        if (value < 123 && value > 96) return value - 97;
+        if (value < 123 && value > 96)
+            return value - 97;
 
         throw new ArgumentException("Character is not a Base32 character.", "c");
     }
 
     private static char ValueToChar(byte b)
     {
-        if (b < 26) return (char)(b + 65);
-        if (b < 32) return (char)(b + 24);
+        if (b < 26)
+            return (char)(b + 65);
+        if (b < 32)
+            return (char)(b + 24);
         throw new ArgumentException("Byte is not a value Base32 value.", "b");
     }
 }

@@ -121,8 +121,10 @@ public abstract partial class NatsConnectionTest
         await subConnection.SubscribeAsync<int>(key, x =>
         {
             _output.WriteLine($"Received: {x}");
-            if (x == 1) signalComplete1.Pulse();
-            if (x == 2) signalComplete2.Pulse();
+            if (x == 1)
+                signalComplete1.Pulse();
+            if (x == 2)
+                signalComplete2.Pulse();
         });
         await subConnection.PingAsync(); // wait for subscribe complete
 

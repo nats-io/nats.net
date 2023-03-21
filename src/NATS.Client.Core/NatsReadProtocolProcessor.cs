@@ -41,7 +41,8 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
 
     public bool TryEnqueuePing(AsyncPingCommand ping)
     {
-        if (_disposed != 0) return false;
+        if (_disposed != 0)
+            return false;
         _pingCommands.Enqueue(ping);
         return true;
     }
@@ -105,7 +106,8 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         var jsonReader = new Utf8JsonReader(buffer.Slice(5));
 
         var serverInfo = JsonSerializer.Deserialize<ServerInfo>(ref jsonReader);
-        if (serverInfo == null) throw new NatsException("Can not parse ServerInfo.");
+        if (serverInfo == null)
+            throw new NatsException("Can not parse ServerInfo.");
         return serverInfo;
     }
 

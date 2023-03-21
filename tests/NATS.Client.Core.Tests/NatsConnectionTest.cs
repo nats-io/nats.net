@@ -36,7 +36,7 @@ public abstract partial class NatsConnectionTest
         });
         await subConnection.PingAsync(); // wait for subscribe complete
 
-        for (int i = 0; i < 10; i++)
+        for (var i = 0; i < 10; i++)
         {
             await pubConnection.PublishAsync(key, i);
         }
@@ -66,7 +66,8 @@ public abstract partial class NatsConnectionTest
             using var d = await subConnection.SubscribeAsync<SampleClass>(key, x =>
             {
                 actual.Add(x);
-                if (x.Id == 30) signalComplete.Pulse();
+                if (x.Id == 30)
+                    signalComplete.Pulse();
             });
             await subConnection.PingAsync(); // wait for subscribe complete
 
@@ -99,7 +100,8 @@ public abstract partial class NatsConnectionTest
 
         await subConnection.SubscribeRequestAsync<int, string>(key, x =>
         {
-            if (x == 100) throw new Exception();
+            if (x == 100)
+                throw new Exception();
             return text + x;
         });
 

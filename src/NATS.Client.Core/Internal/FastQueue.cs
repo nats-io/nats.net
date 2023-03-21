@@ -12,7 +12,8 @@ internal sealed class FastQueue<T>
 
     public FastQueue(int capacity)
     {
-        if (capacity < 0) throw new ArgumentOutOfRangeException("capacity");
+        if (capacity < 0)
+            throw new ArgumentOutOfRangeException("capacity");
         _array = new T[capacity];
         _head = _tail = _size = 0;
     }
@@ -39,11 +40,12 @@ internal sealed class FastQueue<T>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public T Dequeue()
     {
-        if (_size == 0) ThrowForEmptyQueue();
+        if (_size == 0)
+            ThrowForEmptyQueue();
 
-        int head = _head;
-        T[] array = _array;
-        T removed = array[head];
+        var head = _head;
+        var array = _array;
+        var removed = array[head];
         array[head] = default!;
         MoveNext(ref _head);
         _size--;
@@ -52,7 +54,7 @@ internal sealed class FastQueue<T>
 
     public void EnsureNewCapacity(int capacity)
     {
-        T[] newarray = new T[capacity];
+        var newarray = new T[capacity];
         if (_size > 0)
         {
             if (_head < _tail)
@@ -74,7 +76,7 @@ internal sealed class FastQueue<T>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void MoveNext(ref int index)
     {
-        int tmp = index + 1;
+        var tmp = index + 1;
         if (tmp == _array.Length)
         {
             tmp = 0;
