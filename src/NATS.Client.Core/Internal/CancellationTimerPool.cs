@@ -1,21 +1,22 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
 
 namespace NATS.Client.Core.Internal;
 
 // Pool and Node
 internal sealed class CancellationTimerPool : IObjectPoolNode<CancellationTimerPool>
 {
-    CancellationTimerPool? next;
-    public ref CancellationTimerPool? NextNode => ref next;
+    private readonly CancellationTokenSource _cancellationTokenSource;
 
-    readonly CancellationTokenSource cancellationTokenSource;
-
-    public CancellationToken Token => cancellationTokenSource.Token;
+    private CancellationTimerPool? _next;
 
     public CancellationTimerPool()
     {
-        this.cancellationTokenSource = new CancellationTokenSource();
+        _cancellationTokenSource = new CancellationTokenSource();
     }
+
+    public ref CancellationTimerPool? NextNode => ref _next;
+
+    public CancellationToken Token => _cancellationTokenSource.Token;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static CancellationTimerPool Rent(ObjectPool pool)
@@ -32,19 +33,19 @@ internal sealed class CancellationTimerPool : IObjectPoolNode<CancellationTimerP
 
     public void Return(ObjectPool pool)
     {
-        if (cancellationTokenSource.TryReset())
+        if (_cancellationTokenSource.TryReset())
         {
             pool.Return(this);
         }
         else
         {
-            cancellationTokenSource.Cancel();
-            cancellationTokenSource.Dispose();
+            _cancellationTokenSource.Cancel();
+            _cancellationTokenSource.Dispose();
         }
     }
 
     public void CancelAfter(TimeSpan delay)
     {
-        cancellationTokenSource.CancelAfter(delay);
+        _cancellationTokenSource.CancelAfter(delay);
     }
 }

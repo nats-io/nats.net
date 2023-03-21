@@ -1,22 +1,22 @@
-﻿using System.Text;
+using System.Text;
 
 namespace NATS.Client.Core.Tests;
 
 public abstract partial class NatsConnectionTest
 {
-    readonly ITestOutputHelper output;
-    readonly TransportType transportType;
+    private readonly ITestOutputHelper _output;
+    private readonly TransportType _transportType;
 
     protected NatsConnectionTest(ITestOutputHelper output, TransportType transportType)
     {
-        this.output = output;
-        this.transportType = transportType;
+        _output = output;
+        _transportType = transportType;
     }
 
     [Fact]
     public async Task SimplePubSubTest()
     {
-        await using var server = new NatsServer(output, transportType);
+        await using var server = new NatsServer(_output, _transportType);
 
         await using var subConnection = server.CreateClientConnection();
         await using var pubConnection = server.CreateClientConnection();
@@ -27,7 +27,7 @@ public abstract partial class NatsConnectionTest
         var list = new List<int>();
         await subConnection.SubscribeAsync<int>(key, x =>
         {
-            output.WriteLine($"Received: {x}");
+            _output.WriteLine($"Received: {x}");
             list.Add(x);
             if (x == 9)
             {
@@ -49,7 +49,7 @@ public abstract partial class NatsConnectionTest
     [Fact]
     public async Task EncodingTest()
     {
-        await using var server = new NatsServer(output, transportType);
+        await using var server = new NatsServer(_output, _transportType);
 
         var serializer1 = NatsOptions.Default.Serializer;
 
@@ -88,12 +88,11 @@ public abstract partial class NatsConnectionTest
     [InlineData(32768)] // 32 KiB
     public async Task RequestTest(int minSize)
     {
-        await using var server = new NatsServer(output, transportType);
+        await using var server = new NatsServer(_output, _transportType);
 
         var options = NatsOptions.Default with { RequestTimeout = TimeSpan.FromSeconds(5) };
         await using var subConnection = server.CreateClientConnection(options);
         await using var pubConnection = server.CreateClientConnection(options);
-
 
         var key = Guid.NewGuid().ToString();
         var text = new StringBuilder(minSize).Insert(0, "a", minSize).ToString();
@@ -127,10 +126,10 @@ public abstract partial class NatsConnectionTest
     {
         using var options = new NatsServerOptions
         {
-            EnableWebSocket = transportType == TransportType.WebSocket,
-            ServerDisposeReturnsPorts = false
+            EnableWebSocket = _transportType == TransportType.WebSocket,
+            ServerDisposeReturnsPorts = false,
         };
-        await using var server = new NatsServer(output, transportType, options);
+        await using var server = new NatsServer(_output, _transportType, options);
         var key = Guid.NewGuid().ToString();
 
         await using var subConnection = server.CreateClientConnection();
@@ -143,7 +142,7 @@ public abstract partial class NatsConnectionTest
         var waitForReceiveFinish = new WaitSignal();
         var d = await subConnection.SubscribeAsync(key, (int x) =>
         {
-            output.WriteLine("RECEIVED: " + x);
+            _output.WriteLine("RECEIVED: " + x);
             list.Add(x);
             if (x == 300)
             {
@@ -161,24 +160,24 @@ public abstract partial class NatsConnectionTest
         await pubConnection.PublishAsync(key, 200);
         await pubConnection.PublishAsync(key, 300);
 
-        output.WriteLine("TRY WAIT RECEIVE 300");
+        _output.WriteLine("TRY WAIT RECEIVE 300");
         await waitForReceive300;
 
         var disconnectSignal1 = subConnection.ConnectionDisconnectedAsAwaitable();
         var disconnectSignal2 = pubConnection.ConnectionDisconnectedAsAwaitable();
 
-        output.WriteLine("TRY DISCONNECT START");
+        _output.WriteLine("TRY DISCONNECT START");
         await server.DisposeAsync(); // disconnect server
         await disconnectSignal1;
         await disconnectSignal2;
 
         // start new nats server on same port
-        output.WriteLine("START NEW SERVER");
-        await using var newServer = new NatsServer(output, transportType, options);
+        _output.WriteLine("START NEW SERVER");
+        await using var newServer = new NatsServer(_output, _transportType, options);
         await subConnection.ConnectAsync(); // wait open again
         await pubConnection.ConnectAsync(); // wait open again
 
-        output.WriteLine("RECONNECT COMPLETE, PUBLISH 400 and 500");
+        _output.WriteLine("RECONNECT COMPLETE, PUBLISH 400 and 500");
         await pubConnection.PublishAsync(key, 400);
         await pubConnection.PublishAsync(key, 500);
         await waitForReceiveFinish;
@@ -189,7 +188,7 @@ public abstract partial class NatsConnectionTest
     [Fact(Timeout = 15000)]
     public async Task ReconnectClusterTest()
     {
-        await using var cluster = new NatsCluster(output, transportType);
+        await using var cluster = new NatsCluster(_output, _transportType);
         await Task.Delay(TimeSpan.FromSeconds(5)); // wait for cluster completely connected.
 
         var key = Guid.NewGuid().ToString();
@@ -202,12 +201,12 @@ public abstract partial class NatsConnectionTest
         await connection2.ConnectAsync();
         await connection3.ConnectAsync();
 
-        output.WriteLine("Server1 ClientConnectUrls:" +
-                         String.Join(", ", connection1.ServerInfo?.ClientConnectUrls ?? Array.Empty<string>()));
-        output.WriteLine("Server2 ClientConnectUrls:" +
-                         String.Join(", ", connection2.ServerInfo?.ClientConnectUrls ?? Array.Empty<string>()));
-        output.WriteLine("Server3 ClientConnectUrls:" +
-                         String.Join(", ", connection3.ServerInfo?.ClientConnectUrls ?? Array.Empty<string>()));
+        _output.WriteLine("Server1 ClientConnectUrls:" +
+                         string.Join(", ", connection1.ServerInfo?.ClientConnectUrls ?? Array.Empty<string>()));
+        _output.WriteLine("Server2 ClientConnectUrls:" +
+                         string.Join(", ", connection2.ServerInfo?.ClientConnectUrls ?? Array.Empty<string>()));
+        _output.WriteLine("Server3 ClientConnectUrls:" +
+                         string.Join(", ", connection3.ServerInfo?.ClientConnectUrls ?? Array.Empty<string>()));
 
         connection1.ServerInfo!.ClientConnectUrls!.Select(x => new NatsUri(x, true).Port).Distinct().Count().ShouldBe(3);
         connection2.ServerInfo!.ClientConnectUrls!.Select(x => new NatsUri(x, true).Port).Distinct().Count().ShouldBe(3);
@@ -218,7 +217,7 @@ public abstract partial class NatsConnectionTest
         var waitForReceiveFinish = new WaitSignal();
         var d = await connection1.SubscribeAsync(key, (int x) =>
         {
-            output.WriteLine("RECEIVED: " + x);
+            _output.WriteLine("RECEIVED: " + x);
             list.Add(x);
             if (x == 300)
             {
@@ -239,7 +238,7 @@ public abstract partial class NatsConnectionTest
 
         var disconnectSignal = connection1.ConnectionDisconnectedAsAwaitable(); // register disconnect before kill
 
-        output.WriteLine($"TRY KILL SERVER1 Port:{cluster.Server1.Options.ServerPort}");
+        _output.WriteLine($"TRY KILL SERVER1 Port:{cluster.Server1.Options.ServerPort}");
         await cluster.Server1.DisposeAsync(); // process kill
         await disconnectSignal;
 
@@ -257,15 +256,15 @@ public abstract partial class NatsConnectionTest
 
 public class SampleClass : IEquatable<SampleClass>
 {
-    public int Id { get; set; }
-
-    public string Name { get; set; }
-
     public SampleClass(int id, string name)
     {
         Id = id;
         Name = name;
     }
+
+    public int Id { get; set; }
+
+    public string Name { get; set; }
 
     public bool Equals(SampleClass? other)
     {

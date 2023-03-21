@@ -1,4 +1,4 @@
-﻿namespace NATS.Client.Core;
+namespace NATS.Client.Core;
 
 internal sealed class NatsUri : IEquatable<NatsUri>
 {
@@ -8,8 +8,6 @@ internal sealed class NatsUri : IEquatable<NatsUri>
     public readonly bool IsSeed;
     public readonly bool IsTls;
     public readonly bool IsWebSocket;
-    public string Host => Uri.Host;
-    public int Port => Uri.Port;
 
     public NatsUri(string urlString, bool isSeed, string defaultScheme = DefaultScheme)
     {
@@ -35,6 +33,7 @@ internal sealed class NatsUri : IEquatable<NatsUri>
                 {
                     uriBuilder.Port = 4222;
                 }
+
                 break;
             case "ws":
                 IsWebSocket = true;
@@ -48,6 +47,10 @@ internal sealed class NatsUri : IEquatable<NatsUri>
 
         Uri = uriBuilder.Uri;
     }
+
+    public string Host => Uri.Host;
+
+    public int Port => Uri.Port;
 
     public override string ToString()
     {

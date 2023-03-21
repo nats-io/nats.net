@@ -1,7 +1,7 @@
-﻿using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace NATS.Client.Core;
 
@@ -46,8 +46,7 @@ public sealed record NatsOptions
     TimeSpan ReconnectJitter,
     TimeSpan ConnectTimeout,
     int CommandPoolSize,
-    TimeSpan RequestTimeout
-)
+    TimeSpan RequestTimeout)
 {
     public static readonly NatsOptions Default = new(
         Url: "nats://localhost:4222",
@@ -69,8 +68,7 @@ public sealed record NatsOptions
         ReconnectJitter: TimeSpan.FromMilliseconds(100),
         ConnectTimeout: TimeSpan.FromSeconds(2),
         CommandPoolSize: 256,
-        RequestTimeout: TimeSpan.FromMinutes(1)
-    );
+        RequestTimeout: TimeSpan.FromMinutes(1));
 
     internal NatsUri[] GetSeedUris()
     {

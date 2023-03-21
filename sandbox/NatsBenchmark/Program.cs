@@ -1,12 +1,12 @@
-﻿using NATS.Client.Core;
+using System.Diagnostics;
+using System.Runtime;
+using System.Text;
 using MessagePack;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NATS.Client;
+using NATS.Client.Core;
 using NatsBenchmark;
-using System.Diagnostics;
-using System.Runtime;
-using System.Text;
 using ZLogger;
 
 var isPortableThreadPool = await IsRunOnPortableThreadPoolAsync();
@@ -16,9 +16,9 @@ Console.WriteLine(new { GCSettings.IsServerGC, GCSettings.LatencyMode });
 ThreadPool.SetMinThreads(1000, 1000);
 
 var key = new NatsKey("foo");
-//var p = PublishCommand<Vector3>.Create(key, new Vector3(), serializer);
-//(p as ICommand).Return();
 
+// var p = PublishCommand<Vector3>.Create(key, new Vector3(), serializer);
+// (p as ICommand).Return();
 try
 {
     // use only pubsub suite
@@ -29,7 +29,6 @@ catch (Exception e)
     Console.WriteLine("Error: " + e.Message);
     Console.WriteLine(e);
 }
-
 
 // COMPlus_ThreadPool_UsePortableThreadPool=0 -> false
 static Task<bool> IsRunOnPortableThreadPoolAsync()
@@ -43,12 +42,11 @@ static Task<bool> IsRunOnPortableThreadPoolAsync()
     return tcs.Task;
 }
 
-
 namespace NatsBenchmark
 {
-    partial class Benchmark
+    public partial class Benchmark
     {
-        void RunPubSubBenchmark(string testName, long testCount, long testSize, bool disableShow = false)
+        private void RunPubSubBenchmark(string testName, long testCount, long testSize, bool disableShow = false)
         {
             var provider = new ServiceCollection()
                 .AddLogging(x =>
@@ -59,7 +57,6 @@ namespace NatsBenchmark
                 })
                 .BuildServiceProvider();
 
-
             var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
             var logger = loggerFactory.CreateLogger<ILogger<Benchmark>>();
             var options = NatsOptions.Default with
@@ -67,14 +64,14 @@ namespace NatsBenchmark
                 // LoggerFactory = loggerFactory,
                 UseThreadPoolCallback = false,
                 Echo = false,
-                Verbose = false
+                Verbose = false,
             };
 
             object pubSubLock = new object();
             bool finished = false;
             int subCount = 0;
 
-            byte[] payload = generatePayload(testSize);
+            byte[] payload = GeneratePayload(testSize);
 
             var pubConn = new NATS.Client.Core.NatsConnection(options);
             var subConn = new NATS.Client.Core.NatsConnection(options);
@@ -82,15 +79,13 @@ namespace NatsBenchmark
             pubConn.ConnectAsync().AsTask().Wait();
             subConn.ConnectAsync().AsTask().Wait();
 
+            var key = new NatsKey(_subject);
 
-
-            var key = new NatsKey(subject);
-
-            var d = subConn.SubscribeAsync<byte[]>(subject, _ =>
+            var d = subConn.SubscribeAsync<byte[]>(_subject, _ =>
            {
                Interlocked.Increment(ref subCount);
-               // logger.LogInformation("here:{0}", subCount);
 
+               // logger.LogInformation("here:{0}", subCount);
                if (subCount == testCount)
                {
                    lock (pubSubLock)
@@ -115,8 +110,8 @@ namespace NatsBenchmark
             {
                 if (!finished)
                     Monitor.Wait(pubSubLock);
-
             }
+
             sw.Stop();
 
             if (!disableShow)
@@ -128,7 +123,7 @@ namespace NatsBenchmark
             subConn.DisposeAsync().AsTask().Wait();
         }
 
-        void RunPubSubBenchmarkBatch(string testName, long testCount, long testSize, bool disableShow = false)
+        private void RunPubSubBenchmarkBatch(string testName, long testCount, long testSize, bool disableShow = false)
         {
             var provider = new ServiceCollection()
                 .AddLogging(x =>
@@ -139,7 +134,6 @@ namespace NatsBenchmark
                 })
                 .BuildServiceProvider();
 
-
             var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
             var logger = loggerFactory.CreateLogger<ILogger<Benchmark>>();
             var options = NatsOptions.Default with
@@ -147,14 +141,14 @@ namespace NatsBenchmark
                 // LoggerFactory = loggerFactory,
                 UseThreadPoolCallback = false,
                 Echo = false,
-                Verbose = false
+                Verbose = false,
             };
 
             object pubSubLock = new object();
             bool finished = false;
             int subCount = 0;
 
-            byte[] payload = generatePayload(testSize);
+            byte[] payload = GeneratePayload(testSize);
 
             var pubConn = new NATS.Client.Core.NatsConnection(options);
             var subConn = new NATS.Client.Core.NatsConnection(options);
@@ -162,15 +156,13 @@ namespace NatsBenchmark
             pubConn.ConnectAsync().AsTask().Wait();
             subConn.ConnectAsync().AsTask().Wait();
 
+            var key = new NatsKey(_subject);
 
-
-            var key = new NatsKey(subject);
-
-            var d = subConn.SubscribeAsync<byte[]>(subject, _ =>
+            var d = subConn.SubscribeAsync<byte[]>(_subject, _ =>
             {
                 Interlocked.Increment(ref subCount);
-                // logger.LogInformation("here:{0}", subCount);
 
+                // logger.LogInformation("here:{0}", subCount);
                 if (subCount == testCount)
                 {
                     lock (pubSubLock)
@@ -180,7 +172,6 @@ namespace NatsBenchmark
                     }
                 }
             }).AsTask().Result;
-
 
             var data = Enumerable.Range(0, 1000)
                 .Select(x => (key, payload))
@@ -201,8 +192,8 @@ namespace NatsBenchmark
             {
                 if (!finished)
                     Monitor.Wait(pubSubLock);
-
             }
+
             sw.Stop();
 
             if (!disableShow)
@@ -214,8 +205,7 @@ namespace NatsBenchmark
             subConn.DisposeAsync().AsTask().Wait();
         }
 
-
-        void ProfilingRunPubSubBenchmarkAsync(string testName, long testCount, long testSize, bool disableShow = false)
+        private void ProfilingRunPubSubBenchmarkAsync(string testName, long testCount, long testSize, bool disableShow = false)
         {
             var provider = new ServiceCollection()
                 .AddLogging(x =>
@@ -226,7 +216,6 @@ namespace NatsBenchmark
                 })
                 .BuildServiceProvider();
 
-
             var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
             var logger = loggerFactory.CreateLogger<ILogger<Benchmark>>();
             var options = NatsOptions.Default with
@@ -234,14 +223,14 @@ namespace NatsBenchmark
                 // LoggerFactory = loggerFactory,
                 UseThreadPoolCallback = false,
                 Echo = false,
-                Verbose = false
+                Verbose = false,
             };
 
             object pubSubLock = new object();
             bool finished = false;
             int subCount = 0;
 
-            byte[] payload = generatePayload(testSize);
+            byte[] payload = GeneratePayload(testSize);
 
             var pubConn = new NATS.Client.Core.NatsConnection(options);
             var subConn = new NATS.Client.Core.NatsConnection(options);
@@ -249,15 +238,13 @@ namespace NatsBenchmark
             pubConn.ConnectAsync().AsTask().Wait();
             subConn.ConnectAsync().AsTask().Wait();
 
+            var key = new NatsKey(_subject);
 
-
-            var key = new NatsKey(subject);
-
-            var d = subConn.SubscribeAsync<byte[]>(subject, _ =>
+            var d = subConn.SubscribeAsync<byte[]>(_subject, _ =>
             {
                 Interlocked.Increment(ref subCount);
-                // logger.LogInformation("here:{0}", subCount);
 
+                // logger.LogInformation("here:{0}", subCount);
                 if (subCount == testCount)
                 {
                     lock (pubSubLock)
@@ -286,8 +273,8 @@ namespace NatsBenchmark
             {
                 if (!finished)
                     Monitor.Wait(pubSubLock);
-
             }
+
             sw.Stop();
             JetBrains.Profiler.Api.MemoryProfiler.GetSnapshot("Finished");
 
@@ -300,7 +287,7 @@ namespace NatsBenchmark
             subConn.DisposeAsync().AsTask().Wait();
         }
 
-        void RunPubSubBenchmarkBatchRaw(string testName, long testCount, long testSize, int batchSize = 1000, bool disableShow = false)
+        private void RunPubSubBenchmarkBatchRaw(string testName, long testCount, long testSize, int batchSize = 1000, bool disableShow = false)
         {
             var provider = new ServiceCollection()
                 .AddLogging(x =>
@@ -311,22 +298,21 @@ namespace NatsBenchmark
                 })
                 .BuildServiceProvider();
 
-
             var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
             var logger = loggerFactory.CreateLogger<ILogger<Benchmark>>();
             var options = NatsOptions.Default with
             {
-                //LoggerFactory = loggerFactory,
+                // LoggerFactory = loggerFactory,
                 UseThreadPoolCallback = false,
                 Echo = false,
-                Verbose = false
+                Verbose = false,
             };
 
             object pubSubLock = new object();
             bool finished = false;
             int subCount = 0;
 
-            byte[] payload = generatePayload(testSize);
+            byte[] payload = GeneratePayload(testSize);
 
             var pubConn = new NATS.Client.Core.NatsConnection(options);
             var subConn = new NATS.Client.Core.NatsConnection(options);
@@ -334,15 +320,13 @@ namespace NatsBenchmark
             pubConn.ConnectAsync().AsTask().Wait();
             subConn.ConnectAsync().AsTask().Wait();
 
+            var key = new NatsKey(_subject);
 
-
-            var key = new NatsKey(subject);
-
-            var d = subConn.SubscribeAsync<byte[]>(subject, _ =>
+            var d = subConn.SubscribeAsync<byte[]>(_subject, _ =>
             {
                 Interlocked.Increment(ref subCount);
-                // logger.LogInformation("here:{0}", subCount);
 
+                // logger.LogInformation("here:{0}", subCount);
                 if (subCount == testCount)
                 {
                     lock (pubSubLock)
@@ -352,7 +336,6 @@ namespace NatsBenchmark
                     }
                 }
             }).AsTask().Result;
-
 
             var command = new NATS.Client.Core.Commands.DirectWriteCommand(BuildCommand(testSize), batchSize);
 
@@ -372,8 +355,8 @@ namespace NatsBenchmark
             {
                 if (!finished)
                     Monitor.Wait(pubSubLock);
-
             }
+
             sw.Stop();
 
             if (!disableShow)
@@ -385,11 +368,11 @@ namespace NatsBenchmark
             subConn.DisposeAsync().AsTask().Wait();
         }
 
-        string BuildCommand(long testSize)
+        private string BuildCommand(long testSize)
         {
             var sb = new StringBuilder();
             sb.Append("PUB ");
-            sb.Append(this.subject);
+            sb.Append(_subject);
             sb.Append(" ");
             sb.Append(testSize);
             if (testSize > 0)
@@ -400,10 +383,11 @@ namespace NatsBenchmark
                     sb.Append('a');
                 }
             }
+
             return sb.ToString();
         }
 
-        void RunPubSubBenchmarkPubSub2(string testName, long testCount, long testSize, bool disableShow = false)
+        private void RunPubSubBenchmarkPubSub2(string testName, long testCount, long testSize, bool disableShow = false)
         {
             var provider = new ServiceCollection()
                 .AddLogging(x =>
@@ -414,7 +398,6 @@ namespace NatsBenchmark
                 })
                 .BuildServiceProvider();
 
-
             var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
             var logger = loggerFactory.CreateLogger<ILogger<Benchmark>>();
             var options = NatsOptions.Default with
@@ -422,7 +405,7 @@ namespace NatsBenchmark
                 // LoggerFactory = loggerFactory,
                 UseThreadPoolCallback = false,
                 Echo = false,
-                Verbose = false
+                Verbose = false,
             };
 
             object pubSubLock = new object();
@@ -432,7 +415,7 @@ namespace NatsBenchmark
             int subCount = 0;
             int subCount2 = 0;
 
-            byte[] payload = generatePayload(testSize);
+            byte[] payload = GeneratePayload(testSize);
 
             var pubConn = new NATS.Client.Core.NatsConnection(options);
             var subConn = new NATS.Client.Core.NatsConnection(options);
@@ -444,13 +427,13 @@ namespace NatsBenchmark
             pubConn2.ConnectAsync().AsTask().Wait();
             subConn2.ConnectAsync().AsTask().Wait();
 
-            var key = new NatsKey(subject);
+            var key = new NatsKey(_subject);
 
-            var d = subConn.SubscribeAsync<byte[]>(subject, _ =>
+            var d = subConn.SubscribeAsync<byte[]>(_subject, _ =>
             {
                 Interlocked.Increment(ref subCount);
-                // logger.LogInformation("here:{0}", subCount);
 
+                // logger.LogInformation("here:{0}", subCount);
                 if (subCount == testCount)
                 {
                     lock (pubSubLock)
@@ -460,11 +443,11 @@ namespace NatsBenchmark
                     }
                 }
             }).AsTask().Result;
-            var d2 = subConn2.SubscribeAsync<byte[]>(subject, _ =>
+            var d2 = subConn2.SubscribeAsync<byte[]>(_subject, _ =>
             {
                 Interlocked.Increment(ref subCount2);
-                // logger.LogInformation("here:{0}", subCount);
 
+                // logger.LogInformation("here:{0}", subCount);
                 if (subCount2 == testCount)
                 {
                     lock (pubSubLock2)
@@ -523,7 +506,7 @@ namespace NatsBenchmark
             subConn.DisposeAsync().AsTask().Wait();
         }
 
-        void RunPubSubBenchmarkVector3(string testName, long testCount, bool disableShow = false)
+        private void RunPubSubBenchmarkVector3(string testName, long testCount, bool disableShow = false)
         {
             var provider = new ServiceCollection()
                 .AddLogging(x =>
@@ -534,7 +517,6 @@ namespace NatsBenchmark
                 })
                 .BuildServiceProvider();
 
-
             var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
             var logger = loggerFactory.CreateLogger<ILogger<Benchmark>>();
             var options = NatsOptions.Default with
@@ -542,7 +524,7 @@ namespace NatsBenchmark
                 // LoggerFactory = loggerFactory,
                 UseThreadPoolCallback = false,
                 Echo = false,
-                Verbose = false
+                Verbose = false,
             };
 
             object pubSubLock = new object();
@@ -550,12 +532,10 @@ namespace NatsBenchmark
             int subCount = 0;
 
             // byte[] payload = generatePayload(testSize);
-
             var pubConn = new NATS.Client.Core.NatsConnection(options);
             var subConn = new NATS.Client.Core.NatsConnection(options);
 
-            var key = new NatsKey(subject);
-
+            var key = new NatsKey(_subject);
 
             pubConn.ConnectAsync().AsTask().Wait();
             subConn.ConnectAsync().AsTask().Wait();
@@ -563,43 +543,41 @@ namespace NatsBenchmark
             var d = subConn.SubscribeAsync<Vector3>(key.Key, _ =>
             {
                 Interlocked.Increment(ref subCount);
-                // logger.LogInformation("here:{0}", subCount);
 
+                // logger.LogInformation("here:{0}", subCount);
                 if (subCount == testCount)
                 {
                     lock (pubSubLock)
                     {
                         finished = true;
-                        //JetBrains.Profiler.Api.MemoryProfiler.GetSnapshot("After");
+
+                        // JetBrains.Profiler.Api.MemoryProfiler.GetSnapshot("After");
                         Monitor.Pulse(pubSubLock);
                     }
                 }
             }).AsTask().Result;
 
-            MessagePackSerializer.Serialize(new Vector3());
-
+            MessagePackSerializer.Serialize(default(Vector3));
 
             GC.Collect();
             GC.WaitForPendingFinalizers();
             GC.Collect();
             Stopwatch sw = Stopwatch.StartNew();
 
-            //JetBrains.Profiler.Api.MemoryProfiler.ForceGc();
-            //JetBrains.Profiler.Api.MemoryProfiler.CollectAllocations(true);
-            //JetBrains.Profiler.Api.MemoryProfiler.GetSnapshot("Before");
-
-
+            // JetBrains.Profiler.Api.MemoryProfiler.ForceGc();
+            // JetBrains.Profiler.Api.MemoryProfiler.CollectAllocations(true);
+            // JetBrains.Profiler.Api.MemoryProfiler.GetSnapshot("Before");
             for (int i = 0; i < testCount; i++)
             {
-                pubConn.PostPublish(key, new Vector3());
+                pubConn.PostPublish(key, default(Vector3));
             }
 
             lock (pubSubLock)
             {
                 if (!finished)
                     Monitor.Wait(pubSubLock);
-
             }
+
             sw.Stop();
 
             if (!disableShow)
@@ -611,26 +589,26 @@ namespace NatsBenchmark
             subConn.DisposeAsync().AsTask().Wait();
         }
 
-        void runPubSubVector3(string testName, long testCount)
+        private void RunPubSubVector3(string testName, long testCount)
         {
             object pubSubLock = new object();
             bool finished = false;
             int subCount = 0;
 
             // byte[] payload = generatePayload(testSize);
-
             ConnectionFactory cf = new ConnectionFactory();
 
             Options o = ConnectionFactory.GetDefaultOptions();
             o.ClosedEventHandler = (_, __) => { };
             o.DisconnectedEventHandler = (_, __) => { };
 
-            o.Url = url;
+            o.Url = _url;
             o.SubChannelLength = 10000000;
-            if (creds != null)
+            if (_creds != null)
             {
-                o.SetUserCredentials(creds);
+                o.SetUserCredentials(_creds);
             }
+
             o.AsyncErrorEventHandler += (sender, obj) =>
             {
                 Console.WriteLine("Error: " + obj.Error);
@@ -639,7 +617,7 @@ namespace NatsBenchmark
             IConnection subConn = cf.CreateConnection(o);
             IConnection pubConn = cf.CreateConnection(o);
 
-            IAsyncSubscription s = subConn.SubscribeAsync(subject, (sender, args) =>
+            IAsyncSubscription s = subConn.SubscribeAsync(_subject, (sender, args) =>
             {
                 MessagePackSerializer.Deserialize<Vector3>(args.Message.Data);
 
@@ -656,7 +634,7 @@ namespace NatsBenchmark
             s.SetPendingLimits(10000000, 1000000000);
             subConn.Flush();
 
-            MessagePackSerializer.Serialize(new Vector3());
+            MessagePackSerializer.Serialize(default(Vector3));
 
             GC.Collect();
             GC.WaitForPendingFinalizers();
@@ -665,7 +643,7 @@ namespace NatsBenchmark
 
             for (int i = 0; i < testCount; i++)
             {
-                pubConn.Publish(subject, MessagePackSerializer.Serialize(new Vector3()));
+                pubConn.Publish(_subject, MessagePackSerializer.Serialize(default(Vector3)));
             }
 
             pubConn.Flush();
@@ -674,8 +652,8 @@ namespace NatsBenchmark
             {
                 if (!finished)
                     Monitor.Wait(pubSubLock);
-
             }
+
             sw.Stop();
 
             PrintResults(testName, sw, testCount, 16);
@@ -684,9 +662,8 @@ namespace NatsBenchmark
             subConn.Close();
         }
 
-        void RunPubSubRedis(string testName, long testCount, long testSize)
+        private void RunPubSubRedis(string testName, long testCount, long testSize)
         {
-
             var provider = new ServiceCollection()
                 .AddLogging(x =>
                 {
@@ -696,7 +673,6 @@ namespace NatsBenchmark
                 })
                 .BuildServiceProvider();
 
-
             var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
             var logger = loggerFactory.CreateLogger<ILogger<Benchmark>>();
 
@@ -704,17 +680,16 @@ namespace NatsBenchmark
             bool finished = false;
             int subCount = 0;
 
-            byte[] payload = generatePayload(testSize);
+            byte[] payload = GeneratePayload(testSize);
 
             var pubConn = StackExchange.Redis.ConnectionMultiplexer.Connect("localhost");
             var subConn = StackExchange.Redis.ConnectionMultiplexer.Connect("localhost");
 
-
-            subConn.GetSubscriber().Subscribe(subject, (channel, v) =>
+            subConn.GetSubscriber().Subscribe(_subject, (channel, v) =>
             {
                 Interlocked.Increment(ref subCount);
-                //logger.LogInformation("here?:" + subCount);
 
+                // logger.LogInformation("here?:" + subCount);
                 if (subCount == testCount)
                 {
                     lock (pubSubLock)
@@ -729,15 +704,15 @@ namespace NatsBenchmark
 
             for (int i = 0; i < testCount; i++)
             {
-                _ = pubConn.GetDatabase().PublishAsync(subject, payload, StackExchange.Redis.CommandFlags.FireAndForget);
+                _ = pubConn.GetDatabase().PublishAsync(_subject, payload, StackExchange.Redis.CommandFlags.FireAndForget);
             }
 
             lock (pubSubLock)
             {
                 if (!finished)
                     Monitor.Wait(pubSubLock);
-
             }
+
             sw.Stop();
 
             PrintResults(testName, sw, testCount, testSize);
@@ -748,58 +723,54 @@ namespace NatsBenchmark
             subConn.Dispose();
         }
 
-        void runSuite()
+        private void RunSuite()
         {
-            //RunPubSubBenchmark("Benchmark8b", 10000000, 8, disableShow: true);
-            //RunPubSubBenchmarkVector3("BenchmarkV3", 10000000, disableShow: true);
+            // RunPubSubBenchmark("Benchmark8b", 10000000, 8, disableShow: true);
+            // RunPubSubBenchmarkVector3("BenchmarkV3", 10000000, disableShow: true);
 
-            //ProfilingRunPubSubBenchmarkAsync("BenchmarkProfiling", 10000000, 0);
+            // ProfilingRunPubSubBenchmarkAsync("BenchmarkProfiling", 10000000, 0);
 
             //
-            //RunPubSubBenchmarkBatchRaw("Benchmark", 10000000, 8, disableShow: true); // warmup
-            //RunPubSubBenchmarkBatchRaw("Benchmark", 500000, 1024 * 4, disableShow: true); // warmup
-            //RunPubSubBenchmarkBatchRaw("Benchmark", 100000, 1024 * 8, disableShow: true); // warmup
-            //RunPubSubBenchmarkBatchRaw("Benchmark8b_Opt", 10000000, 8);
-            //RunPubSubBenchmarkBatchRaw("Benchmark4k_Opt", 500000, 1024 * 4);
+            // RunPubSubBenchmarkBatchRaw("Benchmark", 10000000, 8, disableShow: true); // warmup
+            // RunPubSubBenchmarkBatchRaw("Benchmark", 500000, 1024 * 4, disableShow: true); // warmup
+            // RunPubSubBenchmarkBatchRaw("Benchmark", 100000, 1024 * 8, disableShow: true); // warmup
+            // RunPubSubBenchmarkBatchRaw("Benchmark8b_Opt", 10000000, 8);
+            // RunPubSubBenchmarkBatchRaw("Benchmark4k_Opt", 500000, 1024 * 4);
             RunPubSubBenchmarkBatchRaw("Benchmark8k_Opt", 100000, 1024 * 8, batchSize: 10, disableShow: true);
             RunPubSubBenchmarkBatchRaw("Benchmark8k_Opt", 100000, 1024 * 8, batchSize: 10);
             RunPubSubBenchmark("Benchmark8k", 100000, 1024 * 8, disableShow: true);
             RunPubSubBenchmark("Benchmark8k", 100000, 1024 * 8);
 
-            //RunPubSubBenchmark("Benchmark8b", 10000000, 8, disableShow: true);
-            //RunPubSubBenchmark("Benchmark8b", 10000000, 8);
+            // RunPubSubBenchmark("Benchmark8b", 10000000, 8, disableShow: true);
+            // RunPubSubBenchmark("Benchmark8b", 10000000, 8);
 
+            // runPubSubVector3("PubSubVector3", 10000000);
+            // runPubSub("PubSubNo", 10000000, 0);
+            // runPubSub("PubSub8b", 10000000, 8);
 
-            //runPubSubVector3("PubSubVector3", 10000000);
-            //runPubSub("PubSubNo", 10000000, 0);
-            //runPubSub("PubSub8b", 10000000, 8);
+            // runPubSub("PubSub8b", 10000000, 8);
 
-            //runPubSub("PubSub8b", 10000000, 8);
+            // runPubSub("PubSub32b", 10000000, 32);
+            // runPubSub("PubSub100b", 10000000, 100);
+            // runPubSub("PubSub256b", 10000000, 256);
+            // runPubSub("PubSub512b", 500000, 512);
+            // runPubSub("PubSub1k", 500000, 1024);
+            // runPubSub("PubSub4k", 500000, 1024 * 4);
+            RunPubSub("PubSub8k", 100000, 1024 * 8);
 
+            // RunPubSubBenchmarkVector3("BenchmarkV3", 10000000);
+            // RunPubSubBenchmark("BenchmarkNo", 10000000, 0);
+            // RunPubSubBenchmark("Benchmark8b", 10000000, 8);
+            // RunPubSubBenchmarkBatch("Benchmark8bBatch", 10000000, 8);
+            // RunPubSubBenchmarkPubSub2("Benchmark8b 2", 10000000, 8);
 
-            //runPubSub("PubSub32b", 10000000, 32);
-            //runPubSub("PubSub100b", 10000000, 100);
-            //runPubSub("PubSub256b", 10000000, 256);
-            //runPubSub("PubSub512b", 500000, 512);
-            //runPubSub("PubSub1k", 500000, 1024);
-            //runPubSub("PubSub4k", 500000, 1024 * 4);
-            runPubSub("PubSub8k", 100000, 1024 * 8);
-
-
-
-            //RunPubSubBenchmarkVector3("BenchmarkV3", 10000000);
-            //RunPubSubBenchmark("BenchmarkNo", 10000000, 0);
-            //RunPubSubBenchmark("Benchmark8b", 10000000, 8);
-            //RunPubSubBenchmarkBatch("Benchmark8bBatch", 10000000, 8);
-            //RunPubSubBenchmarkPubSub2("Benchmark8b 2", 10000000, 8);
-
-            //RunPubSubBenchmark("Benchmark32b", 10000000, 32);
-            //RunPubSubBenchmark("Benchmark100b", 10000000, 100);
-            //RunPubSubBenchmark("Benchmark256b", 10000000, 256);
-            //RunPubSubBenchmark("Benchmark512b", 500000, 512);
-            //RunPubSubBenchmark("Benchmark1k", 500000, 1024);
-            //RunPubSubBenchmark("Benchmark4k", 500000, 1024 * 4);
-            //RunPubSubBenchmark("Benchmark8k", 100000, 1024 * 8);
+            // RunPubSubBenchmark("Benchmark32b", 10000000, 32);
+            // RunPubSubBenchmark("Benchmark100b", 10000000, 100);
+            // RunPubSubBenchmark("Benchmark256b", 10000000, 256);
+            // RunPubSubBenchmark("Benchmark512b", 500000, 512);
+            // RunPubSubBenchmark("Benchmark1k", 500000, 1024);
+            // RunPubSubBenchmark("Benchmark4k", 500000, 1024 * 4);
+            // RunPubSubBenchmark("Benchmark8k", 100000, 1024 * 8);
 
             // Redis?
             // RunPubSubRedis("StackExchange.Redis", 10000000, 8);
@@ -807,32 +778,32 @@ namespace NatsBenchmark
 
             // These run significantly slower.
             // req->server->reply->server->req
-            //runReqReply("ReqReplNo", 20000, 0);
-            //runReqReply("ReqRepl8b", 10000, 8);
-            //runReqReply("ReqRepl32b", 10000, 32);
-            //runReqReply("ReqRepl256b", 5000, 256);
-            //runReqReply("ReqRepl512b", 5000, 512);
-            //runReqReply("ReqRepl1k", 5000, 1024);
-            //runReqReply("ReqRepl4k", 5000, 1024 * 4);
-            //runReqReply("ReqRepl8k", 5000, 1024 * 8);
+            // runReqReply("ReqReplNo", 20000, 0);
+            // runReqReply("ReqRepl8b", 10000, 8);
+            // runReqReply("ReqRepl32b", 10000, 32);
+            // runReqReply("ReqRepl256b", 5000, 256);
+            // runReqReply("ReqRepl512b", 5000, 512);
+            // runReqReply("ReqRepl1k", 5000, 1024);
+            // runReqReply("ReqRepl4k", 5000, 1024 * 4);
+            // runReqReply("ReqRepl8k", 5000, 1024 * 8);
 
-            //runReqReplyAsync("ReqReplAsyncNo", 20000, 0).Wait();
-            //runReqReplyAsync("ReqReplAsync8b", 10000, 8).Wait();
-            //runReqReplyAsync("ReqReplAsync32b", 10000, 32).Wait();
-            //runReqReplyAsync("ReqReplAsync256b", 5000, 256).Wait();
-            //runReqReplyAsync("ReqReplAsync512b", 5000, 512).Wait();
-            //runReqReplyAsync("ReqReplAsync1k", 5000, 1024).Wait();
-            //runReqReplyAsync("ReqReplAsync4k", 5000, 1024 * 4).Wait();
-            //runReqReplyAsync("ReqReplAsync8k", 5000, 1024 * 8).Wait();
+            // runReqReplyAsync("ReqReplAsyncNo", 20000, 0).Wait();
+            // runReqReplyAsync("ReqReplAsync8b", 10000, 8).Wait();
+            // runReqReplyAsync("ReqReplAsync32b", 10000, 32).Wait();
+            // runReqReplyAsync("ReqReplAsync256b", 5000, 256).Wait();
+            // runReqReplyAsync("ReqReplAsync512b", 5000, 512).Wait();
+            // runReqReplyAsync("ReqReplAsync1k", 5000, 1024).Wait();
+            // runReqReplyAsync("ReqReplAsync4k", 5000, 1024 * 4).Wait();
+            // runReqReplyAsync("ReqReplAsync8k", 5000, 1024 * 8).Wait();
 
-            //runPubSubLatency("LatNo", 500, 0);
-            //runPubSubLatency("Lat8b", 500, 8);
-            //runPubSubLatency("Lat32b", 500, 32);
-            //runPubSubLatency("Lat256b", 500, 256);
-            //runPubSubLatency("Lat512b", 500, 512);
-            //runPubSubLatency("Lat1k", 500, 1024);
-            //runPubSubLatency("Lat4k", 500, 1024 * 4);
-            //runPubSubLatency("Lat8k", 500, 1024 * 8);
+            // runPubSubLatency("LatNo", 500, 0);
+            // runPubSubLatency("Lat8b", 500, 8);
+            // runPubSubLatency("Lat32b", 500, 32);
+            // runPubSubLatency("Lat256b", 500, 256);
+            // runPubSubLatency("Lat512b", 500, 512);
+            // runPubSubLatency("Lat1k", 500, 1024);
+            // runPubSubLatency("Lat4k", 500, 1024 * 4);
+            // runPubSubLatency("Lat8k", 500, 1024 * 8);
         }
     }
 }
@@ -847,4 +818,3 @@ public struct Vector3
     [Key(2)]
     public float Z;
 }
-

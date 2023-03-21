@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
@@ -49,11 +49,13 @@ public static class NatsHostingExtensions
                 {
                     options = configureOptions(options);
                 }
+
                 var conn = new NatsConnection(options);
                 if (configureConnection != null)
                 {
                     configureConnection(conn);
                 }
+
                 return conn;
             });
 

@@ -1,4 +1,4 @@
-﻿using System.Net.Sockets;
+using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Runtime.CompilerServices;
 
@@ -6,16 +6,16 @@ namespace NATS.Client.Core.Internal;
 
 internal sealed class WebSocketConnection : ISocketConnection
 {
-    readonly ClientWebSocket socket;
-    readonly TaskCompletionSource<Exception> waitForClosedSource = new();
-    int disposed;
-
-    public Task<Exception> WaitForClosed => waitForClosedSource.Task;
+    private readonly ClientWebSocket _socket;
+    private readonly TaskCompletionSource<Exception> _waitForClosedSource = new();
+    private int _disposed;
 
     public WebSocketConnection()
     {
-        this.socket = new ClientWebSocket();
+        _socket = new ClientWebSocket();
     }
+
+    public Task<Exception> WaitForClosed => _waitForClosedSource.Task;
 
     // CancellationToken is not used, operation lifetime is completely same as socket.
 
@@ -26,11 +26,10 @@ internal sealed class WebSocketConnection : ISocketConnection
     //  throws DisposedException
 
     // return ValueTask directly for performance, not care exception and signal-disconnected.
-
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Task ConnectAsync(Uri uri, CancellationToken cancellationToken)
     {
-        return socket.ConnectAsync(uri, cancellationToken);
+        return _socket.ConnectAsync(uri, cancellationToken);
     }
 
     /// <summary>
@@ -41,7 +40,7 @@ internal sealed class WebSocketConnection : ISocketConnection
         using var cts = new CancellationTokenSource(timeout);
         try
         {
-            await socket.ConnectAsync(uri, cts.Token).ConfigureAwait(false);
+            await _socket.ConnectAsync(uri, cts.Token).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -60,14 +59,14 @@ internal sealed class WebSocketConnection : ISocketConnection
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public async ValueTask<int> SendAsync(ReadOnlyMemory<byte> buffer)
     {
-        await socket.SendAsync(buffer, WebSocketMessageType.Binary, WebSocketMessageFlags.EndOfMessage, CancellationToken.None).ConfigureAwait(false);
+        await _socket.SendAsync(buffer, WebSocketMessageType.Binary, WebSocketMessageFlags.EndOfMessage, CancellationToken.None).ConfigureAwait(false);
         return buffer.Length;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public async ValueTask<int> ReceiveAsync(Memory<byte> buffer)
     {
-        var wsRead = await socket.ReceiveAsync(buffer, CancellationToken.None).ConfigureAwait(false);
+        var wsRead = await _socket.ReceiveAsync(buffer, CancellationToken.None).ConfigureAwait(false);
         return wsRead.Count;
     }
 
@@ -75,27 +74,31 @@ internal sealed class WebSocketConnection : ISocketConnection
     {
         // ClientWebSocket.Abort() doesn't accept a cancellation token, so check at the beginning of this method
         cancellationToken.ThrowIfCancellationRequested();
-        socket.Abort();
+        _socket.Abort();
         return default;
     }
 
     public ValueTask DisposeAsync()
     {
-        if (Interlocked.Increment(ref disposed) == 1)
+        if (Interlocked.Increment(ref _disposed) == 1)
         {
             try
             {
-                waitForClosedSource.TrySetCanceled();
+                _waitForClosedSource.TrySetCanceled();
             }
-            catch { }
-            socket.Dispose();
+            catch
+            {
+            }
+
+            _socket.Dispose();
         }
+
         return default;
     }
 
     // when catch SocketClosedException, call this method.
     public void SignalDisconnected(Exception exception)
     {
-        waitForClosedSource.TrySetResult(exception);
+        _waitForClosedSource.TrySetResult(exception);
     }
 }

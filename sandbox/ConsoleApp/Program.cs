@@ -1,6 +1,6 @@
-﻿using NATS.Client.Core;
-using Microsoft.Extensions.Logging;
 using System.Net.Http.Json;
+using Microsoft.Extensions.Logging;
+using NATS.Client.Core;
 using NATS.Client.Hosting;
 
 var builder = ConsoleApp.CreateBuilder(args);
@@ -9,36 +9,23 @@ builder.ConfigureServices(services =>
     services.AddNats(poolSize: 4, configureOptions: opt => opt with { Url = "localhost:4222", Name = "MyClient" });
 });
 
-
-
 // create connection(default, connect to nats://localhost:4222)
 
-
 // var conn = new NatsConnectionPool(1).GetConnection();
-
-
 await using var conn = new NatsConnection();
 conn.OnConnectingAsync = async x =>
 {
     var health = await new HttpClient().GetFromJsonAsync<NatsHealth>($"http://{x.Host}:8222/healthz");
-    if (health == null || health.status != "ok") throw new Exception();
+    if (health == null || health.Status != "ok") throw new Exception();
 
     return x;
 };
-
-
-
 
 // Server
 await conn.SubscribeRequestAsync("foobar", (int x) => $"Hello {x}");
 
 // Client(response: "Hello 100")
 var response = await conn.RequestAsync<int, string>("foobar", 100);
-
-
-
-
-
 
 // subscribe
 var subscription = await conn.SubscribeAsync<Person>("foo", x =>
@@ -48,8 +35,6 @@ var subscription = await conn.SubscribeAsync<Person>("foo", x =>
 
 // publish
 await conn.PublishAsync("foo", new Person(30, "bar"));
-
-
 
 // Options can configure `with` expression
 var options = NatsOptions.Default with
@@ -64,9 +49,6 @@ var options = NatsOptions.Default with
     },
 };
 
-
-
-
 var app = builder.Build();
 
 app.AddCommands<Runner>();
@@ -76,20 +58,20 @@ public record Person(int Age, string Name);
 
 public class Runner : ConsoleAppBase
 {
-    readonly INatsCommand command;
+    private readonly INatsCommand _command;
 
     public Runner(INatsCommand command)
     {
-        this.command = command;
+        _command = command;
     }
 
     [RootCommand]
     public async Task Run()
     {
-        await command.SubscribeAsync("foo", () => Console.WriteLine("Yeah"));
-        await command.PingAsync();
-        await command.PublishAsync("foo");
+        await _command.SubscribeAsync("foo", () => Console.WriteLine("Yeah"));
+        await _command.PingAsync();
+        await _command.PublishAsync("foo");
     }
 }
 
-public record NatsHealth(string status);
+public record NatsHealth(string Status);

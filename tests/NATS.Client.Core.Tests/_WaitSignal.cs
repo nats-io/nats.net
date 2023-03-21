@@ -1,44 +1,7 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
 using NATS.Client.Core;
 
 namespace NATS.Client.Core.Tests;
-
-public class WaitSignal
-{
-    TimeSpan timeout;
-    TaskCompletionSource tcs;
-
-    public TimeSpan Timeout => timeout;
-    public Task Task => tcs.Task;
-
-    public WaitSignal()
-        : this(TimeSpan.FromSeconds(10))
-    {
-    }
-
-    public WaitSignal(TimeSpan timeout)
-    {
-        this.timeout = timeout;
-        this.tcs = new TaskCompletionSource();
-    }
-
-    public void Pulse(Exception? exception = null)
-    {
-        if (exception == null)
-        {
-            tcs.TrySetResult();
-        }
-        else
-        {
-            tcs.TrySetException(exception);
-        }
-    }
-
-    public TaskAwaiter GetAwaiter()
-    {
-        return tcs.Task.WaitAsync(timeout).GetAwaiter();
-    }
-}
 
 public static class WaitSignalExtensions
 {
@@ -70,5 +33,43 @@ public static class WaitSignalExtensions
             signal.Pulse();
         };
         return signal.Task.WaitAsync(signal.Timeout);
+    }
+}
+
+public class WaitSignal
+{
+    private TimeSpan _timeout;
+    private TaskCompletionSource _tcs;
+
+    public WaitSignal()
+        : this(TimeSpan.FromSeconds(10))
+    {
+    }
+
+    public WaitSignal(TimeSpan timeout)
+    {
+        _timeout = timeout;
+        _tcs = new TaskCompletionSource();
+    }
+
+    public TimeSpan Timeout => _timeout;
+
+    public Task Task => _tcs.Task;
+
+    public void Pulse(Exception? exception = null)
+    {
+        if (exception == null)
+        {
+            _tcs.TrySetResult();
+        }
+        else
+        {
+            _tcs.TrySetException(exception);
+        }
+    }
+
+    public TaskAwaiter GetAwaiter()
+    {
+        return _tcs.Task.WaitAsync(_timeout).GetAwaiter();
     }
 }

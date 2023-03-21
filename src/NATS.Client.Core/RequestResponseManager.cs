@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Text;
 using NATS.Client.Core.Commands;
 using NATS.Client.Core.Internal;
@@ -7,27 +7,28 @@ namespace NATS.Client.Core;
 
 internal sealed class RequestResponseManager : IDisposable
 {
-    internal readonly NatsConnection connection;
-    readonly ObjectPool pool;
-    readonly object gate = new object();
-    readonly SemaphoreSlim asyncLock = new SemaphoreSlim(1, 1);
-    readonly CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
+    internal readonly NatsConnection Connection;
+    private readonly ObjectPool _pool;
+    private readonly object _gate = new object();
+    private readonly SemaphoreSlim _asyncLock = new SemaphoreSlim(1, 1);
+    private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
 
-    int requestId = 0; // unique id per connection
-    bool isDisposed;
+    private int _requestId = 0; // unique id per connection
+    private bool _isDisposed;
+
     // ID: Handler
-    Dictionary<int, (Type responseType, object handler)> responseBoxes = new();
-    IDisposable? globalSubscription;
+    private Dictionary<int, (Type responseType, object handler)> _responseBoxes = new();
+    private IDisposable? _globalSubscription;
 
     public RequestResponseManager(NatsConnection connection, ObjectPool pool)
     {
-        this.connection = connection;
-        this.pool = pool;
+        Connection = connection;
+        _pool = pool;
     }
 
     public ValueTask<RequestAsyncCommand<TRequest, TResponse?>> AddAsync<TRequest, TResponse>(NatsKey key, ReadOnlyMemory<byte> inBoxPrefix, TRequest request, CancellationToken cancellationToken)
     {
-        if (globalSubscription == null)
+        if (_globalSubscription == null)
         {
             return AddWithGlobalSubscribeAsync<TRequest, TResponse>(key, inBoxPrefix, request, cancellationToken);
         }
@@ -35,89 +36,89 @@ internal sealed class RequestResponseManager : IDisposable
         return new ValueTask<RequestAsyncCommand<TRequest, TResponse?>>(AddAsyncCore<TRequest, TResponse>(key, inBoxPrefix, request, cancellationToken));
     }
 
-    async ValueTask<RequestAsyncCommand<TRequest, TResponse?>> AddWithGlobalSubscribeAsync<TRequest, TResponse>(NatsKey key, ReadOnlyMemory<byte> inBoxPrefix, TRequest request, CancellationToken cancellationToken)
-    {
-        await asyncLock.WaitAsync(cancellationTokenSource.Token).ConfigureAwait(false);
-        try
-        {
-            if (globalSubscription == null)
-            {
-                var globalSubscribeKey = $"{Encoding.ASCII.GetString(inBoxPrefix.Span)}*";
-                globalSubscription = await connection.SubscribeAsync<byte[]>(globalSubscribeKey, _ => { }).ConfigureAwait(false);
-            }
-        }
-        finally
-        {
-            asyncLock.Release();
-        }
-
-        return AddAsyncCore<TRequest, TResponse>(key, inBoxPrefix, request, cancellationToken);
-    }
-
-    RequestAsyncCommand<TRequest, TResponse?> AddAsyncCore<TRequest, TResponse>(NatsKey key, ReadOnlyMemory<byte> inBoxPrefix, TRequest request, CancellationToken cancellationToken)
-    {
-        var id = Interlocked.Increment(ref requestId);
-        var command = RequestAsyncCommand<TRequest, TResponse?>.Create(pool, key, inBoxPrefix, id, request, connection.Options.Serializer, cancellationToken, this);
-
-        lock (gate)
-        {
-            if (isDisposed) throw new NatsException("Connection is closed.");
-            if (globalSubscription == null) throw new NatsException("Connection is disconnected.");
-            responseBoxes.Add(id, (typeof(TResponse), command));
-        }
-
-        connection.PostCommand(command);
-        return command;
-    }
-
-
     public void PublishToResponseHandler(int id, in ReadOnlySequence<byte> buffer)
     {
         (Type responseType, object handler) box;
-        lock (gate)
+        lock (_gate)
         {
-            if (!responseBoxes.Remove(id, out box))
+            if (!_responseBoxes.Remove(id, out box))
             {
                 return;
             }
         }
 
-        ResponsePublisher.PublishResponse(box.responseType, connection.Options, buffer, box.handler);
+        ResponsePublisher.PublishResponse(box.responseType, Connection.Options, buffer, box.handler);
     }
 
     public bool Remove(int id)
     {
-        lock (gate)
+        lock (_gate)
         {
-            return responseBoxes.Remove(id, out _);
+            return _responseBoxes.Remove(id, out _);
         }
     }
 
     // when socket disconnected, can not receive new one so set cancel all waiting promise.
     public void Reset()
     {
-        lock (gate)
+        lock (_gate)
         {
-            foreach (var item in responseBoxes)
+            foreach (var item in _responseBoxes)
             {
                 if (item.Value.handler is IPromise p)
                 {
                     p.SetCanceled(CancellationToken.None);
                 }
             }
-            responseBoxes.Clear();
 
-            globalSubscription?.Dispose();
-            globalSubscription = null;
+            _responseBoxes.Clear();
+
+            _globalSubscription?.Dispose();
+            _globalSubscription = null;
         }
     }
 
     public void Dispose()
     {
-        if (isDisposed) return;
-        isDisposed = true;
-        cancellationTokenSource.Cancel();
+        if (_isDisposed) return;
+        _isDisposed = true;
+        _cancellationTokenSource.Cancel();
 
         Reset();
+    }
+
+    private async ValueTask<RequestAsyncCommand<TRequest, TResponse?>> AddWithGlobalSubscribeAsync<TRequest, TResponse>(NatsKey key, ReadOnlyMemory<byte> inBoxPrefix, TRequest request, CancellationToken cancellationToken)
+    {
+        await _asyncLock.WaitAsync(_cancellationTokenSource.Token).ConfigureAwait(false);
+        try
+        {
+            if (_globalSubscription == null)
+            {
+                var globalSubscribeKey = $"{Encoding.ASCII.GetString(inBoxPrefix.Span)}*";
+                _globalSubscription = await Connection.SubscribeAsync<byte[]>(globalSubscribeKey, _ => { }).ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            _asyncLock.Release();
+        }
+
+        return AddAsyncCore<TRequest, TResponse>(key, inBoxPrefix, request, cancellationToken);
+    }
+
+    private RequestAsyncCommand<TRequest, TResponse?> AddAsyncCore<TRequest, TResponse>(NatsKey key, ReadOnlyMemory<byte> inBoxPrefix, TRequest request, CancellationToken cancellationToken)
+    {
+        var id = Interlocked.Increment(ref _requestId);
+        var command = RequestAsyncCommand<TRequest, TResponse?>.Create(_pool, key, inBoxPrefix, id, request, Connection.Options.Serializer, cancellationToken, this);
+
+        lock (_gate)
+        {
+            if (_isDisposed) throw new NatsException("Connection is closed.");
+            if (_globalSubscription == null) throw new NatsException("Connection is disconnected.");
+            _responseBoxes.Add(id, (typeof(TResponse), command));
+        }
+
+        Connection.PostCommand(command);
+        return command;
     }
 }

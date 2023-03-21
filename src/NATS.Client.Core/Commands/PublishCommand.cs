@@ -1,15 +1,15 @@
-﻿using System.Threading.Tasks.Sources;
+using System.Threading.Tasks.Sources;
 using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core.Commands;
 
 internal sealed class PublishCommand<T> : CommandBase<PublishCommand<T>>
 {
-    NatsKey subject;
-    T? value;
-    INatsSerializer? serializer;
+    private NatsKey _subject;
+    private T? _value;
+    private INatsSerializer? _serializer;
 
-    PublishCommand()
+    private PublishCommand()
     {
     }
 
@@ -20,33 +20,33 @@ internal sealed class PublishCommand<T> : CommandBase<PublishCommand<T>>
             result = new PublishCommand<T>();
         }
 
-        result.subject = subject;
-        result.value = value;
-        result.serializer = serializer;
+        result._subject = subject;
+        result._value = value;
+        result._serializer = serializer;
 
         return result;
     }
 
     public override void Write(ProtocolWriter writer)
     {
-        writer.WritePublish(subject, null, value, serializer!);
+        writer.WritePublish(_subject, null, _value, _serializer!);
     }
 
     protected override void Reset()
     {
-        subject = default;
-        value = default;
-        serializer = null;
+        _subject = default;
+        _value = default;
+        _serializer = null;
     }
 }
 
 internal sealed class AsyncPublishCommand<T> : AsyncCommandBase<AsyncPublishCommand<T>>
 {
-    NatsKey subject;
-    T? value;
-    INatsSerializer? serializer;
+    private NatsKey _subject;
+    private T? _value;
+    private INatsSerializer? _serializer;
 
-    AsyncPublishCommand()
+    private AsyncPublishCommand()
     {
     }
 
@@ -57,33 +57,33 @@ internal sealed class AsyncPublishCommand<T> : AsyncCommandBase<AsyncPublishComm
             result = new AsyncPublishCommand<T>();
         }
 
-        result.subject = subject;
-        result.value = value;
-        result.serializer = serializer;
+        result._subject = subject;
+        result._value = value;
+        result._serializer = serializer;
 
         return result;
     }
 
     public override void Write(ProtocolWriter writer)
     {
-        writer.WritePublish(subject!, null, value, serializer!);
+        writer.WritePublish(_subject!, null, _value, _serializer!);
     }
 
     protected override void Reset()
     {
-        subject = default;
-        value = default;
-        serializer = null;
+        _subject = default;
+        _value = default;
+        _serializer = null;
     }
 }
 
 internal sealed class PublishBatchCommand<T> : CommandBase<PublishBatchCommand<T>>, IBatchCommand
 {
-    IEnumerable<(NatsKey subject, T? value)>? values1;
-    IEnumerable<(string subject, T? value)>? values2;
-    INatsSerializer? serializer;
+    private IEnumerable<(NatsKey subject, T? value)>? _values1;
+    private IEnumerable<(string subject, T? value)>? _values2;
+    private INatsSerializer? _serializer;
 
-    PublishBatchCommand()
+    private PublishBatchCommand()
     {
     }
 
@@ -94,8 +94,8 @@ internal sealed class PublishBatchCommand<T> : CommandBase<PublishBatchCommand<T
             result = new PublishBatchCommand<T>();
         }
 
-        result.values1 = values;
-        result.serializer = serializer;
+        result._values1 = values;
+        result._serializer = serializer;
 
         return result;
     }
@@ -107,8 +107,8 @@ internal sealed class PublishBatchCommand<T> : CommandBase<PublishBatchCommand<T
             result = new PublishBatchCommand<T>();
         }
 
-        result.values2 = values;
-        result.serializer = serializer;
+        result._values2 = values;
+        result._serializer = serializer;
 
         return result;
     }
@@ -118,44 +118,44 @@ internal sealed class PublishBatchCommand<T> : CommandBase<PublishBatchCommand<T
         (this as IBatchCommand).Write(writer);
     }
 
-
     int IBatchCommand.Write(ProtocolWriter writer)
     {
         var i = 0;
-        if (values1 != null)
+        if (_values1 != null)
         {
-            foreach (var item in values1)
+            foreach (var item in _values1)
             {
-                writer.WritePublish(item.subject, null, item.value, serializer!);
+                writer.WritePublish(item.subject, null, item.value, _serializer!);
                 i++;
             }
         }
-        else if (values2 != null)
+        else if (_values2 != null)
         {
-            foreach (var item in values2)
+            foreach (var item in _values2)
             {
-                writer.WritePublish(new NatsKey(item.subject, true), null, item.value, serializer!);
+                writer.WritePublish(new NatsKey(item.subject, true), null, item.value, _serializer!);
                 i++;
             }
         }
+
         return i;
     }
 
     protected override void Reset()
     {
-        values1 = default;
-        values2 = default;
-        serializer = null;
+        _values1 = default;
+        _values2 = default;
+        _serializer = null;
     }
 }
 
 internal sealed class AsyncPublishBatchCommand<T> : AsyncCommandBase<AsyncPublishBatchCommand<T>>, IBatchCommand
 {
-    IEnumerable<(NatsKey subject, T? value)>? values1;
-    IEnumerable<(string subject, T? value)>? values2;
-    INatsSerializer? serializer;
+    private IEnumerable<(NatsKey subject, T? value)>? _values1;
+    private IEnumerable<(string subject, T? value)>? _values2;
+    private INatsSerializer? _serializer;
 
-    AsyncPublishBatchCommand()
+    private AsyncPublishBatchCommand()
     {
     }
 
@@ -166,8 +166,8 @@ internal sealed class AsyncPublishBatchCommand<T> : AsyncCommandBase<AsyncPublis
             result = new AsyncPublishBatchCommand<T>();
         }
 
-        result.values1 = values;
-        result.serializer = serializer;
+        result._values1 = values;
+        result._serializer = serializer;
 
         return result;
     }
@@ -179,8 +179,8 @@ internal sealed class AsyncPublishBatchCommand<T> : AsyncCommandBase<AsyncPublis
             result = new AsyncPublishBatchCommand<T>();
         }
 
-        result.values2 = values;
-        result.serializer = serializer;
+        result._values2 = values;
+        result._serializer = serializer;
 
         return result;
     }
@@ -190,43 +190,43 @@ internal sealed class AsyncPublishBatchCommand<T> : AsyncCommandBase<AsyncPublis
         (this as IBatchCommand).Write(writer);
     }
 
-
     int IBatchCommand.Write(ProtocolWriter writer)
     {
         var i = 0;
-        if (values1 != null)
+        if (_values1 != null)
         {
-            foreach (var item in values1)
+            foreach (var item in _values1)
             {
-                writer.WritePublish(item.subject, null, item.value, serializer!);
+                writer.WritePublish(item.subject, null, item.value, _serializer!);
                 i++;
             }
         }
-        else if (values2 != null)
+        else if (_values2 != null)
         {
-            foreach (var item in values2)
+            foreach (var item in _values2)
             {
-                writer.WritePublish(new NatsKey(item.subject, true), null, item.value, serializer!);
+                writer.WritePublish(new NatsKey(item.subject, true), null, item.value, _serializer!);
                 i++;
             }
         }
+
         return i;
     }
 
     protected override void Reset()
     {
-        values1 = default;
-        values2 = default;
-        serializer = null;
+        _values1 = default;
+        _values2 = default;
+        _serializer = null;
     }
 }
 
 internal sealed class PublishBytesCommand : CommandBase<PublishBytesCommand>
 {
-    NatsKey subject;
-    ReadOnlyMemory<byte> value;
+    private NatsKey _subject;
+    private ReadOnlyMemory<byte> _value;
 
-    PublishBytesCommand()
+    private PublishBytesCommand()
     {
     }
 
@@ -237,30 +237,30 @@ internal sealed class PublishBytesCommand : CommandBase<PublishBytesCommand>
             result = new PublishBytesCommand();
         }
 
-        result.subject = subject;
-        result.value = value;
+        result._subject = subject;
+        result._value = value;
 
         return result;
     }
 
     public override void Write(ProtocolWriter writer)
     {
-        writer.WritePublish(subject, null, value.Span);
+        writer.WritePublish(_subject, null, _value.Span);
     }
 
     protected override void Reset()
     {
-        subject = default;
-        value = default;
+        _subject = default;
+        _value = default;
     }
 }
 
 internal sealed class AsyncPublishBytesCommand : AsyncCommandBase<AsyncPublishBytesCommand>
 {
-    NatsKey subject;
-    ReadOnlyMemory<byte> value;
+    private NatsKey _subject;
+    private ReadOnlyMemory<byte> _value;
 
-    AsyncPublishBytesCommand()
+    private AsyncPublishBytesCommand()
     {
     }
 
@@ -271,20 +271,20 @@ internal sealed class AsyncPublishBytesCommand : AsyncCommandBase<AsyncPublishBy
             result = new AsyncPublishBytesCommand();
         }
 
-        result.subject = subject;
-        result.value = value;
+        result._subject = subject;
+        result._value = value;
 
         return result;
     }
 
     public override void Write(ProtocolWriter writer)
     {
-        writer.WritePublish(subject!, null, value.Span);
+        writer.WritePublish(_subject!, null, _value.Span);
     }
 
     protected override void Reset()
     {
-        subject = default;
-        value = default;
+        _subject = default;
+        _value = default;
     }
 }

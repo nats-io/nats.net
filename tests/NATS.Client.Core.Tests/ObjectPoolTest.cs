@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -56,36 +56,37 @@ public class ObjectPoolTest
     }
 }
 
-class PoolTestObject1 : IObjectPoolNode<PoolTestObject1>
+internal class PoolTestObject1 : IObjectPoolNode<PoolTestObject1>
 {
-    PoolTestObject1? next;
-    public ref PoolTestObject1? NextNode => ref next;
+    private PoolTestObject1? _next;
+
+    public ref PoolTestObject1? NextNode => ref _next;
 }
 
-
-class PoolTestObject2 : IObjectPoolNode<PoolTestObject2>
+internal class PoolTestObject2 : IObjectPoolNode<PoolTestObject2>
 {
-    PoolTestObject2? next;
-    public ref PoolTestObject2? NextNode => ref next;
+    private PoolTestObject2? _next;
+
+    public ref PoolTestObject2? NextNode => ref _next;
 }
 
-
-class PoolTestObject3 : IObjectPoolNode<PoolTestObject3>
+internal class PoolTestObject3 : IObjectPoolNode<PoolTestObject3>
 {
-    PoolTestObject3? next;
-    public ref PoolTestObject3? NextNode => ref next;
+    private PoolTestObject3? _next;
+
+    public ref PoolTestObject3? NextNode => ref _next;
 }
 
-
-class PoolTestObject4 : IObjectPoolNode<PoolTestObject4>
+internal class PoolTestObject4 : IObjectPoolNode<PoolTestObject4>
 {
-    PoolTestObject4? next;
-    public ref PoolTestObject4? NextNode => ref next;
+    private PoolTestObject4? _next;
+
+    public ref PoolTestObject4? NextNode => ref _next;
 }
 
-
-class PoolTestObject5 : IObjectPoolNode<PoolTestObject5>
+internal class PoolTestObject5 : IObjectPoolNode<PoolTestObject5>
 {
-    PoolTestObject5? next;
-    public ref PoolTestObject5? NextNode => ref next;
+    private PoolTestObject5? _next;
+
+    public ref PoolTestObject5? NextNode => ref _next;
 }

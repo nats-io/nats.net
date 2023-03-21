@@ -1,7 +1,7 @@
-using NATS.Client.Core;
+using BlazorWasm.Client;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
-using BlazorWasm.Client;
+using NATS.Client.Core;
 using NATS.Client.Hosting;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);

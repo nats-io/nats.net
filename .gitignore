@@ -57,7 +57,7 @@ _ReSharper*
 *.ncrunch*
 .*crunch*.local.xml
 
-# Installshield output folder 
+# Installshield output folder
 [Ee]xpress
 
 # DocProject is a documentation generator add-in
@@ -94,7 +94,6 @@ TestResults
 [Tt]est[Rr]esult*
 *.Cache
 ClientBin
-[Ss]tyle[Cc]op.*
 ~$*
 *.dbmdl
 Generated_Code #added for RIA/Silverlight projects

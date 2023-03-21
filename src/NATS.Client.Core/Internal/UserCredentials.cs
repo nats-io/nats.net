@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using NATS.Client.Core.NaCl;
 
 namespace NATS.Client.Core.Internal;
@@ -21,60 +21,6 @@ internal class UserCredentials
         {
             (Seed, Nkey) = LoadNKeyFile(authOptions.NKeyFile);
         }
-    }
-
-    (string, string) LoadCredsFile(string path)
-    {
-        string? jwt = null;
-        string? seed = null;
-        using var reader = new StreamReader(path);
-        while (reader.ReadLine()?.Trim() is { } line)
-        {
-            if (line.StartsWith("-----BEGIN NATS USER JWT-----"))
-            {
-                jwt = reader.ReadLine();
-                if (jwt == null) break;
-
-            }
-            else if (line.StartsWith("-----BEGIN USER NKEY SEED-----"))
-            {
-                seed = reader.ReadLine();
-                if (seed == null) break;
-            }
-        }
-
-        if (jwt == null)
-            throw new NatsException($"Can't find JWT while loading creds file ${path}");
-        if (seed == null)
-            throw new NatsException($"Can't find NKEY seed while loading creds file ${path}");
-
-        return (jwt, seed);
-    }
-
-    (string, string) LoadNKeyFile(string path)
-    {
-        string? seed = null;
-        string? nkey = null;
-
-        using var reader = new StreamReader(path);
-        while (reader.ReadLine()?.Trim() is { } line)
-        {
-            if (line.StartsWith("SU"))
-            {
-                seed = line;
-            }
-            else if (line.StartsWith("U"))
-            {
-                nkey = line;
-            }
-        }
-
-        if (seed == null)
-            throw new NatsException($"Can't find seed while loading NKEY file ${path}");
-        if (nkey == null)
-            throw new NatsException($"Can't find public key while loading NKEY file ${path}");
-
-        return (seed, nkey);
     }
 
     public string? Jwt { get; }
@@ -102,5 +48,58 @@ internal class UserCredentials
         options.Nkey = Nkey;
         options.AuthToken = Token;
         options.Sig = info is { AuthRequired: true, Nonce: { } } ? Sign(info.Nonce) : null;
+    }
+
+    private (string, string) LoadCredsFile(string path)
+    {
+        string? jwt = null;
+        string? seed = null;
+        using var reader = new StreamReader(path);
+        while (reader.ReadLine()?.Trim() is { } line)
+        {
+            if (line.StartsWith("-----BEGIN NATS USER JWT-----"))
+            {
+                jwt = reader.ReadLine();
+                if (jwt == null) break;
+            }
+            else if (line.StartsWith("-----BEGIN USER NKEY SEED-----"))
+            {
+                seed = reader.ReadLine();
+                if (seed == null) break;
+            }
+        }
+
+        if (jwt == null)
+            throw new NatsException($"Can't find JWT while loading creds file ${path}");
+        if (seed == null)
+            throw new NatsException($"Can't find NKEY seed while loading creds file ${path}");
+
+        return (jwt, seed);
+    }
+
+    private (string, string) LoadNKeyFile(string path)
+    {
+        string? seed = null;
+        string? nkey = null;
+
+        using var reader = new StreamReader(path);
+        while (reader.ReadLine()?.Trim() is { } line)
+        {
+            if (line.StartsWith("SU"))
+            {
+                seed = line;
+            }
+            else if (line.StartsWith("U"))
+            {
+                nkey = line;
+            }
+        }
+
+        if (seed == null)
+            throw new NatsException($"Can't find seed while loading NKEY file ${path}");
+        if (nkey == null)
+            throw new NatsException($"Can't find public key while loading NKEY file ${path}");
+
+        return (seed, nkey);
     }
 }

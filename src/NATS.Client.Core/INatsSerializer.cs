@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Text.Json;
 
 namespace NATS.Client.Core;
@@ -6,6 +6,7 @@ namespace NATS.Client.Core;
 public interface INatsSerializer
 {
     int Serialize<T>(ICountableBufferWriter bufferWriter, T? value);
+
     T? Deserialize<T>(in ReadOnlySequence<byte> buffer);
 }
 
@@ -16,20 +17,20 @@ public interface ICountableBufferWriter : IBufferWriter<byte>
 
 public sealed class JsonNatsSerializer : INatsSerializer
 {
-    readonly JsonSerializerOptions options;
-
-    [ThreadStatic]
-    static Utf8JsonWriter? jsonWriter;
-
-    static readonly JsonWriterOptions JsonWriterOptions = new JsonWriterOptions
+    private static readonly JsonWriterOptions JsonWriterOptions = new JsonWriterOptions
     {
         Indented = false,
-        SkipValidation = true
+        SkipValidation = true,
     };
+
+    [ThreadStatic]
+    private static Utf8JsonWriter? jsonWriter;
+
+    private readonly JsonSerializerOptions _options;
 
     public JsonNatsSerializer(JsonSerializerOptions options)
     {
-        this.options = options;
+        _options = options;
     }
 
     public int Serialize<T>(ICountableBufferWriter bufferWriter, T? value)
@@ -45,7 +46,7 @@ public sealed class JsonNatsSerializer : INatsSerializer
             writer.Reset(bufferWriter);
         }
 
-        JsonSerializer.Serialize(writer, value, options);
+        JsonSerializer.Serialize(writer, value, _options);
 
         var bytesCommitted = (int)writer.BytesCommitted;
         writer.Reset(NullBufferWriter.Instance);
@@ -55,10 +56,10 @@ public sealed class JsonNatsSerializer : INatsSerializer
     public T? Deserialize<T>(in ReadOnlySequence<byte> buffer)
     {
         var reader = new Utf8JsonReader(buffer); // Utf8JsonReader is ref struct, no allocate.
-        return JsonSerializer.Deserialize<T>(ref reader, options);
+        return JsonSerializer.Deserialize<T>(ref reader, _options);
     }
 
-    sealed class NullBufferWriter : IBufferWriter<byte>
+    private sealed class NullBufferWriter : IBufferWriter<byte>
     {
         internal static readonly IBufferWriter<byte> Instance = new NullBufferWriter();
 

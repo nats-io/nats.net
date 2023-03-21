@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -7,40 +7,40 @@ namespace NATS.Client.Core.Internal;
 
 internal sealed class SeqeunceBuilder
 {
-    SequenceSegment? first;
-    SequenceSegment? last;
-    int length;
-
-    public ReadOnlySequence<byte> ToReadOnlySequence() => new ReadOnlySequence<byte>(first!, 0, last!, last!.Memory.Length);
-
-    public int Count => length;
+    private SequenceSegment? _first;
+    private SequenceSegment? _last;
+    private int _length;
 
     public SeqeunceBuilder()
     {
     }
 
+    public int Count => _length;
+
+    public ReadOnlySequence<byte> ToReadOnlySequence() => new ReadOnlySequence<byte>(_first!, 0, _last!, _last!.Memory.Length);
+
     // Memory is only allowed rent from ArrayPool.
     public void Append(ReadOnlyMemory<byte> buffer)
     {
-        if (length == 0 && first == null)
+        if (_length == 0 && _first == null)
         {
             var first = SequenceSegment.Create(buffer);
-            this.first = first;
-            last = first;
-            length = buffer.Length;
+            _first = first;
+            _last = first;
+            _length = buffer.Length;
         }
         else
         {
             // if append same and continuous buffer, edit memory.
-            if (MemoryMarshal.TryGetArray(last!.Memory, out var array1) && MemoryMarshal.TryGetArray(buffer, out var array2))
+            if (MemoryMarshal.TryGetArray(_last!.Memory, out var array1) && MemoryMarshal.TryGetArray(buffer, out var array2))
             {
                 if (array1.Array == array2.Array)
                 {
                     if (array1.Offset + array1.Count == array2.Offset)
                     {
                         var newMemory = array1.Array.AsMemory(array1.Offset, array1.Count + array2.Count);
-                        last.SetMemory(newMemory);
-                        length += buffer.Length;
+                        _last.SetMemory(newMemory);
+                        _length += buffer.Length;
                         return;
                     }
                     else
@@ -53,23 +53,23 @@ internal sealed class SeqeunceBuilder
 
             // others, append new segment to last.
             var newLast = SequenceSegment.Create(buffer);
-            last!.SetNextSegment(newLast);
-            newLast.SetRunningIndex(length);
-            last = newLast;
-            length += buffer.Length;
+            _last!.SetNextSegment(newLast);
+            newLast.SetRunningIndex(_length);
+            _last = newLast;
+            _length += buffer.Length;
         }
     }
 
     public void AdvanceTo(SequencePosition start)
     {
-        Debug.Assert(first != null);
-        Debug.Assert(last != null);
+        Debug.Assert(_first != null);
+        Debug.Assert(_last != null);
 
         var segment = (SequenceSegment)start.GetObject()!;
         var index = start.GetInteger();
 
         // try to find matched segment
-        var target = first;
+        var target = _first;
         while (target != null && target != segment)
         {
             var t = target;
@@ -79,14 +79,14 @@ internal sealed class SeqeunceBuilder
 
         if (target == null) throw new InvalidOperationException("failed to find next segment.");
 
-        length -= ((int)target.RunningIndex + index);
+        _length -= (int)target.RunningIndex + index;
         target.SetMemory(target.Memory.Slice(index));
         target.SetRunningIndex(0);
-        first = target;
+        _first = target;
 
         // change all after node runningIndex
-        var runningIndex = first.Memory.Length;
-        target = (SequenceSegment?)first.Next;
+        var runningIndex = _first.Memory.Length;
+        target = (SequenceSegment?)_first.Next;
         while (target != null)
         {
             target.SetRunningIndex(runningIndex);
@@ -98,11 +98,15 @@ internal sealed class SeqeunceBuilder
 
 internal class SequenceSegment : ReadOnlySequenceSegment<byte>
 {
-    static readonly ConcurrentQueue<SequenceSegment> pool = new();
+    private static readonly ConcurrentQueue<SequenceSegment> Pool = new();
+
+    private SequenceSegment()
+    {
+    }
 
     public static SequenceSegment Create(ReadOnlyMemory<byte> buffer)
     {
-        if (!pool.TryDequeue(out var result))
+        if (!Pool.TryDequeue(out var result))
         {
             result = new SequenceSegment();
         }
@@ -110,10 +114,6 @@ internal class SequenceSegment : ReadOnlySequenceSegment<byte>
         result.SetMemory(buffer);
 
         return result;
-    }
-
-    SequenceSegment()
-    {
     }
 
     internal void SetMemory(ReadOnlyMemory<byte> buffer)
@@ -124,25 +124,25 @@ internal class SequenceSegment : ReadOnlySequenceSegment<byte>
     internal void SetRunningIndex(long runningIndex)
     {
         // RunningIndex: The sum of node lengths before the current node.
-        this.RunningIndex = runningIndex;
+        RunningIndex = runningIndex;
     }
 
     internal void SetNextSegment(SequenceSegment? nextSegment)
     {
-        this.Next = nextSegment;
+        Next = nextSegment;
     }
 
     internal void Return()
     {
         // guranteed does not add another segment in same memory so can return buffer in this.
-        if (MemoryMarshal.TryGetArray(this.Memory, out var array) && array.Array != null)
+        if (MemoryMarshal.TryGetArray(Memory, out var array) && array.Array != null)
         {
             ArrayPool<byte>.Shared.Return(array.Array);
         }
 
-        this.Memory = default;
-        this.RunningIndex = 0;
-        this.Next = null;
-        pool.Enqueue(this);
+        Memory = default;
+        RunningIndex = 0;
+        Next = null;
+        Pool.Enqueue(this);
     }
 }

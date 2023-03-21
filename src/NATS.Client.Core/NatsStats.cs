@@ -1,4 +1,4 @@
-﻿namespace NATS.Client.Core;
+namespace NATS.Client.Core;
 
 public readonly record struct NatsStats
 (
@@ -7,8 +7,7 @@ public readonly record struct NatsStats
     long PendingMessages,
     long SentMessages,
     long ReceivedMessages,
-    long SubscriptionCount
-);
+    long SubscriptionCount);
 
 internal sealed class ConnectionStatsCounter
 {

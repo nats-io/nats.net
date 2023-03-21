@@ -1,11 +1,10 @@
-using NATS.Client.Core;
 using BlazorWasm.Server.NatsServices;
+using NATS.Client.Core;
 using NATS.Client.Hosting;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
 builder.Services.AddNats(configureOptions: opt => opt with { Url = "localhost:4222", Name = "BlazorServer" });

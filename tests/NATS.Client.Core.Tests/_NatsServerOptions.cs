@@ -1,17 +1,25 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Net.NetworkInformation;
 using System.Text;
 
 namespace NATS.Client.Core.Tests;
 
+public enum TransportType
+{
+    Tcp,
+    Tls,
+    WebSocket,
+}
+
 public sealed class NatsServerOptionsBuilder
 {
-    readonly List<string> _extraConfigs = new();
-    bool _enableWebSocket;
-    bool _enableTls;
-    string? _tlsServerCertFile;
-    string? _tlsServerKeyFile;
-    string? _tlsCaFile;
+    private readonly List<string> _extraConfigs = new();
+    private bool _enableWebSocket;
+    private bool _enableTls;
+    private string? _tlsServerCertFile;
+    private string? _tlsServerKeyFile;
+    private string? _tlsCaFile;
+
     public NatsServerOptions Build()
     {
         return new NatsServerOptions
@@ -38,6 +46,7 @@ public sealed class NatsServerOptionsBuilder
         {
             _enableWebSocket = true;
         }
+
         return this;
     }
 
@@ -50,24 +59,7 @@ public sealed class NatsServerOptionsBuilder
 
 public sealed class NatsServerOptions : IDisposable
 {
-    public bool EnableClustering { get; init; }
-    public bool EnableWebSocket { get; init; }
-    public bool EnableTls { get; init; }
-    public bool ServerDisposeReturnsPorts { get; init; } = true;
-    public string? TlsClientCertFile { get; init; }
-    public string? TlsClientKeyFile { get; init; }
-    public string? TlsServerCertFile { get; init; }
-    public string? TlsServerKeyFile { get; init; }
-    public string? TlsCaFile { get; init; }
-    public List<string> ExtraConfigs { get; init; } = new();
-
-    int disposed;
-    string routes = "";
-    readonly Lazy<int> lazyServerPort;
-    readonly Lazy<int?> lazyClusteringPort;
-    readonly Lazy<int?> lazyWebSocketPort;
-
-    static readonly Lazy<ConcurrentQueue<int>> portFactory = new(() =>
+    private static readonly Lazy<ConcurrentQueue<int>> PortFactory = new(() =>
     {
         const int start = 1024;
         const int size = 4096;
@@ -80,36 +72,47 @@ public sealed class NatsServerOptions : IDisposable
         return new ConcurrentQueue<int>(freePorts);
     });
 
-    static int LeasePort()
-    {
-        if (portFactory.Value.TryDequeue(out var port))
-        {
-            return port;
-        }
+    private readonly Lazy<int> _lazyServerPort;
 
-        throw new Exception("unable to allocate port");
-    }
+    private readonly Lazy<int?> _lazyClusteringPort;
 
-    static void ReturnPort(int port)
-    {
-        portFactory.Value.Enqueue(port);
-    }
+    private readonly Lazy<int?> _lazyWebSocketPort;
+
+    private int _disposed;
+    private string _routes = string.Empty;
 
     public NatsServerOptions()
     {
-        lazyServerPort = new Lazy<int>(LeasePort);
-        lazyClusteringPort = new Lazy<int?>(() => EnableClustering ? LeasePort() : null);
-        lazyWebSocketPort = new Lazy<int?>(() => EnableWebSocket ? LeasePort() : null);
+        _lazyServerPort = new Lazy<int>(LeasePort);
+        _lazyClusteringPort = new Lazy<int?>(() => EnableClustering ? LeasePort() : null);
+        _lazyWebSocketPort = new Lazy<int?>(() => EnableWebSocket ? LeasePort() : null);
     }
 
-    public int ServerPort => lazyServerPort.Value;
-    public int? ClusteringPort => lazyClusteringPort.Value;
-    public int? WebSocketPort => lazyWebSocketPort.Value;
+    public bool EnableClustering { get; init; }
 
-    public void SetRoutes(IEnumerable<NatsServerOptions> options)
-    {
-        routes = string.Join(",", options.Select(o => $"nats://localhost:{o.ClusteringPort}"));
-    }
+    public bool EnableWebSocket { get; init; }
+
+    public bool EnableTls { get; init; }
+
+    public bool ServerDisposeReturnsPorts { get; init; } = true;
+
+    public string? TlsClientCertFile { get; init; }
+
+    public string? TlsClientKeyFile { get; init; }
+
+    public string? TlsServerCertFile { get; init; }
+
+    public string? TlsServerKeyFile { get; init; }
+
+    public string? TlsCaFile { get; init; }
+
+    public List<string> ExtraConfigs { get; init; } = new();
+
+    public int ServerPort => _lazyServerPort.Value;
+
+    public int? ClusteringPort => _lazyClusteringPort.Value;
+
+    public int? WebSocketPort => _lazyWebSocketPort.Value;
 
     public string ConfigFileContents
     {
@@ -130,7 +133,7 @@ public sealed class NatsServerOptions : IDisposable
                 sb.AppendLine("cluster {");
                 sb.AppendLine("  name: nats");
                 sb.AppendLine($"  port: {ClusteringPort}");
-                sb.AppendLine($"  routes: [{routes}]");
+                sb.AppendLine($"  routes: [{_routes}]");
                 sb.AppendLine("}");
             }
 
@@ -140,6 +143,7 @@ public sealed class NatsServerOptions : IDisposable
                 {
                     throw new Exception("TLS is enabled but cert or key missing");
                 }
+
                 sb.AppendLine("tls {");
                 sb.AppendLine($"  cert_file: {TlsServerCertFile}");
                 sb.AppendLine($"  key_file: {TlsServerKeyFile}");
@@ -147,6 +151,7 @@ public sealed class NatsServerOptions : IDisposable
                 {
                     sb.AppendLine($"  ca_file: {TlsCaFile}");
                 }
+
                 sb.AppendLine("}");
             }
 
@@ -157,9 +162,14 @@ public sealed class NatsServerOptions : IDisposable
         }
     }
 
+    public void SetRoutes(IEnumerable<NatsServerOptions> options)
+    {
+        _routes = string.Join(",", options.Select(o => $"nats://localhost:{o.ClusteringPort}"));
+    }
+
     public void Dispose()
     {
-        if (Interlocked.Increment(ref disposed) != 1)
+        if (Interlocked.Increment(ref _disposed) != 1)
         {
             return;
         }
@@ -175,11 +185,19 @@ public sealed class NatsServerOptions : IDisposable
             ReturnPort(WebSocketPort.Value);
         }
     }
-}
 
-public enum TransportType
-{
-    Tcp,
-    Tls,
-    WebSocket
+    private static int LeasePort()
+    {
+        if (PortFactory.Value.TryDequeue(out var port))
+        {
+            return port;
+        }
+
+        throw new Exception("unable to allocate port");
+    }
+
+    private static void ReturnPort(int port)
+    {
+        PortFactory.Value.Enqueue(port);
+    }
 }
