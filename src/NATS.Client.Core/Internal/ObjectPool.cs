@@ -76,7 +76,9 @@ internal sealed class ObjectPool
     // avoid for Dictionary<Type, ***> lookup cost.
     private static class IdentityGenerator<T>
     {
+#pragma warning disable SA1401
         public static int Identity;
+#pragma warning restore SA1401
 
         static IdentityGenerator()
         {

@@ -18,6 +18,7 @@ public enum NatsConnectionState
 
 public partial class NatsConnection : IAsyncDisposable, INatsCommand
 {
+#pragma warning disable SA1401
     /// <summary>
     /// Hook before TCP connection open.
     /// </summary>
@@ -25,6 +26,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
 
     internal readonly ConnectionStatsCounter Counter; // allow to call from external sources
     internal readonly ReadOnlyMemory<byte> InboxPrefix;
+#pragma warning restore SA1401
     private readonly object _gate = new object();
     private readonly WriterState _writerState;
     private readonly ChannelWriter<ICommand> _commandWriter;
@@ -201,7 +203,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
 
     private async ValueTask InitialConnectAsync()
     {
-        Debug.Assert(ConnectionState == NatsConnectionState.Connecting);
+        Debug.Assert(ConnectionState == NatsConnectionState.Connecting, "Connection state");
 
         var uris = Options.GetSeedUris();
         if (Options.TlsOptions.Disabled && uris.Any(u => u.IsTls))

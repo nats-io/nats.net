@@ -107,7 +107,7 @@ public class SequenceBuilderTest
     private static int GetSegmentCount(ReadOnlySequence<byte> sequence)
     {
         var count = 0;
-        foreach (var _ in sequence)
+        foreach (var x in sequence)
         {
             count++;
         }

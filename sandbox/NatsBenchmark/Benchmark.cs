@@ -171,7 +171,10 @@ namespace NatsBenchmark
 
             Console.WriteLine(
                 "{0}\t{1,10}\t{2,10} msgs/s\t{3,8} kb/s",
-                testPrefix, testCount, msgRate, msgRate * msgSize / 1024);
+                testPrefix,
+                testCount,
+                msgRate,
+                msgRate * msgSize / 1024);
         }
 
         private byte[] GeneratePayload(long size)

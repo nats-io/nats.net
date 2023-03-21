@@ -87,7 +87,6 @@ public class NkeyPair : IDisposable
                 Wipe();
             }
 
-            _key = null;
             _disposedValue = true;
         }
     }

@@ -6,8 +6,10 @@ namespace NATS.Client.Core;
 
 internal sealed class SubscriptionManager : IDisposable
 {
+#pragma warning disable SA1401
     internal readonly object Gate = new object(); // lock for add/remove, publish can avoid lock.
     internal readonly NatsConnection Connection;
+#pragma warning restore SA1401
 
     private readonly ConcurrentDictionary<int, RefCountSubscription> _bySubscriptionId = new();
     private readonly ConcurrentDictionary<string, RefCountSubscription> _byStringKey = new();

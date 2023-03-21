@@ -4,11 +4,6 @@ internal sealed class NatsUri : IEquatable<NatsUri>
 {
     public const string DefaultScheme = "nats";
 
-    public readonly Uri Uri;
-    public readonly bool IsSeed;
-    public readonly bool IsTls;
-    public readonly bool IsWebSocket;
-
     public NatsUri(string urlString, bool isSeed, string defaultScheme = DefaultScheme)
     {
         IsSeed = isSeed;
@@ -47,6 +42,14 @@ internal sealed class NatsUri : IEquatable<NatsUri>
 
         Uri = uriBuilder.Uri;
     }
+
+    public Uri Uri { get; }
+
+    public bool IsSeed { get; }
+
+    public bool IsTls { get; }
+
+    public bool IsWebSocket { get; }
 
     public string Host => Uri.Host;
 

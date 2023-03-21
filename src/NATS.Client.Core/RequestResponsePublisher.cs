@@ -140,17 +140,19 @@ internal sealed class RequestPublisher<TRequest, TResponse>
             {
                 ThreadPool.UnsafeQueueUserWorkItem(
                     static state =>
-                {
-                    var (connection, value, replyTo, callback) = state;
-                    if (callback is Func<TRequest, TResponse> func)
                     {
-                        PublishSync(connection, value, replyTo, func);
-                    }
-                    else if (callback is Func<TRequest, Task<TResponse>> asyncFunc)
-                    {
-                        PublishAsync(connection, value, replyTo, asyncFunc);
-                    }
-                }, (connection, value, replyTo, callback), false);
+                        var (connection, value, replyTo, callback) = state;
+                        if (callback is Func<TRequest, TResponse> func)
+                        {
+                            PublishSync(connection, value, replyTo, func);
+                        }
+                        else if (callback is Func<TRequest, Task<TResponse>> asyncFunc)
+                        {
+                            PublishAsync(connection, value, replyTo, asyncFunc);
+                        }
+                    },
+                    (connection, value, replyTo, callback),
+                    false);
             }
         }
         catch (Exception ex)

@@ -9,7 +9,10 @@ namespace NATS.Client.Core;
 /// Immutable options for NatsConnection, you can configure via `with` operator.
 /// </summary>
 /// <param name="Url"></param>
-/// <param name="ConnectOptions"></param>
+/// <param name="Name"></param>
+/// <param name="Echo"></param>
+/// <param name="Verbose"></param>
+/// <param name="AuthOptions"></param>
 /// <param name="TlsOptions"></param>
 /// <param name="Serializer"></param>
 /// <param name="LoggerFactory"></param>

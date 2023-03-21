@@ -1,6 +1,6 @@
 #pragma warning disable IDE0044
 
-using NATS.Client.Core;
+using System.Text.Json;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Diagnosers;
@@ -8,9 +8,8 @@ using BenchmarkDotNet.Exporters;
 using BenchmarkDotNet.Jobs;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using NATS.Client.Core;
 using StackExchange.Redis;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using ZLogger;
 
 var config = ManualConfig.CreateMinimumViable()
@@ -155,9 +154,11 @@ public class DefaultRun
 
     private class Handler
     {
+#pragma warning disable SA1401
         public int Called;
         public int Max;
         public object Gate;
+#pragma warning restore SA1401
 
         public void Handle(MyVector3 vec)
         {

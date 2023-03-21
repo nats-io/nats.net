@@ -36,22 +36,23 @@ internal sealed class RequestAsyncCommand<TRequest, TResponse> : AsyncCommandBas
         {
             result._cancellationTokenRegistration = cancellationToken.Register(
                 static cmd =>
-            {
-                if (cmd is RequestAsyncCommand<TRequest, TResponse?> x)
                 {
-                    lock (x)
+                    if (cmd is RequestAsyncCommand<TRequest, TResponse?> x)
                     {
-                        // if succeed(after await), possibillity of already returned to pool so don't call SetException
-                        if (!x._succeed)
+                        lock (x)
                         {
-                            if (x._box?.Remove(x._id) ?? false)
+                            // if succeed(after await), possibillity of already returned to pool so don't call SetException
+                            if (!x._succeed)
                             {
-                                x.SetException(new TimeoutException("Request timed out."));
+                                if (x._box?.Remove(x._id) ?? false)
+                                {
+                                    x.SetException(new TimeoutException("Request timed out."));
+                                }
                             }
                         }
                     }
-                }
-            }, result);
+                },
+                result);
         }
 
         return result;

@@ -7,8 +7,6 @@ namespace NATS.Client.Core.Tests;
 
 public class NatsServer : IAsyncDisposable
 {
-    public readonly NatsServerOptions Options;
-
     private static readonly string Ext = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? ".exe" : string.Empty;
     private static readonly string NatsServerPath = $"nats-server{Ext}";
 
@@ -73,6 +71,8 @@ public class NatsServer : IAsyncDisposable
 
         outputHelper.WriteLine("OK to Process Start, Port:" + Options.ServerPort);
     }
+
+    public NatsServerOptions Options { get; }
 
     public string ClientUrl => _transportType switch
     {

@@ -7,7 +7,7 @@ namespace NATS.Client.Core;
 
 internal sealed class RequestResponseManager : IDisposable
 {
-    internal readonly NatsConnection Connection;
+    private readonly NatsConnection _connection;
     private readonly ObjectPool _pool;
     private readonly object _gate = new object();
     private readonly SemaphoreSlim _asyncLock = new SemaphoreSlim(1, 1);
@@ -22,7 +22,7 @@ internal sealed class RequestResponseManager : IDisposable
 
     public RequestResponseManager(NatsConnection connection, ObjectPool pool)
     {
-        Connection = connection;
+        _connection = connection;
         _pool = pool;
     }
 
@@ -47,7 +47,7 @@ internal sealed class RequestResponseManager : IDisposable
             }
         }
 
-        ResponsePublisher.PublishResponse(box.responseType, Connection.Options, buffer, box.handler);
+        ResponsePublisher.PublishResponse(box.responseType, _connection.Options, buffer, box.handler);
     }
 
     public bool Remove(int id)
@@ -95,7 +95,7 @@ internal sealed class RequestResponseManager : IDisposable
             if (_globalSubscription == null)
             {
                 var globalSubscribeKey = $"{Encoding.ASCII.GetString(inBoxPrefix.Span)}*";
-                _globalSubscription = await Connection.SubscribeAsync<byte[]>(globalSubscribeKey, _ => { }).ConfigureAwait(false);
+                _globalSubscription = await _connection.SubscribeAsync<byte[]>(globalSubscribeKey, _ => { }).ConfigureAwait(false);
             }
         }
         finally
@@ -109,7 +109,7 @@ internal sealed class RequestResponseManager : IDisposable
     private RequestAsyncCommand<TRequest, TResponse?> AddAsyncCore<TRequest, TResponse>(NatsKey key, ReadOnlyMemory<byte> inBoxPrefix, TRequest request, CancellationToken cancellationToken)
     {
         var id = Interlocked.Increment(ref _requestId);
-        var command = RequestAsyncCommand<TRequest, TResponse?>.Create(_pool, key, inBoxPrefix, id, request, Connection.Options.Serializer, cancellationToken, this);
+        var command = RequestAsyncCommand<TRequest, TResponse?>.Create(_pool, key, inBoxPrefix, id, request, _connection.Options.Serializer, cancellationToken, this);
 
         lock (_gate)
         {
@@ -118,7 +118,7 @@ internal sealed class RequestResponseManager : IDisposable
             _responseBoxes.Add(id, (typeof(TResponse), command));
         }
 
-        Connection.PostCommand(command);
+        _connection.PostCommand(command);
         return command;
     }
 }

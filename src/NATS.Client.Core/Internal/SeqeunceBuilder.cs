@@ -62,8 +62,8 @@ internal sealed class SeqeunceBuilder
 
     public void AdvanceTo(SequencePosition start)
     {
-        Debug.Assert(_first != null);
-        Debug.Assert(_last != null);
+        Debug.Assert(_first != null, "First segment");
+        Debug.Assert(_last != null, "Last segment");
 
         var segment = (SequenceSegment)start.GetObject()!;
         var index = start.GetInteger();

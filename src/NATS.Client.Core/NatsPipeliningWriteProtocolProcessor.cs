@@ -179,8 +179,10 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
 
                         promiseList.Clear();
                     }
-                    catch (Exception ex) // may receive from socket.SendAsync
+                    catch (Exception ex)
                     {
+                        // may receive from socket.SendAsync
+
                         // when error, command is dequeued and written buffer is still exists in state.BufferWriter
                         // store current pending promises to state.
                         _state.PendingPromises.AddRange(promiseList);
