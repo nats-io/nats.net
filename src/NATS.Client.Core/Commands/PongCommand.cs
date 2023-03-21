@@ -1,10 +1,10 @@
-﻿using NATS.Client.Core.Internal;
+using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core.Commands;
 
 internal sealed class PongCommand : CommandBase<PongCommand>
 {
-    PongCommand()
+    private PongCommand()
     {
     }
 
@@ -14,6 +14,7 @@ internal sealed class PongCommand : CommandBase<PongCommand>
         {
             result = new PongCommand();
         }
+
         return result;
     }
 

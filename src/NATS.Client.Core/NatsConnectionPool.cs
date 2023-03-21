@@ -1,9 +1,9 @@
-﻿namespace NATS.Client.Core;
+namespace NATS.Client.Core;
 
 public sealed class NatsConnectionPool : IAsyncDisposable
 {
-    readonly NatsConnection[] connections;
-    int index = -1;
+    private readonly NatsConnection[] _connections;
+    private int _index = -1;
 
     public NatsConnectionPool()
         : this(Environment.ProcessorCount / 2, NatsOptions.Default, _ => { })
@@ -18,7 +18,6 @@ public sealed class NatsConnectionPool : IAsyncDisposable
     public NatsConnectionPool(NatsOptions options)
         : this(Environment.ProcessorCount / 2, options, _ => { })
     {
-
     }
 
     public NatsConnectionPool(int poolSize, NatsOptions options)
@@ -29,25 +28,25 @@ public sealed class NatsConnectionPool : IAsyncDisposable
     public NatsConnectionPool(int poolSize, NatsOptions options, Action<NatsConnection> configureConnection)
     {
         poolSize = Math.Max(1, poolSize);
-        connections = new NatsConnection[poolSize];
-        for (int i = 0; i < connections.Length; i++)
+        _connections = new NatsConnection[poolSize];
+        for (var i = 0; i < _connections.Length; i++)
         {
             var name = (options.Name == null) ? $"#{i}" : $"{options.Name}#{i}";
-            var conn = new NatsConnection(options with {  Name = name });
+            var conn = new NatsConnection(options with { Name = name });
             configureConnection(conn);
-            connections[i] = conn;
+            _connections[i] = conn;
         }
     }
 
     public NatsConnection GetConnection()
     {
-        var i = Interlocked.Increment(ref index);
-        return connections[i % connections.Length];
+        var i = Interlocked.Increment(ref _index);
+        return _connections[i % _connections.Length];
     }
 
     public IEnumerable<NatsConnection> GetConnections()
     {
-        foreach (var item in connections)
+        foreach (var item in _connections)
         {
             yield return item;
         }
@@ -60,7 +59,7 @@ public sealed class NatsConnectionPool : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        foreach (var item in connections)
+        foreach (var item in _connections)
         {
             await item.DisposeAsync().ConfigureAwait(false);
         }

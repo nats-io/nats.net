@@ -1,5 +1,5 @@
-using NATS.Client.Core;
 using BlazorWasm.Shared;
+using NATS.Client.Core;
 
 namespace BlazorWasm.Server.NatsServices;
 
@@ -7,7 +7,7 @@ public class WeatherForecastService : IHostedService
 {
     private static readonly string[] Summaries = new[]
     {
-        "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
+        "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching",
     };
 
     private readonly ILogger<WeatherForecastService> _logger;
@@ -27,7 +27,7 @@ public class WeatherForecastService : IHostedService
             {
                 Date = DateTime.Now.AddDays(index),
                 TemperatureC = Random.Shared.Next(-20, 55),
-                Summary = Summaries[Random.Shared.Next(Summaries.Length)]
+                Summary = Summaries[Random.Shared.Next(Summaries.Length)],
             }).ToArray();
         });
         _logger.LogInformation("Weather Forecast Services is running");

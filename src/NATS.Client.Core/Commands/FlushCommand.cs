@@ -1,12 +1,11 @@
-﻿using NATS.Client.Core.Internal;
+using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core.Commands;
 
 internal sealed class AsyncFlushCommand : AsyncCommandBase<AsyncFlushCommand>
 {
-    AsyncFlushCommand()
+    private AsyncFlushCommand()
     {
-
     }
 
     public static AsyncFlushCommand Create(ObjectPool pool)

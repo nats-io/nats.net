@@ -1,22 +1,24 @@
-﻿using Microsoft.Extensions.Logging;
 using System.Buffers;
 using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
 
+internal delegate void PublishMessage(NatsOptions options, in ReadOnlySequence<byte> buffer, object?[] callbacks);
+
 internal static class MessagePublisher
 {
     // To avoid boxing, cache generic type and invoke it.
-    static readonly Func<Type, PublishMessage> createPublisher = CreatePublisher;
-    static readonly ConcurrentDictionary<Type, PublishMessage> publisherCache = new();
+    private static readonly Func<Type, PublishMessage> CreatePublisherValue = CreatePublisher;
+    private static readonly ConcurrentDictionary<Type, PublishMessage> PublisherCache = new();
 
     public static void Publish(Type type, NatsOptions options, in ReadOnlySequence<byte> buffer, object?[] callbacks)
     {
-        publisherCache.GetOrAdd(type, createPublisher).Invoke(options, buffer, callbacks);
+        PublisherCache.GetOrAdd(type, CreatePublisherValue).Invoke(options, buffer, callbacks);
     }
 
-    static PublishMessage CreatePublisher(Type type)
+    private static PublishMessage CreatePublisher(Type type)
     {
         if (type == typeof(byte[]))
         {
@@ -33,8 +35,6 @@ internal static class MessagePublisher
     }
 }
 
-internal delegate void PublishMessage(NatsOptions options, in ReadOnlySequence<byte> buffer, object?[] callbacks);
-
 internal sealed class MessagePublisher<T>
 {
     public void Publish(NatsOptions options, in ReadOnlySequence<byte> buffer, object?[] callbacks)
@@ -50,7 +50,10 @@ internal sealed class MessagePublisher<T>
             {
                 options!.LoggerFactory.CreateLogger<MessagePublisher<T>>().LogError(ex, "Deserialize error during receive subscribed message. Type:{0}", typeof(T).Name);
             }
-            catch { }
+            catch
+            {
+            }
+
             return;
         }
 
@@ -91,7 +94,9 @@ internal sealed class MessagePublisher<T>
             {
                 options!.LoggerFactory.CreateLogger<MessagePublisher<T>>().LogError(ex, "Error occured during publish callback.");
             }
-            catch { }
+            catch
+            {
+            }
         }
     }
 }
@@ -118,7 +123,10 @@ internal sealed class ByteArrayMessagePublisher
             {
                 options!.LoggerFactory.CreateLogger<ReadOnlyMemoryMessagePublisher>().LogError(ex, "Deserialize error during receive subscribed message.");
             }
-            catch { }
+            catch
+            {
+            }
+
             return;
         }
 
@@ -159,7 +167,9 @@ internal sealed class ByteArrayMessagePublisher
             {
                 options!.LoggerFactory.CreateLogger<ByteArrayMessagePublisher>().LogError(ex, "Error occured during publish callback.");
             }
-            catch { }
+            catch
+            {
+            }
         }
     }
 }
@@ -186,7 +196,10 @@ internal sealed class ReadOnlyMemoryMessagePublisher
             {
                 options!.LoggerFactory.CreateLogger<ReadOnlyMemoryMessagePublisher>().LogError(ex, "Deserialize error during receive subscribed message.");
             }
-            catch { }
+            catch
+            {
+            }
+
             return;
         }
 
@@ -227,7 +240,9 @@ internal sealed class ReadOnlyMemoryMessagePublisher
             {
                 options!.LoggerFactory.CreateLogger<ReadOnlyMemoryMessagePublisher>().LogError(ex, "Error occured during publish callback.");
             }
-            catch { }
+            catch
+            {
+            }
         }
     }
 }

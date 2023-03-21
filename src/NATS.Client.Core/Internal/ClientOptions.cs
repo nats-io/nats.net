@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using System.Text.Json.Serialization;
 
 namespace NATS.Client.Core.Internal;
@@ -85,7 +85,7 @@ internal sealed class ClientOptions
     [JsonPropertyName("no_responders")]
     public bool NoResponders { get; init; } = false;
 
-    static string GetAssemblyVersion()
+    private static string GetAssemblyVersion()
     {
         var asm = typeof(ClientOptions);
         var version = "1.0.0";
@@ -102,6 +102,7 @@ internal sealed class ClientOptions
                 version = asmVersion.Version;
             }
         }
+
         return version;
     }
 }

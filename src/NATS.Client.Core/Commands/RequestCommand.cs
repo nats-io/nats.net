@@ -1,19 +1,19 @@
-﻿using NATS.Client.Core.Internal;
+using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core.Commands;
 
 internal sealed class RequestAsyncCommand<TRequest, TResponse> : AsyncCommandBase<RequestAsyncCommand<TRequest, TResponse>, TResponse>
 {
-    NatsKey key;
-    TRequest? request;
-    ReadOnlyMemory<byte> inboxPrefix;
-    int id;
-    INatsSerializer? serializer;
-    CancellationTokenRegistration cancellationTokenRegistration;
-    RequestResponseManager? box;
-    bool succeed;
+    private NatsKey _key;
+    private TRequest? _request;
+    private ReadOnlyMemory<byte> _inboxPrefix;
+    private int _id;
+    private INatsSerializer? _serializer;
+    private CancellationTokenRegistration _cancellationTokenRegistration;
+    private RequestResponseManager? _box;
+    private bool _succeed;
 
-    RequestAsyncCommand()
+    private RequestAsyncCommand()
     {
     }
 
@@ -24,36 +24,43 @@ internal sealed class RequestAsyncCommand<TRequest, TResponse> : AsyncCommandBas
             result = new RequestAsyncCommand<TRequest, TResponse>();
         }
 
-        result.key = key;
-        result.inboxPrefix = inboxPrefix;
-        result.id = id;
-        result.request = request;
-        result.serializer = serializer;
-        result.succeed = false;
-        result.box = box;
+        result._key = key;
+        result._inboxPrefix = inboxPrefix;
+        result._id = id;
+        result._request = request;
+        result._serializer = serializer;
+        result._succeed = false;
+        result._box = box;
 
         if (cancellationToken.CanBeCanceled)
         {
-            result.cancellationTokenRegistration = cancellationToken.Register(static cmd =>
-            {
-                if (cmd is RequestAsyncCommand<TRequest, TResponse?> x)
+            result._cancellationTokenRegistration = cancellationToken.Register(
+                static cmd =>
                 {
-                    lock (x)
+                    if (cmd is RequestAsyncCommand<TRequest, TResponse?> x)
                     {
-                        // if succeed(after await), possibillity of already returned to pool so don't call SetException
-                        if (!x.succeed)
+                        lock (x)
                         {
-                            if (x.box?.Remove(x.id) ?? false)
+                            // if succeed(after await), possibillity of already returned to pool so don't call SetException
+                            if (!x._succeed)
                             {
-                                x.SetException(new TimeoutException("Request timed out."));
+                                if (x._box?.Remove(x._id) ?? false)
+                                {
+                                    x.SetException(new TimeoutException("Request timed out."));
+                                }
                             }
                         }
                     }
-                }
-            }, result);
+                },
+                result);
         }
 
         return result;
+    }
+
+    public override void Write(ProtocolWriter writer)
+    {
+        writer.WritePublish(_key, _inboxPrefix, _id, _request, _serializer!);
     }
 
     protected override void Reset()
@@ -62,22 +69,20 @@ internal sealed class RequestAsyncCommand<TRequest, TResponse> : AsyncCommandBas
         {
             try
             {
-                cancellationTokenRegistration.Dispose(); // stop cancellation timer.
+                _cancellationTokenRegistration.Dispose(); // stop cancellation timer.
             }
-            catch { }
-            cancellationTokenRegistration = default;
-            key = default;
-            request = default;
-            inboxPrefix = null;
-            serializer = null;
-            box = null;
-            succeed = true;
-            id = 0;
-        }
-    }
+            catch
+            {
+            }
 
-    public override void Write(ProtocolWriter writer)
-    {
-        writer.WritePublish(key, inboxPrefix, id, request, serializer!);
+            _cancellationTokenRegistration = default;
+            _key = default;
+            _request = default;
+            _inboxPrefix = null;
+            _serializer = null;
+            _box = null;
+            _succeed = true;
+            _id = 0;
+        }
     }
 }

@@ -1,6 +1,6 @@
-﻿using FluentAssertions.Collections;
 using System;
 using System.Collections.Generic;
+using FluentAssertions.Collections;
 
 namespace NATS.Client.Core.Tests;
 
@@ -10,6 +10,7 @@ public static class FluentAssertionsExtension
     {
         actual.Should().Be(expected);
     }
+
     public static void ShouldBeTrue(this bool v)
     {
         v.Should().BeTrue();

@@ -1,10 +1,10 @@
-﻿using NATS.Client.Core.Internal;
+using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core.Commands;
 
 internal sealed class PingCommand : CommandBase<PingCommand>
 {
-    PingCommand()
+    private PingCommand()
     {
     }
 
@@ -14,6 +14,7 @@ internal sealed class PingCommand : CommandBase<PingCommand>
         {
             result = new PingCommand();
         }
+
         return result;
     }
 
@@ -29,12 +30,13 @@ internal sealed class PingCommand : CommandBase<PingCommand>
 
 internal sealed class AsyncPingCommand : AsyncCommandBase<AsyncPingCommand, TimeSpan>
 {
-    public DateTimeOffset? WriteTime { get; private set; }
-    NatsConnection? connection;
+    private NatsConnection? _connection;
 
-    AsyncPingCommand()
+    private AsyncPingCommand()
     {
     }
+
+    public DateTimeOffset? WriteTime { get; private set; }
 
     public static AsyncPingCommand Create(NatsConnection connection, ObjectPool pool)
     {
@@ -42,21 +44,22 @@ internal sealed class AsyncPingCommand : AsyncCommandBase<AsyncPingCommand, Time
         {
             result = new AsyncPingCommand();
         }
-        result.connection = connection;
+
+        result._connection = connection;
 
         return result;
-    }
-
-    protected override void Reset()
-    {
-        WriteTime = null;
-        connection = null;
     }
 
     public override void Write(ProtocolWriter writer)
     {
         WriteTime = DateTimeOffset.UtcNow;
-        connection!.EnqueuePing(this);
+        _connection!.EnqueuePing(this);
         writer.WritePing();
+    }
+
+    protected override void Reset()
+    {
+        WriteTime = null;
+        _connection = null;
     }
 }

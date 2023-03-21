@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
@@ -104,21 +104,21 @@ public class SequenceBuilderTest
         builder.Count.Should().Be(0);
     }
 
-    Memory<byte> GetMemory(params byte[] data)
+    private static int GetSegmentCount(ReadOnlySequence<byte> sequence)
+    {
+        var count = 0;
+        foreach (var x in sequence)
+        {
+            count++;
+        }
+
+        return count;
+    }
+
+    private Memory<byte> GetMemory(params byte[] data)
     {
         var buffer = ArrayPool<byte>.Shared.Rent(data.Length);
         data.AsSpan().CopyTo(buffer.AsSpan());
         return buffer.AsMemory(0, data.Length);
     }
-
-    static int GetSegmentCount(ReadOnlySequence<byte> sequence)
-    {
-        var count = 0;
-        foreach (var _ in sequence)
-        {
-            count++;
-        }
-        return count;
-    }
-
 }

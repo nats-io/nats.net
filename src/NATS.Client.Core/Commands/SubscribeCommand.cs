@@ -1,14 +1,14 @@
-﻿using NATS.Client.Core.Internal;
+using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core.Commands;
 
 internal sealed class SubscribeCommand : CommandBase<SubscribeCommand>
 {
-    NatsKey subject;
-    NatsKey? queueGroup;
-    int subscriptionId;
+    private NatsKey _subject;
+    private NatsKey? _queueGroup;
+    private int _subscriptionId;
 
-    SubscribeCommand()
+    private SubscribeCommand()
     {
     }
 
@@ -19,33 +19,33 @@ internal sealed class SubscribeCommand : CommandBase<SubscribeCommand>
             result = new SubscribeCommand();
         }
 
-        result.subject = subject;
-        result.subscriptionId = subscriptionId;
-        result.queueGroup = queueGroup;
+        result._subject = subject;
+        result._subscriptionId = subscriptionId;
+        result._queueGroup = queueGroup;
 
         return result;
     }
 
     public override void Write(ProtocolWriter writer)
     {
-        writer.WriteSubscribe(subscriptionId, subject, queueGroup);
+        writer.WriteSubscribe(_subscriptionId, _subject, _queueGroup);
     }
 
     protected override void Reset()
     {
-        subject = default;
-        queueGroup = default;
-        subscriptionId = 0;
+        _subject = default;
+        _queueGroup = default;
+        _subscriptionId = 0;
     }
 }
 
 internal sealed class AsyncSubscribeCommand : AsyncCommandBase<AsyncSubscribeCommand>
 {
-    NatsKey subject;
-    NatsKey? queueGroup;
-    int subscriptionId;
+    private NatsKey _subject;
+    private NatsKey? _queueGroup;
+    private int _subscriptionId;
 
-    AsyncSubscribeCommand()
+    private AsyncSubscribeCommand()
     {
     }
 
@@ -56,31 +56,31 @@ internal sealed class AsyncSubscribeCommand : AsyncCommandBase<AsyncSubscribeCom
             result = new AsyncSubscribeCommand();
         }
 
-        result.subject = subject;
-        result.subscriptionId = subscriptionId;
-        result.queueGroup = queueGroup;
+        result._subject = subject;
+        result._subscriptionId = subscriptionId;
+        result._queueGroup = queueGroup;
 
         return result;
     }
 
     public override void Write(ProtocolWriter writer)
     {
-        writer.WriteSubscribe(subscriptionId, subject, queueGroup);
+        writer.WriteSubscribe(_subscriptionId, _subject, _queueGroup);
     }
 
     protected override void Reset()
     {
-        subject = default;
-        queueGroup = default;
-        subscriptionId = 0;
+        _subject = default;
+        _queueGroup = default;
+        _subscriptionId = 0;
     }
 }
 
 internal sealed class AsyncSubscribeBatchCommand : AsyncCommandBase<AsyncSubscribeBatchCommand>, IBatchCommand
 {
-    (int subscriptionId, string subject, NatsKey? queueGroup)[]? subscriptions;
+    private (int subscriptionId, string subject, NatsKey? queueGroup)[]? _subscriptions;
 
-    AsyncSubscribeBatchCommand()
+    private AsyncSubscribeBatchCommand()
     {
     }
 
@@ -91,7 +91,7 @@ internal sealed class AsyncSubscribeBatchCommand : AsyncCommandBase<AsyncSubscri
             result = new AsyncSubscribeBatchCommand();
         }
 
-        result.subscriptions = subscriptions;
+        result._subscriptions = subscriptions;
 
         return result;
     }
@@ -104,19 +104,20 @@ internal sealed class AsyncSubscribeBatchCommand : AsyncCommandBase<AsyncSubscri
     int IBatchCommand.Write(ProtocolWriter writer)
     {
         var i = 0;
-        if (subscriptions != null)
+        if (_subscriptions != null)
         {
-            foreach (var (id, subject, queue) in subscriptions)
+            foreach (var (id, subject, queue) in _subscriptions)
             {
                 i++;
                 writer.WriteSubscribe(id, new NatsKey(subject, true), queue);
             }
         }
+
         return i;
     }
 
     protected override void Reset()
     {
-        subscriptions = default;
+        _subscriptions = default;
     }
 }

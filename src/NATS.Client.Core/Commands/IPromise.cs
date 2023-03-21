@@ -1,9 +1,11 @@
-﻿namespace NATS.Client.Core.Commands;
+namespace NATS.Client.Core.Commands;
 
 internal interface IPromise
 {
     void SetResult();
+
     void SetCanceled(CancellationToken cancellationToken);
+
     void SetException(Exception exception);
 }
 

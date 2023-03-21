@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Runtime.CompilerServices;
 
 namespace NATS.Client.Core.Internal;
@@ -6,22 +6,23 @@ namespace NATS.Client.Core.Internal;
 // similar as ArrayBufferWriter but adds more functional for ProtocolWriter
 internal sealed class FixedArrayBufferWriter : ICountableBufferWriter
 {
-    byte[] buffer;
-    int written;
-
-    public ReadOnlyMemory<byte> WrittenMemory => buffer.AsMemory(0, written);
-    public int WrittenCount => written;
+    private byte[] _buffer;
+    private int _written;
 
     public FixedArrayBufferWriter(int capacity = 65535)
     {
-        buffer = new byte[capacity];
-        written = 0;
+        _buffer = new byte[capacity];
+        _written = 0;
     }
+
+    public ReadOnlyMemory<byte> WrittenMemory => _buffer.AsMemory(0, _written);
+
+    public int WrittenCount => _written;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Range PreAllocate(int size)
     {
-        var range = new Range(written, written + size);
+        var range = new Range(_written, _written + size);
         Advance(size);
         return range;
     }
@@ -29,43 +30,45 @@ internal sealed class FixedArrayBufferWriter : ICountableBufferWriter
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Span<byte> GetSpanInPreAllocated(Range range)
     {
-        return buffer.AsSpan(range);
+        return _buffer.AsSpan(range);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Reset()
     {
-        written = 0;
+        _written = 0;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Advance(int count)
     {
-        written += count;
+        _written += count;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Memory<byte> GetMemory(int sizeHint = 0)
     {
-        if (buffer.Length - written < sizeHint)
+        if (_buffer.Length - _written < sizeHint)
         {
             Resize(sizeHint);
         }
-        return buffer.AsMemory(written);
+
+        return _buffer.AsMemory(_written);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Span<byte> GetSpan(int sizeHint = 0)
     {
-        if (buffer.Length - written < sizeHint)
+        if (_buffer.Length - _written < sizeHint)
         {
             Resize(sizeHint);
         }
-        return buffer.AsSpan(written);
+
+        return _buffer.AsSpan(_written);
     }
 
-    void Resize(int sizeHint)
+    private void Resize(int sizeHint)
     {
-        Array.Resize(ref buffer, Math.Max(sizeHint, buffer.Length * 2));
+        Array.Resize(ref _buffer, Math.Max(sizeHint, _buffer.Length * 2));
     }
 }

@@ -1,4 +1,4 @@
-﻿using System.Buffers.Text;
+using System.Buffers.Text;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -8,14 +8,14 @@ namespace NATS.Client.Core.Commands;
 
 internal sealed class ProtocolWriter
 {
-    const int MaxIntStringLength = 10; // int.MaxValue.ToString().Length
-    const int NewLineLength = 2; // \r\n
+    private const int MaxIntStringLength = 10; // int.MaxValue.ToString().Length
+    private const int NewLineLength = 2; // \r\n
 
-    readonly FixedArrayBufferWriter writer; // where T : IBufferWriter<byte>
+    private readonly FixedArrayBufferWriter _writer; // where T : IBufferWriter<byte>
 
     public ProtocolWriter(FixedArrayBufferWriter writer)
     {
-        this.writer = writer;
+        _writer = writer;
     }
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#connect
@@ -24,10 +24,10 @@ internal sealed class ProtocolWriter
     {
         WriteConstant(CommandConstants.ConnectWithPadding);
 
-        var jsonWriter = new Utf8JsonWriter(writer);
+        var jsonWriter = new Utf8JsonWriter(_writer);
         JsonSerializer.Serialize(jsonWriter, options, new JsonSerializerOptions
         {
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         });
 
         WriteConstant(CommandConstants.NewLine);
@@ -48,7 +48,6 @@ internal sealed class ProtocolWriter
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#pub
     // PUB <subject> [reply-to] <#bytes>\r\n[payload]
     // To omit the payload, set the payload size to 0, but the second CRLF is still required.
-
     public void WritePublish(in NatsKey subject, in NatsKey? replyTo, ReadOnlySpan<byte> payload)
     {
         var offset = 0;
@@ -60,15 +59,15 @@ internal sealed class ProtocolWriter
             + payload.Length
             + NewLineLength;
 
-        var writableSpan = writer.GetSpan(maxLength);
+        var writableSpan = _writer.GetSpan(maxLength);
 
         CommandConstants.PubWithPadding.CopyTo(writableSpan);
         offset += CommandConstants.PubWithPadding.Length;
 
-        if (subject.buffer != null)
+        if (subject.Buffer != null)
         {
-            subject.buffer.AsSpan().CopyTo(writableSpan.Slice(offset));
-            offset += subject.buffer.Length;
+            subject.Buffer.AsSpan().CopyTo(writableSpan.Slice(offset));
+            offset += subject.Buffer.Length;
         }
         else
         {
@@ -80,10 +79,10 @@ internal sealed class ProtocolWriter
 
         if (replyTo != null)
         {
-            if (replyTo.Value.buffer != null)
+            if (replyTo.Value.Buffer != null)
             {
-                replyTo.Value.buffer.AsSpan().CopyTo(writableSpan.Slice(offset));
-                offset += replyTo.Value.buffer.Length;
+                replyTo.Value.Buffer.AsSpan().CopyTo(writableSpan.Slice(offset));
+                offset += replyTo.Value.Buffer.Length;
             }
             else
             {
@@ -98,6 +97,7 @@ internal sealed class ProtocolWriter
         {
             throw new NatsException("Can not format integer.");
         }
+
         offset += written;
 
         CommandConstants.NewLine.CopyTo(writableSpan.Slice(offset));
@@ -112,7 +112,7 @@ internal sealed class ProtocolWriter
         CommandConstants.NewLine.CopyTo(writableSpan.Slice(offset));
         offset += CommandConstants.NewLine.Length;
 
-        writer.Advance(offset);
+        _writer.Advance(offset);
     }
 
     public void WritePublish<T>(in NatsKey subject, in NatsKey? replyTo, T? value, INatsSerializer serializer)
@@ -124,15 +124,15 @@ internal sealed class ProtocolWriter
             + MaxIntStringLength
             + NewLineLength;
 
-        var writableSpan = writer.GetSpan(maxLengthWithoutPayload);
+        var writableSpan = _writer.GetSpan(maxLengthWithoutPayload);
 
         CommandConstants.PubWithPadding.CopyTo(writableSpan);
         offset += CommandConstants.PubWithPadding.Length;
 
-        if (subject.buffer != null)
+        if (subject.Buffer != null)
         {
-            subject.buffer.AsSpan().CopyTo(writableSpan.Slice(offset));
-            offset += subject.buffer.Length;
+            subject.Buffer.AsSpan().CopyTo(writableSpan.Slice(offset));
+            offset += subject.Buffer.Length;
         }
         else
         {
@@ -144,10 +144,10 @@ internal sealed class ProtocolWriter
 
         if (replyTo != null)
         {
-            if (replyTo.Value.buffer != null)
+            if (replyTo.Value.Buffer != null)
             {
-                replyTo.Value.buffer.AsSpan().CopyTo(writableSpan.Slice(offset));
-                offset += replyTo.Value.buffer.Length;
+                replyTo.Value.Buffer.AsSpan().CopyTo(writableSpan.Slice(offset));
+                offset += replyTo.Value.Buffer.Length;
             }
             else
             {
@@ -159,17 +159,17 @@ internal sealed class ProtocolWriter
         }
 
         // Advance for written.
-        writer.Advance(offset);
+        _writer.Advance(offset);
 
         // preallocate range for write #bytes(write after serialized)
-        var preallocatedRange = writer.PreAllocate(MaxIntStringLength);
+        var preallocatedRange = _writer.PreAllocate(MaxIntStringLength);
         offset += MaxIntStringLength;
 
         CommandConstants.NewLine.CopyTo(writableSpan.Slice(offset));
-        writer.Advance(CommandConstants.NewLine.Length);
+        _writer.Advance(CommandConstants.NewLine.Length);
 
-        var payloadLength = serializer.Serialize(writer, value);
-        var payloadLengthSpan = writer.GetSpanInPreAllocated(preallocatedRange);
+        var payloadLength = serializer.Serialize(_writer, value);
+        var payloadLengthSpan = _writer.GetSpanInPreAllocated(preallocatedRange);
         payloadLengthSpan.Fill((byte)' ');
         if (!Utf8Formatter.TryFormat(payloadLength, payloadLengthSpan, out var written))
         {
@@ -194,15 +194,15 @@ internal sealed class ProtocolWriter
             + MaxIntStringLength
             + NewLineLength;
 
-        var writableSpan = writer.GetSpan(maxLengthWithoutPayload);
+        var writableSpan = _writer.GetSpan(maxLengthWithoutPayload);
 
         CommandConstants.PubWithPadding.CopyTo(writableSpan);
         offset += CommandConstants.PubWithPadding.Length;
 
-        if (subject.buffer != null)
+        if (subject.Buffer != null)
         {
-            subject.buffer.AsSpan().CopyTo(writableSpan.Slice(offset));
-            offset += subject.buffer.Length;
+            subject.Buffer.AsSpan().CopyTo(writableSpan.Slice(offset));
+            offset += subject.Buffer.Length;
         }
         else
         {
@@ -221,17 +221,17 @@ internal sealed class ProtocolWriter
         offset += 1;
 
         // Advance for written.
-        writer.Advance(offset);
+        _writer.Advance(offset);
 
         // preallocate range for write #bytes(write after serialized)
-        var preallocatedRange = writer.PreAllocate(MaxIntStringLength);
+        var preallocatedRange = _writer.PreAllocate(MaxIntStringLength);
         offset += MaxIntStringLength;
 
         CommandConstants.NewLine.CopyTo(writableSpan.Slice(offset));
-        writer.Advance(CommandConstants.NewLine.Length);
+        _writer.Advance(CommandConstants.NewLine.Length);
 
-        var payloadLength = serializer.Serialize(writer, value);
-        var payloadLengthSpan = writer.GetSpanInPreAllocated(preallocatedRange);
+        var payloadLength = serializer.Serialize(_writer, value);
+        var payloadLengthSpan = _writer.GetSpanInPreAllocated(preallocatedRange);
         payloadLengthSpan.Fill((byte)' ');
         if (!Utf8Formatter.TryFormat(payloadLength, payloadLengthSpan, out written))
         {
@@ -253,14 +253,14 @@ internal sealed class ProtocolWriter
             + MaxIntStringLength
             + NewLineLength; // newline
 
-        var writableSpan = writer.GetSpan(maxLength);
+        var writableSpan = _writer.GetSpan(maxLength);
         CommandConstants.SubWithPadding.CopyTo(writableSpan);
         offset += CommandConstants.SubWithPadding.Length;
 
-        if (subject.buffer != null)
+        if (subject.Buffer != null)
         {
-            subject.buffer.AsSpan().CopyTo(writableSpan.Slice(offset));
-            offset += subject.buffer.Length;
+            subject.Buffer.AsSpan().CopyTo(writableSpan.Slice(offset));
+            offset += subject.Buffer.Length;
         }
         else
         {
@@ -272,10 +272,10 @@ internal sealed class ProtocolWriter
 
         if (queueGroup != null)
         {
-            if (queueGroup.Value.buffer != null)
+            if (queueGroup.Value.Buffer != null)
             {
-                queueGroup.Value.buffer.AsSpan().CopyTo(writableSpan.Slice(offset));
-                offset += queueGroup.Value.buffer.Length;
+                queueGroup.Value.Buffer.AsSpan().CopyTo(writableSpan.Slice(offset));
+                offset += queueGroup.Value.Buffer.Length;
             }
             else
             {
@@ -290,12 +290,13 @@ internal sealed class ProtocolWriter
         {
             throw new NatsException("Can not format integer.");
         }
+
         offset += written;
 
         CommandConstants.NewLine.CopyTo(writableSpan.Slice(offset));
         offset += CommandConstants.NewLine.Length;
 
-        writer.Advance(offset);
+        _writer.Advance(offset);
     }
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#unsub
@@ -308,7 +309,7 @@ internal sealed class ProtocolWriter
             + ((maxMessages != null) ? (1 + MaxIntStringLength) : 0)
             + NewLineLength;
 
-        var writableSpan = writer.GetSpan(maxLength);
+        var writableSpan = _writer.GetSpan(maxLength);
         CommandConstants.UnsubWithPadding.CopyTo(writableSpan);
         offset += CommandConstants.UnsubWithPadding.Length;
 
@@ -316,6 +317,7 @@ internal sealed class ProtocolWriter
         {
             throw new NatsException("Can not format integer.");
         }
+
         offset += written;
 
         if (maxMessages != null)
@@ -326,26 +328,27 @@ internal sealed class ProtocolWriter
             {
                 throw new NatsException("Can not format integer.");
             }
+
             offset += written;
         }
 
         CommandConstants.NewLine.CopyTo(writableSpan.Slice(offset));
         offset += CommandConstants.NewLine.Length;
 
-        writer.Advance(offset);
+        _writer.Advance(offset);
     }
 
     internal void WriteRaw(byte[] protocol)
     {
-        var span = writer.GetSpan(protocol.Length);
+        var span = _writer.GetSpan(protocol.Length);
         protocol.CopyTo(span);
-        writer.Advance(protocol.Length);
+        _writer.Advance(protocol.Length);
     }
 
-    void WriteConstant(ReadOnlySpan<byte> constant)
+    private void WriteConstant(ReadOnlySpan<byte> constant)
     {
-        var writableSpan = writer.GetSpan(constant.Length);
+        var writableSpan = _writer.GetSpan(constant.Length);
         constant.CopyTo(writableSpan);
-        writer.Advance(constant.Length);
+        _writer.Advance(constant.Length);
     }
 }

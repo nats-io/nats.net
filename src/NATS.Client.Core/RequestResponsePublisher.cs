@@ -1,23 +1,26 @@
-﻿using Microsoft.Extensions.Logging;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
+using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
 
 namespace NATS.Client.Core;
 
+internal delegate void PublishResponseMessage(NatsOptions options, in ReadOnlySequence<byte> buffer, object callback);
+internal delegate void PublishRequestMessage(NatsConnection connection, in NatsKey replyTo, in ReadOnlySequence<byte> buffer, object callback);
+
 internal static class ResponsePublisher
 {
     // To avoid boxing, cache generic type and invoke it.
-    static readonly Func<Type, PublishResponseMessage> createPublisher = CreatePublisher;
-    static readonly ConcurrentDictionary<Type, PublishResponseMessage> publisherCache = new();
+    private static readonly Func<Type, PublishResponseMessage> CreatePublisherValue = CreatePublisher;
+    private static readonly ConcurrentDictionary<Type, PublishResponseMessage> PublisherCache = new();
 
     public static void PublishResponse(Type type, NatsOptions options, in ReadOnlySequence<byte> buffer, object callback)
     {
-        publisherCache.GetOrAdd(type, createPublisher).Invoke(options, buffer, callback);
+        PublisherCache.GetOrAdd(type, CreatePublisherValue).Invoke(options, buffer, callback);
     }
 
-    static PublishResponseMessage CreatePublisher(Type type)
+    private static PublishResponseMessage CreatePublisher(Type type)
     {
         var publisher = typeof(ResponsePublisher<>).MakeGenericType(type)!;
         var instance = Activator.CreateInstance(publisher)!;
@@ -28,24 +31,21 @@ internal static class ResponsePublisher
 internal static class RequestPublisher
 {
     // To avoid boxing, cache generic type and invoke it.
-    static readonly Func<(Type, Type), PublishRequestMessage> createPublisher = CreatePublisher;
-    static readonly ConcurrentDictionary<(Type, Type), PublishRequestMessage> publisherCache = new();
+    private static readonly Func<(Type, Type), PublishRequestMessage> CreatePublisherValue = CreatePublisher;
+    private static readonly ConcurrentDictionary<(Type, Type), PublishRequestMessage> PublisherCache = new();
 
     public static void PublishRequest(Type requestType, Type responseType, NatsConnection connection, in NatsKey replyTo, in ReadOnlySequence<byte> buffer, object callback)
     {
-        publisherCache.GetOrAdd((requestType, responseType), createPublisher).Invoke(connection, replyTo, buffer, callback);
+        PublisherCache.GetOrAdd((requestType, responseType), CreatePublisherValue).Invoke(connection, replyTo, buffer, callback);
     }
 
-    static PublishRequestMessage CreatePublisher((Type requestType, Type responseType) type)
+    private static PublishRequestMessage CreatePublisher((Type requestType, Type responseType) type)
     {
         var publisher = typeof(RequestPublisher<,>).MakeGenericType(type.requestType, type.responseType)!;
         var instance = Activator.CreateInstance(publisher)!;
         return (PublishRequestMessage)Delegate.CreateDelegate(typeof(PublishRequestMessage), instance, "Publish", false);
     }
 }
-
-internal delegate void PublishResponseMessage(NatsOptions options, in ReadOnlySequence<byte> buffer, object callback);
-internal delegate void PublishRequestMessage(NatsConnection connection, in NatsKey replyTo, in ReadOnlySequence<byte> buffer, object callback);
 
 internal sealed class ResponsePublisher<T>
 {
@@ -69,7 +69,10 @@ internal sealed class ResponsePublisher<T>
             {
                 options!.LoggerFactory.CreateLogger<ResponsePublisher<T>>().LogError(ex, "Deserialize error during receive subscribed message. Type:{0}", typeof(T).Name);
             }
-            catch { }
+            catch
+            {
+            }
+
             return;
         }
 
@@ -91,7 +94,9 @@ internal sealed class ResponsePublisher<T>
             {
                 options!.LoggerFactory.CreateLogger<ResponsePublisher<T>>().LogError(ex, "Error occured during response callback.");
             }
-            catch { }
+            catch
+            {
+            }
         }
     }
 }
@@ -111,7 +116,10 @@ internal sealed class RequestPublisher<TRequest, TResponse>
             {
                 connection.Options.LoggerFactory.CreateLogger<RequestPublisher<TRequest, TResponse>>().LogError(ex, "Deserialize error during receive subscribed message. Type:{0}", typeof(TRequest).Name);
             }
-            catch { }
+            catch
+            {
+            }
+
             return;
         }
 
@@ -130,18 +138,21 @@ internal sealed class RequestPublisher<TRequest, TResponse>
             }
             else
             {
-                ThreadPool.UnsafeQueueUserWorkItem(static state =>
-                {
-                    var (connection, value, replyTo, callback) = state;
-                    if (callback is Func<TRequest, TResponse> func)
+                ThreadPool.UnsafeQueueUserWorkItem(
+                    static state =>
                     {
-                        PublishSync(connection, value, replyTo, func);
-                    }
-                    else if (callback is Func<TRequest, Task<TResponse>> asyncFunc)
-                    {
-                        PublishAsync(connection, value, replyTo, asyncFunc);
-                    }
-                }, (connection, value, replyTo, callback), false);
+                        var (connection, value, replyTo, callback) = state;
+                        if (callback is Func<TRequest, TResponse> func)
+                        {
+                            PublishSync(connection, value, replyTo, func);
+                        }
+                        else if (callback is Func<TRequest, Task<TResponse>> asyncFunc)
+                        {
+                            PublishAsync(connection, value, replyTo, asyncFunc);
+                        }
+                    },
+                    (connection, value, replyTo, callback),
+                    false);
             }
         }
         catch (Exception ex)
@@ -150,7 +161,9 @@ internal sealed class RequestPublisher<TRequest, TResponse>
             {
                 connection.Options.LoggerFactory.CreateLogger<RequestPublisher<TRequest, TResponse>>().LogError(ex, "Error occured during request handler.");
             }
-            catch { }
+            catch
+            {
+            }
         }
 
         static void PublishSync(NatsConnection connection, TRequest? value, in NatsKey replyTo, Func<TRequest, TResponse> callback)
@@ -166,7 +179,10 @@ internal sealed class RequestPublisher<TRequest, TResponse>
                 {
                     connection.Options.LoggerFactory.CreateLogger<RequestPublisher<TRequest, TResponse>>().LogError(ex, "Error occured during request handler.");
                 }
-                catch { }
+                catch
+                {
+                }
+
                 connection.PostPublish(replyTo); // send empty when error
                 return;
             }
@@ -187,7 +203,10 @@ internal sealed class RequestPublisher<TRequest, TResponse>
                 {
                     connection.Options.LoggerFactory.CreateLogger<RequestPublisher<TRequest, TResponse>>().LogError(ex, "Error occured during request handler.");
                 }
-                catch { }
+                catch
+                {
+                }
+
                 connection.PostPublish(replyTo); // send empty when error
                 return;
             }

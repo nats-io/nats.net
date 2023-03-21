@@ -1,4 +1,4 @@
-﻿namespace NATS.Client.Core;
+namespace NATS.Client.Core;
 
 public readonly record struct NatsStats
 (
@@ -7,18 +7,19 @@ public readonly record struct NatsStats
     long PendingMessages,
     long SentMessages,
     long ReceivedMessages,
-    long SubscriptionCount
-);
+    long SubscriptionCount);
 
 internal sealed class ConnectionStatsCounter
 {
     // for operate Interlocked.Increment/Decrement/Add, expose field as public
+#pragma warning disable SA1401
     public long SentBytes;
     public long SentMessages;
     public long PendingMessages;
     public long ReceivedBytes;
     public long ReceivedMessages;
     public long SubscriptionCount;
+#pragma warning restore SA1401
 
     public NatsStats ToStats()
     {

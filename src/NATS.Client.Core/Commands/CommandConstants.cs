@@ -1,4 +1,4 @@
-﻿namespace NATS.Client.Core.Commands;
+namespace NATS.Client.Core.Commands;
 
 internal static class CommandConstants
 {

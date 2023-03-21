@@ -1,35 +1,37 @@
-﻿using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
+using Microsoft.Extensions.Logging;
 
 namespace NATS.Client.Core.Internal;
 
 internal sealed class ThreadPoolWorkItem<T> : IThreadPoolWorkItem
 {
-    static readonly ConcurrentQueue<ThreadPoolWorkItem<T>> pool = new();
+    private static readonly ConcurrentQueue<ThreadPoolWorkItem<T>> Pool = new();
 
-    ThreadPoolWorkItem<T>? nextNode;
-    public ref ThreadPoolWorkItem<T>? NextNode => ref nextNode;
+    private ThreadPoolWorkItem<T>? _nextNode;
 
-    Action<T?>? continuation;
-    T? value;
-    ILoggerFactory? loggerFactory;
+    private Action<T?>? _continuation;
+    private T? _value;
 
-    ThreadPoolWorkItem()
+    private ILoggerFactory? _loggerFactory;
+
+    private ThreadPoolWorkItem()
     {
     }
+
+    public ref ThreadPoolWorkItem<T>? NextNode => ref _nextNode;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static ThreadPoolWorkItem<T> Create(Action<T?> continuation, T? value, ILoggerFactory loggerFactory)
     {
-        if (!pool.TryDequeue(out var item))
+        if (!Pool.TryDequeue(out var item))
         {
             item = new ThreadPoolWorkItem<T>();
         }
 
-        item.continuation = continuation;
-        item.value = value;
-        item.loggerFactory = loggerFactory;
+        item._continuation = continuation;
+        item._value = value;
+        item._loggerFactory = loggerFactory;
 
         return item;
     }
@@ -37,15 +39,15 @@ internal sealed class ThreadPoolWorkItem<T> : IThreadPoolWorkItem
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Execute()
     {
-        var call = continuation;
-        var v = value;
-        var factory = loggerFactory;
-        continuation = null;
-        value = default;
-        loggerFactory = null;
+        var call = _continuation;
+        var v = _value;
+        var factory = _loggerFactory;
+        _continuation = null;
+        _value = default;
+        _loggerFactory = null;
         if (call != null)
         {
-            pool.Enqueue(this);
+            Pool.Enqueue(this);
 
             try
             {
@@ -53,9 +55,9 @@ internal sealed class ThreadPoolWorkItem<T> : IThreadPoolWorkItem
             }
             catch (Exception ex)
             {
-                if (loggerFactory != null)
+                if (_loggerFactory != null)
                 {
-                    loggerFactory.CreateLogger<ThreadPoolWorkItem<T>>().LogError(ex, "Error occured during execute callback on ThreadPool.");
+                    _loggerFactory.CreateLogger<ThreadPoolWorkItem<T>>().LogError(ex, "Error occured during execute callback on ThreadPool.");
                 }
             }
         }

@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core.Commands;
@@ -6,6 +6,7 @@ namespace NATS.Client.Core.Commands;
 internal interface ICommand
 {
     void Return(ObjectPool pool);
+
     void Write(ProtocolWriter writer);
 }
 

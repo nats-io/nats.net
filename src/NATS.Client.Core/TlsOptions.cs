@@ -1,4 +1,4 @@
-﻿namespace NATS.Client.Core;
+namespace NATS.Client.Core;
 
 /// <summary>
 /// Immutable options for TlsOptions, you can configure via `with` operator.

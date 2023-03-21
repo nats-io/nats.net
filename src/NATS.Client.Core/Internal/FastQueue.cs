@@ -1,93 +1,96 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
 
 namespace NATS.Client.Core.Internal;
 
 // fixed size queue.
 internal sealed class FastQueue<T>
 {
-    T[] array;
-    int head;
-    int tail;
-    int size;
+    private T[] _array;
+    private int _head;
+    private int _tail;
+    private int _size;
 
     public FastQueue(int capacity)
     {
-        if (capacity < 0) throw new ArgumentOutOfRangeException("capacity");
-        array = new T[capacity];
-        head = tail = size = 0;
+        if (capacity < 0)
+            throw new ArgumentOutOfRangeException("capacity");
+        _array = new T[capacity];
+        _head = _tail = _size = 0;
     }
 
     public int Count
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get { return size; }
+        get { return _size; }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Enqueue(T item)
     {
-        if (size == array.Length)
+        if (_size == _array.Length)
         {
             ThrowForFullQueue();
         }
 
-        array[tail] = item;
-        MoveNext(ref tail);
-        size++;
+        _array[_tail] = item;
+        MoveNext(ref _tail);
+        _size++;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public T Dequeue()
     {
-        if (size == 0) ThrowForEmptyQueue();
+        if (_size == 0)
+            ThrowForEmptyQueue();
 
-        int head = this.head;
-        T[] array = this.array;
-        T removed = array[head];
+        var head = _head;
+        var array = _array;
+        var removed = array[head];
         array[head] = default!;
-        MoveNext(ref this.head);
-        size--;
+        MoveNext(ref _head);
+        _size--;
         return removed;
     }
 
     public void EnsureNewCapacity(int capacity)
     {
-        T[] newarray = new T[capacity];
-        if (size > 0)
+        var newarray = new T[capacity];
+        if (_size > 0)
         {
-            if (head < tail)
+            if (_head < _tail)
             {
-                Array.Copy(array, head, newarray, 0, size);
+                Array.Copy(_array, _head, newarray, 0, _size);
             }
             else
             {
-                Array.Copy(array, head, newarray, 0, array.Length - head);
-                Array.Copy(array, 0, newarray, array.Length - head, tail);
+                Array.Copy(_array, _head, newarray, 0, _array.Length - _head);
+                Array.Copy(_array, 0, newarray, _array.Length - _head, _tail);
             }
         }
 
-        array = newarray;
-        head = 0;
-        tail = size == capacity ? 0 : size;
+        _array = newarray;
+        _head = 0;
+        _tail = _size == capacity ? 0 : _size;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    void MoveNext(ref int index)
+    private void MoveNext(ref int index)
     {
-        int tmp = index + 1;
-        if (tmp == array.Length)
+        var tmp = index + 1;
+        if (tmp == _array.Length)
         {
             tmp = 0;
         }
+
         index = tmp;
     }
 
-    void ThrowForEmptyQueue()
+    private void ThrowForEmptyQueue()
     {
         throw new InvalidOperationException("Queue is empty.");
     }
 
-    void ThrowForFullQueue()
+    private void ThrowForFullQueue()
     {
         throw new InvalidOperationException("Queue is full.");
     }

@@ -1,4 +1,4 @@
-﻿namespace NATS.Client.Core;
+namespace NATS.Client.Core;
 
 public class NatsException : Exception
 {
@@ -10,6 +10,5 @@ public class NatsException : Exception
     public NatsException(string message, Exception exception)
         : base(message, exception)
     {
-
     }
 }

@@ -1,4 +1,4 @@
-﻿using System.Text.Json.Serialization;
+using System.Text.Json.Serialization;
 
 namespace NATS.Client.Core;
 
@@ -7,25 +7,25 @@ namespace NATS.Client.Core;
 public sealed record ServerInfo
 {
     [JsonPropertyName("server_id")]
-    public string Id { get; init; } = "";
+    public string Id { get; init; } = string.Empty;
 
     [JsonPropertyName("server_name")]
-    public string Name { get; init; } = "";
+    public string Name { get; init; } = string.Empty;
 
     [JsonPropertyName("version")]
-    public string Version { get; init; } = "";
+    public string Version { get; init; } = string.Empty;
 
     [JsonPropertyName("proto")]
     public long ProtocolVersion { get; init; }
 
     [JsonPropertyName("git_commit")]
-    public string GitCommit { get; init; } = "";
+    public string GitCommit { get; init; } = string.Empty;
 
     [JsonPropertyName("go")]
-    public string GoVersion { get; init; } = "";
+    public string GoVersion { get; init; } = string.Empty;
 
     [JsonPropertyName("host")]
-    public string Host { get; init; } = "";
+    public string Host { get; init; } = string.Empty;
 
     [JsonPropertyName("port")]
     public int Port { get; init; }
@@ -55,7 +55,7 @@ public sealed record ServerInfo
     public ulong ClientId { get; init; }
 
     [JsonPropertyName("client_ip")]
-    public string ClientIp { get; init; } = "";
+    public string ClientIp { get; init; } = string.Empty;
 
     [JsonPropertyName("nonce")]
     public string? Nonce { get; init; }

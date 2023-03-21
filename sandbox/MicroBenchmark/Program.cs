@@ -1,6 +1,6 @@
-﻿#pragma warning disable IDE0044
+#pragma warning disable IDE0044
 
-using NATS.Client.Core;
+using System.Text.Json;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Diagnosers;
@@ -8,9 +8,8 @@ using BenchmarkDotNet.Exporters;
 using BenchmarkDotNet.Jobs;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using NATS.Client.Core;
 using StackExchange.Redis;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using ZLogger;
 
 var config = ManualConfig.CreateMinimumViable()
@@ -20,23 +19,30 @@ var config = ManualConfig.CreateMinimumViable()
 
 BenchmarkDotNet.Running.BenchmarkRunner.Run<DefaultRun>(config, args);
 
-//var run = new DefaultRun();
-//await run.SetupAsync();
-//await run.RunBenchmark();
-//await run.RunStackExchangeRedis();
+public struct MyVector3
+{
+    public float X { get; set; }
 
-//await run.CleanupAsync();
+    public float Y { get; set; }
 
+    public float Z { get; set; }
+}
 
+// var run = new DefaultRun();
+// await run.SetupAsync();
+// await run.RunBenchmark();
+// await run.RunStackExchangeRedis();
+
+// await run.CleanupAsync();
 public class DefaultRun
 {
 #pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
-    NatsConnection connection;
-    NatsKey key;
-    ConnectionMultiplexer redis;
-    object gate;
-    Handler handler;
-    IDisposable subscription = default!;
+    private NatsConnection _connection;
+    private NatsKey _key;
+    private ConnectionMultiplexer _redis;
+    private object _gate;
+    private Handler _handler;
+    private IDisposable _subscription = default!;
 
     [GlobalSetup]
     public async Task SetupAsync()
@@ -50,27 +56,27 @@ public class DefaultRun
            })
            .BuildServiceProvider();
 
-
         var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
         var logger = loggerFactory.CreateLogger<ILogger<DefaultRun>>();
         var options = NatsOptions.Default with
         {
             LoggerFactory = loggerFactory,
             Echo = true,
-            Verbose = false
+            Verbose = false,
         };
 
-        connection = new NATS.Client.Core.NatsConnection(options);
-        key = new NatsKey("foobar");
-        await connection.ConnectAsync();
-        gate = new object();
-        redis = StackExchange.Redis.ConnectionMultiplexer.Connect("localhost");
+        _connection = new NATS.Client.Core.NatsConnection(options);
+        _key = new NatsKey("foobar");
+        await _connection.ConnectAsync();
+        _gate = new object();
+        _redis = StackExchange.Redis.ConnectionMultiplexer.Connect("localhost");
 
-        handler = new Handler();
-        //subscription = connection.Subscribe<MyVector3>(key, handler.Handle);
+        _handler = new Handler();
+
+        // subscription = connection.Subscribe<MyVector3>(key, handler.Handle);
     }
 
-    //[Benchmark]
+    // [Benchmark]
     public async Task Nop()
     {
         await Task.Yield();
@@ -79,62 +85,44 @@ public class DefaultRun
     [Benchmark]
     public async Task PublishAsync()
     {
-        for (int i = 0; i < 1; i++)
+        for (var i = 0; i < 1; i++)
         {
-            await connection.PublishAsync(key, new MyVector3());
+            await _connection.PublishAsync(_key, default(MyVector3));
         }
     }
 
-    //[Benchmark]
+    // [Benchmark]
     public async Task PublishAsyncRedis()
     {
-        for (int i = 0; i < 1; i++)
+        for (var i = 0; i < 1; i++)
         {
-            await redis.GetDatabase().PublishAsync(key.Key, JsonSerializer.Serialize(new MyVector3()));
+            await _redis.GetDatabase().PublishAsync(_key.Key, JsonSerializer.Serialize(default(MyVector3)));
         }
     }
 
-    //[Benchmark]
+    // [Benchmark]
     public void RunBenchmark()
     {
         const int count = 10000;
-        handler.gate = gate;
-        handler.called = 0;
-        handler.max = count;
+        _handler.Gate = _gate;
+        _handler.Called = 0;
+        _handler.Max = count;
 
-        for (int i = 0; i < count; i++)
+        for (var i = 0; i < count; i++)
         {
-            connection.PostPublish(key, new MyVector3());
+            _connection.PostPublish(_key, default(MyVector3));
         }
 
-        lock (gate)
+        lock (_gate)
         {
             // Monitor.Wait(gate);
             Thread.Sleep(1000);
         }
     }
 
-    class Handler
-    {
-        public int called;
-        public int max;
-        public object gate;
-
-        public void Handle(MyVector3 vec)
-        {
-            if (Interlocked.Increment(ref called) == max)
-            {
-                lock (gate)
-                {
-                    Monitor.PulseAll(gate);
-                }
-            }
-        }
-    }
-
-    //[Benchmark]
-    //public async Task RunStackExchangeRedis()
-    //{
+    // [Benchmark]
+    // public async Task RunStackExchangeRedis()
+    // {
     //    var tcs = new TaskCompletionSource();
     //    var called = 0;
     //    redis.GetSubscriber().Subscribe(key.Key, (channel, v) =>
@@ -145,29 +133,42 @@ public class DefaultRun
     //        }
     //    });
 
-    //    for (int i = 0; i < 1000; i++)
+    // for (int i = 0; i < 1000; i++)
     //    {
     //        _ = redis.GetDatabase().PublishAsync(key.Key, JsonSerializer.Serialize(new MyVector3()), StackExchange.Redis.CommandFlags.FireAndForget);
     //    }
 
-    //    await tcs.Task;
-    //}
-
+    // await tcs.Task;
+    // }
     [GlobalCleanup]
     public async Task CleanupAsync()
     {
-        subscription?.Dispose();
-        if (connection != null)
+        _subscription?.Dispose();
+        if (_connection != null)
         {
-            await connection.DisposeAsync();
+            await _connection.DisposeAsync();
         }
-        redis?.Dispose();
-    }
-}
 
-public struct MyVector3
-{
-    public float X { get; set; }
-    public float Y { get; set; }
-    public float Z { get; set; }
+        _redis?.Dispose();
+    }
+
+    private class Handler
+    {
+#pragma warning disable SA1401
+        public int Called;
+        public int Max;
+        public object Gate;
+#pragma warning restore SA1401
+
+        public void Handle(MyVector3 vec)
+        {
+            if (Interlocked.Increment(ref Called) == Max)
+            {
+                lock (Gate)
+                {
+                    Monitor.PulseAll(Gate);
+                }
+            }
+        }
+    }
 }

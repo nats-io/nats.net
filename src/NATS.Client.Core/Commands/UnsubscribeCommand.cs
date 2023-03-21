@@ -1,12 +1,12 @@
-﻿using NATS.Client.Core.Internal;
+using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core.Commands;
 
 internal sealed class UnsubscribeCommand : CommandBase<UnsubscribeCommand>
 {
-    int subscriptionId;
+    private int _subscriptionId;
 
-    UnsubscribeCommand()
+    private UnsubscribeCommand()
     {
     }
 
@@ -17,18 +17,18 @@ internal sealed class UnsubscribeCommand : CommandBase<UnsubscribeCommand>
             result = new UnsubscribeCommand();
         }
 
-        result.subscriptionId = subscriptionId;
+        result._subscriptionId = subscriptionId;
 
         return result;
     }
 
     public override void Write(ProtocolWriter writer)
     {
-        writer.WriteUnsubscribe(subscriptionId, null);
+        writer.WriteUnsubscribe(_subscriptionId, null);
     }
 
     protected override void Reset()
     {
-        subscriptionId = 0;
+        _subscriptionId = 0;
     }
 }

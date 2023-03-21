@@ -1,14 +1,14 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 
 namespace NATS.Client.Core;
 
 public class MinimumConsoleLoggerFactory : ILoggerFactory
 {
-    readonly LogLevel logLevel;
+    private readonly LogLevel _logLevel;
 
     public MinimumConsoleLoggerFactory(LogLevel logLevel)
     {
-        this.logLevel = logLevel;
+        _logLevel = logLevel;
     }
 
     public void AddProvider(ILoggerProvider provider)
@@ -17,20 +17,20 @@ public class MinimumConsoleLoggerFactory : ILoggerFactory
 
     public ILogger CreateLogger(string categoryName)
     {
-        return new Logger(logLevel);
+        return new Logger(_logLevel);
     }
 
     public void Dispose()
     {
     }
 
-    class Logger : ILogger
+    private class Logger : ILogger
     {
-        readonly LogLevel logLevel;
+        private readonly LogLevel _logLevel;
 
         public Logger(LogLevel logLevel)
         {
-            this.logLevel = logLevel;
+            _logLevel = logLevel;
         }
 
         public IDisposable BeginScope<TState>(TState state)
@@ -40,7 +40,7 @@ public class MinimumConsoleLoggerFactory : ILoggerFactory
 
         public bool IsEnabled(LogLevel logLevel)
         {
-            return this.logLevel <= logLevel;
+            return _logLevel <= logLevel;
         }
 
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
@@ -56,13 +56,12 @@ public class MinimumConsoleLoggerFactory : ILoggerFactory
         }
     }
 
-    class NullDisposable : IDisposable
+    private class NullDisposable : IDisposable
     {
         public static readonly IDisposable Instance = new NullDisposable();
 
-        NullDisposable()
+        private NullDisposable()
         {
-
         }
 
         public void Dispose()

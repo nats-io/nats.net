@@ -1,30 +1,30 @@
-﻿using Microsoft.Extensions.Logging;
 using System.Buffers;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using Microsoft.Extensions.Logging;
 
 namespace NATS.Client.Core.Internal;
 
 // When socket is closed/disposed, operation throws SocketClosedException
 internal sealed class SocketReader
 {
-    ISocketConnection socketConnection;
+    private readonly int _minimumBufferSize;
+    private readonly ConnectionStatsCounter _counter;
+    private readonly SeqeunceBuilder _seqeunceBuilder = new SeqeunceBuilder();
+    private readonly Stopwatch _stopwatch = new Stopwatch();
+    private readonly ILogger<SocketReader> _logger;
+    private readonly bool _isTraceLogging;
+    private ISocketConnection _socketConnection;
 
-    Memory<byte> availableMemory;
-    readonly int minimumBufferSize;
-    readonly ConnectionStatsCounter counter;
-    readonly SeqeunceBuilder seqeunceBuilder = new SeqeunceBuilder();
-    readonly Stopwatch stopwatch = new Stopwatch();
-    readonly ILogger<SocketReader> logger;
-    readonly bool isTraceLogging;
+    private Memory<byte> _availableMemory;
 
     public SocketReader(ISocketConnection socketConnection, int minimumBufferSize, ConnectionStatsCounter counter, ILoggerFactory loggerFactory)
     {
-        this.socketConnection = socketConnection;
-        this.minimumBufferSize = minimumBufferSize;
-        this.counter = counter;
-        this.logger = loggerFactory.CreateLogger<SocketReader>();
-        this.isTraceLogging = logger.IsEnabled(LogLevel.Trace);
+        _socketConnection = socketConnection;
+        _minimumBufferSize = minimumBufferSize;
+        _counter = counter;
+        _logger = loggerFactory.CreateLogger<SocketReader>();
+        _isTraceLogging = _logger.IsEnabled(LogLevel.Trace);
     }
 
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
@@ -33,42 +33,44 @@ internal sealed class SocketReader
         var totalRead = 0;
         do
         {
-            if (availableMemory.Length == 0)
+            if (_availableMemory.Length == 0)
             {
-                availableMemory = ArrayPool<byte>.Shared.Rent(minimumBufferSize);
+                _availableMemory = ArrayPool<byte>.Shared.Rent(_minimumBufferSize);
             }
 
-            stopwatch.Restart();
+            _stopwatch.Restart();
             int read;
             try
             {
-                read = await socketConnection.ReceiveAsync(availableMemory).ConfigureAwait(false);
+                read = await _socketConnection.ReceiveAsync(_availableMemory).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                socketConnection.SignalDisconnected(ex);
+                _socketConnection.SignalDisconnected(ex);
                 throw new SocketClosedException(ex);
             }
 
-            stopwatch.Stop();
-            if (isTraceLogging)
+            _stopwatch.Stop();
+            if (_isTraceLogging)
             {
-                logger.LogTrace("Socket.ReceiveAsync Size: {0} Elapsed: {1}ms", read, stopwatch.Elapsed.TotalMilliseconds);
+                _logger.LogTrace("Socket.ReceiveAsync Size: {0} Elapsed: {1}ms", read, _stopwatch.Elapsed.TotalMilliseconds);
             }
 
             if (read == 0)
             {
                 var ex = new SocketClosedException(null);
-                socketConnection.SignalDisconnected(ex);
+                _socketConnection.SignalDisconnected(ex);
                 throw ex;
             }
-            totalRead += read;
-            Interlocked.Add(ref counter.ReceivedBytes, read);
-            seqeunceBuilder.Append(availableMemory.Slice(0, read));
-            availableMemory = availableMemory.Slice(read);
-        } while (totalRead < minimumSize);
 
-        return seqeunceBuilder.ToReadOnlySequence();
+            totalRead += read;
+            Interlocked.Add(ref _counter.ReceivedBytes, read);
+            _seqeunceBuilder.Append(_availableMemory.Slice(0, read));
+            _availableMemory = _availableMemory.Slice(read);
+        }
+        while (totalRead < minimumSize);
+
+        return _seqeunceBuilder.ToReadOnlySequence();
     }
 
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
@@ -76,40 +78,40 @@ internal sealed class SocketReader
     {
         while (true)
         {
-            if (availableMemory.Length == 0)
+            if (_availableMemory.Length == 0)
             {
-                availableMemory = ArrayPool<byte>.Shared.Rent(minimumBufferSize);
+                _availableMemory = ArrayPool<byte>.Shared.Rent(_minimumBufferSize);
             }
 
-            stopwatch.Restart();
+            _stopwatch.Restart();
             int read;
             try
             {
-                read = await socketConnection.ReceiveAsync(availableMemory).ConfigureAwait(false);
+                read = await _socketConnection.ReceiveAsync(_availableMemory).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                socketConnection.SignalDisconnected(ex);
+                _socketConnection.SignalDisconnected(ex);
                 throw new SocketClosedException(ex);
             }
 
-            stopwatch.Stop();
-            if (isTraceLogging)
+            _stopwatch.Stop();
+            if (_isTraceLogging)
             {
-                logger.LogTrace("Socket.ReceiveAsync Size: {0} Elapsed: {1}ms", read, stopwatch.Elapsed.TotalMilliseconds);
+                _logger.LogTrace("Socket.ReceiveAsync Size: {0} Elapsed: {1}ms", read, _stopwatch.Elapsed.TotalMilliseconds);
             }
 
             if (read == 0)
             {
                 var ex = new SocketClosedException(null);
-                socketConnection.SignalDisconnected(ex);
+                _socketConnection.SignalDisconnected(ex);
                 throw ex;
             }
 
-            Interlocked.Add(ref counter.ReceivedBytes, read);
-            var appendMemory = availableMemory.Slice(0, read);
-            seqeunceBuilder.Append(appendMemory);
-            availableMemory = availableMemory.Slice(read);
+            Interlocked.Add(ref _counter.ReceivedBytes, read);
+            var appendMemory = _availableMemory.Slice(0, read);
+            _seqeunceBuilder.Append(appendMemory);
+            _availableMemory = _availableMemory.Slice(read);
 
             if (appendMemory.Span.Contains((byte)'\n'))
             {
@@ -117,11 +119,11 @@ internal sealed class SocketReader
             }
         }
 
-        return seqeunceBuilder.ToReadOnlySequence();
+        return _seqeunceBuilder.ToReadOnlySequence();
     }
 
     public void AdvanceTo(SequencePosition start)
     {
-        seqeunceBuilder.AdvanceTo(start);
+        _seqeunceBuilder.AdvanceTo(start);
     }
 }

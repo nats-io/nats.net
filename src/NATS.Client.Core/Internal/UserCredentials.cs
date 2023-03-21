@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using NATS.Client.Core.NaCl;
 
 namespace NATS.Client.Core.Internal;
@@ -23,7 +23,35 @@ internal class UserCredentials
         }
     }
 
-    (string, string) LoadCredsFile(string path)
+    public string? Jwt { get; }
+
+    public string? Seed { get; }
+
+    public string? Nkey { get; }
+
+    public string? Token { get; }
+
+    public string? Sign(string? nonce)
+    {
+        if (Seed == null || nonce == null)
+            return null;
+
+        using var kp = Nkeys.FromSeed(Seed);
+        var bytes = kp.Sign(Encoding.ASCII.GetBytes(nonce));
+        var sig = CryptoBytes.ToBase64String(bytes);
+
+        return sig;
+    }
+
+    internal void Authenticate(ClientOptions options, ServerInfo? info)
+    {
+        options.JWT = Jwt;
+        options.Nkey = Nkey;
+        options.AuthToken = Token;
+        options.Sig = info is { AuthRequired: true, Nonce: { } } ? Sign(info.Nonce) : null;
+    }
+
+    private (string, string) LoadCredsFile(string path)
     {
         string? jwt = null;
         string? seed = null;
@@ -33,13 +61,14 @@ internal class UserCredentials
             if (line.StartsWith("-----BEGIN NATS USER JWT-----"))
             {
                 jwt = reader.ReadLine();
-                if (jwt == null) break;
-
+                if (jwt == null)
+                    break;
             }
             else if (line.StartsWith("-----BEGIN USER NKEY SEED-----"))
             {
                 seed = reader.ReadLine();
-                if (seed == null) break;
+                if (seed == null)
+                    break;
             }
         }
 
@@ -51,7 +80,7 @@ internal class UserCredentials
         return (jwt, seed);
     }
 
-    (string, string) LoadNKeyFile(string path)
+    private (string, string) LoadNKeyFile(string path)
     {
         string? seed = null;
         string? nkey = null;
@@ -75,32 +104,5 @@ internal class UserCredentials
             throw new NatsException($"Can't find public key while loading NKEY file ${path}");
 
         return (seed, nkey);
-    }
-
-    public string? Jwt { get; }
-
-    public string? Seed { get; }
-
-    public string? Nkey { get; }
-
-    public string? Token { get; }
-
-    public string? Sign(string? nonce)
-    {
-        if (Seed == null || nonce == null) return null;
-
-        using var kp = Nkeys.FromSeed(Seed);
-        byte[] bytes = kp.Sign(Encoding.ASCII.GetBytes(nonce));
-        var sig = CryptoBytes.ToBase64String(bytes);
-
-        return sig;
-    }
-
-    internal void Authenticate(ClientOptions options, ServerInfo? info)
-    {
-        options.JWT = Jwt;
-        options.Nkey = Nkey;
-        options.AuthToken = Token;
-        options.Sig = info is { AuthRequired: true, Nonce: { } } ? Sign(info.Nonce) : null;
     }
 }

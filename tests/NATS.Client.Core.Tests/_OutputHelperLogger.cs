@@ -1,16 +1,16 @@
-﻿using Microsoft.Extensions.Logging;
 using System;
+using Microsoft.Extensions.Logging;
 using Xunit.Abstractions;
 
 namespace NATS.Client.Core.Tests;
 
 public class OutputHelperLoggerFactory : ILoggerFactory
 {
-    readonly ITestOutputHelper testOutputHelper;
+    private readonly ITestOutputHelper _testOutputHelper;
 
     public OutputHelperLoggerFactory(ITestOutputHelper testOutputHelper)
     {
-        this.testOutputHelper = testOutputHelper;
+        _testOutputHelper = testOutputHelper;
     }
 
     public void AddProvider(ILoggerProvider provider)
@@ -19,20 +19,20 @@ public class OutputHelperLoggerFactory : ILoggerFactory
 
     public ILogger CreateLogger(string categoryName)
     {
-        return new Logger(testOutputHelper);
+        return new Logger(_testOutputHelper);
     }
 
     public void Dispose()
     {
     }
 
-    class Logger : ILogger
+    private class Logger : ILogger
     {
-        readonly ITestOutputHelper testOutputHelper;
+        private readonly ITestOutputHelper _testOutputHelper;
 
         public Logger(ITestOutputHelper testOutputHelper)
         {
-            this.testOutputHelper = testOutputHelper;
+            _testOutputHelper = testOutputHelper;
         }
 
         public IDisposable BeginScope<TState>(TState state)
@@ -49,23 +49,24 @@ public class OutputHelperLoggerFactory : ILoggerFactory
         {
             try
             {
-                testOutputHelper.WriteLine(formatter(state, exception));
+                _testOutputHelper.WriteLine(formatter(state, exception));
                 if (exception != null)
                 {
-                    testOutputHelper.WriteLine(exception.ToString());
+                    _testOutputHelper.WriteLine(exception.ToString());
                 }
             }
-            catch { }
+            catch
+            {
+            }
         }
     }
 
-    class NullDisposable : IDisposable
+    private class NullDisposable : IDisposable
     {
         public static readonly IDisposable Instance = new NullDisposable();
 
-        NullDisposable()
+        private NullDisposable()
         {
-
         }
 
         public void Dispose()

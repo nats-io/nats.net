@@ -1,11 +1,9 @@
-﻿using System.Security.Cryptography.X509Certificates;
-using NATS.Client.Core;
+using System.Security.Cryptography.X509Certificates;
+
+namespace NATS.Client.Core.Internal;
 
 internal class TlsCerts
 {
-    public readonly X509Certificate2Collection? CaCerts;
-    public readonly X509Certificate2Collection? ClientCerts;
-
     public TlsCerts(TlsOptions tlsOptions)
     {
         if (tlsOptions.Disabled)
@@ -30,4 +28,8 @@ internal class TlsCerts
             ClientCerts = new X509Certificate2Collection(X509Certificate2.CreateFromPemFile(tlsOptions.CertFile, tlsOptions.KeyFile));
         }
     }
+
+    public X509Certificate2Collection? CaCerts { get; }
+
+    public X509Certificate2Collection? ClientCerts { get; }
 }

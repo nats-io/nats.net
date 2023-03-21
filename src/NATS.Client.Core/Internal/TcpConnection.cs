@@ -1,4 +1,4 @@
-﻿using System.Net.Security;
+using System.Net.Security;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 
@@ -14,24 +14,24 @@ internal sealed class SocketClosedException : Exception
 
 internal sealed class TcpConnection : ISocketConnection
 {
-    readonly Socket socket;
-    readonly TaskCompletionSource<Exception> waitForClosedSource = new();
-    int disposed;
-
-    public Task<Exception> WaitForClosed => waitForClosedSource.Task;
+    private readonly Socket _socket;
+    private readonly TaskCompletionSource<Exception> _waitForClosedSource = new();
+    private int _disposed;
 
     public TcpConnection()
     {
-        this.socket = new Socket(Socket.OSSupportsIPv6 ? AddressFamily.InterNetworkV6 : AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        _socket = new Socket(Socket.OSSupportsIPv6 ? AddressFamily.InterNetworkV6 : AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         if (Socket.OSSupportsIPv6)
         {
-            socket.DualMode = true;
+            _socket.DualMode = true;
         }
 
-        socket.NoDelay = true;
-        socket.SendBufferSize = 0;
-        socket.ReceiveBufferSize = 0;
+        _socket.NoDelay = true;
+        _socket.SendBufferSize = 0;
+        _socket.ReceiveBufferSize = 0;
     }
+
+    public Task<Exception> WaitForClosed => _waitForClosedSource.Task;
 
     // CancellationToken is not used, operation lifetime is completely same as socket.
 
@@ -42,11 +42,10 @@ internal sealed class TcpConnection : ISocketConnection
     //  throws DisposedException
 
     // return ValueTask directly for performance, not care exception and signal-disconnected.
-
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ValueTask ConnectAsync(string host, int port, CancellationToken cancellationToken)
     {
-        return socket.ConnectAsync(host, port, cancellationToken);
+        return _socket.ConnectAsync(host, port, cancellationToken);
     }
 
     /// <summary>
@@ -57,7 +56,7 @@ internal sealed class TcpConnection : ISocketConnection
         using var cts = new CancellationTokenSource(timeout);
         try
         {
-            await socket.ConnectAsync(host, port, cts.Token).ConfigureAwait(false);
+            await _socket.ConnectAsync(host, port, cts.Token).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -76,51 +75,55 @@ internal sealed class TcpConnection : ISocketConnection
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ValueTask<int> SendAsync(ReadOnlyMemory<byte> buffer)
     {
-        return socket.SendAsync(buffer, SocketFlags.None, CancellationToken.None);
+        return _socket.SendAsync(buffer, SocketFlags.None, CancellationToken.None);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ValueTask<int> ReceiveAsync(Memory<byte> buffer)
     {
-        return socket.ReceiveAsync(buffer, SocketFlags.None, CancellationToken.None);
+        return _socket.ReceiveAsync(buffer, SocketFlags.None, CancellationToken.None);
     }
 
     public ValueTask AbortConnectionAsync(CancellationToken cancellationToken)
     {
-        return socket.DisconnectAsync(false, cancellationToken);
+        return _socket.DisconnectAsync(false, cancellationToken);
     }
 
     public ValueTask DisposeAsync()
     {
-        if (Interlocked.Increment(ref disposed) == 1)
+        if (Interlocked.Increment(ref _disposed) == 1)
         {
             try
             {
-                waitForClosedSource.TrySetCanceled();
+                _waitForClosedSource.TrySetCanceled();
             }
-            catch { }
-            socket.Dispose();
+            catch
+            {
+            }
+
+            _socket.Dispose();
         }
+
         return default;
     }
 
     // when catch SocketClosedException, call this method.
     public void SignalDisconnected(Exception exception)
     {
-        waitForClosedSource.TrySetResult(exception);
+        _waitForClosedSource.TrySetResult(exception);
     }
 
     // NetworkStream will own the Socket, so mark as disposed
     // in order to skip socket.Dispose() in DisposeAsync
     public SslStreamConnection UpgradeToSslStreamConnection(TlsOptions tlsOptions, TlsCerts? tlsCerts)
     {
-        if (Interlocked.Increment(ref disposed) == 1)
+        if (Interlocked.Increment(ref _disposed) == 1)
         {
             return new SslStreamConnection(
-                new SslStream(new NetworkStream(socket, true)),
+                new SslStream(new NetworkStream(_socket, true)),
                 tlsOptions,
                 tlsCerts,
-                waitForClosedSource);
+                _waitForClosedSource);
         }
 
         throw new ObjectDisposedException(nameof(TcpConnection));

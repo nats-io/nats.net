@@ -1,6 +1,6 @@
-﻿using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Threading.Channels;
+using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
 using NATS.Client.Core.Internal;
 
@@ -8,37 +8,46 @@ namespace NATS.Client.Core;
 
 internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
 {
-    readonly ISocketConnection socketConnection;
-    readonly WriterState state;
-    readonly ObjectPool pool;
-    readonly ConnectionStatsCounter counter;
-    readonly FixedArrayBufferWriter bufferWriter;
-    readonly Channel<ICommand> channel;
-    readonly NatsOptions options;
-    readonly Task writeLoop;
-    readonly Stopwatch stopwatch = new Stopwatch();
-    readonly CancellationTokenSource cancellationTokenSource;
-    int disposed;
+    private readonly ISocketConnection _socketConnection;
+    private readonly WriterState _state;
+    private readonly ObjectPool _pool;
+    private readonly ConnectionStatsCounter _counter;
+    private readonly FixedArrayBufferWriter _bufferWriter;
+    private readonly Channel<ICommand> _channel;
+    private readonly NatsOptions _options;
+    private readonly Task _writeLoop;
+    private readonly Stopwatch _stopwatch = new Stopwatch();
+    private readonly CancellationTokenSource _cancellationTokenSource;
+    private int _disposed;
 
     public NatsPipeliningWriteProtocolProcessor(ISocketConnection socketConnection, WriterState state, ObjectPool pool, ConnectionStatsCounter counter)
     {
-        this.socketConnection = socketConnection;
-        this.state = state;
-        this.pool = pool;
-        this.counter = counter;
-        this.bufferWriter = state.BufferWriter;
-        this.channel = state.CommandBuffer;
-        this.options = state.Options;
-        this.cancellationTokenSource = new CancellationTokenSource();
-        this.writeLoop = Task.Run(WriteLoopAsync);
+        _socketConnection = socketConnection;
+        _state = state;
+        _pool = pool;
+        _counter = counter;
+        _bufferWriter = state.BufferWriter;
+        _channel = state.CommandBuffer;
+        _options = state.Options;
+        _cancellationTokenSource = new CancellationTokenSource();
+        _writeLoop = Task.Run(WriteLoopAsync);
     }
 
-    async Task WriteLoopAsync()
+    public async ValueTask DisposeAsync()
     {
-        var reader = channel.Reader;
-        var protocolWriter = new ProtocolWriter(bufferWriter);
-        var logger = options.LoggerFactory.CreateLogger<NatsPipeliningWriteProtocolProcessor>();
-        var writerBufferSize = options.WriterBufferSize;
+        if (Interlocked.Increment(ref _disposed) == 1)
+        {
+            _cancellationTokenSource.Cancel();
+            await _writeLoop.ConfigureAwait(false); // wait for drain writer
+        }
+    }
+
+    private async Task WriteLoopAsync()
+    {
+        var reader = _channel.Reader;
+        var protocolWriter = new ProtocolWriter(_bufferWriter);
+        var logger = _options.LoggerFactory.CreateLogger<NatsPipeliningWriteProtocolProcessor>();
+        var writerBufferSize = _options.WriterBufferSize;
         var promiseList = new List<IPromise>(100);
         var isEnabledTraceLogging = logger.IsEnabled(LogLevel.Trace);
 
@@ -46,7 +55,7 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
         {
             // at first, send priority lane(initial command).
             {
-                var firstCommands = state.PriorityCommands;
+                var firstCommands = _state.PriorityCommands;
                 if (firstCommands.Count != 0)
                 {
                     var count = firstCommands.Count;
@@ -61,33 +70,36 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
                             promiseList.Add(p);
                         }
 
-                        command.Return(pool); // Promise does not Return but set ObjectPool here.
+                        command.Return(_pool); // Promise does not Return but set ObjectPool here.
                     }
-                    state.PriorityCommands.Clear();
+
+                    _state.PriorityCommands.Clear();
 
                     try
                     {
                         var memory = tempBuffer.WrittenMemory;
                         while (memory.Length > 0)
                         {
-                            stopwatch.Restart();
-                            var sent = await socketConnection.SendAsync(memory).ConfigureAwait(false);
-                            stopwatch.Stop();
+                            _stopwatch.Restart();
+                            var sent = await _socketConnection.SendAsync(memory).ConfigureAwait(false);
+                            _stopwatch.Stop();
                             if (isEnabledTraceLogging)
                             {
-                                logger.LogTrace("Socket.SendAsync. Size: {0} BatchSize: {1} Elapsed: {2}ms", sent, count, stopwatch.Elapsed.TotalMilliseconds);
+                                logger.LogTrace("Socket.SendAsync. Size: {0} BatchSize: {1} Elapsed: {2}ms", sent, count, _stopwatch.Elapsed.TotalMilliseconds);
                             }
-                            Interlocked.Add(ref counter.SentBytes, sent);
+
+                            Interlocked.Add(ref _counter.SentBytes, sent);
                             memory = memory.Slice(sent);
                         }
                     }
                     catch (Exception ex)
                     {
-                        socketConnection.SignalDisconnected(ex);
+                        _socketConnection.SignalDisconnected(ex);
                         foreach (var item in promiseList)
                         {
                             item.SetException(ex); // signal failed
                         }
+
                         return; // when socket closed, finish writeloop.
                     }
 
@@ -95,23 +107,24 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
                     {
                         item.SetResult();
                     }
+
                     promiseList.Clear();
                 }
             }
 
             // restore promise(command is exist in bufferWriter) when enter from reconnecting.
-            promiseList.AddRange(state.PendingPromises);
-            state.PendingPromises.Clear();
+            promiseList.AddRange(_state.PendingPromises);
+            _state.PendingPromises.Clear();
 
             // main writer loop
-            while ((bufferWriter.WrittenCount != 0) || (await reader.WaitToReadAsync(cancellationTokenSource.Token).ConfigureAwait(false)))
+            while ((_bufferWriter.WrittenCount != 0) || (await reader.WaitToReadAsync(_cancellationTokenSource.Token).ConfigureAwait(false)))
             {
                 try
                 {
                     var count = 0;
-                    while (bufferWriter.WrittenCount < writerBufferSize && reader.TryRead(out var command))
+                    while (_bufferWriter.WrittenCount < writerBufferSize && reader.TryRead(out var command))
                     {
-                        Interlocked.Decrement(ref counter.PendingMessages);
+                        Interlocked.Decrement(ref _counter.PendingMessages);
 
                         if (command is IBatchCommand batch)
                         {
@@ -128,46 +141,52 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
                             promiseList.Add(p);
                         }
 
-                        command.Return(pool); // Promise does not Return but set ObjectPool here.
+                        command.Return(_pool); // Promise does not Return but set ObjectPool here.
                     }
 
                     try
                     {
                         // SendAsync(ReadOnlyMemory) is very efficient, internally using AwaitableAsyncSocketEventArgs
                         // should use cancellation token?, currently no, wait for flush complete.
-                        var memory = bufferWriter.WrittenMemory;
+                        var memory = _bufferWriter.WrittenMemory;
                         while (memory.Length != 0)
                         {
-                            stopwatch.Restart();
-                            var sent = await socketConnection.SendAsync(memory).ConfigureAwait(false);
-                            stopwatch.Stop();
+                            _stopwatch.Restart();
+                            var sent = await _socketConnection.SendAsync(memory).ConfigureAwait(false);
+                            _stopwatch.Stop();
                             if (isEnabledTraceLogging)
                             {
-                                logger.LogTrace("Socket.SendAsync. Size: {0} BatchSize: {1} Elapsed: {2}ms", sent, count, stopwatch.Elapsed.TotalMilliseconds);
+                                logger.LogTrace("Socket.SendAsync. Size: {0} BatchSize: {1} Elapsed: {2}ms", sent, count, _stopwatch.Elapsed.TotalMilliseconds);
                             }
+
                             if (sent == 0)
                             {
                                 throw new SocketClosedException(null);
                             }
-                            Interlocked.Add(ref counter.SentBytes, sent);
+
+                            Interlocked.Add(ref _counter.SentBytes, sent);
 
                             memory = memory.Slice(sent);
                         }
-                        Interlocked.Add(ref counter.SentMessages, count);
 
-                        bufferWriter.Reset();
+                        Interlocked.Add(ref _counter.SentMessages, count);
+
+                        _bufferWriter.Reset();
                         foreach (var item in promiseList)
                         {
                             item.SetResult();
                         }
+
                         promiseList.Clear();
                     }
-                    catch (Exception ex) // may receive from socket.SendAsync
+                    catch (Exception ex)
                     {
+                        // may receive from socket.SendAsync
+
                         // when error, command is dequeued and written buffer is still exists in state.BufferWriter
                         // store current pending promises to state.
-                        state.PendingPromises.AddRange(promiseList);
-                        socketConnection.SignalDisconnected(ex);
+                        _state.PendingPromises.AddRange(promiseList);
+                        _socketConnection.SignalDisconnected(ex);
                         return; // when socket closed, finish writeloop.
                     }
                 }
@@ -177,11 +196,14 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
                     {
                         return;
                     }
+
                     try
                     {
                         logger.LogError(ex, "Internal error occured on WriteLoop.");
                     }
-                    catch { }
+                    catch
+                    {
+                    }
                 }
             }
         }
@@ -192,21 +214,14 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
         {
             try
             {
-                if (bufferWriter.WrittenMemory.Length != 0)
+                if (_bufferWriter.WrittenMemory.Length != 0)
                 {
-                    await socketConnection.SendAsync(bufferWriter.WrittenMemory).ConfigureAwait(false);
+                    await _socketConnection.SendAsync(_bufferWriter.WrittenMemory).ConfigureAwait(false);
                 }
             }
-            catch { }
-        }
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (Interlocked.Increment(ref disposed) == 1)
-        {
-            cancellationTokenSource.Cancel();
-            await writeLoop.ConfigureAwait(false); // wait for drain writer
+            catch
+            {
+            }
         }
     }
 }

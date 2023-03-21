@@ -15,6 +15,10 @@ The NATS.NET V2 client is under heavy development and is not ready for public us
 - **NATS.Client.Hosting**: extension to configure DI container
 - **NATS.Client.JetStream**: JetStream *not yet implemented*
 
+## Contributing
+
+- Run `dotnet format` at root directory of project in order to clear warnings that can be auto-formatted
+
 ## Attribution
 
 This library is based on the excellent work in [Cysharp/AlterNats](https://github.com/Cysharp/AlterNats)
