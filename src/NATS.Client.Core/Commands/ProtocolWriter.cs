@@ -20,7 +20,7 @@ internal sealed class ProtocolWriter
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#connect
     // CONNECT {["option_name":option_value],...}
-    public void WriteConnect(ConnectOptions options)
+    public void WriteConnect(ClientOptions options)
     {
         WriteConstant(CommandConstants.ConnectWithPadding);
 

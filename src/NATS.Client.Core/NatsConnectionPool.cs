@@ -32,8 +32,8 @@ public sealed class NatsConnectionPool : IAsyncDisposable
         connections = new NatsConnection[poolSize];
         for (int i = 0; i < connections.Length; i++)
         {
-            var name = (options.ConnectOptions.Name == null) ? $"#{i}" : $"{options.ConnectOptions.Name}#{i}";
-            var conn = new NatsConnection(options with { ConnectOptions = options.ConnectOptions with { Name = name } });
+            var name = (options.Name == null) ? $"#{i}" : $"{options.Name}#{i}";
+            var conn = new NatsConnection(options with {  Name = name });
             configureConnection(conn);
             connections[i] = conn;
         }

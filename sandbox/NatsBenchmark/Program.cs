@@ -66,7 +66,8 @@ namespace NatsBenchmark
             {
                 // LoggerFactory = loggerFactory,
                 UseThreadPoolCallback = false,
-                ConnectOptions = ConnectOptions.Default with { Echo = false, Verbose = false }
+                Echo = false,
+                Verbose = false
             };
 
             object pubSubLock = new object();
@@ -145,7 +146,8 @@ namespace NatsBenchmark
             {
                 // LoggerFactory = loggerFactory,
                 UseThreadPoolCallback = false,
-                ConnectOptions = ConnectOptions.Default with { Echo = false, Verbose = false }
+                Echo = false,
+                Verbose = false
             };
 
             object pubSubLock = new object();
@@ -231,7 +233,8 @@ namespace NatsBenchmark
             {
                 // LoggerFactory = loggerFactory,
                 UseThreadPoolCallback = false,
-                ConnectOptions = ConnectOptions.Default with { Echo = false, Verbose = false }
+                Echo = false,
+                Verbose = false
             };
 
             object pubSubLock = new object();
@@ -315,7 +318,8 @@ namespace NatsBenchmark
             {
                 //LoggerFactory = loggerFactory,
                 UseThreadPoolCallback = false,
-                ConnectOptions = ConnectOptions.Default with { Echo = false, Verbose = false }
+                Echo = false,
+                Verbose = false
             };
 
             object pubSubLock = new object();
@@ -417,7 +421,8 @@ namespace NatsBenchmark
             {
                 // LoggerFactory = loggerFactory,
                 UseThreadPoolCallback = false,
-                ConnectOptions = ConnectOptions.Default with { Echo = false, Verbose = false }
+                Echo = false,
+                Verbose = false
             };
 
             object pubSubLock = new object();
@@ -536,7 +541,8 @@ namespace NatsBenchmark
             {
                 // LoggerFactory = loggerFactory,
                 UseThreadPoolCallback = false,
-                ConnectOptions = ConnectOptions.Default with { Echo = false, Verbose = false }
+                Echo = false,
+                Verbose = false
             };
 
             object pubSubLock = new object();

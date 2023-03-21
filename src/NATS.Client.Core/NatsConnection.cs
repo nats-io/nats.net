@@ -66,6 +66,8 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
     NatsPipeliningWriteProtocolProcessor? socketWriter;
     TaskCompletionSource waitForOpenConnection;
     TlsCerts? tlsCerts;
+    ClientOptions clientOptions;
+    UserCredentials? userCredentials;
 
     public NatsOptions Options { get; }
     public NatsConnectionState ConnectionState { get; private set; }
@@ -92,7 +94,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
         ConnectionState = NatsConnectionState.Closed;
         waitForOpenConnection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         pool = new ObjectPool(options.CommandPoolSize);
-        name = options.ConnectOptions.Name ?? "";
+        name = options.Name;
         counter = new ConnectionStatsCounter();
         writerState = new WriterState(options);
         commandWriter = writerState.CommandBuffer.Writer;
@@ -100,6 +102,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
         requestResponseManager = new RequestResponseManager(this, pool);
         inboxPrefix = Encoding.ASCII.GetBytes($"{options.InboxPrefix}{Guid.NewGuid()}.");
         logger = options.LoggerFactory.CreateLogger<NatsConnection>();
+        clientOptions = new ClientOptions(Options);
     }
 
     /// <summary>
@@ -147,6 +150,11 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
             throw new NatsException($"URI {uris.First(u => u.IsTls)} requires TLS but TlsOptions.Disabled is set to true");
         if (Options.TlsOptions.Required)
             tlsCerts = new TlsCerts(Options.TlsOptions);
+
+        if (!Options.AuthOptions.IsAnonymous)
+        {
+            userCredentials = new UserCredentials(Options.AuthOptions);
+        }
 
         foreach (var uri in uris)
         {
@@ -231,20 +239,6 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
         if (currentConnectUri!.IsSeed)
             lastSeedConnectUri = currentConnectUri;
 
-        // add CONNECT and PING command to priority lane
-        writerState.PriorityCommands.Clear();
-        var connectCommand = AsyncConnectCommand.Create(pool, Options.ConnectOptions);
-        writerState.PriorityCommands.Add(connectCommand);
-        writerState.PriorityCommands.Add(PingCommand.Create(pool));
-
-        if (reconnect)
-        {
-            // Add SUBSCRIBE command to priority lane
-            var subscribeCommand =
-                AsyncSubscribeBatchCommand.Create(pool, subscriptionManager.GetExistingSubscriptions());
-            writerState.PriorityCommands.Add(subscribeCommand);
-        }
-
         // create the socket reader
         var waitForInfoSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var waitForPongOrErrorSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -301,6 +295,23 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
 
             // mark INFO as parsed
             infoParsedSignal.SetResult();
+
+            // Authentication
+            userCredentials?.Authenticate(clientOptions, ServerInfo);
+
+            // add CONNECT and PING command to priority lane
+            writerState.PriorityCommands.Clear();
+            var connectCommand = AsyncConnectCommand.Create(pool, clientOptions);
+            writerState.PriorityCommands.Add(connectCommand);
+            writerState.PriorityCommands.Add(PingCommand.Create(pool));
+
+            if (reconnect)
+            {
+                // Add SUBSCRIBE command to priority lane
+                var subscribeCommand =
+                    AsyncSubscribeBatchCommand.Create(pool, subscriptionManager.GetExistingSubscriptions());
+                writerState.PriorityCommands.Add(subscribeCommand);
+            }
 
             // create the socket writer
             socketWriter = new NatsPipeliningWriteProtocolProcessor(socket!, writerState, pool, counter);
