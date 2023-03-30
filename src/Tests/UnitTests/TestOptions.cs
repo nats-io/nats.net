@@ -12,8 +12,11 @@
 // limitations under the License.
 
 using System;
+using System.Collections.Generic;
+using System.Text;
 using NATS.Client;
 using Xunit;
+using Xunit.Abstractions;
 using static NATS.Client.Defaults;
 
 namespace UnitTests
@@ -21,6 +24,11 @@ namespace UnitTests
     public class TestOptions
     {
         private Options GetDefaultOptions() => ConnectionFactory.GetDefaultOptions();
+        private readonly ITestOutputHelper output;
+        public TestOptions(ITestOutputHelper output)
+        {
+            this.output = output;
+        }
 
         [Fact]
         public void TestBadOptionTimeoutConnect()
@@ -92,7 +100,7 @@ namespace UnitTests
         }
         
         [Fact]
-        public void TestBadServers()
+        public void TestUnsupportedProtocols()
         {
             var invalidServers = new[]
             {
@@ -114,10 +122,91 @@ namespace UnitTests
                 "NATS://localhost:4222",
                 "tls://localhost:4222",
                 "TLS://localhost:4222",
-                "",
-                "null",
+                null,
+                ""
             };
             GetDefaultOptions().Servers = okServers;
+        }
+
+        [Fact]
+        public void TestUrlAndServersGetAndSet()
+        {
+            string[] expected = new[] { Defaults.Url };
+            Options o = ConnectionFactory.GetDefaultOptions();
+            ValidateOptionUrlAndServersGet(expected, o);
+
+            o.Url = null;
+            ValidateOptionUrlAndServersGet(expected, o);
+
+            o.Url = "";
+            ValidateOptionUrlAndServersGet(expected, o);
+
+            o.Servers = expected;
+            ValidateOptionUrlAndServersGet(expected, o);
+
+            o.Servers = new string[0];
+            ValidateOptionUrlAndServersGet(expected, o);
+
+            o.Servers = new string[]{""};
+            ValidateOptionUrlAndServersGet(expected, o);
+
+            o.Servers = new string[]{null};
+            ValidateOptionUrlAndServersGet(expected, o);
+
+            List<NatsUri> toNuriList(string[] arr)
+            {
+                List<NatsUri> list = new List<NatsUri>();
+                foreach (string s in arr)
+                {
+                    if (s == null)
+                    {
+                        list.Add(null);   
+                    }
+                    else
+                    {
+                        list.Add(new NatsUri(s));
+                    }
+                }
+                return list;
+            }
+            
+            o.ServerUris = toNuriList(expected);
+            ValidateOptionUrlAndServersGet(expected, o);
+
+            o.ServerUris = null;
+            ValidateOptionUrlAndServersGet(expected, o);
+
+            o.ServerUris = toNuriList(new string[]{""});
+            ValidateOptionUrlAndServersGet(expected, o);
+
+            o.ServerUris = toNuriList(new string[]{null});
+            ValidateOptionUrlAndServersGet(expected, o);
+                
+            expected = new[] { "nats://localhost:1111" };
+            o.Url = expected[0];
+            ValidateOptionUrlAndServersGet(expected, o);
+
+            o.Servers = expected;
+            ValidateOptionUrlAndServersGet(expected, o);
+            
+            expected = new[] { "nats://localhost:1111", "nats://localhost:2222" };
+            o.Url = string.Join(",", expected);
+            ValidateOptionUrlAndServersGet(expected, o);
+            
+            o.Servers = expected;
+            ValidateOptionUrlAndServersGet(expected, o);
+        }
+
+        private static void ValidateOptionUrlAndServersGet(string[] split, Options o)
+        {
+            Assert.Equal(string.Join(",", split), o.Url);
+            Assert.Equal(split.Length, o.Servers.Length);
+            Assert.Equal(split.Length, o.ServerUris.Count);
+            for (int i = 0; i < split.Length; i++)
+            {
+                Assert.Equal(split[i], o.Servers[i]);
+                Assert.Equal(new NatsUri(split[i]), o.ServerUris[i]);
+            }
         }
 
         [Fact]
@@ -159,6 +248,94 @@ namespace UnitTests
             FlowControlProcessedEventArgs fcpea = new FlowControlProcessedEventArgs(null, null, null, FlowControlSource.Heartbeat);
             DefaultFlowControlProcessedEventHandler().Invoke(null, fcpea);
             DefaultFlowControlProcessedEventHandler().Invoke(null, null);
+        }
+
+        [Fact]
+        public void TestNatsUri() {
+            string[] schemes = new string[] { "nats", "NATS", "tls",  null,  "unsupported"};
+            bool[] secures = new bool[]     { false,   false,  true,  false, false};
+            string[] hosts = new string[]{"host", "1.2.3.4", null};
+            bool[] ips = new bool[]      {false,  true,      false};
+            int?[] ports = new int?[]{1122, null};
+            string[] userInfos = new string[]{null, "u:p"};
+            for (int e = 0; e < schemes.Length; e++) {
+                string scheme = schemes[e];
+                for (int h = 0; h < hosts.Length; h++) {
+                    string host = hosts[h];
+                    foreach (int? port in ports) {
+                        foreach (string userInfo in userInfos) {
+                            StringBuilder sb = new StringBuilder();
+                            string expectedScheme;
+                            if (scheme == null) {
+                                expectedScheme = "nats";
+                            }
+                            else {
+                                expectedScheme = scheme;
+                                sb.Append(scheme).Append("://");
+                            }
+                            if (userInfo != null) {
+                                sb.Append(userInfo).Append("@");
+                            }
+
+                            string expectedHost;
+                            if (host == null)
+                            {
+                                expectedHost = "localhost";
+                            }
+                            else
+                            {
+                                expectedHost = host;
+                                sb.Append(host);
+                            }
+
+                            int expectedPort;
+                            if (port == null) {
+                                expectedPort = NatsUri.DefaultPort;
+                            }
+                            else {
+                                expectedPort = port.Value;
+                                sb.Append(":").Append(expectedPort);
+                            }
+
+                            String url = sb.ToString();
+                            if ("unsupported".Equals(scheme) || (host == null && !string.IsNullOrEmpty(url))) {
+                                Assert.Throws<UriFormatException>(() => new NatsUri(url));
+                            }
+                            else {
+                                NatsUri uri1 = new NatsUri(sb.ToString());
+                                NatsUri uri2 = new NatsUri(uri1.Uri);
+                                Assert.Equal(uri1, uri2);
+                                checkCreate(uri1, secures[e], ips[h], expectedScheme, expectedHost, expectedPort, userInfo);
+                                checkCreate(uri2, secures[e], ips[h], expectedScheme, expectedHost, expectedPort, userInfo);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        private static void checkCreate(NatsUri uri, bool secure, bool ip, string scheme, string host, int port, string userInfo)
+        {
+            scheme = scheme.ToLower();
+            Assert.Equal(secure, uri.Secure);
+            Assert.Equal(scheme, uri.Scheme);
+            Assert.Equal(host, uri.Host);
+            Assert.Equal(port, uri.Port);
+            if (userInfo == null)
+            {
+                Assert.Empty(uri.UserInfo);
+            }
+            else
+            {
+                Assert.Equal(userInfo, uri.UserInfo);
+            }
+
+            string expectedUri = userInfo == null
+                ? scheme + "://" + host + ":" + port
+                : scheme + "://" + userInfo + "@" + host + ":" + port;
+            Assert.Equal(expectedUri, uri.ToString());
+            Assert.Equal(expectedUri.Replace(host, "rehost"), uri.ReHost("rehost").ToString());
+            Assert.Equal(ip, uri.HostIsIpAddress);
         }
     }
 }

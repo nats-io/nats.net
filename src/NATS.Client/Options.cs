@@ -12,7 +12,7 @@
 // limitations under the License.
 
 using System;
-using System.Linq;
+using System.Collections.Generic;
 using System.Net.Security;
 using System.Reflection;
 using System.Security.Cryptography.X509Certificates;
@@ -26,9 +26,9 @@ namespace NATS.Client
     /// </summary>
     public sealed class Options
     {
-        string url = null;
-        string[] servers = null;
+        IList<NatsUri> _serverUris = null;
         bool noRandomize = false;
+        bool resolveHostnames = false;
         string name = null;
         bool verbose = false;
         bool pedantic = false;
@@ -37,7 +37,7 @@ namespace NATS.Client
         bool allowReconnect = true;
         bool noEcho = false;
         bool ignoreDiscoveredServers = false;
-        IServerProvider serverProvider = null;
+        IServerListProvider serverListProvider = null;
         int maxReconnect  = Defaults.MaxReconnect;
         int reconnectWait = Defaults.ReconnectWait;
         int pingInterval  = Defaults.PingInterval;
@@ -260,7 +260,11 @@ namespace NATS.Client
 
         // Options can only be publicly created through 
         // ConnectionFactory.GetDefaultOptions();
-        internal Options() { }
+        internal Options()
+        {
+            _serverUris = new List<NatsUri>();
+            SetServers(null); // servers should NEVER be empty. SetServers handles null to default server
+        }
 
         // Copy constructor
         internal Options(Options o)
@@ -283,9 +287,10 @@ namespace NATS.Client
             maxReconnect = o.maxReconnect;
             name = o.name;
             noRandomize = o.noRandomize;
+            resolveHostnames = o.resolveHostnames;
             noEcho = o.noEcho;
             ignoreDiscoveredServers = o.ignoreDiscoveredServers;
-            serverProvider = o.serverProvider;
+            serverListProvider = o.serverListProvider;
             pedantic = o.pedantic;
             reconnectBufSize = o.reconnectBufSize;
             useOldRequestStyle = o.useOldRequestStyle;
@@ -304,16 +309,7 @@ namespace NATS.Client
             subscriptionBatchSize = o.subscriptionBatchSize;
             customInboxPrefix = o.customInboxPrefix;
 
-            if (o.url != null)
-            {
-                processUrlString(o.url);
-            }
-            
-            if (o.servers != null)
-            {
-                servers = new string[o.servers.Length];
-                Array.Copy(o.servers, servers, o.servers.Length);
-            }
+            _serverUris = new List<NatsUri>(o._serverUris); 
 
             subChanLen = o.subChanLen;
             timeout = o.timeout;
@@ -327,38 +323,53 @@ namespace NATS.Client
             CheckCertificateRevocation = o.CheckCertificateRevocation;
         }
 
-        static readonly string[] protcolSep = new[] {"://"};
-        
-        static string ensureProperUrl(string url)
+        internal void SetServers(params string[] urls)
         {
-            if (string.IsNullOrWhiteSpace(url))
-                return url;
-            
-            if (url.StartsWith("nats://", StringComparison.OrdinalIgnoreCase))
-                return url;
-
-            if (url.StartsWith("tls://", StringComparison.OrdinalIgnoreCase))
-                return url;
-
-            var parts = url.Split(protcolSep, StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length == 1)
-                return $"nats://{url}";
-            
-            throw new ArgumentException("Allowed protocols are: 'nats://, tls://'.");
+            try
+            {
+                _serverUris.Clear();
+                if (urls == null || urls.Length == 0)
+                {
+                    _serverUris.Add(new NatsUri(Defaults.Url));
+                }
+                else
+                {
+                    for (int i = 0; i < urls.Length; i++)
+                    {
+                        _serverUris.Add(new NatsUri(urls[i]));
+                    }
+                }
+            }
+            catch (UriFormatException u)
+            {
+                throw new ArgumentException("Error setting servers.", u);
+            }
         }
 
-        internal void processUrlString(string url)
+        internal void SetServerUris(IList<NatsUri> nuris)
         {
-            if (url == null)
-                return;
-
-            string[] urls = url.Split(',');
-            for (int i = 0; i < urls.Length; i++)
+            _serverUris.Clear();
+            if (nuris == null || nuris.Count == 0)
             {
-                urls[i] = urls[i].Trim();
+                _serverUris.Add(new NatsUri(Defaults.Url));
             }
+            else
+            {
+                foreach (var val in nuris)
+                {
+                    _serverUris.Add(val == null ? new NatsUri() : val);
+                }
+            }
+        }
 
-            servers = urls;
+        internal string[] GetServerUrls()
+        {
+            string[] strings = new string[_serverUris.Count];
+            for (var i = 0; i < _serverUris.Count; i++)
+            {
+                strings[i] = _serverUris[i].ToString();
+            }
+            return strings;
         }
 
         /// <summary>
@@ -369,11 +380,8 @@ namespace NATS.Client
         /// </remarks>
         public string Url
         {
-            get { return url; }
-            set
-            {
-                url = ensureProperUrl(value);
-            }
+            get => string.Join(",", _serverUris); // serverNatsUris will never be null or empty
+            set => SetServers(value == null ? null : value.Split(','));
         }
 
         /// <summary>
@@ -384,11 +392,14 @@ namespace NATS.Client
         /// </remarks>
         public string[] Servers
         {
-            get { return servers; }
-            set
-            {
-                servers = value?.Select(ensureProperUrl).ToArray();
-            }
+            get => GetServerUrls();
+            set => SetServers(value);
+        }
+        
+        public IList<NatsUri> ServerUris
+        {
+            get => _serverUris;
+            set => SetServerUris(value);
         }
 
         /// <summary>
@@ -397,10 +408,22 @@ namespace NATS.Client
         /// </summary>
         public bool NoRandomize
         {
-            get { return noRandomize;  }
-            set { noRandomize = value;  }
+            get => noRandomize;
+            set => noRandomize = value;
         }
 
+        // TODO ResolveHostnames System.Net.Dns not available, ask for help
+/*        
+        /// <summary>
+        /// Gets or sets a value indicating whether or not the hostnames should be resolved
+        /// when getting the servers for connecting. 
+        /// </summary>
+        public bool ResolveHostnames
+        {
+            get => resolveHostnames;
+            set => resolveHostnames = value;
+        }
+*/        
         /// <summary>
         /// Gets or sets the name of this client.
         /// </summary>
@@ -708,9 +731,12 @@ namespace NATS.Client
         /// </summary>
         public bool IgnoreDiscoveredServers { get => ignoreDiscoveredServers; set => ignoreDiscoveredServers = value; }
 
-        // TODO After connect adr is complete
-        internal IServerProvider ServerProvider { get => serverProvider; set => serverProvider = value; }
-        
+        public IServerListProvider ServerListProvider
+        {
+            get => serverListProvider;
+            set => serverListProvider = value;
+        }
+
         private void appendEventHandler(StringBuilder sb, String name, Delegate eh)
         {
             if (eh != null)
@@ -833,9 +859,11 @@ namespace NATS.Client
             sb.AppendFormat("MaxReconnect={0};", MaxReconnect);
             sb.AppendFormat("Name={0};", Name != null ? Name : "null");
             sb.AppendFormat("NoRandomize={0};", NoRandomize);
+            // TODO ResolveHostnames System.Net.Dns not available, ask for help
+            // sb.AppendFormat("ResolveHostnames={0};", ResolveHostnames);
             sb.AppendFormat("NoEcho={0};", NoEcho);
             sb.AppendFormat("IgnoreDiscoveredServers={0};", ignoreDiscoveredServers);
-            sb.AppendFormat("ServerProvider={0};", serverProvider == null ? "Default" : "Provided");
+            sb.AppendFormat("ServerProvider={0};", serverListProvider == null ? "Default" : "Provided");
             sb.AppendFormat("Pedantic={0};", Pedantic);
             sb.AppendFormat("UseOldRequestStyle={0};", UseOldRequestStyle);
             sb.AppendFormat("PingInterval={0};", PingInterval);
@@ -856,12 +884,15 @@ namespace NATS.Client
             else
             {
                 sb.Append("Servers={");
-                foreach (string s in servers)
+                for (var i = 0; i < _serverUris.Count; i++)
                 {
-                    sb.AppendFormat("[{0}]", s);
-                    if (s != servers[servers.Length-1])
+                    if (i > 0)
+                    {
                         sb.AppendFormat(",");
+                    }
+                    sb.AppendFormat("[{0}]", _serverUris[i].ToString());
                 }
+
                 sb.Append("};");
             }
             sb.AppendFormat("SubChannelLength={0};", SubChannelLength);
