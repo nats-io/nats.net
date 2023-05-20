@@ -13,7 +13,7 @@ internal sealed class PublishCommand<T> : CommandBase<PublishCommand<T>>
     {
     }
 
-    public static PublishCommand<T> Create(ObjectPool pool, in NatsKey subject, T? value, INatsSerializer serializer)
+    public static PublishCommand<T> Create(ObjectPool pool, CancellationTimer timer, in NatsKey subject, T? value, INatsSerializer serializer)
     {
         if (!TryRent(pool, out var result))
         {
@@ -23,6 +23,7 @@ internal sealed class PublishCommand<T> : CommandBase<PublishCommand<T>>
         result._subject = subject;
         result._value = value;
         result._serializer = serializer;
+        result.SetCancellationTimer(timer);
 
         return result;
     }
@@ -50,7 +51,7 @@ internal sealed class AsyncPublishCommand<T> : AsyncCommandBase<AsyncPublishComm
     {
     }
 
-    public static AsyncPublishCommand<T> Create(ObjectPool pool, in NatsKey subject, T? value, INatsSerializer serializer)
+    public static AsyncPublishCommand<T> Create(ObjectPool pool, CancellationTimer timer, in NatsKey subject, T? value, INatsSerializer serializer)
     {
         if (!TryRent(pool, out var result))
         {
@@ -60,6 +61,7 @@ internal sealed class AsyncPublishCommand<T> : AsyncCommandBase<AsyncPublishComm
         result._subject = subject;
         result._value = value;
         result._serializer = serializer;
+        result.SetCancellationTimer(timer);
 
         return result;
     }
@@ -87,7 +89,7 @@ internal sealed class PublishBatchCommand<T> : CommandBase<PublishBatchCommand<T
     {
     }
 
-    public static PublishBatchCommand<T> Create(ObjectPool pool, IEnumerable<(NatsKey subject, T? value)> values, INatsSerializer serializer)
+    public static PublishBatchCommand<T> Create(ObjectPool pool, CancellationTimer timer, IEnumerable<(NatsKey subject, T? value)> values, INatsSerializer serializer)
     {
         if (!TryRent(pool, out var result))
         {
@@ -96,11 +98,12 @@ internal sealed class PublishBatchCommand<T> : CommandBase<PublishBatchCommand<T
 
         result._values1 = values;
         result._serializer = serializer;
+        result.SetCancellationTimer(timer);
 
         return result;
     }
 
-    public static PublishBatchCommand<T> Create(ObjectPool pool, IEnumerable<(string subject, T? value)> values, INatsSerializer serializer)
+    public static PublishBatchCommand<T> Create(ObjectPool pool, CancellationTimer timer, IEnumerable<(string subject, T? value)> values, INatsSerializer serializer)
     {
         if (!TryRent(pool, out var result))
         {
@@ -109,6 +112,7 @@ internal sealed class PublishBatchCommand<T> : CommandBase<PublishBatchCommand<T
 
         result._values2 = values;
         result._serializer = serializer;
+        result.SetCancellationTimer(timer);
 
         return result;
     }
@@ -159,7 +163,7 @@ internal sealed class AsyncPublishBatchCommand<T> : AsyncCommandBase<AsyncPublis
     {
     }
 
-    public static AsyncPublishBatchCommand<T> Create(ObjectPool pool, IEnumerable<(NatsKey subject, T? value)> values, INatsSerializer serializer)
+    public static AsyncPublishBatchCommand<T> Create(ObjectPool pool, CancellationTimer timer, IEnumerable<(NatsKey subject, T? value)> values, INatsSerializer serializer)
     {
         if (!TryRent(pool, out var result))
         {
@@ -168,11 +172,12 @@ internal sealed class AsyncPublishBatchCommand<T> : AsyncCommandBase<AsyncPublis
 
         result._values1 = values;
         result._serializer = serializer;
+        result.SetCancellationTimer(timer);
 
         return result;
     }
 
-    public static AsyncPublishBatchCommand<T> Create(ObjectPool pool, IEnumerable<(string subject, T? value)> values, INatsSerializer serializer)
+    public static AsyncPublishBatchCommand<T> Create(ObjectPool pool, CancellationTimer timer, IEnumerable<(string subject, T? value)> values, INatsSerializer serializer)
     {
         if (!TryRent(pool, out var result))
         {
@@ -181,6 +186,7 @@ internal sealed class AsyncPublishBatchCommand<T> : AsyncCommandBase<AsyncPublis
 
         result._values2 = values;
         result._serializer = serializer;
+        result.SetCancellationTimer(timer);
 
         return result;
     }
@@ -230,7 +236,7 @@ internal sealed class PublishBytesCommand : CommandBase<PublishBytesCommand>
     {
     }
 
-    public static PublishBytesCommand Create(ObjectPool pool, in NatsKey subject, ReadOnlyMemory<byte> value)
+    public static PublishBytesCommand Create(ObjectPool pool, CancellationTimer timer, in NatsKey subject, ReadOnlyMemory<byte> value)
     {
         if (!TryRent(pool, out var result))
         {
@@ -239,6 +245,7 @@ internal sealed class PublishBytesCommand : CommandBase<PublishBytesCommand>
 
         result._subject = subject;
         result._value = value;
+        result.SetCancellationTimer(timer);
 
         return result;
     }
@@ -264,7 +271,7 @@ internal sealed class AsyncPublishBytesCommand : AsyncCommandBase<AsyncPublishBy
     {
     }
 
-    public static AsyncPublishBytesCommand Create(ObjectPool pool, in NatsKey subject, ReadOnlyMemory<byte> value)
+    public static AsyncPublishBytesCommand Create(ObjectPool pool, CancellationTimer timer, in NatsKey subject, ReadOnlyMemory<byte> value)
     {
         if (!TryRent(pool, out var result))
         {
@@ -273,6 +280,7 @@ internal sealed class AsyncPublishBytesCommand : AsyncCommandBase<AsyncPublishBy
 
         result._subject = subject;
         result._value = value;
+        result.SetCancellationTimer(timer);
 
         return result;
     }

@@ -54,7 +54,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
             await _readLoop.ConfigureAwait(false); // wait for drain buffer.
             foreach (var item in _pingCommands)
             {
-                item.SetCanceled(CancellationToken.None);
+                item.SetCanceled();
             }
 
             _waitForInfoSignal.TrySetCanceled();
@@ -286,7 +286,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         {
             const int PingSize = 6; // PING\r\n
 
-            _connection.PostPong(); // return pong
+            await _connection.PostPongAsync().ConfigureAwait(false); // return pong to server
 
             if (length < PingSize)
             {

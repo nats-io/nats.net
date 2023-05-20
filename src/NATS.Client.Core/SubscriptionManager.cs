@@ -29,7 +29,7 @@ internal sealed class SubscriptionManager : IDisposable
         }
     }
 
-    public async ValueTask<IDisposable> AddAsync<T>(string key, NatsKey? queueGroup, Action<T> handler)
+    public async ValueTask<IDisposable> AddAsync<T>(string key, NatsKey? queueGroup, Action<T> handler, CancellationToken cancellationToken)
     {
         int sid;
         RefCountSubscription? subscription;
@@ -64,7 +64,7 @@ internal sealed class SubscriptionManager : IDisposable
         var returnSubscription = new Subscription(subscription, handlerId);
         try
         {
-            await Connection.SubscribeAsync(sid, key, queueGroup).ConfigureAwait(false);
+            await Connection.SubscribeCoreAsync(sid, key, queueGroup, cancellationToken).ConfigureAwait(false);
         }
         catch
         {
@@ -75,7 +75,7 @@ internal sealed class SubscriptionManager : IDisposable
         return returnSubscription;
     }
 
-    public async ValueTask<IDisposable> AddRequestHandlerAsync<TRequest, TResponse>(string key, Func<TRequest, TResponse> handler)
+    public async ValueTask<IDisposable> AddRequestHandlerAsync<TRequest, TResponse>(string key, Func<TRequest, TResponse> handler, CancellationToken cancellationToken)
     {
         int sid;
         RefCountSubscription? subscription;
@@ -112,7 +112,7 @@ internal sealed class SubscriptionManager : IDisposable
         var returnSubscription = new Subscription(subscription, handlerId);
         try
         {
-            await Connection.SubscribeAsync(sid, key, null).ConfigureAwait(false);
+            await Connection.SubscribeCoreAsync(sid, key, null, cancellationToken).ConfigureAwait(false);
         }
         catch
         {
@@ -123,7 +123,7 @@ internal sealed class SubscriptionManager : IDisposable
         return returnSubscription;
     }
 
-    public async ValueTask<IDisposable> AddRequestHandlerAsync<TRequest, TResponse>(string key, Func<TRequest, Task<TResponse>> asyncHandler)
+    public async ValueTask<IDisposable> AddRequestHandlerAsync<TRequest, TResponse>(string key, Func<TRequest, Task<TResponse>> asyncHandler, CancellationToken cancellationToken)
     {
         int sid;
         RefCountSubscription? subscription;
@@ -160,7 +160,7 @@ internal sealed class SubscriptionManager : IDisposable
         var returnSubscription = new Subscription(subscription, handlerId);
         try
         {
-            await Connection.SubscribeAsync(sid, key, null).ConfigureAwait(false);
+            await Connection.SubscribeCoreAsync(sid, key, null, cancellationToken).ConfigureAwait(false);
         }
         catch
         {

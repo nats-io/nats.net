@@ -12,7 +12,7 @@ internal sealed class SubscribeCommand : CommandBase<SubscribeCommand>
     {
     }
 
-    public static SubscribeCommand Create(ObjectPool pool, int subscriptionId, in NatsKey subject, in NatsKey? queueGroup)
+    public static SubscribeCommand Create(ObjectPool pool, CancellationTimer timer, int subscriptionId, in NatsKey subject, in NatsKey? queueGroup)
     {
         if (!TryRent(pool, out var result))
         {
@@ -22,6 +22,7 @@ internal sealed class SubscribeCommand : CommandBase<SubscribeCommand>
         result._subject = subject;
         result._subscriptionId = subscriptionId;
         result._queueGroup = queueGroup;
+        result.SetCancellationTimer(timer);
 
         return result;
     }
@@ -49,7 +50,7 @@ internal sealed class AsyncSubscribeCommand : AsyncCommandBase<AsyncSubscribeCom
     {
     }
 
-    public static AsyncSubscribeCommand Create(ObjectPool pool, int subscriptionId, in NatsKey subject, in NatsKey? queueGroup)
+    public static AsyncSubscribeCommand Create(ObjectPool pool, CancellationTimer timer, int subscriptionId, in NatsKey subject, in NatsKey? queueGroup)
     {
         if (!TryRent(pool, out var result))
         {
@@ -59,6 +60,7 @@ internal sealed class AsyncSubscribeCommand : AsyncCommandBase<AsyncSubscribeCom
         result._subject = subject;
         result._subscriptionId = subscriptionId;
         result._queueGroup = queueGroup;
+        result.SetCancellationTimer(timer);
 
         return result;
     }
@@ -84,7 +86,7 @@ internal sealed class AsyncSubscribeBatchCommand : AsyncCommandBase<AsyncSubscri
     {
     }
 
-    public static AsyncSubscribeBatchCommand Create(ObjectPool pool, (int subscriptionId, string subject, NatsKey? queueGroup)[] subscriptions)
+    public static AsyncSubscribeBatchCommand Create(ObjectPool pool, CancellationTimer timer, (int subscriptionId, string subject, NatsKey? queueGroup)[] subscriptions)
     {
         if (!TryRent(pool, out var result))
         {
@@ -92,6 +94,7 @@ internal sealed class AsyncSubscribeBatchCommand : AsyncCommandBase<AsyncSubscri
         }
 
         result._subscriptions = subscriptions;
+        result.SetCancellationTimer(timer);
 
         return result;
     }
