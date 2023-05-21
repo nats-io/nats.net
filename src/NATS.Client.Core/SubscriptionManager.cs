@@ -29,7 +29,9 @@ internal sealed class SubscriptionManager : IDisposable
         }
     }
 
-    public async ValueTask<IDisposable> AddAsync<T>(string key, NatsKey? queueGroup, Action<T> handler, CancellationToken cancellationToken)
+    // XXX
+    // public async ValueTask<IDisposable> AddAsync<T>(string key, NatsKey? queueGroup, Action<T> handler, CancellationToken cancellationToken)
+    public async ValueTask<IDisposable> AddAsync<T>(string key, NatsKey? queueGroup, object handler, CancellationToken cancellationToken)
     {
         int sid;
         RefCountSubscription? subscription;
@@ -310,6 +312,11 @@ internal sealed class RefCountSubscription
     // Add is in lock(gate)
     public int AddHandler(object handler)
     {
+        if (handler is NatsSubBase natsSub)
+        {
+            natsSub.Sid = SubscriptionId;
+        }
+
         var id = Handlers.Add(handler);
         ReferenceCount++;
         Interlocked.Increment(ref _manager.Connection.Counter.SubscriptionCount);

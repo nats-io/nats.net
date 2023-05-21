@@ -18,7 +18,7 @@ internal sealed class RequestResponseManager : IDisposable
 
     // ID: Handler
     private Dictionary<int, (Type responseType, object handler)> _responseBoxes = new();
-    private IDisposable? _globalSubscription;
+    private NatsSub? _globalSubscription;
 
     public RequestResponseManager(NatsConnection connection, ObjectPool pool)
     {
@@ -73,7 +73,9 @@ internal sealed class RequestResponseManager : IDisposable
 
             _responseBoxes.Clear();
 
-            _globalSubscription?.Dispose();
+#pragma warning disable VSTHRD110
+            _globalSubscription?.DisposeAsync();
+#pragma warning restore VSTHRD110
             _globalSubscription = null;
         }
     }
@@ -96,7 +98,7 @@ internal sealed class RequestResponseManager : IDisposable
             if (_globalSubscription == null)
             {
                 var globalSubscribeKey = $"{Encoding.ASCII.GetString(inBoxPrefix.Span)}*";
-                _globalSubscription = await _connection.SubscribeAsync<byte[]>(globalSubscribeKey, _ => { }).ConfigureAwait(false);
+                _globalSubscription = await _connection.SubscribeAsync(globalSubscribeKey).ConfigureAwait(false);
             }
         }
         finally

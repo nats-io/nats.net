@@ -81,20 +81,20 @@ namespace NatsBenchmark
 
             var key = new NatsKey(_subject);
 
-            var d = subConn.SubscribeAsync<byte[]>(_subject, _ =>
-           {
-               Interlocked.Increment(ref subCount);
+            var d = subConn.SubscribeAsync(_subject).AsTask().Result.Register(_ =>
+            {
+                Interlocked.Increment(ref subCount);
 
-               // logger.LogInformation("here:{0}", subCount);
-               if (subCount == testCount)
-               {
-                   lock (pubSubLock)
-                   {
-                       finished = true;
-                       Monitor.Pulse(pubSubLock);
-                   }
-               }
-           }).AsTask().Result;
+                // logger.LogInformation("here:{0}", subCount);
+                if (subCount == testCount)
+                {
+                    lock (pubSubLock)
+                    {
+                        finished = true;
+                        Monitor.Pulse(pubSubLock);
+                    }
+                }
+            });
 
             GC.Collect();
             GC.WaitForPendingFinalizers();
@@ -158,7 +158,7 @@ namespace NatsBenchmark
 
             var key = new NatsKey(_subject);
 
-            var d = subConn.SubscribeAsync<byte[]>(_subject, _ =>
+            var d = subConn.SubscribeAsync(_subject).AsTask().Result.Register(_ =>
             {
                 Interlocked.Increment(ref subCount);
 
@@ -171,7 +171,7 @@ namespace NatsBenchmark
                         Monitor.Pulse(pubSubLock);
                     }
                 }
-            }).AsTask().Result;
+            });
 
             var data = Enumerable.Range(0, 1000)
                 .Select(x => (key, payload))
@@ -244,7 +244,7 @@ namespace NatsBenchmark
 
             var key = new NatsKey(_subject);
 
-            var d = subConn.SubscribeAsync<byte[]>(_subject, _ =>
+            var d = subConn.SubscribeAsync(_subject).AsTask().Result.Register(_ =>
             {
                 Interlocked.Increment(ref subCount);
 
@@ -257,7 +257,7 @@ namespace NatsBenchmark
                         Monitor.Pulse(pubSubLock);
                     }
                 }
-            }).AsTask().Result;
+            });
 
             GC.Collect();
             GC.WaitForPendingFinalizers();
@@ -326,7 +326,7 @@ namespace NatsBenchmark
 
             var key = new NatsKey(_subject);
 
-            var d = subConn.SubscribeAsync<byte[]>(_subject, _ =>
+            var d = subConn.SubscribeAsync(_subject).AsTask().Result.Register(_ =>
             {
                 Interlocked.Increment(ref subCount);
 
@@ -339,7 +339,7 @@ namespace NatsBenchmark
                         Monitor.Pulse(pubSubLock);
                     }
                 }
-            }).AsTask().Result;
+            });
 
             var command = new NATS.Client.Core.Commands.DirectWriteCommand(BuildCommand(testSize), batchSize);
 
@@ -433,7 +433,7 @@ namespace NatsBenchmark
 
             var key = new NatsKey(_subject);
 
-            var d = subConn.SubscribeAsync<byte[]>(_subject, _ =>
+            var d = subConn.SubscribeAsync(_subject).AsTask().Result.Register(_ =>
             {
                 Interlocked.Increment(ref subCount);
 
@@ -446,8 +446,8 @@ namespace NatsBenchmark
                         Monitor.Pulse(pubSubLock);
                     }
                 }
-            }).AsTask().Result;
-            var d2 = subConn2.SubscribeAsync<byte[]>(_subject, _ =>
+            });
+            var d2 = subConn2.SubscribeAsync(_subject).AsTask().Result.Register(_ =>
             {
                 Interlocked.Increment(ref subCount2);
 
@@ -460,7 +460,7 @@ namespace NatsBenchmark
                         Monitor.Pulse(pubSubLock2);
                     }
                 }
-            }).AsTask().Result;
+            });
 
             GC.Collect();
             GC.WaitForPendingFinalizers();
@@ -544,7 +544,7 @@ namespace NatsBenchmark
             pubConn.ConnectAsync().AsTask().Wait();
             subConn.ConnectAsync().AsTask().Wait();
 
-            var d = subConn.SubscribeAsync<Vector3>(key.Key, _ =>
+            var d = subConn.SubscribeAsync<Vector3>(key.Key).AsTask().Result.Register(_ =>
             {
                 Interlocked.Increment(ref subCount);
 
@@ -559,7 +559,7 @@ namespace NatsBenchmark
                         Monitor.Pulse(pubSubLock);
                     }
                 }
-            }).AsTask().Result;
+            });
 
             MessagePackSerializer.Serialize(default(Vector3));
 

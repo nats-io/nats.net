@@ -118,14 +118,16 @@ public abstract partial class NatsConnectionTest
         var signalComplete1 = new WaitSignal();
         var signalComplete2 = new WaitSignal();
 
-        await subConnection.SubscribeAsync<int>(key, x =>
+        var natsSub = await subConnection.SubscribeAsync<int>(key.Key);
+        natsSub.Register(x =>
         {
             _output.WriteLine($"Received: {x}");
-            if (x == 1)
+            if (x.Data == 1)
                 signalComplete1.Pulse();
-            if (x == 2)
+            if (x.Data == 2)
                 signalComplete2.Pulse();
         });
+
         await subConnection.PingAsync(); // wait for subscribe complete
 
         _output.WriteLine("AUTHENTICATED CONNECTION");

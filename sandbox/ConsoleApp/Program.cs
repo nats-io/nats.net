@@ -29,9 +29,9 @@ await conn.SubscribeRequestAsync("foobar", (int x) => $"Hello {x}");
 var response = await conn.RequestAsync<int, string>("foobar", 100);
 
 // subscribe
-var subscription = await conn.SubscribeAsync<Person>("foo", x =>
+var subscription = (await conn.SubscribeAsync<Person>("foo")).Register(x =>
 {
-    Console.WriteLine($"Received {x}");
+    Console.WriteLine($"Received {x.Data}");
 });
 
 // publish
@@ -69,7 +69,7 @@ public class Runner : ConsoleAppBase
     [RootCommand]
     public async Task Run()
     {
-        await _command.SubscribeAsync("foo", () => Console.WriteLine("Yeah"));
+        (await _command.SubscribeAsync("foo")).Register(_ => Console.WriteLine("Yeah"));
         await _command.PingAsync();
         await _command.PublishAsync("foo");
     }

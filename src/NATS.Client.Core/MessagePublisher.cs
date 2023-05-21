@@ -213,7 +213,18 @@ internal sealed class ReadOnlyMemoryMessagePublisher
                     {
                         try
                         {
-                            ((Action<ReadOnlyMemory<byte>>)callback).Invoke(value);
+                            if (callback is NatsSubBase natsSub)
+                            {
+                                natsSub.Receive(new NatsMsg { Data = buffer, });
+                            }
+                            else if (callback is Action<ReadOnlyMemory<byte>> action)
+                            {
+                                action.Invoke(value);
+                            }
+                            else
+                            {
+                                throw new NatsException($"Unexpected internal handler type: {callback.GetType().Name}");
+                            }
                         }
                         catch (Exception ex)
                         {

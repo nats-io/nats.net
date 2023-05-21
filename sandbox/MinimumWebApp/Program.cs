@@ -8,7 +8,7 @@ builder.Services.AddNats();
 
 var app = builder.Build();
 
-app.MapGet("/subscribe", (INatsCommand command) => command.SubscribeAsync("foo", (int x) => Console.WriteLine($"received {x}")));
-app.MapGet("/publish", (INatsCommand command) => command.PublishAsync("foo", 99));
+app.MapGet("/subscribe", async (INatsCommand command) => (await command.SubscribeAsync("foo")).Register(x => Console.WriteLine($"received {x.Data}")));
+app.MapGet("/publish", async (INatsCommand command) => await command.PublishAsync("foo", 99));
 
 app.Run();

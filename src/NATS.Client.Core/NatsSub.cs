@@ -2,27 +2,43 @@ using System.Threading.Channels;
 
 namespace NATS.Client.Core;
 
-public class NatsSub : NatsSubBase
+public sealed class NatsSub : NatsSubBase
 {
     private readonly Channel<NatsMsg> _msgs = Channel.CreateUnbounded<NatsMsg>();
 
     public ChannelReader<NatsMsg> Msgs => _msgs.Reader;
 
-    public override void Dispose()
+    public NatsSub Register(Action<NatsMsg> action)
+    {
+        // XXX
+#pragma warning disable VSTHRD110
+        Task.Run(async () =>
+#pragma warning restore VSTHRD110
+        {
+            await foreach (var natsMsg in _msgs.Reader.ReadAllAsync())
+            {
+                action(natsMsg);
+            }
+        });
+
+        return this;
+    }
+
+    public override async ValueTask DisposeAsync()
     {
         if (_msgs.Writer.TryComplete())
         {
-            base.Dispose();
+            await base.DisposeAsync().ConfigureAwait(false);
         }
     }
 
-    internal ValueTask ReceiveAsync(NatsMsg msg)
+    internal override bool Receive(NatsMsg msg)
     {
-        return _msgs.Writer.WriteAsync(msg);
+        return _msgs.Writer.TryWrite(msg);
     }
 }
 
-public abstract class NatsSubBase : IDisposable
+public abstract class NatsSubBase : IAsyncDisposable
 {
     public string Subject
     {
@@ -44,13 +60,17 @@ public abstract class NatsSubBase : IDisposable
 
     internal NatsConnection? Connection { get; set; }
 
-    public virtual void Dispose()
+    internal ValueTask<IDisposable> InternalSubscription { get; set; }
+
+    public virtual async ValueTask DisposeAsync()
     {
-        Connection?.PostUnsubscribe(Sid);
+        (await InternalSubscription.ConfigureAwait(false)).Dispose();
     }
+
+    internal abstract bool Receive(NatsMsg msg);
 }
 
-public class NatsSub<T> : NatsSubBase
+public sealed class NatsSub<T> : NatsSubBase
 {
     private readonly Channel<NatsMsg<T>> _msgs = Channel.CreateUnbounded<NatsMsg<T>>();
 
@@ -58,19 +78,35 @@ public class NatsSub<T> : NatsSubBase
 
     public ChannelReader<NatsMsg<T>> Msgs => _msgs.Reader;
 
-    public override void Dispose()
+    public NatsSub<T> Register(Action<NatsMsg<T>> action)
+    {
+        // XXX
+#pragma warning disable VSTHRD110
+        Task.Run(async () =>
+#pragma warning restore VSTHRD110
+        {
+            await foreach (var natsMsg in _msgs.Reader.ReadAllAsync())
+            {
+                action(natsMsg);
+            }
+        });
+
+        return this;
+    }
+
+    public override async ValueTask DisposeAsync()
     {
         if (_msgs.Writer.TryComplete())
         {
-            base.Dispose();
+            await base.DisposeAsync().ConfigureAwait(false);
         }
     }
 
-    internal ValueTask ReceiveAsync(NatsMsg msg)
+    internal override bool Receive(NatsMsg msg)
     {
         var serializer = Serializer ?? Connection!.Options.Serializer;
         var tData = serializer.Deserialize<T>(msg.Data);
-        return _msgs.Writer.WriteAsync(new NatsMsg<T>(tData!)
+        return _msgs.Writer.TryWrite(new NatsMsg<T>(tData!)
         {
             Connection = msg.Connection,
             SubjectKey = msg.SubjectKey,

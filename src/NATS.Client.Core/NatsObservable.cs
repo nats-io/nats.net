@@ -14,22 +14,22 @@ internal sealed class NatsObservable<T> : IObservable<T>
     public IDisposable Subscribe(IObserver<T> observer)
     {
         var disp = new CancellationTokenDisposable();
-        var disp2 = new FireAndForgetDisposable(_connection.SubscribeAsync<T>(_key, observer.OnNext, disp.Token), observer.OnError);
+        var disp2 = new FireAndForgetDisposable(_connection.SubscribeAsync<T>(_key.Key, cancellationToken: disp.Token), observer);
         return new Tuple2Disposable(disp, disp2);
     }
 
     private sealed class FireAndForgetDisposable : IDisposable
     {
+        private readonly IObserver<T> _observer;
         private bool _disposed;
-        private IDisposable? _taskDisposable;
-        private Action<Exception> _onError;
+        private IAsyncDisposable? _taskDisposable;
         private object _gate = new object();
 
-        public FireAndForgetDisposable(ValueTask<IDisposable> task, Action<Exception> onError)
+        public FireAndForgetDisposable(ValueTask<NatsSub<T>> natsSub, IObserver<T> observer)
         {
+            _observer = observer;
             _disposed = false;
-            _onError = onError;
-            FireAndForget(task);
+            FireAndForget(natsSub, observer);
         }
 
         public void Dispose()
@@ -39,23 +39,33 @@ internal sealed class NatsObservable<T> : IObservable<T>
                 _disposed = true;
                 if (_taskDisposable != null)
                 {
-                    _taskDisposable.Dispose();
+#pragma warning disable VSTHRD110
+                    _taskDisposable.DisposeAsync();
+#pragma warning restore VSTHRD110
                 }
             }
         }
 
-        private async void FireAndForget(ValueTask<IDisposable> task)
+        private async void FireAndForget(ValueTask<NatsSub<T>> natsSub, IObserver<T> observer)
         {
             try
             {
-                _taskDisposable = await task.ConfigureAwait(false);
+                var sub = await natsSub.ConfigureAwait(false);
+                sub.Register(msg => observer.OnNext(msg.Data));
+
+                _taskDisposable = sub;
+
+                var task = ValueTask.CompletedTask;
+
                 lock (_gate)
                 {
                     if (_disposed)
                     {
-                        _taskDisposable.Dispose();
+                        task = _taskDisposable.DisposeAsync();
                     }
                 }
+
+                await task.ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -64,7 +74,7 @@ internal sealed class NatsObservable<T> : IObservable<T>
                     _disposed = true;
                 }
 
-                _onError(ex);
+                _observer.OnError(ex);
             }
         }
     }

@@ -51,11 +51,12 @@ public readonly struct ShardringNatsCommand
 
     public ValueTask<TResponse?> RequestAsync<TRequest, TResponse>(TRequest request) => _connection.RequestAsync<TRequest, TResponse>(_key, request);
 
-    public ValueTask<IDisposable> SubscribeAsync(Action handler) => _connection.SubscribeAsync(_key, handler);
+    public async ValueTask<NatsSub<T>> SubscribeAsync<T>(Action<T> handler) =>
+        (await _connection.SubscribeAsync<T>(_key.Key).ConfigureAwait(false))
+        .Register(msg => handler(msg.Data));
 
-    public ValueTask<IDisposable> SubscribeAsync<T>(Action<T> handler) => _connection.SubscribeAsync<T>(_key, handler);
-
-    public ValueTask<IDisposable> SubscribeAsync<T>(Func<T, Task> asyncHandler) => _connection.SubscribeAsync<T>(_key, asyncHandler);
+    public ValueTask<NatsSub> SubscribeAsync(string subject, in NatsSubOpts? opts = default, CancellationToken cancellationToken = default) =>
+        _connection.SubscribeAsync(subject, opts, cancellationToken);
 
     public ValueTask<IDisposable> SubscribeRequestAsync<TRequest, TResponse>(Func<TRequest, Task<TResponse>> requestHandler) => _connection.SubscribeRequestAsync<TRequest, TResponse>(_key, requestHandler);
 

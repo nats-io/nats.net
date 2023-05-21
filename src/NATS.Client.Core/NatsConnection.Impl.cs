@@ -117,11 +117,64 @@ public partial class NatsConnection : INatsCommand
 
     public ValueTask<NatsSub> SubscribeAsync(string subject, in NatsSubOpts? opts = default, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        var natsSub = new NatsSub
+        {
+            Subject = subject,
+            Connection = this,
+            QueueGroup = opts?.QueueGroup ?? string.Empty,
+        };
+
+        if (ConnectionState == NatsConnectionState.Open)
+        {
+            natsSub.InternalSubscription = _subscriptionManager.AddAsync<ReadOnlyMemory<byte>>(subject, null, natsSub, cancellationToken);
+            return new ValueTask<NatsSub>(natsSub);
+        }
+        else
+        {
+            return WithConnectAsync(subject, natsSub, cancellationToken, static (self, key, handler, token) =>
+            {
+                handler.InternalSubscription = self._subscriptionManager.AddAsync<ReadOnlyMemory<byte>>(key, null, handler, token);
+                return new ValueTask<NatsSub>(handler);
+            });
+        }
     }
 
+    // XXX
+    // public ValueTask<IDisposable> SubscribeAsync<T>(string key, Action<T> handler, CancellationToken cancellationToken = default)
+    // {
+    //     if (ConnectionState == NatsConnectionState.Open)
+    //     {
+    //         return _subscriptionManager.AddAsync<T>(key, null, handler, cancellationToken);
+    //     }
+    //     else
+    //     {
+    //         return WithConnectAsync(key, handler, cancellationToken, static (self, key, handler, token) =>
+    //         {
+    //             return self._subscriptionManager.AddAsync<T>(key, null, handler, token);
+    //         });
+    //     }
+    // }
     public ValueTask<NatsSub<T>> SubscribeAsync<T>(string subject, in NatsSubOpts? opts = default, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        var natsSub = new NatsSub<T>
+        {
+            Subject = subject,
+            Connection = this,
+            QueueGroup = opts?.QueueGroup ?? string.Empty,
+        };
+
+        if (ConnectionState == NatsConnectionState.Open)
+        {
+            natsSub.InternalSubscription = _subscriptionManager.AddAsync<ReadOnlyMemory<byte>>(subject, null, natsSub, cancellationToken);
+            return new ValueTask<NatsSub<T>>(natsSub);
+        }
+        else
+        {
+            return WithConnectAsync(subject, natsSub, cancellationToken, static (self, key, handler, token) =>
+            {
+                handler.InternalSubscription = self._subscriptionManager.AddAsync<ReadOnlyMemory<byte>>(key, null, handler, token);
+                return new ValueTask<NatsSub<T>>(handler);
+            });
+        }
     }
 }

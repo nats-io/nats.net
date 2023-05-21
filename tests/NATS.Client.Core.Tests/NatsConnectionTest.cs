@@ -25,11 +25,11 @@ public abstract partial class NatsConnectionTest
         var signalComplete = new WaitSignal();
 
         var list = new List<int>();
-        await subConnection.SubscribeAsync<int>(key, x =>
+        (await subConnection.SubscribeAsync<int>(key.Key)).Register(x =>
         {
-            _output.WriteLine($"Received: {x}");
-            list.Add(x);
-            if (x == 9)
+            _output.WriteLine($"Received: {x.Data}");
+            list.Add(x.Data);
+            if (x.Data == 9)
             {
                 signalComplete.Pulse();
             }
@@ -63,10 +63,10 @@ public abstract partial class NatsConnectionTest
 
             var actual = new List<SampleClass>();
             var signalComplete = new WaitSignal();
-            using var d = await subConnection.SubscribeAsync<SampleClass>(key, x =>
+            await using var d = (await subConnection.SubscribeAsync<SampleClass>(key)).Register(x =>
             {
-                actual.Add(x);
-                if (x.Id == 30)
+                actual.Add(x.Data);
+                if (x.Data.Id == 30)
                     signalComplete.Pulse();
             });
             await subConnection.PingAsync(); // wait for subscribe complete
@@ -142,16 +142,16 @@ public abstract partial class NatsConnectionTest
         var list = new List<int>();
         var waitForReceive300 = new WaitSignal();
         var waitForReceiveFinish = new WaitSignal();
-        var d = await subConnection.SubscribeAsync(key, (int x) =>
+        var d = (await subConnection.SubscribeAsync<int>(key)).Register(x =>
         {
-            _output.WriteLine("RECEIVED: " + x);
-            list.Add(x);
-            if (x == 300)
+            _output.WriteLine("RECEIVED: " + x.Data);
+            list.Add(x.Data);
+            if (x.Data == 300)
             {
                 waitForReceive300.Pulse();
             }
 
-            if (x == 500)
+            if (x.Data == 500)
             {
                 waitForReceiveFinish.Pulse();
             }
@@ -217,16 +217,16 @@ public abstract partial class NatsConnectionTest
         var list = new List<int>();
         var waitForReceive300 = new WaitSignal();
         var waitForReceiveFinish = new WaitSignal();
-        var d = await connection1.SubscribeAsync(key, (int x) =>
+        var d = (await connection1.SubscribeAsync<int>(key)).Register(x =>
         {
-            _output.WriteLine("RECEIVED: " + x);
-            list.Add(x);
-            if (x == 300)
+            _output.WriteLine("RECEIVED: " + x.Data);
+            list.Add(x.Data);
+            if (x.Data == 300)
             {
                 waitForReceive300.Pulse();
             }
 
-            if (x == 500)
+            if (x.Data == 500)
             {
                 waitForReceiveFinish.Pulse();
             }
