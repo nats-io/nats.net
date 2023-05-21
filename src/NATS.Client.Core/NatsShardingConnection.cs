@@ -25,21 +25,21 @@ public readonly struct ShardringNatsCommand
 
     public void PostPing() => _connection.PostPing();
 
-    public void PostPublish() => _connection.PostPublish(_key);
+    public void PostPublish() => _connection.PostPublish(_key.Key);
 
-    public void PostPublish(byte[] value) => _connection.PostPublish(_key, value);
+    public void PostPublish(byte[] value) => _connection.PostPublish(_key.Key, value);
 
-    public void PostPublish(ReadOnlyMemory<byte> value) => _connection.PostPublish(_key, value);
+    public void PostPublish(ReadOnlyMemory<byte> value) => _connection.PostPublish(_key.Key, value);
 
-    public void PostPublish<T>(T value) => _connection.PostPublish(_key, value);
+    public void PostPublish<T>(T value) => _connection.PostPublish(_key.Key, value);
 
-    public ValueTask PublishAsync() => _connection.PublishAsync(_key);
+    public ValueTask PublishAsync() => _connection.PublishAsync(_key.Key);
 
-    public ValueTask PublishAsync(byte[] value) => _connection.PublishAsync(_key, value);
+    public ValueTask PublishAsync(byte[] value) => _connection.PublishAsync(_key.Key, value);
 
-    public ValueTask PublishAsync(ReadOnlyMemory<byte> value) => _connection.PublishAsync(_key, value);
+    public ValueTask PublishAsync(ReadOnlyMemory<byte> value) => _connection.PublishAsync(_key.Key, value);
 
-    public ValueTask PublishAsync<T>(T value) => _connection.PublishAsync(_key, value);
+    public ValueTask PublishAsync<T>(T value) => _connection.PublishAsync(_key.Key, value);
 
     public ValueTask<IDisposable> QueueSubscribeAsync<T>(in NatsKey queueGroup, Action<T> handler) => _connection.QueueSubscribeAsync(_key, queueGroup, handler);
 

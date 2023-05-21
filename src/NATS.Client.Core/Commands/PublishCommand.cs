@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Threading.Tasks.Sources;
 using NATS.Client.Core.Internal;
 
@@ -230,13 +231,13 @@ internal sealed class AsyncPublishBatchCommand<T> : AsyncCommandBase<AsyncPublis
 internal sealed class PublishBytesCommand : CommandBase<PublishBytesCommand>
 {
     private NatsKey _subject;
-    private ReadOnlyMemory<byte> _value;
+    private ReadOnlySequence<byte> _value;
 
     private PublishBytesCommand()
     {
     }
 
-    public static PublishBytesCommand Create(ObjectPool pool, CancellationTimer timer, in NatsKey subject, ReadOnlyMemory<byte> value)
+    public static PublishBytesCommand Create(ObjectPool pool, CancellationTimer timer, in NatsKey subject, ReadOnlySequence<byte> value)
     {
         if (!TryRent(pool, out var result))
         {
@@ -252,7 +253,7 @@ internal sealed class PublishBytesCommand : CommandBase<PublishBytesCommand>
 
     public override void Write(ProtocolWriter writer)
     {
-        writer.WritePublish(_subject, null, _value.Span);
+        writer.WritePublish(_subject, null, _value);
     }
 
     protected override void Reset()
@@ -265,13 +266,13 @@ internal sealed class PublishBytesCommand : CommandBase<PublishBytesCommand>
 internal sealed class AsyncPublishBytesCommand : AsyncCommandBase<AsyncPublishBytesCommand>
 {
     private NatsKey _subject;
-    private ReadOnlyMemory<byte> _value;
+    private ReadOnlySequence<byte> _value;
 
     private AsyncPublishBytesCommand()
     {
     }
 
-    public static AsyncPublishBytesCommand Create(ObjectPool pool, CancellationTimer timer, in NatsKey subject, ReadOnlyMemory<byte> value)
+    public static AsyncPublishBytesCommand Create(ObjectPool pool, CancellationTimer timer, in NatsKey subject, ReadOnlySequence<byte> value)
     {
         if (!TryRent(pool, out var result))
         {
@@ -287,7 +288,7 @@ internal sealed class AsyncPublishBytesCommand : AsyncCommandBase<AsyncPublishBy
 
     public override void Write(ProtocolWriter writer)
     {
-        writer.WritePublish(_subject!, null, _value.Span);
+        writer.WritePublish(_subject!, null, _value);
     }
 
     protected override void Reset()

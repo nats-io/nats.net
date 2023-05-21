@@ -108,7 +108,7 @@ public abstract partial class NatsConnectionTest
         {
             await using var failConnection = server.CreateClientConnection();
             var natsException =
-                await Assert.ThrowsAsync<NatsException>(async () => await failConnection.PublishAsync(key, 0));
+                await Assert.ThrowsAsync<NatsException>(async () => await failConnection.PublishAsync(key.Key, 0));
             Assert.Contains("Authorization Violation", natsException.GetBaseException().Message);
         }
 
@@ -129,7 +129,7 @@ public abstract partial class NatsConnectionTest
         await subConnection.PingAsync(); // wait for subscribe complete
 
         _output.WriteLine("AUTHENTICATED CONNECTION");
-        await pubConnection.PublishAsync(key, 1);
+        await pubConnection.PublishAsync(key.Key, 1);
         await signalComplete1;
 
         var disconnectSignal1 = subConnection.ConnectionDisconnectedAsAwaitable();
@@ -146,7 +146,7 @@ public abstract partial class NatsConnectionTest
         await pubConnection.ConnectAsync(); // wait open again
 
         _output.WriteLine("AUTHENTICATED RE-CONNECTION");
-        await pubConnection.PublishAsync(key, 2);
+        await pubConnection.PublishAsync(key.Key, 2);
         await signalComplete2;
     }
 }

@@ -38,7 +38,7 @@ public abstract partial class NatsConnectionTest
 
         for (var i = 0; i < 10; i++)
         {
-            await pubConnection.PublishAsync(key, i);
+            await pubConnection.PublishAsync(key.Key, i);
         }
 
         await signalComplete;

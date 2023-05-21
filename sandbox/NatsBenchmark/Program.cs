@@ -103,7 +103,7 @@ namespace NatsBenchmark
 
             for (var i = 0; i < testCount; i++)
             {
-                pubConn.PostPublish(key, payload);
+                pubConn.PostPublish(key.Key, payload);
             }
 
             lock (pubSubLock)
@@ -185,7 +185,11 @@ namespace NatsBenchmark
             var to = testCount / data.Length;
             for (var i = 0; i < to; i++)
             {
-                pubConn.PostPublishBatch(data!);
+                // pubConn.PostPublishBatch(data!);
+                foreach (var (natsKey, bytes) in data)
+                {
+                    pubConn.PostPublish(natsKey.Key, bytes);
+                }
             }
 
             lock (pubSubLock)
@@ -266,7 +270,7 @@ namespace NatsBenchmark
 
             for (var i = 0; i < testCount; i++)
             {
-                pubConn.PostPublish(key, payload);
+                pubConn.PostPublish(key.Key, payload);
             }
 
             lock (pubSubLock)
@@ -466,8 +470,8 @@ namespace NatsBenchmark
             var publishCount = testCount / 2;
             for (var i = 0; i < publishCount; i++)
             {
-                pubConn.PostPublish(key, payload);
-                pubConn2.PostPublish(key, payload);
+                pubConn.PostPublish(key.Key, payload);
+                pubConn2.PostPublish(key.Key, payload);
             }
 
             var t1 = Task.Run(() =>
@@ -569,7 +573,7 @@ namespace NatsBenchmark
             // JetBrains.Profiler.Api.MemoryProfiler.GetSnapshot("Before");
             for (var i = 0; i < testCount; i++)
             {
-                pubConn.PostPublish(key, default(Vector3));
+                pubConn.PostPublish(key.Key, default(Vector3));
             }
 
             lock (pubSubLock)

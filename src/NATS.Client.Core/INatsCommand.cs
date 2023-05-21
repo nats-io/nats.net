@@ -1,3 +1,4 @@
+using System.Buffers;
 using NATS.Client.Core.Commands;
 
 namespace NATS.Client.Core;
@@ -5,61 +6,35 @@ namespace NATS.Client.Core;
 // ***Async or Post***Async(fire-and-forget)
 public interface INatsCommand
 {
-    IObservable<T> AsObservable<T>(in NatsKey key);
-
-    IObservable<T> AsObservable<T>(string key);
-
     ValueTask FlushAsync(CancellationToken cancellationToken = default);
 
     ValueTask<TimeSpan> PingAsync(CancellationToken cancellationToken = default);
 
-    void PostDirectWrite(byte[] protocol);
-
-    void PostDirectWrite(DirectWriteCommand command);
-
-    void PostDirectWrite(string protocol, int repeatCount = 1);
-
     void PostPing(CancellationToken cancellationToken = default);
 
-    void PostPublish(in NatsKey key);
+    // publish
+    ValueTask PublishAsync(string subject, ReadOnlySequence<byte> data = default, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
 
-    void PostPublish(in NatsKey key, byte[] value);
+    ValueTask PublishAsync(NatsMsg msg, CancellationToken cancellationToken = default);
 
-    void PostPublish(in NatsKey key, ReadOnlyMemory<byte> value);
+    ValueTask PublishAsync<T>(string subject, T data, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
 
-    void PostPublish(string key);
+    ValueTask PublishAsync<T>(NatsMsg<T> msg, CancellationToken cancellationToken = default);
 
-    void PostPublish(string key, byte[] value);
+    void PostPublish(string subject, ReadOnlySequence<byte> data = default, in NatsPubOpts? opts = default);
 
-    void PostPublish(string key, ReadOnlyMemory<byte> value);
+    void PostPublish(NatsMsg msg);
 
-    void PostPublish<T>(in NatsKey key, T value);
+    void PostPublish<T>(string subject, T data, in NatsPubOpts? opts = default);
 
-    void PostPublish<T>(string key, T value);
+    void PostPublish<T>(NatsMsg<T> msg);
 
-    void PostPublishBatch<T>(IEnumerable<(NatsKey, T?)> values);
+    // subscribe
+    ValueTask<NatsSub> SubscribeAsync(string subject, in NatsSubOpts? opts = default, CancellationToken cancellationToken = default);
 
-    void PostPublishBatch<T>(IEnumerable<(string, T?)> values);
+    ValueTask<NatsSub<T>> SubscribeAsync<T>(string subject, in NatsSubOpts? opts = default, CancellationToken cancellationToken = default);
 
-    ValueTask PublishAsync(in NatsKey key, CancellationToken cancellationToken = default);
-
-    ValueTask PublishAsync(in NatsKey key, byte[] value, CancellationToken cancellationToken = default);
-
-    ValueTask PublishAsync(in NatsKey key, ReadOnlyMemory<byte> value, CancellationToken cancellationToken = default);
-
-    ValueTask PublishAsync(string key, CancellationToken cancellationToken = default);
-
-    ValueTask PublishAsync(string key, byte[] value, CancellationToken cancellationToken = default);
-
-    ValueTask PublishAsync(string key, ReadOnlyMemory<byte> value, CancellationToken cancellationToken = default);
-
-    ValueTask PublishAsync<T>(in NatsKey key, T value, CancellationToken cancellationToken = default);
-
-    ValueTask PublishAsync<T>(string key, T value, CancellationToken cancellationToken = default);
-
-    ValueTask PublishBatchAsync<T>(IEnumerable<(NatsKey, T?)> values, CancellationToken cancellationToken = default);
-
-    ValueTask PublishBatchAsync<T>(IEnumerable<(string, T?)> values, CancellationToken cancellationToken = default);
+    /****************************************************************************************************/
 
     ValueTask<IDisposable> QueueSubscribeAsync<T>(in NatsKey key, in NatsKey queueGroup, Action<T> handler, CancellationToken cancellationToken = default);
 
@@ -92,4 +67,15 @@ public interface INatsCommand
     ValueTask<IDisposable> SubscribeRequestAsync<TRequest, TResponse>(string key, Func<TRequest, Task<TResponse>> requestHandler, CancellationToken cancellationToken = default);
 
     ValueTask<IDisposable> SubscribeRequestAsync<TRequest, TResponse>(string key, Func<TRequest, TResponse> requestHandler, CancellationToken cancellationToken = default);
+
+    /**************************************************************************/
+    IObservable<T> AsObservable<T>(in NatsKey key);
+
+    IObservable<T> AsObservable<T>(string key);
+
+    void PostDirectWrite(byte[] protocol);
+
+    void PostDirectWrite(DirectWriteCommand command);
+
+    void PostDirectWrite(string protocol, int repeatCount = 1);
 }

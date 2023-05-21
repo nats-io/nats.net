@@ -216,12 +216,6 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
         Interlocked.Exchange(ref _pongCount, 0);
     }
 
-    internal async ValueTask EnqueueAndAwaitCommandAsync(IAsyncCommand command)
-    {
-        await EnqueueCommandAsync(command).ConfigureAwait(false);
-        await command.AsValueTask().ConfigureAwait(false);
-    }
-
     internal async ValueTask<T> EnqueueAndAwaitCommandAsync<T>(IAsyncCommand<T> command)
     {
         await EnqueueCommandAsync(command).ConfigureAwait(false);
@@ -601,31 +595,10 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
         }
     }
 
-    // internal commands.
-    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-    private CancellationTimer GetCommandTimer(CancellationToken cancellationToken)
-    {
-        return _cancellationTimerPool.Start(Options.CommandTimeout, cancellationToken);
-    }
-
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
     private CancellationTimer GetRequestCommandTimer(CancellationToken cancellationToken)
     {
         return _cancellationTimerPool.Start(Options.RequestTimeout, cancellationToken);
-    }
-
-    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-    private bool TryEnqueueCommand(ICommand command)
-    {
-        if (_commandWriter.TryWrite(command))
-        {
-            Interlocked.Increment(ref Counter.PendingMessages);
-            return true;
-        }
-        else
-        {
-            return false;
-        }
     }
 
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
@@ -754,6 +727,21 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
         }
 
         core(this, item1, item2);
+    }
+
+    private async void WithConnect<T1, T2, T3>(T1 item1, T2 item2, T3 item3, Action<NatsConnection, T1, T2, T3> core)
+    {
+        try
+        {
+            await ConnectAsync().ConfigureAwait(false);
+        }
+        catch
+        {
+            // log will shown on ConnectAsync failed
+            return;
+        }
+
+        core(this, item1, item2, item3);
     }
 
     private async ValueTask WithConnectAsync(Func<NatsConnection, ValueTask> coreAsync)
