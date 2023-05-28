@@ -3,7 +3,7 @@ using NATS.Client.Core;
 
 namespace BlazorWasm.Server.NatsServices;
 
-public class WeatherForecastService : IHostedService
+public class WeatherForecastService : IHostedService, IAsyncDisposable
 {
     private static readonly string[] Summaries = new[]
     {
@@ -12,6 +12,7 @@ public class WeatherForecastService : IHostedService
 
     private readonly ILogger<WeatherForecastService> _logger;
     private readonly INatsCommand _natsCommand;
+    private NatsReplyUtils? _replyHandle;
 
     public WeatherForecastService(ILogger<WeatherForecastService> logger, INatsCommand natsCommand)
     {
@@ -21,7 +22,7 @@ public class WeatherForecastService : IHostedService
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        await _natsCommand.SubscribeRequestAsync<object, WeatherForecast[]>("weather", req =>
+        _replyHandle = await _natsCommand.ReplyAsync<object, WeatherForecast[]>("weather", req =>
         {
             return Enumerable.Range(1, 5).Select(index => new WeatherForecast
             {
@@ -38,4 +39,6 @@ public class WeatherForecastService : IHostedService
         _logger.LogInformation("Weather Forecast Services is stopping");
         return Task.CompletedTask;
     }
+
+    public ValueTask DisposeAsync() => _replyHandle?.DisposeAsync() ?? ValueTask.CompletedTask;
 }

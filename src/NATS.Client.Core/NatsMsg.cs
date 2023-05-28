@@ -5,7 +5,7 @@ namespace NATS.Client.Core;
 
 public record NatsMsg : NatsMsgBase
 {
-    public ReadOnlySequence<byte> Data { get; set; }
+    public ReadOnlyMemory<byte> Data { get; set; }
 }
 
 public abstract record NatsMsgBase
@@ -20,12 +20,12 @@ public abstract record NatsMsgBase
         set => SubjectKey = new NatsKey(value);
     }
 
-    internal NatsKey ReplyToKey { get; set; }
+    internal NatsKey? ReplyToKey { get; set; }
 
-    public string ReplyTo
+    public string? ReplyTo
     {
-        get => ReplyToKey.Key;
-        set => ReplyToKey = new NatsKey(value);
+        get => ReplyToKey?.Key;
+        set => ReplyToKey = value == null ? null : new NatsKey(value);
     }
 
     public NatsHeaders? Headers { get; set; }
@@ -33,55 +33,54 @@ public abstract record NatsMsgBase
     public ValueTask ReplyAsync(ReadOnlySequence<byte> data = default, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         CheckReplyPreconditions();
-        return Connection.PublishAsync(ReplyTo, data, opts, cancellationToken);
+        return Connection.PublishAsync(ReplyTo!, data, opts, cancellationToken);
     }
 
     public ValueTask ReplyAsync(NatsMsg msg, CancellationToken cancellationToken = default)
     {
         CheckReplyPreconditions();
-        msg.SubjectKey = ReplyToKey;
+        msg.SubjectKey = ReplyToKey!.Value;
         return Connection.PublishAsync(msg, cancellationToken);
     }
 
     public ValueTask ReplyAsync<TReply>(TReply data, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         CheckReplyPreconditions();
-        return Connection.PublishAsync(ReplyTo, data, opts, cancellationToken);
+        return Connection.PublishAsync(ReplyTo!, data, opts, cancellationToken);
     }
 
     public ValueTask ReplyAsync<TReply>(NatsMsg<TReply> msg)
     {
         CheckReplyPreconditions();
-        msg.SubjectKey = ReplyToKey;
+        msg.SubjectKey = ReplyToKey!.Value;
         return Connection.PublishAsync(msg);
     }
 
-    public void PostReply(ReadOnlySequence<byte> data = default, in NatsPubOpts? opts = default)
-    {
-        CheckReplyPreconditions();
-        Connection.PostPublish(ReplyTo, data, opts);
-    }
+    // public void PostReply(ReadOnlySequence<byte> data = default, in NatsPubOpts? opts = default)
+    // {
+    //     CheckReplyPreconditions();
+    //     Connection.PostPublish(ReplyTo, data, opts);
+    // }
+    //
+    // public void PostReply(NatsMsg msg)
+    // {
+    //     CheckReplyPreconditions();
+    //     msg.SubjectKey = ReplyToKey;
+    //     Connection.PostPublish(msg);
+    // }
 
-    public void PostReply(NatsMsg msg)
-    {
-        CheckReplyPreconditions();
-        msg.SubjectKey = ReplyToKey;
-        Connection.PostPublish(msg);
-    }
-
-    public void PostReply<TReply>(TReply data, in NatsPubOpts? opts = default)
-    {
-        CheckReplyPreconditions();
-        Connection.PostPublish(ReplyTo, data, opts);
-    }
-
-    public void PostReply<TReply>(NatsMsg<TReply> msg)
-    {
-        CheckReplyPreconditions();
-        msg.SubjectKey = ReplyToKey;
-        Connection.PostPublish(msg);
-    }
-
+    // public void PostReply<TReply>(TReply data, in NatsPubOpts? opts = default)
+    // {
+    //     CheckReplyPreconditions();
+    //     Connection.PostPublish(ReplyTo, data, opts);
+    // }
+    //
+    // public void PostReply<TReply>(NatsMsg<TReply> msg)
+    // {
+    //     CheckReplyPreconditions();
+    //     msg.SubjectKey = ReplyToKey;
+    //     Connection.PostPublish(msg);
+    // }
     [MemberNotNull(nameof(Connection))]
     private void CheckReplyPreconditions()
     {
@@ -90,7 +89,7 @@ public abstract record NatsMsgBase
             throw new NatsException("unable to send reply; message did not originate from a subscription");
         }
 
-        if (string.IsNullOrEmpty(ReplyToKey.Key) && ReplyToKey.Buffer?.Length == 0)
+        if (string.IsNullOrEmpty(ReplyToKey?.Key) && ReplyToKey?.Buffer?.Length == 0)
         {
             throw new NatsException("unable to send reply; ReplyTo is empty");
         }

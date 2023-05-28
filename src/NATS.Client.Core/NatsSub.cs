@@ -1,42 +1,7 @@
+using System.Buffers;
 using System.Threading.Channels;
 
 namespace NATS.Client.Core;
-
-public sealed class NatsSub : NatsSubBase
-{
-    private readonly Channel<NatsMsg> _msgs = Channel.CreateUnbounded<NatsMsg>();
-
-    public ChannelReader<NatsMsg> Msgs => _msgs.Reader;
-
-    public NatsSub Register(Action<NatsMsg> action)
-    {
-        // XXX
-#pragma warning disable VSTHRD110
-        Task.Run(async () =>
-#pragma warning restore VSTHRD110
-        {
-            await foreach (var natsMsg in _msgs.Reader.ReadAllAsync())
-            {
-                action(natsMsg);
-            }
-        });
-
-        return this;
-    }
-
-    public override async ValueTask DisposeAsync()
-    {
-        if (_msgs.Writer.TryComplete())
-        {
-            await base.DisposeAsync().ConfigureAwait(false);
-        }
-    }
-
-    internal override bool Receive(NatsMsg msg)
-    {
-        return _msgs.Writer.TryWrite(msg);
-    }
-}
 
 public abstract class NatsSubBase : IAsyncDisposable
 {
@@ -67,32 +32,14 @@ public abstract class NatsSubBase : IAsyncDisposable
         (await InternalSubscription.ConfigureAwait(false)).Dispose();
     }
 
-    internal abstract bool Receive(NatsMsg msg);
+    internal abstract ValueTask ReceiveAsync(string subject, string? replyTo, ReadOnlySequence<byte> buffer);
 }
 
-public sealed class NatsSub<T> : NatsSubBase
+public sealed class NatsSub : NatsSubBase
 {
-    private readonly Channel<NatsMsg<T>> _msgs = Channel.CreateUnbounded<NatsMsg<T>>();
+    private readonly Channel<NatsMsg> _msgs = Channel.CreateUnbounded<NatsMsg>();
 
-    public INatsSerializer? Serializer { get; internal set; }
-
-    public ChannelReader<NatsMsg<T>> Msgs => _msgs.Reader;
-
-    public NatsSub<T> Register(Action<NatsMsg<T>> action)
-    {
-        // XXX
-#pragma warning disable VSTHRD110
-        Task.Run(async () =>
-#pragma warning restore VSTHRD110
-        {
-            await foreach (var natsMsg in _msgs.Reader.ReadAllAsync())
-            {
-                action(natsMsg);
-            }
-        });
-
-        return this;
-    }
+    public ChannelReader<NatsMsg> Msgs => _msgs.Reader;
 
     public override async ValueTask DisposeAsync()
     {
@@ -102,16 +49,50 @@ public sealed class NatsSub<T> : NatsSubBase
         }
     }
 
-    internal override bool Receive(NatsMsg msg)
+    internal override ValueTask ReceiveAsync(string subject, string? replyTo, ReadOnlySequence<byte> buffer)
+    {
+        return _msgs.Writer.WriteAsync(new NatsMsg
+        {
+            Connection = Connection,
+            Subject = subject,
+            ReplyTo = replyTo,
+            Data = buffer.ToArray(),
+        });
+    }
+}
+
+public sealed class NatsSub<T> : NatsSubBase
+{
+    private readonly Channel<NatsMsg<T>> _msgs = Channel.CreateBounded<NatsMsg<T>>(new BoundedChannelOptions(capacity: 1_000)
+    {
+        FullMode = BoundedChannelFullMode.Wait,
+        SingleWriter = true,
+        SingleReader = false,
+        AllowSynchronousContinuations = false,
+    });
+
+    public INatsSerializer? Serializer { get; internal set; }
+
+    public ChannelReader<NatsMsg<T>> Msgs => _msgs.Reader;
+
+    public override async ValueTask DisposeAsync()
+    {
+        if (_msgs.Writer.TryComplete())
+        {
+            await base.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    internal override ValueTask ReceiveAsync(string subject, string? replyTo, ReadOnlySequence<byte> buffer)
     {
         var serializer = Serializer ?? Connection!.Options.Serializer;
-        var tData = serializer.Deserialize<T>(msg.Data);
-        return _msgs.Writer.TryWrite(new NatsMsg<T>(tData!)
+        var data = serializer.Deserialize<T>(buffer);
+        return _msgs.Writer.WriteAsync(new NatsMsg<T>(data!)
         {
-            Connection = msg.Connection,
-            SubjectKey = msg.SubjectKey,
-            ReplyToKey = msg.ReplyToKey,
-            Headers = msg.Headers,
+            Connection = Connection,
+            Subject = subject,
+            ReplyTo = replyTo,
+            Data = data!,
         });
     }
 }

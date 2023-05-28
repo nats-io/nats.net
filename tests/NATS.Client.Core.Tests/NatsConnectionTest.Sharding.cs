@@ -35,9 +35,9 @@ public abstract partial class NatsConnectionTest
         var l1 = new List<int>();
         var l2 = new List<int>();
         var l3 = new List<int>();
-        await shardedConnection.GetCommand("foo").SubscribeAsync((int x) => l1.Add(x));
-        await shardedConnection.GetCommand("bar").SubscribeAsync((int x) => l2.Add(x));
-        await shardedConnection.GetCommand("baz").SubscribeAsync((int x) => l3.Add(x));
+        (await shardedConnection.GetCommand("foo").SubscribeAsync<int>()).Register(msg => l1.Add(msg.Data));
+        (await shardedConnection.GetCommand("bar").SubscribeAsync<int>()).Register(msg => l2.Add(msg.Data));
+        (await shardedConnection.GetCommand("baz").SubscribeAsync<int>()).Register(msg => l3.Add(msg.Data));
 
         await shardedConnection.GetCommand("foo").PublishAsync(10);
         await shardedConnection.GetCommand("bar").PublishAsync(20);
@@ -49,7 +49,7 @@ public abstract partial class NatsConnectionTest
         l2.ShouldEqual(20);
         l3.ShouldEqual(30);
 
-        await shardedConnection.GetCommand("foobarbaz").SubscribeRequestAsync((int x) => x * x);
+        await shardedConnection.GetCommand("foobarbaz").ReplyAsync((int x) => x * x);
 
         var r = await shardedConnection.GetCommand("foobarbaz").RequestAsync<int, int>(100);
 

@@ -173,7 +173,7 @@ internal sealed class SubscriptionManager : IDisposable
         return returnSubscription;
     }
 
-    public void PublishToClientHandlers(int subscriptionId, in ReadOnlySequence<byte> buffer)
+    public Task PublishToClientHandlersAsync(string subject, string? replyTo, int subscriptionId, in ReadOnlySequence<byte> buffer)
     {
         RefCountSubscription? subscription;
         object?[] list;
@@ -185,11 +185,11 @@ internal sealed class SubscriptionManager : IDisposable
             }
             else
             {
-                return;
+                return Task.CompletedTask;
             }
         }
 
-        MessagePublisher.Publish(subscription.ElementType, Connection.Options, buffer, list);
+        return MessagePublisher.PublishAsync(subject, replyTo, subscription.ElementType, Connection.Options, buffer, list);
     }
 
     public void PublishToRequestHandler(int subscriptionId, in NatsKey replyTo, in ReadOnlySequence<byte> buffer)

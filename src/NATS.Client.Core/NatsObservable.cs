@@ -39,9 +39,7 @@ internal sealed class NatsObservable<T> : IObservable<T>
                 _disposed = true;
                 if (_taskDisposable != null)
                 {
-#pragma warning disable VSTHRD110
-                    _taskDisposable.DisposeAsync();
-#pragma warning restore VSTHRD110
+                    _ = _taskDisposable.DisposeAsync();
                 }
             }
         }
@@ -51,7 +49,20 @@ internal sealed class NatsObservable<T> : IObservable<T>
             try
             {
                 var sub = await natsSub.ConfigureAwait(false);
-                sub.Register(msg => observer.OnNext(msg.Data));
+
+                // TODO: Consider observable support from the API
+                // * Channels and observables don't go together very well and creating a generic solution is
+                //   problematic. An avid RX developer should be able to hook the channel up easily for their
+                //   scenario.
+                // * Below workaround isn't very well thought out and will probably create bugs except maybe
+                //   in simple scenarios.
+                _ = Task.Run(async () =>
+                {
+                    await foreach (var msg in sub.Msgs.ReadAllAsync())
+                    {
+                        observer.OnNext(msg.Data);
+                    }
+                });
 
                 _taskDisposable = sub;
 

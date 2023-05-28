@@ -5,7 +5,8 @@ using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
 
-internal delegate void PublishMessage(NatsOptions options, in ReadOnlySequence<byte> buffer, object?[] callbacks);
+// TODO: Clean up message publisher.
+internal delegate Task PublishMessage(string subject, string? replyTo, NatsOptions options, ReadOnlySequence<byte> buffer, object?[] callbacks);
 
 internal static class MessagePublisher
 {
@@ -13,9 +14,9 @@ internal static class MessagePublisher
     private static readonly Func<Type, PublishMessage> CreatePublisherValue = CreatePublisher;
     private static readonly ConcurrentDictionary<Type, PublishMessage> PublisherCache = new();
 
-    public static void Publish(Type type, NatsOptions options, in ReadOnlySequence<byte> buffer, object?[] callbacks)
+    public static Task PublishAsync(string subject, string? replyTo, Type type, NatsOptions options, in ReadOnlySequence<byte> buffer, object?[] callbacks)
     {
-        PublisherCache.GetOrAdd(type, CreatePublisherValue).Invoke(options, buffer, callbacks);
+        return PublisherCache.GetOrAdd(type, CreatePublisherValue).Invoke(subject, replyTo, options, buffer, callbacks);
     }
 
     private static PublishMessage CreatePublisher(Type type)
@@ -26,7 +27,7 @@ internal static class MessagePublisher
         }
         else if (type == typeof(ReadOnlyMemory<byte>))
         {
-            return new ReadOnlyMemoryMessagePublisher().Publish;
+            return new ReadOnlyMemoryMessagePublisher().PublishAsync;
         }
 
         var publisher = typeof(MessagePublisher<>).MakeGenericType(type)!;
@@ -103,7 +104,13 @@ internal sealed class MessagePublisher<T>
 
 internal sealed class ByteArrayMessagePublisher
 {
-    public void Publish(NatsOptions options, in ReadOnlySequence<byte> buffer, object?[] callbacks)
+#pragma warning disable CA1822
+#pragma warning disable VSTHRD200
+#pragma warning disable CS1998
+    public async Task Publish(string subject, string? replyTo, NatsOptions? options, ReadOnlySequence<byte> buffer, object?[] callbacks)
+#pragma warning restore CS1998
+#pragma warning restore VSTHRD200
+#pragma warning restore CA1822
     {
         byte[] value;
         try
@@ -132,7 +139,7 @@ internal sealed class ByteArrayMessagePublisher
 
         try
         {
-            if (!options.UseThreadPoolCallback)
+            if (options is { UseThreadPoolCallback: false })
             {
                 foreach (var callback in callbacks!)
                 {
@@ -176,7 +183,7 @@ internal sealed class ByteArrayMessagePublisher
 
 internal sealed class ReadOnlyMemoryMessagePublisher
 {
-    public void Publish(NatsOptions options, in ReadOnlySequence<byte> buffer, object?[] callbacks)
+    public async Task PublishAsync(string subject, string? replyTo, NatsOptions? options, ReadOnlySequence<byte> buffer, object?[] callbacks)
     {
         ReadOnlyMemory<byte> value;
         try
@@ -205,7 +212,7 @@ internal sealed class ReadOnlyMemoryMessagePublisher
 
         try
         {
-            if (!options.UseThreadPoolCallback)
+            if (options is { UseThreadPoolCallback: false })
             {
                 foreach (var callback in callbacks!)
                 {
@@ -215,7 +222,7 @@ internal sealed class ReadOnlyMemoryMessagePublisher
                         {
                             if (callback is NatsSubBase natsSub)
                             {
-                                natsSub.Receive(new NatsMsg { Data = buffer, });
+                                await natsSub.ReceiveAsync(subject, replyTo, buffer).ConfigureAwait(false);
                             }
                             else if (callback is Action<ReadOnlyMemory<byte>> action)
                             {

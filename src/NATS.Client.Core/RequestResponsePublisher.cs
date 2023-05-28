@@ -183,11 +183,11 @@ internal sealed class RequestPublisher<TRequest, TResponse>
                 {
                 }
 
-                connection.PostPublish(replyTo.Key); // send empty when error
+                _ = connection.PublishAsync(replyTo.Key); // send empty when error
                 return;
             }
 
-            connection.PostPublish(replyTo.Key, response); // send response.
+            _ = connection.PublishAsync(replyTo.Key, response); // send response.
         }
 
         static async void PublishAsync(NatsConnection connection, TRequest? value, NatsKey replyTo, Func<TRequest, Task<TResponse>> callback)
@@ -207,11 +207,11 @@ internal sealed class RequestPublisher<TRequest, TResponse>
                 {
                 }
 
-                connection.PostPublish(replyTo.Key); // send empty when error
+                await connection.PublishAsync(replyTo.Key).ConfigureAwait(false); // send empty when error
                 return;
             }
 
-            connection.PostPublish(replyTo.Key, response); // send response.
+            await connection.PublishAsync(replyTo.Key, response).ConfigureAwait(false); // send response.
         }
     }
 }

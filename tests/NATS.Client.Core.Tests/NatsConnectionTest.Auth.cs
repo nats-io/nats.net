@@ -152,3 +152,32 @@ public abstract partial class NatsConnectionTest
         await signalComplete2;
     }
 }
+
+internal static class NatsMsgTestUtils
+{
+    internal static NatsSub<T>? Register<T>(this NatsSub<T>? sub, Action<NatsMsg<T>> action)
+    {
+        if (sub == null) return null;
+        Task.Run(async () =>
+        {
+            await foreach (var natsMsg in sub.Msgs.ReadAllAsync())
+            {
+                action(natsMsg);
+            }
+        });
+        return sub;
+    }
+
+    internal static NatsSub? Register(this NatsSub? sub, Action<NatsMsg> action)
+    {
+        if (sub == null) return null;
+        Task.Run(async () =>
+        {
+            await foreach (var natsMsg in sub.Msgs.ReadAllAsync())
+            {
+                action(natsMsg);
+            }
+        });
+        return sub;
+    }
+}

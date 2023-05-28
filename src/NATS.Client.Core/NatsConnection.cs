@@ -167,11 +167,9 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
 
     internal void PostPong()
     {
-#pragma warning disable CS4014
-#pragma warning disable VSTHRD110
-        EnqueueCommandAsync(PongCommand.Create(_pool, GetCommandTimer(CancellationToken.None)));
-#pragma warning restore VSTHRD110
-#pragma warning restore CS4014
+#pragma warning disable CA2012
+        _ = EnqueueCommandAsync(PongCommand.Create(_pool, GetCommandTimer(CancellationToken.None)));
+#pragma warning restore CA2012
     }
 
     internal ValueTask SubscribeAsync(int subscriptionId, string subject, in NatsKey? queueGroup)
@@ -189,16 +187,12 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
 
     internal void PostCommand(ICommand command)
     {
-#pragma warning disable CS4014
-#pragma warning disable VSTHRD110
-        EnqueueCommandAsync(command);
-#pragma warning restore VSTHRD110
-#pragma warning restore CS4014
+        _ = EnqueueCommandAsync(command);
     }
 
-    internal void PublishToClientHandlers(int subscriptionId, in ReadOnlySequence<byte> buffer)
+    internal Task PublishToClientHandlersAsync(string subject, string? replyTo, int subscriptionId, in ReadOnlySequence<byte> buffer)
     {
-        _subscriptionManager.PublishToClientHandlers(subscriptionId, buffer);
+        return _subscriptionManager.PublishToClientHandlersAsync(subject, replyTo, subscriptionId, buffer);
     }
 
     internal void PublishToRequestHandler(int subscriptionId, in NatsKey replyTo, in ReadOnlySequence<byte> buffer)
@@ -766,6 +760,12 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
     {
         await ConnectAsync().ConfigureAwait(false);
         await coreAsync(this, item1, item2, item3).ConfigureAwait(false);
+    }
+
+    private async ValueTask WithConnectAsync<T1, T2, T3, T4>(T1 item1, T2 item2, T3 item3, T4 item4, Func<NatsConnection, T1, T2, T3, T4, ValueTask> coreAsync)
+    {
+        await ConnectAsync().ConfigureAwait(false);
+        await coreAsync(this, item1, item2, item3, item4).ConfigureAwait(false);
     }
 
     private async ValueTask<T> WithConnectAsync<T>(Func<NatsConnection, ValueTask<T>> coreAsync)

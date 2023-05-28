@@ -23,16 +23,6 @@ public readonly struct ShardringNatsCommand
 
     public ValueTask<TimeSpan> PingAsync() => _connection.PingAsync();
 
-    public void PostPing() => _connection.PostPing();
-
-    public void PostPublish() => _connection.PostPublish(_key.Key);
-
-    public void PostPublish(byte[] value) => _connection.PostPublish(_key.Key, value);
-
-    public void PostPublish(ReadOnlyMemory<byte> value) => _connection.PostPublish(_key.Key, value);
-
-    public void PostPublish<T>(T value) => _connection.PostPublish(_key.Key, value);
-
     public ValueTask PublishAsync() => _connection.PublishAsync(_key.Key);
 
     public ValueTask PublishAsync(byte[] value) => _connection.PublishAsync(_key.Key, value);
@@ -41,26 +31,14 @@ public readonly struct ShardringNatsCommand
 
     public ValueTask PublishAsync<T>(T value) => _connection.PublishAsync(_key.Key, value);
 
-    public ValueTask<IDisposable> QueueSubscribeAsync<T>(in NatsKey queueGroup, Action<T> handler) => _connection.QueueSubscribeAsync(_key, queueGroup, handler);
+    public Task<TResponse> RequestAsync<TRequest, TResponse>(TRequest request) => _connection.RequestAsync<TRequest, TResponse>(_key.Key, request);
 
-    public ValueTask<IDisposable> QueueSubscribeAsync<T>(in NatsKey queueGroup, Func<T, Task> asyncHandler) => _connection.QueueSubscribeAsync(_key, queueGroup, asyncHandler);
+    public Task<NatsReplyUtils> ReplyAsync<TRequest, TResponse>(Func<TRequest, TResponse> reply) => _connection.ReplyAsync<TRequest, TResponse>(_key.Key, reply);
 
-    public ValueTask<IDisposable> QueueSubscribeAsync<T>(string queueGroup, Action<T> handler) => _connection.QueueSubscribeAsync(_key.Key, queueGroup, handler);
-
-    public ValueTask<IDisposable> QueueSubscribeAsync<T>(string queueGroup, Func<T, Task> asyncHandler) => _connection.QueueSubscribeAsync(_key.Key, queueGroup, asyncHandler);
-
-    public ValueTask<TResponse?> RequestAsync<TRequest, TResponse>(TRequest request) => _connection.RequestAsync<TRequest, TResponse>(_key, request);
-
-    public async ValueTask<NatsSub<T>> SubscribeAsync<T>(Action<T> handler) =>
-        (await _connection.SubscribeAsync<T>(_key.Key).ConfigureAwait(false))
-        .Register(msg => handler(msg.Data));
+    public ValueTask<NatsSub<T>> SubscribeAsync<T>() => _connection.SubscribeAsync<T>(_key.Key);
 
     public ValueTask<NatsSub> SubscribeAsync(string subject, in NatsSubOpts? opts = default, CancellationToken cancellationToken = default) =>
         _connection.SubscribeAsync(subject, opts, cancellationToken);
-
-    public ValueTask<IDisposable> SubscribeRequestAsync<TRequest, TResponse>(Func<TRequest, Task<TResponse>> requestHandler) => _connection.SubscribeRequestAsync<TRequest, TResponse>(_key, requestHandler);
-
-    public ValueTask<IDisposable> SubscribeRequestAsync<TRequest, TResponse>(Func<TRequest, TResponse> requestHandler) => _connection.SubscribeRequestAsync<TRequest, TResponse>(_key, requestHandler);
 }
 
 public sealed class NatsShardingConnection : IAsyncDisposable
@@ -117,6 +95,8 @@ public sealed class NatsShardingConnection : IAsyncDisposable
         }
     }
 
+    // TODO: Unsafe really needed?
+    // Benchmark without SkipLocalsInit to see if the performance impact is negligible
     [SkipLocalsInit]
     private int GetHashIndex(string key)
     {

@@ -1,25 +1,28 @@
-﻿using System.Text;
+﻿// > nats sub bar.*
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 
-var subject = "foo.*";
+var subject = "bar.xyz";
 var options = NatsOptions.Default with { LoggerFactory = new MinimumConsoleLoggerFactory(LogLevel.Error) };
 
 Print("[CON] Connecting...\n");
 
 await using var connection = new NatsConnection(options);
 
-Print($"[SUB] Subscribing to subject '{subject}'...\n");
-
-NatsSub sub = await connection.SubscribeAsync(subject);
-
-await foreach (var msg in sub.Msgs.ReadAllAsync())
+for (int i = 0; i < 10; i++)
 {
-    var data = Encoding.UTF8.GetString(msg.Data.ToArray());
-    Print($"[RCV] {msg.Subject}: {data}\n");
+    Print($"[PUB] Publishing to subject ({i}) '{subject}'...\n");
+    await connection.PublishAsync<Bar>(subject, new Bar { Id = i, Name = "Baz" });
 }
 
 void Print(string message)
 {
     Console.Write($"{DateTime.Now:HH:mm:ss} {message}");
+}
+
+public record Bar
+{
+    public int Id { get; set; }
+
+    public string? Name { get; set; }
 }

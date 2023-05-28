@@ -74,7 +74,7 @@ internal sealed class RequestResponseManager : IDisposable
             _responseBoxes.Clear();
 
 #pragma warning disable VSTHRD110
-            _globalSubscription?.DisposeAsync();
+            _ = _globalSubscription?.DisposeAsync();
 #pragma warning restore VSTHRD110
             _globalSubscription = null;
         }

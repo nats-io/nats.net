@@ -43,6 +43,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.Core.SubscribeRaw",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.Core.SubscribeModel", "sandbox\Example.Core.SubscribeModel\Example.Core.SubscribeModel.csproj", "{6E000410-7557-46F0-BACC-10CD31FF1D5B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.Core.SubscribeQueueGroup", "sandbox\Example.Core.SubscribeQueueGroup\Example.Core.SubscribeQueueGroup.csproj", "{C85BA135-3C21-4027-BE5A-849E1011DD0A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.Core.PublishModel", "sandbox\Example.Core.PublishModel\Example.Core.PublishModel.csproj", "{29F96D05-D02F-4610-A8FB-3527BF83C4A5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -97,6 +101,14 @@ Global
 		{6E000410-7557-46F0-BACC-10CD31FF1D5B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6E000410-7557-46F0-BACC-10CD31FF1D5B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6E000410-7557-46F0-BACC-10CD31FF1D5B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C85BA135-3C21-4027-BE5A-849E1011DD0A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C85BA135-3C21-4027-BE5A-849E1011DD0A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C85BA135-3C21-4027-BE5A-849E1011DD0A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C85BA135-3C21-4027-BE5A-849E1011DD0A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{29F96D05-D02F-4610-A8FB-3527BF83C4A5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{29F96D05-D02F-4610-A8FB-3527BF83C4A5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{29F96D05-D02F-4610-A8FB-3527BF83C4A5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{29F96D05-D02F-4610-A8FB-3527BF83C4A5}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -115,6 +127,8 @@ Global
 		{35D141D0-F80A-4E9B-A2AA-A1AEA925C9C2} = {326017A7-18B3-4567-B9F9-5521E4467198}
 		{07217C71-7260-4C5B-B405-75905E5BC76B} = {95A69671-16CA-4133-981C-CC381B7AAA30}
 		{6E000410-7557-46F0-BACC-10CD31FF1D5B} = {95A69671-16CA-4133-981C-CC381B7AAA30}
+		{C85BA135-3C21-4027-BE5A-849E1011DD0A} = {95A69671-16CA-4133-981C-CC381B7AAA30}
+		{29F96D05-D02F-4610-A8FB-3527BF83C4A5} = {95A69671-16CA-4133-981C-CC381B7AAA30}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {8CBB7278-D093-448E-B3DE-B5991209A1AA}

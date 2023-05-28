@@ -1,3 +1,4 @@
+using System.Text;
 using NATS.Client.Core;
 using NATS.Client.Hosting;
 
@@ -8,7 +9,19 @@ builder.Services.AddNats();
 
 var app = builder.Build();
 
-app.MapGet("/subscribe", async (INatsCommand command) => (await command.SubscribeAsync("foo")).Register(x => Console.WriteLine($"received {x.Data}")));
+app.MapGet("/subscribe", async (INatsCommand command) =>
+{
+    var subscription = await command.SubscribeAsync("foo");
+
+    _ = Task.Run(async () =>
+    {
+        await foreach (var msg in subscription.Msgs.ReadAllAsync())
+        {
+            Console.WriteLine($"Received {Encoding.UTF8.GetString(msg.Data.ToArray())}");
+        }
+    });
+});
+
 app.MapGet("/publish", async (INatsCommand command) => await command.PublishAsync("foo", 99));
 
 app.Run();

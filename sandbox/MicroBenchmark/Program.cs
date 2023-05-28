@@ -110,7 +110,7 @@ public class DefaultRun
 
         for (var i = 0; i < count; i++)
         {
-            _connection.PostPublish(_key.Key, default(MyVector3));
+            _connection.PublishAsync(_key.Key, default(MyVector3));
         }
 
         lock (_gate)

@@ -103,7 +103,7 @@ namespace NatsBenchmark
 
             for (var i = 0; i < testCount; i++)
             {
-                pubConn.PostPublish(key.Key, payload);
+                pubConn.PublishAsync(key.Key, payload);
             }
 
             lock (pubSubLock)
@@ -188,7 +188,7 @@ namespace NatsBenchmark
                 // pubConn.PostPublishBatch(data!);
                 foreach (var (natsKey, bytes) in data)
                 {
-                    pubConn.PostPublish(natsKey.Key, bytes);
+                    pubConn.PublishAsync(natsKey.Key, bytes);
                 }
             }
 
@@ -270,7 +270,7 @@ namespace NatsBenchmark
 
             for (var i = 0; i < testCount; i++)
             {
-                pubConn.PostPublish(key.Key, payload);
+                pubConn.PublishAsync(key.Key, payload);
             }
 
             lock (pubSubLock)
@@ -470,8 +470,8 @@ namespace NatsBenchmark
             var publishCount = testCount / 2;
             for (var i = 0; i < publishCount; i++)
             {
-                pubConn.PostPublish(key.Key, payload);
-                pubConn2.PostPublish(key.Key, payload);
+                pubConn.PublishAsync(key.Key, payload);
+                pubConn2.PublishAsync(key.Key, payload);
             }
 
             var t1 = Task.Run(() =>
@@ -573,7 +573,7 @@ namespace NatsBenchmark
             // JetBrains.Profiler.Api.MemoryProfiler.GetSnapshot("Before");
             for (var i = 0; i < testCount; i++)
             {
-                pubConn.PostPublish(key.Key, default(Vector3));
+                pubConn.PublishAsync(key.Key, default(Vector3));
             }
 
             lock (pubSubLock)
@@ -821,4 +821,33 @@ public struct Vector3
     public float Y;
     [Key(2)]
     public float Z;
+}
+
+internal static class NatsMsgTestUtils
+{
+    internal static NatsSub<T>? Register<T>(this NatsSub<T>? sub, Action<NatsMsg<T>> action)
+    {
+        if (sub == null) return null;
+        Task.Run(async () =>
+        {
+            await foreach (var natsMsg in sub.Msgs.ReadAllAsync())
+            {
+                action(natsMsg);
+            }
+        });
+        return sub;
+    }
+
+    internal static NatsSub? Register(this NatsSub? sub, Action<NatsMsg> action)
+    {
+        if (sub == null) return null;
+        Task.Run(async () =>
+        {
+            await foreach (var natsMsg in sub.Msgs.ReadAllAsync())
+            {
+                action(natsMsg);
+            }
+        });
+        return sub;
+    }
 }
