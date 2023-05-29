@@ -5,6 +5,8 @@ using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
 
+// TODO: Clean-up request-response management
+// This is a higher level concept. Should not be handled at lower levels to avoid unnecessary complexity.
 internal sealed class RequestResponseManager : IDisposable
 {
     private readonly NatsConnection _connection;

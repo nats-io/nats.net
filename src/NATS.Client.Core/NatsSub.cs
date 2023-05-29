@@ -37,7 +37,13 @@ public abstract class NatsSubBase : IAsyncDisposable
 
 public sealed class NatsSub : NatsSubBase
 {
-    private readonly Channel<NatsMsg> _msgs = Channel.CreateUnbounded<NatsMsg>();
+    private readonly Channel<NatsMsg> _msgs = Channel.CreateBounded<NatsMsg>(new BoundedChannelOptions(1_000)
+    {
+        FullMode = BoundedChannelFullMode.Wait,
+        SingleWriter = true,
+        SingleReader = false,
+        AllowSynchronousContinuations = false,
+    });
 
     public ChannelReader<NatsMsg> Msgs => _msgs.Reader;
 
@@ -92,7 +98,6 @@ public sealed class NatsSub<T> : NatsSubBase
             Connection = Connection,
             Subject = subject,
             ReplyTo = replyTo,
-            Data = data!,
         });
     }
 }

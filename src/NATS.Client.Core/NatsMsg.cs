@@ -28,8 +28,12 @@ public abstract record NatsMsgBase
         set => ReplyToKey = value == null ? null : new NatsKey(value);
     }
 
-    public NatsHeaders? Headers { get; set; }
-
+    // TODO: Implement headers in NatsMsg
+    // public NatsHeaders? Headers
+    // {
+    //     get => throw new NotImplementedException();
+    //     set => throw new NotImplementedException();
+    // }
     public ValueTask ReplyAsync(ReadOnlySequence<byte> data = default, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         CheckReplyPreconditions();
@@ -56,31 +60,6 @@ public abstract record NatsMsgBase
         return Connection.PublishAsync(msg);
     }
 
-    // public void PostReply(ReadOnlySequence<byte> data = default, in NatsPubOpts? opts = default)
-    // {
-    //     CheckReplyPreconditions();
-    //     Connection.PostPublish(ReplyTo, data, opts);
-    // }
-    //
-    // public void PostReply(NatsMsg msg)
-    // {
-    //     CheckReplyPreconditions();
-    //     msg.SubjectKey = ReplyToKey;
-    //     Connection.PostPublish(msg);
-    // }
-
-    // public void PostReply<TReply>(TReply data, in NatsPubOpts? opts = default)
-    // {
-    //     CheckReplyPreconditions();
-    //     Connection.PostPublish(ReplyTo, data, opts);
-    // }
-    //
-    // public void PostReply<TReply>(NatsMsg<TReply> msg)
-    // {
-    //     CheckReplyPreconditions();
-    //     msg.SubjectKey = ReplyToKey;
-    //     Connection.PostPublish(msg);
-    // }
     [MemberNotNull(nameof(Connection))]
     private void CheckReplyPreconditions()
     {

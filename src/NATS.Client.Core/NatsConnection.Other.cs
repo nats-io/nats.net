@@ -1,22 +1,12 @@
-using System.Runtime.CompilerServices;
 using NATS.Client.Core.Commands;
 
 namespace NATS.Client.Core;
 
-public partial class NatsConnection : INatsCommand
+public partial class NatsConnection
 {
-    // public ValueTask<TResponse?> RequestAsync<TRequest, TResponse>(string key, TRequest request, CancellationToken cancellationToken = default)
-    // {
-    //     return RequestAsync<TRequest, TResponse>(new NatsKey(key, true), request, cancellationToken);
-    // }
-    public IObservable<T> AsObservable<T>(string key)
+    public IObservable<T> AsObservable<T>(string subject)
     {
-        return AsObservable<T>(new NatsKey(key, true));
-    }
-
-    public IObservable<T> AsObservable<T>(in NatsKey key)
-    {
-        return new NatsObservable<T>(this, key);
+        return new NatsObservable<T>(this, new NatsKey(subject, true));
     }
 
     public ValueTask FlushAsync(CancellationToken cancellationToken = default)
@@ -42,92 +32,4 @@ public partial class NatsConnection : INatsCommand
             });
         }
     }
-
-    internal void PostDirectWrite(ICommand command)
-    {
-        if (ConnectionState == NatsConnectionState.Open)
-        {
-            EnqueueCommandSync(command);
-        }
-        else
-        {
-            WithConnect(command, static (self, command) =>
-            {
-                self.EnqueueCommandSync(command);
-            });
-        }
-    }
-
-    // DirectWrite is not supporting CancellationTimer
-    internal void PostDirectWrite(string protocol, int repeatCount = 1)
-    {
-        if (ConnectionState == NatsConnectionState.Open)
-        {
-            EnqueueCommandSync(new DirectWriteCommand(protocol, repeatCount));
-        }
-        else
-        {
-            WithConnect(protocol, repeatCount, static (self, protocol, repeatCount) =>
-            {
-                self.EnqueueCommandSync(new DirectWriteCommand(protocol, repeatCount));
-            });
-        }
-    }
-
-    internal void PostDirectWrite(byte[] protocol)
-    {
-        if (ConnectionState == NatsConnectionState.Open)
-        {
-            EnqueueCommandSync(new DirectWriteCommand(protocol));
-        }
-        else
-        {
-            WithConnect(protocol, static (self, protocol) =>
-            {
-                self.EnqueueCommandSync(new DirectWriteCommand(protocol));
-            });
-        }
-    }
-
-    internal void PostDirectWrite(DirectWriteCommand command)
-    {
-        if (ConnectionState == NatsConnectionState.Open)
-        {
-            EnqueueCommandSync(command);
-        }
-        else
-        {
-            WithConnect(command, static (self, command) =>
-            {
-                self.EnqueueCommandSync(command);
-            });
-        }
-    }
-
-    // [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
-    // public async ValueTask<TResponse?> RequestAsync<TRequest, TResponse>(NatsKey key, TRequest request, CancellationToken cancellationToken = default)
-    // {
-    //     var timer = GetRequestCommandTimer(cancellationToken);
-    //     try
-    //     {
-    //         TResponse? response;
-    //         if (ConnectionState == NatsConnectionState.Open)
-    //         {
-    //             response = await _requestResponseManager.AddAsync<TRequest, TResponse>(key, InboxPrefix, request, timer.Token).ConfigureAwait(false);
-    //         }
-    //         else
-    //         {
-    //             response = await WithConnectAsync(key, request, timer.Token, static (self, key, request, token) =>
-    //             {
-    //                 return self._requestResponseManager.AddAsync<TRequest, TResponse>(key, self.InboxPrefix, request, token);
-    //             }).ConfigureAwait(false);
-    //         }
-    //
-    //         return response;
-    //     }
-    //     finally
-    //     {
-    //         timer.TryReturn();
-    //     }
-    // }
 }

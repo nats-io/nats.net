@@ -2,15 +2,13 @@ using System.Text;
 
 namespace NATS.Client.Core;
 
-/// <summary>
-/// Represents Subject/QueueGroup of NATS
-/// </summary>
-public readonly struct NatsKey : IEquatable<NatsKey>
+// TODO: Move NatsKey to internal namespace
+internal readonly struct NatsKey : IEquatable<NatsKey>
 {
     public readonly string Key;
     internal readonly byte[]? Buffer; // subject with space padding.
 
-    public NatsKey(string key)
+    internal NatsKey(string key)
         : this(key, false)
     {
     }

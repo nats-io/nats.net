@@ -50,7 +50,7 @@ internal sealed class NatsObservable<T> : IObservable<T>
             {
                 var sub = await natsSub.ConfigureAwait(false);
 
-                // TODO: Consider observable support from the API
+                // TODO: Consider removing observable support from the API
                 // * Channels and observables don't go together very well and creating a generic solution is
                 //   problematic. An avid RX developer should be able to hook the channel up easily for their
                 //   scenario.

@@ -1,92 +1,79 @@
-// using System.Buffers;
-// using NATS.Client.Core.Commands;
-//
-// namespace NATS.Client.Core;
-//
-// public partial class NatsConnection : INatsCommand
-// {
-//     // New API doesn't have batching concept
-//
-//     // public ValueTask PublishBatchAsync<T>(IEnumerable<(NatsKey, T?)> values, CancellationToken cancellationToken = default)
-//     // {
-//     //     if (ConnectionState == NatsConnectionState.Open)
-//     //     {
-//     //         var command = AsyncPublishBatchCommand<T>.Create(_pool, GetCommandTimer(cancellationToken), values, Options.Serializer);
-//     //         if (TryEnqueueCommand(command))
-//     //         {
-//     //             return command.AsValueTask();
-//     //         }
-//     //         else
-//     //         {
-//     //             return EnqueueAndAwaitCommandAsync(command);
-//     //         }
-//     //     }
-//     //     else
-//     //     {
-//     //         return WithConnectAsync(values, cancellationToken, static (self, v, token) =>
-//     //         {
-//     //             var command = AsyncPublishBatchCommand<T>.Create(self._pool, self.GetCommandTimer(token), v, self.Options.Serializer);
-//     //             return self.EnqueueAndAwaitCommandAsync(command);
-//     //         });
-//     //     }
-//     // }
-//     //
-//     // public ValueTask PublishBatchAsync<T>(IEnumerable<(string, T?)> values, CancellationToken cancellationToken = default)
-//     // {
-//     //     if (ConnectionState == NatsConnectionState.Open)
-//     //     {
-//     //         var command = AsyncPublishBatchCommand<T>.Create(_pool, GetCommandTimer(cancellationToken), values, Options.Serializer);
-//     //         if (TryEnqueueCommand(command))
-//     //         {
-//     //             return command.AsValueTask();
-//     //         }
-//     //         else
-//     //         {
-//     //             return EnqueueAndAwaitCommandAsync(command);
-//     //         }
-//     //     }
-//     //     else
-//     //     {
-//     //         return WithConnectAsync(values, cancellationToken, static (self, values, token) =>
-//     //         {
-//     //             var command = AsyncPublishBatchCommand<T>.Create(self._pool, self.GetCommandTimer(token), values, self.Options.Serializer);
-//     //             return self.EnqueueAndAwaitCommandAsync(command);
-//     //         });
-//     //     }
-//     // }
-//     //
-//     // public void PostPublishBatch<T>(IEnumerable<(NatsKey, T?)> values)
-//     // {
-//     //     if (ConnectionState == NatsConnectionState.Open)
-//     //     {
-//     //         var command = PublishBatchCommand<T>.Create(_pool, GetCommandTimer(CancellationToken.None), values, Options.Serializer);
-//     //         EnqueueCommandSync(command);
-//     //     }
-//     //     else
-//     //     {
-//     //         WithConnect(values, static (self, v) =>
-//     //         {
-//     //             var command = PublishBatchCommand<T>.Create(self._pool, self.GetCommandTimer(CancellationToken.None), v, self.Options.Serializer);
-//     //             self.EnqueueCommandSync(command);
-//     //         });
-//     //     }
-//     // }
-//     //
-//     // public void PostPublishBatch<T>(IEnumerable<(string, T?)> values)
-//     // {
-//     //     if (ConnectionState == NatsConnectionState.Open)
-//     //     {
-//     //         var command = PublishBatchCommand<T>.Create(_pool, GetCommandTimer(CancellationToken.None), values, Options.Serializer);
-//     //         EnqueueCommandSync(command);
-//     //     }
-//     //     else
-//     //     {
-//     //         WithConnect(values, static (self, v) =>
-//     //         {
-//     //             var command = PublishBatchCommand<T>.Create(self._pool, self.GetCommandTimer(CancellationToken.None), v, self.Options.Serializer);
-//     //             self.EnqueueCommandSync(command);
-//     //         });
-//     //     }
-//     // }
-//     //
-// }
+using System.Buffers;
+using NATS.Client.Core.Commands;
+
+namespace NATS.Client.Core;
+
+public partial class NatsConnection
+{
+    /// <inheritdoc />
+    public ValueTask PublishAsync(string subject, ReadOnlySequence<byte> payload = default, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
+    {
+        var key = new NatsKey(subject, true);
+
+        if (ConnectionState == NatsConnectionState.Open)
+        {
+            var command = AsyncPublishBytesCommand.Create(_pool, GetCommandTimer(cancellationToken), key, payload);
+            if (TryEnqueueCommand(command))
+            {
+                return command.AsValueTask();
+            }
+            else
+            {
+                return EnqueueAndAwaitCommandAsync(command);
+            }
+        }
+        else
+        {
+            return WithConnectAsync(key, payload, cancellationToken, static (self, k, v, token) =>
+            {
+                var command = AsyncPublishBytesCommand.Create(self._pool, self.GetCommandTimer(token), k, v);
+                return self.EnqueueAndAwaitCommandAsync(command);
+            });
+        }
+    }
+
+    /// <inheritdoc />
+    public ValueTask PublishAsync(NatsMsg msg, CancellationToken cancellationToken = default)
+    {
+        return PublishAsync(msg.Subject, msg.Data, default, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public ValueTask PublishAsync<T>(string subject, T data, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
+    {
+        var key = new NatsKey(subject, true);
+
+        NatsKey? replyTo = null;
+        if (!string.IsNullOrEmpty(opts?.ReplyTo))
+        {
+            replyTo = new NatsKey(opts.Value.ReplyTo, true);
+        }
+
+        if (ConnectionState == NatsConnectionState.Open)
+        {
+            var command = AsyncPublishCommand<T>.Create(_pool, GetCommandTimer(cancellationToken), key, replyTo, data, opts?.Serializer ?? Options.Serializer);
+            if (TryEnqueueCommand(command))
+            {
+                return command.AsValueTask();
+            }
+            else
+            {
+                return EnqueueAndAwaitCommandAsync(command);
+            }
+        }
+        else
+        {
+            return WithConnectAsync(key, replyTo, data, cancellationToken, static (self, k, r, v, token) =>
+            {
+                var command = AsyncPublishCommand<T>.Create(self._pool, self.GetCommandTimer(token), k, r, v, self.Options.Serializer);
+                return self.EnqueueAndAwaitCommandAsync(command);
+            });
+        }
+    }
+
+    /// <inheritdoc />
+    public ValueTask PublishAsync<T>(NatsMsg<T> msg, CancellationToken cancellationToken = default)
+    {
+        return PublishAsync<T>(msg.Subject, msg.Data, default, cancellationToken);
+    }
+}

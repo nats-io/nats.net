@@ -4,6 +4,11 @@ using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
 
+// TODO: Clean-up subscription management
+// * Remove internal subscription to same subject
+// * Double check if we need a weak reference SubscriptionManager - Subscription link.
+//   This is to avoid a leak if user was to not dispose the subscription and GC won't collect
+//   it since manager might still hold a reference to the subscription.
 internal sealed class SubscriptionManager : IDisposable
 {
 #pragma warning disable SA1401
@@ -29,8 +34,6 @@ internal sealed class SubscriptionManager : IDisposable
         }
     }
 
-    // XXX
-    // public async ValueTask<IDisposable> AddAsync<T>(string key, NatsKey? queueGroup, Action<T> handler, CancellationToken cancellationToken)
     public async ValueTask<IDisposable> AddAsync<T>(string key, NatsKey? queueGroup, object handler, CancellationToken cancellationToken)
     {
         int sid;

@@ -9,15 +9,15 @@ public readonly struct ShardringNatsCommand
     private readonly NatsConnection _connection;
     private readonly NatsKey _key;
 
-    public ShardringNatsCommand(NatsConnection connection, NatsKey key)
+    public ShardringNatsCommand(NatsConnection connection, string subject)
     {
         _connection = connection;
-        _key = key;
+        _key = new NatsKey(subject);
     }
 
     public NatsConnection GetConnection() => _connection;
 
-    public IObservable<T> AsObservable<T>() => _connection.AsObservable<T>(_key);
+    public IObservable<T> AsObservable<T>() => _connection.AsObservable<T>(_key.Key);
 
     public ValueTask FlushAsync() => _connection.FlushAsync();
 
@@ -71,20 +71,12 @@ public sealed class NatsShardingConnection : IAsyncDisposable
         }
     }
 
-    public ShardringNatsCommand GetCommand(in NatsKey key)
+    public ShardringNatsCommand GetCommand(string subject)
     {
-        Validate(key.Key);
-        var i = GetHashIndex(key.Key);
+        Validate(subject);
+        var i = GetHashIndex(subject);
         var pool = _pools[i];
-        return new ShardringNatsCommand(pool.GetConnection(), key);
-    }
-
-    public ShardringNatsCommand GetCommand(string key)
-    {
-        Validate(key);
-        var i = GetHashIndex(key);
-        var pool = _pools[i];
-        return new ShardringNatsCommand(pool.GetConnection(), new NatsKey(key, true));
+        return new ShardringNatsCommand(pool.GetConnection(), subject);
     }
 
     public async ValueTask DisposeAsync()

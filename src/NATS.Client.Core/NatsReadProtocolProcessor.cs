@@ -203,6 +203,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                                 buffer = buffer.Slice(buffer.GetPosition(3, positionBeforePayload.Value));
                             }
 
+                            // TODO: Clean-up MSG handling
                             // publish to registered handlers.
                             // if (replyTo != null)
                             // {
@@ -457,7 +458,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
 
         // header parsing use Slice frequently so ReadOnlySequence is high cost, should use Span.
         // msgheader is not too long, ok to use stackalloc.
-        // TODO: Possible stack overflow
+        // TODO: Fix possible stack overflow
         Span<byte> buffer = stackalloc byte[(int)msgHeader.Length];
         msgHeader.CopyTo(buffer);
         return ParseMessageHeader(buffer);

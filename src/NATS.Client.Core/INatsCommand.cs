@@ -1,80 +1,74 @@
 using System.Buffers;
-using NATS.Client.Core.Commands;
 
 namespace NATS.Client.Core;
 
-// ***Async or Post***Async(fire-and-forget)
 public interface INatsCommand
 {
     ValueTask FlushAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Send PING command and await PONG. Return value is similar as Round Trip Time (RTT).
+    /// </summary>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
+    /// <returns>A <see cref="ValueTask{TResult}"/> that represents the asynchronous round trip operation.</returns>
     ValueTask<TimeSpan> PingAsync(CancellationToken cancellationToken = default);
 
-    // void PostPing(CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Publishes the message payload to the given subject name, optionally supplying a reply subject.
+    /// </summary>
+    /// <param name="subject">The destination subject to publish to.</param>
+    /// <param name="payload">The message payload data.</param>
+    /// <param name="opts">A <see cref="NatsPubOpts"/> for publishing options.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
+    /// <returns>A <see cref="ValueTask"/> that represents the asynchronous send operation.</returns>
+    ValueTask PublishAsync(string subject, ReadOnlySequence<byte> payload = default, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
 
-    // publish
-    ValueTask PublishAsync(string subject, ReadOnlySequence<byte> data = default, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
-
+    /// <summary>
+    /// Publishes the message payload to the given subject name, optionally supplying a reply subject.
+    /// </summary>
+    /// <param name="msg">A <see cref="NatsMsg"/> representing message details.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
+    /// <returns>A <see cref="ValueTask"/> that represents the asynchronous send operation.</returns>
     ValueTask PublishAsync(NatsMsg msg, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Publishes a serializable message payload to the given subject name, optionally supplying a reply subject.
+    /// </summary>
+    /// <param name="subject">The destination subject to publish to.</param>
+    /// <param name="data">Serializable data object</param>
+    /// <param name="opts">A <see cref="NatsPubOpts"/> for publishing options.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
+    /// <typeparam name="T">Specifies the type of data that may be send to the NATS Server.</typeparam>
+    /// <returns>A <see cref="ValueTask"/> that represents the asynchronous send operation.</returns>
     ValueTask PublishAsync<T>(string subject, T data, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Publishes a serializable message payload to the given subject name, optionally supplying a reply subject.
+    /// </summary>
+    /// <param name="msg">A <see cref="NatsMsg{T}"/> representing message details.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
+    /// <typeparam name="T">Specifies the type of data that may be send to the NATS Server.</typeparam>
+    /// <returns>A <see cref="ValueTask"/> that represents the asynchronous send operation.</returns>
     ValueTask PublishAsync<T>(NatsMsg<T> msg, CancellationToken cancellationToken = default);
 
-    // void PostPublish(string subject, ReadOnlySequence<byte> data = default, in NatsPubOpts? opts = default);
-    //
-    // void PostPublish(NatsMsg msg);
-    //
-    // void PostPublish<T>(string subject, T data, in NatsPubOpts? opts = default);
-    //
-    // void PostPublish<T>(NatsMsg<T> msg);
-
-    // subscribe
+    /// <summary>
+    /// Initiates a subscription to a subject, optionally joining a distributed queue group.
+    /// </summary>
+    /// <param name="subject">The subject name to subscribe to.</param>
+    /// <param name="opts">A <see cref="NatsSubOpts"/> for subscription options.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
+    /// <returns>A <see cref="ValueTask{TResult}"/> that represents the asynchronous send operation.</returns>
     ValueTask<NatsSub> SubscribeAsync(string subject, in NatsSubOpts? opts = default, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Initiates a subscription to a subject, optionally joining a distributed queue group.
+    /// </summary>
+    /// <param name="subject">The subject name to subscribe to.</param>
+    /// <param name="opts">A <see cref="NatsSubOpts"/> for subscription options.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
+    /// <typeparam name="T">Specifies the type of data that may be received from the NATS Server.</typeparam>
+    /// <returns>A <see cref="ValueTask{TResult}"/> that represents the asynchronous send operation.</returns>
     ValueTask<NatsSub<T>> SubscribeAsync<T>(string subject, in NatsSubOpts? opts = default, CancellationToken cancellationToken = default);
 
-    /****************************************************************************************************/
-
-    // ValueTask<IDisposable> QueueSubscribeAsync<T>(in NatsKey key, in NatsKey queueGroup, Action<T> handler, CancellationToken cancellationToken = default);
-    //
-    // ValueTask<IDisposable> QueueSubscribeAsync<T>(in NatsKey key, in NatsKey queueGroup, Func<T, Task> asyncHandler, CancellationToken cancellationToken = default);
-    //
-    // ValueTask<IDisposable> QueueSubscribeAsync<T>(string key, string queueGroup, Action<T> handler, CancellationToken cancellationToken = default);
-    //
-    // ValueTask<IDisposable> QueueSubscribeAsync<T>(string key, string queueGroup, Func<T, Task> asyncHandler, CancellationToken cancellationToken = default);
-    //
-    // ValueTask<TResponse?> RequestAsync<TRequest, TResponse>(NatsKey key, TRequest request, CancellationToken cancellationToken = default);
-    //
-    // ValueTask<TResponse?> RequestAsync<TRequest, TResponse>(string key, TRequest request, CancellationToken cancellationToken = default);
-
-    // ValueTask<IDisposable> SubscribeAsync(in NatsKey key, Action handler, CancellationToken cancellationToken = default);
-    //
-    // ValueTask<IDisposable> SubscribeAsync(string key, Action handler, CancellationToken cancellationToken = default);
-    //
-    // ValueTask<IDisposable> SubscribeAsync<T>(in NatsKey key, Action<T> handler, CancellationToken cancellationToken = default);
-    //
-    // ValueTask<IDisposable> SubscribeAsync<T>(in NatsKey key, Func<T, Task> asyncHandler, CancellationToken cancellationToken = default);
-    //
-    // ValueTask<IDisposable> SubscribeAsync<T>(string key, Action<T> handler, CancellationToken cancellationToken = default);
-    //
-    // ValueTask<IDisposable> SubscribeAsync<T>(string key, Func<T, Task> asyncHandler, CancellationToken cancellationToken = default);
-    // ValueTask<IDisposable> SubscribeRequestAsync<TRequest, TResponse>(in NatsKey key, Func<TRequest, Task<TResponse>> requestHandler, CancellationToken cancellationToken = default);
-    //
-    // ValueTask<IDisposable> SubscribeRequestAsync<TRequest, TResponse>(in NatsKey key, Func<TRequest, TResponse> requestHandler, CancellationToken cancellationToken = default);
-    //
-    // ValueTask<IDisposable> SubscribeRequestAsync<TRequest, TResponse>(string key, Func<TRequest, Task<TResponse>> requestHandler, CancellationToken cancellationToken = default);
-    //
-    // ValueTask<IDisposable> SubscribeRequestAsync<TRequest, TResponse>(string key, Func<TRequest, TResponse> requestHandler, CancellationToken cancellationToken = default);
-
-    /**************************************************************************/
-    IObservable<T> AsObservable<T>(in NatsKey key);
-
-    IObservable<T> AsObservable<T>(string key);
-
-    // void PostDirectWrite(byte[] protocol);
-    //
-    // void PostDirectWrite(DirectWriteCommand command);
-    //
-    // void PostDirectWrite(string protocol, int repeatCount = 1);
+    IObservable<T> AsObservable<T>(string subject);
 }
