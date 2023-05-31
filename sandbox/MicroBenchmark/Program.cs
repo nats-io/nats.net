@@ -38,7 +38,7 @@ public class DefaultRun
 {
 #pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
     private NatsConnection _connection;
-    private NatsKey _key;
+    private string _subject;
     private ConnectionMultiplexer _redis;
     private object _gate;
     private Handler _handler;
@@ -66,7 +66,7 @@ public class DefaultRun
         };
 
         _connection = new NATS.Client.Core.NatsConnection(options);
-        _key = new NatsKey("foobar");
+        _subject = "foobar";
         await _connection.ConnectAsync();
         _gate = new object();
         _redis = StackExchange.Redis.ConnectionMultiplexer.Connect("localhost");
@@ -87,7 +87,7 @@ public class DefaultRun
     {
         for (var i = 0; i < 1; i++)
         {
-            await _connection.PublishAsync(_key, default(MyVector3));
+            await _connection.PublishAsync(_subject, default(MyVector3));
         }
     }
 
@@ -96,7 +96,7 @@ public class DefaultRun
     {
         for (var i = 0; i < 1; i++)
         {
-            await _redis.GetDatabase().PublishAsync(_key.Key, JsonSerializer.Serialize(default(MyVector3)));
+            await _redis.GetDatabase().PublishAsync(_subject, JsonSerializer.Serialize(default(MyVector3)));
         }
     }
 
@@ -110,7 +110,7 @@ public class DefaultRun
 
         for (var i = 0; i < count; i++)
         {
-            _connection.PostPublish(_key, default(MyVector3));
+            _connection.PublishAsync(_subject, default(MyVector3));
         }
 
         lock (_gate)

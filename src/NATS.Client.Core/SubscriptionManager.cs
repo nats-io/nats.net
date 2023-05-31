@@ -4,6 +4,11 @@ using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
 
+// TODO: Clean-up subscription management
+// * Remove internal subscription to same subject
+// * Double check if we need a weak reference SubscriptionManager - Subscription link.
+//   This is to avoid a leak if user was to not dispose the subscription and GC won't collect
+//   it since manager might still hold a reference to the subscription.
 internal sealed class SubscriptionManager : IDisposable
 {
 #pragma warning disable SA1401
@@ -29,7 +34,7 @@ internal sealed class SubscriptionManager : IDisposable
         }
     }
 
-    public async ValueTask<IDisposable> AddAsync<T>(string key, NatsKey? queueGroup, Action<T> handler)
+    public async ValueTask<IDisposable> AddAsync<T>(string key, NatsKey? queueGroup, object handler, CancellationToken cancellationToken)
     {
         int sid;
         RefCountSubscription? subscription;
@@ -64,7 +69,7 @@ internal sealed class SubscriptionManager : IDisposable
         var returnSubscription = new Subscription(subscription, handlerId);
         try
         {
-            await Connection.SubscribeAsync(sid, key, queueGroup).ConfigureAwait(false);
+            await Connection.SubscribeCoreAsync(sid, key, queueGroup, cancellationToken).ConfigureAwait(false);
         }
         catch
         {
@@ -75,7 +80,7 @@ internal sealed class SubscriptionManager : IDisposable
         return returnSubscription;
     }
 
-    public async ValueTask<IDisposable> AddRequestHandlerAsync<TRequest, TResponse>(string key, Func<TRequest, TResponse> handler)
+    public async ValueTask<IDisposable> AddRequestHandlerAsync<TRequest, TResponse>(string key, Func<TRequest, TResponse> handler, CancellationToken cancellationToken)
     {
         int sid;
         RefCountSubscription? subscription;
@@ -112,7 +117,7 @@ internal sealed class SubscriptionManager : IDisposable
         var returnSubscription = new Subscription(subscription, handlerId);
         try
         {
-            await Connection.SubscribeAsync(sid, key, null).ConfigureAwait(false);
+            await Connection.SubscribeCoreAsync(sid, key, null, cancellationToken).ConfigureAwait(false);
         }
         catch
         {
@@ -123,7 +128,7 @@ internal sealed class SubscriptionManager : IDisposable
         return returnSubscription;
     }
 
-    public async ValueTask<IDisposable> AddRequestHandlerAsync<TRequest, TResponse>(string key, Func<TRequest, Task<TResponse>> asyncHandler)
+    public async ValueTask<IDisposable> AddRequestHandlerAsync<TRequest, TResponse>(string key, Func<TRequest, Task<TResponse>> asyncHandler, CancellationToken cancellationToken)
     {
         int sid;
         RefCountSubscription? subscription;
@@ -160,7 +165,7 @@ internal sealed class SubscriptionManager : IDisposable
         var returnSubscription = new Subscription(subscription, handlerId);
         try
         {
-            await Connection.SubscribeAsync(sid, key, null).ConfigureAwait(false);
+            await Connection.SubscribeCoreAsync(sid, key, null, cancellationToken).ConfigureAwait(false);
         }
         catch
         {
@@ -171,7 +176,7 @@ internal sealed class SubscriptionManager : IDisposable
         return returnSubscription;
     }
 
-    public void PublishToClientHandlers(int subscriptionId, in ReadOnlySequence<byte> buffer)
+    public Task PublishToClientHandlersAsync(string subject, string? replyTo, int subscriptionId, in ReadOnlySequence<byte> buffer)
     {
         RefCountSubscription? subscription;
         object?[] list;
@@ -183,11 +188,11 @@ internal sealed class SubscriptionManager : IDisposable
             }
             else
             {
-                return;
+                return Task.CompletedTask;
             }
         }
 
-        MessagePublisher.Publish(subscription.ElementType, Connection.Options, buffer, list);
+        return MessagePublisher.PublishAsync(subject, replyTo, subscription.ElementType, Connection.Options, buffer, list);
     }
 
     public void PublishToRequestHandler(int subscriptionId, in NatsKey replyTo, in ReadOnlySequence<byte> buffer)
@@ -310,6 +315,11 @@ internal sealed class RefCountSubscription
     // Add is in lock(gate)
     public int AddHandler(object handler)
     {
+        if (handler is NatsSubBase natsSub)
+        {
+            natsSub.Sid = SubscriptionId;
+        }
+
         var id = Handlers.Add(handler);
         ReferenceCount++;
         Interlocked.Increment(ref _manager.Connection.Counter.SubscriptionCount);

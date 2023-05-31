@@ -9,57 +9,36 @@ public readonly struct ShardringNatsCommand
     private readonly NatsConnection _connection;
     private readonly NatsKey _key;
 
-    public ShardringNatsCommand(NatsConnection connection, NatsKey key)
+    public ShardringNatsCommand(NatsConnection connection, string subject)
     {
         _connection = connection;
-        _key = key;
+        _key = new NatsKey(subject);
     }
 
     public NatsConnection GetConnection() => _connection;
 
-    public IObservable<T> AsObservable<T>() => _connection.AsObservable<T>(_key);
+    public IObservable<T> AsObservable<T>() => _connection.AsObservable<T>(_key.Key);
 
     public ValueTask FlushAsync() => _connection.FlushAsync();
 
     public ValueTask<TimeSpan> PingAsync() => _connection.PingAsync();
 
-    public void PostPing() => _connection.PostPing();
+    public ValueTask PublishAsync() => _connection.PublishAsync(_key.Key);
 
-    public void PostPublish() => _connection.PostPublish(_key);
+    public ValueTask PublishAsync(byte[] value) => _connection.PublishAsync(_key.Key, value);
 
-    public void PostPublish(byte[] value) => _connection.PostPublish(_key, value);
+    public ValueTask PublishAsync(ReadOnlyMemory<byte> value) => _connection.PublishAsync(_key.Key, value);
 
-    public void PostPublish(ReadOnlyMemory<byte> value) => _connection.PostPublish(_key, value);
+    public ValueTask PublishAsync<T>(T value) => _connection.PublishAsync(_key.Key, value);
 
-    public void PostPublish<T>(T value) => _connection.PostPublish(_key, value);
+    public Task<TResponse> RequestAsync<TRequest, TResponse>(TRequest request) => _connection.RequestAsync<TRequest, TResponse>(_key.Key, request);
 
-    public ValueTask PublishAsync() => _connection.PublishAsync(_key);
+    public Task<NatsReplyUtils> ReplyAsync<TRequest, TResponse>(Func<TRequest, TResponse> reply) => _connection.ReplyAsync<TRequest, TResponse>(_key.Key, reply);
 
-    public ValueTask PublishAsync(byte[] value) => _connection.PublishAsync(_key, value);
+    public ValueTask<NatsSub<T>> SubscribeAsync<T>() => _connection.SubscribeAsync<T>(_key.Key);
 
-    public ValueTask PublishAsync(ReadOnlyMemory<byte> value) => _connection.PublishAsync(_key, value);
-
-    public ValueTask PublishAsync<T>(T value) => _connection.PublishAsync(_key, value);
-
-    public ValueTask<IDisposable> QueueSubscribeAsync<T>(in NatsKey queueGroup, Action<T> handler) => _connection.QueueSubscribeAsync(_key, queueGroup, handler);
-
-    public ValueTask<IDisposable> QueueSubscribeAsync<T>(in NatsKey queueGroup, Func<T, Task> asyncHandler) => _connection.QueueSubscribeAsync(_key, queueGroup, asyncHandler);
-
-    public ValueTask<IDisposable> QueueSubscribeAsync<T>(string queueGroup, Action<T> handler) => _connection.QueueSubscribeAsync(_key.Key, queueGroup, handler);
-
-    public ValueTask<IDisposable> QueueSubscribeAsync<T>(string queueGroup, Func<T, Task> asyncHandler) => _connection.QueueSubscribeAsync(_key.Key, queueGroup, asyncHandler);
-
-    public ValueTask<TResponse?> RequestAsync<TRequest, TResponse>(TRequest request) => _connection.RequestAsync<TRequest, TResponse>(_key, request);
-
-    public ValueTask<IDisposable> SubscribeAsync(Action handler) => _connection.SubscribeAsync(_key, handler);
-
-    public ValueTask<IDisposable> SubscribeAsync<T>(Action<T> handler) => _connection.SubscribeAsync<T>(_key, handler);
-
-    public ValueTask<IDisposable> SubscribeAsync<T>(Func<T, Task> asyncHandler) => _connection.SubscribeAsync<T>(_key, asyncHandler);
-
-    public ValueTask<IDisposable> SubscribeRequestAsync<TRequest, TResponse>(Func<TRequest, Task<TResponse>> requestHandler) => _connection.SubscribeRequestAsync<TRequest, TResponse>(_key, requestHandler);
-
-    public ValueTask<IDisposable> SubscribeRequestAsync<TRequest, TResponse>(Func<TRequest, TResponse> requestHandler) => _connection.SubscribeRequestAsync<TRequest, TResponse>(_key, requestHandler);
+    public ValueTask<NatsSub> SubscribeAsync(string subject, in NatsSubOpts? opts = default, CancellationToken cancellationToken = default) =>
+        _connection.SubscribeAsync(subject, opts, cancellationToken);
 }
 
 public sealed class NatsShardingConnection : IAsyncDisposable
@@ -92,20 +71,12 @@ public sealed class NatsShardingConnection : IAsyncDisposable
         }
     }
 
-    public ShardringNatsCommand GetCommand(in NatsKey key)
+    public ShardringNatsCommand GetCommand(string subject)
     {
-        Validate(key.Key);
-        var i = GetHashIndex(key.Key);
+        Validate(subject);
+        var i = GetHashIndex(subject);
         var pool = _pools[i];
-        return new ShardringNatsCommand(pool.GetConnection(), key);
-    }
-
-    public ShardringNatsCommand GetCommand(string key)
-    {
-        Validate(key);
-        var i = GetHashIndex(key);
-        var pool = _pools[i];
-        return new ShardringNatsCommand(pool.GetConnection(), new NatsKey(key, true));
+        return new ShardringNatsCommand(pool.GetConnection(), subject);
     }
 
     public async ValueTask DisposeAsync()
@@ -116,6 +87,8 @@ public sealed class NatsShardingConnection : IAsyncDisposable
         }
     }
 
+    // TODO: Unsafe really needed?
+    // Benchmark without SkipLocalsInit to see if the performance impact is negligible
     [SkipLocalsInit]
     private int GetHashIndex(string key)
     {

@@ -4,7 +4,7 @@ internal interface IPromise
 {
     void SetResult();
 
-    void SetCanceled(CancellationToken cancellationToken);
+    void SetCanceled();
 
     void SetException(Exception exception);
 }

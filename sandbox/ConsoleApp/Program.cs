@@ -23,15 +23,20 @@ conn.OnConnectingAsync = async x =>
 };
 
 // Server
-await conn.SubscribeRequestAsync("foobar", (int x) => $"Hello {x}");
+await conn.ReplyAsync("foobar", (int x) => $"Hello {x}");
 
 // Client(response: "Hello 100")
 var response = await conn.RequestAsync<int, string>("foobar", 100);
 
 // subscribe
-var subscription = await conn.SubscribeAsync<Person>("foo", x =>
+var subscription = await conn.SubscribeAsync<Person>("foo");
+
+_ = Task.Run(async () =>
 {
-    Console.WriteLine($"Received {x}");
+        await foreach (var msg in subscription.Msgs.ReadAllAsync())
+        {
+            Console.WriteLine($"Received {msg.Data}");
+        }
 });
 
 // publish
@@ -69,7 +74,16 @@ public class Runner : ConsoleAppBase
     [RootCommand]
     public async Task Run()
     {
-        await _command.SubscribeAsync("foo", () => Console.WriteLine("Yeah"));
+        var subscription = await _command.SubscribeAsync("foo");
+
+        _ = Task.Run(async () =>
+        {
+            await foreach (var msg in subscription.Msgs.ReadAllAsync())
+            {
+                Console.WriteLine("Yeah");
+            }
+        });
+
         await _command.PingAsync();
         await _command.PublishAsync("foo");
     }

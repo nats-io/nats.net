@@ -108,7 +108,7 @@ public abstract partial class NatsConnectionTest
         {
             await using var failConnection = server.CreateClientConnection();
             var natsException =
-                await Assert.ThrowsAsync<NatsException>(async () => await failConnection.PublishAsync(key, 0));
+                await Assert.ThrowsAsync<NatsException>(async () => await failConnection.PublishAsync(key.Key, 0));
             Assert.Contains("Authorization Violation", natsException.GetBaseException().Message);
         }
 
@@ -118,18 +118,20 @@ public abstract partial class NatsConnectionTest
         var signalComplete1 = new WaitSignal();
         var signalComplete2 = new WaitSignal();
 
-        await subConnection.SubscribeAsync<int>(key, x =>
+        var natsSub = await subConnection.SubscribeAsync<int>(key.Key);
+        natsSub.Register(x =>
         {
             _output.WriteLine($"Received: {x}");
-            if (x == 1)
+            if (x.Data == 1)
                 signalComplete1.Pulse();
-            if (x == 2)
+            if (x.Data == 2)
                 signalComplete2.Pulse();
         });
+
         await subConnection.PingAsync(); // wait for subscribe complete
 
         _output.WriteLine("AUTHENTICATED CONNECTION");
-        await pubConnection.PublishAsync(key, 1);
+        await pubConnection.PublishAsync(key.Key, 1);
         await signalComplete1;
 
         var disconnectSignal1 = subConnection.ConnectionDisconnectedAsAwaitable();
@@ -146,7 +148,36 @@ public abstract partial class NatsConnectionTest
         await pubConnection.ConnectAsync(); // wait open again
 
         _output.WriteLine("AUTHENTICATED RE-CONNECTION");
-        await pubConnection.PublishAsync(key, 2);
+        await pubConnection.PublishAsync(key.Key, 2);
         await signalComplete2;
+    }
+}
+
+internal static class NatsMsgTestUtils
+{
+    internal static NatsSub<T>? Register<T>(this NatsSub<T>? sub, Action<NatsMsg<T>> action)
+    {
+        if (sub == null) return null;
+        Task.Run(async () =>
+        {
+            await foreach (var natsMsg in sub.Msgs.ReadAllAsync())
+            {
+                action(natsMsg);
+            }
+        });
+        return sub;
+    }
+
+    internal static NatsSub? Register(this NatsSub? sub, Action<NatsMsg> action)
+    {
+        if (sub == null) return null;
+        Task.Run(async () =>
+        {
+            await foreach (var natsMsg in sub.Msgs.ReadAllAsync())
+            {
+                action(natsMsg);
+            }
+        });
+        return sub;
     }
 }
