@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace NATS.Client.Core.Tests;
 
 public class SubscriptionTest
@@ -17,14 +19,16 @@ public class SubscriptionTest
         var sub2 = await conn2.SubscribeAsync<int>("foo.bar");
         var sub3 = await conn2.SubscribeAsync<int>("foo.baz");
 
-        var sync = new WaitSignal(3);
+        var sync1 = 0;
+        var sync2 = 0;
+        var sync3 = 0;
         var count = new WaitSignal(3);
 
         sub1.Register(m =>
         {
             if (m.Data == 0)
             {
-                sync.Pulse();
+                Interlocked.Exchange(ref sync1, 1);
                 return;
             }
 
@@ -35,7 +39,7 @@ public class SubscriptionTest
         {
             if (m.Data == 0)
             {
-                sync.Pulse();
+                Interlocked.Exchange(ref sync2, 1);
                 return;
             }
 
@@ -46,7 +50,7 @@ public class SubscriptionTest
         {
             if (m.Data == 0)
             {
-                sync.Pulse();
+                Interlocked.Exchange(ref sync3, 1);
                 return;
             }
 
@@ -54,25 +58,23 @@ public class SubscriptionTest
         });
 
         // Wait until all subscriptions are active
-        var syncTask = Task.Run(async () =>
+        await Task.Run(async () =>
         {
-            while (sync.Count > 0)
+            while (Volatile.Read(ref sync1) + Volatile.Read(ref sync2) + Volatile.Read(ref sync3) != 3)
             {
                 await Task.Delay(100);
                 await conn1.PublishAsync("foo.bar", 0);
                 await conn1.PublishAsync("foo.baz", 0);
             }
         });
-        await sync;
-        await syncTask;
 
         await conn1.PublishAsync("foo.bar", 1);
-        await conn1.PublishAsync("foo.baz", 2);
+        await conn1.PublishAsync("foo.baz", 1);
 
         // Wait until we received all test data
         await count;
 
-        var frames = tap.ClientFrames;
+        var frames = tap.ClientFrames.OrderBy(f => f.Message).ToList();
 
         foreach (var frame in frames)
         {
@@ -83,6 +85,7 @@ public class SubscriptionTest
         Assert.StartsWith("SUB foo.bar", frames[0].Message);
         Assert.StartsWith("SUB foo.bar", frames[1].Message);
         Assert.StartsWith("SUB foo.baz", frames[2].Message);
+        Assert.False(frames[0].Message.Equals(frames[1].Message), "Should have different SIDs");
 
         await sub1.DisposeAsync();
         await sub2.DisposeAsync();

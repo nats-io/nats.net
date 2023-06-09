@@ -11,11 +11,7 @@ public partial class NatsConnection
             QueueGroup = opts?.QueueGroup ?? string.Empty,
         };
 
-        NatsKey? queueGroup = null;
-        if (!string.IsNullOrWhiteSpace(opts?.QueueGroup))
-        {
-            queueGroup = new NatsKey(opts.Value.QueueGroup);
-        }
+        var queueGroup = opts?.QueueGroup;
 
         if (ConnectionState == NatsConnectionState.Open)
         {
@@ -41,11 +37,7 @@ public partial class NatsConnection
             QueueGroup = opts?.QueueGroup ?? string.Empty,
         };
 
-        NatsKey? queueGroup = null;
-        if (!string.IsNullOrWhiteSpace(opts?.QueueGroup))
-        {
-            queueGroup = new NatsKey(opts.Value.QueueGroup);
-        }
+        var queueGroup = opts?.QueueGroup;
 
         if (ConnectionState == NatsConnectionState.Open)
         {
