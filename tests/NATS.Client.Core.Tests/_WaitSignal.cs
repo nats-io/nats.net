@@ -63,6 +63,8 @@ public class WaitSignal
 
     public Task Task => _tcs.Task;
 
+    public int Count => Volatile.Read(ref _count);
+
     public void Pulse(Exception? exception = null)
     {
         if (exception == null)

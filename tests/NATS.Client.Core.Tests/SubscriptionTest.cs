@@ -9,45 +9,67 @@ public class SubscriptionTest
     [Fact]
     public async Task Subscription_with_same_subject()
     {
-        _output.WriteLine($"### [Subscription_with_same_subject] started");
         await using var server = new NatsServer(_output, TransportType.Tcp, new NatsServerOptions { UseEphemeralPort = true });
-
-        _output.WriteLine($"### [Subscription_with_same_subject] publisher connection");
         var conn1 = server.CreateClientConnection();
-
-        _output.WriteLine($"### [Subscription_with_same_subject] subscriber connection");
         var (conn2, tap) = server.CreateTappedClientConnection();
 
         var sub1 = await conn2.SubscribeAsync<int>("foo.bar");
         var sub2 = await conn2.SubscribeAsync<int>("foo.bar");
         var sub3 = await conn2.SubscribeAsync<int>("foo.baz");
-        _output.WriteLine($"### [Subscription_with_same_subject] subscribers created");
 
-        await conn1.PingAsync();
-        await conn2.PingAsync();
-        _output.WriteLine($"### [Subscription_with_same_subject] pinged");
+        var sync = new WaitSignal(3);
+        var count = new WaitSignal(3);
 
-        var count = new WaitSignal(TimeSpan.FromSeconds(30), 3);
         sub1.Register(m =>
         {
-            _output.WriteLine($"### [Subscription_with_same_subject] sub1 rcv");
-            count.Pulse(m.Subject == "foo.bar" ? null : new Exception($"Subject mismatch {m.Subject}"));
-        }, _output);
-        sub2.Register(m =>
-        {
-            _output.WriteLine($"### [Subscription_with_same_subject] sub2 rcv");
+            if (m.Data == 0)
+            {
+                sync.Pulse();
+                return;
+            }
+
             count.Pulse(m.Subject == "foo.bar" ? null : new Exception($"Subject mismatch {m.Subject}"));
         });
+
+        sub2.Register(m =>
+        {
+            if (m.Data == 0)
+            {
+                sync.Pulse();
+                return;
+            }
+
+            count.Pulse(m.Subject == "foo.bar" ? null : new Exception($"Subject mismatch {m.Subject}"));
+        });
+
         sub3.Register(m =>
         {
-            _output.WriteLine($"### [Subscription_with_same_subject] sub3 rcv");
+            if (m.Data == 0)
+            {
+                sync.Pulse();
+                return;
+            }
+
             count.Pulse(m.Subject == "foo.baz" ? null : new Exception($"Subject mismatch {m.Subject}"));
         });
 
+        // Wait until all subscriptions are active
+        var syncTask = Task.Run(async () =>
+        {
+            while (sync.Count > 0)
+            {
+                await Task.Delay(100);
+                await conn1.PublishAsync("foo.bar", 0);
+                await conn1.PublishAsync("foo.baz", 0);
+            }
+        });
+        await sync;
+        await syncTask;
+
         await conn1.PublishAsync("foo.bar", 1);
         await conn1.PublishAsync("foo.baz", 2);
-        _output.WriteLine($"### [Subscription_with_same_subject] published");
 
+        // Wait until we received all test data
         await count;
 
         var frames = tap.ClientFrames;
@@ -68,6 +90,5 @@ public class SubscriptionTest
         await conn1.DisposeAsync();
         await conn2.DisposeAsync();
         tap.Dispose();
-        _output.WriteLine($"### [Subscription_with_same_subject] done");
     }
 }
