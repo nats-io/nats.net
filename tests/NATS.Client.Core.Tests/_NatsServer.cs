@@ -274,9 +274,9 @@ public class NatsCluster : IAsyncDisposable
             _tcpListener.Start();
 
 
-            var client = 0;
             Task.Run(() =>
             {
+                var client = 0;
                 while (true)
                 {
                     var tcpClient1 = _tcpListener.AcceptTcpClient();
@@ -298,12 +298,17 @@ public class NatsCluster : IAsyncDisposable
 
                         Task.Run(() =>
                         {
-                            while (NatsProtoDump(n, "C", sr1, sw2)) { }
-                        });
-                        while (NatsProtoDump(n, $"S", sr2, sw1)) { }
-                    });
+                                while (NatsProtoDump(n, "C", sr1, sw2))
+                                {
+                                }
+                        }).ContinueWith(t => Log($"Client SND ({n}) loop error: {t.Exception}"), TaskContinuationOptions.OnlyOnFaulted);
+
+                        while (NatsProtoDump(n, $"S", sr2, sw1))
+                        {
+                        }
+                    }).ContinueWith(t => Log($"Client RCV ({n}) loop error: {t.Exception}"), TaskContinuationOptions.OnlyOnFaulted);;
                 }
-            });
+            }).ContinueWith(t => Log($"Server loop error: {t.Exception}"), TaskContinuationOptions.OnlyOnFaulted);
 
             var stopwatch = Stopwatch.StartNew();
             while (stopwatch.Elapsed < TimeSpan.FromSeconds(10))
