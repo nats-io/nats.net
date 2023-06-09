@@ -152,7 +152,7 @@ public class NatsServer : IAsyncDisposable
             throw new Exception("Tapped mode doesn't work wit TLS");
         }
 
-        var tap = new NatsCluster.WireTap(Options.ServerPort);
+        var tap = new NatsCluster.WireTap(Options.ServerPort, _outputHelper);
 
         var client = new NatsConnection(NatsOptions.Default with
         {
@@ -263,13 +263,17 @@ public class NatsCluster : IAsyncDisposable
 
     public class WireTap : IDisposable
     {
+        private readonly ITestOutputHelper _outputHelper;
         private readonly TcpListener _tcpListener;
         private readonly List<Frame> _frames = new();
 
-        public WireTap(int port)
+        public WireTap(int port, ITestOutputHelper outputHelper)
         {
+            _outputHelper = outputHelper;
             _tcpListener = new TcpListener(IPAddress.Loopback, 0);
             _tcpListener.Start();
+
+
             var client = 0;
             Task.Run(() =>
             {
@@ -300,6 +304,7 @@ public class NatsCluster : IAsyncDisposable
                     });
                 }
             });
+
             var stopwatch = Stopwatch.StartNew();
             while (stopwatch.Elapsed < TimeSpan.FromSeconds(10))
             {
@@ -307,12 +312,14 @@ public class NatsCluster : IAsyncDisposable
                 {
                     using var tcpClient = new TcpClient();
                     tcpClient.Connect(IPAddress.Loopback, Port);
+                    Log($"Server started on localhost:{Port}");
                     return;
                 }
                 catch (SocketException)
                 {
                 }
             }
+
             throw new TimeoutException("Wiretap server didn't start");
         }
 
@@ -344,11 +351,8 @@ public class NatsCluster : IAsyncDisposable
 
             if (Regex.IsMatch(line, @"^(INFO|CONNECT|PING|PONG|UNSUB|SUB|\+OK|-ERR)"))
             {
-                lock (_frames)
-                {
-                    if (client > 0)
-                        _frames.Add(new Frame { Client = client, Origin = dir, Message = line });
-                }
+                if (client > 0)
+                    AddFrame(new Frame { Client = client, Origin = dir, Message = line });
 
                 sw.WriteLine(line);
                 sw.Flush();
@@ -399,23 +403,25 @@ public class NatsCluster : IAsyncDisposable
                 sw.Write(buffer);
                 sw.Flush();
 
-                lock (_frames)
-                {
-                    if (client > 0)
-                        _frames.Add(new Frame { Origin = dir, Message = $"{line}\n{new string(' ', dir.Length)} {sb}" });
-                }
+                if (client > 0)
+                    AddFrame(new Frame { Origin = dir, Message = $"{line}\n{new string(' ', dir.Length)} {sb}" });
 
                 return true;
             }
 
-            lock (_frames)
-            {
-                if (client > 0)
-                    _frames.Add(new Frame { Origin = "ERROR", Message = $"Error: Unknown protocol: {line}" });
-            }
+            if (client > 0)
+                AddFrame(new Frame { Origin = "ERROR", Message = $"Error: Unknown protocol: {line}" });
 
             return false;
         }
+
+        private void AddFrame(Frame frame)
+        {
+            Log($"Dump {frame}");
+            lock (_frames) _frames.Add(frame);
+        }
+
+        private void Log(string text) => _outputHelper.WriteLine($"{DateTime.Now:HH:mm:ss.fff} [TAP] {text}");
 
         public record Frame
         {
