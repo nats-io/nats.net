@@ -1,25 +1,16 @@
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Channels;
 
 namespace NATS.Client.Core;
 
 public abstract class NatsSubBase : IAsyncDisposable
 {
-    public string Subject
-    {
-        get => SubjectKey.Key;
-        internal set => SubjectKey = new NatsKey(value);
-    }
+    protected NatsSubBase(string subject) => Subject = subject;
 
-    public string QueueGroup
-    {
-        get => SubjectKey.Key;
-        internal set => SubjectKey = new NatsKey(value);
-    }
+    public string Subject { get; }
 
-    internal NatsKey SubjectKey { get; set; }
-
-    internal NatsKey QueueGroupKey { get; set; }
+    public string? QueueGroup { get; set; }
 
     internal int Sid { get; set; }
 
@@ -65,6 +56,10 @@ public sealed class NatsSub : NatsSubBase
             Data = buffer.ToArray(),
         });
     }
+
+    public NatsSub(string subject) : base(subject)
+    {
+    }
 }
 
 public sealed class NatsSub<T> : NatsSubBase
@@ -99,5 +94,9 @@ public sealed class NatsSub<T> : NatsSubBase
             Subject = subject,
             ReplyTo = replyTo,
         });
+    }
+
+    public NatsSub(string subject) : base(subject)
+    {
     }
 }

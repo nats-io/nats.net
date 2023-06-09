@@ -5,9 +5,8 @@ public partial class NatsConnection
     /// <inheritdoc />
     public ValueTask<NatsSub> SubscribeAsync(string subject, in NatsSubOpts? opts = default, CancellationToken cancellationToken = default)
     {
-        var natsSub = new NatsSub
+        var natsSub = new NatsSub(subject)
         {
-            Subject = subject,
             Connection = this,
             QueueGroup = opts?.QueueGroup ?? string.Empty,
         };
@@ -36,9 +35,8 @@ public partial class NatsConnection
     /// <inheritdoc />
     public ValueTask<NatsSub<T>> SubscribeAsync<T>(string subject, in NatsSubOpts? opts = default, CancellationToken cancellationToken = default)
     {
-        var natsSub = new NatsSub<T>
+        var natsSub = new NatsSub<T>(subject)
         {
-            Subject = subject,
             Connection = this,
             QueueGroup = opts?.QueueGroup ?? string.Empty,
         };

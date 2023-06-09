@@ -27,16 +27,12 @@ public class SubscriptionTest
         await conn2.PingAsync();
         _output.WriteLine($"### [Subscription_with_same_subject] pinged");
 
-        await conn1.PublishAsync("foo.bar", 1);
-        await conn1.PublishAsync("foo.baz", 2);
-        _output.WriteLine($"### [Subscription_with_same_subject] published");
-
         var count = new WaitSignal(TimeSpan.FromSeconds(30), 3);
         sub1.Register(m =>
         {
             _output.WriteLine($"### [Subscription_with_same_subject] sub1 rcv");
             count.Pulse(m.Subject == "foo.bar" ? null : new Exception($"Subject mismatch {m.Subject}"));
-        });
+        }, _output);
         sub2.Register(m =>
         {
             _output.WriteLine($"### [Subscription_with_same_subject] sub2 rcv");
@@ -47,6 +43,11 @@ public class SubscriptionTest
             _output.WriteLine($"### [Subscription_with_same_subject] sub3 rcv");
             count.Pulse(m.Subject == "foo.baz" ? null : new Exception($"Subject mismatch {m.Subject}"));
         });
+
+        await conn1.PublishAsync("foo.bar", 1);
+        await conn1.PublishAsync("foo.baz", 2);
+        _output.WriteLine($"### [Subscription_with_same_subject] published");
+
         await count;
 
         var frames = tap.ClientFrames;

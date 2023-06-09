@@ -155,14 +155,25 @@ public abstract partial class NatsConnectionTest
 
 internal static class NatsMsgTestUtils
 {
-    internal static NatsSub<T>? Register<T>(this NatsSub<T>? sub, Action<NatsMsg<T>> action)
+    internal static NatsSub<T>? Register<T>(this NatsSub<T>? sub, Action<NatsMsg<T>> action, ITestOutputHelper? output = null)
     {
         if (sub == null) return null;
+        var subject = $"{sub.Subject}[{sub.Sid}]";
+        output?.WriteLine($"### Registering subscription ({subject}) callback");
         Task.Run(async () =>
         {
-            await foreach (var natsMsg in sub.Msgs.ReadAllAsync())
+            try
             {
-                action(natsMsg);
+                output?.WriteLine($"### Register subscription ({subject}) callback started");
+                await foreach (var natsMsg in sub.Msgs.ReadAllAsync())
+                {
+                    output?.WriteLine($"### Register subscription ({subject}) callback rcv: {natsMsg.Data}");
+                    action(natsMsg);
+                }
+            }
+            catch (Exception e)
+            {
+                output?.WriteLine($"### Register subscription ({subject}) Error: {e}");
             }
         });
         return sub;
