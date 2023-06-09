@@ -80,6 +80,7 @@ public sealed class NatsServerOptions : IDisposable
 
     private int _disposed;
     private string _routes = string.Empty;
+    private int _ephemeralPort = -1;
 
     public NatsServerOptions()
     {
@@ -106,9 +107,11 @@ public sealed class NatsServerOptions : IDisposable
 
     public string? TlsCaFile { get; init; }
 
+    public bool UseEphemeralPort { get; init; } = false;
+
     public List<string> ExtraConfigs { get; init; } = new();
 
-    public int ServerPort => _lazyServerPort.Value;
+    public int ServerPort => UseEphemeralPort ? Volatile.Read(ref _ephemeralPort) : _lazyServerPort.Value;
 
     public int? ClusteringPort => _lazyClusteringPort.Value;
 
@@ -200,4 +203,6 @@ public sealed class NatsServerOptions : IDisposable
     {
         PortFactory.Value.Enqueue(port);
     }
+
+    public void SetEphemeralPort(int port) => Interlocked.Exchange(ref _ephemeralPort, port);
 }
