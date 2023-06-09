@@ -2,6 +2,6 @@
 <RunSettings>
     <RunConfiguration>
         <MaxCpuCount>1</MaxCpuCount>
-        <TestSessionTimeout>60000</TestSessionTimeout>
+        <TestSessionTimeout>300000</TestSessionTimeout>
     </RunConfiguration>
 </RunSettings>
