@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 
 namespace NATS.Client.Core.Tests;
@@ -12,12 +13,12 @@ public class SubscriptionTest
     public async Task Subscription_with_same_subject()
     {
         await using var server = new NatsServer(_output, TransportType.Tcp, new NatsServerOptions { UseEphemeralPort = true });
-        var conn1 = server.CreateClientConnection();
-        var (conn2, tap) = server.CreateTappedClientConnection();
+        var nats1 = server.CreateClientConnection();
+        var (nats2, proxy) = server.CreateProxiedClientConnection();
 
-        var sub1 = await conn2.SubscribeAsync<int>("foo.bar");
-        var sub2 = await conn2.SubscribeAsync<int>("foo.bar");
-        var sub3 = await conn2.SubscribeAsync<int>("foo.baz");
+        var sub1 = await nats2.SubscribeAsync<int>("foo.bar");
+        var sub2 = await nats2.SubscribeAsync<int>("foo.bar");
+        var sub3 = await nats2.SubscribeAsync<int>("foo.baz");
 
         var sync1 = 0;
         var sync2 = 0;
@@ -57,28 +58,29 @@ public class SubscriptionTest
             count.Pulse(m.Subject == "foo.baz" ? null : new Exception($"Subject mismatch {m.Subject}"));
         });
 
-        // Wait until all subscriptions are active
-        await Task.Run(async () =>
-        {
-            while (Volatile.Read(ref sync1) + Volatile.Read(ref sync2) + Volatile.Read(ref sync3) != 3)
+        // Since subscription and publishing are sent through different connections there is
+        // a race where one or more subscriptions are made after the publishing happens.
+        // So, we make sure subscribers are accepted by the server before we send any test data.
+        await RetryUntil(
+            "all subscriptions are active",
+            () => Volatile.Read(ref sync1) + Volatile.Read(ref sync2) + Volatile.Read(ref sync3) == 3,
+            async () =>
             {
-                await Task.Delay(100);
-                await conn1.PublishAsync("foo.bar", 0);
-                await conn1.PublishAsync("foo.baz", 0);
-            }
-        });
+                await nats1.PublishAsync("foo.bar", 0);
+                await nats1.PublishAsync("foo.baz", 0);
+            });
 
-        await conn1.PublishAsync("foo.bar", 1);
-        await conn1.PublishAsync("foo.baz", 1);
+        await nats1.PublishAsync("foo.bar", 1);
+        await nats1.PublishAsync("foo.baz", 1);
 
         // Wait until we received all test data
         await count;
 
-        var frames = tap.ClientFrames.OrderBy(f => f.Message).ToList();
+        var frames = proxy.ClientFrames.OrderBy(f => f.Message).ToList();
 
         foreach (var frame in frames)
         {
-            _output.WriteLine($"[TAP] {frame}");
+            _output.WriteLine($"[PROXY] {frame}");
         }
 
         Assert.Equal(3, frames.Count);
@@ -90,8 +92,23 @@ public class SubscriptionTest
         await sub1.DisposeAsync();
         await sub2.DisposeAsync();
         await sub3.DisposeAsync();
-        await conn1.DisposeAsync();
-        await conn2.DisposeAsync();
-        tap.Dispose();
+        await nats1.DisposeAsync();
+        await nats2.DisposeAsync();
+        proxy.Dispose();
+    }
+
+    private async Task RetryUntil(string reason, Func<bool> condition, Func<Task> action)
+    {
+        var timeout = TimeSpan.FromSeconds(10);
+        var stopwatch = Stopwatch.StartNew();
+        while (stopwatch.Elapsed < timeout)
+        {
+            await action();
+            if (condition())
+                return;
+            await Task.Delay(50);
+        }
+
+        throw new TimeoutException($"Can't {reason} in time");
     }
 }

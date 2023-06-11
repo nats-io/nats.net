@@ -43,20 +43,28 @@ public class NatsServer : IAsyncDisposable
 
         if (Options.UseEphemeralPort)
         {
-            var portEvent = new ManualResetEventSlim();
+            var tcpPortEvent = new ManualResetEventSlim();
+            var wsPortEvent = new ManualResetEventSlim();
             _processErr = EnumerateWithLogsAsync(
                 stderr,
                 line =>
                 {
                     if (line.Contains("Listening for client connections on"))
                     {
-                        var port = int.Parse(Regex.Match(line, @"connections on [\d\.]+:(\d+)").Groups[1].Value);
-                        Options.SetEphemeralPort(port);
-                        portEvent.Set();
+                        var port = int.Parse(Regex.Match(line, @"connections on [\w\.]+:(\d+)").Groups[1].Value);
+                        Options.SetEphemeralTcpPort(port);
+                        tcpPortEvent.Set();
+                    }
+                    else if (line.Contains("Listening for websocket clients on"))
+                    {
+                        var port = int.Parse(Regex.Match(line, @"websocket clients on ws://[\w\.]+:(\d+)").Groups[1].Value);
+                        Options.SetEphemeralWsPort(port);
+                        wsPortEvent.Set();
                     }
                 },
                 _cancellationTokenSource.Token);
-            portEvent.Wait(TimeSpan.FromSeconds(30));
+            tcpPortEvent.Wait(TimeSpan.FromSeconds(10), _cancellationTokenSource.Token);
+            wsPortEvent.Wait(TimeSpan.FromSeconds(10), _cancellationTokenSource.Token);
         }
         else
         {
@@ -145,23 +153,23 @@ public class NatsServer : IAsyncDisposable
         }
     }
 
-    public (NatsConnection, NatsCluster.WireTap) CreateTappedClientConnection()
+    public (NatsConnection, NatsProxy) CreateProxiedClientConnection()
     {
         if (Options.EnableTls)
         {
             throw new Exception("Tapped mode doesn't work wit TLS");
         }
 
-        var tap = new NatsCluster.WireTap(Options.ServerPort, _outputHelper);
+        var proxy = new NatsProxy(Options.ServerPort, _outputHelper);
 
         var client = new NatsConnection(NatsOptions.Default with
         {
             LoggerFactory = new OutputHelperLoggerFactory(_outputHelper),
-            Url = $"nats://localhost:{tap.Port}",
+            Url = $"nats://localhost:{proxy.Port}",
             ConnectTimeout = TimeSpan.FromSeconds(10),
         });
 
-        return (client, tap);
+        return (client, proxy);
     }
 
     public NatsConnection CreateClientConnection() => CreateClientConnection(NatsOptions.Default);
@@ -260,180 +268,170 @@ public class NatsCluster : IAsyncDisposable
         await Server2.DisposeAsync();
         await Server3.DisposeAsync();
     }
+}
 
-    public class WireTap : IDisposable
+public class NatsProxy : IDisposable
+{
+    private readonly ITestOutputHelper _outputHelper;
+    private readonly TcpListener _tcpListener;
+    private readonly List<Frame> _frames = new();
+
+    public NatsProxy(int port, ITestOutputHelper outputHelper)
     {
-        private readonly ITestOutputHelper _outputHelper;
-        private readonly TcpListener _tcpListener;
-        private readonly List<Frame> _frames = new();
+        _outputHelper = outputHelper;
+        _tcpListener = new TcpListener(IPAddress.Loopback, 0);
+        _tcpListener.Start();
 
-        public WireTap(int port, ITestOutputHelper outputHelper)
+        Task.Run(() =>
         {
-            _outputHelper = outputHelper;
-            _tcpListener = new TcpListener(IPAddress.Loopback, 0);
-            _tcpListener.Start();
-
-            Task.Run(() =>
+            var client = 0;
+            while (true)
             {
-                var client = 0;
-                while (true)
-                {
-                    var tcpClient1 = _tcpListener.AcceptTcpClient();
+                var tcpClient1 = _tcpListener.AcceptTcpClient();
 
-                    var n = client++;
+                var n = client++;
 
-                    var tcpClient2 = new TcpClient("127.0.0.1", port);
+                var tcpClient2 = new TcpClient("127.0.0.1", port);
 
 #pragma warning disable CS4014
+                Task.Run(() =>
+                {
+                    var stream1 = tcpClient1.GetStream();
+                    var sr1 = new StreamReader(stream1, Encoding.ASCII);
+                    var sw1 = new StreamWriter(stream1, Encoding.ASCII);
+
+                    var stream2 = tcpClient2.GetStream();
+                    var sr2 = new StreamReader(stream2, Encoding.ASCII);
+                    var sw2 = new StreamWriter(stream2, Encoding.ASCII);
+
                     Task.Run(() =>
                     {
-                        var stream1 = tcpClient1.GetStream();
-                        var sr1 = new StreamReader(stream1, Encoding.ASCII);
-                        var sw1 = new StreamWriter(stream1, Encoding.ASCII);
-
-                        var stream2 = tcpClient2.GetStream();
-                        var sr2 = new StreamReader(stream2, Encoding.ASCII);
-                        var sw2 = new StreamWriter(stream2, Encoding.ASCII);
-
-                        Task.Run(() =>
-                        {
-                            while (NatsProtoDump(n, "C", sr1, sw2))
-                            {
-                            }
-                        });
-
-                        while (NatsProtoDump(n, $"S", sr2, sw1))
+                        while (NatsProtoDump(n, "C", sr1, sw2))
                         {
                         }
                     });
-                }
-            });
 
-            var stopwatch = Stopwatch.StartNew();
-            while (stopwatch.Elapsed < TimeSpan.FromSeconds(10))
-            {
-                try
-                {
-                    using var tcpClient = new TcpClient();
-                    tcpClient.Connect(IPAddress.Loopback, Port);
-                    Log($"Server started on localhost:{Port}");
-                    return;
-                }
-                catch (SocketException)
-                {
-                }
-            }
-
-            throw new TimeoutException("Wiretap server didn't start");
-        }
-
-        public int Port => ((IPEndPoint)_tcpListener.Server.LocalEndPoint!).Port;
-
-        public IReadOnlyList<Frame> Frames
-        {
-            get
-            {
-                lock (_frames)
-                {
-                    return _frames
-                        .Where(f => !Regex.IsMatch(f.Message, @"^(INFO|CONNECT|PING|PONG|\+OK)"))
-                        .ToList();
-                }
-            }
-        }
-
-        public IReadOnlyList<Frame> ClientFrames => Frames.Where(f => f.Origin == "C").ToList();
-
-        public IReadOnlyList<Frame> ServerFrames => Frames.Where(f => f.Origin == "S").ToList();
-
-        public void Dispose() => _tcpListener.Server.Dispose();
-
-        private bool NatsProtoDump(int client, string dir, TextReader sr, TextWriter sw)
-        {
-            var line = sr.ReadLine();
-            if (line == null) return false;
-
-            if (Regex.IsMatch(line, @"^(INFO|CONNECT|PING|PONG|UNSUB|SUB|\+OK|-ERR)"))
-            {
-                if (client > 0)
-                    AddFrame(new Frame { Client = client, Origin = dir, Message = line });
-
-                sw.WriteLine(line);
-                sw.Flush();
-                return true;
-            }
-
-            var match = Regex.Match(line, @"^(?:PUB|HPUB|MSG|HMSG).*?(\d+)\s*$");
-            if (match.Success)
-            {
-                var size = int.Parse(match.Groups[1].Value);
-                var buffer = new char[size + 2];
-                var span = buffer.AsSpan();
-                while (true)
-                {
-                    var read = sr.Read(span);
-                    if (read == 0) break;
-                    if (read == -1) return false;
-                    span = span[read..];
-                }
-
-                var sb = new StringBuilder();
-                foreach (var c in buffer.AsSpan()[..size])
-                {
-                    switch (c)
+                    while (NatsProtoDump(n, $"S", sr2, sw1))
                     {
-                    case > ' ' and <= '~':
-                        sb.Append(c);
-                        break;
-                    case ' ':
-                        sb.Append(' ');
-                        break;
-                    case '\t':
-                        sb.Append("\\t");
-                        break;
-                    case '\n':
-                        sb.Append("\\n");
-                        break;
-                    case '\r':
-                        sb.Append("\\r");
-                        break;
-                    default:
-                        sb.Append('.');
-                        break;
                     }
-                }
-
-                sw.WriteLine(line);
-                sw.Write(buffer);
-                sw.Flush();
-
-                if (client > 0)
-                    AddFrame(new Frame { Origin = dir, Message = $"{line}\n{new string(' ', dir.Length)} {sb}" });
-
-                return true;
+                });
             }
+        });
 
-            if (client > 0)
-                AddFrame(new Frame { Origin = "ERROR", Message = $"Error: Unknown protocol: {line}" });
-
-            return false;
+        var stopwatch = Stopwatch.StartNew();
+        while (stopwatch.Elapsed < TimeSpan.FromSeconds(10))
+        {
+            try
+            {
+                using var tcpClient = new TcpClient();
+                tcpClient.Connect(IPAddress.Loopback, Port);
+                Log($"Server started on localhost:{Port}");
+                return;
+            }
+            catch (SocketException)
+            {
+            }
         }
 
-        private void AddFrame(Frame frame)
+        throw new TimeoutException("Wiretap server didn't start");
+    }
+
+    public int Port => ((IPEndPoint)_tcpListener.Server.LocalEndPoint!).Port;
+
+    public IReadOnlyList<Frame> Frames
+    {
+        get
         {
-            // Log($"Dump {frame}");
-            lock (_frames) _frames.Add(frame);
-        }
-
-        private void Log(string text) => _outputHelper.WriteLine($"{DateTime.Now:HH:mm:ss.fff} [TAP] {text}");
-
-        public record Frame
-        {
-            public int Client { get; init; }
-
-            public string Origin { get; init; }
-
-            public string Message { get; init; }
+            lock (_frames)
+            {
+                return _frames
+                    .Where(f => !Regex.IsMatch(f.Message, @"^(INFO|CONNECT|PING|PONG|\+OK)"))
+                    .ToList();
+            }
         }
     }
+
+    public IReadOnlyList<Frame> ClientFrames => Frames.Where(f => f.Origin == "C").ToList();
+
+    public IReadOnlyList<Frame> ServerFrames => Frames.Where(f => f.Origin == "S").ToList();
+
+    public void Dispose() => _tcpListener.Server.Dispose();
+
+    private bool NatsProtoDump(int client, string origin, TextReader sr, TextWriter sw)
+    {
+        var message = sr.ReadLine();
+        if (message == null) return false;
+
+        if (Regex.IsMatch(message, @"^(INFO|CONNECT|PING|PONG|UNSUB|SUB|\+OK|-ERR)"))
+        {
+            if (client > 0)
+                AddFrame(new Frame(client, origin, message));
+
+            sw.WriteLine(message);
+            sw.Flush();
+            return true;
+        }
+
+        var match = Regex.Match(message, @"^(?:PUB|HPUB|MSG|HMSG).*?(\d+)\s*$");
+        if (match.Success)
+        {
+            var size = int.Parse(match.Groups[1].Value);
+            var buffer = new char[size + 2];
+            var span = buffer.AsSpan();
+            while (true)
+            {
+                var read = sr.Read(span);
+                if (read == 0) break;
+                if (read == -1) return false;
+                span = span[read..];
+            }
+
+            var sb = new StringBuilder();
+            foreach (var c in buffer.AsSpan()[..size])
+            {
+                switch (c)
+                {
+                case >= ' ' and <= '~':
+                    sb.Append(c);
+                    break;
+                case '\t':
+                    sb.Append("\\t");
+                    break;
+                case '\n':
+                    sb.Append("\\n");
+                    break;
+                case '\r':
+                    sb.Append("\\r");
+                    break;
+                default:
+                    sb.Append('.');
+                    break;
+                }
+            }
+
+            sw.WriteLine(message);
+            sw.Write(buffer);
+            sw.Flush();
+
+            if (client > 0)
+                AddFrame(new Frame(client, origin, Message: $"{message}\\r\\n{sb}"));
+
+            return true;
+        }
+
+        if (client > 0)
+            AddFrame(new Frame(client, Origin: "ERROR", Message: $"Unknown protocol: {message}"));
+
+        return false;
+    }
+
+    private void AddFrame(Frame frame)
+    {
+        // Log($"Dump {frame}");
+        lock (_frames) _frames.Add(frame);
+    }
+
+    private void Log(string text) => _outputHelper.WriteLine($"{DateTime.Now:HH:mm:ss.fff} [PROXY] {text}");
+
+    public record Frame(int Client, string Origin, string Message);
 }

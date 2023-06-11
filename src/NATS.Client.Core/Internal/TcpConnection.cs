@@ -1,6 +1,7 @@
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace NATS.Client.Core.Internal;
 
@@ -27,8 +28,14 @@ internal sealed class TcpConnection : ISocketConnection
         }
 
         _socket.NoDelay = true;
-        _socket.SendBufferSize = 0;
-        _socket.ReceiveBufferSize = 0;
+
+        // Setting buffer sizes to zero throws SocketException on OSX
+        // https://github.com/dotnet/corefx/pull/17853/files
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            _socket.SendBufferSize = 0;
+            _socket.ReceiveBufferSize = 0;
+        }
     }
 
     public Task<Exception> WaitForClosed => _waitForClosedSource.Task;

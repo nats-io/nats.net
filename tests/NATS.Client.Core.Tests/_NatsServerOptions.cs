@@ -80,7 +80,8 @@ public sealed class NatsServerOptions : IDisposable
 
     private int _disposed;
     private string _routes = string.Empty;
-    private int _ephemeralPort = -1;
+    private int _ephemeralTcpPort = -1;
+    private int _ephemeralWsPort = -1;
 
     public NatsServerOptions()
     {
@@ -107,15 +108,16 @@ public sealed class NatsServerOptions : IDisposable
 
     public string? TlsCaFile { get; init; }
 
-    public bool UseEphemeralPort { get; init; } = false;
+    // Use ephemeral ports where possible to reduce intermittent test failures.
+    public bool UseEphemeralPort { get; init; } = true;
 
     public List<string> ExtraConfigs { get; init; } = new();
 
-    public int ServerPort => UseEphemeralPort ? Volatile.Read(ref _ephemeralPort) : _lazyServerPort.Value;
+    public int ServerPort => UseEphemeralPort ? Volatile.Read(ref _ephemeralTcpPort) : _lazyServerPort.Value;
 
     public int? ClusteringPort => _lazyClusteringPort.Value;
 
-    public int? WebSocketPort => _lazyWebSocketPort.Value;
+    public int? WebSocketPort => UseEphemeralPort ? Volatile.Read(ref _ephemeralWsPort) : _lazyWebSocketPort.Value;
 
     public string ConfigFileContents
     {
@@ -170,6 +172,10 @@ public sealed class NatsServerOptions : IDisposable
         _routes = string.Join(",", options.Select(o => $"nats://localhost:{o.ClusteringPort}"));
     }
 
+    public void SetEphemeralTcpPort(int port) => Interlocked.Exchange(ref _ephemeralTcpPort, port);
+
+    public void SetEphemeralWsPort(int port) => Interlocked.Exchange(ref _ephemeralWsPort, port);
+
     public void Dispose()
     {
         if (Interlocked.Increment(ref _disposed) != 1)
@@ -203,6 +209,4 @@ public sealed class NatsServerOptions : IDisposable
     {
         PortFactory.Value.Enqueue(port);
     }
-
-    public void SetEphemeralPort(int port) => Interlocked.Exchange(ref _ephemeralPort, port);
 }
