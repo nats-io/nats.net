@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Text.RegularExpressions;
 
 namespace NATS.Client.Core.Tests;
 
@@ -12,7 +11,7 @@ public class SubscriptionTest
     [Fact]
     public async Task Subscription_with_same_subject()
     {
-        await using var server = new NatsServer(_output, TransportType.Tcp, new NatsServerOptions { UseEphemeralPort = true });
+        await using var server = new NatsServer(_output, TransportType.Tcp);
         var nats1 = server.CreateClientConnection();
         var (nats2, proxy) = server.CreateProxiedClientConnection();
 

@@ -5,13 +5,18 @@ public partial class NatsConnection
     /// <inheritdoc />
     public ValueTask<NatsSub> SubscribeAsync(string subject, in NatsSubOpts? opts = default, CancellationToken cancellationToken = default)
     {
-        var natsSub = new NatsSub(subject)
+        var natsSub = new NatsSub
         {
+            Subject = subject,
             Connection = this,
             QueueGroup = opts?.QueueGroup ?? string.Empty,
         };
 
-        var queueGroup = opts?.QueueGroup;
+        NatsKey? queueGroup = null;
+        if (!string.IsNullOrWhiteSpace(opts?.QueueGroup))
+        {
+            queueGroup = new NatsKey(opts.Value.QueueGroup);
+        }
 
         if (ConnectionState == NatsConnectionState.Open)
         {
@@ -31,13 +36,18 @@ public partial class NatsConnection
     /// <inheritdoc />
     public ValueTask<NatsSub<T>> SubscribeAsync<T>(string subject, in NatsSubOpts? opts = default, CancellationToken cancellationToken = default)
     {
-        var natsSub = new NatsSub<T>(subject)
+        var natsSub = new NatsSub<T>
         {
+            Subject = subject,
             Connection = this,
             QueueGroup = opts?.QueueGroup ?? string.Empty,
         };
 
-        var queueGroup = opts?.QueueGroup;
+        NatsKey? queueGroup = null;
+        if (!string.IsNullOrWhiteSpace(opts?.QueueGroup))
+        {
+            queueGroup = new NatsKey(opts.Value.QueueGroup);
+        }
 
         if (ConnectionState == NatsConnectionState.Open)
         {

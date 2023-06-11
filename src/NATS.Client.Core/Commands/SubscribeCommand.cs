@@ -80,13 +80,13 @@ internal sealed class AsyncSubscribeCommand : AsyncCommandBase<AsyncSubscribeCom
 
 internal sealed class AsyncSubscribeBatchCommand : AsyncCommandBase<AsyncSubscribeBatchCommand>, IBatchCommand
 {
-    private (int subscriptionId, string subject, string? queueGroup)[]? _subscriptions;
+    private (int subscriptionId, string subject, NatsKey? queueGroup)[]? _subscriptions;
 
     private AsyncSubscribeBatchCommand()
     {
     }
 
-    public static AsyncSubscribeBatchCommand Create(ObjectPool pool, CancellationTimer timer, (int subscriptionId, string subject, string? queueGroup)[] subscriptions)
+    public static AsyncSubscribeBatchCommand Create(ObjectPool pool, CancellationTimer timer, (int subscriptionId, string subject, NatsKey? queueGroup)[] subscriptions)
     {
         if (!TryRent(pool, out var result))
         {
@@ -112,7 +112,7 @@ internal sealed class AsyncSubscribeBatchCommand : AsyncCommandBase<AsyncSubscri
             foreach (var (id, subject, queue) in _subscriptions)
             {
                 i++;
-                writer.WriteSubscribe(id, new NatsKey(subject, true), queue == null ? null : new NatsKey(queue, true));
+                writer.WriteSubscribe(id, new NatsKey(subject, true), queue);
             }
         }
 

@@ -195,6 +195,16 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
         return _subscriptionManager.PublishToClientHandlersAsync(subject, replyTo, subscriptionId, buffer);
     }
 
+    internal void PublishToRequestHandler(int subscriptionId, in NatsKey replyTo, in ReadOnlySequence<byte> buffer)
+    {
+        _subscriptionManager.PublishToRequestHandler(subscriptionId, replyTo, buffer);
+    }
+
+    internal void PublishToResponseHandler(int requestId, in ReadOnlySequence<byte> buffer)
+    {
+        _requestResponseManager.PublishToResponseHandler(requestId, buffer);
+    }
+
     internal void ResetPongCount()
     {
         Interlocked.Exchange(ref _pongCount, 0);
@@ -212,9 +222,9 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
     }
 
     // called only internally
-    internal ValueTask SubscribeCoreAsync(int subscriptionId, string subject, in string? queueGroup, CancellationToken cancellationToken)
+    internal ValueTask SubscribeCoreAsync(int subscriptionId, string subject, in NatsKey? queueGroup, CancellationToken cancellationToken)
     {
-        var command = AsyncSubscribeCommand.Create(_pool, GetCommandTimer(cancellationToken), subscriptionId, new NatsKey(subject, true), queueGroup == null ? null : new NatsKey(queueGroup, true));
+        var command = AsyncSubscribeCommand.Create(_pool, GetCommandTimer(cancellationToken), subscriptionId, new NatsKey(subject, true), queueGroup);
         return EnqueueAndAwaitCommandAsync(command);
     }
 

@@ -39,37 +39,8 @@ public class NatsServer : IAsyncDisposable
         outputHelper.WriteLine("ProcessStart: " + cmd + Environment.NewLine + config);
         var (p, stdout, stderr) = ProcessX.GetDualAsyncEnumerable(cmd);
 
-        _processOut = EnumerateWithLogsAsync(stdout, default, _cancellationTokenSource.Token);
-
-        if (Options.UseEphemeralPort)
-        {
-            var tcpPortEvent = new ManualResetEventSlim();
-            var wsPortEvent = new ManualResetEventSlim();
-            _processErr = EnumerateWithLogsAsync(
-                stderr,
-                line =>
-                {
-                    if (line.Contains("Listening for client connections on"))
-                    {
-                        var port = int.Parse(Regex.Match(line, @"connections on [\w\.]+:(\d+)").Groups[1].Value);
-                        Options.SetEphemeralTcpPort(port);
-                        tcpPortEvent.Set();
-                    }
-                    else if (line.Contains("Listening for websocket clients on"))
-                    {
-                        var port = int.Parse(Regex.Match(line, @"websocket clients on ws://[\w\.]+:(\d+)").Groups[1].Value);
-                        Options.SetEphemeralWsPort(port);
-                        wsPortEvent.Set();
-                    }
-                },
-                _cancellationTokenSource.Token);
-            tcpPortEvent.Wait(TimeSpan.FromSeconds(10), _cancellationTokenSource.Token);
-            wsPortEvent.Wait(TimeSpan.FromSeconds(10), _cancellationTokenSource.Token);
-        }
-        else
-        {
-            _processErr = EnumerateWithLogsAsync(stderr, default, _cancellationTokenSource.Token);
-        }
+        _processOut = EnumerateWithLogsAsync(stdout, _cancellationTokenSource.Token);
+        _processErr = EnumerateWithLogsAsync(stderr, _cancellationTokenSource.Token);
 
         // Check for start server
         Task.Run(async () =>
@@ -207,14 +178,13 @@ public class NatsServer : IAsyncDisposable
         };
     }
 
-    private async Task<string[]> EnumerateWithLogsAsync(ProcessAsyncEnumerable enumerable, Action<string>? output, CancellationToken cancellationToken)
+    private async Task<string[]> EnumerateWithLogsAsync(ProcessAsyncEnumerable enumerable, CancellationToken cancellationToken)
     {
         var l = new List<string>();
         try
         {
             await foreach (var item in enumerable.WithCancellation(cancellationToken))
             {
-                output?.Invoke(item);
                 l.Add(item);
             }
         }
