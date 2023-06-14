@@ -62,19 +62,16 @@ internal sealed class SubscriptionManager : IDisposable
 
     public ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte> buffer)
     {
-        Console.WriteLine($"[SMAN] Publish");
         lock (_gate)
         {
             if (_bySid.TryGetValue(sid, out var subRef))
             {
                 if (subRef.TryGetTarget(out var sub))
                 {
-                    Console.WriteLine($"[SMAN] obj ok");
                     return sub.ReceiveAsync(subject, replyTo, buffer);
                 }
                 else
                 {
-                    Console.WriteLine($"[SMAN] obj not found");
                     _logger.LogWarning($"Dead subscription {subject}/{sid}");
                     Remove(sid);
                 }
