@@ -2,55 +2,17 @@ using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core.Commands;
 
-internal sealed class SubscribeCommand : CommandBase<SubscribeCommand>
-{
-    private NatsKey _subject;
-    private NatsKey? _queueGroup;
-    private int _subscriptionId;
-
-    private SubscribeCommand()
-    {
-    }
-
-    public static SubscribeCommand Create(ObjectPool pool, CancellationTimer timer, int subscriptionId, in NatsKey subject, in NatsKey? queueGroup)
-    {
-        if (!TryRent(pool, out var result))
-        {
-            result = new SubscribeCommand();
-        }
-
-        result._subject = subject;
-        result._subscriptionId = subscriptionId;
-        result._queueGroup = queueGroup;
-        result.SetCancellationTimer(timer);
-
-        return result;
-    }
-
-    public override void Write(ProtocolWriter writer)
-    {
-        writer.WriteSubscribe(_subscriptionId, _subject, _queueGroup);
-    }
-
-    protected override void Reset()
-    {
-        _subject = default;
-        _queueGroup = default;
-        _subscriptionId = 0;
-    }
-}
-
 internal sealed class AsyncSubscribeCommand : AsyncCommandBase<AsyncSubscribeCommand>
 {
-    private NatsKey _subject;
-    private NatsKey? _queueGroup;
-    private int _subscriptionId;
+    private string? _subject;
+    private string? _queueGroup;
+    private int _sid;
 
     private AsyncSubscribeCommand()
     {
     }
 
-    public static AsyncSubscribeCommand Create(ObjectPool pool, CancellationTimer timer, int subscriptionId, in NatsKey subject, in NatsKey? queueGroup)
+    public static AsyncSubscribeCommand Create(ObjectPool pool, CancellationTimer timer, int sid, string subject, string? queueGroup)
     {
         if (!TryRent(pool, out var result))
         {
@@ -58,7 +20,7 @@ internal sealed class AsyncSubscribeCommand : AsyncCommandBase<AsyncSubscribeCom
         }
 
         result._subject = subject;
-        result._subscriptionId = subscriptionId;
+        result._sid = sid;
         result._queueGroup = queueGroup;
         result.SetCancellationTimer(timer);
 
@@ -67,26 +29,26 @@ internal sealed class AsyncSubscribeCommand : AsyncCommandBase<AsyncSubscribeCom
 
     public override void Write(ProtocolWriter writer)
     {
-        writer.WriteSubscribe(_subscriptionId, _subject, _queueGroup);
+        writer.WriteSubscribe(_sid, _subject!, _queueGroup);
     }
 
     protected override void Reset()
     {
         _subject = default;
         _queueGroup = default;
-        _subscriptionId = 0;
+        _sid = 0;
     }
 }
 
 internal sealed class AsyncSubscribeBatchCommand : AsyncCommandBase<AsyncSubscribeBatchCommand>, IBatchCommand
 {
-    private (int subscriptionId, string subject, NatsKey? queueGroup)[]? _subscriptions;
+    private (int sid, string subject, string? queueGroup)[]? _subscriptions;
 
     private AsyncSubscribeBatchCommand()
     {
     }
 
-    public static AsyncSubscribeBatchCommand Create(ObjectPool pool, CancellationTimer timer, (int subscriptionId, string subject, NatsKey? queueGroup)[] subscriptions)
+    public static AsyncSubscribeBatchCommand Create(ObjectPool pool, CancellationTimer timer, (int sid, string subject, string? queueGroup)[]? subscriptions)
     {
         if (!TryRent(pool, out var result))
         {
@@ -112,7 +74,7 @@ internal sealed class AsyncSubscribeBatchCommand : AsyncCommandBase<AsyncSubscri
             foreach (var (id, subject, queue) in _subscriptions)
             {
                 i++;
-                writer.WriteSubscribe(id, new NatsKey(subject, true), queue);
+                writer.WriteSubscribe(id, subject, queue);
             }
         }
 

@@ -3,33 +3,30 @@ using System.Threading.Channels;
 
 namespace NATS.Client.Core;
 
-public abstract class NatsSubBase : IAsyncDisposable
+public abstract class NatsSubBase : IDisposable
 {
-    public string Subject
+    internal NatsSubBase(NatsConnection connection, SubscriptionManager manager, string subject, string? queueGroup, int sid)
     {
-        get => SubjectKey.Key;
-        internal set => SubjectKey = new NatsKey(value);
+        Connection = connection;
+        Manager = manager;
+        Subject = subject;
+        QueueGroup = queueGroup;
+        Sid = sid;
     }
 
-    public string QueueGroup
+    public string Subject { get; }
+
+    public string? QueueGroup { get; }
+
+    internal int Sid { get; }
+
+    internal NatsConnection Connection { get; }
+
+    internal SubscriptionManager Manager { get; }
+
+    public virtual void Dispose()
     {
-        get => SubjectKey.Key;
-        internal set => SubjectKey = new NatsKey(value);
-    }
-
-    internal NatsKey SubjectKey { get; set; }
-
-    internal NatsKey QueueGroupKey { get; set; }
-
-    internal int Sid { get; set; }
-
-    internal NatsConnection? Connection { get; set; }
-
-    internal ValueTask<IDisposable> InternalSubscription { get; set; }
-
-    public virtual async ValueTask DisposeAsync()
-    {
-        (await InternalSubscription.ConfigureAwait(false)).Dispose();
+        Manager.Remove(Sid);
     }
 
     internal abstract ValueTask ReceiveAsync(string subject, string? replyTo, ReadOnlySequence<byte> buffer);
@@ -45,24 +42,25 @@ public sealed class NatsSub : NatsSubBase
         AllowSynchronousContinuations = false,
     });
 
+    internal NatsSub(NatsConnection connection, SubscriptionManager manager, string subject, string? queueGroup, int sid)
+        : base(connection, manager, subject, queueGroup, sid)
+    {
+    }
+
     public ChannelReader<NatsMsg> Msgs => _msgs.Reader;
 
-    public override async ValueTask DisposeAsync()
+    public override void Dispose()
     {
-        if (_msgs.Writer.TryComplete())
-        {
-            await base.DisposeAsync().ConfigureAwait(false);
-        }
+        _msgs.Writer.TryComplete();
+        base.Dispose();
     }
 
     internal override ValueTask ReceiveAsync(string subject, string? replyTo, ReadOnlySequence<byte> buffer)
     {
-        return _msgs.Writer.WriteAsync(new NatsMsg
+        return _msgs.Writer.WriteAsync(new NatsMsg(subject, buffer.ToArray())
         {
             Connection = Connection,
-            Subject = subject,
             ReplyTo = replyTo,
-            Data = buffer.ToArray(),
         });
     }
 }
@@ -77,26 +75,26 @@ public sealed class NatsSub<T> : NatsSubBase
         AllowSynchronousContinuations = false,
     });
 
-    public INatsSerializer? Serializer { get; internal set; }
+    internal NatsSub(NatsConnection connection, SubscriptionManager manager, string subject, string? queueGroup, int sid, INatsSerializer serializer)
+        : base(connection, manager, subject, queueGroup, sid) => Serializer = serializer;
 
     public ChannelReader<NatsMsg<T>> Msgs => _msgs.Reader;
 
-    public override async ValueTask DisposeAsync()
+    private INatsSerializer Serializer { get; }
+
+    public override void Dispose()
     {
-        if (_msgs.Writer.TryComplete())
-        {
-            await base.DisposeAsync().ConfigureAwait(false);
-        }
+        _msgs.Writer.TryComplete();
+        base.Dispose();
     }
 
     internal override ValueTask ReceiveAsync(string subject, string? replyTo, ReadOnlySequence<byte> buffer)
     {
-        var serializer = Serializer ?? Connection!.Options.Serializer;
+        var serializer = Serializer;
         var data = serializer.Deserialize<T>(buffer);
-        return _msgs.Writer.WriteAsync(new NatsMsg<T>(data!)
+        return _msgs.Writer.WriteAsync(new NatsMsg<T>(subject, data!)
         {
             Connection = Connection,
-            Subject = subject,
             ReplyTo = replyTo,
         });
     }

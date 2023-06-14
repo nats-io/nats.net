@@ -4,32 +4,32 @@ namespace NATS.Client.Core.Commands;
 
 internal sealed class UnsubscribeCommand : CommandBase<UnsubscribeCommand>
 {
-    private int _subscriptionId;
+    private int _sid;
 
     private UnsubscribeCommand()
     {
     }
 
     // Unsubscribe is fire-and-forget, don't use CancellationTimer.
-    public static UnsubscribeCommand Create(ObjectPool pool, int subscriptionId)
+    public static UnsubscribeCommand Create(ObjectPool pool, int sid)
     {
         if (!TryRent(pool, out var result))
         {
             result = new UnsubscribeCommand();
         }
 
-        result._subscriptionId = subscriptionId;
+        result._sid = sid;
 
         return result;
     }
 
     public override void Write(ProtocolWriter writer)
     {
-        writer.WriteUnsubscribe(_subscriptionId, null);
+        writer.WriteUnsubscribe(_sid, null);
     }
 
     protected override void Reset()
     {
-        _subscriptionId = 0;
+        _sid = 0;
     }
 }

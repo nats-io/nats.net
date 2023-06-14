@@ -21,6 +21,11 @@ public class NatsServer : IAsyncDisposable
     private readonly TransportType _transportType;
     private int _disposed;
 
+    public NatsServer()
+        : this(new NullOutputHelper(), TransportType.Tcp)
+    {
+    }
+
     public NatsServer(ITestOutputHelper outputHelper, TransportType transportType)
         : this(outputHelper, transportType, new NatsServerOptionsBuilder().UseTransport(transportType).Build())
     {
@@ -124,7 +129,7 @@ public class NatsServer : IAsyncDisposable
         }
     }
 
-    public (NatsConnection, NatsProxy) CreateProxiedClientConnection()
+    public (NatsConnection, NatsProxy) CreateProxiedClientConnection(NatsOptions? options = null)
     {
         if (Options.EnableTls)
         {
@@ -133,7 +138,7 @@ public class NatsServer : IAsyncDisposable
 
         var proxy = new NatsProxy(Options.ServerPort, _outputHelper);
 
-        var client = new NatsConnection(NatsOptions.Default with
+        var client = new NatsConnection((options ?? NatsOptions.Default) with
         {
             LoggerFactory = new OutputHelperLoggerFactory(_outputHelper),
             Url = $"nats://localhost:{proxy.Port}",
@@ -404,4 +409,15 @@ public class NatsProxy : IDisposable
     private void Log(string text) => _outputHelper.WriteLine($"{DateTime.Now:HH:mm:ss.fff} [PROXY] {text}");
 
     public record Frame(int Client, string Origin, string Message);
+}
+
+public class NullOutputHelper : ITestOutputHelper
+{
+    public void WriteLine(string message)
+    {
+    }
+
+    public void WriteLine(string format, params object[] args)
+    {
+    }
 }

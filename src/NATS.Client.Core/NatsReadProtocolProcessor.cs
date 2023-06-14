@@ -13,7 +13,6 @@ namespace NATS.Client.Core;
 
 internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
 {
-    private readonly ISocketConnection _socketConnection;
     private readonly NatsConnection _connection;
     private readonly SocketReader _socketReader;
     private readonly Task _readLoop;
@@ -22,15 +21,13 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
     private readonly Task _infoParsed; // wait for an upgrade
     private readonly ConcurrentQueue<AsyncPingCommand> _pingCommands; // wait for pong
     private readonly ILogger<NatsReadProtocolProcessor> _logger;
-    private readonly bool _isEnabledTraceLogging;
     private int _disposed;
 
     public NatsReadProtocolProcessor(ISocketConnection socketConnection, NatsConnection connection, TaskCompletionSource waitForInfoSignal, TaskCompletionSource waitForPongOrErrorSignal, Task infoParsed)
     {
-        _socketConnection = socketConnection;
         _connection = connection;
         _logger = connection.Options.LoggerFactory.CreateLogger<NatsReadProtocolProcessor>();
-        _isEnabledTraceLogging = _logger.IsEnabled(LogLevel.Trace);
+        _logger.IsEnabled(LogLevel.Trace);
         _waitForInfoSignal = waitForInfoSignal;
         _waitForPongOrErrorSignal = waitForPongOrErrorSignal;
         _infoParsed = infoParsed;
@@ -185,7 +182,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                         }
 
                         var msgHeader = buffer.Slice(0, positionBeforePayload.Value);
-                        var (subject, subscriptionId, payloadLength, replyTo, reponseId) = ParseMessageHeader(msgHeader);
+                        var (subject, sid, payloadLength, replyTo, reponseId) = ParseMessageHeader(msgHeader);
 
                         if (payloadLength == 0)
                         {
@@ -203,20 +200,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                                 buffer = buffer.Slice(buffer.GetPosition(3, positionBeforePayload.Value));
                             }
 
-                            // TODO: Clean-up MSG handling
-                            // publish to registered handlers.
-                            // if (replyTo != null)
-                            // {
-                            //     _connection.PublishToRequestHandler(subscriptionId, replyTo.Value, buffer);
-                            // }
-                            // else if (reponseId != null)
-                            // {
-                            //     _connection.PublishToResponseHandler(reponseId.Value, buffer);
-                            // }
-                            // else
-                            {
-                                await _connection.PublishToClientHandlersAsync(subject, replyTo?.Key, subscriptionId, ReadOnlySequence<byte>.Empty).ConfigureAwait(false);
-                            }
+                            await _connection.PublishToClientHandlersAsync(subject, replyTo, sid, ReadOnlySequence<byte>.Empty).ConfigureAwait(false);
                         }
                         else
                         {
@@ -237,19 +221,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
 
                             buffer = buffer.Slice(buffer.GetPosition(2, payloadSlice.End)); // payload + \r\n
 
-                            // publish to registered handlers.
-                            // if (replyTo != null)
-                            // {
-                            //     _connection.PublishToRequestHandler(subscriptionId, replyTo.Value, payloadSlice);
-                            // }
-                            // else if (reponseId != null)
-                            // {
-                            //     _connection.PublishToResponseHandler(reponseId.Value, payloadSlice);
-                            // }
-                            // else
-                            {
-                                await _connection.PublishToClientHandlersAsync(subject, replyTo?.Key, subscriptionId, payloadSlice).ConfigureAwait(false);
-                            }
+                            await _connection.PublishToClientHandlersAsync(subject, replyTo, sid, payloadSlice).ConfigureAwait(false);
                         }
                     }
                     else
@@ -407,12 +379,12 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#msg
     // MSG <subject> <sid> [reply-to] <#bytes>\r\n[payload]
-    private (string subject, int subscriptionId, int payloadLength, NatsKey? replyTo, int? responseId) ParseMessageHeader(ReadOnlySpan<byte> msgHeader)
+    private (string subject, int sid, int payloadLength, string? replyTo, int? responseId) ParseMessageHeader(ReadOnlySpan<byte> msgHeader)
     {
         msgHeader = msgHeader.Slice(4);
         Split(msgHeader, out var subjectBytes, out msgHeader);
-        Split(msgHeader, out var sid, out msgHeader);
-        Split(msgHeader, out var replyToOrBytes, out msgHeader);
+        Split(msgHeader, out var sidBytes, out msgHeader);
+        Split(msgHeader, out var replyToOrSizeBytes, out msgHeader);
 
         var subject = Encoding.ASCII.GetString(subjectBytes);
 
@@ -433,23 +405,23 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                 }
             }
 
-            var subscriptionId = GetInt32(sid);
-            var payloadLength = GetInt32(replyToOrBytes);
-            return (subject, subscriptionId, payloadLength, null, responseId);
+            var sid = GetInt32(sidBytes);
+            var size = GetInt32(replyToOrSizeBytes);
+            return (subject, sid, size, null, responseId);
         }
         else
         {
-            var replyTo = replyToOrBytes;
+            var replyToBytes = replyToOrSizeBytes;
             var bytesSlice = msgHeader;
 
-            var subscriptionId = GetInt32(sid);
+            var sid = GetInt32(sidBytes);
             var payloadLength = GetInt32(bytesSlice);
-            var replyToKey = new NatsKey(Encoding.ASCII.GetString(replyTo));
-            return (subject, subscriptionId, payloadLength, replyToKey, null);
+            var replyTo = Encoding.ASCII.GetString(replyToBytes);
+            return (subject, sid, payloadLength, replyTo, null);
         }
     }
 
-    private (string subject, int subscriptionId, int payloadLength, NatsKey? replyTo, int? responseId) ParseMessageHeader(in ReadOnlySequence<byte> msgHeader)
+    private (string subject, int sid, int payloadLength, string? replyTo, int? responseId) ParseMessageHeader(in ReadOnlySequence<byte> msgHeader)
     {
         if (msgHeader.IsSingleSegment)
         {

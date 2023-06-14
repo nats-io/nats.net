@@ -1,24 +1,34 @@
+using System.Text;
+
 namespace NATS.Client.Core;
 
 public static class NatReplyUtils
 {
-    public static async Task<NatsReplyUtils> ReplyAsync<TRequest, TResponse>(this INatsCommand nats, string subject, Func<TRequest, TResponse> reply)
+    public static async Task<NatsReplyHandle> ReplyAsync<TRequest, TResponse>(this INatsCommand nats, string subject, Func<TRequest, TResponse> reply)
     {
         var sub = await nats.SubscribeAsync<TRequest>(subject).ConfigureAwait(false);
         var reader = Task.Run(async () =>
         {
             await foreach (var msg in sub.Msgs.ReadAllAsync())
             {
-                var response = reply(msg.Data);
-                await msg.ReplyAsync(response).ConfigureAwait(false);
+                try
+                {
+                    var response = reply(msg.Data);
+                    await msg.ReplyAsync(response).ConfigureAwait(false);
+                }
+                catch
+                {
+                    await msg.ReplyAsync(default(TResponse)).ConfigureAwait(false);
+                }
             }
         });
-        return new NatsReplyUtils(sub, reader);
+        return new NatsReplyHandle(sub, reader);
     }
 
     public static async Task<TResponse> RequestAsync<TRequest, TResponse>(this INatsCommand nats, string subject, TRequest request)
     {
-        var replyTo = $"{((NatsConnection)nats).InboxPrefix}.{Guid.NewGuid():N}";
+        var bs = ((NatsConnection)nats).InboxPrefix.ToArray(); // TODO: Fix inbox prefix
+        var replyTo = $"{Encoding.ASCII.GetString(bs)}{Guid.NewGuid():N}";
 
         // TODO: Optimize by using connection wide inbox subscriber
         var sub = await nats.SubscribeAsync<TResponse>(replyTo).ConfigureAwait(false);
@@ -44,18 +54,18 @@ public static class NatReplyUtils
             }
             finally
             {
-                await sub.DisposeAsync().ConfigureAwait(false);
+                sub.Dispose();
             }
         }).ConfigureAwait(false);
     }
 }
 
-public class NatsReplyUtils : IAsyncDisposable
+public class NatsReplyHandle : IAsyncDisposable
 {
     private readonly NatsSubBase _sub;
     private readonly Task _reader;
 
-    internal NatsReplyUtils(NatsSubBase sub, Task reader)
+    internal NatsReplyHandle(NatsSubBase sub, Task reader)
     {
         _sub = sub;
         _reader = reader;
@@ -63,7 +73,7 @@ public class NatsReplyUtils : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        await _sub.DisposeAsync().ConfigureAwait(false);
+        _sub.Dispose();
         await _reader.ConfigureAwait(false);
     }
 }

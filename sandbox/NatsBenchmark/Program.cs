@@ -15,8 +15,6 @@ Console.WriteLine(new { GCSettings.IsServerGC, GCSettings.LatencyMode });
 
 ThreadPool.SetMinThreads(1000, 1000);
 
-var key = new NatsKey("foo");
-
 // var p = PublishCommand<Vector3>.Create(key, new Vector3(), serializer);
 // (p as ICommand).Return();
 try
@@ -79,8 +77,6 @@ namespace NatsBenchmark
             pubConn.ConnectAsync().AsTask().Wait();
             subConn.ConnectAsync().AsTask().Wait();
 
-            var key = new NatsKey(_subject);
-
             var d = subConn.SubscribeAsync(_subject).AsTask().Result.Register(_ =>
             {
                 Interlocked.Increment(ref subCount);
@@ -103,7 +99,7 @@ namespace NatsBenchmark
 
             for (var i = 0; i < testCount; i++)
             {
-                pubConn.PublishAsync(key.Key, payload);
+                pubConn.PublishAsync(_subject, payload);
             }
 
             lock (pubSubLock)
@@ -156,8 +152,6 @@ namespace NatsBenchmark
             pubConn.ConnectAsync().AsTask().Wait();
             subConn.ConnectAsync().AsTask().Wait();
 
-            var key = new NatsKey(_subject);
-
             var d = subConn.SubscribeAsync(_subject).AsTask().Result.Register(_ =>
             {
                 Interlocked.Increment(ref subCount);
@@ -174,7 +168,7 @@ namespace NatsBenchmark
             });
 
             var data = Enumerable.Range(0, 1000)
-                .Select(x => (key, payload))
+                .Select(x => (_subject, payload))
                 .ToArray();
 
             GC.Collect();
@@ -186,9 +180,9 @@ namespace NatsBenchmark
             for (var i = 0; i < to; i++)
             {
                 // pubConn.PostPublishBatch(data!);
-                foreach (var (natsKey, bytes) in data)
+                foreach (var (subject, bytes) in data)
                 {
-                    pubConn.PublishAsync(natsKey.Key, bytes);
+                    pubConn.PublishAsync(subject, bytes);
                 }
             }
 
@@ -242,8 +236,6 @@ namespace NatsBenchmark
             pubConn.ConnectAsync().AsTask().Wait();
             subConn.ConnectAsync().AsTask().Wait();
 
-            var key = new NatsKey(_subject);
-
             var d = subConn.SubscribeAsync(_subject).AsTask().Result.Register(_ =>
             {
                 Interlocked.Increment(ref subCount);
@@ -270,7 +262,7 @@ namespace NatsBenchmark
 
             for (var i = 0; i < testCount; i++)
             {
-                pubConn.PublishAsync(key.Key, payload);
+                pubConn.PublishAsync(_subject, payload);
             }
 
             lock (pubSubLock)
@@ -323,8 +315,6 @@ namespace NatsBenchmark
 
             pubConn.ConnectAsync().AsTask().Wait();
             subConn.ConnectAsync().AsTask().Wait();
-
-            var key = new NatsKey(_subject);
 
             var d = subConn.SubscribeAsync(_subject).AsTask().Result.Register(_ =>
             {
@@ -431,8 +421,6 @@ namespace NatsBenchmark
             pubConn2.ConnectAsync().AsTask().Wait();
             subConn2.ConnectAsync().AsTask().Wait();
 
-            var key = new NatsKey(_subject);
-
             var d = subConn.SubscribeAsync(_subject).AsTask().Result.Register(_ =>
             {
                 Interlocked.Increment(ref subCount);
@@ -470,8 +458,8 @@ namespace NatsBenchmark
             var publishCount = testCount / 2;
             for (var i = 0; i < publishCount; i++)
             {
-                pubConn.PublishAsync(key.Key, payload);
-                pubConn2.PublishAsync(key.Key, payload);
+                pubConn.PublishAsync(_subject, payload);
+                pubConn2.PublishAsync(_subject, payload);
             }
 
             var t1 = Task.Run(() =>
@@ -539,12 +527,10 @@ namespace NatsBenchmark
             var pubConn = new NATS.Client.Core.NatsConnection(options);
             var subConn = new NATS.Client.Core.NatsConnection(options);
 
-            var key = new NatsKey(_subject);
-
             pubConn.ConnectAsync().AsTask().Wait();
             subConn.ConnectAsync().AsTask().Wait();
 
-            var d = subConn.SubscribeAsync<Vector3>(key.Key).AsTask().Result.Register(_ =>
+            var d = subConn.SubscribeAsync<Vector3>(_subject).AsTask().Result.Register(_ =>
             {
                 Interlocked.Increment(ref subCount);
 
@@ -573,7 +559,7 @@ namespace NatsBenchmark
             // JetBrains.Profiler.Api.MemoryProfiler.GetSnapshot("Before");
             for (var i = 0; i < testCount; i++)
             {
-                pubConn.PublishAsync(key.Key, default(Vector3));
+                pubConn.PublishAsync(_subject, default(Vector3));
             }
 
             lock (pubSubLock)

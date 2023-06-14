@@ -7,35 +7,35 @@ namespace NATS.Client.Core;
 public readonly struct ShardringNatsCommand
 {
     private readonly NatsConnection _connection;
-    private readonly NatsKey _key;
+    private readonly string _subject;
 
     public ShardringNatsCommand(NatsConnection connection, string subject)
     {
         _connection = connection;
-        _key = new NatsKey(subject);
+        _subject = subject;
     }
 
     public NatsConnection GetConnection() => _connection;
 
-    public IObservable<T> AsObservable<T>() => _connection.AsObservable<T>(_key.Key);
+    public IObservable<T> AsObservable<T>() => _connection.AsObservable<T>(_subject);
 
     public ValueTask FlushAsync() => _connection.FlushAsync();
 
     public ValueTask<TimeSpan> PingAsync() => _connection.PingAsync();
 
-    public ValueTask PublishAsync() => _connection.PublishAsync(_key.Key);
+    public ValueTask PublishAsync() => _connection.PublishAsync(_subject);
 
-    public ValueTask PublishAsync(byte[] value) => _connection.PublishAsync(_key.Key, value);
+    public ValueTask PublishAsync(byte[] value) => _connection.PublishAsync(_subject, value);
 
-    public ValueTask PublishAsync(ReadOnlyMemory<byte> value) => _connection.PublishAsync(_key.Key, value);
+    public ValueTask PublishAsync(ReadOnlyMemory<byte> value) => _connection.PublishAsync(_subject, value);
 
-    public ValueTask PublishAsync<T>(T value) => _connection.PublishAsync(_key.Key, value);
+    public ValueTask PublishAsync<T>(T value) => _connection.PublishAsync(_subject, value);
 
-    public Task<TResponse> RequestAsync<TRequest, TResponse>(TRequest request) => _connection.RequestAsync<TRequest, TResponse>(_key.Key, request);
+    public Task<TResponse> RequestAsync<TRequest, TResponse>(TRequest request) => _connection.RequestAsync<TRequest, TResponse>(_subject, request);
 
-    public Task<NatsReplyUtils> ReplyAsync<TRequest, TResponse>(Func<TRequest, TResponse> reply) => _connection.ReplyAsync<TRequest, TResponse>(_key.Key, reply);
+    public Task<NatsReplyHandle> ReplyAsync<TRequest, TResponse>(Func<TRequest, TResponse> reply) => _connection.ReplyAsync<TRequest, TResponse>(_subject, reply);
 
-    public ValueTask<NatsSub<T>> SubscribeAsync<T>() => _connection.SubscribeAsync<T>(_key.Key);
+    public ValueTask<NatsSub<T>> SubscribeAsync<T>() => _connection.SubscribeAsync<T>(_subject);
 
     public ValueTask<NatsSub> SubscribeAsync(string subject, in NatsSubOpts? opts = default, CancellationToken cancellationToken = default) =>
         _connection.SubscribeAsync(subject, opts, cancellationToken);

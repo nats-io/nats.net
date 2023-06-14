@@ -43,10 +43,10 @@ Console.ReadLine();
 // ---
 // Clean-up
 Print($"[1][SUB] Unsubscribing '{subject}'...\n");
-await sub1.DisposeAsync();
+sub1.Dispose();
 
 Print($"[2][SUB] Unsubscribing '{subject}'...\n");
-await sub2.DisposeAsync();
+sub2.Dispose();
 
 await Task.WhenAll(task1, task2);
 
