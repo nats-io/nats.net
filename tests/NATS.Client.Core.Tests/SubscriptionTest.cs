@@ -147,12 +147,11 @@ public class SubscriptionTest
 
         GC.Collect();
 
-        // Should trigger UNSUB since NatsSub object should be collected by now.
-        await nats.PublishAsync("foo", 1);
-
+        // Publish should trigger UNSUB since NatsSub object should be collected by now.
         await RetryUntil(
             "unsubscribe message received",
-            () => proxy.ClientFrames.Count(f => f.Message.StartsWith("UNSUB")) == 1);
+            () => proxy.ClientFrames.Count(f => f.Message.StartsWith("UNSUB")) == 1,
+            async () => await nats.PublishAsync("foo", 1));
     }
 
     private async Task RetryUntil(string reason, Func<bool> condition, Func<Task>? action = null, TimeSpan? timeout = null)

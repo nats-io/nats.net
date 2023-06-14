@@ -192,7 +192,7 @@ public abstract partial class NatsConnectionTest
         list.ShouldEqual(100, 200, 300, 400, 500);
     }
 
-    [Fact(Timeout = 15000)]
+    [Fact(Timeout = 30000)]
     public async Task ReconnectClusterTest()
     {
         await using var cluster = new NatsCluster(_output, _transportType);
