@@ -22,7 +22,7 @@ internal sealed class NatsObservable<T> : IObservable<T>
     {
         private readonly IObserver<T> _observer;
         private bool _disposed;
-        private IDisposable? _taskDisposable;
+        private IAsyncDisposable? _taskDisposable;
         private object _gate = new object();
 
         public FireAndForgetDisposable(ValueTask<NatsSub<T>> natsSub, IObserver<T> observer)
@@ -39,7 +39,7 @@ internal sealed class NatsObservable<T> : IObservable<T>
                 _disposed = true;
                 if (_taskDisposable != null)
                 {
-                    _taskDisposable.Dispose();
+                    _ = _taskDisposable.DisposeAsync();
                 }
             }
         }
@@ -70,7 +70,7 @@ internal sealed class NatsObservable<T> : IObservable<T>
                 {
                     if (_disposed)
                     {
-                        _taskDisposable.Dispose();
+                        _ = _taskDisposable.DisposeAsync();
                     }
                 }
             }

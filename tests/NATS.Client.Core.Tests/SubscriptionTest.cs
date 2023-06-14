@@ -88,9 +88,9 @@ public class SubscriptionTest
         Assert.StartsWith("SUB foo.baz", frames[2].Message);
         Assert.False(frames[0].Message.Equals(frames[1].Message), "Should have different SIDs");
 
-        sub1.Dispose();
-        sub2.Dispose();
-        sub3.Dispose();
+        await sub1.DisposeAsync();
+        await sub2.DisposeAsync();
+        await sub3.DisposeAsync();
         await nats1.DisposeAsync();
         await nats2.DisposeAsync();
         proxy.Dispose();

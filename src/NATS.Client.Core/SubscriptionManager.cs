@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 
 namespace NATS.Client.Core;
 
-internal sealed class SubscriptionManager : IDisposable
+internal sealed class SubscriptionManager : IAsyncDisposable
 {
     private readonly ILogger<SubscriptionManager> _logger;
     private readonly object _gate = new();
@@ -30,15 +30,11 @@ internal sealed class SubscriptionManager : IDisposable
     {
         lock (_gate)
         {
-            foreach (var (sid, subRef) in _bySid)
+            foreach (var subRef in _bySid.Values)
             {
                 if (subRef.TryGetTarget(out var sub))
                 {
                     yield return (sub.Sid, sub.Subject, sub.QueueGroup);
-                }
-                else
-                {
-                    _connection.PostUnsubscribe(sid);
                 }
             }
         }
@@ -62,6 +58,7 @@ internal sealed class SubscriptionManager : IDisposable
 
     public ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte> buffer)
     {
+        int? orphanSid = null;
         lock (_gate)
         {
             if (_bySid.TryGetValue(sid, out var subRef))
@@ -73,7 +70,7 @@ internal sealed class SubscriptionManager : IDisposable
                 else
                 {
                     _logger.LogWarning($"Dead subscription {subject}/{sid}");
-                    Remove(sid);
+                    orphanSid = sid;
                 }
             }
             else
@@ -82,30 +79,44 @@ internal sealed class SubscriptionManager : IDisposable
             }
         }
 
+        if (orphanSid != null)
+        {
+            try
+            {
+                return _connection.UnsubscribeAsync(sid);
+            }
+            catch (Exception e)
+            {
+                _logger.LogWarning($"Error unsubscribing ophan SID during publish: {e.GetBaseException().Message}");
+            }
+        }
+
         return ValueTask.CompletedTask;
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         _cts.Cancel();
 
+        WeakReference<NatsSubBase>[] subRefs;
         lock (_gate)
         {
-            foreach (var subRef in _bySid.Values)
-            {
-                if (subRef.TryGetTarget(out var sub))
-                    sub.Dispose();
-            }
-
+            subRefs = _bySid.Values.ToArray();
             _bySid.Clear();
+        }
+
+        foreach (var subRef in subRefs)
+        {
+            if (subRef.TryGetTarget(out var sub))
+                await sub.DisposeAsync().ConfigureAwait(false);
         }
     }
 
-    internal void Remove(int sid)
+    internal ValueTask RemoveAsync(int sid)
     {
         lock (_gate)
             _bySid.Remove(sid, out _);
-        _connection.PostUnsubscribe(sid);
+        return _connection.UnsubscribeAsync(sid);
     }
 
     private async Task CleanupAsync()
@@ -113,6 +124,10 @@ internal sealed class SubscriptionManager : IDisposable
         while (!_cts.Token.IsCancellationRequested)
         {
             await Task.Delay(_cleanupInterval).ConfigureAwait(false);
+
+            // Avoid allocations most of the time
+            List<int>? orphanSids = null;
+
             lock (_gate)
             {
                 foreach (var (sid, subRef) in _bySid)
@@ -123,16 +138,28 @@ internal sealed class SubscriptionManager : IDisposable
                     if (subRef.TryGetTarget(out _))
                         continue;
 
-                    try
-                    {
-                        // NatsSub object GCed, unsubscribe
-                        _connection.PostUnsubscribe(sid);
-                    }
-                    catch (Exception e)
-                    {
-                        _logger.LogWarning($"Error unsubscribing during cleanup: {e.GetBaseException().Message}");
-                    }
+                    // NatsSub object GCed
+                    orphanSids ??= new List<int>();
+                    orphanSids.Add(sid);
                 }
+            }
+
+            if (orphanSids != null)
+                await UnsubscribeSidsAsync(orphanSids).ConfigureAwait(false);
+        }
+    }
+
+    private async ValueTask UnsubscribeSidsAsync(List<int> sids)
+    {
+        foreach (var sid in sids)
+        {
+            try
+            {
+                await _connection.UnsubscribeAsync(sid).ConfigureAwait(false);
+            }
+            catch (Exception e)
+            {
+                _logger.LogWarning($"Error unsubscribing during cleanup: {e.GetBaseException().Message}");
             }
         }
     }
@@ -151,7 +178,7 @@ internal sealed class SubscriptionManager : IDisposable
         }
         catch
         {
-            sub.Dispose();
+            await sub.DisposeAsync().ConfigureAwait(false);
             throw;
         }
     }

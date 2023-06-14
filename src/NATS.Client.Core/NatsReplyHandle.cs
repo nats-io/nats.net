@@ -54,7 +54,7 @@ public static class NatReplyUtils
             }
             finally
             {
-                sub.Dispose();
+                await sub.DisposeAsync().ConfigureAwait(false);
             }
         }).ConfigureAwait(false);
     }
@@ -73,7 +73,7 @@ public class NatsReplyHandle : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        _sub.Dispose();
+        await _sub.DisposeAsync().ConfigureAwait(false);
         await _reader.ConfigureAwait(false);
     }
 }

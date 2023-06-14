@@ -3,7 +3,7 @@ using System.Threading.Channels;
 
 namespace NATS.Client.Core;
 
-public abstract class NatsSubBase : IDisposable
+public abstract class NatsSubBase : IAsyncDisposable
 {
     internal NatsSubBase(NatsConnection connection, SubscriptionManager manager, string subject, string? queueGroup, int sid)
     {
@@ -24,9 +24,9 @@ public abstract class NatsSubBase : IDisposable
 
     internal SubscriptionManager Manager { get; }
 
-    public virtual void Dispose()
+    public virtual ValueTask DisposeAsync()
     {
-        Manager.Remove(Sid);
+        return Manager.RemoveAsync(Sid);
     }
 
     internal abstract ValueTask ReceiveAsync(string subject, string? replyTo, ReadOnlySequence<byte> buffer);
@@ -49,10 +49,10 @@ public sealed class NatsSub : NatsSubBase
 
     public ChannelReader<NatsMsg> Msgs => _msgs.Reader;
 
-    public override void Dispose()
+    public override ValueTask DisposeAsync()
     {
         _msgs.Writer.TryComplete();
-        base.Dispose();
+        return base.DisposeAsync();
     }
 
     internal override ValueTask ReceiveAsync(string subject, string? replyTo, ReadOnlySequence<byte> buffer)
@@ -82,10 +82,10 @@ public sealed class NatsSub<T> : NatsSubBase
 
     private INatsSerializer Serializer { get; }
 
-    public override void Dispose()
+    public override ValueTask DisposeAsync()
     {
         _msgs.Writer.TryComplete();
-        base.Dispose();
+        return base.DisposeAsync();
     }
 
     internal override ValueTask ReceiveAsync(string subject, string? replyTo, ReadOnlySequence<byte> buffer)

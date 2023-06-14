@@ -140,7 +140,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
                 item.SetCanceled();
             }
 
-            _subscriptionManager.Dispose();
+            await _subscriptionManager.DisposeAsync().ConfigureAwait(false);
             _waitForOpenConnection.TrySetCanceled();
             _disposedCancellationTokenSource.Cancel();
         }
@@ -190,23 +190,24 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
         return EnqueueAndAwaitCommandAsync(command);
     }
 
-    // as fire-and-forget operation
-    internal async void PostUnsubscribe(int sid)
+    internal ValueTask UnsubscribeAsync(int sid)
     {
         try
         {
-            await EnqueueCommandAsync(UnsubscribeCommand.Create(_pool, sid)).ConfigureAwait(false);
+            return EnqueueCommandAsync(UnsubscribeCommand.Create(_pool, sid));
         }
         catch (Exception ex)
         {
             // connection is disposed, don't need to unsubscribe command.
             if (_isDisposed)
             {
-                return;
+                return ValueTask.CompletedTask;
             }
 
             _logger.LogError(ex, "Failed to send unsubscribe command.");
         }
+
+        return ValueTask.CompletedTask;
     }
 
     private async ValueTask InitialConnectAsync()

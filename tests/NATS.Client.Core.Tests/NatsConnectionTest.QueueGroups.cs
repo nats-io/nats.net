@@ -89,8 +89,8 @@ public abstract partial class NatsConnectionTest
             Assert.Equal(i, data);
         }
 
-        sub1.Dispose();
-        sub2.Dispose();
+        await sub1.DisposeAsync();
+        await sub2.DisposeAsync();
 
         try
         {
