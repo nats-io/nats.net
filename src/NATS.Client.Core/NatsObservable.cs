@@ -3,18 +3,18 @@ namespace NATS.Client.Core;
 internal sealed class NatsObservable<T> : IObservable<T>
 {
     private readonly NatsConnection _connection;
-    private readonly NatsKey _key;
+    private readonly string _subject;
 
-    public NatsObservable(NatsConnection connection, in NatsKey key)
+    public NatsObservable(NatsConnection connection, string subject)
     {
-        _key = key;
+        _subject = subject;
         _connection = connection;
     }
 
     public IDisposable Subscribe(IObserver<T> observer)
     {
         var disp = new CancellationTokenDisposable();
-        var disp2 = new FireAndForgetDisposable(_connection.SubscribeAsync<T>(_key.Key, cancellationToken: disp.Token), observer);
+        var disp2 = new FireAndForgetDisposable(_connection.SubscribeAsync<T>(_subject, cancellationToken: disp.Token), observer);
         return new Tuple2Disposable(disp, disp2);
     }
 
@@ -66,17 +66,13 @@ internal sealed class NatsObservable<T> : IObservable<T>
 
                 _taskDisposable = sub;
 
-                var task = ValueTask.CompletedTask;
-
                 lock (_gate)
                 {
                     if (_disposed)
                     {
-                        task = _taskDisposable.DisposeAsync();
+                        _ = _taskDisposable.DisposeAsync();
                     }
                 }
-
-                await task.ConfigureAwait(false);
             }
             catch (Exception ex)
             {

@@ -39,6 +39,7 @@ public static class WaitSignalExtensions
 public class WaitSignal
 {
     private TimeSpan _timeout;
+    private int _count;
     private TaskCompletionSource _tcs;
 
     public WaitSignal()
@@ -46,9 +47,15 @@ public class WaitSignal
     {
     }
 
-    public WaitSignal(TimeSpan timeout)
+    public WaitSignal(int count)
+        : this(TimeSpan.FromSeconds(10), count)
+    {
+    }
+
+    public WaitSignal(TimeSpan timeout, int count = 1)
     {
         _timeout = timeout;
+        _count = count;
         _tcs = new TaskCompletionSource();
     }
 
@@ -60,6 +67,11 @@ public class WaitSignal
     {
         if (exception == null)
         {
+            if (Interlocked.Decrement(ref _count) > 0)
+            {
+                return;
+            }
+
             _tcs.TrySetResult();
         }
         else

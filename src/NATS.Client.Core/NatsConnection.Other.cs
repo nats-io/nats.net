@@ -6,7 +6,7 @@ public partial class NatsConnection
 {
     public IObservable<T> AsObservable<T>(string subject)
     {
-        return new NatsObservable<T>(this, new NatsKey(subject, true));
+        return new NatsObservable<T>(this, subject);
     }
 
     public ValueTask FlushAsync(CancellationToken cancellationToken = default)

@@ -3,30 +3,15 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace NATS.Client.Core;
 
-public record NatsMsg : NatsMsgBase
-{
-    public ReadOnlyMemory<byte> Data { get; set; }
-}
+public record NatsMsg(string Subject, ReadOnlyMemory<byte> Data) : NatsMsgBase(Subject);
 
-public abstract record NatsMsgBase
+public record NatsMsg<T>(string Subject, T Data) : NatsMsgBase(Subject);
+
+public abstract record NatsMsgBase(string Subject)
 {
     internal INatsCommand? Connection { get; init; }
 
-    internal NatsKey SubjectKey { get; set; }
-
-    public string Subject
-    {
-        get => SubjectKey.Key;
-        set => SubjectKey = new NatsKey(value);
-    }
-
-    internal NatsKey? ReplyToKey { get; set; }
-
-    public string? ReplyTo
-    {
-        get => ReplyToKey?.Key;
-        set => ReplyToKey = value == null ? null : new NatsKey(value);
-    }
+    public string? ReplyTo { get; init; }
 
     // TODO: Implement headers in NatsMsg
     // public NatsHeaders? Headers
@@ -43,8 +28,7 @@ public abstract record NatsMsgBase
     public ValueTask ReplyAsync(NatsMsg msg, CancellationToken cancellationToken = default)
     {
         CheckReplyPreconditions();
-        msg.SubjectKey = ReplyToKey!.Value;
-        return Connection.PublishAsync(msg, cancellationToken);
+        return Connection.PublishAsync(msg with { Subject = ReplyTo! }, cancellationToken);
     }
 
     public ValueTask ReplyAsync<TReply>(TReply data, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
@@ -56,8 +40,7 @@ public abstract record NatsMsgBase
     public ValueTask ReplyAsync<TReply>(NatsMsg<TReply> msg)
     {
         CheckReplyPreconditions();
-        msg.SubjectKey = ReplyToKey!.Value;
-        return Connection.PublishAsync(msg);
+        return Connection.PublishAsync(msg with { Subject = ReplyTo! });
     }
 
     [MemberNotNull(nameof(Connection))]
@@ -68,24 +51,9 @@ public abstract record NatsMsgBase
             throw new NatsException("unable to send reply; message did not originate from a subscription");
         }
 
-        if (string.IsNullOrEmpty(ReplyToKey?.Key) && ReplyToKey?.Buffer?.Length == 0)
+        if (string.IsNullOrWhiteSpace(ReplyTo))
         {
             throw new NatsException("unable to send reply; ReplyTo is empty");
         }
     }
-
-    private void CheckPublishPreconditions()
-    {
-        if (string.IsNullOrEmpty(SubjectKey.Key) && SubjectKey.Buffer?.Length == 0)
-        {
-            throw new NatsException("unable to publish; Subject is empty");
-        }
-    }
-}
-
-public record NatsMsg<T>(T Data) : NatsMsgBase
-{
-    public T Data { get; set; } = Data;
-
-    public INatsSerializer? Serializer { get; set; }
 }

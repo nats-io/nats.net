@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace NATS.Client.Core;
 
@@ -24,25 +25,28 @@ public sealed class JsonNatsSerializer : INatsSerializer
     };
 
     [ThreadStatic]
-    private static Utf8JsonWriter? jsonWriter;
+    private static Utf8JsonWriter? _jsonWriter;
 
     private readonly JsonSerializerOptions _options;
 
-    public JsonNatsSerializer(JsonSerializerOptions options)
-    {
-        _options = options;
-    }
+    public JsonNatsSerializer(JsonSerializerOptions options) => _options = options;
+
+    public static JsonNatsSerializer Default { get; } =
+        new(new JsonSerializerOptions
+        {
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        });
 
     public int Serialize<T>(ICountableBufferWriter bufferWriter, T? value)
     {
         Utf8JsonWriter writer;
-        if (jsonWriter == null)
+        if (_jsonWriter == null)
         {
-            writer = jsonWriter = new Utf8JsonWriter(bufferWriter, JsonWriterOptions);
+            writer = _jsonWriter = new Utf8JsonWriter(bufferWriter, JsonWriterOptions);
         }
         else
         {
-            writer = jsonWriter;
+            writer = _jsonWriter;
             writer.Reset(bufferWriter);
         }
 
@@ -67,14 +71,8 @@ public sealed class JsonNatsSerializer : INatsSerializer
         {
         }
 
-        public Memory<byte> GetMemory(int sizeHint = 0)
-        {
-            return Array.Empty<byte>();
-        }
+        public Memory<byte> GetMemory(int sizeHint = 0) => Array.Empty<byte>();
 
-        public Span<byte> GetSpan(int sizeHint = 0)
-        {
-            return Array.Empty<byte>();
-        }
+        public Span<byte> GetSpan(int sizeHint = 0) => Array.Empty<byte>();
     }
 }

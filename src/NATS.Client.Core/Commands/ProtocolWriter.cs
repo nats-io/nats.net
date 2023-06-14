@@ -1,6 +1,5 @@
 using System.Buffers;
 using System.Buffers.Text;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using NATS.Client.Core.Internal;
@@ -49,12 +48,12 @@ internal sealed class ProtocolWriter
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#pub
     // PUB <subject> [reply-to] <#bytes>\r\n[payload]
     // To omit the payload, set the payload size to 0, but the second CRLF is still required.
-    public void WritePublish(in NatsKey subject, in NatsKey? replyTo, ReadOnlySequence<byte> payload)
+    public void WritePublish(string subject, string? replyTo, ReadOnlySequence<byte> payload)
     {
         var offset = 0;
         var maxLength = CommandConstants.PubWithPadding.Length
-            + subject.LengthWithSpacePadding
-            + (replyTo == null ? 0 : replyTo.Value.LengthWithSpacePadding)
+            + subject.Length + 1 // with space padding
+            + (replyTo == null ? 0 : replyTo.Length + 1)
             + MaxIntStringLength
             + NewLineLength
             + (int)payload.Length
@@ -65,35 +64,17 @@ internal sealed class ProtocolWriter
         CommandConstants.PubWithPadding.CopyTo(writableSpan);
         offset += CommandConstants.PubWithPadding.Length;
 
-        if (subject.Buffer != null)
-        {
-            subject.Buffer.AsSpan().CopyTo(writableSpan.Slice(offset));
-            offset += subject.Buffer.Length;
-        }
-        else
-        {
-            // Encoding.ASCII.GetBytes(subject.Key.AsSpan(), writableSpan.Slice(offset));
-            subject.Key.WriteASCIIBytes(writableSpan.Slice(offset));
-
-            offset += subject.Key.Length;
-            writableSpan.Slice(offset)[0] = (byte)' ';
-            offset += 1;
-        }
+        subject.WriteASCIIBytes(writableSpan.Slice(offset));
+        offset += subject.Length;
+        writableSpan.Slice(offset)[0] = (byte)' ';
+        offset += 1;
 
         if (replyTo != null)
         {
-            if (replyTo.Value.Buffer != null)
-            {
-                replyTo.Value.Buffer.AsSpan().CopyTo(writableSpan.Slice(offset));
-                offset += replyTo.Value.Buffer.Length;
-            }
-            else
-            {
-                Encoding.ASCII.GetBytes(replyTo.Value.Key.AsSpan(), writableSpan.Slice(offset));
-                offset += replyTo.Value.Key.Length;
-                writableSpan.Slice(offset)[0] = (byte)' ';
-                offset += 1;
-            }
+            replyTo.WriteASCIIBytes(writableSpan.Slice(offset));
+            offset += replyTo.Length;
+            writableSpan.Slice(offset)[0] = (byte)' ';
+            offset += 1;
         }
 
         if (!Utf8Formatter.TryFormat(payload.Length, writableSpan.Slice(offset), out var written))
@@ -118,12 +99,12 @@ internal sealed class ProtocolWriter
         _writer.Advance(offset);
     }
 
-    public void WritePublish<T>(in NatsKey subject, in NatsKey? replyTo, T? value, INatsSerializer serializer)
+    public void WritePublish<T>(string subject, string? replyTo, T? value, INatsSerializer serializer)
     {
         var offset = 0;
         var maxLengthWithoutPayload = CommandConstants.PubWithPadding.Length
-            + subject.LengthWithSpacePadding
-            + (replyTo == null ? 0 : replyTo.Value.LengthWithSpacePadding)
+            + subject.Length + 1
+            + (replyTo == null ? 0 : replyTo.Length + 1)
             + MaxIntStringLength
             + NewLineLength;
 
@@ -132,33 +113,17 @@ internal sealed class ProtocolWriter
         CommandConstants.PubWithPadding.CopyTo(writableSpan);
         offset += CommandConstants.PubWithPadding.Length;
 
-        if (subject.Buffer != null)
-        {
-            subject.Buffer.AsSpan().CopyTo(writableSpan.Slice(offset));
-            offset += subject.Buffer.Length;
-        }
-        else
-        {
-            Encoding.ASCII.GetBytes(subject.Key.AsSpan(), writableSpan.Slice(offset));
-            offset += subject.Key.Length;
-            writableSpan.Slice(offset)[0] = (byte)' ';
-            offset += 1;
-        }
+        subject.WriteASCIIBytes(writableSpan.Slice(offset));
+        offset += subject.Length;
+        writableSpan.Slice(offset)[0] = (byte)' ';
+        offset += 1;
 
         if (replyTo != null)
         {
-            if (replyTo.Value.Buffer != null)
-            {
-                replyTo.Value.Buffer.AsSpan().CopyTo(writableSpan.Slice(offset));
-                offset += replyTo.Value.Buffer.Length;
-            }
-            else
-            {
-                Encoding.ASCII.GetBytes(replyTo.Value.Key.AsSpan(), writableSpan.Slice(offset));
-                offset += replyTo.Value.Key.Length;
-                writableSpan.Slice(offset)[0] = (byte)' ';
-                offset += 1;
-            }
+            replyTo.WriteASCIIBytes(writableSpan.Slice(offset));
+            offset += replyTo.Length;
+            writableSpan.Slice(offset)[0] = (byte)' ';
+            offset += 1;
         }
 
         // Advance for written.
@@ -182,7 +147,7 @@ internal sealed class ProtocolWriter
         WriteConstant(CommandConstants.NewLine);
     }
 
-    public void WritePublish<T>(in NatsKey subject, ReadOnlyMemory<byte> inboxPrefix, int id, T? value, INatsSerializer serializer)
+    public void WritePublish<T>(string subject, ReadOnlyMemory<byte> inboxPrefix, int id, T? value, INatsSerializer serializer)
     {
         Span<byte> idBytes = stackalloc byte[10];
         if (Utf8Formatter.TryFormat(id, idBytes, out var written))
@@ -192,7 +157,7 @@ internal sealed class ProtocolWriter
 
         var offset = 0;
         var maxLengthWithoutPayload = CommandConstants.PubWithPadding.Length
-            + subject.LengthWithSpacePadding
+            + subject.Length + 1
             + (inboxPrefix.Length + idBytes.Length + 1) // with space
             + MaxIntStringLength
             + NewLineLength;
@@ -202,18 +167,10 @@ internal sealed class ProtocolWriter
         CommandConstants.PubWithPadding.CopyTo(writableSpan);
         offset += CommandConstants.PubWithPadding.Length;
 
-        if (subject.Buffer != null)
-        {
-            subject.Buffer.AsSpan().CopyTo(writableSpan.Slice(offset));
-            offset += subject.Buffer.Length;
-        }
-        else
-        {
-            Encoding.ASCII.GetBytes(subject.Key.AsSpan(), writableSpan.Slice(offset));
-            offset += subject.Key.Length;
-            writableSpan.Slice(offset)[0] = (byte)' ';
-            offset += 1;
-        }
+        subject.WriteASCIIBytes(writableSpan.Slice(offset));
+        offset += subject.Length;
+        writableSpan.Slice(offset)[0] = (byte)' ';
+        offset += 1;
 
         // build reply-to
         inboxPrefix.Span.CopyTo(writableSpan.Slice(offset));
@@ -246,13 +203,13 @@ internal sealed class ProtocolWriter
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#sub
     // SUB <subject> [queue group] <sid>
-    public void WriteSubscribe(int subscriptionId, in NatsKey subject, in NatsKey? queueGroup)
+    public void WriteSubscribe(int sid, string subject, string? queueGroup)
     {
         var offset = 0;
 
         var maxLength = CommandConstants.SubWithPadding.Length
-            + subject.LengthWithSpacePadding
-            + (queueGroup == null ? 0 : queueGroup.Value.LengthWithSpacePadding)
+            + subject.Length + 1
+            + (queueGroup == null ? 0 : queueGroup.Length + 1)
             + MaxIntStringLength
             + NewLineLength; // newline
 
@@ -260,36 +217,20 @@ internal sealed class ProtocolWriter
         CommandConstants.SubWithPadding.CopyTo(writableSpan);
         offset += CommandConstants.SubWithPadding.Length;
 
-        if (subject.Buffer != null)
+        subject.WriteASCIIBytes(writableSpan.Slice(offset));
+        offset += subject.Length;
+        writableSpan.Slice(offset)[0] = (byte)' ';
+        offset += 1;
+
+        if (queueGroup != null)
         {
-            subject.Buffer.AsSpan().CopyTo(writableSpan.Slice(offset));
-            offset += subject.Buffer.Length;
-        }
-        else
-        {
-            Encoding.ASCII.GetBytes(subject.Key.AsSpan(), writableSpan.Slice(offset));
-            offset += subject.Key.Length;
+            queueGroup.WriteASCIIBytes(writableSpan.Slice(offset));
+            offset += queueGroup.Length;
             writableSpan.Slice(offset)[0] = (byte)' ';
             offset += 1;
         }
 
-        if (queueGroup != null)
-        {
-            if (queueGroup.Value.Buffer != null)
-            {
-                queueGroup.Value.Buffer.AsSpan().CopyTo(writableSpan.Slice(offset));
-                offset += queueGroup.Value.Buffer.Length;
-            }
-            else
-            {
-                Encoding.ASCII.GetBytes(queueGroup.Value.Key.AsSpan(), writableSpan.Slice(offset));
-                offset += queueGroup.Value.Key.Length;
-                writableSpan.Slice(offset)[0] = (byte)' ';
-                offset += 1;
-            }
-        }
-
-        if (!Utf8Formatter.TryFormat(subscriptionId, writableSpan.Slice(offset), out var written))
+        if (!Utf8Formatter.TryFormat(sid, writableSpan.Slice(offset), out var written))
         {
             throw new NatsException("Can not format integer.");
         }
@@ -304,7 +245,7 @@ internal sealed class ProtocolWriter
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#unsub
     // UNSUB <sid> [max_msgs]
-    public void WriteUnsubscribe(int subscriptionId, int? maxMessages)
+    public void WriteUnsubscribe(int sid, int? maxMessages)
     {
         var offset = 0;
         var maxLength = CommandConstants.UnsubWithPadding.Length
@@ -316,7 +257,7 @@ internal sealed class ProtocolWriter
         CommandConstants.UnsubWithPadding.CopyTo(writableSpan);
         offset += CommandConstants.UnsubWithPadding.Length;
 
-        if (!Utf8Formatter.TryFormat(subscriptionId, writableSpan.Slice(offset), out var written))
+        if (!Utf8Formatter.TryFormat(sid, writableSpan.Slice(offset), out var written))
         {
             throw new NatsException("Can not format integer.");
         }

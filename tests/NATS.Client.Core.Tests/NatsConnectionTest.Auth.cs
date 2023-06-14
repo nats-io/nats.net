@@ -1,5 +1,3 @@
-using System.Text.RegularExpressions;
-
 namespace NATS.Client.Core.Tests;
 
 public abstract partial class NatsConnectionTest
@@ -102,13 +100,13 @@ public abstract partial class NatsConnectionTest
 
         await using var server = new NatsServer(_output, _transportType, serverOptions);
 
-        var key = new NatsKey(Guid.NewGuid().ToString("N"));
+        var subject = Guid.NewGuid().ToString("N");
 
         _output.WriteLine("TRY ANONYMOUS CONNECTION");
         {
             await using var failConnection = server.CreateClientConnection();
             var natsException =
-                await Assert.ThrowsAsync<NatsException>(async () => await failConnection.PublishAsync(key.Key, 0));
+                await Assert.ThrowsAsync<NatsException>(async () => await failConnection.PublishAsync(subject, 0));
             Assert.Contains("Authorization Violation", natsException.GetBaseException().Message);
         }
 
@@ -118,7 +116,7 @@ public abstract partial class NatsConnectionTest
         var signalComplete1 = new WaitSignal();
         var signalComplete2 = new WaitSignal();
 
-        var natsSub = await subConnection.SubscribeAsync<int>(key.Key);
+        var natsSub = await subConnection.SubscribeAsync<int>(subject);
         natsSub.Register(x =>
         {
             _output.WriteLine($"Received: {x}");
@@ -131,7 +129,7 @@ public abstract partial class NatsConnectionTest
         await subConnection.PingAsync(); // wait for subscribe complete
 
         _output.WriteLine("AUTHENTICATED CONNECTION");
-        await pubConnection.PublishAsync(key.Key, 1);
+        await pubConnection.PublishAsync(subject, 1);
         await signalComplete1;
 
         var disconnectSignal1 = subConnection.ConnectionDisconnectedAsAwaitable();
@@ -148,7 +146,7 @@ public abstract partial class NatsConnectionTest
         await pubConnection.ConnectAsync(); // wait open again
 
         _output.WriteLine("AUTHENTICATED RE-CONNECTION");
-        await pubConnection.PublishAsync(key.Key, 2);
+        await pubConnection.PublishAsync(subject, 2);
         await signalComplete2;
     }
 }

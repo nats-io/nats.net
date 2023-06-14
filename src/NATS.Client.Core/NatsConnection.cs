@@ -31,7 +31,6 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
     private readonly WriterState _writerState;
     private readonly ChannelWriter<ICommand> _commandWriter;
     private readonly SubscriptionManager _subscriptionManager;
-    private readonly RequestResponseManager _requestResponseManager;
     private readonly ILogger<NatsConnection> _logger;
     private readonly ObjectPool _pool;
     private readonly CancellationTimerPool _cancellationTimerPool;
@@ -72,7 +71,6 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
         _writerState = new WriterState(options);
         _commandWriter = _writerState.CommandBuffer.Writer;
         _subscriptionManager = new SubscriptionManager(this);
-        _requestResponseManager = new RequestResponseManager(this, _pool);
         InboxPrefix = Encoding.ASCII.GetBytes($"{options.InboxPrefix}{Guid.NewGuid()}.");
         _logger = options.LoggerFactory.CreateLogger<NatsConnection>();
         _clientOptions = new ClientOptions(Options);
@@ -142,8 +140,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
                 item.SetCanceled();
             }
 
-            _subscriptionManager.Dispose();
-            _requestResponseManager.Dispose();
+            await _subscriptionManager.DisposeAsync().ConfigureAwait(false);
             _waitForOpenConnection.TrySetCanceled();
             _disposedCancellationTokenSource.Cancel();
         }
@@ -165,44 +162,9 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
         pingCommand.SetCanceled();
     }
 
-    internal void PostPong()
+    internal ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte> buffer)
     {
-#pragma warning disable CA2012
-        _ = EnqueueCommandAsync(PongCommand.Create(_pool, GetCommandTimer(CancellationToken.None)));
-#pragma warning restore CA2012
-    }
-
-    internal ValueTask SubscribeAsync(int subscriptionId, string subject, in NatsKey? queueGroup)
-    {
-        var command = AsyncSubscribeCommand.Create(_pool, GetCommandTimer(CancellationToken.None), subscriptionId, new NatsKey(subject, true), queueGroup);
-        if (TryEnqueueCommand(command))
-        {
-            return command.AsValueTask();
-        }
-        else
-        {
-            return EnqueueAndAwaitCommandAsync(command);
-        }
-    }
-
-    internal void PostCommand(ICommand command)
-    {
-        _ = EnqueueCommandAsync(command);
-    }
-
-    internal Task PublishToClientHandlersAsync(string subject, string? replyTo, int subscriptionId, in ReadOnlySequence<byte> buffer)
-    {
-        return _subscriptionManager.PublishToClientHandlersAsync(subject, replyTo, subscriptionId, buffer);
-    }
-
-    internal void PublishToRequestHandler(int subscriptionId, in NatsKey replyTo, in ReadOnlySequence<byte> buffer)
-    {
-        _subscriptionManager.PublishToRequestHandler(subscriptionId, replyTo, buffer);
-    }
-
-    internal void PublishToResponseHandler(int requestId, in ReadOnlySequence<byte> buffer)
-    {
-        _requestResponseManager.PublishToResponseHandler(requestId, buffer);
+        return _subscriptionManager.PublishToClientHandlersAsync(subject, replyTo, sid, buffer);
     }
 
     internal void ResetPongCount()
@@ -222,29 +184,30 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
     }
 
     // called only internally
-    internal ValueTask SubscribeCoreAsync(int subscriptionId, string subject, in NatsKey? queueGroup, CancellationToken cancellationToken)
+    internal ValueTask SubscribeCoreAsync(int sid, string subject, string? queueGroup, CancellationToken cancellationToken)
     {
-        var command = AsyncSubscribeCommand.Create(_pool, GetCommandTimer(cancellationToken), subscriptionId, new NatsKey(subject, true), queueGroup);
+        var command = AsyncSubscribeCommand.Create(_pool, GetCommandTimer(cancellationToken), sid, subject, queueGroup);
         return EnqueueAndAwaitCommandAsync(command);
     }
 
-    // as fire-and-forget operation
-    internal async void PostUnsubscribe(int subscriptionId)
+    internal ValueTask UnsubscribeAsync(int sid)
     {
         try
         {
-            await EnqueueCommandAsync(UnsubscribeCommand.Create(_pool, subscriptionId)).ConfigureAwait(false);
+            return EnqueueCommandAsync(UnsubscribeCommand.Create(_pool, sid));
         }
         catch (Exception ex)
         {
             // connection is disposed, don't need to unsubscribe command.
             if (_isDisposed)
             {
-                return;
+                return ValueTask.CompletedTask;
             }
 
             _logger.LogError(ex, "Failed to send unsubscribe command.");
         }
+
+        return ValueTask.CompletedTask;
     }
 
     private async ValueTask InitialConnectAsync()
@@ -421,7 +384,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
             {
                 // Add SUBSCRIBE command to priority lane
                 var subscribeCommand =
-                    AsyncSubscribeBatchCommand.Create(_pool, GetCommandTimer(CancellationToken.None), _subscriptionManager.GetExistingSubscriptions());
+                    AsyncSubscribeBatchCommand.Create(_pool, GetCommandTimer(CancellationToken.None), _subscriptionManager.GetExistingSubscriptions().ToArray());
                 _writerState.PriorityCommands.Add(subscribeCommand);
             }
 
@@ -456,7 +419,6 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
                 _waitForOpenConnection.TrySetCanceled();
                 _waitForOpenConnection = new TaskCompletionSource();
                 _pingTimerCancellationTokenSource?.Cancel();
-                _requestResponseManager.Reset();
             }
 
             // Invoke after state changed

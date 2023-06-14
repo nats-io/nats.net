@@ -1,5 +1,3 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -29,6 +27,7 @@ namespace NATS.Client.Core;
 /// <param name="CommandPoolSize"></param>
 /// <param name="RequestTimeout"></param>
 /// <param name="CommandTimeout"></param>
+/// <param name="SubscriptionCleanUpInterval"></param>
 /// <param name="WriterCommandBufferLimit"></param>
 public sealed record NatsOptions
 (
@@ -53,6 +52,7 @@ public sealed record NatsOptions
     int CommandPoolSize,
     TimeSpan RequestTimeout,
     TimeSpan CommandTimeout,
+    TimeSpan SubscriptionCleanUpInterval,
     int? WriterCommandBufferLimit)
 {
     public static readonly NatsOptions Default = new(
@@ -62,7 +62,7 @@ public sealed record NatsOptions
         Verbose: false,
         AuthOptions: NatsAuthOptions.Default,
         TlsOptions: TlsOptions.Default,
-        Serializer: new JsonNatsSerializer(new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull }),
+        Serializer: JsonNatsSerializer.Default,
         LoggerFactory: NullLoggerFactory.Instance,
         WriterBufferSize: 65534, // 32767
         ReaderBufferSize: 1048576,
@@ -77,6 +77,7 @@ public sealed record NatsOptions
         CommandPoolSize: 256,
         RequestTimeout: TimeSpan.FromMinutes(1),
         CommandTimeout: TimeSpan.FromMinutes(1),
+        SubscriptionCleanUpInterval: TimeSpan.FromMinutes(5),
         WriterCommandBufferLimit: null);
 
     internal NatsUri[] GetSeedUris()

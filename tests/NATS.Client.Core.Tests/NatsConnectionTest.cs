@@ -1,4 +1,7 @@
+using System.Diagnostics;
 using System.Text;
+using System.Threading.Channels;
+using Xunit.Sdk;
 
 namespace NATS.Client.Core.Tests;
 
@@ -21,11 +24,12 @@ public abstract partial class NatsConnectionTest
         await using var subConnection = server.CreateClientConnection();
         await using var pubConnection = server.CreateClientConnection();
 
-        var key = new NatsKey(Guid.NewGuid().ToString("N"));
+        var subject = Guid.NewGuid().ToString("N");
         var signalComplete = new WaitSignal();
 
         var list = new List<int>();
-        (await subConnection.SubscribeAsync<int>(key.Key)).Register(x =>
+        await using var sub = await subConnection.SubscribeAsync<int>(subject);
+        sub.Register(x =>
         {
             _output.WriteLine($"Received: {x.Data}");
             list.Add(x.Data);
@@ -38,7 +42,7 @@ public abstract partial class NatsConnectionTest
 
         for (var i = 0; i < 10; i++)
         {
-            await pubConnection.PublishAsync(key.Key, i);
+            await pubConnection.PublishAsync(subject, i);
         }
 
         await signalComplete;
@@ -95,10 +99,10 @@ public abstract partial class NatsConnectionTest
         await using var subConnection = server.CreateClientConnection(options);
         await using var pubConnection = server.CreateClientConnection(options);
 
-        var key = Guid.NewGuid().ToString();
+        var subject = Guid.NewGuid().ToString();
         var text = new StringBuilder(minSize).Insert(0, "a", minSize).ToString();
 
-        await subConnection.ReplyAsync<int, string>(key, x =>
+        await using var replyHandle = await subConnection.ReplyAsync<int, string>(subject, x =>
         {
             if (x == 100)
                 throw new Exception();
@@ -107,7 +111,7 @@ public abstract partial class NatsConnectionTest
 
         await Task.Delay(1000);
 
-        var v = await pubConnection.RequestAsync<int, string>(key, 9999);
+        var v = await pubConnection.RequestAsync<int, string>(subject, 9999);
         v.Should().Be(text + 9999);
 
         // server exception handling
@@ -188,7 +192,7 @@ public abstract partial class NatsConnectionTest
         list.ShouldEqual(100, 200, 300, 400, 500);
     }
 
-    [Fact(Timeout = 15000)]
+    [Fact(Timeout = 30000)]
     public async Task ReconnectClusterTest()
     {
         await using var cluster = new NatsCluster(_output, _transportType);

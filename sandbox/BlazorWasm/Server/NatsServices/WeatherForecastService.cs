@@ -12,7 +12,7 @@ public class WeatherForecastService : IHostedService, IAsyncDisposable
 
     private readonly ILogger<WeatherForecastService> _logger;
     private readonly INatsCommand _natsCommand;
-    private NatsReplyUtils? _replyHandle;
+    private NatsReplyHandle? _replyHandle;
 
     public WeatherForecastService(ILogger<WeatherForecastService> logger, INatsCommand natsCommand)
     {
