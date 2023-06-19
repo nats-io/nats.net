@@ -11,6 +11,8 @@ public partial class NatsConnection
         var replyTo = opts?.ReplyTo;
         var headers = opts?.Headers;
 
+        headers?.SetReadOnly();
+
         if (ConnectionState == NatsConnectionState.Open)
         {
             var command = AsyncPublishBytesCommand.Create(_pool, GetCommandTimer(cancellationToken), subject, replyTo, headers, payload);
@@ -45,6 +47,8 @@ public partial class NatsConnection
         var replyTo = opts?.ReplyTo;
         var serializer = opts?.Serializer ?? Options.Serializer;
         var headers = opts?.Headers;
+
+        headers?.SetReadOnly();
 
         if (ConnectionState == NatsConnectionState.Open)
         {

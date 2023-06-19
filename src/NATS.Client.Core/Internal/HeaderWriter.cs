@@ -40,8 +40,8 @@ internal class HeaderWriter
                     bufferWriter.Advance(keyLength);
                     bufferWriter.Write(ColonSpace);
 
-                    // write value
-                    var valueLength = _encoding.GetByteCount(kv.Value);
+                    // write values
+                    var valueLength = _encoding.GetByteCount(value);
                     var valueSpan = bufferWriter.GetSpan(valueLength);
                     _encoding.GetBytes(value, valueSpan);
                     if (!ValidateValue(valueSpan.Slice(0, valueLength)))
@@ -49,7 +49,7 @@ internal class HeaderWriter
                         throw new NatsException($"Invalid header value for key '{kv.Key}': contains CRLF");
                     }
 
-                    bufferWriter.Advance(keyLength);
+                    bufferWriter.Advance(valueLength);
                     bufferWriter.Write(CrLf);
                 }
             }

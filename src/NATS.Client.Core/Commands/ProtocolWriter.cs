@@ -84,12 +84,11 @@ internal sealed class ProtocolWriter
             _writer.WriteASCIIAndSpace(replyTo);
         }
 
-        // Prepare fo headers
-        int headersLength = 0;
+        // Prepare for headers
         if (headers != null)
         {
             _bufferHeaders.Reset();
-            headersLength = _headerWriter.Write(_bufferHeaders, headers);
+            _headerWriter.Write(_bufferHeaders, headers);
         }
 
         // Payload / total lenght
@@ -101,6 +100,7 @@ internal sealed class ProtocolWriter
             }
             else
             {
+                var headersLength = _bufferHeaders.WrittenSpan.Length;
                 _writer.WriteNumber(CommandConstants.NatsHeaders10NewLine.Length + headersLength);
                 _writer.WriteSpace();
                 var total = CommandConstants.NatsHeaders10NewLine.Length + headersLength + payload.Length;

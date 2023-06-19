@@ -85,3 +85,53 @@ public class WaitSignal
         return _tcs.Task.WaitAsync(_timeout).GetAwaiter();
     }
 }
+
+public class WaitSignal<T>
+{
+    private TimeSpan _timeout;
+    private int _count;
+    private TaskCompletionSource<T> _tcs;
+
+    public WaitSignal()
+        : this(TimeSpan.FromSeconds(10))
+    {
+    }
+
+    public WaitSignal(int count)
+        : this(TimeSpan.FromSeconds(10), count)
+    {
+    }
+
+    public WaitSignal(TimeSpan timeout, int count = 1)
+    {
+        _timeout = timeout;
+        _count = count;
+        _tcs = new TaskCompletionSource<T>();
+    }
+
+    public TimeSpan Timeout => _timeout;
+
+    public Task Task => _tcs.Task;
+
+    public void Pulse(T result, Exception? exception = null)
+    {
+        if (exception == null)
+        {
+            if (Interlocked.Decrement(ref _count) > 0)
+            {
+                return;
+            }
+
+            _tcs.TrySetResult(result);
+        }
+        else
+        {
+            _tcs.TrySetException(exception);
+        }
+    }
+
+    public TaskAwaiter<T> GetAwaiter()
+    {
+        return _tcs.Task.WaitAsync(_timeout).GetAwaiter();
+    }
+}

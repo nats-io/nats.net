@@ -6,6 +6,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Primitives;
 using NATS.Client.Core.Commands;
 using NATS.Client.Core.Internal;
 
@@ -262,7 +263,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                         {
                             // TODO: Check for zero-header length
                             // If there are no headers do we still expect 'NATS/1.0\r\n' header version string?
-                            throw new NatsException("Protocol error: illogical headers and total lengths");
+                            throw new NatsException("Protocol error: illogical header and total lengths");
                         }
 
                         // TODO: Zero-length header and payload parsing
@@ -306,8 +307,14 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                             // Prepare buffer for the next message by removing headers + payload + \r\n
                             buffer = buffer.Slice(buffer.GetPosition(2, totalSlice.End));
 
-                            // TODO: Check NATS Header version
-                            var headerSlice = totalSlice.Slice(CommandConstants.NatsHeaders10NewLine.Length, headersLength);
+                            var versionLength = CommandConstants.NatsHeaders10NewLine.Length;
+                            var versionSlice = totalSlice.Slice(0, versionLength);
+                            if (!versionSlice.ToSpan().SequenceEqual(CommandConstants.NatsHeaders10NewLine))
+                            {
+                                throw new NatsException("Protocol error: header version mismatch");
+                            }
+
+                            var headerSlice = totalSlice.Slice(versionLength, headersLength - versionLength);
                             var payloadSlice = totalSlice.Slice(headersLength, payloadLength);
 
                             await _connection.PublishToClientHandlersAsync(subject, replyTo, sid, headerSlice, payloadSlice).ConfigureAwait(false);

@@ -18,10 +18,13 @@ NatsSub sub = await connection.SubscribeAsync(subject);
 await foreach (var msg in sub.Msgs.ReadAllAsync())
 {
     Print($"[RCV] {msg.Subject}: {Encoding.UTF8.GetString(msg.Data.Span)}\n");
-    foreach (var (key, values) in msg.Headers)
+    if (msg.Headers != null)
     {
-        foreach (var value in values)
-            Print($"  {key}: {value}\n");
+        foreach (var (key, values) in msg.Headers)
+        {
+            foreach (var value in values)
+                Print($"  {key}: {value}\n");
+        }
     }
 }
 

@@ -21,6 +21,8 @@ public class NatsHeaders : IDictionary<string, StringValues>
     private static readonly IEnumerator<KeyValuePair<string, StringValues>> EmptyIEnumeratorType = default(Enumerator);
     private static readonly IEnumerator EmptyIEnumerator = default(Enumerator);
 
+    private int _readonly = 0;
+
     /// <summary>
     /// Initializes a new instance of <see cref="NatsHeaders"/>.
     /// </summary>
@@ -117,7 +119,7 @@ public class NatsHeaders : IDictionary<string, StringValues>
     /// Gets a value that indicates whether the <see cref="NatsHeaders" /> is in read-only mode.
     /// </summary>
     /// <returns>true if the <see cref="NatsHeaders" /> is in read-only mode; otherwise, false.</returns>
-    public bool IsReadOnly { get; set; }
+    public bool IsReadOnly => Volatile.Read(ref _readonly) == 1;
 
     /// <summary>
     /// Gets the collection of HTTP header names in this instance.
@@ -330,6 +332,8 @@ public class NatsHeaders : IDictionary<string, StringValues>
         }
         return Store.GetEnumerator();
     }
+
+    internal void SetReadOnly() => Interlocked.Exchange(ref _readonly, 1);
 
     private void ThrowIfReadOnly()
     {
