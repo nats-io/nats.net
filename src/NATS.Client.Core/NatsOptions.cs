@@ -10,6 +10,7 @@ namespace NATS.Client.Core;
 /// <param name="Name"></param>
 /// <param name="Echo"></param>
 /// <param name="Verbose"></param>
+/// <param name="Headers"></param>
 /// <param name="AuthOptions"></param>
 /// <param name="TlsOptions"></param>
 /// <param name="Serializer"></param>
@@ -35,6 +36,7 @@ public sealed record NatsOptions
     string Name,
     bool Echo,
     bool Verbose,
+    bool Headers,
     NatsAuthOptions AuthOptions,
     TlsOptions TlsOptions,
     INatsSerializer Serializer,
@@ -60,6 +62,7 @@ public sealed record NatsOptions
         Name: "NATS .Net Client",
         Echo: true,
         Verbose: false,
+        Headers: true,
         AuthOptions: NatsAuthOptions.Default,
         TlsOptions: TlsOptions.Default,
         Serializer: JsonNatsSerializer.Default,

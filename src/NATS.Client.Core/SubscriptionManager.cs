@@ -56,7 +56,7 @@ internal sealed class SubscriptionManager : IAsyncDisposable
         return sub;
     }
 
-    public ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte> buffer)
+    public ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
     {
         int? orphanSid = null;
         lock (_gate)
@@ -65,7 +65,7 @@ internal sealed class SubscriptionManager : IAsyncDisposable
             {
                 if (subRef.TryGetTarget(out var sub))
                 {
-                    return sub.ReceiveAsync(subject, replyTo, buffer);
+                    return sub.ReceiveAsync(subject, replyTo, headersBuffer, payloadBuffer);
                 }
                 else
                 {

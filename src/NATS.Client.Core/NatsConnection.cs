@@ -162,9 +162,9 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
         pingCommand.SetCanceled();
     }
 
-    internal ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte> buffer)
+    internal ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
     {
-        return _subscriptionManager.PublishToClientHandlersAsync(subject, replyTo, sid, buffer);
+        return _subscriptionManager.PublishToClientHandlersAsync(subject, replyTo, sid, headersBuffer, payloadBuffer);
     }
 
     internal void ResetPongCount()
@@ -728,6 +728,18 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
     {
         await ConnectAsync().ConfigureAwait(false);
         await coreAsync(this, item1, item2, item3, item4).ConfigureAwait(false);
+    }
+
+    private async ValueTask WithConnectAsync<T1, T2, T3, T4, T5>(T1 item1, T2 item2, T3 item3, T4 item4, T5 item5, Func<NatsConnection, T1, T2, T3, T4, T5, ValueTask> coreAsync)
+    {
+        await ConnectAsync().ConfigureAwait(false);
+        await coreAsync(this, item1, item2, item3, item4, item5).ConfigureAwait(false);
+    }
+
+    private async ValueTask WithConnectAsync<T1, T2, T3, T4, T5, T6>(T1 item1, T2 item2, T3 item3, T4 item4, T5 item5, T6 item6, Func<NatsConnection, T1, T2, T3, T4, T5, T6, ValueTask> coreAsync)
+    {
+        await ConnectAsync().ConfigureAwait(false);
+        await coreAsync(this, item1, item2, item3, item4, item5, item6).ConfigureAwait(false);
     }
 
     private async ValueTask<T> WithConnectAsync<T>(Func<NatsConnection, ValueTask<T>> coreAsync)

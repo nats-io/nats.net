@@ -13,12 +13,8 @@ public abstract record NatsMsgBase(string Subject)
 
     public string? ReplyTo { get; init; }
 
-    // TODO: Implement headers in NatsMsg
-    // public NatsHeaders? Headers
-    // {
-    //     get => throw new NotImplementedException();
-    //     set => throw new NotImplementedException();
-    // }
+    public NatsHeaders? Headers { get; init; }
+
     public ValueTask ReplyAsync(ReadOnlySequence<byte> data = default, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         CheckReplyPreconditions();
