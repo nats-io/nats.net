@@ -1,12 +1,12 @@
 using System.Buffers;
 using System.Buffers.Text;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Primitives;
 using NATS.Client.Core.Commands;
 using NATS.Client.Core.Internal;
 
@@ -229,24 +229,8 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                     {
                         // https://docs.nats.io/reference/reference-protocols/nats-protocol#hmsg
                         // HMSG <subject> <sid> [reply-to] <#header bytes> <#total bytes>\r\n[headers]\r\n\r\n[payload]\r\n
-                        //
-                        // #header bytes:
-                        // The size of the headers section in bytes including the \r\n\r\n delimiter before the payload.
-                        //
-                        // #total bytes:
-                        // The total size of headers and payload sections in bytes.
-                        //
-                        // Example
-                        // The following message delivers an application message from subject FOO.BAR with a header:
-                        //                              1         2         3         4
-                        //                     123456789012345678901234567890123456789012345
-                        // HMSG FOO.BAR 34 45␍␊NATS/1.0␍␊FoodGroup: vegetable␍␊␍␊Hello World␍␊
-                        //                                                       12345678901
-                        //                                                                1
-                        // To deliver the same message along with a reply subject:
-                        // HMSG FOO.BAR 9 BAZ.69 34 45␍␊NATS/1.0␍␊FoodGroup: vegetable␍␊␍␊Hello World␍␊
 
-                        // Try to find before \n
+                        // Find the end of 'HMSG' first message line
                         var positionBeforeNatsHeader = buffer.PositionOf((byte)'\n');
                         if (positionBeforeNatsHeader == null)
                         {
@@ -258,67 +242,41 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                         var msgHeader = buffer.Slice(0, positionBeforeNatsHeader.Value);
                         var (subject, sid, replyTo, headersLength, totalLength) = ParseHMessageHeader(msgHeader);
                         var payloadLength = totalLength - headersLength;
+                        Debug.Assert(payloadLength >= 0, "Protocol error: illogical header and total lengths");
 
-                        if (payloadLength < 0)
+                        var headerBegin = buffer.GetPosition(1, positionBeforeNatsHeader.Value);
+                        var totalSlice = buffer.Slice(headerBegin);
+
+                        // Read rest of the message if it's not already in the buffer
+                        if (totalSlice.Length < totalLength + 2)
                         {
-                            // TODO: Check for zero-header length
-                            // If there are no headers do we still expect 'NATS/1.0\r\n' header version string?
-                            throw new NatsException("Protocol error: illogical header and total lengths");
+                            _socketReader.AdvanceTo(headerBegin);
+
+                            // Read headers + payload + \r\n
+                            var size = totalLength - (int)totalSlice.Length + 2;
+                            buffer = await _socketReader.ReadAtLeastAsync(size).ConfigureAwait(false);
+                            totalSlice = buffer.Slice(0, totalLength);
+                        }
+                        else
+                        {
+                            totalSlice = totalSlice.Slice(0, totalLength);
                         }
 
-                        // TODO: Zero-length header and payload parsing
-                        // if (payloadLength == 0)
-                        // {
-                        //     // payload is empty.
-                        //     var payloadBegin = buffer.GetPosition(1, positionBeforeNatsHeader.Value);
-                        //     var payloadSlice = buffer.Slice(payloadBegin);
-                        //     if (payloadSlice.Length < 2)
-                        //     {
-                        //         _socketReader.AdvanceTo(payloadBegin);
-                        //         buffer = await _socketReader.ReadAtLeastAsync(2).ConfigureAwait(false); // \r\n
-                        //         buffer = buffer.Slice(2);
-                        //     }
-                        //     else
-                        //     {
-                        //         buffer = buffer.Slice(buffer.GetPosition(3, positionBeforeNatsHeader.Value));
-                        //     }
-                        //
-                        //     await _connection.PublishToClientHandlersAsync(subject, replyTo, sid, ReadOnlySequence<byte>.Empty).ConfigureAwait(false);
-                        // }
-                        // else
+                        // Prepare buffer for the next message by removing 'headers + payload + \r\n' from it
+                        buffer = buffer.Slice(buffer.GetPosition(2, totalSlice.End));
+
+                        var versionLength = CommandConstants.NatsHeaders10NewLine.Length;
+                        var versionSlice = totalSlice.Slice(0, versionLength);
+                        if (!versionSlice.ToSpan().SequenceEqual(CommandConstants.NatsHeaders10NewLine))
                         {
-                            var headerBegin = buffer.GetPosition(1, positionBeforeNatsHeader.Value);
-                            var totalSlice = buffer.Slice(headerBegin);
-
-                            // Read rest of the message if it's not already in the buffer
-                            if (totalSlice.Length < totalLength + 2)
-                            {
-                                _socketReader.AdvanceTo(headerBegin);
-
-                                // Read headers + payload + \r\n
-                                buffer = await _socketReader.ReadAtLeastAsync(totalLength - (int)totalSlice.Length + 2).ConfigureAwait(false);
-                                totalSlice = buffer.Slice(0, totalLength);
-                            }
-                            else
-                            {
-                                totalSlice = totalSlice.Slice(0, totalLength);
-                            }
-
-                            // Prepare buffer for the next message by removing headers + payload + \r\n
-                            buffer = buffer.Slice(buffer.GetPosition(2, totalSlice.End));
-
-                            var versionLength = CommandConstants.NatsHeaders10NewLine.Length;
-                            var versionSlice = totalSlice.Slice(0, versionLength);
-                            if (!versionSlice.ToSpan().SequenceEqual(CommandConstants.NatsHeaders10NewLine))
-                            {
-                                throw new NatsException("Protocol error: header version mismatch");
-                            }
-
-                            var headerSlice = totalSlice.Slice(versionLength, headersLength - versionLength);
-                            var payloadSlice = totalSlice.Slice(headersLength, payloadLength);
-
-                            await _connection.PublishToClientHandlersAsync(subject, replyTo, sid, headerSlice, payloadSlice).ConfigureAwait(false);
+                            throw new NatsException("Protocol error: header version mismatch");
                         }
+
+                        var headerSlice = totalSlice.Slice(versionLength, headersLength - versionLength);
+                        var payloadSlice = totalSlice.Slice(headersLength, payloadLength);
+
+                        await _connection.PublishToClientHandlersAsync(subject, replyTo, sid, headerSlice, payloadSlice)
+                            .ConfigureAwait(false);
                     }
                     else
                     {

@@ -334,7 +334,16 @@ public class NatsProxy : IDisposable
 
     private bool NatsProtoDump(int client, string origin, TextReader sr, TextWriter sw)
     {
-        var message = sr.ReadLine();
+        string? message;
+        try
+        {
+            message = sr.ReadLine();
+        }
+        catch
+        {
+            return false;
+        }
+
         if (message == null) return false;
 
         if (Regex.IsMatch(message, @"^(INFO|CONNECT|PING|PONG|UNSUB|SUB|\+OK|-ERR)"))
@@ -369,14 +378,11 @@ public class NatsProxy : IDisposable
                 case >= ' ' and <= '~':
                     sb.Append(c);
                     break;
-                case '\t':
-                    sb.Append("\\t");
-                    break;
                 case '\n':
-                    sb.Append("\\n");
+                    sb.Append('␊');
                     break;
                 case '\r':
-                    sb.Append("\\r");
+                    sb.Append('␍');
                     break;
                 default:
                     sb.Append('.');
@@ -389,7 +395,7 @@ public class NatsProxy : IDisposable
             sw.Flush();
 
             if (client > 0)
-                AddFrame(new Frame(client, origin, Message: $"{message}\\r\\n{sb}"));
+                AddFrame(new Frame(client, origin, Message: $"{message}␍␊{sb}"));
 
             return true;
         }

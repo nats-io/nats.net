@@ -55,10 +55,10 @@ internal class HeaderWriter
             }
         }
 
-        if (bufferWriter.WrittenCount > initialCount)
-        {
-            bufferWriter.Write(CrLf);
-        }
+        // Even empty header needs to terminate.
+        // We will send NATS/1.0 version line
+        // even if there are no headers.
+        bufferWriter.Write(CrLf);
 
         return bufferWriter.WrittenCount - initialCount;
     }
