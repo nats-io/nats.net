@@ -34,7 +34,7 @@ jobs:
         run: dotnet build -c Debug
 
       - name: Test
-        run: dotnet test -c Debug --no-build -v normal tests/NATS.Client.Core.Tests/NATS.Client.Core.Tests.csproj
+        run: dotnet test -c Debug --no-build --logger:"console;verbosity=detailed" tests/NATS.Client.Core.Tests/NATS.Client.Core.Tests.csproj
 
   memory_test:
     name: memory test
