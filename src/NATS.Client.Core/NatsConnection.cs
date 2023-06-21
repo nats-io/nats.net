@@ -74,6 +74,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
         InboxPrefix = Encoding.ASCII.GetBytes($"{options.InboxPrefix}{Guid.NewGuid()}.");
         _logger = options.LoggerFactory.CreateLogger<NatsConnection>();
         _clientOptions = new ClientOptions(Options);
+        HeaderParser = new HeaderParser(options.HeaderEncoding);
     }
 
     // events
@@ -88,6 +89,8 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
     public NatsConnectionState ConnectionState { get; private set; }
 
     public ServerInfo? ServerInfo { get; internal set; } // server info is set when received INFO
+
+    internal HeaderParser HeaderParser { get; }
 
     /// <summary>
     /// Connect socket and write CONNECT command to nats server.

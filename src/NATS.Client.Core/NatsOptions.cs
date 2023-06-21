@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -30,6 +31,7 @@ namespace NATS.Client.Core;
 /// <param name="CommandTimeout"></param>
 /// <param name="SubscriptionCleanUpInterval"></param>
 /// <param name="WriterCommandBufferLimit"></param>
+/// <param name="HeaderEncoding"></param>
 public sealed record NatsOptions
 (
     string Url,
@@ -55,7 +57,8 @@ public sealed record NatsOptions
     TimeSpan RequestTimeout,
     TimeSpan CommandTimeout,
     TimeSpan SubscriptionCleanUpInterval,
-    int? WriterCommandBufferLimit)
+    int? WriterCommandBufferLimit,
+    Encoding HeaderEncoding)
 {
     public static readonly NatsOptions Default = new(
         Url: "nats://localhost:4222",
@@ -81,7 +84,8 @@ public sealed record NatsOptions
         RequestTimeout: TimeSpan.FromMinutes(1),
         CommandTimeout: TimeSpan.FromMinutes(1),
         SubscriptionCleanUpInterval: TimeSpan.FromMinutes(5),
-        WriterCommandBufferLimit: null);
+        WriterCommandBufferLimit: null,
+        HeaderEncoding: Encoding.ASCII);
 
     internal NatsUri[] GetSeedUris()
     {

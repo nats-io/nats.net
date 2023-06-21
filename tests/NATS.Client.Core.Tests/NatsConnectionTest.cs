@@ -284,7 +284,8 @@ public abstract partial class NatsConnectionTest
         await Retry.Until(
             "subscription is active (1)",
             () => Volatile.Read(ref sync) == 1,
-            async () => await connection2.PublishAsync(subject, 1));
+            async () => await connection2.PublishAsync(subject, 1),
+            retryDelay: TimeSpan.FromSeconds(.5));
 
         await connection2.PublishAsync(subject, 100);
         await connection2.PublishAsync(subject, 200);
@@ -297,6 +298,8 @@ public abstract partial class NatsConnectionTest
         await cluster.Server1.DisposeAsync(); // process kill
         await disconnectSignal;
 
+        Net.WaitForTcpPortToClose(cluster.Server1.Options.ServerPort);
+
         await connection1.ConnectAsync(); // wait for reconnect complete.
 
         connection1.ServerInfo!.Port.Should()
@@ -305,7 +308,8 @@ public abstract partial class NatsConnectionTest
         await Retry.Until(
             "subscription is active (2)",
             () => Volatile.Read(ref sync) == 2,
-            async () => await connection2.PublishAsync(subject, 2));
+            async () => await connection2.PublishAsync(subject, 2),
+            retryDelay: TimeSpan.FromSeconds(.5));
 
         await connection2.PublishAsync(subject, 400);
         await connection2.PublishAsync(subject, 500);

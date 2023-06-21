@@ -11,7 +11,6 @@ public abstract class NatsSubBase : IAsyncDisposable
     {
         Connection = connection;
         Manager = manager;
-        HeaderParser = new HeaderParser(Encoding.UTF8);
         Subject = subject;
         QueueGroup = queueGroup;
         Sid = sid;
@@ -26,8 +25,6 @@ public abstract class NatsSubBase : IAsyncDisposable
     internal NatsConnection Connection { get; }
 
     internal SubscriptionManager Manager { get; }
-
-    internal HeaderParser HeaderParser { get; }
 
     public virtual ValueTask DisposeAsync()
     {
@@ -66,7 +63,7 @@ public sealed class NatsSub : NatsSubBase
         if (headersBuffer != null)
         {
             natsHeaders = new NatsHeaders();
-            if (!HeaderParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), natsHeaders))
+            if (!Connection.HeaderParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), natsHeaders))
             {
                 throw new NatsException("Error parsing headers");
             }
@@ -115,7 +112,7 @@ public sealed class NatsSub<T> : NatsSubBase
         if (headersBuffer != null)
         {
             natsHeaders = new NatsHeaders();
-            if (!HeaderParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), natsHeaders))
+            if (!Connection.HeaderParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), natsHeaders))
             {
                 throw new NatsException("Error parsing headers");
             }
