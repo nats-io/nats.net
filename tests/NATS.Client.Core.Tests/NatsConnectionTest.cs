@@ -298,12 +298,11 @@ public abstract partial class NatsConnectionTest
         await cluster.Server1.DisposeAsync(); // process kill
         await disconnectSignal;
 
-        Net.WaitForTcpPortToClose(cluster.Server1.Options.ServerPort);
+        Net.WaitForTcpPortToClose(cluster.Server1.ConnectionPort);
 
         await connection1.ConnectAsync(); // wait for reconnect complete.
 
-        connection1.ServerInfo!.Port.Should()
-            .BeOneOf(cluster.Server2.Options.ServerPort, cluster.Server3.Options.ServerPort);
+        connection1.ServerInfo!.Port.Should().BeOneOf(cluster.Server2.ConnectionPort, cluster.Server3.ConnectionPort);
 
         await Retry.Until(
             "subscription is active (2)",
