@@ -24,6 +24,7 @@ public class NatsServer : IAsyncDisposable
 {
     private static readonly string Ext = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? ".exe" : string.Empty;
     private static readonly string NatsServerPath = $"nats-server{Ext}";
+    private static readonly Version Version;
 
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     private readonly string? _configFileName;
@@ -32,6 +33,25 @@ public class NatsServer : IAsyncDisposable
     private readonly Task<string[]> _processErr;
     private readonly TransportType _transportType;
     private int _disposed;
+
+    static NatsServer()
+    {
+        var process = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = NatsServerPath,
+                Arguments = "-v",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+            },
+        };
+        process.Start();
+        process.WaitForExit();
+        var output = process.StandardOutput.ReadToEnd();
+        var value = Regex.Match(output, @"v(\d+\.\d+\.\d+)").Groups[1].Value;
+        Version = new Version(value);
+    }
 
     public NatsServer()
         : this(new NullOutputHelper(), TransportType.Tcp)
@@ -56,24 +76,8 @@ public class NatsServer : IAsyncDisposable
         outputHelper.WriteLine("ProcessStart: " + cmd + Environment.NewLine + config);
         var (p, stdout, stderr) = ProcessX.GetDualAsyncEnumerable(cmd);
 
-        var readVersion = new ManualResetEventSlim();
-        Version? version = null;
-        _processOut = EnumerateWithLogsAsync(stdout, null, _cancellationTokenSource.Token);
-        _processErr = EnumerateWithLogsAsync(
-            stderr,
-            line =>
-            {
-                var match = Regex.Match(line, @"INF.*Version:\s*([\d\.]+)");
-                if (match.Success)
-                {
-                    version = new Version(match.Groups[1].Value);
-                    readVersion.Set();
-                }
-            },
-            _cancellationTokenSource.Token);
-
-        readVersion.Wait();
-        Version = version!;
+        _processOut = EnumerateWithLogsAsync(stdout, _cancellationTokenSource.Token);
+        _processErr = EnumerateWithLogsAsync(stderr, _cancellationTokenSource.Token);
 
         // Check for start server
         Task.Run(async () =>
@@ -111,8 +115,6 @@ public class NatsServer : IAsyncDisposable
 
     public NatsServerOptions Options { get; }
 
-    public Version Version { get; }
-
     public string ClientUrl => _transportType switch
     {
         TransportType.Tcp => $"nats://localhost:{Options.ServerPort}",
@@ -125,7 +127,7 @@ public class NatsServer : IAsyncDisposable
     {
         get
         {
-            if (_transportType == TransportType.WebSocket && Version >= ServerVersions.V2_9_19)
+            if (_transportType == TransportType.WebSocket && ServerVersions.V2_9_19 <= Version)
             {
                 return Options.WebSocketPort!.Value;
             }
@@ -228,14 +230,13 @@ public class NatsServer : IAsyncDisposable
         };
     }
 
-    private async Task<string[]> EnumerateWithLogsAsync(ProcessAsyncEnumerable enumerable, Action<string>? output, CancellationToken cancellationToken)
+    private async Task<string[]> EnumerateWithLogsAsync(ProcessAsyncEnumerable enumerable, CancellationToken cancellationToken)
     {
         var l = new List<string>();
         try
         {
             await foreach (var item in enumerable.WithCancellation(cancellationToken))
             {
-                output?.Invoke(item);
                 l.Add(item);
             }
         }
