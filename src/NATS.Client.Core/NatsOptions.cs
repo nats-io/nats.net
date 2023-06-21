@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -10,6 +11,7 @@ namespace NATS.Client.Core;
 /// <param name="Name"></param>
 /// <param name="Echo"></param>
 /// <param name="Verbose"></param>
+/// <param name="Headers"></param>
 /// <param name="AuthOptions"></param>
 /// <param name="TlsOptions"></param>
 /// <param name="Serializer"></param>
@@ -29,12 +31,14 @@ namespace NATS.Client.Core;
 /// <param name="CommandTimeout"></param>
 /// <param name="SubscriptionCleanUpInterval"></param>
 /// <param name="WriterCommandBufferLimit"></param>
+/// <param name="HeaderEncoding"></param>
 public sealed record NatsOptions
 (
     string Url,
     string Name,
     bool Echo,
     bool Verbose,
+    bool Headers,
     NatsAuthOptions AuthOptions,
     TlsOptions TlsOptions,
     INatsSerializer Serializer,
@@ -53,13 +57,15 @@ public sealed record NatsOptions
     TimeSpan RequestTimeout,
     TimeSpan CommandTimeout,
     TimeSpan SubscriptionCleanUpInterval,
-    int? WriterCommandBufferLimit)
+    int? WriterCommandBufferLimit,
+    Encoding HeaderEncoding)
 {
     public static readonly NatsOptions Default = new(
         Url: "nats://localhost:4222",
         Name: "NATS .Net Client",
         Echo: true,
         Verbose: false,
+        Headers: true,
         AuthOptions: NatsAuthOptions.Default,
         TlsOptions: TlsOptions.Default,
         Serializer: JsonNatsSerializer.Default,
@@ -78,7 +84,8 @@ public sealed record NatsOptions
         RequestTimeout: TimeSpan.FromMinutes(1),
         CommandTimeout: TimeSpan.FromMinutes(1),
         SubscriptionCleanUpInterval: TimeSpan.FromMinutes(5),
-        WriterCommandBufferLimit: null);
+        WriterCommandBufferLimit: null,
+        HeaderEncoding: Encoding.ASCII);
 
     internal NatsUri[] GetSeedUris()
     {

@@ -17,6 +17,8 @@ internal sealed class FixedArrayBufferWriter : ICountableBufferWriter
 
     public ReadOnlyMemory<byte> WrittenMemory => _buffer.AsMemory(0, _written);
 
+    public ReadOnlySpan<byte> WrittenSpan => _buffer.AsSpan(0, _written);
+
     public int WrittenCount => _written;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

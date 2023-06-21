@@ -4,11 +4,7 @@ public readonly record struct NatsPubOpts
 {
     public string? ReplyTo { get; init; }
 
-    // TODO: Implement headers in NatsPubOpts
-    // public NatsHeaders? Headers
-    // {
-    //     get => throw new NotImplementedException();
-    //     init => throw new NotImplementedException();
-    // }
+    public NatsHeaders? Headers { get; init; }
+
     public INatsSerializer? Serializer { get; init; }
 }

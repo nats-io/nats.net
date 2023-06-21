@@ -12,6 +12,7 @@ internal sealed class ClientOptions
         Name = options.Name;
         Echo = options.Echo;
         Verbose = options.Verbose;
+        Headers = options.Headers;
         Username = options.AuthOptions.Username;
         Password = options.AuthOptions.Password;
         AuthToken = options.AuthOptions.Token;

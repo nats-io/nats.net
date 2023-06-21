@@ -1,5 +1,7 @@
 using System.Buffers;
+using System.Text;
 using System.Threading.Channels;
+using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
 
@@ -29,7 +31,7 @@ public abstract class NatsSubBase : IAsyncDisposable
         return Manager.RemoveAsync(Sid);
     }
 
-    internal abstract ValueTask ReceiveAsync(string subject, string? replyTo, ReadOnlySequence<byte> buffer);
+    internal abstract ValueTask ReceiveAsync(string subject, string? replyTo, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer);
 }
 
 public sealed class NatsSub : NatsSubBase
@@ -55,12 +57,25 @@ public sealed class NatsSub : NatsSubBase
         return base.DisposeAsync();
     }
 
-    internal override ValueTask ReceiveAsync(string subject, string? replyTo, ReadOnlySequence<byte> buffer)
+    internal override ValueTask ReceiveAsync(string subject, string? replyTo, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
     {
-        return _msgs.Writer.WriteAsync(new NatsMsg(subject, buffer.ToArray())
+        NatsHeaders? natsHeaders = null;
+        if (headersBuffer != null)
+        {
+            natsHeaders = new NatsHeaders();
+            if (!Connection.HeaderParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), natsHeaders))
+            {
+                throw new NatsException("Error parsing headers");
+            }
+
+            natsHeaders.SetReadOnly();
+        }
+
+        return _msgs.Writer.WriteAsync(new NatsMsg(subject, payloadBuffer.ToArray())
         {
             Connection = Connection,
             ReplyTo = replyTo,
+            Headers = natsHeaders,
         });
     }
 }
@@ -88,14 +103,28 @@ public sealed class NatsSub<T> : NatsSubBase
         return base.DisposeAsync();
     }
 
-    internal override ValueTask ReceiveAsync(string subject, string? replyTo, ReadOnlySequence<byte> buffer)
+    internal override ValueTask ReceiveAsync(string subject, string? replyTo, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
     {
         var serializer = Serializer;
-        var data = serializer.Deserialize<T>(buffer);
+        var data = serializer.Deserialize<T>(payloadBuffer);
+
+        NatsHeaders? natsHeaders = null;
+        if (headersBuffer != null)
+        {
+            natsHeaders = new NatsHeaders();
+            if (!Connection.HeaderParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), natsHeaders))
+            {
+                throw new NatsException("Error parsing headers");
+            }
+
+            natsHeaders.SetReadOnly();
+        }
+
         return _msgs.Writer.WriteAsync(new NatsMsg<T>(subject, data!)
         {
             Connection = Connection,
             ReplyTo = replyTo,
+            Headers = natsHeaders,
         });
     }
 }

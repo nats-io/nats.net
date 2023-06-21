@@ -5,7 +5,8 @@ public abstract partial class NatsConnectionTest
     [Fact]
     public async Task QueueGroupsTest()
     {
-        const int messageCount = 20;
+        // Use high enough count to create some distribution among subscribers.
+        const int messageCount = 100;
 
         await using var server = new NatsServer(_output, _transportType);
 
@@ -21,12 +22,19 @@ public abstract partial class NatsConnectionTest
         cts.Token.Register(() => signal.Pulse());
         var count = 0;
 
+        var sync1 = 0;
         var messages1 = new List<int>();
         var reader1 = Task.Run(
             async () =>
             {
                 await foreach (var msg in sub1.Msgs.ReadAllAsync(cts.Token))
                 {
+                    if (msg.Subject == "foo.sync")
+                    {
+                        Interlocked.Exchange(ref sync1, 1);
+                        continue;
+                    }
+
                     Assert.Equal($"foo.xyz{msg.Data}", msg.Subject);
                     lock (messages1) messages1.Add(msg.Data);
                     var total = Interlocked.Increment(ref count);
@@ -35,12 +43,19 @@ public abstract partial class NatsConnectionTest
             },
             cts.Token);
 
+        var sync2 = 0;
         var messages2 = new List<int>();
         var reader2 = Task.Run(
             async () =>
             {
                 await foreach (var msg in sub2.Msgs.ReadAllAsync(cts.Token))
                 {
+                    if (msg.Subject == "foo.sync")
+                    {
+                        Interlocked.Exchange(ref sync2, 1);
+                        continue;
+                    }
+
                     Assert.Equal($"foo.xyz{msg.Data}", msg.Subject);
                     lock (messages2) messages2.Add(msg.Data);
                     var total = Interlocked.Increment(ref count);
@@ -49,8 +64,10 @@ public abstract partial class NatsConnectionTest
             },
             cts.Token);
 
-        await conn1.PingAsync();
-        await conn2.PingAsync();
+        await Retry.Until(
+            "subscriptions are active",
+            () => Volatile.Read(ref sync1) + Volatile.Read(ref sync2) == 2,
+            async () => await conn3.PublishAsync("foo.sync", 0));
 
         for (int i = 0; i < messageCount; i++)
         {

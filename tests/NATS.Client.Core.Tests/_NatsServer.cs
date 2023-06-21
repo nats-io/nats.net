@@ -8,10 +8,23 @@ using Cysharp.Diagnostics;
 
 namespace NATS.Client.Core.Tests;
 
+public static class ServerVersions
+{
+#pragma warning disable SA1310
+#pragma warning disable SA1401
+
+    // Changed INFO port reporting for WS connections (nats-server #4255)
+    public static Version V2_9_19 = new("2.9.19");
+
+#pragma warning restore SA1401
+#pragma warning restore SA1310
+}
+
 public class NatsServer : IAsyncDisposable
 {
     private static readonly string Ext = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? ".exe" : string.Empty;
     private static readonly string NatsServerPath = $"nats-server{Ext}";
+    private static readonly Version Version;
 
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     private readonly string? _configFileName;
@@ -20,6 +33,25 @@ public class NatsServer : IAsyncDisposable
     private readonly Task<string[]> _processErr;
     private readonly TransportType _transportType;
     private int _disposed;
+
+    static NatsServer()
+    {
+        var process = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = NatsServerPath,
+                Arguments = "-v",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+            },
+        };
+        process.Start();
+        process.WaitForExit();
+        var output = process.StandardOutput.ReadToEnd();
+        var value = Regex.Match(output, @"v(\d+\.\d+\.\d+)").Groups[1].Value;
+        Version = new Version(value);
+    }
 
     public NatsServer()
         : this(new NullOutputHelper(), TransportType.Tcp)
@@ -90,6 +122,21 @@ public class NatsServer : IAsyncDisposable
         TransportType.WebSocket => $"ws://localhost:{Options.WebSocketPort}",
         _ => throw new ArgumentOutOfRangeException(),
     };
+
+    public int ConnectionPort
+    {
+        get
+        {
+            if (_transportType == TransportType.WebSocket && ServerVersions.V2_9_19 <= Version)
+            {
+                return Options.WebSocketPort!.Value;
+            }
+            else
+            {
+                return Options.ServerPort;
+            }
+        }
+    }
 
     public async ValueTask DisposeAsync()
     {
@@ -334,7 +381,16 @@ public class NatsProxy : IDisposable
 
     private bool NatsProtoDump(int client, string origin, TextReader sr, TextWriter sw)
     {
-        var message = sr.ReadLine();
+        string? message;
+        try
+        {
+            message = sr.ReadLine();
+        }
+        catch
+        {
+            return false;
+        }
+
         if (message == null) return false;
 
         if (Regex.IsMatch(message, @"^(INFO|CONNECT|PING|PONG|UNSUB|SUB|\+OK|-ERR)"))
@@ -369,14 +425,11 @@ public class NatsProxy : IDisposable
                 case >= ' ' and <= '~':
                     sb.Append(c);
                     break;
-                case '\t':
-                    sb.Append("\\t");
-                    break;
                 case '\n':
-                    sb.Append("\\n");
+                    sb.Append('␊');
                     break;
                 case '\r':
-                    sb.Append("\\r");
+                    sb.Append('␍');
                     break;
                 default:
                     sb.Append('.');
@@ -389,7 +442,7 @@ public class NatsProxy : IDisposable
             sw.Flush();
 
             if (client > 0)
-                AddFrame(new Frame(client, origin, Message: $"{message}\\r\\n{sb}"));
+                AddFrame(new Frame(client, origin, Message: $"{message}␍␊{sb}"));
 
             return true;
         }

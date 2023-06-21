@@ -117,7 +117,7 @@ public abstract partial class NatsConnectionTest
         var signalComplete2 = new WaitSignal();
 
         var natsSub = await subConnection.SubscribeAsync<int>(subject);
-        natsSub.Register(x =>
+        var register = natsSub.Register(x =>
         {
             _output.WriteLine($"Received: {x}");
             if (x.Data == 1)
@@ -148,34 +148,35 @@ public abstract partial class NatsConnectionTest
         _output.WriteLine("AUTHENTICATED RE-CONNECTION");
         await pubConnection.PublishAsync(subject, 2);
         await signalComplete2;
+
+        await natsSub.DisposeAsync();
+        await register;
     }
 }
 
 internal static class NatsMsgTestUtils
 {
-    internal static NatsSub<T>? Register<T>(this NatsSub<T>? sub, Action<NatsMsg<T>> action)
+    internal static Task Register<T>(this NatsSub<T>? sub, Action<NatsMsg<T>> action)
     {
-        if (sub == null) return null;
-        Task.Run(async () =>
+        if (sub == null) return Task.CompletedTask;
+        return Task.Run(async () =>
         {
             await foreach (var natsMsg in sub.Msgs.ReadAllAsync())
             {
                 action(natsMsg);
             }
         });
-        return sub;
     }
 
-    internal static NatsSub? Register(this NatsSub? sub, Action<NatsMsg> action)
+    internal static Task Register(this NatsSub? sub, Action<NatsMsg> action)
     {
-        if (sub == null) return null;
-        Task.Run(async () =>
+        if (sub == null) return Task.CompletedTask;
+        return Task.Run(async () =>
         {
             await foreach (var natsMsg in sub.Msgs.ReadAllAsync())
             {
                 action(natsMsg);
             }
         });
-        return sub;
     }
 }

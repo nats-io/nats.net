@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Buffers.Text;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using NATS.Client.Core.Internal;
@@ -12,6 +13,9 @@ internal sealed class ProtocolWriter
     private const int NewLineLength = 2; // \r\n
 
     private readonly FixedArrayBufferWriter _writer; // where T : IBufferWriter<byte>
+    private readonly FixedArrayBufferWriter _bufferHeaders = new();
+    private readonly FixedArrayBufferWriter _bufferPayload = new();
+    private readonly HeaderWriter _headerWriter = new(Encoding.UTF8);
 
     public ProtocolWriter(FixedArrayBufferWriter writer)
     {
@@ -46,159 +50,63 @@ internal sealed class ProtocolWriter
     }
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#pub
-    // PUB <subject> [reply-to] <#bytes>\r\n[payload]
-    // To omit the payload, set the payload size to 0, but the second CRLF is still required.
-    public void WritePublish(string subject, string? replyTo, ReadOnlySequence<byte> payload)
+    // PUB <subject> [reply-to] <#bytes>\r\n[payload]\r\n
+    public void WritePublish(string subject, string? replyTo, NatsHeaders? headers, ReadOnlySequence<byte> payload)
     {
-        var offset = 0;
-        var maxLength = CommandConstants.PubWithPadding.Length
-            + subject.Length + 1 // with space padding
-            + (replyTo == null ? 0 : replyTo.Length + 1)
-            + MaxIntStringLength
-            + NewLineLength
-            + (int)payload.Length
-            + NewLineLength;
+        // We use a separate buffer to write the headers so that we can calculate the
+        // size before we write to the output buffer '_writer'.
+        if (headers != null)
+        {
+            _bufferHeaders.Reset();
+            _headerWriter.Write(_bufferHeaders, headers);
+        }
 
-        var writableSpan = _writer.GetSpan(maxLength);
-
-        CommandConstants.PubWithPadding.CopyTo(writableSpan);
-        offset += CommandConstants.PubWithPadding.Length;
-
-        subject.WriteASCIIBytes(writableSpan.Slice(offset));
-        offset += subject.Length;
-        writableSpan.Slice(offset)[0] = (byte)' ';
-        offset += 1;
+        // Start writing the message to buffer:
+        // PUP / HPUB
+        _writer.WriteSpan(headers == null ? CommandConstants.PubWithPadding : CommandConstants.HPubWithPadding);
+        _writer.WriteASCIIAndSpace(subject);
 
         if (replyTo != null)
         {
-            replyTo.WriteASCIIBytes(writableSpan.Slice(offset));
-            offset += replyTo.Length;
-            writableSpan.Slice(offset)[0] = (byte)' ';
-            offset += 1;
+            _writer.WriteASCIIAndSpace(replyTo);
         }
 
-        if (!Utf8Formatter.TryFormat(payload.Length, writableSpan.Slice(offset), out var written))
+        if (headers == null)
         {
-            throw new NatsException("Can not format integer.");
+            _writer.WriteNumber(payload.Length);
+        }
+        else
+        {
+            var headersLength = _bufferHeaders.WrittenSpan.Length;
+            _writer.WriteNumber(CommandConstants.NatsHeaders10NewLine.Length + headersLength);
+            _writer.WriteSpace();
+            var total = CommandConstants.NatsHeaders10NewLine.Length + headersLength + payload.Length;
+            _writer.WriteNumber(total);
         }
 
-        offset += written;
+        // End of message first line
+        _writer.WriteNewLine();
 
-        CommandConstants.NewLine.CopyTo(writableSpan.Slice(offset));
-        offset += CommandConstants.NewLine.Length;
+        if (headers != null)
+        {
+            _writer.WriteSpan(CommandConstants.NatsHeaders10NewLine);
+            _writer.WriteSpan(_bufferHeaders.WrittenSpan);
+        }
 
         if (payload.Length != 0)
         {
-            payload.CopyTo(writableSpan.Slice(offset));
-            offset += (int)payload.Length;
+            _writer.WriteSequence(payload);
         }
 
-        CommandConstants.NewLine.CopyTo(writableSpan.Slice(offset));
-        offset += CommandConstants.NewLine.Length;
-
-        _writer.Advance(offset);
+        _writer.WriteNewLine();
     }
 
-    public void WritePublish<T>(string subject, string? replyTo, T? value, INatsSerializer serializer)
+    public void WritePublish<T>(string subject, string? replyTo, NatsHeaders? headers, T? value, INatsSerializer serializer)
     {
-        var offset = 0;
-        var maxLengthWithoutPayload = CommandConstants.PubWithPadding.Length
-            + subject.Length + 1
-            + (replyTo == null ? 0 : replyTo.Length + 1)
-            + MaxIntStringLength
-            + NewLineLength;
-
-        var writableSpan = _writer.GetSpan(maxLengthWithoutPayload);
-
-        CommandConstants.PubWithPadding.CopyTo(writableSpan);
-        offset += CommandConstants.PubWithPadding.Length;
-
-        subject.WriteASCIIBytes(writableSpan.Slice(offset));
-        offset += subject.Length;
-        writableSpan.Slice(offset)[0] = (byte)' ';
-        offset += 1;
-
-        if (replyTo != null)
-        {
-            replyTo.WriteASCIIBytes(writableSpan.Slice(offset));
-            offset += replyTo.Length;
-            writableSpan.Slice(offset)[0] = (byte)' ';
-            offset += 1;
-        }
-
-        // Advance for written.
-        _writer.Advance(offset);
-
-        // preallocate range for write #bytes(write after serialized)
-        var preallocatedRange = _writer.PreAllocate(MaxIntStringLength);
-        offset += MaxIntStringLength;
-
-        CommandConstants.NewLine.CopyTo(writableSpan.Slice(offset));
-        _writer.Advance(CommandConstants.NewLine.Length);
-
-        var payloadLength = serializer.Serialize(_writer, value);
-        var payloadLengthSpan = _writer.GetSpanInPreAllocated(preallocatedRange);
-        payloadLengthSpan.Fill((byte)' ');
-        if (!Utf8Formatter.TryFormat(payloadLength, payloadLengthSpan, out var written))
-        {
-            throw new NatsException("Can not format integer.");
-        }
-
-        WriteConstant(CommandConstants.NewLine);
-    }
-
-    public void WritePublish<T>(string subject, ReadOnlyMemory<byte> inboxPrefix, int id, T? value, INatsSerializer serializer)
-    {
-        Span<byte> idBytes = stackalloc byte[10];
-        if (Utf8Formatter.TryFormat(id, idBytes, out var written))
-        {
-            idBytes = idBytes.Slice(0, written);
-        }
-
-        var offset = 0;
-        var maxLengthWithoutPayload = CommandConstants.PubWithPadding.Length
-            + subject.Length + 1
-            + (inboxPrefix.Length + idBytes.Length + 1) // with space
-            + MaxIntStringLength
-            + NewLineLength;
-
-        var writableSpan = _writer.GetSpan(maxLengthWithoutPayload);
-
-        CommandConstants.PubWithPadding.CopyTo(writableSpan);
-        offset += CommandConstants.PubWithPadding.Length;
-
-        subject.WriteASCIIBytes(writableSpan.Slice(offset));
-        offset += subject.Length;
-        writableSpan.Slice(offset)[0] = (byte)' ';
-        offset += 1;
-
-        // build reply-to
-        inboxPrefix.Span.CopyTo(writableSpan.Slice(offset));
-        offset += inboxPrefix.Length;
-        idBytes.CopyTo(writableSpan.Slice(offset));
-        offset += idBytes.Length;
-        writableSpan.Slice(offset)[0] = (byte)' ';
-        offset += 1;
-
-        // Advance for written.
-        _writer.Advance(offset);
-
-        // preallocate range for write #bytes(write after serialized)
-        var preallocatedRange = _writer.PreAllocate(MaxIntStringLength);
-        offset += MaxIntStringLength;
-
-        CommandConstants.NewLine.CopyTo(writableSpan.Slice(offset));
-        _writer.Advance(CommandConstants.NewLine.Length);
-
-        var payloadLength = serializer.Serialize(_writer, value);
-        var payloadLengthSpan = _writer.GetSpanInPreAllocated(preallocatedRange);
-        payloadLengthSpan.Fill((byte)' ');
-        if (!Utf8Formatter.TryFormat(payloadLength, payloadLengthSpan, out written))
-        {
-            throw new NatsException("Can not format integer.");
-        }
-
-        WriteConstant(CommandConstants.NewLine);
+        _bufferPayload.Reset();
+        serializer.Serialize(_bufferPayload, value);
+        var payload = new ReadOnlySequence<byte>(_bufferPayload.WrittenMemory);
+        WritePublish(subject, replyTo, headers, payload);
     }
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#sub
