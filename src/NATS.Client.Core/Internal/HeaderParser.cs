@@ -1,3 +1,5 @@
+// Adapted from https://github.com/dotnet/aspnetcore/blob/v6.0.18/src/Servers/Kestrel/Core/src/Internal/Http/HttpParser.cs
+
 using System.Buffers;
 using System.Diagnostics;
 using System.Text;
