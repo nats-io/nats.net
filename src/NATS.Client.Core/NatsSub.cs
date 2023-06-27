@@ -1,11 +1,9 @@
 using System.Buffers;
-using System.Text;
 using System.Threading.Channels;
-using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
 
-public abstract class NatsSubBase : IAsyncDisposable
+public abstract class NatsSubBase : INatsSub
 {
     internal NatsSubBase(NatsConnection connection, SubscriptionManager manager, string subject, string? queueGroup, int sid)
     {
@@ -20,7 +18,7 @@ public abstract class NatsSubBase : IAsyncDisposable
 
     public string? QueueGroup { get; }
 
-    internal int Sid { get; }
+    public int Sid { get; }
 
     internal NatsConnection Connection { get; }
 
@@ -31,7 +29,7 @@ public abstract class NatsSubBase : IAsyncDisposable
         return Manager.RemoveAsync(Sid);
     }
 
-    internal abstract ValueTask ReceiveAsync(string subject, string? replyTo, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer);
+    public abstract ValueTask ReceiveAsync(string subject, string? replyTo, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer);
 }
 
 public sealed class NatsSub : NatsSubBase
@@ -57,7 +55,7 @@ public sealed class NatsSub : NatsSubBase
         return base.DisposeAsync();
     }
 
-    internal override ValueTask ReceiveAsync(string subject, string? replyTo, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
+    public override ValueTask ReceiveAsync(string subject, string? replyTo, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
     {
         NatsHeaders? natsHeaders = null;
         if (headersBuffer != null)
@@ -103,7 +101,7 @@ public sealed class NatsSub<T> : NatsSubBase
         return base.DisposeAsync();
     }
 
-    internal override ValueTask ReceiveAsync(string subject, string? replyTo, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
+    public override ValueTask ReceiveAsync(string subject, string? replyTo, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
     {
         var serializer = Serializer;
         var data = serializer.Deserialize<T>(payloadBuffer);

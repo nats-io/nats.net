@@ -7,7 +7,7 @@ using Microsoft.Extensions.Primitives;
 
 namespace NATS.Client.Core.Internal;
 
-internal class HeaderParser
+public class HeaderParser
 {
     private const byte ByteCR = (byte)'\r';
     private const byte ByteLF = (byte)'\n';
