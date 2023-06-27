@@ -69,12 +69,7 @@ public sealed class NatsSub : NatsSubBase
             natsHeaders.SetReadOnly();
         }
 
-        return _msgs.Writer.WriteAsync(new NatsMsg(subject, payloadBuffer.ToArray())
-        {
-            Connection = Connection,
-            ReplyTo = replyTo,
-            Headers = natsHeaders,
-        });
+        return _msgs.Writer.WriteAsync(new NatsMsg(subject, replyTo, natsHeaders, payloadBuffer.ToArray(), Connection));
     }
 }
 
@@ -118,11 +113,6 @@ public sealed class NatsSub<T> : NatsSubBase
             natsHeaders.SetReadOnly();
         }
 
-        return _msgs.Writer.WriteAsync(new NatsMsg<T>(subject, data!)
-        {
-            Connection = Connection,
-            ReplyTo = replyTo,
-            Headers = natsHeaders,
-        });
+        return _msgs.Writer.WriteAsync(new NatsMsg<T>(subject, replyTo, natsHeaders, data, Connection));
     }
 }
