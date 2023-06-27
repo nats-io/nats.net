@@ -1,6 +1,7 @@
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
 

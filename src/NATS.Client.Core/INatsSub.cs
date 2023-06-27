@@ -22,7 +22,7 @@ public interface INatsSubBuilder<out T>
 
 public class NatsSubBuilder : INatsSubBuilder<NatsSub>
 {
-    public static NatsSubBuilder Default = new();
+    public static readonly NatsSubBuilder Default = new();
 
     public NatsSub Build(string subject, string? queueGroup, NatsConnection connection, SubscriptionManager manager)
     {
@@ -36,10 +36,10 @@ public class NatsSubModelBuilder<T> : INatsSubBuilder<NatsSub<T>>
     private static readonly ConcurrentDictionary<INatsSerializer, NatsSubModelBuilder<T>> Cache = new();
     private readonly INatsSerializer _serializer;
 
+    public NatsSubModelBuilder(INatsSerializer serializer) => _serializer = serializer;
+
     public static NatsSubModelBuilder<T> For(INatsSerializer serializer) =>
         Cache.GetOrAdd(serializer, static s => new NatsSubModelBuilder<T>(s));
-
-    public NatsSubModelBuilder(INatsSerializer serializer) => _serializer = serializer;
 
     public NatsSub<T> Build(string subject, string? queueGroup, NatsConnection connection, SubscriptionManager manager)
     {

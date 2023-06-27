@@ -1,4 +1,4 @@
-namespace NATS.Client.Core;
+namespace NATS.Client.Core.Internal;
 
 internal sealed class NatsUri : IEquatable<NatsUri>
 {

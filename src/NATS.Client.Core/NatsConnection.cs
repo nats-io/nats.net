@@ -16,7 +16,7 @@ public enum NatsConnectionState
     Reconnecting,
 }
 
-public partial class NatsConnection : IAsyncDisposable, INatsCommand
+public partial class NatsConnection : IAsyncDisposable, INatsConnection
 {
 #pragma warning disable SA1401
     /// <summary>

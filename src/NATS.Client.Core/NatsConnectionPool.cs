@@ -52,7 +52,7 @@ public sealed class NatsConnectionPool : IAsyncDisposable
         }
     }
 
-    public INatsCommand GetCommand()
+    public INatsConnection GetCommand()
     {
         return GetConnection();
     }

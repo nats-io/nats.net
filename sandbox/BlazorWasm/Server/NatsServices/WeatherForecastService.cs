@@ -11,18 +11,18 @@ public class WeatherForecastService : IHostedService, IAsyncDisposable
     };
 
     private readonly ILogger<WeatherForecastService> _logger;
-    private readonly INatsCommand _natsCommand;
+    private readonly INatsConnection _natsConnection;
     private NatsReplyHandle? _replyHandle;
 
-    public WeatherForecastService(ILogger<WeatherForecastService> logger, INatsCommand natsCommand)
+    public WeatherForecastService(ILogger<WeatherForecastService> logger, INatsConnection natsConnection)
     {
         _logger = logger;
-        _natsCommand = natsCommand;
+        _natsConnection = natsConnection;
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        _replyHandle = await _natsCommand.ReplyAsync<object, WeatherForecast[]>("weather", req =>
+        _replyHandle = await _natsConnection.ReplyAsync<object, WeatherForecast[]>("weather", req =>
         {
             return Enumerable.Range(1, 5).Select(index => new WeatherForecast
             {

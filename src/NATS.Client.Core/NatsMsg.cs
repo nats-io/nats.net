@@ -9,7 +9,7 @@ public record NatsMsg<T>(string Subject, T Data) : NatsMsgBase(Subject);
 
 public abstract record NatsMsgBase(string Subject)
 {
-    internal INatsCommand? Connection { get; init; }
+    internal INatsConnection? Connection { get; init; }
 
     public string? ReplyTo { get; init; }
 

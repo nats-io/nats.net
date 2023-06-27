@@ -4,8 +4,9 @@ using System.Buffers;
 using System.Diagnostics;
 using System.Text;
 using Microsoft.Extensions.Primitives;
+using NATS.Client.Core.Internal;
 
-namespace NATS.Client.Core.Internal;
+namespace NATS.Client.Core;
 
 public class HeaderParser
 {

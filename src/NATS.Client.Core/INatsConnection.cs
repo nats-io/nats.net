@@ -2,10 +2,8 @@ using System.Buffers;
 
 namespace NATS.Client.Core;
 
-public interface INatsCommand
+public interface INatsConnection
 {
-    ValueTask FlushAsync(CancellationToken cancellationToken = default);
-
     /// <summary>
     /// Send PING command and await PONG. Return value is similar as Round Trip Time (RTT).
     /// </summary>
@@ -69,6 +67,4 @@ public interface INatsCommand
     /// <typeparam name="T">Specifies the type of data that may be received from the NATS Server.</typeparam>
     /// <returns>A <see cref="ValueTask{TResult}"/> that represents the asynchronous send operation.</returns>
     ValueTask<NatsSub<T>> SubscribeAsync<T>(string subject, in NatsSubOpts? opts = default, CancellationToken cancellationToken = default);
-
-    IObservable<T> AsObservable<T>(string subject);
 }

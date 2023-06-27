@@ -16,5 +16,4 @@ public partial class NatsConnection
         var serializer = opts?.Serializer ?? Options.Serializer;
         return SubAsync<NatsSub<T>>(subject, opts?.QueueGroup, NatsSubModelBuilder<T>.For(serializer), cancellationToken);
     }
-
 }
