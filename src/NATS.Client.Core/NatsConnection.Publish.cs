@@ -1,5 +1,4 @@
 using System.Buffers;
-using NATS.Client.Core.Commands;
 
 namespace NATS.Client.Core;
 
@@ -8,31 +7,7 @@ public partial class NatsConnection
     /// <inheritdoc />
     public ValueTask PublishAsync(string subject, ReadOnlySequence<byte> payload = default, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
-        var replyTo = opts?.ReplyTo;
-        var headers = opts?.Headers;
-
-        headers?.SetReadOnly();
-
-        if (ConnectionState == NatsConnectionState.Open)
-        {
-            var command = AsyncPublishBytesCommand.Create(_pool, GetCommandTimer(cancellationToken), subject, replyTo, headers, payload);
-            if (TryEnqueueCommand(command))
-            {
-                return command.AsValueTask();
-            }
-            else
-            {
-                return EnqueueAndAwaitCommandAsync(command);
-            }
-        }
-        else
-        {
-            return WithConnectAsync(subject, replyTo, headers, payload, cancellationToken, static (self, s, r, h, p, token) =>
-            {
-                var command = AsyncPublishBytesCommand.Create(self._pool, self.GetCommandTimer(token), s, r, h, p);
-                return self.EnqueueAndAwaitCommandAsync(command);
-            });
-        }
+        return PubAsync(subject, opts?.ReplyTo, payload, opts?.Headers, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -44,32 +19,8 @@ public partial class NatsConnection
     /// <inheritdoc />
     public ValueTask PublishAsync<T>(string subject, T data, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
-        var replyTo = opts?.ReplyTo;
         var serializer = opts?.Serializer ?? Options.Serializer;
-        var headers = opts?.Headers;
-
-        headers?.SetReadOnly();
-
-        if (ConnectionState == NatsConnectionState.Open)
-        {
-            var command = AsyncPublishCommand<T>.Create(_pool, GetCommandTimer(cancellationToken), subject, replyTo, headers, data, serializer);
-            if (TryEnqueueCommand(command))
-            {
-                return command.AsValueTask();
-            }
-            else
-            {
-                return EnqueueAndAwaitCommandAsync(command);
-            }
-        }
-        else
-        {
-            return WithConnectAsync(subject, replyTo, headers, data, serializer, cancellationToken, static (self, s, r, h, v, ser, token) =>
-            {
-                var command = AsyncPublishCommand<T>.Create(self._pool, self.GetCommandTimer(token), s, r, h, v, ser);
-                return self.EnqueueAndAwaitCommandAsync(command);
-            });
-        }
+        return PubModelAsync<T>(subject, data, serializer, opts?.ReplyTo, opts?.Headers, cancellationToken);
     }
 
     /// <inheritdoc />

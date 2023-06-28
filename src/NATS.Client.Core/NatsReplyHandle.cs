@@ -4,7 +4,7 @@ namespace NATS.Client.Core;
 
 public static class NatReplyUtils
 {
-    public static async Task<NatsReplyHandle> ReplyAsync<TRequest, TResponse>(this INatsCommand nats, string subject, Func<TRequest, TResponse> reply)
+    public static async Task<NatsReplyHandle> ReplyAsync<TRequest, TResponse>(this INatsConnection nats, string subject, Func<TRequest, TResponse> reply)
     {
         var sub = await nats.SubscribeAsync<TRequest>(subject).ConfigureAwait(false);
         var reader = Task.Run(async () =>
@@ -25,7 +25,7 @@ public static class NatReplyUtils
         return new NatsReplyHandle(sub, reader);
     }
 
-    public static async Task<TResponse> RequestAsync<TRequest, TResponse>(this INatsCommand nats, string subject, TRequest request)
+    public static async Task<TResponse> RequestAsync<TRequest, TResponse>(this INatsConnection nats, string subject, TRequest request)
     {
         var bs = ((NatsConnection)nats).InboxPrefix.ToArray(); // TODO: Fix inbox prefix
         var replyTo = $"{Encoding.ASCII.GetString(bs)}{Guid.NewGuid():N}";

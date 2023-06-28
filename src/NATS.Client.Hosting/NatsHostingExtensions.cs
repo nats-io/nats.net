@@ -34,7 +34,7 @@ public static class NatsHostingExtensions
                 return pool.GetConnection();
             });
 
-            services.TryAddTransient<INatsCommand>(static provider =>
+            services.TryAddTransient<INatsConnection>(static provider =>
             {
                 var pool = provider.GetRequiredService<NatsConnectionPool>();
                 return pool.GetCommand();
@@ -59,30 +59,11 @@ public static class NatsHostingExtensions
                 return conn;
             });
 
-            services.TryAddSingleton<INatsCommand>(static provider =>
+            services.TryAddSingleton<INatsConnection>(static provider =>
             {
                 return provider.GetRequiredService<NatsConnection>();
             });
         }
-
-        return services;
-    }
-
-    /// <summary>
-    /// Add Singleton NatsShardingConnection to ServiceCollection.
-    /// </summary>
-    public static IServiceCollection AddNats(this IServiceCollection services, int poolSize, string[] urls, Func<NatsOptions, NatsOptions>? configureOptions = null, Action<NatsConnection>? configureConnection = null)
-    {
-        services.TryAddSingleton<NatsShardingConnection>(provider =>
-        {
-            var options = NatsOptions.Default with { LoggerFactory = provider.GetRequiredService<ILoggerFactory>() };
-            if (configureOptions != null)
-            {
-                options = configureOptions(options);
-            }
-
-            return new NatsShardingConnection(poolSize, options, urls, configureConnection ?? (_ => { }));
-        });
 
         return services;
     }

@@ -3,18 +3,13 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace NATS.Client.Core;
 
-public record NatsMsg(string Subject, ReadOnlyMemory<byte> Data) : NatsMsgBase(Subject);
-
-public record NatsMsg<T>(string Subject, T Data) : NatsMsgBase(Subject);
-
-public abstract record NatsMsgBase(string Subject)
+public readonly record struct NatsMsg(
+    string Subject,
+    string? ReplyTo,
+    NatsHeaders? Headers,
+    ReadOnlyMemory<byte> Data,
+    INatsConnection? Connection)
 {
-    internal INatsCommand? Connection { get; init; }
-
-    public string? ReplyTo { get; init; }
-
-    public NatsHeaders? Headers { get; init; }
-
     public ValueTask ReplyAsync(ReadOnlySequence<byte> data = default, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         CheckReplyPreconditions();
@@ -27,6 +22,28 @@ public abstract record NatsMsgBase(string Subject)
         return Connection.PublishAsync(msg with { Subject = ReplyTo! }, cancellationToken);
     }
 
+    [MemberNotNull(nameof(Connection))]
+    private void CheckReplyPreconditions()
+    {
+        if (Connection == default)
+        {
+            throw new NatsException("unable to send reply; message did not originate from a subscription");
+        }
+
+        if (string.IsNullOrWhiteSpace(ReplyTo))
+        {
+            throw new NatsException("unable to send reply; ReplyTo is empty");
+        }
+    }
+}
+
+public readonly record struct NatsMsg<T>(
+    string Subject,
+    string? ReplyTo,
+    NatsHeaders? Headers,
+    T? Data,
+    INatsConnection? Connection)
+{
     public ValueTask ReplyAsync<TReply>(TReply data, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         CheckReplyPreconditions();

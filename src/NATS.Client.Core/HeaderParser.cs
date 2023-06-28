@@ -4,10 +4,11 @@ using System.Buffers;
 using System.Diagnostics;
 using System.Text;
 using Microsoft.Extensions.Primitives;
+using NATS.Client.Core.Internal;
 
-namespace NATS.Client.Core.Internal;
+namespace NATS.Client.Core;
 
-internal class HeaderParser
+public class HeaderParser
 {
     private const byte ByteCR = (byte)'\r';
     private const byte ByteLF = (byte)'\n';

@@ -9,7 +9,7 @@ builder.Services.AddNats();
 
 var app = builder.Build();
 
-app.MapGet("/subscribe", async (INatsCommand command) =>
+app.MapGet("/subscribe", async (INatsConnection command) =>
 {
     var subscription = await command.SubscribeAsync("foo");
 
@@ -22,6 +22,6 @@ app.MapGet("/subscribe", async (INatsCommand command) =>
     });
 });
 
-app.MapGet("/publish", async (INatsCommand command) => await command.PublishAsync("foo", 99));
+app.MapGet("/publish", async (INatsConnection command) => await command.PublishAsync("foo", 99));
 
 app.Run();

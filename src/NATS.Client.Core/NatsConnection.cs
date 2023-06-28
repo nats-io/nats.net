@@ -16,7 +16,7 @@ public enum NatsConnectionState
     Reconnecting,
 }
 
-public partial class NatsConnection : IAsyncDisposable, INatsCommand
+public partial class NatsConnection : IAsyncDisposable, INatsConnection
 {
 #pragma warning disable SA1401
     /// <summary>
@@ -90,7 +90,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsCommand
 
     public ServerInfo? ServerInfo { get; internal set; } // server info is set when received INFO
 
-    internal HeaderParser HeaderParser { get; }
+    public HeaderParser HeaderParser { get; }
 
     /// <summary>
     /// Connect socket and write CONNECT command to nats server.

@@ -2,9 +2,8 @@ using System.Diagnostics;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
-using NATS.Client.Core.Internal;
 
-namespace NATS.Client.Core;
+namespace NATS.Client.Core.Internal;
 
 internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
 {

@@ -64,17 +64,17 @@ public record Person(int Age, string Name);
 
 public class Runner : ConsoleAppBase
 {
-    private readonly INatsCommand _command;
+    private readonly INatsConnection _connection;
 
-    public Runner(INatsCommand command)
+    public Runner(INatsConnection connection)
     {
-        _command = command;
+        _connection = connection;
     }
 
     [RootCommand]
     public async Task Run()
     {
-        var subscription = await _command.SubscribeAsync("foo");
+        var subscription = await _connection.SubscribeAsync("foo");
 
         _ = Task.Run(async () =>
         {
@@ -84,8 +84,8 @@ public class Runner : ConsoleAppBase
             }
         });
 
-        await _command.PingAsync();
-        await _command.PublishAsync("foo");
+        await _connection.PingAsync();
+        await _connection.PublishAsync("foo");
     }
 }
 
