@@ -5,7 +5,7 @@ namespace NATS.Client.Core;
 
 public partial class NatsConnection
 {
-    public ValueTask PubAsync(string subject, string? replyTo = default, ReadOnlySequence<byte> payload = default, NatsHeaders? headers = default, CancellationToken cancellationToken = default)
+    internal ValueTask PubAsync(string subject, string? replyTo = default, ReadOnlySequence<byte> payload = default, NatsHeaders? headers = default, CancellationToken cancellationToken = default)
     {
         headers?.SetReadOnly();
 
@@ -31,7 +31,7 @@ public partial class NatsConnection
         }
     }
 
-    public ValueTask PubModelAsync<T>(string subject, T data, INatsSerializer serializer, string? replyTo = default, NatsHeaders? headers = default, CancellationToken cancellationToken = default)
+    internal ValueTask PubModelAsync<T>(string subject, T data, INatsSerializer serializer, string? replyTo = default, NatsHeaders? headers = default, CancellationToken cancellationToken = default)
     {
         headers?.SetReadOnly();
 
@@ -57,7 +57,7 @@ public partial class NatsConnection
         }
     }
 
-    public ValueTask<T> SubAsync<T>(string subject, string? queueGroup, INatsSubBuilder<T> builder, CancellationToken cancellationToken = default)
+    internal ValueTask<T> SubAsync<T>(string subject, string? queueGroup, INatsSubBuilder<T> builder, CancellationToken cancellationToken = default)
         where T : INatsSub
     {
         var sub = builder.Build(subject, queueGroup, this, _subscriptionManager);

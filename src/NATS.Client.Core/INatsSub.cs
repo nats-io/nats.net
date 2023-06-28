@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 
 namespace NATS.Client.Core;
 
-public interface INatsSub : IAsyncDisposable
+internal interface INatsSub : IAsyncDisposable
 {
     string Subject { get; }
 
@@ -14,13 +14,13 @@ public interface INatsSub : IAsyncDisposable
     ValueTask ReceiveAsync(string subject, string? replyTo, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer);
 }
 
-public interface INatsSubBuilder<out T>
+internal interface INatsSubBuilder<out T>
     where T : INatsSub
 {
     T Build(string subject, string? queueGroup, NatsConnection connection, SubscriptionManager manager);
 }
 
-public class NatsSubBuilder : INatsSubBuilder<NatsSub>
+internal class NatsSubBuilder : INatsSubBuilder<NatsSub>
 {
     public static readonly NatsSubBuilder Default = new();
 
@@ -31,7 +31,7 @@ public class NatsSubBuilder : INatsSubBuilder<NatsSub>
     }
 }
 
-public class NatsSubModelBuilder<T> : INatsSubBuilder<NatsSub<T>>
+internal class NatsSubModelBuilder<T> : INatsSubBuilder<NatsSub<T>>
 {
     private static readonly ConcurrentDictionary<INatsSerializer, NatsSubModelBuilder<T>> Cache = new();
     private readonly INatsSerializer _serializer;

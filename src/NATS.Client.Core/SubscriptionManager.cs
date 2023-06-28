@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 
 namespace NATS.Client.Core;
 
-public sealed class SubscriptionManager : IAsyncDisposable
+internal sealed class SubscriptionManager : IAsyncDisposable
 {
     private readonly ILogger<SubscriptionManager> _logger;
     private readonly object _gate = new();
