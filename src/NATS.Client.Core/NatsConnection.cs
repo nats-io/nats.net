@@ -25,7 +25,6 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
     public Func<(string Host, int Port), ValueTask<(string Host, int Port)>>? OnConnectingAsync;
 
     internal readonly ConnectionStatsCounter Counter; // allow to call from external sources
-    internal readonly ReadOnlyMemory<byte> InboxPrefix;
 #pragma warning restore SA1401
     private readonly object _gate = new object();
     private readonly WriterState _writerState;
@@ -71,11 +70,10 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         _writerState = new WriterState(options);
         _commandWriter = _writerState.CommandBuffer.Writer;
         _subscriptionManager = new SubscriptionManager(this);
-        InboxPrefix = Encoding.ASCII.GetBytes($"{options.InboxPrefix}{Guid.NewGuid()}.");
         _logger = options.LoggerFactory.CreateLogger<NatsConnection>();
         _clientOptions = new ClientOptions(Options);
         HeaderParser = new HeaderParser(options.HeaderEncoding);
-        InboxSubscriber = new InboxSubscriber(this);
+        InboxSubscriber = new InboxSubscriber(this, prefix1: options.InboxPrefix);
     }
 
     // events

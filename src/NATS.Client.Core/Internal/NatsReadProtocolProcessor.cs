@@ -182,7 +182,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                         }
 
                         var msgHeader = buffer.Slice(0, positionBeforePayload.Value);
-                        var (subject, sid, payloadLength, replyTo, reponseId) = ParseMessageHeader(msgHeader);
+                        var (subject, sid, payloadLength, replyTo) = ParseMessageHeader(msgHeader);
 
                         if (payloadLength == 0)
                         {
@@ -432,7 +432,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#msg
     // MSG <subject> <sid> [reply-to] <#bytes>\r\n[payload]
-    private (string subject, int sid, int payloadLength, string? replyTo, int? responseId) ParseMessageHeader(ReadOnlySpan<byte> msgHeader)
+    private (string subject, int sid, int payloadLength, string? replyTo) ParseMessageHeader(ReadOnlySpan<byte> msgHeader)
     {
         msgHeader = msgHeader.Slice(4);
         Split(msgHeader, out var subjectBytes, out msgHeader);
@@ -443,24 +443,9 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
 
         if (msgHeader.Length == 0)
         {
-            int? responseId = null;
-
-            // Parse: _INBOX.RANDOM-GUID.ID
-            if (subjectBytes.StartsWith(_connection.InboxPrefix.Span))
-            {
-                var lastIndex = subjectBytes.LastIndexOf((byte)'.');
-                if (lastIndex != -1)
-                {
-                    if (Utf8Parser.TryParse(subjectBytes.Slice(lastIndex + 1), out int id, out _))
-                    {
-                        responseId = id;
-                    }
-                }
-            }
-
             var sid = GetInt32(sidBytes);
             var size = GetInt32(replyToOrSizeBytes);
-            return (subject, sid, size, null, responseId);
+            return (subject, sid, size, null);
         }
         else
         {
@@ -470,11 +455,11 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
             var sid = GetInt32(sidBytes);
             var payloadLength = GetInt32(bytesSlice);
             var replyTo = Encoding.ASCII.GetString(replyToBytes);
-            return (subject, sid, payloadLength, replyTo, null);
+            return (subject, sid, payloadLength, replyTo);
         }
     }
 
-    private (string subject, int sid, int payloadLength, string? replyTo, int? responseId) ParseMessageHeader(in ReadOnlySequence<byte> msgHeader)
+    private (string subject, int sid, int payloadLength, string? replyTo) ParseMessageHeader(in ReadOnlySequence<byte> msgHeader)
     {
         if (msgHeader.IsSingleSegment)
         {
