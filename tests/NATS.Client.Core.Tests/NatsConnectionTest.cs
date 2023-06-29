@@ -67,13 +67,13 @@ public abstract partial class NatsConnectionTest
 
             var key = Guid.NewGuid().ToString();
 
-            var actual = new List<SampleClass>();
+            var actual = new List<SampleClass?>();
             var signalComplete = new WaitSignal();
             var sub = await subConnection.SubscribeAsync<SampleClass>(key);
             var register = sub.Register(x =>
             {
                 actual.Add(x.Data);
-                if (x.Data.Id == 30)
+                if (x.Data?.Id == 30)
                     signalComplete.Pulse();
             });
             await subConnection.PingAsync(); // wait for subscribe complete
@@ -138,9 +138,9 @@ public abstract partial class NatsConnectionTest
         // });
 
         // timeout check
-        await Assert.ThrowsAsync<TimeoutException>(async () =>
+        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
         {
-            await pubConnection.RequestAsync<int, string>("foo", 10);
+            await pubConnection.RequestAsync<int, string>("foo", 10, timeout: TimeSpan.FromSeconds(2));
         });
     }
 

@@ -9,7 +9,7 @@ public partial class NatsConnection
     {
         if (ConnectionState == NatsConnectionState.Open)
         {
-            var command = AsyncPingCommand.Create(this, _pool, GetCommandTimer(cancellationToken));
+            var command = AsyncPingCommand.Create(this, _pool, GetCancellationTimer(cancellationToken));
             if (TryEnqueueCommand(command))
             {
                 return command.AsValueTask();
@@ -23,7 +23,7 @@ public partial class NatsConnection
         {
             return WithConnectAsync(cancellationToken, static (self, token) =>
             {
-                var command = AsyncPingCommand.Create(self, self._pool, self.GetCommandTimer(token));
+                var command = AsyncPingCommand.Create(self, self._pool, self.GetCancellationTimer(token));
                 return self.EnqueueAndAwaitCommandAsync(command);
             });
         }
@@ -33,11 +33,11 @@ public partial class NatsConnection
     {
         if (ConnectionState == NatsConnectionState.Open)
         {
-            EnqueueCommandSync(PingCommand.Create(_pool, GetCommandTimer(cancellationToken)));
+            EnqueueCommandSync(PingCommand.Create(_pool, GetCancellationTimer(cancellationToken)));
         }
         else
         {
-            WithConnect(cancellationToken, static (self, token) => self.EnqueueCommandSync(PingCommand.Create(self._pool, self.GetCommandTimer(token))));
+            WithConnect(cancellationToken, static (self, token) => self.EnqueueCommandSync(PingCommand.Create(self._pool, self.GetCancellationTimer(token))));
         }
     }
 }

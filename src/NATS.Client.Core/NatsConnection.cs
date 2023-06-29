@@ -75,6 +75,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         _logger = options.LoggerFactory.CreateLogger<NatsConnection>();
         _clientOptions = new ClientOptions(Options);
         HeaderParser = new HeaderParser(options.HeaderEncoding);
+        InboxSubscriber = new InboxSubscriber(this);
     }
 
     // events
@@ -91,6 +92,10 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
     public ServerInfo? ServerInfo { get; internal set; } // server info is set when received INFO
 
     public HeaderParser HeaderParser { get; }
+
+    internal InboxSubscriber InboxSubscriber { get; }
+
+    internal ObjectPool ObjectPool => _pool;
 
     /// <summary>
     /// Connect socket and write CONNECT command to nats server.
@@ -183,13 +188,13 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
     internal ValueTask PostPongAsync()
     {
-        return EnqueueCommandAsync(PongCommand.Create(_pool, GetCommandTimer(CancellationToken.None)));
+        return EnqueueCommandAsync(PongCommand.Create(_pool, GetCancellationTimer(CancellationToken.None)));
     }
 
     // called only internally
     internal ValueTask SubscribeCoreAsync(int sid, string subject, string? queueGroup, CancellationToken cancellationToken)
     {
-        var command = AsyncSubscribeCommand.Create(_pool, GetCommandTimer(cancellationToken), sid, subject, queueGroup);
+        var command = AsyncSubscribeCommand.Create(_pool, GetCancellationTimer(cancellationToken), sid, subject, queueGroup);
         return EnqueueAndAwaitCommandAsync(command);
     }
 
@@ -379,15 +384,15 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
             // add CONNECT and PING command to priority lane
             _writerState.PriorityCommands.Clear();
-            var connectCommand = AsyncConnectCommand.Create(_pool, _clientOptions, GetCommandTimer(CancellationToken.None));
+            var connectCommand = AsyncConnectCommand.Create(_pool, _clientOptions, GetCancellationTimer(CancellationToken.None));
             _writerState.PriorityCommands.Add(connectCommand);
-            _writerState.PriorityCommands.Add(PingCommand.Create(_pool, GetCommandTimer(CancellationToken.None)));
+            _writerState.PriorityCommands.Add(PingCommand.Create(_pool, GetCancellationTimer(CancellationToken.None)));
 
             if (reconnect)
             {
                 // Add SUBSCRIBE command to priority lane
                 var subscribeCommand =
-                    AsyncSubscribeBatchCommand.Create(_pool, GetCommandTimer(CancellationToken.None), _subscriptionManager.GetExistingSubscriptions().ToArray());
+                    AsyncSubscribeBatchCommand.Create(_pool, GetCancellationTimer(CancellationToken.None), _subscriptionManager.GetExistingSubscriptions().ToArray());
                 _writerState.PriorityCommands.Add(subscribeCommand);
             }
 

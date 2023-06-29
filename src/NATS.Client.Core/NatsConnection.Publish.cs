@@ -17,7 +17,7 @@ public partial class NatsConnection
     }
 
     /// <inheritdoc />
-    public ValueTask PublishAsync<T>(string subject, T data, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
+    public ValueTask PublishAsync<T>(string subject, T? data, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         var serializer = opts?.Serializer ?? Options.Serializer;
         return PubModelAsync<T>(subject, data, serializer, opts?.ReplyTo, opts?.Headers, cancellationToken);

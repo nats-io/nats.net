@@ -66,16 +66,18 @@ public partial class NatsConnection
         }
     }
 
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    internal CancellationTimer GetCancellationTimer(CancellationToken cancellationToken, TimeSpan timeout = default)
+    {
+        if (timeout == default)
+            timeout = Options.CommandTimeout;
+        return _cancellationTimerPool.Start(timeout, cancellationToken);
+    }
+
     private async ValueTask EnqueueAndAwaitCommandAsync(IAsyncCommand command)
     {
         await EnqueueCommandAsync(command).ConfigureAwait(false);
         await command.AsValueTask().ConfigureAwait(false);
-    }
-
-    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-    private CancellationTimer GetCommandTimer(CancellationToken cancellationToken)
-    {
-        return _cancellationTimerPool.Start(Options.CommandTimeout, cancellationToken);
     }
 
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
