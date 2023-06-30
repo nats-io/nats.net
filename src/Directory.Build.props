@@ -1,8 +1,27 @@
 <Project>
     <Import Project="..\Directory.Build.props" />
 
+    <PropertyGroup>
+        <!-- NuGet Packaging -->
+        <PackageVersion>$([System.IO.File]::ReadAllText("$(MSBuildThisFileDirectory)..\version.txt"))</PackageVersion>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <NoWarn>$(NoWarn);CS1591</NoWarn>
+        <SignAssembly>true</SignAssembly>
+        <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)..\opensource.snk</AssemblyOriginatorKeyFile>
+        <Company>CNCF</Company>
+        <Authors>The NATS Authors</Authors>
+        <Copyright>Copyright © The NATS Authors 2016-$([System.DateTime]::Now.ToString(yyyy))</Copyright>
+        <PackageProjectUrl>https://github.com/nats-io/nats.net.v2</PackageProjectUrl>
+        <RepositoryUrl>$(PackageProjectUrl)</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+        <PackageIcon>Icon.png</PackageIcon>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+    </PropertyGroup>
+
     <ItemGroup>
-        <None Include="..\..\LICENSE" Pack="true" PackagePath=""/>
-        <None Include="..\..\README.md" Pack="true" PackagePath=""/>
+        <None Include="$(MSBuildThisFileDirectory)..\LICENSE" Pack="true" PackagePath=""/>
+        <None Include="$(MSBuildThisFileDirectory)..\README.md" Pack="true" PackagePath=""/>
+        <None Include="$(MSBuildThisFileDirectory)..\Icon.png" Pack="true" PackagePath=""/>
     </ItemGroup>
 </Project>

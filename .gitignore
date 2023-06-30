@@ -114,4 +114,6 @@ nuget/*.unitypackage
 # Jetbrains Rider
 .idea/
 
-# Unity
+# NuGet package
+/dist
+
