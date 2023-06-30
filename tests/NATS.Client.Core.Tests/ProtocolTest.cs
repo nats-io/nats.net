@@ -193,7 +193,7 @@ public class ProtocolTest
 
         // Manual unsubscribe
         {
-            proxy.ClearFrames();
+            await proxy.FlushFramesAsync(nats);
 
             await using var sub = await nats.SubscribeAsync<int>("foo2");
 
@@ -201,7 +201,7 @@ public class ProtocolTest
 
             var sid = ((INatsSub)sub).Sid;
 
-            await Retry.Until("all frames arrived", () => proxy.ClientFrames.Count >= 2);
+            await Retry.Until("all frames arrived", () => proxy.ClientFrames.Count == 2);
 
             Assert.Equal($"SUB foo2 {sid}", proxy.ClientFrames[0].Message);
             Assert.Equal($"UNSUB {sid}", proxy.ClientFrames[1].Message);

@@ -1,0 +1,48 @@
+name: Release
+
+on: workflow_dispatch
+
+permissions:
+  contents: write
+
+jobs:
+  nuget:
+    name: dotnet
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - id: tag
+        name: Determine tag
+        run: |
+          version="$(head -n 1 version.txt)"
+          ref_name="v$version"
+          create=true
+          if ["$(git ls-remote origin "refs/tags/$ref_name" | wc -l)" = "1" ]; then
+            create=false
+          fi
+
+          echo "version=$version" | tee -a "$GITHUB_OUTPUT"
+          echo "ref-name=$ref_name" | tee -a "$GITHUB_OUTPUT"
+          echo "create=$create" | tee -a "$GITHUB_OUTPUT"
+
+      - if: ${{ fromJSON(steps.tag.outputs.create) }}
+        name: Setup dotnet
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '6.x'
+
+      - if: ${{ fromJSON(steps.tag.outputs.create) }}
+        name: Pack
+        run: dotnet pack -c Release -o dist
+
+      - if: ${{ fromJSON(steps.tag.outputs.create) }}
+        name: Push
+        run: dotnet nuget push dist/*.nupkg -s https://api.nuget.org/v3/index.json -k "${{ secrets.NUGET_API_KEY }}" --skip-duplicate
+
+      - if: ${{ fromJSON(steps.tag.outputs.create) }}
+        name: Tag
+        run: |
+          git tag "${{ steps.tag.outputs.ref-name }}"
+          git push origin "${{ steps.tag.outputs.ref-name }}"
