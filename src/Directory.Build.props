@@ -5,9 +5,6 @@
         <!-- NuGet Packaging -->
         <PackageVersion>$([System.IO.File]::ReadAllText("$(MSBuildThisFileDirectory)..\version.txt"))</PackageVersion>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
-        <NoWarn>$(NoWarn);CS1591</NoWarn>
-        <SignAssembly>true</SignAssembly>
-        <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)..\opensource.snk</AssemblyOriginatorKeyFile>
         <Company>CNCF</Company>
         <Authors>The NATS Authors</Authors>
         <Copyright>Copyright © The NATS Authors 2016-$([System.DateTime]::Now.ToString(yyyy))</Copyright>
