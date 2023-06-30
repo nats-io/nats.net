@@ -9,6 +9,8 @@ public interface INatsSerializer
     int Serialize<T>(ICountableBufferWriter bufferWriter, T? value);
 
     T? Deserialize<T>(in ReadOnlySequence<byte> buffer);
+
+    object? Deserialize(in ReadOnlySequence<byte> buffer, Type type);
 }
 
 public interface ICountableBufferWriter : IBufferWriter<byte>
@@ -61,6 +63,12 @@ public sealed class JsonNatsSerializer : INatsSerializer
     {
         var reader = new Utf8JsonReader(buffer); // Utf8JsonReader is ref struct, no allocate.
         return JsonSerializer.Deserialize<T>(ref reader, _options);
+    }
+
+    public object? Deserialize(in ReadOnlySequence<byte> buffer, Type type)
+    {
+        var reader = new Utf8JsonReader(buffer); // Utf8JsonReader is ref struct, no allocate.
+        return JsonSerializer.Deserialize(ref reader, type, _options);
     }
 
     private sealed class NullBufferWriter : IBufferWriter<byte>

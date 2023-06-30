@@ -61,6 +61,12 @@ public class SubscriptionTest
         await Retry.Until(
             "unsubscribe message received",
             () => proxy.ClientFrames.Count(f => f.Message.StartsWith("UNSUB")) == 1,
-            async () => await nats.PublishAsync("foo", 1));
+            async () =>
+            {
+                GC.Collect();
+                await nats.PublishAsync("foo", 1);
+            },
+            timeout: TimeSpan.FromSeconds(30),
+            retryDelay: TimeSpan.FromSeconds(.5));
     }
 }

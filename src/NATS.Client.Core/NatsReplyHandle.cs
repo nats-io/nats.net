@@ -1,10 +1,26 @@
-using System.Text;
-
 namespace NATS.Client.Core;
+
+public readonly struct NatsReplyHandle : IAsyncDisposable
+{
+    private readonly NatsSubBase _sub;
+    private readonly Task _reader;
+
+    internal NatsReplyHandle(NatsSubBase sub, Task reader)
+    {
+        _sub = sub;
+        _reader = reader;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _sub.DisposeAsync().ConfigureAwait(false);
+        await _reader.ConfigureAwait(false);
+    }
+}
 
 public static class NatReplyUtils
 {
-    public static async Task<NatsReplyHandle> ReplyAsync<TRequest, TResponse>(this INatsConnection nats, string subject, Func<TRequest, TResponse> reply)
+    public static async Task<NatsReplyHandle> ReplyAsync<TRequest, TResponse>(this INatsConnection nats, string subject, Func<TRequest?, TResponse> reply)
     {
         var sub = await nats.SubscribeAsync<TRequest>(subject).ConfigureAwait(false);
         var reader = Task.Run(async () =>
@@ -25,55 +41,36 @@ public static class NatReplyUtils
         return new NatsReplyHandle(sub, reader);
     }
 
-    public static async Task<TResponse> RequestAsync<TRequest, TResponse>(this INatsConnection nats, string subject, TRequest request)
+    public static async ValueTask<TReply?> RequestAsync<TRequest, TReply>(this NatsConnection nats, string subject, TRequest data, CancellationToken cancellationToken = default, TimeSpan timeout = default)
     {
-        var bs = ((NatsConnection)nats).InboxPrefix.ToArray(); // TODO: Fix inbox prefix
-        var replyTo = $"{Encoding.ASCII.GetString(bs)}{Guid.NewGuid():N}";
+        var serializer = nats.Options.Serializer;
+        var inboxSubscriber = nats.InboxSubscriber;
+        await inboxSubscriber.EnsureStartedAsync().ConfigureAwait(false);
 
-        // TODO: Optimize by using connection wide inbox subscriber
-        var sub = await nats.SubscribeAsync<TResponse>(replyTo).ConfigureAwait(false);
-
-        await nats.PublishAsync(subject, request, new NatsPubOpts { ReplyTo = replyTo }).ConfigureAwait(false);
-
-        return await Task.Run(async () =>
+        if (!nats.ObjectPool.TryRent<MsgWrapper>(out var wrapper))
         {
-            try
-            {
-                // TODO: Implement configurable request timeout
-                var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-                await foreach (var msg in sub.Msgs.ReadAllAsync(cts.Token))
-                {
-                    return msg.Data;
-                }
+            wrapper = new MsgWrapper();
+        }
 
-                throw new NatsException("Request-reply subscriber closed unexpectedly");
-            }
-            catch (OperationCanceledException e)
-            {
-                throw new TimeoutException("Request-reply timed-out", e);
-            }
-            finally
-            {
-                await sub.DisposeAsync().ConfigureAwait(false);
-            }
-        }).ConfigureAwait(false);
-    }
-}
+        var cancellationTimer = nats.GetCancellationTimer(cancellationToken, timeout);
+        wrapper.SetSerializer<TReply>(serializer, cancellationTimer.Token);
 
-public class NatsReplyHandle : IAsyncDisposable
-{
-    private readonly NatsSubBase _sub;
-    private readonly Task _reader;
+        var replyTo = inboxSubscriber.Register(wrapper);
+        try
+        {
+            await nats.PubModelAsync<TRequest>(subject, data, serializer, replyTo, cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
 
-    internal NatsReplyHandle(NatsSubBase sub, Task reader)
-    {
-        _sub = sub;
-        _reader = reader;
-    }
+            var dataReply = await wrapper.MsgRetrieveAsync().ConfigureAwait(false);
 
-    public async ValueTask DisposeAsync()
-    {
-        await _sub.DisposeAsync().ConfigureAwait(false);
-        await _reader.ConfigureAwait(false);
+            nats.ObjectPool.Return(wrapper);
+            cancellationTimer.TryReturn();
+
+            return (TReply?)dataReply;
+        }
+        finally
+        {
+            inboxSubscriber.Unregister(replyTo);
+        }
     }
 }

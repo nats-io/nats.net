@@ -10,6 +10,30 @@ public readonly record struct NatsMsg(
     ReadOnlyMemory<byte> Data,
     INatsConnection? Connection)
 {
+    internal static NatsMsg Build(
+        string subject,
+        string? replyTo,
+        in ReadOnlySequence<byte>? headersBuffer,
+        in ReadOnlySequence<byte> payloadBuffer,
+        INatsConnection? connection,
+        HeaderParser headerParser)
+    {
+        NatsHeaders? headers = null;
+
+        if (headersBuffer != null)
+        {
+            headers = new NatsHeaders();
+            if (!headerParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), headers))
+            {
+                throw new NatsException("Error parsing headers");
+            }
+
+            headers.SetReadOnly();
+        }
+
+        return new NatsMsg(subject, replyTo, headers, payloadBuffer.ToArray(), connection);
+    }
+
     public ValueTask ReplyAsync(ReadOnlySequence<byte> data = default, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         CheckReplyPreconditions();
@@ -44,6 +68,33 @@ public readonly record struct NatsMsg<T>(
     T? Data,
     INatsConnection? Connection)
 {
+    internal static NatsMsg<T> Build(
+        string subject,
+        string? replyTo,
+        in ReadOnlySequence<byte>? headersBuffer,
+        in ReadOnlySequence<byte> payloadBuffer,
+        INatsConnection? connection,
+        HeaderParser headerParser,
+        INatsSerializer serializer)
+    {
+        var data = serializer.Deserialize<T>(payloadBuffer);
+
+        NatsHeaders? headers = null;
+
+        if (headersBuffer != null)
+        {
+            headers = new NatsHeaders();
+            if (!headerParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), headers))
+            {
+                throw new NatsException("Error parsing headers");
+            }
+
+            headers.SetReadOnly();
+        }
+
+        return new NatsMsg<T>(subject, replyTo, headers, data, connection);
+    }
+
     public ValueTask ReplyAsync<TReply>(TReply data, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         CheckReplyPreconditions();

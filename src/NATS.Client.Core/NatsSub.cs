@@ -57,19 +57,15 @@ public sealed class NatsSub : NatsSubBase
 
     public override ValueTask ReceiveAsync(string subject, string? replyTo, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
     {
-        NatsHeaders? natsHeaders = null;
-        if (headersBuffer != null)
-        {
-            natsHeaders = new NatsHeaders();
-            if (!Connection.HeaderParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), natsHeaders))
-            {
-                throw new NatsException("Error parsing headers");
-            }
+        var natsMsg = NatsMsg.Build(
+            subject,
+            replyTo,
+            headersBuffer,
+            payloadBuffer,
+            Connection,
+            Connection.HeaderParser);
 
-            natsHeaders.SetReadOnly();
-        }
-
-        return _msgs.Writer.WriteAsync(new NatsMsg(subject, replyTo, natsHeaders, payloadBuffer.ToArray(), Connection));
+        return _msgs.Writer.WriteAsync(natsMsg);
     }
 }
 
@@ -98,21 +94,15 @@ public sealed class NatsSub<T> : NatsSubBase
 
     public override ValueTask ReceiveAsync(string subject, string? replyTo, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
     {
-        var serializer = Serializer;
-        var data = serializer.Deserialize<T>(payloadBuffer);
+        var natsMsg = NatsMsg<T>.Build(
+            subject,
+            replyTo,
+            headersBuffer,
+            payloadBuffer,
+            Connection,
+            Connection.HeaderParser,
+            Serializer);
 
-        NatsHeaders? natsHeaders = null;
-        if (headersBuffer != null)
-        {
-            natsHeaders = new NatsHeaders();
-            if (!Connection.HeaderParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), natsHeaders))
-            {
-                throw new NatsException("Error parsing headers");
-            }
-
-            natsHeaders.SetReadOnly();
-        }
-
-        return _msgs.Writer.WriteAsync(new NatsMsg<T>(subject, replyTo, natsHeaders, data, Connection));
+        return _msgs.Writer.WriteAsync(natsMsg);
     }
 }

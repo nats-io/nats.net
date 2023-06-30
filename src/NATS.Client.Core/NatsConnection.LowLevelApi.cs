@@ -11,7 +11,7 @@ public partial class NatsConnection
 
         if (ConnectionState == NatsConnectionState.Open)
         {
-            var command = AsyncPublishBytesCommand.Create(_pool, GetCommandTimer(cancellationToken), subject, replyTo, headers, payload);
+            var command = AsyncPublishBytesCommand.Create(_pool, GetCancellationTimer(cancellationToken), subject, replyTo, headers, payload);
             if (TryEnqueueCommand(command))
             {
                 return command.AsValueTask();
@@ -25,19 +25,19 @@ public partial class NatsConnection
         {
             return WithConnectAsync(subject, replyTo, headers, payload, cancellationToken, static (self, s, r, h, p, token) =>
             {
-                var command = AsyncPublishBytesCommand.Create(self._pool, self.GetCommandTimer(token), s, r, h, p);
+                var command = AsyncPublishBytesCommand.Create(self._pool, self.GetCancellationTimer(token), s, r, h, p);
                 return self.EnqueueAndAwaitCommandAsync(command);
             });
         }
     }
 
-    internal ValueTask PubModelAsync<T>(string subject, T data, INatsSerializer serializer, string? replyTo = default, NatsHeaders? headers = default, CancellationToken cancellationToken = default)
+    internal ValueTask PubModelAsync<T>(string subject, T? data, INatsSerializer serializer, string? replyTo = default, NatsHeaders? headers = default, CancellationToken cancellationToken = default)
     {
         headers?.SetReadOnly();
 
         if (ConnectionState == NatsConnectionState.Open)
         {
-            var command = AsyncPublishCommand<T>.Create(_pool, GetCommandTimer(cancellationToken), subject, replyTo, headers, data, serializer);
+            var command = AsyncPublishCommand<T>.Create(_pool, GetCancellationTimer(cancellationToken), subject, replyTo, headers, data, serializer);
             if (TryEnqueueCommand(command))
             {
                 return command.AsValueTask();
@@ -51,7 +51,7 @@ public partial class NatsConnection
         {
             return WithConnectAsync(subject, replyTo, headers, data, serializer, cancellationToken, static (self, s, r, h, v, ser, token) =>
             {
-                var command = AsyncPublishCommand<T>.Create(self._pool, self.GetCommandTimer(token), s, r, h, v, ser);
+                var command = AsyncPublishCommand<T>.Create(self._pool, self.GetCancellationTimer(token), s, r, h, v, ser);
                 return self.EnqueueAndAwaitCommandAsync(command);
             });
         }
