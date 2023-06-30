@@ -193,8 +193,6 @@ public class ProtocolTest
 
         // Manual unsubscribe
         {
-            proxy.ClearFrames();
-
             await using var sub = await nats.SubscribeAsync<int>("foo2");
 
             await sub.UnsubscribeAsync();
@@ -203,8 +201,9 @@ public class ProtocolTest
 
             await Retry.Until("all frames arrived", () => proxy.ClientFrames.Count >= 2);
 
-            Assert.Equal($"SUB foo2 {sid}", proxy.ClientFrames[0].Message);
-            Assert.Equal($"UNSUB {sid}", proxy.ClientFrames[1].Message);
+            var frames = proxy.ClientFrames.TakeFramesIncludingAndAfter($"SUB foo2 {sid}").ToList();
+            Assert.Equal($"SUB foo2 {sid}", frames[0].Message);
+            Assert.Equal($"UNSUB {sid}", frames[1].Message);
 
             // send messages to check we receive none since we're already unsubscribed
             for (var i = 0; i < 100; i++)
@@ -277,6 +276,21 @@ public class ProtocolTest
 
             await sub.DisposeAsync();
             await reg;
+        }
+    }
+}
+
+public static class FrameEnumerable
+{
+    public static IEnumerable<NatsProxy.Frame> TakeFramesIncludingAndAfter(this IEnumerable<NatsProxy.Frame> frames, string message)
+    {
+        var start = false;
+        foreach (var frame in frames)
+        {
+            if (frame.Message == message)
+                start = true;
+            if (start)
+                yield return frame;
         }
     }
 }
