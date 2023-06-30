@@ -25,7 +25,7 @@ internal sealed class SubscriptionManager : IAsyncDisposable
         _timer = Task.Run(CleanupAsync, _cts.Token);
     }
 
-    public IEnumerable<(int Sid, string Subject, string? QueueGroup)> GetExistingSubscriptions()
+    public IEnumerable<(int Sid, string Subject, string? QueueGroup, int? maxMsgs)> GetExistingSubscriptions()
     {
         lock (_gate)
         {
@@ -33,7 +33,7 @@ internal sealed class SubscriptionManager : IAsyncDisposable
             {
                 if (subRef.TryGetTarget(out var sub))
                 {
-                    yield return (sub.Sid, sub.Subject, sub.QueueGroup);
+                    yield return (sub.Sid, sub.Subject, sub.QueueGroup, sub.PendingMsgs);
                 }
             }
         }
@@ -41,7 +41,7 @@ internal sealed class SubscriptionManager : IAsyncDisposable
 
     public int GetNextSid() => Interlocked.Increment(ref _sid);
 
-    public async ValueTask<T> SubscribeAsync<T>(string subject, string? queueGroup, T sub, CancellationToken cancellationToken)
+    public async ValueTask<T> SubscribeAsync<T>(string subject, NatsSubOpts? opts, T sub, CancellationToken cancellationToken)
         where T : INatsSub
     {
         lock (_gate)
@@ -51,7 +51,8 @@ internal sealed class SubscriptionManager : IAsyncDisposable
 
         try
         {
-            await _connection.SubscribeCoreAsync(sub.Sid, subject, queueGroup, cancellationToken).ConfigureAwait(false);
+            await _connection.SubscribeCoreAsync(sub.Sid, subject, opts?.QueueGroup, opts?.MaxMsgs, cancellationToken).ConfigureAwait(false);
+            sub.Ready();
             return sub;
         }
         catch

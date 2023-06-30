@@ -11,7 +11,7 @@ public partial class NatsConnection
     }
 
     /// <inheritdoc />
-    public ValueTask PublishAsync(NatsMsg msg, CancellationToken cancellationToken = default)
+    public ValueTask PublishAsync(in NatsMsg msg, CancellationToken cancellationToken = default)
     {
         return PublishAsync(msg.Subject, msg.Data, default, cancellationToken);
     }
@@ -24,7 +24,7 @@ public partial class NatsConnection
     }
 
     /// <inheritdoc />
-    public ValueTask PublishAsync<T>(NatsMsg<T> msg, CancellationToken cancellationToken = default)
+    public ValueTask PublishAsync<T>(in NatsMsg<T> msg, CancellationToken cancellationToken = default)
     {
         return PublishAsync<T>(msg.Subject, msg.Data, default, cancellationToken);
     }

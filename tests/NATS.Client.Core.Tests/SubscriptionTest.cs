@@ -69,4 +69,111 @@ public class SubscriptionTest
             timeout: TimeSpan.FromSeconds(30),
             retryDelay: TimeSpan.FromSeconds(.5));
     }
+
+    [Fact]
+    public async Task Auto_unsubscribe_test()
+    {
+        // Use a single server to test multiple scenarios to make test runs more efficient
+        await using var server = new NatsServer();
+        await using var nats = server.CreateClientConnection();
+
+        // Auto unsubscribe on max messages
+        {
+            const string subject = "foo1";
+            const int maxMsgs = 99;
+            var opts = new NatsSubOpts { MaxMsgs = maxMsgs };
+
+            await using var sub = await nats.SubscribeAsync<int>(subject, opts);
+
+            // send more messages than max to check we only get max
+            for (var i = 0; i < maxMsgs + 10; i++)
+            {
+                await nats.PublishAsync(subject, i);
+            }
+
+            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var cancellationToken = cts.Token;
+            var count = 0;
+            await foreach (var natsMsg in sub.Msgs.ReadAllAsync(cancellationToken))
+            {
+                Assert.Equal(count, natsMsg.Data);
+                count++;
+            }
+
+            Assert.Equal(maxMsgs, count);
+            Assert.Equal(NatsSubEndReason.MaxMsgs, sub.EndReason);
+        }
+
+        // Auto unsubscribe on timeout
+        {
+            const string subject = "foo2";
+            var opts = new NatsSubOpts { Timeout = TimeSpan.FromSeconds(1) };
+
+            await using var sub = await nats.SubscribeAsync<int>(subject, opts);
+
+            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var cancellationToken = cts.Token;
+            var count = 0;
+            await foreach (var unused in sub.Msgs.ReadAllAsync(cancellationToken))
+            {
+                count++;
+            }
+
+            Assert.Equal(0, count);
+            Assert.Equal(NatsSubEndReason.Timeout, sub.EndReason);
+        }
+
+        // Auto unsubscribe on idle timeout
+        {
+            const string subject = "foo3";
+            var opts = new NatsSubOpts { IdleTimeout = TimeSpan.FromMilliseconds(500) };
+
+            await using var sub = await nats.SubscribeAsync<int>(subject, opts);
+
+            await nats.PublishAsync(subject, 0);
+            await nats.PublishAsync(subject, 1);
+            await nats.PublishAsync(subject, 2);
+            await Task.Delay(TimeSpan.FromMilliseconds(100));
+            await nats.PublishAsync(subject, 3);
+            await Task.Delay(TimeSpan.FromMilliseconds(700));
+            await nats.PublishAsync(subject, 100);
+
+            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var cancellationToken = cts.Token;
+            var count = 0;
+            await foreach (var natsMsg in sub.Msgs.ReadAllAsync(cancellationToken))
+            {
+                Assert.Equal(count, natsMsg.Data);
+                count++;
+            }
+
+            Assert.Equal(4, count);
+            Assert.Equal(NatsSubEndReason.IdleTimeout, sub.EndReason);
+        }
+
+        // Manual unsubscribe
+        {
+            const string subject = "foo4";
+            await using var sub = await nats.SubscribeAsync<int>(subject);
+
+            await sub.UnsubscribeAsync();
+
+            for (var i = 0; i < 10; i++)
+            {
+                await nats.PublishAsync(subject, i);
+            }
+
+            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var cancellationToken = cts.Token;
+            var count = 0;
+            await foreach (var natsMsg in sub.Msgs.ReadAllAsync(cancellationToken))
+            {
+                Assert.Equal(count, natsMsg.Data);
+                count++;
+            }
+
+            Assert.Equal(0, count);
+            Assert.Equal(NatsSubEndReason.None, sub.EndReason);
+        }
+    }
 }

@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace NATS.Client.Core.Tests;
 
 public class ProtocolTest
@@ -152,5 +154,77 @@ public class ProtocolTest
 
         await sub.DisposeAsync();
         await reg;
+    }
+
+    [Fact]
+    public async Task Unsubscribe_max_msgs()
+    {
+        // Use a single server to test multiple scenarios to make test runs more efficient
+        await using var server = new NatsServer();
+        var (nats, proxy) = server.CreateProxiedClientConnection();
+
+        // Auto-unsubscribe after consuming max-msgs
+        {
+            const int maxMsgs = 99;
+            var opts = new NatsSubOpts { MaxMsgs = maxMsgs };
+            await using var sub = await nats.SubscribeAsync<int>("foo", opts);
+
+            var sid = ((INatsSub) sub).Sid;
+            Assert.Equal($"SUB foo {sid}", proxy.Frames[0].Message);
+            Assert.Equal($"UNSUB {sid} {maxMsgs}", proxy.Frames[1].Message);
+
+            // send more messages than max to check we only get max
+            for (var i = 0; i < maxMsgs + 10; i++)
+            {
+                await nats.PublishAsync("foo", i);
+            }
+
+            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var cancellationToken = cts.Token;
+            var count = 0;
+            await foreach (var natsMsg in sub.Msgs.ReadAllAsync(cancellationToken))
+            {
+                Assert.Equal(count, natsMsg.Data);
+                count++;
+            }
+
+            Assert.Equal(maxMsgs, count);
+            Assert.Equal(NatsSubEndReason.MaxMsgs, sub.EndReason);
+        }
+
+        // Manual unsubscribe
+        {
+            await using var sub = await nats.SubscribeAsync<int>("foo2");
+
+            await sub.UnsubscribeAsync();
+
+            var sid = ((INatsSub)sub).Sid;
+
+            // Frames we're interested in would be somewhere down the list
+            // since we ran other tests above.
+            var index = proxy.ClientFrames
+                .Select((f, i) => (frame: f, Index: i))
+                .Single(fi => fi.frame.Message == $"SUB foo2 {sid}")
+                .Index;
+            Assert.Matches($"SUB foo2 {sid}", proxy.ClientFrames[index].Message);
+            Assert.Matches($"UNSUB {sid}", proxy.ClientFrames[index + 1].Message);
+
+            // send messages to check we receive none since we're already unsubscribed
+            for (var i = 0; i < 10; i++)
+            {
+                await nats.PublishAsync("foo2", i);
+            }
+
+            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var cancellationToken = cts.Token;
+            var count = 0;
+            await foreach (var unused in sub.Msgs.ReadAllAsync(cancellationToken))
+            {
+                count++;
+            }
+
+            Assert.Equal(0, count);
+            Assert.Equal(NatsSubEndReason.None, sub.EndReason);
+        }
     }
 }

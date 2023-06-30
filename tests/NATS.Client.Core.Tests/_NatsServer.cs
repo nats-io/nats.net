@@ -310,10 +310,16 @@ public class NatsProxy : IDisposable
             while (true)
             {
                 var tcpClient1 = _tcpListener.AcceptTcpClient();
+                tcpClient1.NoDelay = true;
+                tcpClient1.ReceiveBufferSize = 0;
+                tcpClient1.SendBufferSize = 0;
 
                 var n = client++;
 
                 var tcpClient2 = new TcpClient("127.0.0.1", port);
+                tcpClient2.NoDelay = true;
+                tcpClient2.ReceiveBufferSize = 0;
+                tcpClient2.SendBufferSize = 0;
 
 #pragma warning disable CS4014
                 Task.Run(() =>

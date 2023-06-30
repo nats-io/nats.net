@@ -16,7 +16,7 @@ public class LowLevelApiTest
         var nats = server.CreateClientConnection();
 
         var builder = new NatsSubCustomTestBuilder(_output);
-        NatsSubTest sub = await nats.SubAsync<NatsSubTest>("foo.*", null, builder);
+        NatsSubTest sub = await nats.SubAsync<NatsSubTest>("foo.*", opts: default, builder);
 
         await Retry.Until(
             "subscription is ready",
@@ -54,11 +54,17 @@ public class LowLevelApiTest
 
         public string QueueGroup => string.Empty;
 
+        public int? PendingMsgs => 0;
+
         public int Sid => 0;
+
+        public void Ready()
+        {
+        }
 
         public ValueTask DisposeAsync() => _manager.DisposeAsync();
 
-        public ValueTask ReceiveAsync(string subject, string? replyTo, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
+        public ValueTask ReceiveAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
         {
             if (subject.EndsWith(".sync"))
             {
@@ -113,9 +119,9 @@ public class LowLevelApiTest
             }
         }
 
-        public NatsSubTest Build(string subject, string? queueGroup, NatsConnection connection, SubscriptionManager manager)
+        public NatsSubTest Build(string subject, NatsSubOpts? opts, NatsConnection connection, SubscriptionManager manager)
         {
-            return new NatsSubTest(this, _output, manager);
+            return new NatsSubTest(builder: this, _output, manager);
         }
 
         public void Sync() => Interlocked.Exchange(ref _sync, 1);

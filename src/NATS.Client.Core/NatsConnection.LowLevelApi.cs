@@ -57,19 +57,19 @@ public partial class NatsConnection
         }
     }
 
-    internal ValueTask<T> SubAsync<T>(string subject, string? queueGroup, INatsSubBuilder<T> builder, CancellationToken cancellationToken = default)
+    internal ValueTask<T> SubAsync<T>(string subject, NatsSubOpts? opts, INatsSubBuilder<T> builder, CancellationToken cancellationToken = default)
         where T : INatsSub
     {
-        var sub = builder.Build(subject, queueGroup, this, _subscriptionManager);
+        var sub = builder.Build(subject, opts, connection: this, _subscriptionManager);
         if (ConnectionState == NatsConnectionState.Open)
         {
-            return _subscriptionManager.SubscribeAsync(subject, queueGroup, sub, cancellationToken);
+            return _subscriptionManager.SubscribeAsync(subject, opts, sub, cancellationToken);
         }
         else
         {
-            return WithConnectAsync(subject, queueGroup, sub, cancellationToken, static (self, s, qg, sb, token) =>
+            return WithConnectAsync(subject, opts, sub, cancellationToken, static (self, s, o, sb, token) =>
             {
-                return self._subscriptionManager.SubscribeAsync(s, qg, sb, token);
+                return self._subscriptionManager.SubscribeAsync(s, o, sb, token);
             });
         }
     }
