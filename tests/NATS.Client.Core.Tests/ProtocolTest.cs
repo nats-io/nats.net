@@ -280,18 +280,3 @@ public class ProtocolTest
         }
     }
 }
-
-public static class FrameEnumerable
-{
-    public static IEnumerable<NatsProxy.Frame> TakeFramesIncludingAndAfter(this IEnumerable<NatsProxy.Frame> frames, string message)
-    {
-        var start = false;
-        foreach (var frame in frames)
-        {
-            if (frame.Message == message)
-                start = true;
-            if (start)
-                yield return frame;
-        }
-    }
-}
