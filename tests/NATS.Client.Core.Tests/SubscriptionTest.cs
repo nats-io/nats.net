@@ -119,23 +119,23 @@ public class SubscriptionTest
                 count++;
             }
 
-            Assert.Equal(0, count);
             Assert.Equal(NatsSubEndReason.Timeout, sub.EndReason);
+            Assert.Equal(0, count);
         }
 
         // Auto unsubscribe on idle timeout
         {
             const string subject = "foo3";
-            var opts = new NatsSubOpts { IdleTimeout = TimeSpan.FromMilliseconds(500) };
+            var opts = new NatsSubOpts { IdleTimeout = TimeSpan.FromSeconds(2) };
 
             await using var sub = await nats.SubscribeAsync<int>(subject, opts);
 
             await nats.PublishAsync(subject, 0);
             await nats.PublishAsync(subject, 1);
             await nats.PublishAsync(subject, 2);
-            await Task.Delay(TimeSpan.FromMilliseconds(100));
+            await Task.Delay(TimeSpan.FromSeconds(.1));
             await nats.PublishAsync(subject, 3);
-            await Task.Delay(TimeSpan.FromMilliseconds(700));
+            await Task.Delay(TimeSpan.FromSeconds(2.1));
             await nats.PublishAsync(subject, 100);
 
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -147,8 +147,8 @@ public class SubscriptionTest
                 count++;
             }
 
-            Assert.Equal(4, count);
             Assert.Equal(NatsSubEndReason.IdleTimeout, sub.EndReason);
+            Assert.Equal(4, count);
         }
 
         // Manual unsubscribe
