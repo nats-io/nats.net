@@ -193,17 +193,18 @@ public class ProtocolTest
 
         // Manual unsubscribe
         {
+            await proxy.FlushFramesAsync(nats);
+
             await using var sub = await nats.SubscribeAsync<int>("foo2");
 
             await sub.UnsubscribeAsync();
 
             var sid = ((INatsSub)sub).Sid;
 
-            await Retry.Until("all frames arrived", () => proxy.ClientFrames.Count >= 2);
+            await Retry.Until("all frames arrived", () => proxy.ClientFrames.Count == 2);
 
-            var frames = proxy.ClientFrames.TakeFramesIncludingAndAfter($"SUB foo2 {sid}").ToList();
-            Assert.Equal($"SUB foo2 {sid}", frames[0].Message);
-            Assert.Equal($"UNSUB {sid}", frames[1].Message);
+            Assert.Equal($"SUB foo2 {sid}", proxy.ClientFrames[0].Message);
+            Assert.Equal($"UNSUB {sid}", proxy.ClientFrames[1].Message);
 
             // send messages to check we receive none since we're already unsubscribed
             for (var i = 0; i < 100; i++)

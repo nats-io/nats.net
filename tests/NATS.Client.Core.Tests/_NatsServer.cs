@@ -299,6 +299,7 @@ public class NatsProxy : IDisposable
     private readonly List<TcpClient> _clients = new();
     private readonly List<Frame> _frames = new();
     private readonly Stopwatch _watch = new();
+    private int _syncCount;
 
     public NatsProxy(int port, ITestOutputHelper outputHelper)
     {
@@ -419,14 +420,22 @@ public class NatsProxy : IDisposable
                 }
             }
 
-            ClearFrames();
+            lock (_frames) _frames.Clear();
 
             _watch.Restart();
         }
     }
 
-    public void ClearFrames()
+    public async Task FlushFramesAsync(NatsConnection nats)
     {
+        var subject = $"_SIGNAL_SYNC_{Interlocked.Increment(ref _syncCount)}";
+
+        await nats.PublishAsync(subject);
+
+        await Retry.Until(
+            "flush sync frame",
+            () => AllFrames.Any(f => f.Message == $"PUB {subject} 0␍␊"));
+
         lock (_frames) _frames.Clear();
     }
 
