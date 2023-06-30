@@ -1,5 +1,3 @@
-using System.Text.RegularExpressions;
-
 namespace NATS.Client.Core.Tests;
 
 public class ProtocolTest
@@ -169,7 +167,7 @@ public class ProtocolTest
             var opts = new NatsSubOpts { MaxMsgs = maxMsgs };
             await using var sub = await nats.SubscribeAsync<int>("foo", opts);
 
-            var sid = ((INatsSub) sub).Sid;
+            var sid = ((INatsSub)sub).Sid;
             await Retry.Until("all frames arrived", () => proxy.Frames.Count >= 2);
             Assert.Equal($"SUB foo {sid}", proxy.Frames[0].Message);
             Assert.Equal($"UNSUB {sid} {maxMsgs}", proxy.Frames[1].Message);
@@ -195,22 +193,18 @@ public class ProtocolTest
 
         // Manual unsubscribe
         {
+            proxy.ClearFrames();
+
             await using var sub = await nats.SubscribeAsync<int>("foo2");
 
             await sub.UnsubscribeAsync();
 
             var sid = ((INatsSub)sub).Sid;
 
-            await Retry.Until("all frames arrived", () => proxy.Frames.Count(f => f.Message == $"UNSUB {sid}") == 1);
+            await Retry.Until("all frames arrived", () => proxy.ClientFrames.Count >= 2);
 
-            // Frames we're interested in would be somewhere down the list
-            // since we ran other tests above.
-            var index = proxy.ClientFrames
-                .Select((f, i) => (frame: f, Index: i))
-                .Single(fi => fi.frame.Message == $"SUB foo2 {sid}")
-                .Index;
-            Assert.Matches($"SUB foo2 {sid}", proxy.ClientFrames[index].Message);
-            Assert.Matches($"UNSUB {sid}", proxy.ClientFrames[index + 1].Message);
+            Assert.Equal($"SUB foo2 {sid}", proxy.ClientFrames[0].Message);
+            Assert.Equal($"UNSUB {sid}", proxy.ClientFrames[1].Message);
 
             // send messages to check we receive none since we're already unsubscribed
             for (var i = 0; i < 100; i++)
@@ -230,6 +224,59 @@ public class ProtocolTest
 
             Assert.Equal(0, count);
             Assert.Equal(NatsSubEndReason.None, sub.EndReason);
+        }
+
+        // Reconnect
+        {
+            proxy.Reset();
+
+            const int maxMsgs = 100;
+            const int pubMsgs = 10;
+            var opts = new NatsSubOpts { MaxMsgs = maxMsgs };
+            var sub = await nats.SubscribeAsync<int>("foo3", opts);
+            var count = 0;
+            var reg = sub.Register(_ => Interlocked.Increment(ref count));
+            var sid = ((INatsSub)sub).Sid;
+            await Retry.Until("subscribed", () => proxy.Frames.Any(f => f.Message == $"SUB foo3 {sid}"));
+
+            for (var i = 0; i < pubMsgs; i++)
+            {
+                await nats.PublishAsync("foo3", i);
+            }
+
+            await Retry.Until("published", () => proxy.Frames.Count(f => f.Message.StartsWith("PUB foo3")) == 10);
+            await Retry.Until("received", () => Volatile.Read(ref count) == 10);
+
+            var pending = maxMsgs - pubMsgs;
+            Assert.Equal(pending, ((INatsSub)sub).PendingMsgs);
+
+            proxy.Reset();
+
+            // SUB + UNSUB
+            await Retry.Until("re-subscribed", () => proxy.ClientFrames.Count == 2);
+
+            // Make sure we're still using the same SID
+            Assert.Equal($"SUB foo3 {sid}", proxy.ClientFrames[0].Message);
+            Assert.Equal($"UNSUB {sid} {pending}", proxy.ClientFrames[1].Message);
+
+            // We already published a few, this should exceed max-msgs
+            for (var i = 0; i < maxMsgs; i++)
+            {
+                await nats.PublishAsync("foo3", i);
+            }
+
+            await Retry.Until(
+                "published more",
+                () => proxy.ClientFrames.Count(f => f.Message.StartsWith("PUB foo3")) == maxMsgs);
+
+            await Retry.Until(
+                "unsubscribed with max-msgs",
+                () => sub.EndReason == NatsSubEndReason.MaxMsgs);
+
+            Assert.Equal(Volatile.Read(ref count), maxMsgs);
+
+            await sub.DisposeAsync();
+            await reg;
         }
     }
 }
