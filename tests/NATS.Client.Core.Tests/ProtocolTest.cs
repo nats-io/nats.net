@@ -153,4 +153,130 @@ public class ProtocolTest
         await sub.DisposeAsync();
         await reg;
     }
+
+    [Fact]
+    public async Task Unsubscribe_max_msgs()
+    {
+        // Use a single server to test multiple scenarios to make test runs more efficient
+        await using var server = new NatsServer();
+        var (nats, proxy) = server.CreateProxiedClientConnection();
+
+        // Auto-unsubscribe after consuming max-msgs
+        {
+            const int maxMsgs = 99;
+            var opts = new NatsSubOpts { MaxMsgs = maxMsgs };
+            await using var sub = await nats.SubscribeAsync<int>("foo", opts);
+
+            var sid = ((INatsSub)sub).Sid;
+            await Retry.Until("all frames arrived", () => proxy.Frames.Count >= 2);
+            Assert.Equal($"SUB foo {sid}", proxy.Frames[0].Message);
+            Assert.Equal($"UNSUB {sid} {maxMsgs}", proxy.Frames[1].Message);
+
+            // send more messages than max to check we only get max
+            for (var i = 0; i < maxMsgs + 10; i++)
+            {
+                await nats.PublishAsync("foo", i);
+            }
+
+            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var cancellationToken = cts.Token;
+            var count = 0;
+            await foreach (var natsMsg in sub.Msgs.ReadAllAsync(cancellationToken))
+            {
+                Assert.Equal(count, natsMsg.Data);
+                count++;
+            }
+
+            Assert.Equal(maxMsgs, count);
+            Assert.Equal(NatsSubEndReason.MaxMsgs, sub.EndReason);
+        }
+
+        // Manual unsubscribe
+        {
+            proxy.ClearFrames();
+
+            await using var sub = await nats.SubscribeAsync<int>("foo2");
+
+            await sub.UnsubscribeAsync();
+
+            var sid = ((INatsSub)sub).Sid;
+
+            await Retry.Until("all frames arrived", () => proxy.ClientFrames.Count >= 2);
+
+            Assert.Equal($"SUB foo2 {sid}", proxy.ClientFrames[0].Message);
+            Assert.Equal($"UNSUB {sid}", proxy.ClientFrames[1].Message);
+
+            // send messages to check we receive none since we're already unsubscribed
+            for (var i = 0; i < 100; i++)
+            {
+                await nats.PublishAsync("foo2", i);
+            }
+
+            await Retry.Until("all pub frames arrived", () => proxy.Frames.Count(f => f.Message.StartsWith("PUB foo2")) == 100);
+
+            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var cancellationToken = cts.Token;
+            var count = 0;
+            await foreach (var unused in sub.Msgs.ReadAllAsync(cancellationToken))
+            {
+                count++;
+            }
+
+            Assert.Equal(0, count);
+            Assert.Equal(NatsSubEndReason.None, sub.EndReason);
+        }
+
+        // Reconnect
+        {
+            proxy.Reset();
+
+            const int maxMsgs = 100;
+            const int pubMsgs = 10;
+            var opts = new NatsSubOpts { MaxMsgs = maxMsgs };
+            var sub = await nats.SubscribeAsync<int>("foo3", opts);
+            var count = 0;
+            var reg = sub.Register(_ => Interlocked.Increment(ref count));
+            var sid = ((INatsSub)sub).Sid;
+            await Retry.Until("subscribed", () => proxy.Frames.Any(f => f.Message == $"SUB foo3 {sid}"));
+
+            for (var i = 0; i < pubMsgs; i++)
+            {
+                await nats.PublishAsync("foo3", i);
+            }
+
+            await Retry.Until("published", () => proxy.Frames.Count(f => f.Message.StartsWith("PUB foo3")) == 10);
+            await Retry.Until("received", () => Volatile.Read(ref count) == 10);
+
+            var pending = maxMsgs - pubMsgs;
+            Assert.Equal(pending, ((INatsSub)sub).PendingMsgs);
+
+            proxy.Reset();
+
+            // SUB + UNSUB
+            await Retry.Until("re-subscribed", () => proxy.ClientFrames.Count == 2);
+
+            // Make sure we're still using the same SID
+            Assert.Equal($"SUB foo3 {sid}", proxy.ClientFrames[0].Message);
+            Assert.Equal($"UNSUB {sid} {pending}", proxy.ClientFrames[1].Message);
+
+            // We already published a few, this should exceed max-msgs
+            for (var i = 0; i < maxMsgs; i++)
+            {
+                await nats.PublishAsync("foo3", i);
+            }
+
+            await Retry.Until(
+                "published more",
+                () => proxy.ClientFrames.Count(f => f.Message.StartsWith("PUB foo3")) == maxMsgs);
+
+            await Retry.Until(
+                "unsubscribed with max-msgs",
+                () => sub.EndReason == NatsSubEndReason.MaxMsgs);
+
+            Assert.Equal(Volatile.Read(ref count), maxMsgs);
+
+            await sub.DisposeAsync();
+            await reg;
+        }
+    }
 }

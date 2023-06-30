@@ -190,9 +190,9 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
     }
 
     // called only internally
-    internal ValueTask SubscribeCoreAsync(int sid, string subject, string? queueGroup, CancellationToken cancellationToken)
+    internal ValueTask SubscribeCoreAsync(int sid, string subject, string? queueGroup, int? maxMsgs, CancellationToken cancellationToken)
     {
-        var command = AsyncSubscribeCommand.Create(_pool, GetCancellationTimer(cancellationToken), sid, subject, queueGroup);
+        var command = AsyncSubscribeCommand.Create(_pool, GetCancellationTimer(cancellationToken), sid, subject, queueGroup, maxMsgs);
         return EnqueueAndAwaitCommandAsync(command);
     }
 
@@ -776,6 +776,12 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
     {
         await ConnectAsync().ConfigureAwait(false);
         return await coreAsync(this, item1, item2, item3, item4).ConfigureAwait(false);
+    }
+
+    private async ValueTask<TResult> WithConnectAsync<T1, T2, T3, T4, T5, TResult>(T1 item1, T2 item2, T3 item3, T4 item4, T5 item5, Func<NatsConnection, T1, T2, T3, T4, T5, ValueTask<TResult>> coreAsync)
+    {
+        await ConnectAsync().ConfigureAwait(false);
+        return await coreAsync(this, item1, item2, item3, item4, item5).ConfigureAwait(false);
     }
 }
 

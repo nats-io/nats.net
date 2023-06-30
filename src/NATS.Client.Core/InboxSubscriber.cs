@@ -46,7 +46,7 @@ internal class InboxSubscriber : INatsSubBuilder<InboxSub>, IAsyncDisposable
 
         try
         {
-            _sub = await Connection.SubAsync($"{_prefix}.*", _queueGroup, this)
+            _sub = await Connection.SubAsync($"{_prefix}.*", new NatsSubOpts { QueueGroup = _queueGroup }, builder: this)
                 .ConfigureAwait(false);
         }
         catch
@@ -60,10 +60,10 @@ internal class InboxSubscriber : INatsSubBuilder<InboxSub>, IAsyncDisposable
         }
     }
 
-    public InboxSub Build(string subject, string? queueGroup, NatsConnection connection, SubscriptionManager manager)
+    public InboxSub Build(string subject, NatsSubOpts? opts, NatsConnection connection, SubscriptionManager manager)
     {
         var sid = manager.GetNextSid();
-        return new InboxSub(this, subject, queueGroup, sid, connection, manager);
+        return new InboxSub(this, subject, opts, sid, connection, manager);
     }
 
     public string Register(MsgWrapper msg, string? suffix = null)
@@ -105,7 +105,7 @@ internal class InboxSub : INatsSub
     public InboxSub(
         InboxSubscriber inbox,
         string subject,
-        string? queueGroup,
+        NatsSubOpts? opts,
         int sid,
         NatsConnection connection,
         SubscriptionManager manager)
@@ -114,7 +114,8 @@ internal class InboxSub : INatsSub
         _connection = connection;
         _manager = manager;
         Subject = subject;
-        QueueGroup = queueGroup;
+        QueueGroup = opts?.QueueGroup;
+        PendingMsgs = opts?.MaxMsgs;
         Sid = sid;
     }
 
@@ -122,9 +123,15 @@ internal class InboxSub : INatsSub
 
     public string? QueueGroup { get; }
 
+    public int? PendingMsgs { get; }
+
     public int Sid { get; }
 
-    public ValueTask ReceiveAsync(string subject, string? replyTo, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
+    public void Ready()
+    {
+    }
+
+    public ValueTask ReceiveAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
     {
         _inbox.Received(subject, replyTo, headersBuffer, payloadBuffer, _connection);
         return ValueTask.CompletedTask;

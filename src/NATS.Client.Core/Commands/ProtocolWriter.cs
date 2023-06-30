@@ -111,7 +111,7 @@ internal sealed class ProtocolWriter
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#sub
     // SUB <subject> [queue group] <sid>
-    public void WriteSubscribe(int sid, string subject, string? queueGroup)
+    public void WriteSubscribe(int sid, string subject, string? queueGroup, int? maxMsgs)
     {
         var offset = 0;
 
@@ -149,6 +149,14 @@ internal sealed class ProtocolWriter
         offset += CommandConstants.NewLine.Length;
 
         _writer.Advance(offset);
+
+        // Immediately send UNSUB <sid> <max-msgs> to minimize the risk of
+        // receiving more messages than <max-msgs> in case they are published
+        // between our SUB and UNSUB calls.
+        if (maxMsgs != null)
+        {
+            WriteUnsubscribe(sid, maxMsgs);
+        }
     }
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#unsub

@@ -296,24 +296,39 @@ public class NatsProxy : IDisposable
 {
     private readonly ITestOutputHelper _outputHelper;
     private readonly TcpListener _tcpListener;
+    private readonly List<TcpClient> _clients = new();
     private readonly List<Frame> _frames = new();
+    private readonly Stopwatch _watch = new();
 
     public NatsProxy(int port, ITestOutputHelper outputHelper)
     {
         _outputHelper = outputHelper;
         _tcpListener = new TcpListener(IPAddress.Loopback, 0);
         _tcpListener.Start();
+        _watch.Restart();
 
         Task.Run(() =>
         {
             var client = 0;
             while (true)
             {
-                var tcpClient1 = _tcpListener.AcceptTcpClient();
+                TcpClient tcpClient1 = _tcpListener.AcceptTcpClient();
+                TcpClient tcpClient2;
+                lock (_clients)
+                {
+                    tcpClient1.NoDelay = true;
+                    tcpClient1.ReceiveBufferSize = 0;
+                    tcpClient1.SendBufferSize = 0;
+                    _clients.Add(tcpClient1);
+
+                    tcpClient2 = new TcpClient("127.0.0.1", port);
+                    tcpClient2.NoDelay = true;
+                    tcpClient2.ReceiveBufferSize = 0;
+                    tcpClient2.SendBufferSize = 0;
+                    _clients.Add(tcpClient2);
+                }
 
                 var n = client++;
-
-                var tcpClient2 = new TcpClient("127.0.0.1", port);
 
 #pragma warning disable CS4014
                 Task.Run(() =>
@@ -360,6 +375,17 @@ public class NatsProxy : IDisposable
 
     public int Port => ((IPEndPoint)_tcpListener.Server.LocalEndPoint!).Port;
 
+    public IReadOnlyList<Frame> AllFrames
+    {
+        get
+        {
+            lock (_frames)
+            {
+                return _frames.ToList();
+            }
+        }
+    }
+
     public IReadOnlyList<Frame> Frames
     {
         get
@@ -376,6 +402,33 @@ public class NatsProxy : IDisposable
     public IReadOnlyList<Frame> ClientFrames => Frames.Where(f => f.Origin == "C").ToList();
 
     public IReadOnlyList<Frame> ServerFrames => Frames.Where(f => f.Origin == "S").ToList();
+
+    public void Reset()
+    {
+        lock (_clients)
+        {
+            foreach (var tcpClient in _clients)
+            {
+                try
+                {
+                    tcpClient.Close();
+                }
+                catch
+                {
+                    // ignore
+                }
+            }
+
+            ClearFrames();
+
+            _watch.Restart();
+        }
+    }
+
+    public void ClearFrames()
+    {
+        lock (_frames) _frames.Clear();
+    }
 
     public void Dispose() => _tcpListener.Server.Dispose();
 
@@ -396,7 +449,7 @@ public class NatsProxy : IDisposable
         if (Regex.IsMatch(message, @"^(INFO|CONNECT|PING|PONG|UNSUB|SUB|\+OK|-ERR)"))
         {
             if (client > 0)
-                AddFrame(new Frame(client, origin, message));
+                AddFrame(new Frame(_watch.Elapsed, client, origin, message));
 
             sw.WriteLine(message);
             sw.Flush();
@@ -442,13 +495,13 @@ public class NatsProxy : IDisposable
             sw.Flush();
 
             if (client > 0)
-                AddFrame(new Frame(client, origin, Message: $"{message}␍␊{sb}"));
+                AddFrame(new Frame(_watch.Elapsed, client, origin, Message: $"{message}␍␊{sb}"));
 
             return true;
         }
 
         if (client > 0)
-            AddFrame(new Frame(client, Origin: "ERROR", Message: $"Unknown protocol: {message}"));
+            AddFrame(new Frame(_watch.Elapsed, client, Origin: "ERROR", Message: $"Unknown protocol: {message}"));
 
         return false;
     }
@@ -461,7 +514,7 @@ public class NatsProxy : IDisposable
 
     private void Log(string text) => _outputHelper.WriteLine($"{DateTime.Now:HH:mm:ss.fff} [PROXY] {text}");
 
-    public record Frame(int Client, string Origin, string Message);
+    public record Frame(TimeSpan Timestamp, int Client, string Origin, string Message);
 }
 
 public class NullOutputHelper : ITestOutputHelper

@@ -27,7 +27,7 @@ public interface INatsConnection
     /// <param name="msg">A <see cref="NatsMsg"/> representing message details.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous send operation.</returns>
-    ValueTask PublishAsync(NatsMsg msg, CancellationToken cancellationToken = default);
+    ValueTask PublishAsync(in NatsMsg msg, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Publishes a serializable message payload to the given subject name, optionally supplying a reply subject.
@@ -47,7 +47,7 @@ public interface INatsConnection
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
     /// <typeparam name="T">Specifies the type of data that may be send to the NATS Server.</typeparam>
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous send operation.</returns>
-    ValueTask PublishAsync<T>(NatsMsg<T> msg, CancellationToken cancellationToken = default);
+    ValueTask PublishAsync<T>(in NatsMsg<T> msg, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Initiates a subscription to a subject, optionally joining a distributed queue group.
