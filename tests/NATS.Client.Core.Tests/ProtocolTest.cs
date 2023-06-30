@@ -170,6 +170,7 @@ public class ProtocolTest
             await using var sub = await nats.SubscribeAsync<int>("foo", opts);
 
             var sid = ((INatsSub) sub).Sid;
+            await Retry.Until("all frames arrived", () => proxy.Frames.Count >= 2);
             Assert.Equal($"SUB foo {sid}", proxy.Frames[0].Message);
             Assert.Equal($"UNSUB {sid} {maxMsgs}", proxy.Frames[1].Message);
 
@@ -200,6 +201,8 @@ public class ProtocolTest
 
             var sid = ((INatsSub)sub).Sid;
 
+            await Retry.Until("all frames arrived", () => proxy.Frames.Count(f => f.Message == $"UNSUB {sid}") == 1);
+
             // Frames we're interested in would be somewhere down the list
             // since we ran other tests above.
             var index = proxy.ClientFrames
@@ -210,7 +213,7 @@ public class ProtocolTest
             Assert.Matches($"UNSUB {sid}", proxy.ClientFrames[index + 1].Message);
 
             // send messages to check we receive none since we're already unsubscribed
-            for (var i = 0; i < 10; i++)
+            for (var i = 0; i < 100; i++)
             {
                 await nats.PublishAsync("foo2", i);
             }
