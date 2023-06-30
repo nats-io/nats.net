@@ -218,6 +218,8 @@ public class ProtocolTest
                 await nats.PublishAsync("foo2", i);
             }
 
+            await Retry.Until("all pub frames arrived", () => proxy.Frames.Count(f => f.Message.StartsWith("PUB foo2")) == 100);
+
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             var cancellationToken = cts.Token;
             var count = 0;
