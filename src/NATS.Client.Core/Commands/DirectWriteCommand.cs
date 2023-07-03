@@ -4,7 +4,7 @@ using NATS.Client.Core.Internal;
 namespace NATS.Client.Core.Commands;
 
 // public for optimize reusing
-public sealed class DirectWriteCommand : ICommand
+internal sealed class DirectWriteCommand : ICommand
 {
     private readonly byte[] _protocol;
 
