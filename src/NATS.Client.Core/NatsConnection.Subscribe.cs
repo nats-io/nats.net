@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
 

@@ -3,9 +3,8 @@ using System.Collections.Concurrent;
 using System.Runtime.ExceptionServices;
 using System.Threading.Tasks.Sources;
 using Microsoft.Extensions.Logging;
-using NATS.Client.Core.Internal;
 
-namespace NATS.Client.Core;
+namespace NATS.Client.Core.Internal;
 
 internal class InboxSubscriber : INatsSubBuilder<InboxSub>, IAsyncDisposable
 {

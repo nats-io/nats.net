@@ -27,7 +27,7 @@ namespace NATS.Client.Core;
 /// <param name="ReconnectWait"></param>
 /// <param name="ReconnectJitter"></param>
 /// <param name="ConnectTimeout"></param>
-/// <param name="CommandPoolSize"></param>
+/// <param name="ObjectPoolSize"></param>
 /// <param name="RequestTimeout"></param>
 /// <param name="CommandTimeout"></param>
 /// <param name="SubscriptionCleanUpInterval"></param>
@@ -54,7 +54,7 @@ public sealed record NatsOptions
     TimeSpan ReconnectWait,
     TimeSpan ReconnectJitter,
     TimeSpan ConnectTimeout,
-    int CommandPoolSize,
+    int ObjectPoolSize,
     TimeSpan RequestTimeout,
     TimeSpan CommandTimeout,
     TimeSpan SubscriptionCleanUpInterval,
@@ -81,7 +81,7 @@ public sealed record NatsOptions
         ReconnectWait: TimeSpan.FromSeconds(2),
         ReconnectJitter: TimeSpan.FromMilliseconds(100),
         ConnectTimeout: TimeSpan.FromSeconds(2),
-        CommandPoolSize: 256,
+        ObjectPoolSize: 256,
         RequestTimeout: TimeSpan.FromMinutes(1),
         CommandTimeout: TimeSpan.FromMinutes(1),
         SubscriptionCleanUpInterval: TimeSpan.FromMinutes(5),

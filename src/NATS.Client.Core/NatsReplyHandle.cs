@@ -1,3 +1,5 @@
+using NATS.Client.Core.Internal;
+
 namespace NATS.Client.Core;
 
 public readonly struct NatsReplyHandle : IAsyncDisposable
@@ -20,6 +22,15 @@ public readonly struct NatsReplyHandle : IAsyncDisposable
 
 public static class NatReplyUtils
 {
+    /// <summary>
+    /// Create a responder using the NATS Request-Reply pattern, with a single response.
+    /// </summary>
+    /// <param name="nats">NATS connection</param>
+    /// <param name="subject">Subject to subscribed to</param>
+    /// <param name="reply">Callback to prepare replies to incoming requests. Exceptions will be handled and a default response will be sent. You should implement your own exception handling.</param>
+    /// <typeparam name="TRequest">Incoming request type</typeparam>
+    /// <typeparam name="TResponse">Reply or response type to be sent to requesters</typeparam>
+    /// <returns>A disposable handler to keep track of subscription. Dispose to unsubscribe and wait for reply callback to exit.</returns>
     public static async Task<NatsReplyHandle> ReplyAsync<TRequest, TResponse>(this INatsConnection nats, string subject, Func<TRequest?, TResponse> reply)
     {
         var sub = await nats.SubscribeAsync<TRequest>(subject).ConfigureAwait(false);
@@ -41,6 +52,17 @@ public static class NatReplyUtils
         return new NatsReplyHandle(sub, reader);
     }
 
+    /// <summary>
+    /// Request data using the NATSRequest-Reply pattern with a single response.
+    /// </summary>
+    /// <param name="nats">NATS connection</param>
+    /// <param name="subject">Subject the responder subscribed to</param>
+    /// <param name="data">Request data</param>
+    /// <param name="cancellationToken">Cancellation token for cancelling the request</param>
+    /// <param name="timeout">Allowed time span before the request is cancelled</param>
+    /// <typeparam name="TRequest">Request type being sent</typeparam>
+    /// <typeparam name="TReply">Reply or response type received</typeparam>
+    /// <returns>Data sent by the responder</returns>
     public static async ValueTask<TReply?> RequestAsync<TRequest, TReply>(this NatsConnection nats, string subject, TRequest data, CancellationToken cancellationToken = default, TimeSpan timeout = default)
     {
         var serializer = nats.Options.Serializer;

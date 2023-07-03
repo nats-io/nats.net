@@ -130,12 +130,9 @@ public abstract partial class NatsConnectionTest
         var v = await pubConnection.RequestAsync<int, string>(subject, 9999);
         v.Should().Be(text + 9999);
 
-        // server exception handling
-        // TODO: What's the point of server request exceptions?
-        // await Assert.ThrowsAsync<NatsException>(async () =>
-        // {
-        //     await pubConnection.RequestAsync<int, string>(key, 100);
-        // });
+        // server exception handling: respond with the default value of the type.
+        var response = await pubConnection.RequestAsync<int, string>(subject, 100);
+        Assert.Null(response);
 
         // timeout check
         await Assert.ThrowsAsync<OperationCanceledException>(async () =>

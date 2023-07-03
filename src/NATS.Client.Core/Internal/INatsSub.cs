@@ -1,7 +1,7 @@
 using System.Buffers;
 using System.Collections.Concurrent;
 
-namespace NATS.Client.Core;
+namespace NATS.Client.Core.Internal;
 
 internal interface INatsSub : IAsyncDisposable
 {

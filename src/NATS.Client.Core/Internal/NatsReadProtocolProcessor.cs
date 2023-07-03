@@ -467,11 +467,19 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         }
 
         // header parsing use Slice frequently so ReadOnlySequence is high cost, should use Span.
-        // msgheader is not too long, ok to use stackalloc.
-        // TODO: Fix possible stack overflow
-        Span<byte> buffer = stackalloc byte[(int)msgHeader.Length];
-        msgHeader.CopyTo(buffer);
-        return ParseMessageHeader(buffer);
+        // msgheader is not too long, ok to use stackalloc in most cases.
+        const int maxAlloc = 256;
+        var msgHeaderLength = (int)msgHeader.Length;
+        if (msgHeaderLength <= maxAlloc)
+        {
+            Span<byte> buffer = stackalloc byte[msgHeaderLength];
+            msgHeader.CopyTo(buffer);
+            return ParseMessageHeader(buffer);
+        }
+        else
+        {
+            return ParseMessageHeader(msgHeader.ToSpan());
+        }
     }
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#hmsg
@@ -520,11 +528,19 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         }
 
         // header parsing use Slice frequently so ReadOnlySequence is high cost, should use Span.
-        // msgheader is not too long, ok to use stackalloc.
-        // TODO: Fix possible stack overflow
-        Span<byte> buffer = stackalloc byte[(int)msgHeader.Length];
-        msgHeader.CopyTo(buffer);
-        return ParseHMessageHeader(buffer);
+        // msgheader is not too long, ok to use stackalloc in most cases.
+        const int maxAlloc = 256;
+        var msgHeaderLength = (int)msgHeader.Length;
+        if (msgHeaderLength <= maxAlloc)
+        {
+            Span<byte> buffer = stackalloc byte[msgHeaderLength];
+            msgHeader.CopyTo(buffer);
+            return ParseHMessageHeader(buffer);
+        }
+        else
+        {
+            return ParseHMessageHeader(msgHeader.ToSpan());
+        }
     }
 
     internal static class ServerOpCodes

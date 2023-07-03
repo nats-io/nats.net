@@ -2,7 +2,7 @@ using System.Buffers;
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 
-namespace NATS.Client.Core;
+namespace NATS.Client.Core.Internal;
 
 internal sealed class SubscriptionManager : IAsyncDisposable
 {
