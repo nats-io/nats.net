@@ -1,0 +1,12 @@
+- name: Documentation
+  href: documentation/
+
+- name: API
+  href: api/
+  homepage: api/index.md
+
+- name: GitHub
+  href: https://github.com/nats-io/nats.net.v2
+
+- name: Slack
+  href: https://natsio.slack.com/channels/dotnet
