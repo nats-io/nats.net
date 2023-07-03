@@ -1,6 +1,6 @@
 namespace NATS.Client.Core.Internal;
 
-public interface ISocketConnection : IAsyncDisposable
+internal interface ISocketConnection : IAsyncDisposable
 {
     public Task<Exception> WaitForClosed { get; }
 
