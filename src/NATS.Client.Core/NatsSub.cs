@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Threading.Channels;
+using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
 

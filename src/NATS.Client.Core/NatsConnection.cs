@@ -63,7 +63,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         ConnectionState = NatsConnectionState.Closed;
         _waitForOpenConnection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         _disposedCancellationTokenSource = new CancellationTokenSource();
-        _pool = new ObjectPool(options.CommandPoolSize);
+        _pool = new ObjectPool(options.ObjectPoolSize);
         _cancellationTimerPool = new CancellationTimerPool(_pool, _disposedCancellationTokenSource.Token);
         _name = options.Name;
         Counter = new ConnectionStatsCounter();
@@ -572,7 +572,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         }
         else
         {
-            // TODO: throw exception
+            throw new NatsException("Can't write to command channel");
         }
     }
 
