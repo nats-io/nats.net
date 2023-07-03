@@ -3,7 +3,8 @@
 
     <PropertyGroup>
         <!-- NuGet Packaging -->
-        <PackageVersion>$([System.IO.File]::ReadAllText("$(MSBuildThisFileDirectory)..\version.txt"))</PackageVersion>
+        <Version>$([System.IO.File]::ReadAllText("$(MSBuildThisFileDirectory)..\version.txt"))</Version>
+        <PackageVersion>$(Version)</PackageVersion>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <Company>CNCF</Company>
         <Authors>The NATS Authors</Authors>
