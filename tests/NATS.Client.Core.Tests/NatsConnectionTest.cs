@@ -118,7 +118,10 @@ public abstract partial class NatsConnectionTest
             }
 
             if (m.Data == 100)
+            {
                 await m.ReplyAsync(default(string));
+                return;
+            }
 
             await m.ReplyAsync(text + m.Data);
         });
