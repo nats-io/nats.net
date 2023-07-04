@@ -12,7 +12,8 @@ public class WeatherForecastService : IHostedService, IAsyncDisposable
 
     private readonly ILogger<WeatherForecastService> _logger;
     private readonly INatsConnection _natsConnection;
-    private NatsReplyHandle? _replyHandle;
+    private NatsSub<object>? _replySubscription;
+    private Task? _replyTask;
 
     public WeatherForecastService(ILogger<WeatherForecastService> logger, INatsConnection natsConnection)
     {
@@ -22,23 +23,35 @@ public class WeatherForecastService : IHostedService, IAsyncDisposable
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        _replyHandle = await _natsConnection.ReplyAsync<object, WeatherForecast[]>("weather", req =>
-        {
-            return Enumerable.Range(1, 5).Select(index => new WeatherForecast
+        _replySubscription = await _natsConnection.SubscribeAsync<object>("weather", cancellationToken: cancellationToken);
+        _replyTask = Task.Run(
+            async () =>
             {
-                Date = DateTime.Now.AddDays(index),
-                TemperatureC = Random.Shared.Next(-20, 55),
-                Summary = Summaries[Random.Shared.Next(Summaries.Length)],
-            }).ToArray();
-        });
+                await foreach (var msg in _replySubscription.Msgs.ReadAllAsync(cancellationToken))
+                {
+                    var forecasts = Enumerable.Range(1, 5).Select(index => new WeatherForecast
+                    {
+                        Date = DateTime.Now.AddDays(index),
+                        TemperatureC = Random.Shared.Next(-20, 55),
+                        Summary = Summaries[Random.Shared.Next(Summaries.Length)],
+                    }).ToArray();
+                    await msg.ReplyAsync(forecasts, cancellationToken: cancellationToken);
+                }
+            },
+            cancellationToken);
         _logger.LogInformation("Weather Forecast Services is running");
     }
 
-    public Task StopAsync(CancellationToken cancellationToken)
+    public async Task StopAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("Weather Forecast Services is stopping");
-        return Task.CompletedTask;
+        if (_replySubscription != null) await _replySubscription.UnsubscribeAsync();
+        if (_replyTask != null) await _replyTask;
     }
 
-    public ValueTask DisposeAsync() => _replyHandle?.DisposeAsync() ?? ValueTask.CompletedTask;
+    public async ValueTask DisposeAsync()
+    {
+        if (_replySubscription != null) await _replySubscription.DisposeAsync();
+        if (_replyTask != null) await _replyTask;
+    }
 }

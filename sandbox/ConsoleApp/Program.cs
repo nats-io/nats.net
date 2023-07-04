@@ -23,10 +23,20 @@ conn.OnConnectingAsync = async x =>
 };
 
 // Server
-await conn.ReplyAsync("foobar", (int x) => $"Hello {x}");
+var sub = await conn.SubscribeAsync<int>("foobar");
+var replyTask = Task.Run(async () =>
+{
+    await foreach (var msg in sub.Msgs.ReadAllAsync())
+    {
+        await msg.ReplyAsync($"Hello {msg.Data}");
+    }
+});
 
 // Client(response: "Hello 100")
 var response = await conn.RequestAsync<int, string>("foobar", 100);
+
+await sub.UnsubscribeAsync();
+await replyTask;
 
 // subscribe
 var subscription = await conn.SubscribeAsync<Person>("foo");

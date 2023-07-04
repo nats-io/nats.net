@@ -108,17 +108,19 @@ public abstract partial class NatsConnectionTest
         var text = new StringBuilder(minSize).Insert(0, "a", minSize).ToString();
 
         var sync = 0;
-        await using var replyHandle = await subConnection.ReplyAsync<int, string>(subject, x =>
+        var sub = await subConnection.SubscribeAsync<int>(subject);
+        var reg = sub.Register(async m =>
         {
-            if (x < 10)
+            if (m.Data < 10)
             {
-                Interlocked.Exchange(ref sync, x);
-                return "sync";
+                Interlocked.Exchange(ref sync, m.Data);
+                await m.ReplyAsync( "sync");
             }
 
-            if (x == 100)
-                throw new Exception();
-            return text + x;
+            if (m.Data == 100)
+                await m.ReplyAsync(default(string));
+
+            await m.ReplyAsync(text + m.Data);
         });
 
         await Retry.Until(
@@ -139,6 +141,9 @@ public abstract partial class NatsConnectionTest
         {
             await pubConnection.RequestAsync<int, string>("foo", 10, timeout: TimeSpan.FromSeconds(2));
         });
+
+        await sub.DisposeAsync();
+        await reg;
     }
 
     [Fact]

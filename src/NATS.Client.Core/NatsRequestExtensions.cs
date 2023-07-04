@@ -2,56 +2,8 @@ using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
 
-public readonly struct NatsReplyHandle : IAsyncDisposable
+public static class NatsRequestExtensions
 {
-    private readonly NatsSubBase _sub;
-    private readonly Task _reader;
-
-    internal NatsReplyHandle(NatsSubBase sub, Task reader)
-    {
-        _sub = sub;
-        _reader = reader;
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        await _sub.DisposeAsync().ConfigureAwait(false);
-        await _reader.ConfigureAwait(false);
-    }
-}
-
-public static class NatReplyUtils
-{
-    /// <summary>
-    /// Create a responder using the NATS Request-Reply pattern, with a single response.
-    /// </summary>
-    /// <param name="nats">NATS connection</param>
-    /// <param name="subject">Subject to subscribed to</param>
-    /// <param name="reply">Callback to prepare replies to incoming requests. Exceptions will be handled and a default response will be sent. You should implement your own exception handling.</param>
-    /// <typeparam name="TRequest">Incoming request type</typeparam>
-    /// <typeparam name="TResponse">Reply or response type to be sent to requesters</typeparam>
-    /// <returns>A disposable handler to keep track of subscription. Dispose to unsubscribe and wait for reply callback to exit.</returns>
-    public static async Task<NatsReplyHandle> ReplyAsync<TRequest, TResponse>(this INatsConnection nats, string subject, Func<TRequest?, TResponse> reply)
-    {
-        var sub = await nats.SubscribeAsync<TRequest>(subject).ConfigureAwait(false);
-        var reader = Task.Run(async () =>
-        {
-            await foreach (var msg in sub.Msgs.ReadAllAsync())
-            {
-                try
-                {
-                    var response = reply(msg.Data);
-                    await msg.ReplyAsync(response).ConfigureAwait(false);
-                }
-                catch
-                {
-                    await msg.ReplyAsync(default(TResponse)).ConfigureAwait(false);
-                }
-            }
-        });
-        return new NatsReplyHandle(sub, reader);
-    }
-
     /// <summary>
     /// Request data using the NATSRequest-Reply pattern with a single response.
     /// </summary>
