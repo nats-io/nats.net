@@ -6,6 +6,9 @@
 
 - name: Request-Reply
   href: req-rep.md
-  
+
+- name: Queue Groups
+  href: queue.md
+
 - name: Updating Documentation
   href: update-docs.md
