@@ -130,8 +130,7 @@ public abstract class NatsSubBase : INatsSub
         ReadOnlySequence<byte> payloadBuffer) =>
         ReceiveInternalAsync(subject, replyTo, headersBuffer, payloadBuffer);
 
-    protected abstract ValueTask ReceiveInternalAsync(string subject, string? replyTo,
-        ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer);
+    protected abstract ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer);
 
     protected void ResetIdleTimeout()
     {
@@ -185,8 +184,7 @@ public sealed class NatsSub : NatsSubBase
 
     public ChannelReader<NatsMsg> Msgs => _msgs.Reader;
 
-    protected override async ValueTask ReceiveInternalAsync(string subject, string? replyTo,
-        ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
+    protected override async ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
     {
         ResetIdleTimeout();
 
@@ -224,8 +222,7 @@ public sealed class NatsSub<T> : NatsSubBase
 
     private INatsSerializer Serializer { get; }
 
-    protected override async ValueTask ReceiveInternalAsync(string subject, string? replyTo,
-        ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
+    protected override async ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
     {
         ResetIdleTimeout();
 

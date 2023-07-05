@@ -48,8 +48,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
         }
     }
 
-    public async ValueTask<T> SubscribeAsync<T>(string subject, NatsSubOpts? opts, T sub,
-        CancellationToken cancellationToken)
+    public async ValueTask<T> SubscribeAsync<T>(string subject, NatsSubOpts? opts, T sub, CancellationToken cancellationToken)
         where T : INatsSub
     {
         var sid = GetNextSid();
@@ -73,10 +72,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
         }
     }
 
-    protected int GetNextSid() => Interlocked.Increment(ref _sid);
-
-    public ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid,
-        in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
+    public ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
     {
         int? orphanSid = null;
         lock (_gate)
@@ -147,6 +143,8 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
 
         return _connection.UnsubscribeAsync(subMetadata.Sid);
     }
+
+    private int GetNextSid() => Interlocked.Increment(ref _sid);
 
     private async Task CleanupAsync()
     {
