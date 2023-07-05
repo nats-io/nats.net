@@ -36,9 +36,11 @@ public abstract partial class NatsConnectionTest
                     }
 
                     Assert.Equal($"foo.xyz{msg.Data}", msg.Subject);
-                    lock (messages1) messages1.Add(msg.Data);
+                    lock (messages1)
+                        messages1.Add(msg.Data);
                     var total = Interlocked.Increment(ref count);
-                    if (total == messageCount) cts.Cancel();
+                    if (total == messageCount)
+                        cts.Cancel();
                 }
             },
             cts.Token);
@@ -57,9 +59,11 @@ public abstract partial class NatsConnectionTest
                     }
 
                     Assert.Equal($"foo.xyz{msg.Data}", msg.Subject);
-                    lock (messages2) messages2.Add(msg.Data);
+                    lock (messages2)
+                        messages2.Add(msg.Data);
                     var total = Interlocked.Increment(ref count);
-                    if (total == messageCount) cts.Cancel();
+                    if (total == messageCount)
+                        cts.Cancel();
                 }
             },
             cts.Token);
@@ -69,7 +73,7 @@ public abstract partial class NatsConnectionTest
             () => Volatile.Read(ref sync1) + Volatile.Read(ref sync2) == 2,
             async () => await conn3.PublishAsync("foo.sync", 0));
 
-        for (int i = 0; i < messageCount; i++)
+        for (var i = 0; i < messageCount; i++)
         {
             await conn3.PublishAsync($"foo.xyz{i}", i);
         }
@@ -100,7 +104,7 @@ public abstract partial class NatsConnectionTest
         // Ensure we received all messages from the two subscribers.
         messages.Sort();
         Assert.Equal(messageCount, messages.Count);
-        for (int i = 0; i < messageCount; i++)
+        for (var i = 0; i < messageCount; i++)
         {
             var data = messages[i];
             Assert.Equal(i, data);

@@ -45,13 +45,17 @@ public class WeatherForecastService : IHostedService, IAsyncDisposable
     public async Task StopAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("Weather Forecast Services is stopping");
-        if (_replySubscription != null) await _replySubscription.UnsubscribeAsync();
-        if (_replyTask != null) await _replyTask;
+        if (_replySubscription != null)
+            await _replySubscription.UnsubscribeAsync();
+        if (_replyTask != null)
+            await _replyTask;
     }
 
     public async ValueTask DisposeAsync()
     {
-        if (_replySubscription != null) await _replySubscription.DisposeAsync();
-        if (_replyTask != null) await _replyTask;
+        if (_replySubscription != null)
+            await _replySubscription.DisposeAsync();
+        if (_replyTask != null)
+            await _replyTask;
     }
 }

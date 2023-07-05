@@ -11,7 +11,7 @@ internal static class StringExtensions
     public static void WriteASCIIBytes(this string key, Span<byte> span)
     {
         var count = Math.Min(key.Length, span.Length);
-        for (int i = 0; i < count; i++)
+        for (var i = 0; i < count; i++)
         {
             int c = key[i];
             span[i] = (byte)c;

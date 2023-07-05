@@ -48,7 +48,8 @@ internal static class NatsMsgTestUtils
 {
     internal static Task Register<T>(this NatsSub<T>? sub, Action<NatsMsg<T>> action)
     {
-        if (sub == null) return Task.CompletedTask;
+        if (sub == null)
+            return Task.CompletedTask;
         return Task.Run(async () =>
         {
             await foreach (var natsMsg in sub.Msgs.ReadAllAsync())
@@ -60,7 +61,8 @@ internal static class NatsMsgTestUtils
 
     internal static Task Register<T>(this NatsSub<T>? sub, Func<NatsMsg<T>, Task> action)
     {
-        if (sub == null) return Task.CompletedTask;
+        if (sub == null)
+            return Task.CompletedTask;
         return Task.Run(async () =>
         {
             await foreach (var natsMsg in sub.Msgs.ReadAllAsync())
@@ -72,7 +74,8 @@ internal static class NatsMsgTestUtils
 
     internal static Task Register(this NatsSub? sub, Action<NatsMsg> action)
     {
-        if (sub == null) return Task.CompletedTask;
+        if (sub == null)
+            return Task.CompletedTask;
         return Task.Run(async () =>
         {
             await foreach (var natsMsg in sub.Msgs.ReadAllAsync())
@@ -84,7 +87,8 @@ internal static class NatsMsgTestUtils
 
     internal static Task Register(this NatsSub? sub, Func<NatsMsg, Task> action)
     {
-        if (sub == null) return Task.CompletedTask;
+        if (sub == null)
+            return Task.CompletedTask;
         return Task.Run(async () =>
         {
             await foreach (var natsMsg in sub.Msgs.ReadAllAsync())

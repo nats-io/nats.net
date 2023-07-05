@@ -813,7 +813,8 @@ internal static class NatsMsgTestUtils
 {
     internal static NatsSub<T>? Register<T>(this NatsSub<T>? sub, Action<NatsMsg<T>> action)
     {
-        if (sub == null) return null;
+        if (sub == null)
+            return null;
         Task.Run(async () =>
         {
             await foreach (var natsMsg in sub.Msgs.ReadAllAsync())
@@ -826,7 +827,8 @@ internal static class NatsMsgTestUtils
 
     internal static NatsSub? Register(this NatsSub? sub, Action<NatsMsg> action)
     {
-        if (sub == null) return null;
+        if (sub == null)
+            return null;
         Task.Run(async () =>
         {
             await foreach (var natsMsg in sub.Msgs.ReadAllAsync())
