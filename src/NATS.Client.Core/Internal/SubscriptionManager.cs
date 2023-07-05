@@ -1,15 +1,24 @@
 using System.Buffers;
 using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 
 namespace NATS.Client.Core.Internal;
 
-internal sealed class SubscriptionManager : IAsyncDisposable
+internal interface ISubscriptionManager
+{
+    public ValueTask RemoveAsync(INatsSub sub);
+}
+
+internal sealed record SubscriptionMetadata(int Sid);
+
+internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposable
 {
     private readonly ILogger<SubscriptionManager> _logger;
     private readonly object _gate = new();
     private readonly NatsConnection _connection;
     private readonly ConcurrentDictionary<int, WeakReference<INatsSub>> _bySid = new();
+    private readonly ConditionalWeakTable<INatsSub, SubscriptionMetadata> _bySub = new();
     private readonly CancellationTokenSource _cts;
     private readonly Task _timer;
     private readonly TimeSpan _cleanupInterval;
@@ -29,29 +38,31 @@ internal sealed class SubscriptionManager : IAsyncDisposable
     {
         lock (_gate)
         {
-            foreach (var subRef in _bySid.Values)
+            foreach (var subRef in _bySid)
             {
-                if (subRef.TryGetTarget(out var sub))
+                if (subRef.Value.TryGetTarget(out var sub))
                 {
-                    yield return (sub.Sid, sub.Subject, sub.QueueGroup, sub.PendingMsgs);
+                    yield return (subRef.Key, sub.Subject, sub.QueueGroup, sub.PendingMsgs);
                 }
             }
         }
     }
 
-    public int GetNextSid() => Interlocked.Increment(ref _sid);
-
-    public async ValueTask<T> SubscribeAsync<T>(string subject, NatsSubOpts? opts, T sub, CancellationToken cancellationToken)
+    public async ValueTask<T> SubscribeAsync<T>(string subject, NatsSubOpts? opts, T sub,
+        CancellationToken cancellationToken)
         where T : INatsSub
     {
+        var sid = GetNextSid();
         lock (_gate)
         {
-            _bySid[sub.Sid] = new WeakReference<INatsSub>(sub);
+            _bySid[sid] = new WeakReference<INatsSub>(sub);
+            _bySub.AddOrUpdate(sub, new SubscriptionMetadata(Sid: sid));
         }
 
         try
         {
-            await _connection.SubscribeCoreAsync(sub.Sid, subject, opts?.QueueGroup, opts?.MaxMsgs, cancellationToken).ConfigureAwait(false);
+            await _connection.SubscribeCoreAsync(sid, subject, opts?.QueueGroup, opts?.MaxMsgs, cancellationToken)
+                .ConfigureAwait(false);
             sub.Ready();
             return sub;
         }
@@ -62,7 +73,10 @@ internal sealed class SubscriptionManager : IAsyncDisposable
         }
     }
 
-    public ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
+    protected int GetNextSid() => Interlocked.Increment(ref _sid);
+
+    public ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid,
+        in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
     {
         int? orphanSid = null;
         lock (_gate)
@@ -118,11 +132,20 @@ internal sealed class SubscriptionManager : IAsyncDisposable
         }
     }
 
-    public ValueTask RemoveAsync(int sid)
+    public ValueTask RemoveAsync(INatsSub sub)
     {
+        if (!_bySub.TryGetValue(sub, out var subMetadata))
+        {
+            throw new NatsException("subscription is not registered with the manager");
+        }
+
         lock (_gate)
-            _bySid.Remove(sid, out _);
-        return _connection.UnsubscribeAsync(sid);
+        {
+            _bySub.Remove(sub);
+            _bySid.Remove(subMetadata.Sid, out _);
+        }
+
+        return _connection.UnsubscribeAsync(subMetadata.Sid);
     }
 
     private async Task CleanupAsync()

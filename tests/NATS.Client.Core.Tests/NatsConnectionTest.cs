@@ -114,7 +114,7 @@ public abstract partial class NatsConnectionTest
             if (m.Data < 10)
             {
                 Interlocked.Exchange(ref sync, m.Data);
-                await m.ReplyAsync( "sync");
+                await m.ReplyAsync("sync");
             }
 
             if (m.Data == 100)

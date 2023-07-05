@@ -1,4 +1,4 @@
-﻿// > nats pub bar.xyz --count=10 "my_message_{{ Count }}" -H X-Foo:Baz
+// > nats pub bar.xyz --count=10 "my_message_{{ Count }}" -H X-Foo:Baz
 
 using System.Text;
 using Microsoft.Extensions.Logging;
@@ -13,7 +13,7 @@ await using var connection = new NatsConnection(options);
 
 Print($"[SUB] Subscribing to subject '{subject}'...\n");
 
-NatsSub sub = await connection.SubscribeAsync(subject);
+var sub = await connection.SubscribeAsync(subject);
 
 await foreach (var msg in sub.Msgs.ReadAllAsync())
 {

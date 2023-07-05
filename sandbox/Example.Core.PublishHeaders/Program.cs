@@ -1,4 +1,4 @@
-﻿// > nats sub bar.*
+// > nats sub bar.*
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 
@@ -9,7 +9,7 @@ Print("[CON] Connecting...\n");
 
 await using var connection = new NatsConnection(options);
 
-for (int i = 0; i < 10; i++)
+for (var i = 0; i < 10; i++)
 {
     Print($"[PUB] Publishing to subject ({i}) '{subject}'...\n");
     await connection.PublishAsync<Bar>(

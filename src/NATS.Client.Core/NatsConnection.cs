@@ -578,7 +578,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
     private async ValueTask EnqueueCommandAsync(ICommand command)
     {
-        RETRY:
+    RETRY:
         if (_commandWriter.TryWrite(command))
         {
             Interlocked.Increment(ref Counter.PendingMessages);

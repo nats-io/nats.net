@@ -29,7 +29,7 @@ internal static class BufferExtensions
     {
         if (source.IsSingleSegment)
         {
-            int index = source.First.Span.IndexOfAny(value0, value1);
+            var index = source.First.Span.IndexOfAny(value0, value1);
             if (index != -1)
             {
                 return source.GetPosition(index);
@@ -46,11 +46,11 @@ internal static class BufferExtensions
     private static SequencePosition? PositionOfAnyMultiSegment<T>(in ReadOnlySequence<T> source, T value0, T value1)
         where T : IEquatable<T>
     {
-        SequencePosition position = source.Start;
-        SequencePosition result = position;
-        while (source.TryGet(ref position, out ReadOnlyMemory<T> memory))
+        var position = source.Start;
+        var result = position;
+        while (source.TryGet(ref position, out var memory))
         {
-            int index = memory.Span.IndexOfAny(value0, value1);
+            var index = memory.Span.IndexOfAny(value0, value1);
             if (index != -1)
             {
                 return source.GetPosition(index, result);
