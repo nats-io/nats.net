@@ -10,6 +10,7 @@ internal enum NatsSubEndReason
     MaxMsgs,
     Timeout,
     IdleTimeout,
+    StartUpTimeout,
 }
 
 public abstract class NatsSubBase : INatsSub
@@ -19,8 +20,10 @@ public abstract class NatsSubBase : INatsSub
     private readonly Timer? _timeoutTimer;
     private readonly Timer? _idleTimeoutTimer;
     private readonly TimeSpan _idleTimeout;
+    private readonly TimeSpan _startUpTimeout;
     private readonly TimeSpan _timeout;
     private readonly bool _countPendingMsgs;
+    private volatile Timer? _startUpTimeoutTimer;
     private bool _disposed;
     private bool _unsubscribed;
     private bool _endSubscription;
@@ -34,6 +37,7 @@ public abstract class NatsSubBase : INatsSub
         _pendingMsgs = opts is { MaxMsgs: > 0 } ? opts.Value.MaxMsgs ?? -1 : -1;
         _countPendingMsgs = _pendingMsgs > 0;
         _idleTimeout = opts?.IdleTimeout ?? default;
+        _startUpTimeout = opts?.IdleTimeout ?? default;
         _timeout = opts?.Timeout ?? default;
 
         Connection = connection;
@@ -53,6 +57,11 @@ public abstract class NatsSubBase : INatsSub
             // Since awaiting unsubscribe isn't crucial Timer approach is currently acceptable.
             // If we need an async loop in the future cancellation token source approach can be used.
             _idleTimeoutTimer = new Timer(_ => EndSubscription(NatsSubEndReason.IdleTimeout));
+        }
+
+        if (_startUpTimeout != default)
+        {
+            _idleTimeoutTimer = new Timer(_ => EndSubscription(NatsSubEndReason.StartUpTimeout));
         }
 
         if (_timeout != default)
@@ -85,7 +94,12 @@ public abstract class NatsSubBase : INatsSub
 
     void INatsSub.Ready()
     {
-        _idleTimeoutTimer?.Change(_idleTimeout, Timeout.InfiniteTimeSpan);
+        // Let idle timer start with the first message, in case
+        // we're allowed to wait longer for the first message.
+        if (_startUpTimeoutTimer == null)
+            _idleTimeoutTimer?.Change(_idleTimeout, Timeout.InfiniteTimeSpan);
+
+        _startUpTimeoutTimer?.Change(_startUpTimeout, Timeout.InfiniteTimeSpan);
         _timeoutTimer?.Change(dueTime: _timeout, period: Timeout.InfiniteTimeSpan);
     }
 
@@ -105,6 +119,7 @@ public abstract class NatsSubBase : INatsSub
 
         _timeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
         _idleTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+        _startUpTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
         TryComplete();
 
         return _manager.RemoveAsync(_sid);
@@ -123,6 +138,7 @@ public abstract class NatsSubBase : INatsSub
 
         _timeoutTimer?.Dispose();
         _idleTimeoutTimer?.Dispose();
+        _startUpTimeoutTimer?.Dispose();
 
         return UnsubscribeAsync();
     }
@@ -139,6 +155,13 @@ public abstract class NatsSubBase : INatsSub
     protected void ResetIdleTimeout()
     {
         _idleTimeoutTimer?.Change(dueTime: _idleTimeout, period: Timeout.InfiniteTimeSpan);
+
+        // Once the first message is received we don't need to keep resetting the start-up timer
+        if (_startUpTimeoutTimer != null)
+        {
+            _startUpTimeoutTimer.Change(dueTime: Timeout.InfiniteTimeSpan, period: Timeout.InfiniteTimeSpan);
+            _startUpTimeoutTimer = null;
+        }
     }
 
     protected void DecrementMaxMsgs()

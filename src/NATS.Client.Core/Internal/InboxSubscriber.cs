@@ -1,10 +1,34 @@
 using System.Buffers;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Runtime.ExceptionServices;
 using System.Threading.Tasks.Sources;
 using Microsoft.Extensions.Logging;
 
 namespace NATS.Client.Core.Internal;
+
+internal enum NatsMsgCarrierTermination
+{
+    None,
+    MaxMsgCount,
+    Timeout,
+    StartUpTimeout,
+    IdleTimeout,
+}
+
+internal readonly record struct NatsMsgCarrier(
+    string Subject,
+    string? ReplyTo,
+    NatsHeaders? Headers,
+    INatsConnection? Connection,
+    NatsMsgCarrierTermination Termination,
+    object? ModelData,
+    ReadOnlyMemory<byte>? BufferData)
+{
+    internal NatsMsg ToMsg() => new(Subject, ReplyTo, Headers, BufferData!.Value, Connection);
+
+    internal NatsMsg<T> ToMsg<T>() => new(Subject, ReplyTo, Headers, (T?)ModelData, Connection);
+}
 
 internal class InboxSubscriber : INatsSubBuilder<InboxSub>, IAsyncDisposable
 {
@@ -139,39 +163,173 @@ internal class InboxSub : INatsSub
     public ValueTask DisposeAsync() => _manager.RemoveAsync(Sid);
 }
 
-internal class MsgWrapper : IValueTaskSource<object?>, IObjectPoolNode<MsgWrapper>
+internal class MsgWrapper : IValueTaskSource<NatsMsgCarrier>, IObjectPoolNode<MsgWrapper>
 {
-    private ManualResetValueTaskSourceCore<object?> _core = new()
-    {
-        RunContinuationsAsynchronously = true,
-    };
-
+    private readonly Timer _timer1;
+    private readonly Timer _timer2;
+    private readonly Timer _timer3;
+    private ManualResetValueTaskSourceCore<NatsMsgCarrier> _core;
     private INatsSerializer? _serializer;
     private Type? _type;
     private MsgWrapper? _next;
     private CancellationTokenRegistration _ctr;
+    private bool _isSet;
+    private TimeSpan? _timeout1;
+    private TimeSpan? _timeout2;
+    private TimeSpan? _timeout3;
+    private short _timerVersion;
+    private int _msgCount;
+    private int _maxMsgCount;
+
+    public MsgWrapper()
+    {
+        _core = new ManualResetValueTaskSourceCore<NatsMsgCarrier> { RunContinuationsAsynchronously = true };
+
+        // Make suze _timerVersion != _core.Version until initialized
+        _timerVersion = (short)(_core.Version - 1);
+
+        _timer1 = new(
+            state => TimersCallback(state, NatsMsgCarrierTermination.Timeout),
+            this,
+            Timeout.Infinite,
+            Timeout.Infinite);
+
+        _timer2 = new(
+            state => TimersCallback(state, NatsMsgCarrierTermination.StartUpTimeout),
+            this,
+            Timeout.Infinite,
+            Timeout.Infinite);
+
+        _timer3 = new(
+            state => TimersCallback(state, NatsMsgCarrierTermination.IdleTimeout),
+            this,
+            Timeout.Infinite,
+            Timeout.Infinite);
+    }
 
     public ref MsgWrapper? NextNode => ref _next;
 
-    public void SetSerializer<TData>(INatsSerializer serializer, CancellationToken cancellationToken)
+    public void Initialize(
+        INatsSerializer? serializer,
+        Type? type,
+        TimeSpan? timeout,
+        TimeSpan? startUpTimeout,
+        TimeSpan? idleTimeout,
+        int maxMsgCount,
+        CancellationToken cancellationToken)
     {
-        _serializer = serializer;
-        _type = typeof(TData);
-        _ctr = cancellationToken.UnsafeRegister(
-            static (msgWrapper, cancellationToken) => ((MsgWrapper)msgWrapper!).Cancel(cancellationToken), this);
+        lock (this)
+        {
+            Debug.Assert(_timerVersion != _core.Version, "Initialized before reset");
+            _timerVersion = _core.Version;
+
+            _serializer = serializer;
+            _type = type;
+            _ctr = cancellationToken.UnsafeRegister(
+                static (msgWrapper, cancellationToken) => ((MsgWrapper)msgWrapper!).Cancel(cancellationToken), this);
+
+            _timeout1 = timeout;
+            _timeout2 = startUpTimeout;
+            _timeout3 = idleTimeout;
+            _msgCount = maxMsgCount;
+
+            if (_timeout1 != null)
+            {
+                _timer1.Change(_timeout1.Value, Timeout.InfiniteTimeSpan);
+            }
+
+            if (_timeout2 != null)
+            {
+                _timer2.Change(_timeout2.Value, Timeout.InfiniteTimeSpan);
+            }
+
+            // Start idle timer only if start-up timer isn't set
+            // in case we're allowed to wait longer for the first message.
+            if (_timeout2 == null && _timeout3 != null)
+            {
+                _timer3.Change(_timeout3.Value, Timeout.InfiniteTimeSpan);
+            }
+        }
     }
 
     public void MsgReceived(string subject, string? replyTo, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer, NatsConnection connection)
     {
-        if (_serializer == null || _type == null)
-            throw new NullReferenceException("Serializer must be set");
-        var data = _serializer.Deserialize(payloadBuffer, _type);
-        _core.SetResult(data);
+        Monitor.Enter(this);
+        try
+        {
+            if (_isSet) return;
+            _isSet = true;
+
+            if (_maxMsgCount > 0 && ++_msgCount > _maxMsgCount)
+            {
+                SetTerminationResult(this, NatsMsgCarrierTermination.MaxMsgCount);
+                return;
+            }
+
+            if (_timeout2 != null)
+            {
+                // Stop Start-up timer on first message
+                _timeout2 = null;
+                _timer2.Change(Timeout.Infinite, Timeout.Infinite);
+            }
+
+            if (_timeout3 != null)
+            {
+                // Restart Idle timer on every message
+                _timer3.Change(_timeout3.Value, Timeout.InfiniteTimeSpan);
+            }
+
+            NatsHeaders? headers = null;
+            if (headersBuffer != null)
+            {
+                headers = new NatsHeaders();
+                if (!connection.HeaderParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), headers))
+                {
+                    throw new NatsException("Error parsing headers");
+                }
+
+                headers.SetReadOnly();
+            }
+
+            object? modelData = default;
+            ReadOnlyMemory<byte>? bufferData = default;
+
+            if (_serializer == null)
+            {
+                bufferData = payloadBuffer.ToArray();
+            }
+            else
+            {
+                if (_type == null)
+                {
+                    throw new NullReferenceException("Type must be set for serializer");
+                }
+
+                modelData = _serializer.Deserialize(payloadBuffer, _type);
+            }
+
+            _core.SetResult(new NatsMsgCarrier(
+                Subject: subject,
+                ReplyTo: replyTo,
+                Headers: headers,
+                Connection: connection,
+                Termination: NatsMsgCarrierTermination.None,
+                ModelData: modelData,
+                BufferData: bufferData));
+        }
+        catch (Exception e)
+        {
+            _core.SetException(e);
+        }
+        finally
+        {
+            Monitor.Exit(this);
+        }
     }
 
-    public ValueTask<object?> MsgRetrieveAsync() => new(this, _core.Version);
+    public ValueTask<NatsMsgCarrier> MsgRetrieveAsync() => new(this, _core.Version);
 
-    public object? GetResult(short token)
+    public NatsMsgCarrier GetResult(short token)
     {
         _ctr.Dispose();
         lock (this)
@@ -186,6 +344,17 @@ internal class MsgWrapper : IValueTaskSource<object?>, IObjectPoolNode<MsgWrappe
                 _serializer = default;
                 _type = default;
                 _ctr = default;
+                _isSet = default;
+                _msgCount = default;
+                _maxMsgCount = default;
+
+                // Note that _timerVersion is reset in initializer
+                _timer1.Change(Timeout.Infinite, Timeout.Infinite);
+                _timer2.Change(Timeout.Infinite, Timeout.Infinite);
+                _timer3.Change(Timeout.Infinite, Timeout.Infinite);
+                _timeout1 = default;
+                _timeout2 = default;
+                _timeout3 = default;
             }
         }
     }
@@ -198,6 +367,32 @@ internal class MsgWrapper : IValueTaskSource<object?>, IObjectPoolNode<MsgWrappe
         short token,
         ValueTaskSourceOnCompletedFlags flags)
         => _core.OnCompleted(continuation, state, token, flags);
+
+    private static void TimersCallback(object? state, NatsMsgCarrierTermination termination)
+    {
+        if (state == null) return;
+        var self = (MsgWrapper)state;
+        lock (self)
+        {
+            // Guard against timers misfiring after reset
+            if (self._core.Version != self._timerVersion) return;
+
+            if (self._isSet) return;
+            self._isSet = true;
+
+            SetTerminationResult(self, termination);
+        }
+    }
+
+    private static void SetTerminationResult(MsgWrapper self, NatsMsgCarrierTermination termination) =>
+        self._core.SetResult(new NatsMsgCarrier(
+            Termination: termination,
+            Subject: string.Empty,
+            ReplyTo: default,
+            Headers: default,
+            Connection: default,
+            ModelData: default,
+            BufferData: default));
 
     private void Cancel(CancellationToken cancellationToken)
     {
