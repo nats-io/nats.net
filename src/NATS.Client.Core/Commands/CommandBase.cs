@@ -95,7 +95,8 @@ internal abstract class AsyncCommandBase<TSelf> : ICommand, IAsyncCommand, IObje
         _timerRegistration.Dispose();
         _timerRegistration = default;
 
-        if (IsCanceled) return; // already called Canceled, it invoked SetCanceled.
+        if (IsCanceled)
+            return; // already called Canceled, it invoked SetCanceled.
 
         if (_timer != null)
         {
@@ -113,7 +114,8 @@ internal abstract class AsyncCommandBase<TSelf> : ICommand, IAsyncCommand, IObje
 
     public void SetCanceled()
     {
-        if (_noReturn) return;
+        if (_noReturn)
+            return;
 
         _timerRegistration.Dispose();
         _timerRegistration = default;
@@ -134,7 +136,8 @@ internal abstract class AsyncCommandBase<TSelf> : ICommand, IAsyncCommand, IObje
 
     public void SetException(Exception exception)
     {
-        if (_noReturn) return;
+        if (_noReturn)
+            return;
 
         _timerRegistration.Dispose();
         _timerRegistration = default;
@@ -249,7 +252,8 @@ internal abstract class AsyncCommandBase<TSelf, TResponse> : ICommand, IAsyncCom
     {
         _response = result;
 
-        if (IsCanceled) return; // already called Canceled, it invoked SetCanceled.
+        if (IsCanceled)
+            return; // already called Canceled, it invoked SetCanceled.
 
         _timerRegistration.Dispose();
         _timerRegistration = default;
@@ -289,7 +293,8 @@ internal abstract class AsyncCommandBase<TSelf, TResponse> : ICommand, IAsyncCom
 
     public void SetException(Exception exception)
     {
-        if (_noReturn) return;
+        if (_noReturn)
+            return;
 
         _timerRegistration.Dispose();
         _timerRegistration = default;

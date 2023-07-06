@@ -16,14 +16,14 @@ public class LowLevelApiTest
         var nats = server.CreateClientConnection();
 
         var builder = new NatsSubCustomTestBuilder(_output);
-        NatsSubTest sub = await nats.SubAsync<NatsSubTest>("foo.*", opts: default, builder);
+        var sub = await nats.SubAsync<NatsSubTest>("foo.*", opts: default, builder);
 
         await Retry.Until(
             "subscription is ready",
             () => builder.IsSynced,
             async () => await nats.PubAsync("foo.sync"));
 
-        for (int i = 0; i < 10; i++)
+        for (var i = 0; i < 10; i++)
         {
             var headers = new NatsHeaders { { "X-Test", $"value-{i}" } };
             await nats.PubModelAsync<int>($"foo.data{i}", i, JsonNatsSerializer.Default, "bar", headers);
@@ -76,8 +76,8 @@ public class LowLevelApiTest
             }
             else
             {
-                byte[]? headers = headersBuffer?.ToArray();
-                byte[] payload = payloadBuffer.ToArray();
+                var headers = headersBuffer?.ToArray();
+                var payload = payloadBuffer.ToArray();
 
                 var sb = new StringBuilder();
                 sb.AppendLine($"Subject: {subject}");
@@ -130,7 +130,8 @@ public class LowLevelApiTest
 
         public void MessageReceived(string message)
         {
-            lock (_messages) _messages.Add(message);
+            lock (_messages)
+                _messages.Add(message);
         }
     }
 }

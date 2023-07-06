@@ -78,15 +78,15 @@ internal class InboxSubscriber : INatsSubBuilder<InboxSub>, IAsyncDisposable
             // the first one fails to subscribe, other calls might carry on without exception.
             // While first call would produce the correct exception, subsequent calls will only
             // fail with a timeout. We reset here to allow retries to subscribe again.
-            lock (this) _started = false;
+            lock (this)
+                _started = false;
             throw;
         }
     }
 
     public InboxSub Build(string subject, NatsSubOpts? opts, NatsConnection connection, SubscriptionManager manager)
     {
-        var sid = manager.GetNextSid();
-        return new InboxSub(this, subject, opts, sid, connection, manager);
+        return new InboxSub(this, subject, opts, connection, manager);
     }
 
     public string Register(MsgWrapper msg, string? suffix = null)
@@ -129,7 +129,6 @@ internal class InboxSub : INatsSub
         InboxSubscriber inbox,
         string subject,
         NatsSubOpts? opts,
-        int sid,
         NatsConnection connection,
         SubscriptionManager manager)
     {
@@ -139,7 +138,6 @@ internal class InboxSub : INatsSub
         Subject = subject;
         QueueGroup = opts?.QueueGroup;
         PendingMsgs = opts?.MaxMsgs;
-        Sid = sid;
     }
 
     public string Subject { get; }
@@ -147,8 +145,6 @@ internal class InboxSub : INatsSub
     public string? QueueGroup { get; }
 
     public int? PendingMsgs { get; }
-
-    public int Sid { get; }
 
     public void Ready()
     {
@@ -160,7 +156,7 @@ internal class InboxSub : INatsSub
         return ValueTask.CompletedTask;
     }
 
-    public ValueTask DisposeAsync() => _manager.RemoveAsync(Sid);
+    public ValueTask DisposeAsync() => _manager.RemoveAsync(this);
 }
 
 internal class MsgWrapper : IValueTaskSource<NatsMsgCarrier>, IObjectPoolNode<MsgWrapper>

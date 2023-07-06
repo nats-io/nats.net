@@ -15,8 +15,7 @@ internal enum NatsSubEndReason
 
 public abstract class NatsSubBase : INatsSub
 {
-    private readonly int _sid;
-    private readonly SubscriptionManager _manager;
+    private readonly ISubscriptionManager _manager;
     private readonly Timer? _timeoutTimer;
     private readonly Timer? _idleTimeoutTimer;
     private readonly TimeSpan _idleTimeout;
@@ -30,9 +29,8 @@ public abstract class NatsSubBase : INatsSub
     private int _endReasonRaw;
     private int _pendingMsgs;
 
-    internal NatsSubBase(NatsConnection connection, SubscriptionManager manager, string subject, NatsSubOpts? opts, int sid)
+    internal NatsSubBase(NatsConnection connection, ISubscriptionManager manager, string subject, NatsSubOpts? opts)
     {
-        _sid = sid;
         _manager = manager;
         _pendingMsgs = opts is { MaxMsgs: > 0 } ? opts.Value.MaxMsgs ?? -1 : -1;
         _countPendingMsgs = _pendingMsgs > 0;
@@ -86,8 +84,6 @@ public abstract class NatsSubBase : INatsSub
     // since INatsSub is marked as internal.
     int? INatsSub.PendingMsgs => _pendingMsgs == -1 ? null : Volatile.Read(ref _pendingMsgs);
 
-    int INatsSub.Sid => _sid;
-
     internal NatsSubEndReason EndReason => (NatsSubEndReason)Volatile.Read(ref _endReasonRaw);
 
     protected NatsConnection Connection { get; }
@@ -122,7 +118,7 @@ public abstract class NatsSubBase : INatsSub
         _startUpTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
         TryComplete();
 
-        return _manager.RemoveAsync(_sid);
+        return _manager.RemoveAsync(this);
     }
 
     public ValueTask DisposeAsync()
@@ -166,7 +162,8 @@ public abstract class NatsSubBase : INatsSub
 
     protected void DecrementMaxMsgs()
     {
-        if (!_countPendingMsgs) return;
+        if (!_countPendingMsgs)
+            return;
         var maxMsgs = Interlocked.Decrement(ref _pendingMsgs);
         if (maxMsgs == 0)
             EndSubscription(NatsSubEndReason.MaxMsgs);
@@ -203,8 +200,8 @@ public sealed class NatsSub : NatsSubBase
         AllowSynchronousContinuations = false,
     });
 
-    internal NatsSub(NatsConnection connection, SubscriptionManager manager, string subject, NatsSubOpts? opts, int sid)
-        : base(connection, manager, subject, opts, sid)
+    internal NatsSub(NatsConnection connection, ISubscriptionManager manager, string subject, NatsSubOpts? opts)
+        : base(connection, manager, subject, opts)
     {
     }
 
@@ -232,16 +229,17 @@ public sealed class NatsSub : NatsSubBase
 
 public sealed class NatsSub<T> : NatsSubBase
 {
-    private readonly Channel<NatsMsg<T>> _msgs = Channel.CreateBounded<NatsMsg<T>>(new BoundedChannelOptions(capacity: 1_000)
-    {
-        FullMode = BoundedChannelFullMode.Wait,
-        SingleWriter = true,
-        SingleReader = false,
-        AllowSynchronousContinuations = false,
-    });
+    private readonly Channel<NatsMsg<T>> _msgs = Channel.CreateBounded<NatsMsg<T>>(
+        new BoundedChannelOptions(capacity: 1_000)
+        {
+            FullMode = BoundedChannelFullMode.Wait,
+            SingleWriter = true,
+            SingleReader = false,
+            AllowSynchronousContinuations = false,
+        });
 
-    internal NatsSub(NatsConnection connection, SubscriptionManager manager, string subject, NatsSubOpts? opts, int sid, INatsSerializer serializer)
-        : base(connection, manager, subject, opts, sid) => Serializer = serializer;
+    internal NatsSub(NatsConnection connection, ISubscriptionManager manager, string subject, NatsSubOpts? opts, INatsSerializer serializer)
+        : base(connection, manager, subject, opts) => Serializer = serializer;
 
     public ChannelReader<NatsMsg<T>> Msgs => _msgs.Reader;
 

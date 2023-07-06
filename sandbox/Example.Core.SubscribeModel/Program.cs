@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 
 var subject = "bar.*";
@@ -10,7 +10,7 @@ await using var connection = new NatsConnection(options);
 
 Print($"[SUB] Subscribing to subject '{subject}'...\n");
 
-NatsSub<Bar> sub = await connection.SubscribeAsync<Bar>(subject);
+var sub = await connection.SubscribeAsync<Bar>(subject);
 
 await foreach (var msg in sub.Msgs.ReadAllAsync())
 {

@@ -11,8 +11,6 @@ internal interface INatsSub : IAsyncDisposable
 
     int? PendingMsgs { get; }
 
-    int Sid { get; }
-
     /// <summary>
     /// Called after subscription is sent to the server.
     /// Helps maintain more accurate timeouts, especially idle timeout.
@@ -34,8 +32,7 @@ internal class NatsSubBuilder : INatsSubBuilder<NatsSub>
 
     public NatsSub Build(string subject, NatsSubOpts? opts, NatsConnection connection, SubscriptionManager manager)
     {
-        var sid = manager.GetNextSid();
-        return new NatsSub(connection, manager, subject, opts, sid);
+        return new NatsSub(connection, manager, subject, opts);
     }
 }
 
@@ -51,7 +48,6 @@ internal class NatsSubModelBuilder<T> : INatsSubBuilder<NatsSub<T>>
 
     public NatsSub<T> Build(string subject, NatsSubOpts? opts, NatsConnection connection, SubscriptionManager manager)
     {
-        var sid = manager.GetNextSid();
-        return new NatsSub<T>(connection, manager, subject, opts, sid, _serializer);
+        return new NatsSub<T>(connection, manager, subject, opts, _serializer);
     }
 }

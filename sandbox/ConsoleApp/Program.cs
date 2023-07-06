@@ -43,10 +43,10 @@ var subscription = await conn.SubscribeAsync<Person>("foo");
 
 _ = Task.Run(async () =>
 {
-        await foreach (var msg in subscription.Msgs.ReadAllAsync())
-        {
-            Console.WriteLine($"Received {msg.Data}");
-        }
+    await foreach (var msg in subscription.Msgs.ReadAllAsync())
+    {
+        Console.WriteLine($"Received {msg.Data}");
+    }
 });
 
 // publish
