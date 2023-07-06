@@ -133,17 +133,15 @@ public abstract partial class NatsConnectionTest
             retryDelay: TimeSpan.FromSeconds(1));
 
         var v = await pubConnection.RequestAsync<int, string>(subject, 9999);
-        v.Should().Be(text + 9999);
+        v?.Data.Should().Be(text + 9999);
 
         // server exception handling: respond with the default value of the type.
         var response = await pubConnection.RequestAsync<int, string>(subject, 100);
-        Assert.Null(response);
+        Assert.Null(response?.Data);
 
         // timeout check
-        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
-        {
-            await pubConnection.RequestAsync<int, string>("foo", 10, timeout: TimeSpan.FromSeconds(2));
-        });
+        var noReply = await pubConnection.RequestAsync<int, string>("foo", 10, replyOpts: new NatsSubOpts { Timeout = TimeSpan.FromSeconds(1) });
+        Assert.Null(noReply);
 
         await sub.DisposeAsync();
         await reg;

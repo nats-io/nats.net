@@ -31,6 +31,14 @@ public readonly record struct NatsSubOpts
     public TimeSpan? Timeout { get; init; }
 
     /// <summary>
+    /// Maximum amount of time allowed before the first message is received.
+    /// If exceeded, subscription will be automatically unsubscribed.
+    /// If not set, all published messages will be received until explicitly
+    /// unsubscribed or disposed.
+    /// </summary>
+    public TimeSpan? StartUpTimeout { get; init; }
+
+    /// <summary>
     /// Maximum amount of time allowed between any two subsequent messages
     /// before automatically unsubscribing.
     /// If not set, all published messages will be received until explicitly
