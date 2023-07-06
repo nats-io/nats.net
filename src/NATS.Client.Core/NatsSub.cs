@@ -61,7 +61,7 @@ public abstract class NatsSubBase : INatsSub
 
         if (_startUpTimeout != default)
         {
-            _idleTimeoutTimer = new Timer(_ => EndSubscription(NatsSubEndReason.StartUpTimeout));
+            _startUpTimeoutTimer = new Timer(_ => EndSubscription(NatsSubEndReason.StartUpTimeout));
         }
 
         if (_timeout != default)

@@ -16,7 +16,7 @@ public static class NatsRequestManyAsyncExtensions
         this NatsConnection nats,
         string subject,
         ReadOnlySequence<byte> payload = default,
-        NatsPubOpts? requestOpts = default, // Not used
+        NatsPubOpts? requestOpts = default,
         NatsSubOpts? replyOpts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -42,7 +42,7 @@ public static class NatsRequestManyAsyncExtensions
         var replyTo = inboxSubscriber.Register(wrapper);
         try
         {
-            await nats.PubAsync(subject, replyTo, payload, cancellationToken: cancellationToken)
+            await nats.PubAsync(subject, replyTo, payload, requestOpts?.Headers, cancellationToken)
                 .ConfigureAwait(false);
 
             var msgCarrier = await wrapper.MsgRetrieveAsync().ConfigureAwait(false);
@@ -107,7 +107,7 @@ public static class NatsRequestManyAsyncExtensions
         var replyTo = inboxSubscriber.Register(wrapper);
         try
         {
-            await nats.PubModelAsync(subject, data, requestOpts?.Serializer ?? nats.Options.Serializer, replyTo, cancellationToken: cancellationToken)
+            await nats.PubModelAsync(subject, data, requestOpts?.Serializer ?? nats.Options.Serializer, replyTo, requestOpts?.Headers, cancellationToken)
                 .ConfigureAwait(false);
 
             var msgCarrier = await wrapper.MsgRetrieveAsync().ConfigureAwait(false);
