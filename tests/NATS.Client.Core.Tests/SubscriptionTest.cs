@@ -1,3 +1,6 @@
+using System.Buffers;
+using System.Text;
+
 namespace NATS.Client.Core.Tests;
 
 public class SubscriptionTest

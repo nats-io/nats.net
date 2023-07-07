@@ -104,7 +104,13 @@ internal sealed class ProtocolWriter
     public void WritePublish<T>(string subject, string? replyTo, NatsHeaders? headers, T? value, INatsSerializer serializer)
     {
         _bufferPayload.Reset();
-        serializer.Serialize(_bufferPayload, value);
+
+        // Consider empty payload as null
+        if (value != null)
+        {
+            serializer.Serialize(_bufferPayload, value);
+        }
+
         var payload = new ReadOnlySequence<byte>(_bufferPayload.WrittenMemory);
         WritePublish(subject, replyTo, headers, payload);
     }

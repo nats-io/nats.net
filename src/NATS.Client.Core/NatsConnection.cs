@@ -52,6 +52,8 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
     private ClientOptions _clientOptions;
     private UserCredentials? _userCredentials;
 
+    internal string InboxPrefix { get; }
+
     public NatsConnection()
         : this(NatsOptions.Default)
     {
@@ -69,11 +71,12 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         Counter = new ConnectionStatsCounter();
         _writerState = new WriterState(options);
         _commandWriter = _writerState.CommandBuffer.Writer;
-        _subscriptionManager = new SubscriptionManager(this);
+        InboxPrefix = $"{options.InboxPrefix}.{Guid.NewGuid():n}.";
+        _subscriptionManager = new SubscriptionManager(this, InboxPrefix);
         _logger = options.LoggerFactory.CreateLogger<NatsConnection>();
         _clientOptions = new ClientOptions(Options);
         HeaderParser = new HeaderParser(options.HeaderEncoding);
-        InboxSubscriber = new InboxSubscriber(this, prefix1: options.InboxPrefix);
+        // InboxSubscriber = new InboxSubscriber(this, prefix1: options.InboxPrefix);
     }
 
     // events
@@ -91,7 +94,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
     public HeaderParser HeaderParser { get; }
 
-    internal InboxSubscriber InboxSubscriber { get; }
+    // internal InboxSubscriber InboxSubscriber { get; }
 
     internal ObjectPool ObjectPool => _pool;
 

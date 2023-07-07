@@ -41,9 +41,9 @@ public class LowLevelApiTest
     {
         private readonly NatsSubCustomTestBuilder _builder;
         private readonly ITestOutputHelper _output;
-        private readonly SubscriptionManager _manager;
+        private readonly ISubscriptionManager _manager;
 
-        public NatsSubTest(NatsSubCustomTestBuilder builder, ITestOutputHelper output, SubscriptionManager manager)
+        public NatsSubTest(NatsSubCustomTestBuilder builder, ITestOutputHelper output, ISubscriptionManager manager)
         {
             _builder = builder;
             _output = output;
@@ -62,7 +62,7 @@ public class LowLevelApiTest
         {
         }
 
-        public ValueTask DisposeAsync() => _manager.DisposeAsync();
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
         public ValueTask ReceiveAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
         {
@@ -119,7 +119,7 @@ public class LowLevelApiTest
             }
         }
 
-        public NatsSubTest Build(string subject, NatsSubOpts? opts, NatsConnection connection, SubscriptionManager manager)
+        public NatsSubTest Build(string subject, NatsSubOpts? opts, NatsConnection connection, ISubscriptionManager manager, CancellationToken cancellationToken)
         {
             return new NatsSubTest(builder: this, _output, manager);
         }
