@@ -16,7 +16,7 @@ public class RequestReplyTest
 
         for (var i = 0; i < 10; i++)
         {
-            var rep = await nats.RequestSingleAsync<int, int>("foo", i);
+            var rep = await nats.RequestAsync<int, int>("foo", i);
             Assert.Equal(i * 2, rep?.Data);
         }
 
@@ -35,7 +35,7 @@ public class RequestReplyTest
 
         await Assert.ThrowsAsync<OperationCanceledException>(async () =>
         {
-            await nats.RequestSingleAsync<int, int>("foo", 0);
+            await nats.RequestAsync<int, int>("foo", 0);
         });
     }
 }

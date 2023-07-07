@@ -20,7 +20,7 @@ public static class NatsRequestManyExtensions
         NatsSubOpts? replyOpts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        await using var sub = await nats.RequestAsync(subject, payload, requestOpts, replyOpts, cancellationToken).ConfigureAwait(false);
+        await using var sub = await nats.RequestSubAsync(subject, payload, requestOpts, replyOpts, cancellationToken).ConfigureAwait(false);
 
         while (await sub.Msgs.WaitToReadAsync(CancellationToken.None).ConfigureAwait(false))
         {
@@ -52,7 +52,7 @@ public static class NatsRequestManyExtensions
         NatsSubOpts? replyOpts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        await using var sub = await nats.RequestAsync<TRequest, TReply>(subject, data, requestOpts, replyOpts, cancellationToken)
+        await using var sub = await nats.RequestSubAsync<TRequest, TReply>(subject, data, requestOpts, replyOpts, cancellationToken)
             .ConfigureAwait(false);
 
         while (await sub.Msgs.WaitToReadAsync(CancellationToken.None).ConfigureAwait(false))

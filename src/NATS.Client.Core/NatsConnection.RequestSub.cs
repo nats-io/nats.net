@@ -5,7 +5,7 @@ namespace NATS.Client.Core;
 
 public partial class NatsConnection
 {
-    public async ValueTask<NatsSub> RequestAsync(
+    public async ValueTask<NatsSub> RequestSubAsync(
         string subject,
         ReadOnlySequence<byte> payload = default,
         NatsPubOpts? requestOpts = default,
@@ -18,7 +18,7 @@ public partial class NatsConnection
         return sub;
     }
 
-    public async ValueTask<NatsSub<TReply>> RequestAsync<TRequest, TReply>(
+    public async ValueTask<NatsSub<TReply>> RequestSubAsync<TRequest, TReply>(
         string subject,
         TRequest? data,
         NatsPubOpts? requestOpts = default,

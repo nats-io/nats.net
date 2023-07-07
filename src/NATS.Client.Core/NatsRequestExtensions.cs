@@ -3,7 +3,7 @@ using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
 
-public static class NatsRequestSingleExtensions
+public static class NatsRequestExtensions
 {
     // RequestAsync methods
     // Same as PublishAsync with the following changes
@@ -12,7 +12,7 @@ public static class NatsRequestSingleExtensions
     // - add SubOpts replyOpts
     //   - default replyOpts.MaxMsgs to 1
     //   - if replyOpts.Timeout == null then set to NatsOptions.RequestTimeout
-    public static async ValueTask<NatsMsg<TReply?>?> RequestSingleAsync<TRequest, TReply>(
+    public static async ValueTask<NatsMsg<TReply?>?> RequestAsync<TRequest, TReply>(
         this NatsConnection nats,
         string subject,
         TRequest? data,
@@ -24,7 +24,7 @@ public static class NatsRequestSingleExtensions
             replyOpts = (replyOpts ?? default) with { CanBeCancelled = true, };
 
         var cancellationTimer = nats.GetCancellationTimer(cancellationToken);
-        await using var sub = await nats.RequestAsync<TRequest, TReply>(subject, data, requestOpts, replyOpts, cancellationTimer.Token)
+        await using var sub = await nats.RequestSubAsync<TRequest, TReply>(subject, data, requestOpts, replyOpts, cancellationTimer.Token)
             .ConfigureAwait(false);
 
         if (await sub.Msgs.WaitToReadAsync(CancellationToken.None).ConfigureAwait(false))
@@ -46,14 +46,14 @@ public static class NatsRequestSingleExtensions
         return null;
     }
 
-    public static ValueTask<NatsMsg<TReply?>?> RequestSingleAsync<TRequest, TReply>(
+    public static ValueTask<NatsMsg<TReply?>?> RequestAsync<TRequest, TReply>(
         this NatsConnection nats,
         in NatsMsg<TRequest> msg,
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default) =>
-        RequestSingleAsync<TRequest, TReply>(nats, msg.Subject, data: msg.Data, replyOpts: replyOpts, cancellationToken: cancellationToken);
+        RequestAsync<TRequest, TReply>(nats, msg.Subject, data: msg.Data, replyOpts: replyOpts, cancellationToken: cancellationToken);
 
-    public static async ValueTask<NatsMsg?> RequestSingleAsync(
+    public static async ValueTask<NatsMsg?> RequestAsync(
         this NatsConnection nats,
         string subject,
         ReadOnlySequence<byte> payload = default,
@@ -61,7 +61,7 @@ public static class NatsRequestSingleExtensions
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default)
     {
-        await using var sub = await nats.RequestAsync(subject, payload, requestOpts, replyOpts, cancellationToken).ConfigureAwait(false);
+        await using var sub = await nats.RequestSubAsync(subject, payload, requestOpts, replyOpts, cancellationToken).ConfigureAwait(false);
 
         if (await sub.Msgs.WaitToReadAsync(CancellationToken.None).ConfigureAwait(false))
         {
@@ -74,10 +74,10 @@ public static class NatsRequestSingleExtensions
         return null;
     }
 
-    public static ValueTask<NatsMsg?> RequestSingleAsync(
+    public static ValueTask<NatsMsg?> RequestAsync(
         this NatsConnection nats,
         in NatsMsg msg,
         in NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default) =>
-        RequestSingleAsync(nats, msg.Subject, new ReadOnlySequence<byte>(msg.Data), default, replyOpts, cancellationToken);
+        RequestAsync(nats, msg.Subject, new ReadOnlySequence<byte>(msg.Data), default, replyOpts, cancellationToken);
 }

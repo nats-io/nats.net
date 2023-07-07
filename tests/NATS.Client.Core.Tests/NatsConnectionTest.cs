@@ -132,15 +132,15 @@ public abstract partial class NatsConnectionTest
             async () => await pubConnection.PublishAsync(subject, 1, new NatsPubOpts { ReplyTo = "ignore" }),
             retryDelay: TimeSpan.FromSeconds(1));
 
-        var v = await pubConnection.RequestSingleAsync<int, string>(subject, 9999);
+        var v = await pubConnection.RequestAsync<int, string>(subject, 9999);
         v?.Data.Should().Be(text + 9999);
 
         // server exception handling: respond with the default value of the type.
-        var response = await pubConnection.RequestSingleAsync<int, string>(subject, 100);
+        var response = await pubConnection.RequestAsync<int, string>(subject, 100);
         Assert.Null(response?.Data);
 
         // timeout check
-        var noReply = await pubConnection.RequestSingleAsync<int, string>("foo", 10, replyOpts: new NatsSubOpts { Timeout = TimeSpan.FromSeconds(1) });
+        var noReply = await pubConnection.RequestAsync<int, string>("foo", 10, replyOpts: new NatsSubOpts { Timeout = TimeSpan.FromSeconds(1) });
         Assert.Null(noReply);
 
         await sub.DisposeAsync();
