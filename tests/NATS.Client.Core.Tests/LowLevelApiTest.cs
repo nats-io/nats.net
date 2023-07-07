@@ -119,7 +119,7 @@ public class LowLevelApiTest
             }
         }
 
-        public NatsSubTest Build(string subject, NatsSubOpts? opts, NatsConnection connection, ISubscriptionManager manager)
+        public NatsSubTest Build(string subject, NatsSubOpts? opts, NatsConnection connection, ISubscriptionManager manager, CancellationToken cancellationToken)
         {
             return new NatsSubTest(builder: this, _output, manager);
         }

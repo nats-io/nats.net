@@ -65,7 +65,7 @@ internal class InboxSubBuilder : INatsSubBuilder<InboxSub>, ISubscriptionManager
 
     private NatsConnection Connection { get; }
 
-    public InboxSub Build(string subject, NatsSubOpts? opts, NatsConnection connection, ISubscriptionManager manager)
+    public InboxSub Build(string subject, NatsSubOpts? opts, NatsConnection connection, ISubscriptionManager manager, CancellationToken cancellationToken)
     {
         return new InboxSub(this, subject, opts, connection, manager);
     }

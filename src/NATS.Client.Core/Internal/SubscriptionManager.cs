@@ -83,7 +83,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
                 }
             }
 
-            var sub = builder.Build(subject, opts, connection: _connection, _inboxSubBuilder);
+            var sub = builder.Build(subject, opts, connection: _connection, _inboxSubBuilder, cancellationToken);
             _inboxSubBuilder.Register(sub);
             return sub;
         }
@@ -96,7 +96,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
     private async ValueTask<T> SubscribeInternalAsync<T>(string subject, NatsSubOpts? opts, INatsSubBuilder<T> builder, CancellationToken cancellationToken)
         where T : INatsSub
     {
-        var sub = builder.Build(subject, opts, connection: _connection, this);
+        var sub = builder.Build(subject, opts, connection: _connection, this, cancellationToken);
         var sid = GetNextSid();
         lock (_gate)
         {

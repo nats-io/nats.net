@@ -11,6 +11,7 @@ internal enum NatsSubEndReason
     Timeout,
     IdleTimeout,
     StartUpTimeout,
+    Cancelled,
 }
 
 public abstract class NatsSubBase : INatsSub
@@ -22,6 +23,7 @@ public abstract class NatsSubBase : INatsSub
     private readonly TimeSpan _startUpTimeout;
     private readonly TimeSpan _timeout;
     private readonly bool _countPendingMsgs;
+    private readonly CancellationTokenSource? _cts;
     private volatile Timer? _startUpTimeoutTimer;
     private bool _disposed;
     private bool _unsubscribed;
@@ -29,7 +31,12 @@ public abstract class NatsSubBase : INatsSub
     private int _endReasonRaw;
     private int _pendingMsgs;
 
-    internal NatsSubBase(NatsConnection connection, ISubscriptionManager manager, string subject, NatsSubOpts? opts)
+    internal NatsSubBase(
+        NatsConnection connection,
+        ISubscriptionManager manager,
+        string subject,
+        NatsSubOpts? opts,
+        CancellationToken cancellationToken = default)
     {
         _manager = manager;
         _pendingMsgs = opts is { MaxMsgs: > 0 } ? opts.Value.MaxMsgs ?? -1 : -1;
@@ -41,6 +48,17 @@ public abstract class NatsSubBase : INatsSub
         Connection = connection;
         Subject = subject;
         QueueGroup = opts?.QueueGroup;
+
+        if ((opts?.CanBeCancelled ?? false) && cancellationToken != default)
+        {
+            _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            _cts.Token.UnsafeRegister(
+                static (self, _) =>
+                {
+                    ((NatsSubBase) self!).EndSubscription(NatsSubEndReason.Cancelled);
+                },
+                this);
+        }
 
         // Only allocate timers if necessary to reduce GC pressure
         if (_idleTimeout != default)
@@ -136,6 +154,8 @@ public abstract class NatsSubBase : INatsSub
         _idleTimeoutTimer?.Dispose();
         _startUpTimeoutTimer?.Dispose();
 
+        _cts?.Dispose();
+
         return UnsubscribeAsync();
     }
 
@@ -200,8 +220,8 @@ public sealed class NatsSub : NatsSubBase
         AllowSynchronousContinuations = false,
     });
 
-    internal NatsSub(NatsConnection connection, ISubscriptionManager manager, string subject, NatsSubOpts? opts)
-        : base(connection, manager, subject, opts)
+    internal NatsSub(NatsConnection connection, ISubscriptionManager manager, string subject, NatsSubOpts? opts, CancellationToken cancellationToken = default)
+        : base(connection, manager, subject, opts, cancellationToken)
     {
     }
 
@@ -238,8 +258,8 @@ public sealed class NatsSub<T> : NatsSubBase
             AllowSynchronousContinuations = false,
         });
 
-    internal NatsSub(NatsConnection connection, ISubscriptionManager manager, string subject, NatsSubOpts? opts, INatsSerializer serializer)
-        : base(connection, manager, subject, opts) => Serializer = serializer;
+    internal NatsSub(NatsConnection connection, ISubscriptionManager manager, string subject, NatsSubOpts? opts, INatsSerializer serializer, CancellationToken cancellationToken = default)
+        : base(connection, manager, subject, opts, cancellationToken) => Serializer = serializer;
 
     public ChannelReader<NatsMsg<T?>> Msgs => _msgs.Reader;
 

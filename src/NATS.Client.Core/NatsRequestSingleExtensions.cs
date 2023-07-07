@@ -20,15 +20,27 @@ public static class NatsRequestSingleExtensions
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default)
     {
-        await using var sub = await nats.RequestAsync<TRequest, TReply>(subject, data, requestOpts, replyOpts, cancellationToken)
+        if ((replyOpts?.CanBeCancelled ?? false) == false)
+            replyOpts = (replyOpts ?? default) with { CanBeCancelled = true, };
+
+        var cancellationTimer = nats.GetCancellationTimer(cancellationToken);
+        await using var sub = await nats.RequestAsync<TRequest, TReply>(subject, data, requestOpts, replyOpts, cancellationTimer.Token)
             .ConfigureAwait(false);
 
         if (await sub.Msgs.WaitToReadAsync(CancellationToken.None).ConfigureAwait(false))
         {
             if (sub.Msgs.TryRead(out var msg))
             {
+                cancellationTimer.TryReturn();
                 return msg;
             }
+        }
+
+        cancellationTimer.TryReturn();
+
+        if (sub.EndReason == NatsSubEndReason.Cancelled)
+        {
+            throw new OperationCanceledException("Inbox subscription cancelled (may have timed-out)");
         }
 
         return null;

@@ -23,4 +23,19 @@ public class RequestReplyTest
         await sub.DisposeAsync();
         await reg;
     }
+
+    [Fact]
+    public async Task Request_reply_single_command_timeout_test()
+    {
+        await using var server = new NatsServer();
+        await using var nats = server.CreateClientConnection(NatsOptions.Default with
+        {
+            CommandTimeout = TimeSpan.FromSeconds(1),
+        });
+
+        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+        {
+            await nats.RequestSingleAsync<int, int>("foo", 0);
+        });
+    }
 }
