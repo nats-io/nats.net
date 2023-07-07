@@ -42,7 +42,7 @@ public abstract class NatsSubBase : INatsSub
         _pendingMsgs = opts is { MaxMsgs: > 0 } ? opts.Value.MaxMsgs ?? -1 : -1;
         _countPendingMsgs = _pendingMsgs > 0;
         _idleTimeout = opts?.IdleTimeout ?? default;
-        _startUpTimeout = opts?.IdleTimeout ?? default;
+        _startUpTimeout = opts?.StartUpTimeout ?? default;
         _timeout = opts?.Timeout ?? default;
 
         Connection = connection;

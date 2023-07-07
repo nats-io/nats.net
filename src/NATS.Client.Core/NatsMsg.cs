@@ -34,10 +34,10 @@ public readonly record struct NatsMsg(
         return new NatsMsg(subject, replyTo, headers, payloadBuffer.ToArray(), connection);
     }
 
-    public ValueTask ReplyAsync(ReadOnlySequence<byte> data = default, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
+    public ValueTask ReplyAsync(ReadOnlySequence<byte> payload = default, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         CheckReplyPreconditions();
-        return Connection.PublishAsync(ReplyTo!, data, opts, cancellationToken);
+        return Connection.PublishAsync(ReplyTo!, payload, opts, cancellationToken);
     }
 
     public ValueTask ReplyAsync(NatsMsg msg, CancellationToken cancellationToken = default)
@@ -77,7 +77,10 @@ public readonly record struct NatsMsg<T>(
         HeaderParser headerParser,
         INatsSerializer serializer)
     {
-        var data = serializer.Deserialize<T>(payloadBuffer);
+        // Consider an empty payload as null or default value for value types.
+        var data = payloadBuffer.Length > 0
+            ? serializer.Deserialize<T>(payloadBuffer)
+            : default;
 
         NatsHeaders? headers = null;
 
@@ -102,6 +105,18 @@ public readonly record struct NatsMsg<T>(
     }
 
     public ValueTask ReplyAsync<TReply>(NatsMsg<TReply> msg)
+    {
+        CheckReplyPreconditions();
+        return Connection.PublishAsync(msg with { Subject = ReplyTo! });
+    }
+
+    public ValueTask ReplyAsync(ReadOnlySequence<byte> payload = default, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
+    {
+        CheckReplyPreconditions();
+        return Connection.PublishAsync(ReplyTo!, payload: payload, opts, cancellationToken);
+    }
+
+    public ValueTask ReplyAsync(NatsMsg msg)
     {
         CheckReplyPreconditions();
         return Connection.PublishAsync(msg with { Subject = ReplyTo! });

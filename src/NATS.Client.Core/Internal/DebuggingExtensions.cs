@@ -6,7 +6,7 @@ using System.Text;
 
 namespace NATS.Client.Core.Internal;
 
-internal static class DebuggingExtensions
+public static class DebuggingExtensions
 {
     public static string Dump(this ReadOnlySequence<byte> buffer)
     {
