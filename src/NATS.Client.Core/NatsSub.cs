@@ -229,7 +229,7 @@ public sealed class NatsSub : NatsSubBase
 
 public sealed class NatsSub<T> : NatsSubBase
 {
-    private readonly Channel<NatsMsg<T>> _msgs = Channel.CreateBounded<NatsMsg<T>>(
+    private readonly Channel<NatsMsg<T?>> _msgs = Channel.CreateBounded<NatsMsg<T?>>(
         new BoundedChannelOptions(capacity: 1_000)
         {
             FullMode = BoundedChannelFullMode.Wait,
@@ -241,7 +241,7 @@ public sealed class NatsSub<T> : NatsSubBase
     internal NatsSub(NatsConnection connection, ISubscriptionManager manager, string subject, NatsSubOpts? opts, INatsSerializer serializer)
         : base(connection, manager, subject, opts) => Serializer = serializer;
 
-    public ChannelReader<NatsMsg<T>> Msgs => _msgs.Reader;
+    public ChannelReader<NatsMsg<T?>> Msgs => _msgs.Reader;
 
     private INatsSerializer Serializer { get; }
 
@@ -249,7 +249,7 @@ public sealed class NatsSub<T> : NatsSubBase
     {
         ResetIdleTimeout();
 
-        var natsMsg = NatsMsg<T>.Build(
+        var natsMsg = NatsMsg<T?>.Build(
             subject,
             replyTo,
             headersBuffer,

@@ -44,6 +44,6 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        forecasts = (await NatsConnection.RequestAsync<object, WeatherForecast[]>("weather", new object()))?.Data;
+        forecasts = (await NatsConnection.RequestSingleAsync<object, WeatherForecast[]>("weather", new object()))?.Data;
     }
 }

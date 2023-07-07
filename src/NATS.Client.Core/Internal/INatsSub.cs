@@ -23,14 +23,14 @@ internal interface INatsSub : IAsyncDisposable
 internal interface INatsSubBuilder<out T>
     where T : INatsSub
 {
-    T Build(string subject, NatsSubOpts? opts, NatsConnection connection, SubscriptionManager manager);
+    T Build(string subject, NatsSubOpts? opts, NatsConnection connection, ISubscriptionManager manager);
 }
 
 internal class NatsSubBuilder : INatsSubBuilder<NatsSub>
 {
     public static readonly NatsSubBuilder Default = new();
 
-    public NatsSub Build(string subject, NatsSubOpts? opts, NatsConnection connection, SubscriptionManager manager)
+    public NatsSub Build(string subject, NatsSubOpts? opts, NatsConnection connection, ISubscriptionManager manager)
     {
         return new NatsSub(connection, manager, subject, opts);
     }
@@ -46,7 +46,7 @@ internal class NatsSubModelBuilder<T> : INatsSubBuilder<NatsSub<T>>
     public static NatsSubModelBuilder<T> For(INatsSerializer serializer) =>
         Cache.GetOrAdd(serializer, static s => new NatsSubModelBuilder<T>(s));
 
-    public NatsSub<T> Build(string subject, NatsSubOpts? opts, NatsConnection connection, SubscriptionManager manager)
+    public NatsSub<T> Build(string subject, NatsSubOpts? opts, NatsConnection connection, ISubscriptionManager manager)
     {
         return new NatsSub<T>(connection, manager, subject, opts, _serializer);
     }
