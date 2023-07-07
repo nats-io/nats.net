@@ -269,6 +269,10 @@ public sealed class NatsSub<T> : NatsSubBase
     {
         ResetIdleTimeout();
 
+        // We are not handling exceptions here, where there is a possibility of
+        // deserialization exceptions. Currently only way for a user to find out is
+        // to check the logs created by the client. If the logger isn't hooked up
+        // they would be quietly ignored and the message would be lost either way.
         var natsMsg = NatsMsg<T?>.Build(
             subject,
             replyTo,

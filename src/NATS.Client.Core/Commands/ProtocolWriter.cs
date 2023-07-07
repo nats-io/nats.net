@@ -105,7 +105,9 @@ internal sealed class ProtocolWriter
     {
         _bufferPayload.Reset();
 
-        // Consider empty payload as null
+        // Consider null as empty payload. This way we are able to transmit null values as sentinels.
+        // Another point is serializer behaviour. For instance JSON serializer seems to serialize null
+        // as a string "null", others might throw exception.
         if (value != null)
         {
             serializer.Serialize(_bufferPayload, value);
