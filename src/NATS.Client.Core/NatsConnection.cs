@@ -1,6 +1,5 @@
 using System.Buffers;
 using System.Diagnostics;
-using System.Text;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
@@ -76,7 +75,6 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         _logger = options.LoggerFactory.CreateLogger<NatsConnection>();
         _clientOptions = new ClientOptions(Options);
         HeaderParser = new HeaderParser(options.HeaderEncoding);
-        // InboxSubscriber = new InboxSubscriber(this, prefix1: options.InboxPrefix);
     }
 
     // events
@@ -93,8 +91,6 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
     public ServerInfo? ServerInfo { get; internal set; } // server info is set when received INFO
 
     public HeaderParser HeaderParser { get; }
-
-    // internal InboxSubscriber InboxSubscriber { get; }
 
     internal ObjectPool ObjectPool => _pool;
 

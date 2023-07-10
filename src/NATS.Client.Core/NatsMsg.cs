@@ -77,7 +77,9 @@ public readonly record struct NatsMsg<T>(
         HeaderParser headerParser,
         INatsSerializer serializer)
     {
-        // Consider an empty payload as null or default value for value types.
+        // Consider an empty payload as null or default value for value types. This way we are able to
+        // receive sentinels as nulls or default values. This might cause an issue with where we are not
+        // able to differentiate between an empty sentinel and actual default value of a struct e.g. 0 (zero).
         var data = payloadBuffer.Length > 0
             ? serializer.Deserialize<T>(payloadBuffer)
             : default;

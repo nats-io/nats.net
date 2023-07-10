@@ -64,5 +64,5 @@ public readonly record struct NatsSubOpts
     /// token is cancelled. Otherwise <see cref="CancellationToken"/> only applies to
     /// server subscription request.
     /// </summary>
-    public bool CanBeCancelled { get; init; }
+    public bool? CanBeCancelled { get; init; }
 }

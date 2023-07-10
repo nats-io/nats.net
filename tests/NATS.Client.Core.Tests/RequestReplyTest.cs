@@ -35,15 +35,28 @@ public class RequestReplyTest
     public async Task Request_reply_command_timeout_test()
     {
         await using var server = new NatsServer();
-        await using var nats = server.CreateClientConnection(NatsOptions.Default with
-        {
-            CommandTimeout = TimeSpan.FromSeconds(1),
-        });
 
-        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+        // Request timeout as default timeout
         {
-            await nats.RequestAsync<int, int>("foo", 0);
-        });
+            await using var nats = server.CreateClientConnection(NatsOptions.Default with
+            {
+                RequestTimeout = TimeSpan.FromSeconds(1),
+            });
+
+            var reply = await nats.RequestAsync<int, int>("foo", 0);
+            Assert.Null(reply);
+        }
+
+        // Cancellation token usage
+        {
+            await using var nats = server.CreateClientConnection();
+
+            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+            await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+            {
+                await nats.RequestAsync<int, int>("foo", 0, cancellationToken: cts.Token);
+            });
+        }
     }
 
     [Fact]
