@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 
 namespace NATS.Client.Core.Tests;
 
@@ -96,5 +97,35 @@ internal static class NatsMsgTestUtils
                 await action(natsMsg);
             }
         });
+    }
+}
+
+internal static class BinaryUtils
+{
+    public static string Dump(this in Memory<byte> memory) => Dump(memory.Span);
+
+    public static string Dump(this in ReadOnlySpan<byte> span)
+    {
+        var sb = new StringBuilder();
+        foreach (char b in span)
+        {
+            switch (b)
+            {
+            case >= ' ' and <= '~':
+                sb.Append(b);
+                break;
+            case '\r':
+                sb.Append('␍');
+                break;
+            case '\n':
+                sb.Append('␊');
+                break;
+            default:
+                sb.Append('.');
+                break;
+            }
+        }
+
+        return sb.ToString();
     }
 }

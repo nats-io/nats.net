@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <!-- NuGet Packaging -->
+    <PackageTags>pubsub;messaging</PackageTags>
+    <Description>JetStream support for NATS.Client.</Description>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NATS.Client.Core\NATS.Client.Core.csproj" />
+  </ItemGroup>
+
+</Project>

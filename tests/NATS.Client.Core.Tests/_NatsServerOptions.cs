@@ -16,6 +16,7 @@ public sealed class NatsServerOptionsBuilder
     private readonly List<string> _extraConfigs = new();
     private bool _enableWebSocket;
     private bool _enableTls;
+    private bool _enableJetStream;
     private string? _tlsServerCertFile;
     private string? _tlsServerKeyFile;
     private string? _tlsCaFile;
@@ -26,6 +27,7 @@ public sealed class NatsServerOptionsBuilder
         {
             EnableWebSocket = _enableWebSocket,
             EnableTls = _enableTls,
+            EnableJetStream = _enableJetStream,
             TlsServerCertFile = _tlsServerCertFile,
             TlsServerKeyFile = _tlsServerKeyFile,
             TlsCaFile = _tlsCaFile,
@@ -47,6 +49,12 @@ public sealed class NatsServerOptionsBuilder
             _enableWebSocket = true;
         }
 
+        return this;
+    }
+
+    public NatsServerOptionsBuilder UseJetStream()
+    {
+        _enableJetStream = true;
         return this;
     }
 
@@ -93,6 +101,8 @@ public sealed class NatsServerOptions : IDisposable
     public bool EnableWebSocket { get; init; }
 
     public bool EnableTls { get; init; }
+
+    public bool EnableJetStream { get; init; }
 
     public bool ServerDisposeReturnsPorts { get; init; } = true;
 
@@ -152,6 +162,15 @@ public sealed class NatsServerOptions : IDisposable
                     sb.AppendLine($"  ca_file: {TlsCaFile}");
                 }
 
+                sb.AppendLine("}");
+            }
+
+            if (EnableJetStream)
+            {
+                sb.AppendLine("jetstream {");
+                var storeDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("n"));
+                Directory.CreateDirectory(storeDir);
+                sb.AppendLine($"  store_dir: '{storeDir}'");
                 sb.AppendLine("}");
             }
 

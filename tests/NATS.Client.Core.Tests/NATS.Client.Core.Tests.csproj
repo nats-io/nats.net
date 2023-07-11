@@ -22,6 +22,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\..\src\NATS.Client.JetStream\NATS.Client.JetStream.csproj" />
         <Using Include="Xunit" />
         <Using Include="Xunit.Abstractions" />
         <Using Include="FluentAssertions" />
