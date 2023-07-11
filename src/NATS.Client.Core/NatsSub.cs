@@ -150,13 +150,15 @@ public abstract class NatsSubBase : INatsSub
 
         GC.SuppressFinalize(this);
 
+        var unsubscribeAsync = UnsubscribeAsync();
+
         _timeoutTimer?.Dispose();
         _idleTimeoutTimer?.Dispose();
         _startUpTimeoutTimer?.Dispose();
 
         _cts?.Dispose();
 
-        return UnsubscribeAsync();
+        return unsubscribeAsync;
     }
 
     ValueTask INatsSub.ReceiveAsync(
