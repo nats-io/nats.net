@@ -43,27 +43,12 @@ internal class InboxSub : INatsSub
     public ValueTask DisposeAsync() => _manager.RemoveAsync(this);
 }
 
-internal class InboxSubBuilder : INatsSubBuilder<InboxSub>, ISubscriptionManager, IAsyncDisposable
+internal class InboxSubBuilder : INatsSubBuilder<InboxSub>, ISubscriptionManager
 {
     private readonly ILogger<InboxSubBuilder> _logger;
-    private readonly string? _queueGroup;
     private readonly ConcurrentDictionary<string, INatsSub> _writers = new();
-    private readonly string _prefix;
-    private InboxSub? _sub;
-    private bool _started;
 
-    public InboxSubBuilder(
-        NatsConnection connection,
-        string prefix,
-        string? queueGroup)
-    {
-        _logger = connection.Options.LoggerFactory.CreateLogger<InboxSubBuilder>();
-        _prefix = prefix;
-        _queueGroup = queueGroup;
-        Connection = connection;
-    }
-
-    private NatsConnection Connection { get; }
+    public InboxSubBuilder(ILogger<InboxSubBuilder> logger) => _logger = logger;
 
     public InboxSub Build(string subject, NatsSubOpts? opts, NatsConnection connection, ISubscriptionManager manager, CancellationToken cancellationToken)
     {
@@ -88,13 +73,6 @@ internal class InboxSubBuilder : INatsSubBuilder<InboxSub>, ISubscriptionManager
         }
 
         return sub.ReceiveAsync(subject, replyTo, headersBuffer, payloadBuffer);
-    }
-
-    public ValueTask DisposeAsync()
-    {
-        if (_sub != null)
-            return _sub.DisposeAsync();
-        return ValueTask.CompletedTask;
     }
 
     public ValueTask RemoveAsync(INatsSub sub)

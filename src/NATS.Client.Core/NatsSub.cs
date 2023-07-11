@@ -55,7 +55,7 @@ public abstract class NatsSubBase : INatsSub
             _cts.Token.UnsafeRegister(
                 static (self, _) =>
                 {
-                    ((NatsSubBase) self!).EndSubscription(NatsSubEndReason.Cancelled);
+                    ((NatsSubBase)self!).EndSubscription(NatsSubEndReason.Cancelled);
                 },
                 this);
         }

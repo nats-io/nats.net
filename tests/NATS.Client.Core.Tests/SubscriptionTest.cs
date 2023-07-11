@@ -35,7 +35,11 @@ public class SubscriptionTest
         await Retry.Until(
             "unsubscribe message received",
             () => proxy.ClientFrames.Count(f => f.Message.StartsWith("UNSUB")) == 1,
-            async () => GC.Collect(),
+            () =>
+            {
+                GC.Collect();
+                return Task.CompletedTask;
+            },
             retryDelay: TimeSpan.FromSeconds(.5));
     }
 
