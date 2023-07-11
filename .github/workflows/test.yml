@@ -23,10 +23,8 @@ jobs:
     steps:
       - name: Install nats-server
         run: |
-          mkdir tools
-          cd tools
           curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@${{ matrix.config.branch }} | PREFIX=. sh
-          echo "$(pwd)" | tee -a "$GITHUB_PATH"
+          sudo mv nats-server /usr/local/bin
 
       - name: Check nats-server
         run: nats-server -v
