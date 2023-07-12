@@ -18,19 +18,19 @@ namespace NATS.Client.JetStream.Models;
 public record StreamState
 {
     [JsonPropertyName("messages")]
-    public string Messages { get; set; }
+    public ulong Messages { get; set; }
 
     [JsonPropertyName("bytes")]
-    public string Bytes { get; set; }
+    public ulong Bytes { get; set; }
 
     [JsonPropertyName("first_seq")]
-    public string FirstSeq { get; set; }
+    public ulong FirstSeq { get; set; }
 
     [JsonPropertyName("last_seq")]
-    public string LastSeq { get; set; }
+    public ulong LastSeq { get; set; }
 
     [JsonPropertyName("consumer_count")]
-    public string ConsumerCount { get; set; }
+    public ulong ConsumerCount { get; set; }
 
     [JsonPropertyName("num_subjects")]
     public string NumSubjects { get; set; }
