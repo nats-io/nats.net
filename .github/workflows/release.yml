@@ -22,7 +22,7 @@ jobs:
           version="$(head -n 1 version.txt)"
           ref_name="v$version"
           create=true
-          if ["$(git ls-remote origin "refs/tags/$ref_name" | wc -l)" = "1" ]; then
+          if [ "$(git ls-remote origin "refs/tags/$ref_name" | wc -l)" = "1" ]; then
             create=false
           fi
 
