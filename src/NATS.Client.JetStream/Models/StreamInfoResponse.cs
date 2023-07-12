@@ -17,13 +17,13 @@ public record StreamInfoResponse
     public long Limit { get; set; }
 
     [JsonPropertyName("config")]
-    public Config Config { get; set; }
+    public StreamConfig Config { get; set; }
 
     [JsonPropertyName("created")]
     public DateTimeOffset Created { get; set; }
 
     [JsonPropertyName("state")]
-    public State State { get; set; }
+    public StreamState State { get; set; }
 
     [JsonPropertyName("cluster")]
     public Cluster Cluster { get; set; }

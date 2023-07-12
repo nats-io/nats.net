@@ -2,7 +2,7 @@
 
 namespace NATS.Client.JetStream.Models;
 
-public record Config
+public record StreamConfig
 {
     [JsonPropertyName("name")]
     public string Name { get; set; }

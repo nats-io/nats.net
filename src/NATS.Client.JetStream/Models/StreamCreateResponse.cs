@@ -8,13 +8,13 @@ public record StreamCreateResponse
     public string Type { get; set; }
 
     [JsonPropertyName("config")]
-    public Config Config { get; set; }
+    public StreamConfig Config { get; set; }
 
     [JsonPropertyName("created")]
     public DateTimeOffset Created { get; set; }
 
     [JsonPropertyName("state")]
-    public State State { get; set; }
+    public StreamState State { get; set; }
 
     [JsonPropertyName("did_create")]
     public bool DidCreate { get; set; }
