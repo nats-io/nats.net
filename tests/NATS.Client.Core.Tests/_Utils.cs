@@ -47,7 +47,7 @@ public static class Net
 
 internal static class NatsMsgTestUtils
 {
-    internal static Task Register<T>(this NatsSub<T>? sub, Action<NatsMsg<T>> action)
+    internal static Task Register<T>(this NatsSub<T>? sub, Action<NatsMsg<T?>> action)
     {
         if (sub == null)
             return Task.CompletedTask;
@@ -60,7 +60,7 @@ internal static class NatsMsgTestUtils
         });
     }
 
-    internal static Task Register<T>(this NatsSub<T>? sub, Func<NatsMsg<T>, Task> action)
+    internal static Task Register<T>(this NatsSub<T>? sub, Func<NatsMsg<T?>, Task> action)
     {
         if (sub == null)
             return Task.CompletedTask;

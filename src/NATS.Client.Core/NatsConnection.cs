@@ -51,8 +51,6 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
     private ClientOptions _clientOptions;
     private UserCredentials? _userCredentials;
 
-    internal string InboxPrefix { get; }
-
     public NatsConnection()
         : this(NatsOptions.Default)
     {
@@ -92,7 +90,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
     public HeaderParser HeaderParser { get; }
 
-    internal ObjectPool ObjectPool => _pool;
+    internal string InboxPrefix { get; }
 
     /// <summary>
     /// Connect socket and write CONNECT command to nats server.
