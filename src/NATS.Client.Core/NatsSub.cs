@@ -55,7 +55,7 @@ public abstract class NatsSubBase : INatsSub
             _cts.Token.UnsafeRegister(
                 static (self, _) =>
                 {
-                    ((NatsSubBase) self!).EndSubscription(NatsSubEndReason.Cancelled);
+                    ((NatsSubBase)self!).EndSubscription(NatsSubEndReason.Cancelled);
                 },
                 this);
         }
@@ -150,13 +150,15 @@ public abstract class NatsSubBase : INatsSub
 
         GC.SuppressFinalize(this);
 
+        var unsubscribeAsync = UnsubscribeAsync();
+
         _timeoutTimer?.Dispose();
         _idleTimeoutTimer?.Dispose();
         _startUpTimeoutTimer?.Dispose();
 
         _cts?.Dispose();
 
-        return UnsubscribeAsync();
+        return unsubscribeAsync;
     }
 
     ValueTask INatsSub.ReceiveAsync(
