@@ -30,13 +30,13 @@ public record StreamState
     public ulong LastSeq { get; set; }
 
     [JsonPropertyName("consumer_count")]
-    public ulong ConsumerCount { get; set; }
+    public long ConsumerCount { get; set; }
 
     [JsonPropertyName("num_subjects")]
-    public string NumSubjects { get; set; }
+    public long NumSubjects { get; set; }
 
     [JsonPropertyName("num_deleted")]
-    public string NumDeleted { get; set; }
+    public long NumDeleted { get; set; }
 
     [JsonPropertyName("first_ts")]
     public DateTimeOffset FirstTs { get; set; }

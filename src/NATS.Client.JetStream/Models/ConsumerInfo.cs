@@ -36,16 +36,16 @@ public record ConsumerInfo
     public string AckFloor { get; set; }
 
     [JsonPropertyName("num_pending")]
-    public string NumPending { get; set; }
+    public ulong NumPending { get; set; }
 
     [JsonPropertyName("num_waiting")]
-    public string NumWaiting { get; set; }
+    public long NumWaiting { get; set; }
 
     [JsonPropertyName("num_ack_pending")]
-    public string NumAckPending { get; set; }
+    public long NumAckPending { get; set; }
 
     [JsonPropertyName("num_redelivered")]
-    public string NumRedelivered { get; set; }
+    public long NumRedelivered { get; set; }
 
     [JsonPropertyName("cluster")]
     public string Cluster { get; set; }

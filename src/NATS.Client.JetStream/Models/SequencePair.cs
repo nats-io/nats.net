@@ -18,8 +18,8 @@ namespace NATS.Client.JetStream.Models;
 public record SequencePair
 {
     [JsonPropertyName("consumer_seq")]
-    public string ConsumerSeq { get; set; }
+    public ulong ConsumerSeq { get; set; }
 
     [JsonPropertyName("stream_seq")]
-    public string StreamSeq { get; set; }
+    public ulong StreamSeq { get; set; }
 }

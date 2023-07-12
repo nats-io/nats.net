@@ -21,7 +21,7 @@ public record Mirror
     public string Name { get; set; }
 
     [JsonPropertyName("opt_start_seq")]
-    public string OptStartSeq { get; set; }
+    public ulong OptStartSeq { get; set; }
 
     [JsonPropertyName("opt_start_time")]
     public DateTimeOffset OptStartTime { get; set; }

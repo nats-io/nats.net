@@ -18,16 +18,16 @@ namespace NATS.Client.JetStream.Models;
 public record AccountTier
 {
     [JsonPropertyName("memory")]
-    public string Memory { get; set; }
+    public long Memory { get; set; }
 
     [JsonPropertyName("storage")]
-    public string Storage { get; set; }
+    public long Storage { get; set; }
 
     [JsonPropertyName("streams")]
-    public string Streams { get; set; }
+    public long Streams { get; set; }
 
     [JsonPropertyName("consumers")]
-    public string Consumers { get; set; }
+    public long Consumers { get; set; }
 
     [JsonPropertyName("limits")]
     public string Limits { get; set; }
