@@ -17,22 +17,22 @@ public record StreamCreateRequest
     public string Retention { get; set; } = "limits";
 
     [JsonPropertyName("max_consumers")]
-    public long MaxConsumers { get; set; } = -1;
+    public long MaxConsumers { get; set; }
 
     [JsonPropertyName("max_msgs_per_subject")]
-    public long MaxMsgsPerSubject { get; set; } = -1;
+    public long MaxMsgsPerSubject { get; set; }
 
     [JsonPropertyName("max_msgs")]
-    public long MaxMsgs { get; set; } = -1;
+    public long MaxMsgs { get; set; }
 
     [JsonPropertyName("max_bytes")]
-    public long MaxBytes { get; set; } = -1;
+    public long MaxBytes { get; set; }
 
     [JsonPropertyName("max_age")]
-    public long MaxAge { get; set; } = 0;
+    public long MaxAge { get; set; }
 
     [JsonPropertyName("max_msg_size")]
-    public long MaxMsgSize { get; set; } = -1;
+    public long MaxMsgSize { get; set; }
 
     [JsonPropertyName("storage")]
     public string Storage { get; set; } = "file";
@@ -41,26 +41,26 @@ public record StreamCreateRequest
     public string Discard { get; set; } = "old";
 
     [JsonPropertyName("num_replicas")]
-    public long NumReplicas { get; set; } = 1;
+    public long NumReplicas { get; set; }
 
     [JsonPropertyName("duplicate_window")]
-    public long DuplicateWindow { get; set; } = 120000000000;
+    public long DuplicateWindow { get; set; }
 
     [JsonPropertyName("sealed")]
-    public bool Sealed { get; set; } = false;
+    public bool Sealed { get; set; }
 
     [JsonPropertyName("deny_delete")]
-    public bool DenyDelete { get; set; } = false;
+    public bool DenyDelete { get; set; }
 
     [JsonPropertyName("deny_purge")]
-    public bool DenyPurge { get; set; } = false;
+    public bool DenyPurge { get; set; }
 
     [JsonPropertyName("allow_rollup_hdrs")]
-    public bool AllowRollupHdrs { get; set; } = false;
+    public bool AllowRollupHdrs { get; set; }
 
     [JsonPropertyName("allow_direct")]
-    public bool AllowDirect { get; set; } = false;
+    public bool AllowDirect { get; set; }
 
     [JsonPropertyName("mirror_direct")]
-    public bool MirrorDirect { get; set; } = false;
+    public bool MirrorDirect { get; set; }
 }
