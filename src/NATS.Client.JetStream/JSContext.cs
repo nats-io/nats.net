@@ -4,18 +4,18 @@ using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
 
-public class JsContext
+public class JSContext
 {
     private readonly NatsConnection _nats;
-    private readonly JsOptions _options;
+    private readonly JSOptions _options;
 
-    public JsContext(NatsConnection nats, JsOptions options)
+    public JSContext(NatsConnection nats, JSOptions options)
     {
         _nats = nats;
         _options = options;
     }
 
-    public async ValueTask<JsStream> CreateStream(Action<StreamCreateRequest> request)
+    public async ValueTask<JSStream> CreateStream(Action<StreamCreateRequest> request)
     {
         var requestObj = new StreamCreateRequest();
         request(requestObj);
@@ -31,7 +31,7 @@ public class JsContext
         if (response?.Data == null)
             throw new NatsJetStreamException("No response received");
 
-        return new JsStream(response.Value.Data);
+        return new JSStream(response.Value.Data);
     }
 }
 
@@ -48,16 +48,16 @@ public class NatsJetStreamException : NatsException
     }
 }
 
-public record JsOptions
+public record JSOptions
 {
     public string Prefix { get; init; } = "$JS.API";
 }
 
-public class JsStream
+public class JSStream
 {
     public StreamCreateResponse Response { get; }
 
-    public JsStream(StreamCreateResponse response)
+    public JSStream(StreamCreateResponse response)
     {
         Response = response;
     }

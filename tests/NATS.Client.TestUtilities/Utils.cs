@@ -45,9 +45,9 @@ public static class Net
     }
 }
 
-internal static class NatsMsgTestUtils
+public static class NatsMsgTestUtils
 {
-    internal static Task Register<T>(this NatsSub<T>? sub, Action<NatsMsg<T?>> action)
+    public static Task Register<T>(this NatsSub<T>? sub, Action<NatsMsg<T?>> action)
     {
         if (sub == null)
             return Task.CompletedTask;
@@ -60,7 +60,7 @@ internal static class NatsMsgTestUtils
         });
     }
 
-    internal static Task Register<T>(this NatsSub<T>? sub, Func<NatsMsg<T?>, Task> action)
+    public static Task Register<T>(this NatsSub<T>? sub, Func<NatsMsg<T?>, Task> action)
     {
         if (sub == null)
             return Task.CompletedTask;
@@ -73,7 +73,7 @@ internal static class NatsMsgTestUtils
         });
     }
 
-    internal static Task Register(this NatsSub? sub, Action<NatsMsg> action)
+    public static Task Register(this NatsSub? sub, Action<NatsMsg> action)
     {
         if (sub == null)
             return Task.CompletedTask;
@@ -86,7 +86,7 @@ internal static class NatsMsgTestUtils
         });
     }
 
-    internal static Task Register(this NatsSub? sub, Func<NatsMsg, Task> action)
+    public static Task Register(this NatsSub? sub, Func<NatsMsg, Task> action)
     {
         if (sub == null)
             return Task.CompletedTask;
@@ -100,7 +100,7 @@ internal static class NatsMsgTestUtils
     }
 }
 
-internal static class BinaryUtils
+public static class BinaryUtils
 {
     public static string Dump(this in Memory<byte> memory) => Dump(memory.Span);
 

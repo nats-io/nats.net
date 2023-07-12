@@ -17,7 +17,7 @@ public class JetStreamTest
 
         // Create stream
         {
-            var context = new JsContext(nats, new JsOptions());
+            var context = new JSContext(nats, new JSOptions());
             var stream = await context.CreateStream(request: stream =>
             {
                 stream.Name = "events";
@@ -28,7 +28,7 @@ public class JetStreamTest
 
         // Handle exceptions
         {
-            var context = new JsContext(nats, new JsOptions());
+            var context = new JSContext(nats, new JSOptions());
             try
             {
                 var stream = await context.CreateStream(request: stream =>
