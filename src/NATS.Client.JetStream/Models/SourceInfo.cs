@@ -16,4 +16,16 @@ using System.Text.Json.Serialization;
 namespace NATS.Client.JetStream.Models;
 
 public record SourceInfo
-{}
+{
+    [JsonPropertyName("name")]
+    public string Name { get; set; }
+
+    [JsonPropertyName("lag")]
+    public string Lag { get; set; }
+
+    [JsonPropertyName("active")]
+    public TimeSpan Active { get; set; }
+
+    [JsonPropertyName("error")]
+    public string Error { get; set; }
+}

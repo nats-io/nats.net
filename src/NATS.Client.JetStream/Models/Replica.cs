@@ -16,4 +16,20 @@ using System.Text.Json.Serialization;
 namespace NATS.Client.JetStream.Models;
 
 public record Replica
-{}
+{
+    [JsonPropertyName("name")]
+    public string Name { get; set; }
+
+    [JsonPropertyName("current")]
+    public bool Current { get; set; }
+
+    [JsonPropertyName("offline")]
+    public bool Offline { get; set; }
+
+    [JsonPropertyName("active")]
+    public TimeSpan Active { get; set; }
+
+    [JsonPropertyName("lag")]
+    public string Lag { get; set; }
+}
+
