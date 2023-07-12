@@ -68,12 +68,12 @@ jobs:
           dotnet-version: '6.x'
 
       - name: Get nats-server
+        shell: bash
         run: |
-          mkdir tools-nats-server
-          cd tools-nats-server
-          curl -Ls "https://binaries.nats.dev/binary/github.com/nats-io/nats-server/v2?os=windows&arch=amd64&version=${{ matrix.config.branch }}" -o nats-server.exe
-          $current_path = (Get-Item .).FullName
-          echo "$current_path" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          mkdir tools-nats-server && cd tools-nats-server
+          curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@${{ matrix.config.branch }} | PREFIX=. sh
+          mv nats-server nats-server.exe
+          cygpath -w "$(pwd)" | tee -a "$GITHUB_PATH"
 
       - name: Check nats-server
         run: nats-server -v
