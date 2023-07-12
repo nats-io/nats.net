@@ -51,16 +51,16 @@ public record ServerInfo
     public bool Jetstream { get; set; }
 
     [JsonPropertyName("port")]
-    public string Port { get; set; }
+    public int Port { get; set; }
 
     [JsonPropertyName("proto")]
-    public string Proto { get; set; }
+    public int Proto { get; set; }
 
     [JsonPropertyName("max_payload")]
-    public string MaxPayload { get; set; }
+    public long MaxPayload { get; set; }
 
     [JsonPropertyName("client_id")]
-    public string ClientId { get; set; }
+    public int ClientId { get; set; }
 
     [JsonPropertyName("client_ip")]
     public string ClientIp { get; set; }

@@ -36,25 +36,25 @@ public record StreamConfiguration
     public string Subjects { get; set; }
 
     [JsonPropertyName("max_consumers")]
-    public string MaxConsumers { get; set; }
+    public long MaxConsumers { get; set; }
 
     [JsonPropertyName("max_msgs")]
-    public string MaxMsgs { get; set; }
+    public long MaxMsgs { get; set; }
 
     [JsonPropertyName("max_msgs_per_subject")]
-    public string MaxMsgsPerSubject { get; set; }
+    public long MaxMsgsPerSubject { get; set; }
 
     [JsonPropertyName("max_bytes")]
-    public string MaxBytes { get; set; }
+    public long MaxBytes { get; set; }
 
     [JsonPropertyName("max_age")]
     public TimeSpan MaxAge { get; set; }
 
     [JsonPropertyName("max_msg_size")]
-    public string MaxMsgSize { get; set; }
+    public long MaxMsgSize { get; set; }
 
     [JsonPropertyName("num_replicas")]
-    public string NumReplicas { get; set; }
+    public int NumReplicas { get; set; }
 
     [JsonPropertyName("no_ack")]
     public bool NoAck { get; set; }

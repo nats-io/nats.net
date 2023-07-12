@@ -21,5 +21,5 @@ public record LostStreamData
     public string Msgs { get; set; }
 
     [JsonPropertyName("bytes")]
-    public string Bytes { get; set; }
+    public ulong Bytes { get; set; }
 }

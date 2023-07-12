@@ -15,17 +15,20 @@ using System.Text.Json.Serialization;
 
 namespace NATS.Client.JetStream.Models;
 
-public record PublishAck
+public record PeerInfo
 {
-    [JsonPropertyName("stream")]
-    public string Stream { get; set; }
+    [JsonPropertyName("name")]
+    public string Name { get; set; }
 
-    [JsonPropertyName("domain")]
-    public string Domain { get; set; }
+    [JsonPropertyName("current")]
+    public bool Current { get; set; }
 
-    [JsonPropertyName("seq")]
-    public ulong Seq { get; set; }
+    [JsonPropertyName("offline")]
+    public bool Offline { get; set; }
 
-    [JsonPropertyName("duplicate")]
-    public bool Duplicate { get; set; }
+    [JsonPropertyName("active")]
+    public TimeSpan Active { get; set; }
+
+    [JsonPropertyName("lag")]
+    public long Lag { get; set; }
 }

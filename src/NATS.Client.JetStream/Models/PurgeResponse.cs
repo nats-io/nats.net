@@ -21,5 +21,5 @@ public record PurgeResponse
     public bool Success { get; set; }
 
     [JsonPropertyName("purged")]
-    public string Purged { get; set; }
+    public ulong Purged { get; set; }
 }

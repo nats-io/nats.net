@@ -24,7 +24,7 @@ public record MessageInfo
     public string Subject { get; set; }
 
     [JsonPropertyName("seq")]
-    public string Seq { get; set; }
+    public ulong Seq { get; set; }
 
     [JsonPropertyName("time")]
     public DateTimeOffset Time { get; set; }
