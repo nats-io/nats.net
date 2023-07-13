@@ -1,0 +1,1984 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://nats.io/schemas/jetstream/api/v1/definitions.json",
+  "title": "io.nats.jetstream.api.v1.definitions",
+  "description": "Shared definitions for the JetStream API",
+  "type": "object",
+  "definitions": {
+    "golang_duration_nanos": {
+      "$comment": "nanoseconds depicting a duration in time, signed 64 bit integer",
+      "$ref": "#/definitions/golang_int64"
+    },
+    "golang_int": {
+      "$comment": "integer with a dynamic bit size depending on the platform the cluster runs on, can be up to 64bit",
+      "$ref": "#/definitions/golang_int64"
+    },
+    "golang_uint64": {
+      "$comment": "unsigned 64 bit integer",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709552000
+    },
+    "golang_int32": {
+      "$comment": "signed 32 bit integer",
+      "type": "integer",
+      "maximum": 2147483647,
+      "minimum": -2147483648
+    },
+    "golang_int64": {
+      "$comment": "signed 64 bit integer",
+      "type": "integer",
+      "maximum": 9223372036854776000,
+      "minimum": -9223372036854776000
+    },
+    "golang_time": {
+      "$comment": "A point in time in RFC3339 format including timezone, though typically in UTC",
+      "type": "string",
+      "format": "date-time"
+    },
+    "stream_source": {
+      "type": "object",
+      "description": "Defines a source where streams should be replicated from",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "description": "Stream name",
+          "$ref": "#/definitions/basic_name"
+        },
+        "opt_start_seq": {
+          "description": "Sequence to start replicating from",
+          "$ref": "#/definitions/golang_uint64"
+        },
+        "opt_start_time": {
+          "description": "Time stamp to start replicating from",
+          "$ref": "#/definitions/golang_time"
+        },
+        "filter_subject": {
+          "description": "Replicate only a subset of messages based on filter",
+          "type": "string"
+        },
+        "subject_transform_dest": {
+          "description": "Map matching subjects according to this transform destination",
+          "type": "string"
+        },
+        "external": {
+          "$ref": "#/definitions/external_stream_source"
+        }
+      }
+    },
+    "external_stream_source": {
+      "required": [
+        "api"
+      ],
+      "type": "object",
+      "description": "Configuration referencing a stream source in another account or JetStream domain",
+      "properties": {
+        "api": {
+          "type": "string",
+          "description": "The subject prefix that imports the other account/domain $JS.API.CONSUMER.> subjects"
+        },
+        "deliver": {
+          "type": "string",
+          "description": "The delivery subject to use for the push consumer"
+        }
+      }
+    },
+    "stream_source_info": {
+      "required": [
+        "name",
+        "lag",
+        "active"
+      ],
+      "type": "object",
+      "description": "Information about an upstream stream source in a mirror",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the Stream being replicated"
+        },
+        "filter_subject": {
+          "type": "string",
+          "description": "The subject filter to apply to the messages"
+        },
+        "subject_transform_dest": {
+          "type": "string",
+          "description": "The subject transform destination to apply to the messages"
+        },
+        "lag": {
+          "$ref": "#/definitions/golang_uint64",
+          "description": "How many messages behind the mirror operation is",
+          "minimum": 0
+        },
+        "active": {
+          "description": "When last the mirror had activity, in nanoseconds. Value will be -1 when there has been no activity.",
+          "$ref": "#/definitions/golang_duration_nanos",
+          "minimum": -1
+        },
+        "external": {
+          "$ref": "#/definitions/external_stream_source"
+        },
+        "error": {
+          "$ref": "#/definitions/api_error"
+        }
+      }
+    },
+    "lost_stream_data": {
+      "type": "object",
+      "description": "Records messages that were damaged and unrecoverable",
+      "properties": {
+        "msgs": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "description": "The messages that were lost",
+          "items": {
+            "$ref": "#/definitions/golang_uint64",
+            "minimum": 0
+          }
+        },
+        "bytes": {
+          "description": "The number of bytes that were lost",
+          "$ref": "#/definitions/golang_uint64"
+        }
+      }
+    },
+    "placement": {
+      "type": "object",
+      "description": "Placement requirements for a stream",
+      "required": [
+        "cluster"
+      ],
+      "properties": {
+        "cluster": {
+          "type": "string",
+          "description": "The desired cluster name to place the stream"
+        },
+        "tags": {
+          "description": "Tags required on servers hosting this stream",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "peer_info": {
+      "type": "object",
+      "required": [
+        "name",
+        "current",
+        "active"
+      ],
+      "properties": {
+        "name": {
+          "description": "The server name of the peer",
+          "type": "string",
+          "minimum": 1
+        },
+        "current": {
+          "description": "Indicates if the server is up to date and synchronised",
+          "type": "boolean",
+          "default": false
+        },
+        "active": {
+          "description": "Nanoseconds since this peer was last seen",
+          "type": "number"
+        },
+        "offline": {
+          "description": "Indicates the node is considered offline by the group",
+          "type": "boolean",
+          "default": false
+        },
+        "lag": {
+          "description": "How many uncommitted operations this peer is behind the leader",
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "cluster_info": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The cluster name"
+        },
+        "leader": {
+          "type": "string",
+          "description": "The server name of the RAFT leader"
+        },
+        "replicas": {
+          "type": "array",
+          "description": "The members of the RAFT cluster",
+          "items": {
+            "$ref": "#/definitions/peer_info"
+          }
+        }
+      }
+    },
+    "api_stats": {
+      "type": "object",
+      "required": [
+        "total",
+        "errors"
+      ],
+      "properties": {
+        "total": {
+          "description": "Total number of API requests received for this account",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "errors": {
+          "description": "API requests that resulted in an error response",
+          "minimum": 0,
+          "type": "integer"
+        }
+      }
+    },
+    "tier": {
+      "type": "object",
+      "required": [
+        "memory",
+        "storage",
+        "streams",
+        "limits",
+        "consumers"
+      ],
+      "properties": {
+        "memory": {
+          "description": "Memory Storage being used for Stream Message storage",
+          "type": "integer",
+          "minimum": 0
+        },
+        "storage": {
+          "description": "File Storage being used for Stream Message storage",
+          "type": "integer",
+          "minimum": 0
+        },
+        "streams": {
+          "description": "Number of active Streams",
+          "type": "integer",
+          "minimum": 0
+        },
+        "consumers": {
+          "description": "Number of active Consumers",
+          "type": "integer",
+          "minimum": 0
+        },
+        "limits": {
+          "$ref": "#/definitions/account_limits"
+        }
+      }
+    },
+    "account_stats": {
+      "type": "object",
+      "required": [
+        "memory",
+        "storage",
+        "streams",
+        "limits",
+        "api",
+        "consumers"
+      ],
+      "properties": {
+        "memory": {
+          "description": "Memory Storage being used for Stream Message storage",
+          "type": "integer",
+          "minimum": 0
+        },
+        "storage": {
+          "description": "File Storage being used for Stream Message storage",
+          "type": "integer",
+          "minimum": 0
+        },
+        "streams": {
+          "description": "Number of active Streams",
+          "type": "integer",
+          "minimum": 0
+        },
+        "consumers": {
+          "description": "Number of active Consumers",
+          "type": "integer",
+          "minimum": 0
+        },
+        "domain": {
+          "description": "The JetStream domain this account is in",
+          "type": "string"
+        },
+        "limits": {
+          "$ref": "#/definitions/account_limits"
+        },
+        "tiers": {
+          "type": "object",
+          "patternProperties": {
+            ".*": {
+              "$ref": "#/definitions/tier"
+            }
+          }
+        },
+        "api": {
+          "$ref": "#/definitions/api_stats"
+        }
+      }
+    },
+    "account_limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_consumers",
+        "max_memory",
+        "max_storage",
+        "max_streams"
+      ],
+      "properties": {
+        "max_memory": {
+          "type": "integer",
+          "description": "The maximum amount of Memory storage Stream Messages may consume",
+          "minimum": -1
+        },
+        "max_storage": {
+          "type": "integer",
+          "description": "The maximum amount of File storage Stream Messages may consume",
+          "minimum": -1
+        },
+        "max_streams": {
+          "type": "integer",
+          "description": "The maximum number of Streams an account can create",
+          "minimum": -1
+        },
+        "max_consumers": {
+          "type": "integer",
+          "description": "The maximum number of Consumer an account can create",
+          "minimum": -1
+        },
+        "max_bytes_required": {
+          "type": "boolean",
+          "description": "Indicates if Streams created in this account requires the max_bytes property set",
+          "default": false
+        },
+        "max_ack_pending": {
+          "type": "integer",
+          "description": "The maximum number of outstanding ACKs any consumer may configure"
+        },
+        "memory_max_stream_bytes": {
+          "type": "integer",
+          "description": "The maximum size any single memory stream may be",
+          "minimum": -1,
+          "default": -1
+        },
+        "storage_max_stream_bytes": {
+          "type": "integer",
+          "description": "The maximum size any single storage based stream may be",
+          "minimum": -1,
+          "default": -1
+        }
+      }
+    },
+    "stored_message": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "subject",
+        "seq",
+        "time"
+      ],
+      "properties": {
+        "subject": {
+          "type": "string",
+          "description": "The subject the message was originally received on",
+          "minLength": 1
+        },
+        "seq": {
+          "description": "The sequence number of the message in the Stream",
+          "$ref": "#/definitions/golang_uint64"
+        },
+        "data": {
+          "type": "string",
+          "description": "The base64 encoded payload of the message body",
+          "minLength": 0
+        },
+        "time": {
+          "type": "string",
+          "description": "The time the message was received"
+        },
+        "hdrs": {
+          "type": "string",
+          "description": "Base64 encoded headers for the message"
+        }
+      }
+    },
+    "iterable_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "offset"
+      ],
+      "properties": {
+        "offset": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "iterable_response": {
+      "type": "object",
+      "required": [
+        "total",
+        "offset",
+        "limit"
+      ],
+      "properties": {
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "error_response": {
+      "type": "object",
+      "required": [
+        "error"
+      ],
+      "properties": {
+        "error": {
+          "$ref": "#/definitions/api_error"
+        }
+      }
+    },
+    "api_error": {
+      "type": "object",
+      "required": [
+        "code"
+      ],
+      "properties": {
+        "code": {
+          "type": "integer",
+          "description": "HTTP like error code in the 300 to 500 range",
+          "minimum": 300,
+          "maximum": 699
+        },
+        "description": {
+          "type": "string",
+          "description": "A human friendly description of the error"
+        },
+        "err_code": {
+          "type": "integer",
+          "description": "The NATS error code unique to each kind of error",
+          "minimum": 0,
+          "maximum": 65535
+        }
+      }
+    },
+    "basic_name": {
+      "type": "string",
+      "pattern": "^[^.*>]+$",
+      "minLength": 1
+    },
+    "sequence_info": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "consumer_seq",
+        "stream_seq"
+      ],
+      "properties": {
+        "consumer_seq": {
+          "$ref": "#/definitions/golang_uint64",
+          "description": "The sequence number of the Consumer"
+        },
+        "stream_seq": {
+          "$ref": "#/definitions/golang_uint64",
+          "description": "The sequence number of the Stream"
+        },
+        "last_active": {
+          "description": "The last time a message was delivered or acknowledged (for ack_floor)",
+          "$ref": "#/definitions/golang_time"
+        }
+      }
+    },
+    "sequence_pair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "consumer_seq",
+        "stream_seq"
+      ],
+      "properties": {
+        "consumer_seq": {
+          "$ref": "#/definitions/golang_uint64",
+          "description": "The sequence number of the Consumer"
+        },
+        "stream_seq": {
+          "$ref": "#/definitions/golang_uint64",
+          "description": "The sequence number of the Stream"
+        }
+      }
+    },
+    "consumer_info": {
+      "required": [
+        "stream_name",
+        "name",
+        "config",
+        "created",
+        "delivered",
+        "ack_floor",
+        "num_ack_pending",
+        "num_redelivered",
+        "num_waiting",
+        "num_pending"
+      ],
+      "type": "object",
+      "properties": {
+        "stream_name": {
+          "type": "string",
+          "description": "The Stream the consumer belongs to"
+        },
+        "name": {
+          "type": "string",
+          "description": "A unique name for the consumer, either machine generated or the durable name"
+        },
+        "ts": {
+          "description": "The server time the consumer info was created",
+          "$ref": "#/definitions/golang_time"
+        },
+        "config": {
+          "$ref": "#/definitions/consumer_configuration"
+        },
+        "created": {
+          "description": "The time the Consumer was created",
+          "$ref": "#/definitions/golang_time"
+        },
+        "delivered": {
+          "description": "The last message delivered from this Consumer",
+          "$ref": "#/definitions/sequence_info"
+        },
+        "ack_floor": {
+          "description": "The highest contiguous acknowledged message",
+          "$ref": "#/definitions/sequence_info"
+        },
+        "num_ack_pending": {
+          "description": "The number of messages pending acknowledgement",
+          "$ref": "#/definitions/golang_int",
+          "minimum": 0
+        },
+        "num_redelivered": {
+          "description": "The number of redeliveries that have been performed",
+          "$ref": "#/definitions/golang_int",
+          "minimum": 0
+        },
+        "num_waiting": {
+          "description": "The number of pull consumers waiting for messages",
+          "$ref": "#/definitions/golang_int",
+          "minimum": 0
+        },
+        "num_pending": {
+          "description": "The number of messages left unconsumed in this Consumer",
+          "$ref": "#/definitions/golang_uint64",
+          "minimum": 0
+        },
+        "cluster": {
+          "$ref": "#/definitions/cluster_info"
+        },
+        "push_bound": {
+          "description": "Indicates if any client is connected and receiving messages from a push consumer",
+          "type": "boolean"
+        }
+      }
+    },
+    "consumer_configuration": {
+      "required": [
+        "deliver_policy",
+        "ack_policy",
+        "replay_policy"
+      ],
+      "properties": {
+        "deliver_policy": {
+          "type": "string",
+          "enum": [
+            "all",
+            "last",
+            "new",
+            "by_start_sequence",
+            "by_start_time",
+            "last_per_subject"
+          ]
+        },
+        "opt_start_seq": {
+          "$ref": "#/definitions/golang_uint64",
+          "minimum": 0
+        },
+        "opt_start_time": {
+          "$ref": "#/definitions/golang_time"
+        },
+        "durable_name": {
+          "description": "A unique name for a durable consumer",
+          "deprecationMessage": "Durable is deprecated. All consumers will have names. picked by clients.",
+          "$ref": "#/definitions/basic_name"
+        },
+        "name": {
+          "description": "A unique name for a consumer",
+          "$ref": "#/definitions/basic_name"
+        },
+        "description": {
+          "description": "A short description of the purpose of this consumer",
+          "type": "string",
+          "maxLength": 4096
+        },
+        "deliver_subject": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ack_policy": {
+          "type": "string",
+          "enum": [
+            "none",
+            "all",
+            "explicit"
+          ],
+          "default": "none"
+        },
+        "ack_wait": {
+          "description": "How long (in nanoseconds) to allow messages to remain un-acknowledged before attempting redelivery",
+          "$ref": "#/definitions/golang_duration_nanos",
+          "minimum": 1,
+          "default": "30000000000"
+        },
+        "max_deliver": {
+          "$ref": "#/definitions/golang_int",
+          "description": "The number of times a message will be redelivered to consumers if not acknowledged in time",
+          "default": -1
+        },
+        "filter_subject": {
+          "description": "Filter the stream by a single subjects",
+          "type": "string"
+        },
+        "filter_subjects": {
+          "description": "Filter the stream by multiple subjects",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "replay_policy": {
+          "type": "string",
+          "enum": [
+            "instant",
+            "original"
+          ],
+          "default": "instant"
+        },
+        "sample_freq": {
+          "type": "string"
+        },
+        "rate_limit_bps": {
+          "$ref": "#/definitions/golang_uint64",
+          "description": "The rate at which messages will be delivered to clients, expressed in bit per second",
+          "minimum": 0
+        },
+        "max_ack_pending": {
+          "$ref": "#/definitions/golang_int",
+          "description": "The maximum number of messages without acknowledgement that can be outstanding, once this limit is reached message delivery will be suspended",
+          "default": 1000
+        },
+        "idle_heartbeat": {
+          "$ref": "#/definitions/golang_duration_nanos",
+          "minimum": 0,
+          "description": "If the Consumer is idle for more than this many nano seconds a empty message with Status header 100 will be sent indicating the consumer is still alive"
+        },
+        "flow_control": {
+          "type": "boolean",
+          "description": "For push consumers this will regularly send an empty mess with Status header 100 and a reply subject, consumers must reply to these messages to control the rate of message delivery"
+        },
+        "max_waiting": {
+          "$ref": "#/definitions/golang_int",
+          "description": "The number of pulls that can be outstanding on a pull consumer, pulls received after this is reached are ignored",
+          "minimum": 0,
+          "default": 512
+        },
+        "direct": {
+          "type": "boolean",
+          "description": "Creates a special consumer that does not touch the Raft layers, not for general use by clients, internal use only",
+          "default": false
+        },
+        "headers_only": {
+          "type": "boolean",
+          "default": false,
+          "description": "Delivers only the headers of messages in the stream and not the bodies. Additionally adds Nats-Msg-Size header to indicate the size of the removed payload"
+        },
+        "max_batch": {
+          "type": "integer",
+          "description": "The largest batch property that may be specified when doing a pull on a Pull Consumer",
+          "default": 0
+        },
+        "max_expires": {
+          "description": "The maximum expires value that may be set when doing a pull on a Pull Consumer",
+          "$ref": "#/definitions/golang_duration_nanos",
+          "default": 0
+        },
+        "max_bytes": {
+          "description": "The maximum bytes value that maybe set when dong a pull on a Pull Consumer",
+          "$ref": "#/definitions/golang_int",
+          "minimum": 0,
+          "default": 0
+        },
+        "inactive_threshold": {
+          "description": "Duration that instructs the server to cleanup ephemeral consumers that are inactive for that long",
+          "$ref": "#/definitions/golang_duration_nanos",
+          "default": 0
+        },
+        "backoff": {
+          "description": "List of durations in Go format that represents a retry time scale for NaK'd messages",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/golang_duration_nanos"
+          }
+        },
+        "num_replicas": {
+          "description": "When set do not inherit the replica count from the stream but specifically set it to this amount",
+          "type": "integer",
+          "$ref": "#/definitions/golang_int",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "mem_storage": {
+          "description": "Force the consumer state to be kept in memory rather than inherit the setting from the stream",
+          "type": "boolean",
+          "default": false
+        },
+        "metadata": {
+          "description": "Additional metadata for the Consumer",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "anyOf": [
+        {
+          "if": {
+            "properties": {
+              "deliver_policy": {
+                "const": "by_start_sequence"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "opt_start_seq"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "deliver_policy": {
+                "const": "opt_start_time"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "opt_start_seq"
+            ]
+          }
+        }
+      ]
+    },
+    "stream_info": {
+      "type": "object",
+      "required": [
+        "config",
+        "state",
+        "created"
+      ],
+      "properties": {
+        "config": {
+          "type": "object",
+          "description": "The active configuration for the Stream",
+          "$ref": "#/definitions/stream_configuration"
+        },
+        "state": {
+          "type": "object",
+          "description": "Detail about the current State of the Stream",
+          "$ref": "#/definitions/stream_state"
+        },
+        "created": {
+          "description": "Timestamp when the stream was created",
+          "$ref": "#/definitions/golang_time"
+        },
+        "ts": {
+          "description": "The server time the stream info was created",
+          "$ref": "#/definitions/golang_time"
+        },
+        "cluster": {
+          "$ref": "#/definitions/cluster_info"
+        },
+        "mirror": {
+          "$ref": "#/definitions/stream_source_info"
+        },
+        "sources": {
+          "type": "array",
+          "description": "Streams being sourced into this Stream",
+          "items": {
+            "$ref": "#/definitions/stream_source_info"
+          }
+        },
+        "alternates": {
+          "type": "array",
+          "description": "List of mirrors sorted by priority",
+          "items": {
+            "$ref": "#/definitions/stream_alternate"
+          }
+        }
+      }
+    },
+    "stream_alternate": {
+      "type": "object",
+      "description": "An alternate location to read mirrored data",
+      "required": [
+        "name",
+        "cluster"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The mirror stream name"
+        },
+        "cluster": {
+          "type": "string",
+          "description": "The name of the cluster holding the stream"
+        },
+        "domain": {
+          "type": "string",
+          "description": "The domain holding the string"
+        }
+      }
+    },
+    "stream_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "messages",
+        "bytes",
+        "first_seq",
+        "last_seq",
+        "consumer_count"
+      ],
+      "properties": {
+        "messages": {
+          "$ref": "#/definitions/golang_uint64",
+          "description": "Number of messages stored in the Stream",
+          "minimum": 0
+        },
+        "bytes": {
+          "$ref": "#/definitions/golang_uint64",
+          "description": "Combined size of all messages in the Stream",
+          "minimum": 0
+        },
+        "first_seq": {
+          "$ref": "#/definitions/golang_uint64",
+          "description": "Sequence number of the first message in the Stream",
+          "minimum": 0
+        },
+        "first_ts": {
+          "type": "string",
+          "description": "The timestamp of the first message in the Stream"
+        },
+        "last_seq": {
+          "$ref": "#/definitions/golang_uint64",
+          "description": "Sequence number of the last message in the Stream",
+          "minimum": 0
+        },
+        "last_ts": {
+          "type": "string",
+          "description": "The timestamp of the last message in the Stream"
+        },
+        "deleted": {
+          "description": "IDs of messages that were deleted using the Message Delete API or Interest based streams removing messages out of order",
+          "type": "array",
+          "minLength": 0,
+          "items": {
+            "$ref": "#/definitions/golang_uint64",
+            "minimum": 0
+          }
+        },
+        "subjects": {
+          "description": "Subjects and their message counts when a subjects_filter was set",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/golang_uint64"
+          }
+        },
+        "num_subjects": {
+          "description": "The number of unique subjects held in the stream",
+          "$ref": "#/definitions/golang_int",
+          "minimum": 0
+        },
+        "num_deleted": {
+          "description": "The number of deleted messages",
+          "$ref": "#/definitions/golang_int",
+          "minimum": 0
+        },
+        "lost": {
+          "$ref": "#/definitions/lost_stream_data"
+        },
+        "consumer_count": {
+          "$ref": "#/definitions/golang_int",
+          "description": "Number of Consumers attached to the Stream",
+          "minimum": 0
+        }
+      }
+    },
+    "subject_transform": {
+      "type": "object",
+      "description": "Subject transform to apply to matching messages going into the stream",
+      "required": [
+        "dest"
+      ],
+      "properties": {
+        "src": {
+          "type": "string",
+          "description": "The subject transform source"
+        },
+        "dest": {
+          "type": "string",
+          "description": "The subject transform destination"
+        }
+      }
+    },
+    "republish": {
+      "type": "object",
+      "description": "Rules for republishing messages from a stream with subject mapping onto new subjects for partitioning and more",
+      "required": [
+        "src",
+        "dest"
+      ],
+      "properties": {
+        "src": {
+          "type": "string",
+          "description": "The source subject to republish"
+        },
+        "dest": {
+          "type": "string",
+          "description": "The destination to publish to"
+        },
+        "headers_only": {
+          "type": "boolean",
+          "description": "Only send message headers, no bodies",
+          "default": false
+        }
+      }
+    },
+    "stream_configuration": {
+      "type": "object",
+      "required": [
+        "retention",
+        "max_consumers",
+        "max_msgs",
+        "max_bytes",
+        "max_age",
+        "storage",
+        "num_replicas"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "A unique name for the Stream, empty for Stream Templates.",
+          "type": "string",
+          "pattern": "^[^.*>]*$",
+          "minLength": 0
+        },
+        "description": {
+          "description": "A short description of the purpose of this stream",
+          "type": "string",
+          "maxLength": 4096
+        },
+        "subjects": {
+          "description": "A list of subjects to consume, supports wildcards. Must be empty when a mirror is configured. May be empty when sources are configured.",
+          "type": "array",
+          "minLength": 0,
+          "items": {
+            "type": "string"
+          }
+        },
+        "subject_transform": {
+          "description": "Subject transform to apply to matching messages",
+          "$ref": "#/definitions/subject_transform"
+        },
+        "retention": {
+          "description": "How messages are retained in the Stream, once this is exceeded old messages are removed.",
+          "type": "string",
+          "enum": [
+            "limits",
+            "interest",
+            "workqueue"
+          ],
+          "default": "limits"
+        },
+        "max_consumers": {
+          "description": "How many Consumers can be defined for a given Stream. -1 for unlimited.",
+          "$ref": "#/definitions/golang_int",
+          "minimum": -1,
+          "default": -1
+        },
+        "max_msgs": {
+          "description": "How many messages may be in a Stream, oldest messages will be removed if the Stream exceeds this size. -1 for unlimited.",
+          "$ref": "#/definitions/golang_int64",
+          "minimum": -1,
+          "default": -1
+        },
+        "max_msgs_per_subject": {
+          "description": "For wildcard streams ensure that for every unique subject this many messages are kept - a per subject retention limit",
+          "$ref": "#/definitions/golang_int64",
+          "minimum": -1,
+          "default": -1
+        },
+        "max_bytes": {
+          "description": "How big the Stream may be, when the combined stream size exceeds this old messages are removed. -1 for unlimited.",
+          "$ref": "#/definitions/golang_int64",
+          "minimum": -1,
+          "default": -1
+        },
+        "max_age": {
+          "description": "Maximum age of any message in the stream, expressed in nanoseconds. 0 for unlimited.",
+          "$ref": "#/definitions/golang_duration_nanos",
+          "minimum": 0,
+          "default": 0
+        },
+        "max_msg_size": {
+          "description": "The largest message that will be accepted by the Stream. -1 for unlimited.",
+          "$ref": "#/definitions/golang_int32",
+          "minimum": -1,
+          "default": -1
+        },
+        "storage": {
+          "description": "The storage backend to use for the Stream.",
+          "type": "string",
+          "enum": [
+            "file",
+            "memory"
+          ],
+          "default": "file"
+        },
+        "compression": {
+          "description": "Optional compression algorithm used for the Stream.",
+          "type": "string",
+          "enum": [
+            "none",
+            "s2"
+          ],
+          "default": "none"
+        },
+        "num_replicas": {
+          "description": "How many replicas to keep for each message.",
+          "$ref": "#/definitions/golang_int",
+          "minimum": 1,
+          "default": 1,
+          "maximum": 5
+        },
+        "no_ack": {
+          "description": "Disables acknowledging messages that are received by the Stream.",
+          "type": "boolean",
+          "default": false
+        },
+        "template_owner": {
+          "description": "When the Stream is managed by a Stream Template this identifies the template that manages the Stream.",
+          "type": "string"
+        },
+        "discard": {
+          "description": "When a Stream reach it's limits either old messages are deleted or new ones are denied",
+          "type": "string",
+          "enum": [
+            "old",
+            "new"
+          ],
+          "default": "old"
+        },
+        "duplicate_window": {
+          "description": "The time window to track duplicate messages for, expressed in nanoseconds. 0 for default",
+          "$ref": "#/definitions/golang_duration_nanos",
+          "minimum": 0,
+          "default": 0
+        },
+        "placement": {
+          "description": "Placement directives to consider when placing replicas of this stream, random placement when unset",
+          "$ref": "#/definitions/placement"
+        },
+        "mirror": {
+          "description": "Maintains a 1:1 mirror of another stream with name matching this property.  When a mirror is configured subjects and sources must be empty.",
+          "$ref": "#/definitions/stream_source"
+        },
+        "sources": {
+          "type": "array",
+          "description": "List of Stream names to replicate into this Stream",
+          "items": {
+            "$ref": "#/definitions/stream_source"
+          }
+        },
+        "sealed": {
+          "type": "boolean",
+          "default": false,
+          "description": "Sealed streams do not allow messages to be deleted via limits or API, sealed streams can not be unsealed via configuration update. Can only be set on already created streams via the Update API"
+        },
+        "deny_delete": {
+          "type": "boolean",
+          "default": false,
+          "description": "Restricts the ability to delete messages from a stream via the API. Cannot be changed once set to true"
+        },
+        "deny_purge": {
+          "type": "boolean",
+          "default": false,
+          "description": "Restricts the ability to purge messages from a stream via the API. Cannot be change once set to true"
+        },
+        "allow_rollup_hdrs": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allows the use of the Nats-Rollup header to replace all contents of a stream, or subject in a stream, with a single new message"
+        },
+        "allow_direct": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow higher performance, direct access to get individual messages"
+        },
+        "mirror_direct": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow higher performance, direct access for mirrors as well"
+        },
+        "republish": {
+          "$ref": "#/definitions/republish"
+        },
+        "discard_new_per_subject": {
+          "type": "boolean",
+          "description": "When discard policy is new and the stream is one with max messages per subject set, this will apply the new behavior to every subject. Essentially turning discard new from maximum number of subjects into maximum number of messages in a subject.",
+          "default": false
+        },
+        "metadata": {
+          "description": "Additional metadata for the Stream",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "stream_template_info": {
+      "type": "object",
+      "required": [
+        "config",
+        "streams"
+      ],
+      "properties": {
+        "config": {
+          "$ref": "#/definitions/stream_template_configuration"
+        },
+        "streams": {
+          "description": "List of Streams managed by this Template",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "stream_template_configuration": {
+      "description": "The data structure that describe the configuration of a NATS JetStream Stream Template",
+      "title": "io.nats.jetstream.api.v1.stream_template_configuration",
+      "type": "object",
+      "required": [
+        "name",
+        "config",
+        "max_streams"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "A unique name for the Stream Template.",
+          "$ref": "#/definitions/basic_name"
+        },
+        "max_streams": {
+          "description": "The maximum number of Streams this Template can create, -1 for unlimited.",
+          "minimum": -1,
+          "default": -1,
+          "$ref": "#/definitions/golang_int32"
+        },
+        "config": {
+          "$ref": "#/definitions/stream_configuration"
+        }
+      }
+    },
+    "account_info_response": {
+      "description": "A response from the JetStream $JS.API.INFO API",
+      "title": "io.nats.jetstream.api.v1.account_info_response",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/definitions/account_stats"
+        }
+      ]
+    },
+    "account_purge_response": {
+      "description": "A response from the JetStream $JS.API.ACCOUNT.PURGE API",
+      "title": "io.nats.jetstream.api.v1.account_purge_response",
+      "type": "object",
+      "properties": {
+        "initiated": {
+          "type": "boolean",
+          "description": "If the purge operation was succesfully started",
+          "default": false
+        }
+      }
+    },
+    "consumer_create_request": {
+      "description": "A request to the JetStream $JS.API.CONSUMER.CREATE and $JS.API.CONSUMER.DURABLE.CREATE APIs",
+      "title": "io.nats.jetstream.api.v1.consumer_create_request",
+      "type": "object",
+      "required": [
+        "stream_name",
+        "config"
+      ],
+      "properties": {
+        "stream_name": {
+          "type": "string",
+          "description": "The name of the stream to create the consumer in"
+        },
+        "config": {
+          "type": "object",
+          "description": "The consumer configuration",
+          "$ref": "#/definitions/consumer_configuration"
+        }
+      }
+    },
+    "consumer_create_response": {
+      "description": "A response from the JetStream $JS.API.CONSUMER.CREATE API",
+      "title": "io.nats.jetstream.api.v1.consumer_create_response",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/definitions/consumer_info"
+        }
+      ]
+    },
+    "consumer_delete_response": {
+      "description": "A response from the JetStream $JS.API.CONSUMER.DELETE API",
+      "title": "io.nats.jetstream.api.v1.consumer_delete_response",
+      "type": "object",
+      "required": [
+        "success"
+      ],
+      "properties": {
+        "success": {
+          "type": "boolean"
+        }
+      }
+    },
+    "consumer_getnext_request": {
+      "description": "A request to the JetStream $JS.API.CONSUMER.MSG.NEXT API",
+      "title": "io.nats.jetstream.api.v1.consumer_getnext_request",
+      "type": "object",
+      "properties": {
+        "expires": {
+          "$ref": "#/definitions/golang_duration_nanos",
+          "description": "A duration from now when the pull should expire, stated in nanoseconds, 0 for no expiry"
+        },
+        "batch": {
+          "$ref": "#/definitions/golang_int",
+          "description": "How many messages the server should deliver to the requestor",
+          "minimum": 0,
+          "maximum": 256
+        },
+        "max_bytes": {
+          "$ref": "#/definitions/golang_int",
+          "description": "Sends at most this many bytes to the requestor, limited by consumer configuration max_bytes",
+          "minimum": 0
+        },
+        "no_wait": {
+          "type": "boolean",
+          "description": "When true a response with a 404 status header will be returned when no messages are available"
+        },
+        "idle_heartbeat": {
+          "$ref": "#/definitions/golang_duration_nanos",
+          "description": "When not 0 idle heartbeats will be sent on this interval"
+        }
+      }
+    },
+    "consumer_info_response": {
+      "description": "A response from the JetStream $JS.API.CONSUMER.INFO API",
+      "title": "io.nats.jetstream.api.v1.consumer_info_response",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/definitions/consumer_info"
+        }
+      ]
+    },
+    "consumer_leader_stepdown_response": {
+      "description": "A response from the JetStream $JS.API.CONSUMER.LEADER.STEPDOWN API",
+      "title": "io.nats.jetstream.api.v1.consumer_leader_stepdown_response",
+      "type": "object",
+      "required": [
+        "success"
+      ],
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "If the leader successfully stood down",
+          "default": false
+        }
+      }
+    },
+    "consumer_list_request": {
+      "description": "A request to the JetStream $JS.API.CONSUMER.LIST API",
+      "title": "io.nats.jetstream.api.v1.consumer_list_request",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/definitions/iterable_request"
+        }
+      ]
+    },
+    "consumer_list_response": {
+      "description": "A response from the JetStream $JS.API.CONSUMER.LIST API",
+      "title": "io.nats.jetstream.api.v1.consumer_list_response",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/definitions/iterable_response"
+        }
+      ],
+      "required": [
+        "consumers"
+      ],
+      "properties": {
+        "consumers": {
+          "description": "Full Consumer information for each known Consumer",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/consumer_info"
+          },
+          "missing": {
+            "description": "In clustered environments gathering Consumer info might time out, this list would be a list of Consumers for which information was not obtainable",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "consumer_names_request": {
+      "description": "A request to the JetStream $JS.API.CONSUMER.NAMES API",
+      "title": "io.nats.jetstream.api.v1.consumer_names_request",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/definitions/iterable_request"
+        }
+      ],
+      "properties": {
+        "subject": {
+          "type": "string",
+          "description": "Filter the names to those consuming messages matching this subject or wildcard"
+        }
+      }
+    },
+    "consumer_names_response": {
+      "description": "A response from the JetStream $JS.API.CONSUMER.NAMES API",
+      "title": "io.nats.jetstream.api.v1.consumer_names_response",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/definitions/iterable_response"
+        }
+      ],
+      "required": [
+        "consumers"
+      ],
+      "properties": {
+        "consumers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "meta_leader_stepdown_request": {
+      "description": "A request to the JetStream $JS.API.META.LEADER.STEPDOWN API",
+      "title": "io.nats.jetstream.api.v1.meta_leader_stepdown_request",
+      "type": "object",
+      "properties": {
+        "placement": {
+          "$ref": "#/definitions/placement"
+        }
+      }
+    },
+    "meta_leader_stepdown_response": {
+      "description": "A response from the JetStream $JS.API.META.LEADER.STEPDOWN API",
+      "title": "io.nats.jetstream.api.v1.meta_leader_stepdown_response",
+      "type": "object",
+      "required": [
+        "success"
+      ],
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "If the leader successfully stood down",
+          "default": false
+        }
+      }
+    },
+    "meta_server_remove_request": {
+      "description": "A request to the JetStream $JS.API.SERVER.REMOVE API",
+      "title": "io.nats.jetstream.api.v1.meta_server_remove_request",
+      "type": "object",
+      "properties": {
+        "peer": {
+          "type": "string",
+          "description": "The Name of the server to remove from the meta group"
+        },
+        "peer_id": {
+          "type": "string",
+          "description": "Peer ID of the peer to be removed. If specified this is used instead of the server name"
+        }
+      }
+    },
+    "meta_server_remove_response": {
+      "description": "A response from the JetStream $JS.API.SERVER.REMOVE API",
+      "title": "io.nats.jetstream.api.v1.meta_server_remove_response",
+      "required": [
+        "success"
+      ],
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "If the peer was successfully removed",
+          "default": false
+        }
+      }
+    },
+    "pub_ack_response": {
+      "description": "A response received when publishing a message",
+      "title": "io.nats.jetstream.api.v1.pub_ack_response",
+      "type": "object",
+      "required": [
+        "stream"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "error": {
+          "$ref": "#/definitions/api_error"
+        },
+        "stream": {
+          "type": "string",
+          "description": "The name of the stream that received the message",
+          "minLength": 1
+        },
+        "seq": {
+          "type": "integer",
+          "description": "If successful this will be the sequence the message is stored at",
+          "$ref": "#/definitions/golang_uint64"
+        },
+        "duplicate": {
+          "type": "boolean",
+          "description": "Indicates that the message was not stored due to the Nats-Msg-Id header and duplicate tracking",
+          "default": false
+        },
+        "domain": {
+          "type": "string",
+          "description": "If the Stream accepting the message is in a JetStream server configured for a domain this would be that domain"
+        }
+      }
+    },
+    "stream_create_request": {
+      "description": "A request to the JetStream $JS.API.STREAM.CREATE API",
+      "title": "io.nats.jetstream.api.v1.stream_create_request",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/definitions/stream_configuration"
+        }
+      ]
+    },
+    "stream_create_response": {
+      "description": "A response from the JetStream $JS.API.STREAM.CREATE API",
+      "title": "io.nats.jetstream.api.v1.stream_create_response",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/definitions/stream_info"
+        }
+      ]
+    },
+    "stream_delete_response": {
+      "description": "A response from the JetStream $JS.API.STREAM.DELETE API",
+      "title": "io.nats.jetstream.api.v1.stream_delete_response",
+      "type": "object",
+      "required": [
+        "success"
+      ],
+      "properties": {
+        "success": {
+          "type": "boolean"
+        }
+      }
+    },
+    "stream_info_request": {
+      "description": "A request to the JetStream $JS.API.STREAM.INFO API",
+      "title": "io.nats.jetstream.api.v1.stream_info_request",
+      "type": "object",
+      "properties": {
+        "deleted_details": {
+          "type": "boolean",
+          "description": "When true will result in a full list of deleted message IDs being returned in the info response"
+        },
+        "subjects_filter": {
+          "type": "string",
+          "description": "When set will return a list of subjects and how many messages they hold for all matching subjects. Filter is a standard NATS subject wildcard pattern."
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Paging offset when retrieving pages of subjet details"
+        }
+      }
+    },
+    "stream_info_response": {
+      "description": "A response from the JetStream $JS.API.STREAM.INFO API",
+      "title": "io.nats.jetstream.api.v1.stream_info_response",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/definitions/stream_info"
+        }
+      ],
+      "properties": {
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "stream_leader_stepdown_response": {
+      "description": "A response from the JetStream $JS.API.STREAM.LEADER.STEPDOWN API",
+      "title": "io.nats.jetstream.api.v1.stream_leader_stepdown_response",
+      "type": "object",
+      "required": [
+        "success"
+      ],
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "If the leader successfully stood down",
+          "default": false
+        }
+      }
+    },
+    "stream_list_request": {
+      "description": "A request to the JetStream $JS.API.STREAM.LIST API",
+      "title": "io.nats.jetstream.api.v1.stream_list_request",
+      "type": "object",
+      "properties": {
+        "subject": {
+          "type": "string",
+          "description": "Limit the list to streams matching this subject filter"
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "stream_list_response": {
+      "description": "A response from the JetStream $JS.API.STREAM.LIST API",
+      "title": "io.nats.jetstream.api.v1.stream_list_response",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/definitions/iterable_response"
+        }
+      ],
+      "required": [
+        "streams"
+      ],
+      "properties": {
+        "streams": {
+          "description": "Full Stream information for each known Stream",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/stream_info"
+          }
+        },
+        "missing": {
+          "description": "In clustered environments gathering Stream info might time out, this list would be a list of Streams for which information was not obtainable",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "stream_msg_delete_request": {
+      "description": "A request to the JetStream $JS.API.STREAM.MSG.DELETE API",
+      "title": "io.nats.jetstream.api.v1.stream_msg_delete_request",
+      "type": "object",
+      "required": [
+        "seq"
+      ],
+      "properties": {
+        "seq": {
+          "description": "Stream sequence number of the message to delete",
+          "$ref": "#/definitions/golang_uint64"
+        },
+        "no_erase": {
+          "type": "boolean",
+          "description": "Default will securely remove a message and rewrite the data with random data, set this to true to only remove the message"
+        }
+      }
+    },
+    "stream_msg_delete_response": {
+      "description": "A response from the JetStream $JS.API.STREAM.MSG.DELETE API",
+      "title": "io.nats.jetstream.api.v1.stream_msg_delete_response",
+      "type": "object",
+      "required": [
+        "success"
+      ],
+      "properties": {
+        "success": {
+          "type": "boolean"
+        }
+      }
+    },
+    "stream_msg_get_request": {
+      "description": "A request to the JetStream $JS.API.STREAM.MSG.GET API",
+      "title": "io.nats.jetstream.api.v1.stream_msg_get_request",
+      "type": "object",
+      "properties": {
+        "seq": {
+          "type": "integer",
+          "description": "Stream sequence number of the message to retrieve, cannot be combined with last_by_subj"
+        },
+        "last_by_subj": {
+          "type": "string",
+          "description": "Retrieves the last message for a given subject, cannot be combined with seq"
+        },
+        "next_by_subj": {
+          "type": "string",
+          "description": "Combined with sequence gets the next message for a subject with the given sequence or higher"
+        }
+      }
+    },
+    "stream_msg_get_response": {
+      "description": "A response from the JetStream $JS.API.STREAM.MSG.GET API",
+      "title": "io.nats.jetstream.api.v1.stream_msg_get_response",
+      "type": "object",
+      "required": [
+        "message"
+      ],
+      "properties": {
+        "message": {
+          "$ref": "#/definitions/stored_message"
+        }
+      }
+    },
+    "stream_names_request": {
+      "description": "A request to the JetStream $JS.API.STREAM.NAMES API",
+      "title": "io.nats.jetstream.api.v1.stream_names_request",
+      "type": "object",
+      "properties": {
+        "subject": {
+          "type": "string",
+          "description": "Limit the list to streams matching this subject filter"
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "stream_names_response": {
+      "description": "A response from the JetStream $JS.API.STREAM.NAMES API",
+      "title": "io.nats.jetstream.api.v1.stream_names_response",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/definitions/iterable_response"
+        }
+      ],
+      "required": [
+        "streams"
+      ],
+      "properties": {
+        "consumers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "stream_purge_request": {
+      "description": "A request to the JetStream $JS.API.STREAM.PURGE API",
+      "title": "io.nats.jetstream.api.v1.stream_purge_request",
+      "type": "object",
+      "properties": {
+        "filter": {
+          "type": "string",
+          "description": "Restrict purging to messages that match this subject"
+        },
+        "seq": {
+          "description": "Purge all messages up to but not including the message with this sequence. Can be combined with subject filter but not the keep option",
+          "$ref": "#/definitions/golang_uint64"
+        },
+        "keep": {
+          "description": "Ensures this many messages are present after the purge. Can be combined with the subject filter but not the sequence",
+          "$ref": "#/definitions/golang_uint64"
+        }
+      }
+    },
+    "stream_purge_response": {
+      "description": "A response from the JetStream $JS.API.STREAM.PURGE API",
+      "title": "io.nats.jetstream.api.v1.stream_purge_response",
+      "type": "object",
+      "required": [
+        "success",
+        "purged"
+      ],
+      "properties": {
+        "success": {
+          "type": "boolean"
+        },
+        "purged": {
+          "description": "Number of messages purged from the Stream",
+          "$ref": "#/definitions/golang_uint64"
+        }
+      }
+    },
+    "stream_remove_peer_request": {
+      "description": "A request to the JetStream $JS.API.STREAM.PEER.REMOVE API",
+      "title": "io.nats.jetstream.api.v1.stream_remove_peer_request",
+      "type": "object",
+      "required": [
+        "peer"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "peer": {
+          "type": "string",
+          "description": "Server name of the peer to remove",
+          "minLength": 1
+        }
+      }
+    },
+    "stream_remove_peer_response": {
+      "description": "A response from the JetStream $JS.API.STREAM.PEER.REMOVE API",
+      "title": "io.nats.jetstream.api.v1.stream_remove_peer_response",
+      "type": "object",
+      "required": [
+        "success"
+      ],
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "If the peer was successfully removed",
+          "default": false
+        }
+      }
+    },
+    "stream_restore_request": {
+      "description": "A response from the JetStream $JS.API.STREAM.RESTORE API",
+      "title": "io.nats.jetstream.api.v1.stream_restore_request",
+      "type": "object",
+      "required": [
+        "config",
+        "state"
+      ],
+      "properties": {
+        "config": {
+          "$ref": "#/definitions/stream_configuration"
+        },
+        "state": {
+          "$ref": "#/definitions/stream_state"
+        }
+      }
+    },
+    "stream_restore_response": {
+      "description": "A response from the JetStream $JS.API.STREAM.RESTORE API",
+      "title": "io.nats.jetstream.api.v1.stream_restore_response",
+      "type": "object",
+      "required": [
+        "deliver_subject"
+      ],
+      "properties": {
+        "deliver_subject": {
+          "type": "string",
+          "description": "The Subject to send restore chunks to",
+          "minLength": 1
+        }
+      }
+    },
+    "stream_snapshot_request": {
+      "description": "A request to the JetStream $JS.API.STREAM.SNAPSHOT API",
+      "title": "io.nats.jetstream.api.v1.stream_snapshot_request",
+      "type": "object",
+      "required": [
+        "deliver_subject"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "deliver_subject": {
+          "type": "string",
+          "description": "The NATS subject where the snapshot will be delivered",
+          "minLength": 1
+        },
+        "no_consumers": {
+          "type": "boolean",
+          "description": "When true consumer states and configurations will not be present in the snapshot"
+        },
+        "chunk_size": {
+          "type": "integer",
+          "description": "The size of data chunks to send to deliver_subject",
+          "minimum": 1024,
+          "$ref": "#/definitions/golang_int"
+        },
+        "jsck": {
+          "type": "boolean",
+          "description": "Check all message's checksums prior to snapshot",
+          "default": false
+        }
+      }
+    },
+    "stream_snapshot_response": {
+      "description": "A response from the JetStream $JS.API.STREAM.SNAPSHOT API",
+      "title": "io.nats.jetstream.api.v1.stream_snapshot_response",
+      "type": "object",
+      "required": [
+        "config",
+        "state"
+      ],
+      "properties": {
+        "config": {
+          "$ref": "#/definitions/stream_configuration"
+        },
+        "state": {
+          "$ref": "#/definitions/stream_state"
+        }
+      }
+    },
+    "stream_template_create_request": {
+      "description": "A request to the JetStream $JS.API.STREAM.TEMPLATE.CREATE API",
+      "title": "io.nats.jetstream.api.v1.stream_template_create_request",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/definitions/stream_template_configuration"
+        }
+      ]
+    },
+    "stream_template_create_response": {
+      "description": "A response from the JetStream $JS.API.STREAM.TEMPLATE.CREATE API",
+      "title": "io.nats.jetstream.api.v1.stream_template_create_response",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/definitions/stream_template_info"
+        }
+      ]
+    },
+    "stream_template_delete_response": {
+      "description": "A response from the JetStream $JS.API.STREAM.TEMPLATE.DELETE API",
+      "title": "io.nats.jetstream.api.v1.stream_template_delete_response",
+      "type": "object",
+      "required": [
+        "success"
+      ],
+      "properties": {
+        "success": {
+          "type": "boolean"
+        }
+      }
+    },
+    "stream_template_info_response": {
+      "description": "A response from the JetStream $JS.API.STREAM.TEMPLATE.INFO API",
+      "title": "io.nats.jetstream.api.v1.stream_template_info_response",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/definitions/stream_template_info"
+        }
+      ]
+    },
+    "stream_template_names_request": {
+      "description": "A request to the JetStream $JS.API.CONSUMER.LIST API",
+      "title": "io.nats.jetstream.api.v1.stream_template_names_request",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/definitions/iterable_request"
+        }
+      ]
+    },
+    "stream_template_names_response": {
+      "description": "A response from the JetStream $JS.API.STREAM.TEMPLATE.NAMES API",
+      "title": "io.nats.jetstream.api.v1.stream_template_names_response",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/definitions/iterable_response"
+        }
+      ],
+      "required": [
+        "streams"
+      ],
+      "properties": {
+        "consumers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "stream_update_request": {
+      "description": "A request to the JetStream $JS.API.STREAM.UPDATE API",
+      "title": "io.nats.jetstream.api.v1.stream_update_request",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/definitions/stream_configuration"
+        }
+      ]
+    },
+    "stream_update_response": {
+      "description": "A response from the JetStream $JS.API.STREAM.UPDATE API",
+      "title": "io.nats.jetstream.api.v1.stream_update_response",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/definitions/stream_info"
+        }
+      ]
+    }
+  }
+}

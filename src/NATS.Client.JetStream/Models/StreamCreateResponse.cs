@@ -1,21 +1,9 @@
-﻿using System.Text.Json.Serialization;
-
 namespace NATS.Client.JetStream.Models;
 
-public record StreamCreateResponse
+/// <summary>
+/// A response from the JetStream $JS.API.STREAM.CREATE API
+/// </summary>
+
+public record StreamCreateResponse : StreamInfo
 {
-    [JsonPropertyName("type")]
-    public string Type { get; set; }
-
-    [JsonPropertyName("config")]
-    public StreamConfig Config { get; set; }
-
-    [JsonPropertyName("created")]
-    public DateTimeOffset Created { get; set; }
-
-    [JsonPropertyName("state")]
-    public StreamState State { get; set; }
-
-    [JsonPropertyName("did_create")]
-    public bool DidCreate { get; set; }
 }

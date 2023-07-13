@@ -1,25 +1,23 @@
-// Copyright 2023 The NATS Authors
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-using System.Text.Json.Serialization;
-
 namespace NATS.Client.JetStream.Models;
+
+/// <summary>
+/// Records messages that were damaged and unrecoverable
+/// </summary>
 
 public record LostStreamData
 {
-    [JsonPropertyName("msgs")]
-    public string Msgs { get; set; }
+    /// <summary>
+    /// The messages that were lost
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("msgs")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public System.Collections.Generic.ICollection<long>? Msgs { get; set; } = default!;
 
-    [JsonPropertyName("bytes")]
-    public ulong Bytes { get; set; }
+    /// <summary>
+    /// The number of bytes that were lost
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("bytes")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [System.ComponentModel.DataAnnotations.Range(0D, 18446744073709552000D)]
+    public long Bytes { get; set; } = default!;
 }

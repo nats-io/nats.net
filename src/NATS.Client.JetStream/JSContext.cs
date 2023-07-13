@@ -55,10 +55,10 @@ public record JSOptions
 
 public class JSStream
 {
-    public StreamCreateResponse Response { get; }
-
     public JSStream(StreamCreateResponse response)
     {
         Response = response;
     }
+
+    public StreamCreateResponse Response { get; }
 }

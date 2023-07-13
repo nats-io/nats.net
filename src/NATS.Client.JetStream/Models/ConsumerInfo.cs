@@ -1,55 +1,98 @@
-// Copyright 2023 The NATS Authors
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-using System.Text.Json.Serialization;
-
 namespace NATS.Client.JetStream.Models;
 
 public record ConsumerInfo
 {
-    [JsonPropertyName("stream_name")]
-    public string StreamName { get; set; }
+    /// <summary>
+    /// The Stream the consumer belongs to
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("stream_name")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+    public string StreamName { get; set; } = default!;
 
-    [JsonPropertyName("config")]
-    public string Config { get; set; }
+    /// <summary>
+    /// A unique name for the consumer, either machine generated or the durable name
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("name")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+    public string Name { get; set; } = default!;
 
-    [JsonPropertyName("name")]
-    public string Name { get; set; }
+    /// <summary>
+    /// The server time the consumer info was created
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("ts")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public System.DateTimeOffset Ts { get; set; } = default!;
 
-    [JsonPropertyName("created")]
-    public DateTimeOffset Created { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("config")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    public ConsumerConfiguration Config { get; set; } = default!;
 
-    [JsonPropertyName("delivered")]
-    public string Delivered { get; set; }
+    /// <summary>
+    /// The time the Consumer was created
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("created")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+    public System.DateTimeOffset Created { get; set; } = default!;
 
-    [JsonPropertyName("ack_floor")]
-    public string AckFloor { get; set; }
+    /// <summary>
+    /// The last message delivered from this Consumer
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("delivered")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    [System.ComponentModel.DataAnnotations.Required]
+    public SequenceInfo Delivered { get; set; } = new SequenceInfo();
 
-    [JsonPropertyName("num_pending")]
-    public ulong NumPending { get; set; }
+    /// <summary>
+    /// The highest contiguous acknowledged message
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("ack_floor")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    [System.ComponentModel.DataAnnotations.Required]
+    public SequenceInfo AckFloor { get; set; } = new SequenceInfo();
 
-    [JsonPropertyName("num_waiting")]
-    public long NumWaiting { get; set; }
+    /// <summary>
+    /// The number of messages pending acknowledgement
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("num_ack_pending")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
+    public long NumAckPending { get; set; } = default!;
 
-    [JsonPropertyName("num_ack_pending")]
-    public long NumAckPending { get; set; }
+    /// <summary>
+    /// The number of redeliveries that have been performed
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("num_redelivered")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
+    public long NumRedelivered { get; set; } = default!;
 
-    [JsonPropertyName("num_redelivered")]
-    public long NumRedelivered { get; set; }
+    /// <summary>
+    /// The number of pull consumers waiting for messages
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("num_waiting")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
+    public long NumWaiting { get; set; } = default!;
 
-    [JsonPropertyName("cluster")]
-    public string Cluster { get; set; }
+    /// <summary>
+    /// The number of messages left unconsumed in this Consumer
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("num_pending")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    [System.ComponentModel.DataAnnotations.Range(0D, 18446744073709552000D)]
+    public long NumPending { get; set; } = default!;
 
-    [JsonPropertyName("push_bound")]
-    public bool PushBound { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("cluster")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public ClusterInfo Cluster { get; set; } = default!;
+
+    /// <summary>
+    /// Indicates if any client is connected and receiving messages from a push consumer
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("push_bound")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool PushBound { get; set; } = default!;
 }

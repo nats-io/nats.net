@@ -1,28 +1,25 @@
-// Copyright 2023 The NATS Authors
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-using System.Text.Json.Serialization;
-
 namespace NATS.Client.JetStream.Models;
 
 public record ClusterInfo
 {
-    [JsonPropertyName("name")]
-    public string Name { get; set; }
+    /// <summary>
+    /// The cluster name
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("name")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public string Name { get; set; } = default!;
 
-    [JsonPropertyName("leader")]
-    public string Leader { get; set; }
+    /// <summary>
+    /// The server name of the RAFT leader
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("leader")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public string Leader { get; set; } = default!;
 
-    [JsonPropertyName("replicas")]
-    public string Replicas { get; set; }
+    /// <summary>
+    /// The members of the RAFT cluster
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("replicas")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public System.Collections.Generic.ICollection<PeerInfo> Replicas { get; set; } = default!;
 }

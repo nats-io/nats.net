@@ -1,55 +1,92 @@
-// Copyright 2023 The NATS Authors
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-using System.Text.Json.Serialization;
-
 namespace NATS.Client.JetStream.Models;
 
 public record StreamState
 {
-    [JsonPropertyName("messages")]
-    public ulong Messages { get; set; }
+    /// <summary>
+    /// Number of messages stored in the Stream
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("messages")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    [System.ComponentModel.DataAnnotations.Range(0D, 18446744073709552000D)]
+    public long Messages { get; set; } = default!;
 
-    [JsonPropertyName("bytes")]
-    public ulong Bytes { get; set; }
+    /// <summary>
+    /// Combined size of all messages in the Stream
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("bytes")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    [System.ComponentModel.DataAnnotations.Range(0D, 18446744073709552000D)]
+    public long Bytes { get; set; } = default!;
 
-    [JsonPropertyName("first_seq")]
-    public ulong FirstSeq { get; set; }
+    /// <summary>
+    /// Sequence number of the first message in the Stream
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("first_seq")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    [System.ComponentModel.DataAnnotations.Range(0D, 18446744073709552000D)]
+    public long FirstSeq { get; set; } = default!;
 
-    [JsonPropertyName("last_seq")]
-    public ulong LastSeq { get; set; }
+    /// <summary>
+    /// The timestamp of the first message in the Stream
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("first_ts")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public string FirstTs { get; set; } = default!;
 
-    [JsonPropertyName("consumer_count")]
-    public long ConsumerCount { get; set; }
+    /// <summary>
+    /// Sequence number of the last message in the Stream
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("last_seq")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    [System.ComponentModel.DataAnnotations.Range(0D, 18446744073709552000D)]
+    public long LastSeq { get; set; } = default!;
 
-    [JsonPropertyName("num_subjects")]
-    public long NumSubjects { get; set; }
+    /// <summary>
+    /// The timestamp of the last message in the Stream
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("last_ts")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public string LastTs { get; set; } = default!;
 
-    [JsonPropertyName("num_deleted")]
-    public long NumDeleted { get; set; }
+    /// <summary>
+    /// IDs of messages that were deleted using the Message Delete API or Interest based streams removing messages out of order
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("deleted")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public System.Collections.Generic.ICollection<long> Deleted { get; set; } = default!;
 
-    [JsonPropertyName("first_ts")]
-    public DateTimeOffset FirstTs { get; set; }
+    /// <summary>
+    /// Subjects and their message counts when a subjects_filter was set
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("subjects")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public System.Collections.Generic.IDictionary<string, long> Subjects { get; set; } = default!;
 
-    [JsonPropertyName("last_ts")]
-    public DateTimeOffset LastTs { get; set; }
+    /// <summary>
+    /// The number of unique subjects held in the stream
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("num_subjects")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
+    public long NumSubjects { get; set; } = default!;
 
-    [JsonPropertyName("subjects")]
-    public string Subjects { get; set; }
+    /// <summary>
+    /// The number of deleted messages
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("num_deleted")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
+    public long NumDeleted { get; set; } = default!;
 
-    [JsonPropertyName("deleted")]
-    public string Deleted { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("lost")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public LostStreamData Lost { get; set; } = default!;
 
-    [JsonPropertyName("lost")]
-    public string Lost { get; set; }
+    /// <summary>
+    /// Number of Consumers attached to the Stream
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("consumer_count")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
+    public long ConsumerCount { get; set; } = default!;
 }
