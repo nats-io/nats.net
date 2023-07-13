@@ -100,7 +100,11 @@ public class ProtocolTest
     [Fact]
     public async Task Publish_empty_message_for_notifications()
     {
-        await using var server = new NatsServer(_output, TransportType.Tcp);
+        void Log(string text)
+        {
+            _output.WriteLine($"[TESTS] {DateTime.Now:HH:mm:ss.fff} {text}");
+        }
+        await using var server = new NatsServer(_output, new NatsServerOptionsBuilder().UseTransport(TransportType.Tcp).Trace().Build());
         var (nats, proxy) = server.CreateProxiedClientConnection();
 
         var sync = 0;
@@ -129,7 +133,7 @@ public class ProtocolTest
             async () => await nats.PublishAsync("foo.sync"),
             retryDelay: TimeSpan.FromSeconds(1));
 
-        // PUB notifications
+        Log("PUB notifications");
         await nats.PublishAsync("foo.signal1");
         var msg1 = await signal1;
         Assert.Equal(0, msg1.Data.Length);
@@ -139,7 +143,7 @@ public class ProtocolTest
         var msgFrame1 = proxy.Frames.First(f => f.Message.StartsWith("MSG foo.signal1"));
         Assert.Matches(@"^MSG foo.signal1 \w+ 0␍␊$", msgFrame1.Message);
 
-        // HPUB notifications
+        Log("HPUB notifications");
         await nats.PublishAsync("foo.signal2", opts: new NatsPubOpts { Headers = new NatsHeaders() });
         var msg2 = await signal2;
         Assert.Equal(0, msg2.Data.Length);
