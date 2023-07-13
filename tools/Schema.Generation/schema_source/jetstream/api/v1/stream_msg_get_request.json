@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://nats.io/schemas/jetstream/api/v1/stream_msg_get_request.json",
+  "description": "A request to the JetStream $JS.API.STREAM.MSG.GET API",
+  "title": "io.nats.jetstream.api.v1.stream_msg_get_request",
+  "type": "object",
+  "properties": {
+    "seq": {
+      "type": "integer",
+      "description": "Stream sequence number of the message to retrieve, cannot be combined with last_by_subj"
+    },
+    "last_by_subj": {
+      "type": "string",
+      "description": "Retrieves the last message for a given subject, cannot be combined with seq"
+    },
+    "next_by_subj": {
+      "type": "string",
+      "description": "Combined with sequence gets the next message for a subject with the given sequence or higher"
+    }
+  }
+}

@@ -59,6 +59,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.JetStream.Tests
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.TestUtilities", "tests\NATS.Client.TestUtilities\NATS.Client.TestUtilities.csproj", "{90E5BF38-70C1-460A-9177-CE42815BDBF5}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{BD234E2E-F51A-4B18-B8BE-8AF6D546BF87}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Schema.Generation", "tools\Schema.Generation\Schema.Generation.csproj", "{B7DD4A9C-2D24-4772-951E-86A665C59ADF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -145,6 +149,10 @@ Global
 		{90E5BF38-70C1-460A-9177-CE42815BDBF5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{90E5BF38-70C1-460A-9177-CE42815BDBF5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{90E5BF38-70C1-460A-9177-CE42815BDBF5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B7DD4A9C-2D24-4772-951E-86A665C59ADF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B7DD4A9C-2D24-4772-951E-86A665C59ADF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B7DD4A9C-2D24-4772-951E-86A665C59ADF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B7DD4A9C-2D24-4772-951E-86A665C59ADF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -171,6 +179,7 @@ Global
 		{56A9B885-6B7E-4BC6-AED0-ADC67C9A68DB} = {4827B3EC-73D8-436D-AE2A-5E29AC95FD0C}
 		{2D39F649-C512-4EE5-9DFA-7BD4D9E4F145} = {C526E8AB-739A-48D7-8FC4-048978C9B650}
 		{90E5BF38-70C1-460A-9177-CE42815BDBF5} = {C526E8AB-739A-48D7-8FC4-048978C9B650}
+		{B7DD4A9C-2D24-4772-951E-86A665C59ADF} = {BD234E2E-F51A-4B18-B8BE-8AF6D546BF87}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {8CBB7278-D093-448E-B3DE-B5991209A1AA}

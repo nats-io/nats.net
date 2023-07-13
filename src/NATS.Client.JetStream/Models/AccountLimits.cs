@@ -1,43 +1,66 @@
-// Copyright 2023 The NATS Authors
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-using System.Text.Json.Serialization;
-
 namespace NATS.Client.JetStream.Models;
 
 public record AccountLimits
 {
-    [JsonPropertyName("max_memory")]
-    public long MaxMemory { get; set; }
+    /// <summary>
+    /// The maximum amount of Memory storage Stream Messages may consume
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("max_memory")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    [System.ComponentModel.DataAnnotations.Range(-1, int.MaxValue)]
+    public int MaxMemory { get; set; } = default!;
 
-    [JsonPropertyName("max_storage")]
-    public long MaxStorage { get; set; }
+    /// <summary>
+    /// The maximum amount of File storage Stream Messages may consume
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("max_storage")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    [System.ComponentModel.DataAnnotations.Range(-1, int.MaxValue)]
+    public int MaxStorage { get; set; } = default!;
 
-    [JsonPropertyName("max_streams")]
-    public long MaxStreams { get; set; }
+    /// <summary>
+    /// The maximum number of Streams an account can create
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("max_streams")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    [System.ComponentModel.DataAnnotations.Range(-1, int.MaxValue)]
+    public int MaxStreams { get; set; } = default!;
 
-    [JsonPropertyName("max_consumers")]
-    public long MaxConsumers { get; set; }
+    /// <summary>
+    /// The maximum number of Consumer an account can create
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("max_consumers")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    [System.ComponentModel.DataAnnotations.Range(-1, int.MaxValue)]
+    public int MaxConsumers { get; set; } = default!;
 
-    [JsonPropertyName("max_ack_pending")]
-    public long MaxAckPending { get; set; }
+    /// <summary>
+    /// Indicates if Streams created in this account requires the max_bytes property set
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("max_bytes_required")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool MaxBytesRequired { get; set; } = false;
 
-    [JsonPropertyName("memory_max_stream_bytes")]
-    public long MemoryMaxStreamBytes { get; set; }
+    /// <summary>
+    /// The maximum number of outstanding ACKs any consumer may configure
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("max_ack_pending")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public int MaxAckPending { get; set; } = default!;
 
-    [JsonPropertyName("storage_max_stream_bytes")]
-    public long StorageMaxStreamBytes { get; set; }
+    /// <summary>
+    /// The maximum size any single memory stream may be
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("memory_max_stream_bytes")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [System.ComponentModel.DataAnnotations.Range(-1, int.MaxValue)]
+    public int MemoryMaxStreamBytes { get; set; } = -1;
 
-    [JsonPropertyName("max_bytes_required")]
-    public bool MaxBytesRequired { get; set; }
+    /// <summary>
+    /// The maximum size any single storage based stream may be
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("storage_max_stream_bytes")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [System.ComponentModel.DataAnnotations.Range(-1, int.MaxValue)]
+    public int StorageMaxStreamBytes { get; set; } = -1;
 }

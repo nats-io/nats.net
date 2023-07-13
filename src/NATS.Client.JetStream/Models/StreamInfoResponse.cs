@@ -1,30 +1,23 @@
-﻿using System.Text.Json.Serialization;
-
 namespace NATS.Client.JetStream.Models;
 
-public record StreamInfoResponse
+/// <summary>
+/// A response from the JetStream $JS.API.STREAM.INFO API
+/// </summary>
+
+public record StreamInfoResponse : StreamInfo
 {
-    [JsonPropertyName("type")]
-    public string Type { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("total")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [System.ComponentModel.DataAnnotations.Range(0, int.MaxValue)]
+    public int Total { get; set; } = default!;
 
-    [JsonPropertyName("total")]
-    public long Total { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("offset")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [System.ComponentModel.DataAnnotations.Range(0, int.MaxValue)]
+    public int Offset { get; set; } = default!;
 
-    [JsonPropertyName("offset")]
-    public long Offset { get; set; }
-
-    [JsonPropertyName("limit")]
-    public long Limit { get; set; }
-
-    [JsonPropertyName("config")]
-    public StreamConfig Config { get; set; }
-
-    [JsonPropertyName("created")]
-    public DateTimeOffset Created { get; set; }
-
-    [JsonPropertyName("state")]
-    public StreamState State { get; set; }
-
-    [JsonPropertyName("cluster")]
-    public Cluster Cluster { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("limit")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [System.ComponentModel.DataAnnotations.Range(0, int.MaxValue)]
+    public int Limit { get; set; } = default!;
 }

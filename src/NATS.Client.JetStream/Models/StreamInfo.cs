@@ -1,37 +1,57 @@
-// Copyright 2023 The NATS Authors
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-using System.Text.Json.Serialization;
-
 namespace NATS.Client.JetStream.Models;
 
 public record StreamInfo
 {
-    [JsonPropertyName("created")]
-    public DateTimeOffset Created { get; set; }
+    /// <summary>
+    /// The active configuration for the Stream
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("config")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    [System.ComponentModel.DataAnnotations.Required]
+    public StreamConfiguration Config { get; set; } = new StreamConfiguration();
 
-    [JsonPropertyName("config")]
-    public string Config { get; set; }
+    /// <summary>
+    /// Detail about the current State of the Stream
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("state")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    [System.ComponentModel.DataAnnotations.Required]
+    public StreamState State { get; set; } = new StreamState();
 
-    [JsonPropertyName("state")]
-    public string State { get; set; }
+    /// <summary>
+    /// Timestamp when the stream was created
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("created")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+    public System.DateTimeOffset Created { get; set; } = default!;
 
-    [JsonPropertyName("cluster")]
-    public string Cluster { get; set; }
+    /// <summary>
+    /// The server time the stream info was created
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("ts")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public System.DateTimeOffset Ts { get; set; } = default!;
 
-    [JsonPropertyName("mirror")]
-    public string Mirror { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("cluster")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public ClusterInfo Cluster { get; set; } = default!;
 
-    [JsonPropertyName("sources")]
-    public string Sources { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("mirror")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public StreamSourceInfo Mirror { get; set; } = default!;
+
+    /// <summary>
+    /// Streams being sourced into this Stream
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("sources")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public System.Collections.Generic.ICollection<StreamSourceInfo> Sources { get; set; } = default!;
+
+    /// <summary>
+    /// List of mirrors sorted by priority
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("alternates")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public System.Collections.Generic.ICollection<StreamAlternate> Alternates { get; set; } = default!;
 }

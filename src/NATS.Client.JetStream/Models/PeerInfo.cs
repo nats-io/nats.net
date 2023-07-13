@@ -1,34 +1,41 @@
-// Copyright 2023 The NATS Authors
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-using System.Text.Json.Serialization;
-
 namespace NATS.Client.JetStream.Models;
 
 public record PeerInfo
 {
-    [JsonPropertyName("name")]
-    public string Name { get; set; }
+    /// <summary>
+    /// The server name of the peer
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("name")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+    public string Name { get; set; } = default!;
 
-    [JsonPropertyName("current")]
-    public bool Current { get; set; }
+    /// <summary>
+    /// Indicates if the server is up to date and synchronised
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("current")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    public bool Current { get; set; } = false;
 
-    [JsonPropertyName("offline")]
-    public bool Offline { get; set; }
+    /// <summary>
+    /// Nanoseconds since this peer was last seen
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("active")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    public double Active { get; set; } = default!;
 
-    [JsonPropertyName("active")]
-    public TimeSpan Active { get; set; }
+    /// <summary>
+    /// Indicates the node is considered offline by the group
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("offline")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Offline { get; set; } = false;
 
-    [JsonPropertyName("lag")]
-    public long Lag { get; set; }
+    /// <summary>
+    /// How many uncommitted operations this peer is behind the leader
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("lag")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [System.ComponentModel.DataAnnotations.Range(0, int.MaxValue)]
+    public int Lag { get; set; } = default!;
 }
