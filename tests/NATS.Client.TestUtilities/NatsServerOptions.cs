@@ -16,9 +16,12 @@ public sealed class NatsServerOptionsBuilder
     private readonly List<string> _extraConfigs = new();
     private bool _enableWebSocket;
     private bool _enableTls;
+    private bool _enableJetStream;
     private string? _tlsServerCertFile;
     private string? _tlsServerKeyFile;
     private string? _tlsCaFile;
+    private TransportType? _transportType;
+    private bool _trace;
 
     public NatsServerOptions Build()
     {
@@ -26,15 +29,26 @@ public sealed class NatsServerOptionsBuilder
         {
             EnableWebSocket = _enableWebSocket,
             EnableTls = _enableTls,
+            EnableJetStream = _enableJetStream,
             TlsServerCertFile = _tlsServerCertFile,
             TlsServerKeyFile = _tlsServerKeyFile,
             TlsCaFile = _tlsCaFile,
             ExtraConfigs = _extraConfigs,
+            TransportType = _transportType ?? TransportType.Tcp,
+            Trace = _trace,
         };
+    }
+
+    public NatsServerOptionsBuilder Trace()
+    {
+        _trace = true;
+        return this;
     }
 
     public NatsServerOptionsBuilder UseTransport(TransportType transportType)
     {
+        _transportType = transportType;
+
         if (transportType == TransportType.Tls)
         {
             _enableTls = true;
@@ -47,6 +61,12 @@ public sealed class NatsServerOptionsBuilder
             _enableWebSocket = true;
         }
 
+        return this;
+    }
+
+    public NatsServerOptionsBuilder UseJetStream()
+    {
+        _enableJetStream = true;
         return this;
     }
 
@@ -94,6 +114,8 @@ public sealed class NatsServerOptions : IDisposable
 
     public bool EnableTls { get; init; }
 
+    public bool EnableJetStream { get; init; }
+
     public bool ServerDisposeReturnsPorts { get; init; } = true;
 
     public string? TlsClientCertFile { get; init; }
@@ -105,6 +127,10 @@ public sealed class NatsServerOptions : IDisposable
     public string? TlsServerKeyFile { get; init; }
 
     public string? TlsCaFile { get; init; }
+
+    public TransportType TransportType { get; init; }
+
+    public bool Trace { get; init; }
 
     public List<string> ExtraConfigs { get; init; } = new();
 
@@ -120,6 +146,12 @@ public sealed class NatsServerOptions : IDisposable
         {
             var sb = new StringBuilder();
             sb.AppendLine($"port: {ServerPort}");
+
+            if (Trace)
+            {
+                sb.AppendLine($"trace: true");
+            }
+
             if (EnableWebSocket)
             {
                 sb.AppendLine("websocket {");
@@ -152,6 +184,15 @@ public sealed class NatsServerOptions : IDisposable
                     sb.AppendLine($"  ca_file: {TlsCaFile}");
                 }
 
+                sb.AppendLine("}");
+            }
+
+            if (EnableJetStream)
+            {
+                sb.AppendLine("jetstream {");
+                var storeDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("n"));
+                Directory.CreateDirectory(storeDir);
+                sb.AppendLine($"  store_dir: '{storeDir}'");
                 sb.AppendLine("}");
             }
 

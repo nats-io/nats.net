@@ -49,6 +49,11 @@ public static class NatsRequestExtensions
             throw new OperationCanceledException("Inbox subscription cancelled");
         }
 
+        if (sub is { EndReason: NatsSubEndReason.Exception, Exception: not null })
+        {
+            throw sub.Exception;
+        }
+
         return null;
     }
 
@@ -123,6 +128,11 @@ public static class NatsRequestExtensions
         if (sub.EndReason == NatsSubEndReason.Cancelled)
         {
             throw new OperationCanceledException("Inbox subscription cancelled");
+        }
+
+        if (sub is { EndReason: NatsSubEndReason.Exception, Exception: not null })
+        {
+            throw sub.Exception;
         }
 
         return null;

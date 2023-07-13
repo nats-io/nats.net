@@ -59,14 +59,14 @@ public class NatsServer : IAsyncDisposable
     }
 
     public NatsServer(ITestOutputHelper outputHelper, TransportType transportType)
-        : this(outputHelper, transportType, new NatsServerOptionsBuilder().UseTransport(transportType).Build())
+        : this(outputHelper, new NatsServerOptionsBuilder().UseTransport(transportType).Build())
     {
     }
 
-    public NatsServer(ITestOutputHelper outputHelper, TransportType transportType, NatsServerOptions options)
+    public NatsServer(ITestOutputHelper outputHelper, NatsServerOptions options)
     {
         _outputHelper = outputHelper;
-        _transportType = transportType;
+        _transportType = options.TransportType;
         Options = options;
         _configFileName = Path.GetTempFileName();
         var config = options.ConfigFileContents;
@@ -183,7 +183,7 @@ public class NatsServer : IAsyncDisposable
             throw new Exception("Tapped mode doesn't work wit TLS");
         }
 
-        var proxy = new NatsProxy(Options.ServerPort, _outputHelper);
+        var proxy = new NatsProxy(Options.ServerPort, _outputHelper, Options.Trace);
 
         var client = new NatsConnection((options ?? NatsOptions.Default) with
         {
@@ -254,16 +254,19 @@ public class NatsCluster : IAsyncDisposable
     {
         var opts1 = new NatsServerOptions
         {
+            TransportType = transportType,
             EnableWebSocket = transportType == TransportType.WebSocket,
             EnableClustering = true,
         };
         var opts2 = new NatsServerOptions
         {
+            TransportType = transportType,
             EnableWebSocket = transportType == TransportType.WebSocket,
             EnableClustering = true,
         };
         var opts3 = new NatsServerOptions
         {
+            TransportType = transportType,
             EnableWebSocket = transportType == TransportType.WebSocket,
             EnableClustering = true,
         };
@@ -273,9 +276,9 @@ public class NatsCluster : IAsyncDisposable
             opt.SetRoutes(routes);
         }
 
-        Server1 = new NatsServer(outputHelper, transportType, opts1);
-        Server2 = new NatsServer(outputHelper, transportType, opts2);
-        Server3 = new NatsServer(outputHelper, transportType, opts3);
+        Server1 = new NatsServer(outputHelper, opts1);
+        Server2 = new NatsServer(outputHelper, opts2);
+        Server3 = new NatsServer(outputHelper, opts3);
     }
 
     public NatsServer Server1 { get; }
@@ -295,15 +298,17 @@ public class NatsCluster : IAsyncDisposable
 public class NatsProxy : IDisposable
 {
     private readonly ITestOutputHelper _outputHelper;
+    private readonly bool _trace;
     private readonly TcpListener _tcpListener;
     private readonly List<TcpClient> _clients = new();
     private readonly List<Frame> _frames = new();
     private readonly Stopwatch _watch = new();
     private int _syncCount;
 
-    public NatsProxy(int port, ITestOutputHelper outputHelper)
+    public NatsProxy(int port, ITestOutputHelper outputHelper, bool trace)
     {
         _outputHelper = outputHelper;
+        _trace = trace;
         _tcpListener = new TcpListener(IPAddress.Loopback, 0);
         _tcpListener.Start();
         _watch.Restart();
@@ -522,12 +527,13 @@ public class NatsProxy : IDisposable
 
     private void AddFrame(Frame frame)
     {
-        // Log($"Dump {frame}");
+        if (_trace)
+            Log($"TRACE {frame}");
         lock (_frames)
             _frames.Add(frame);
     }
 
-    private void Log(string text) => _outputHelper.WriteLine($"{DateTime.Now:HH:mm:ss.fff} [PROXY] {text}");
+    private void Log(string text) => _outputHelper.WriteLine($"[PROXY] {DateTime.Now:HH:mm:ss.fff} {text}");
 
     public record Frame(TimeSpan Timestamp, int Client, string Origin, string Message);
 }

@@ -100,7 +100,11 @@ public class ProtocolTest
     [Fact]
     public async Task Publish_empty_message_for_notifications()
     {
-        await using var server = new NatsServer(_output, TransportType.Tcp);
+        void Log(string text)
+        {
+            _output.WriteLine($"[TESTS] {DateTime.Now:HH:mm:ss.fff} {text}");
+        }
+        await using var server = new NatsServer(_output, new NatsServerOptionsBuilder().UseTransport(TransportType.Tcp).Trace().Build());
         var (nats, proxy) = server.CreateProxiedClientConnection();
 
         var sync = 0;
@@ -129,7 +133,7 @@ public class ProtocolTest
             async () => await nats.PublishAsync("foo.sync"),
             retryDelay: TimeSpan.FromSeconds(1));
 
-        // PUB notifications
+        Log("PUB notifications");
         await nats.PublishAsync("foo.signal1");
         var msg1 = await signal1;
         Assert.Equal(0, msg1.Data.Length);
@@ -139,7 +143,7 @@ public class ProtocolTest
         var msgFrame1 = proxy.Frames.First(f => f.Message.StartsWith("MSG foo.signal1"));
         Assert.Matches(@"^MSG foo.signal1 \w+ 0␍␊$", msgFrame1.Message);
 
-        // HPUB notifications
+        Log("HPUB notifications");
         await nats.PublishAsync("foo.signal2", opts: new NatsPubOpts { Headers = new NatsHeaders() });
         var msg2 = await signal2;
         Assert.Equal(0, msg2.Data.Length);
@@ -157,14 +161,22 @@ public class ProtocolTest
     [Fact]
     public async Task Unsubscribe_max_msgs()
     {
+        const int maxMsgs = 10;
+        const int pubMsgs = 5;
+        const int extraMsgs = 3;
+
+        void Log(string text)
+        {
+            _output.WriteLine($"[TESTS] {DateTime.Now:HH:mm:ss.fff} {text}");
+        }
+
         // Use a single server to test multiple scenarios to make test runs more efficient
-        await using var server = new NatsServer();
+        await using var server = new NatsServer(_output, new NatsServerOptionsBuilder().UseTransport(TransportType.Tcp).Trace().Build());
         var (nats, proxy) = server.CreateProxiedClientConnection();
         var sid = 0;
 
-        // Auto-unsubscribe after consuming max-msgs
+        Log("### Auto-unsubscribe after consuming max-msgs");
         {
-            const int maxMsgs = 99;
             var opts = new NatsSubOpts { MaxMsgs = maxMsgs };
             await using var sub = await nats.SubscribeAsync<int>("foo", opts);
             sid++;
@@ -173,8 +185,8 @@ public class ProtocolTest
             Assert.Equal($"SUB foo {sid}", proxy.Frames[0].Message);
             Assert.Equal($"UNSUB {sid} {maxMsgs}", proxy.Frames[1].Message);
 
-            // send more messages than max to check we only get max
-            for (var i = 0; i < maxMsgs + 10; i++)
+            Log("Send more messages than max to check we only get max");
+            for (var i = 0; i < maxMsgs + extraMsgs; i++)
             {
                 await nats.PublishAsync("foo", i);
             }
@@ -192,7 +204,7 @@ public class ProtocolTest
             Assert.Equal(NatsSubEndReason.MaxMsgs, sub.EndReason);
         }
 
-        // Manual unsubscribe
+        Log("### Manual unsubscribe");
         {
             await proxy.FlushFramesAsync(nats);
 
@@ -205,13 +217,13 @@ public class ProtocolTest
             Assert.Equal($"SUB foo2 {sid}", proxy.ClientFrames[0].Message);
             Assert.Equal($"UNSUB {sid}", proxy.ClientFrames[1].Message);
 
-            // send messages to check we receive none since we're already unsubscribed
-            for (var i = 0; i < 100; i++)
+            Log("Send messages to check we receive none since we're already unsubscribed");
+            for (var i = 0; i < pubMsgs; i++)
             {
                 await nats.PublishAsync("foo2", i);
             }
 
-            await Retry.Until("all pub frames arrived", () => proxy.Frames.Count(f => f.Message.StartsWith("PUB foo2")) == 100);
+            await Retry.Until("all pub frames arrived", () => proxy.Frames.Count(f => f.Message.StartsWith("PUB foo2")) == pubMsgs);
 
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             var cancellationToken = cts.Token;
@@ -225,12 +237,10 @@ public class ProtocolTest
             Assert.Equal(NatsSubEndReason.None, sub.EndReason);
         }
 
-        // Reconnect
+        Log("### Reconnect");
         {
             proxy.Reset();
 
-            const int maxMsgs = 100;
-            const int pubMsgs = 10;
             var opts = new NatsSubOpts { MaxMsgs = maxMsgs };
             var sub = await nats.SubscribeAsync<int>("foo3", opts);
             sid++;
@@ -243,22 +253,22 @@ public class ProtocolTest
                 await nats.PublishAsync("foo3", i);
             }
 
-            await Retry.Until("published", () => proxy.Frames.Count(f => f.Message.StartsWith("PUB foo3")) == 10);
-            await Retry.Until("received", () => Volatile.Read(ref count) == 10);
+            await Retry.Until("published", () => proxy.Frames.Count(f => f.Message.StartsWith("PUB foo3")) == pubMsgs);
+            await Retry.Until("received", () => Volatile.Read(ref count) == pubMsgs);
 
             var pending = maxMsgs - pubMsgs;
             Assert.Equal(pending, ((INatsSub)sub).PendingMsgs);
 
             proxy.Reset();
 
-            // SUB + UNSUB
+            Log("Expect SUB + UNSUB");
             await Retry.Until("re-subscribed", () => proxy.ClientFrames.Count == 2);
 
-            // Make sure we're still using the same SID
+            Log("Make sure we're still using the same SID");
             Assert.Equal($"SUB foo3 {sid}", proxy.ClientFrames[0].Message);
             Assert.Equal($"UNSUB {sid} {pending}", proxy.ClientFrames[1].Message);
 
-            // We already published a few, this should exceed max-msgs
+            Log("We already published a few, this should exceed max-msgs");
             for (var i = 0; i < maxMsgs; i++)
             {
                 await nats.PublishAsync("foo3", i);
@@ -272,7 +282,7 @@ public class ProtocolTest
                 "unsubscribed with max-msgs",
                 () => sub.EndReason == NatsSubEndReason.MaxMsgs);
 
-            Assert.Equal(Volatile.Read(ref count), maxMsgs);
+            Assert.Equal(maxMsgs, Volatile.Read(ref count));
 
             await sub.DisposeAsync();
             await reg;

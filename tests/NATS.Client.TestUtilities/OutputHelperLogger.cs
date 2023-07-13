@@ -49,10 +49,10 @@ public class OutputHelperLoggerFactory : ILoggerFactory
         {
             try
             {
-                _testOutputHelper.WriteLine(formatter(state, exception));
+                _testOutputHelper.WriteLine($"[NCLOG] {DateTime.Now:HH:mm:ss.fff} {logLevel}: {formatter(state, exception)}");
                 if (exception != null)
                 {
-                    _testOutputHelper.WriteLine(exception.ToString());
+                    _testOutputHelper.WriteLine($"[NCLOG] {DateTime.Now:HH:mm:ss.fff} Exception: {exception}");
                 }
             }
             catch

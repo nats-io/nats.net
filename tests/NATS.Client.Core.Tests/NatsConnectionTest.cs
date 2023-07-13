@@ -152,10 +152,11 @@ public abstract partial class NatsConnectionTest
     {
         using var options = new NatsServerOptions
         {
+            TransportType = _transportType,
             EnableWebSocket = _transportType == TransportType.WebSocket,
             ServerDisposeReturnsPorts = false,
         };
-        await using var server = new NatsServer(_output, _transportType, options);
+        await using var server = new NatsServer(_output, options);
         var subject = Guid.NewGuid().ToString();
 
         await using var subConnection = server.CreateClientConnection();
@@ -211,7 +212,7 @@ public abstract partial class NatsConnectionTest
 
         // start new nats server on same port
         _output.WriteLine("START NEW SERVER");
-        await using var newServer = new NatsServer(_output, _transportType, options);
+        await using var newServer = new NatsServer(_output, options);
         await subConnection.ConnectAsync(); // wait open again
         await pubConnection.ConnectAsync(); // wait open again
 
