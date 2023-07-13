@@ -98,7 +98,7 @@ public abstract partial class NatsConnectionTest
             .AddServerConfig(serverConfig)
             .Build();
 
-        await using var server = new NatsServer(_output, _transportType, serverOptions);
+        await using var server = new NatsServer(_output, serverOptions);
 
         var subject = Guid.NewGuid().ToString("N");
 
@@ -141,7 +141,7 @@ public abstract partial class NatsConnectionTest
         await disconnectSignal2;
 
         _output.WriteLine("START NEW SERVER");
-        await using var newServer = new NatsServer(_output, _transportType, serverOptions);
+        await using var newServer = new NatsServer(_output, serverOptions);
         await subConnection.ConnectAsync(); // wait open again
         await pubConnection.ConnectAsync(); // wait open again
 

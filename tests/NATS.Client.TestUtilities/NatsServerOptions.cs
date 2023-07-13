@@ -20,6 +20,8 @@ public sealed class NatsServerOptionsBuilder
     private string? _tlsServerCertFile;
     private string? _tlsServerKeyFile;
     private string? _tlsCaFile;
+    private TransportType? _transportType;
+    private bool _trace;
 
     public NatsServerOptions Build()
     {
@@ -32,11 +34,21 @@ public sealed class NatsServerOptionsBuilder
             TlsServerKeyFile = _tlsServerKeyFile,
             TlsCaFile = _tlsCaFile,
             ExtraConfigs = _extraConfigs,
+            TransportType = _transportType ?? TransportType.Tcp,
+            Trace = _trace,
         };
+    }
+
+    public NatsServerOptionsBuilder Trace()
+    {
+        _trace = true;
+        return this;
     }
 
     public NatsServerOptionsBuilder UseTransport(TransportType transportType)
     {
+        _transportType = transportType;
+
         if (transportType == TransportType.Tls)
         {
             _enableTls = true;
@@ -116,6 +128,10 @@ public sealed class NatsServerOptions : IDisposable
 
     public string? TlsCaFile { get; init; }
 
+    public TransportType TransportType { get; init; }
+
+    public bool Trace { get; init; }
+
     public List<string> ExtraConfigs { get; init; } = new();
 
     public int ServerPort => _lazyServerPort.Value;
@@ -130,6 +146,12 @@ public sealed class NatsServerOptions : IDisposable
         {
             var sb = new StringBuilder();
             sb.AppendLine($"port: {ServerPort}");
+
+            if (Trace)
+            {
+                sb.AppendLine($"trace: true");
+            }
+
             if (EnableWebSocket)
             {
                 sb.AppendLine("websocket {");

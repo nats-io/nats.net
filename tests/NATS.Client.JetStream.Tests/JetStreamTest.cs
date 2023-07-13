@@ -12,7 +12,7 @@ public class JetStreamTest
     [Fact]
     public async Task Create_stream_test()
     {
-        await using var server = new NatsServer(new NullOutputHelper(), TransportType.Tcp, new NatsServerOptionsBuilder().UseTransport(TransportType.Tcp).UseJetStream().Build());
+        await using var server = new NatsServer(new NullOutputHelper(), new NatsServerOptionsBuilder().UseTransport(TransportType.Tcp).UseJetStream().Build());
         await using var nats = server.CreateClientConnection();
 
         // Create stream
