@@ -104,6 +104,8 @@ public abstract class NatsSubBase : INatsSub
     // since INatsSub is marked as internal.
     int? INatsSub.PendingMsgs => _pendingMsgs == -1 ? null : Volatile.Read(ref _pendingMsgs);
 
+    public Exception? Exception => Volatile.Read(ref _exception);
+
     internal NatsSubEndReason EndReason => (NatsSubEndReason)Volatile.Read(ref _endReasonRaw);
 
     protected NatsConnection Connection { get; }
@@ -172,8 +174,6 @@ public abstract class NatsSubBase : INatsSub
 
     protected abstract ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer);
 
-    public Exception? Exception => Volatile.Read(ref _exception);
-
     protected void SetException(Exception exception)
     {
         Interlocked.Exchange(ref _exception, exception);
@@ -224,20 +224,46 @@ public abstract class NatsSubBase : INatsSub
 
 public sealed class NatsSub : NatsSubBase
 {
-    private readonly Channel<NatsMsg> _msgs = Channel.CreateBounded<NatsMsg>(new BoundedChannelOptions(1_000)
-    {
-        FullMode = BoundedChannelFullMode.Wait,
-        SingleWriter = true,
-        SingleReader = false,
-        AllowSynchronousContinuations = false,
-    });
+    private static readonly BoundedChannelOptions DefaultChannelOptions =
+        new BoundedChannelOptions(1_000)
+        {
+            FullMode = BoundedChannelFullMode.Wait,
+            SingleWriter = true,
+            SingleReader = false,
+            AllowSynchronousContinuations = false,
+        };
+
+    private readonly Channel<NatsMsg> _msgs;
 
     internal NatsSub(NatsConnection connection, ISubscriptionManager manager, string subject, NatsSubOpts? opts, CancellationToken cancellationToken = default)
-        : base(connection, manager, subject, opts, cancellationToken)
-    {
-    }
+        : base(connection, manager, subject, opts, cancellationToken) =>
+        _msgs = Channel.CreateBounded<NatsMsg>(
+            GetChannelOptions(opts?.ChannelOptions));
 
     public ChannelReader<NatsMsg> Msgs => _msgs.Reader;
+
+    internal static BoundedChannelOptions GetChannelOptions(
+        NatsSubChannelOpts? subChannelOpts)
+    {
+        if (subChannelOpts != null)
+        {
+            var overrideOpts = subChannelOpts.Value;
+            return new BoundedChannelOptions(overrideOpts.Capacity ??
+                                             DefaultChannelOptions.Capacity)
+            {
+                AllowSynchronousContinuations =
+                    DefaultChannelOptions.AllowSynchronousContinuations,
+                FullMode =
+                    overrideOpts.FullMode ?? DefaultChannelOptions.FullMode,
+                SingleWriter = DefaultChannelOptions.SingleWriter,
+                SingleReader = DefaultChannelOptions.SingleReader,
+            };
+        }
+        else
+        {
+            return DefaultChannelOptions;
+        }
+    }
 
     protected override async ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
     {
@@ -261,17 +287,22 @@ public sealed class NatsSub : NatsSubBase
 
 public sealed class NatsSub<T> : NatsSubBase
 {
-    private readonly Channel<NatsMsg<T?>> _msgs = Channel.CreateBounded<NatsMsg<T?>>(
-        new BoundedChannelOptions(capacity: 1_000)
-        {
-            FullMode = BoundedChannelFullMode.Wait,
-            SingleWriter = true,
-            SingleReader = false,
-            AllowSynchronousContinuations = false,
-        });
+    private readonly Channel<NatsMsg<T?>> _msgs;
 
-    internal NatsSub(NatsConnection connection, ISubscriptionManager manager, string subject, NatsSubOpts? opts, INatsSerializer serializer, CancellationToken cancellationToken = default)
-        : base(connection, manager, subject, opts, cancellationToken) => Serializer = serializer;
+    internal NatsSub(
+        NatsConnection connection,
+        ISubscriptionManager manager,
+        string subject,
+        NatsSubOpts? opts,
+        INatsSerializer serializer,
+        CancellationToken cancellationToken = default)
+        : base(connection, manager, subject, opts, cancellationToken)
+    {
+        _msgs = Channel.CreateBounded<NatsMsg<T?>>(
+            NatsSub.GetChannelOptions(opts?.ChannelOptions));
+
+        Serializer = serializer;
+    }
 
     public ChannelReader<NatsMsg<T?>> Msgs => _msgs.Reader;
 
