@@ -60,8 +60,8 @@ internal class InboxSubBuilder : INatsSubBuilder<InboxSub>, ISubscriptionManager
     {
         _bySubject.AddOrUpdate(
                 sub.Subject,
-                _ => new ConditionalWeakTable<INatsSub, object> { { sub, new object() } },
-                (_, subTable) =>
+                static (_, s) => new ConditionalWeakTable<INatsSub, object> { { s, new object() } },
+                static (_, subTable, s) =>
                 {
                     lock (subTable)
                     {
@@ -69,15 +69,16 @@ internal class InboxSubBuilder : INatsSubBuilder<InboxSub>, ISubscriptionManager
                         {
                             // if current subTable is empty, it may be in process of being removed
                             // return a new object
-                            return new ConditionalWeakTable<INatsSub, object> { { sub, new object() } };
+                            return new ConditionalWeakTable<INatsSub, object> { { s, new object() } };
                         }
 
                         // the updateValueFactory delegate can be called multiple times
                         // use AddOrUpdate to avoid exceptions if this happens
-                        subTable.AddOrUpdate(sub, new object());
+                        subTable.AddOrUpdate(s, new object());
                         return subTable;
                     }
-                });
+                },
+                sub);
 
         sub.Ready();
     }
