@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 
 namespace NATS.Client.Core.Internal;
@@ -46,7 +47,7 @@ internal class InboxSub : INatsSub
 internal class InboxSubBuilder : INatsSubBuilder<InboxSub>, ISubscriptionManager
 {
     private readonly ILogger<InboxSubBuilder> _logger;
-    private readonly ConcurrentDictionary<string, INatsSub> _writers = new();
+    private readonly ConcurrentDictionary<string, ConditionalWeakTable<INatsSub, object>> _bySubject = new();
 
     public InboxSubBuilder(ILogger<InboxSubBuilder> logger) => _logger = logger;
 
@@ -57,27 +58,65 @@ internal class InboxSubBuilder : INatsSubBuilder<InboxSub>, ISubscriptionManager
 
     public void Register(INatsSub sub)
     {
-        if (!_writers.TryAdd(sub.Subject, sub))
-            throw new InvalidOperationException("Subject already registered");
+        _bySubject.AddOrUpdate(
+                sub.Subject,
+                _ => new ConditionalWeakTable<INatsSub, object> { { sub, new object() } },
+                (_, subTable) =>
+                {
+                    lock (subTable)
+                    {
+                        if (!subTable.Any())
+                        {
+                            // if current subTable is empty, it may be in process of being removed
+                            // return a new object
+                            return new ConditionalWeakTable<INatsSub, object> { { sub, new object() } };
+                        }
+
+                        // the updateValueFactory delegate can be called multiple times
+                        // use AddOrUpdate to avoid exceptions if this happens
+                        subTable.AddOrUpdate(sub, new object());
+                        return subTable;
+                    }
+                });
+
         sub.Ready();
     }
 
-    public void Unregister(string subject) => _writers.TryRemove(subject, out _);
-
-    public ValueTask ReceivedAsync(string subject, string? replyTo, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer, NatsConnection connection)
+    public async ValueTask ReceivedAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer, NatsConnection connection)
     {
-        if (!_writers.TryGetValue(subject, out var sub))
+        if (!_bySubject.TryGetValue(subject, out var subTable))
         {
-            _logger.LogWarning("Unregistered message inbox received");
-            return ValueTask.CompletedTask;
+            _logger.LogWarning($"Unregistered message inbox received for {subject}");
+            return;
         }
 
-        return sub.ReceiveAsync(subject, replyTo, headersBuffer, payloadBuffer);
+        foreach (var (sub, _) in subTable)
+        {
+            await sub.ReceiveAsync(subject, replyTo, headersBuffer, payloadBuffer).ConfigureAwait(false);
+        }
     }
 
     public ValueTask RemoveAsync(INatsSub sub)
     {
-        Unregister(sub.Subject);
+        if (!_bySubject.TryGetValue(sub.Subject, out var subTable))
+        {
+            _logger.LogWarning($"Unregistered message inbox received for {sub.Subject}");
+            return ValueTask.CompletedTask;
+        }
+
+        lock (subTable)
+        {
+            if (!subTable.Remove(sub))
+                _logger.LogWarning($"Unregistered message inbox received for {sub.Subject}");
+
+            if (!subTable.Any())
+            {
+                // try to remove this specific instance of the subTable
+                // if an update is in process and sees an empty subTable, it will set a new instance
+                _bySubject.TryRemove(KeyValuePair.Create(sub.Subject, subTable));
+            }
+        }
+
         return ValueTask.CompletedTask;
     }
 }

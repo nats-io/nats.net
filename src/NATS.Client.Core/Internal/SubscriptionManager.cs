@@ -10,6 +10,8 @@ internal interface ISubscriptionManager
     public ValueTask RemoveAsync(INatsSub sub);
 }
 
+internal record struct SidMetadata(string Subject, WeakReference<INatsSub> WeakReference);
+
 internal sealed record SubscriptionMetadata(int Sid);
 
 internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposable
@@ -18,7 +20,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
     private readonly object _gate = new();
     private readonly NatsConnection _connection;
     private readonly string _inboxPrefix;
-    private readonly ConcurrentDictionary<int, WeakReference<INatsSub>> _bySid = new();
+    private readonly ConcurrentDictionary<int, SidMetadata> _bySid = new();
     private readonly ConditionalWeakTable<INatsSub, SubscriptionMetadata> _bySub = new();
     private readonly CancellationTokenSource _cts;
     private readonly Task _timer;
@@ -47,11 +49,11 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
     {
         lock (_gate)
         {
-            foreach (var subRef in _bySid)
+            foreach (var (sid, sidMetadata) in _bySid)
             {
-                if (subRef.Value.TryGetTarget(out var sub))
+                if (sidMetadata.WeakReference.TryGetTarget(out var sub))
                 {
-                    yield return (subRef.Key, sub.Subject, sub.QueueGroup, sub.PendingMsgs);
+                    yield return (sid, sub.Subject, sub.QueueGroup, sub.PendingMsgs);
                 }
             }
         }
@@ -98,15 +100,15 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
         int? orphanSid = null;
         lock (_gate)
         {
-            if (_bySid.TryGetValue(sid, out var subRef))
+            if (_bySid.TryGetValue(sid, out var sidMetadata))
             {
-                if (subRef.TryGetTarget(out var sub))
+                if (sidMetadata.WeakReference.TryGetTarget(out var sub))
                 {
                     return sub.ReceiveAsync(subject, replyTo, headersBuffer, payloadBuffer);
                 }
                 else
                 {
-                    _logger.LogWarning($"Dead subscription {subject}/{sid}");
+                    _logger.LogWarning($"Subscription GCd but was never disposed {subject}/{sid}");
                     orphanSid = sid;
                 }
             }
@@ -124,7 +126,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
             }
             catch (Exception e)
             {
-                _logger.LogWarning($"Error unsubscribing ophan SID during publish: {e.GetBaseException().Message}");
+                _logger.LogWarning($"Error unsubscribing orphan SID during publish: {e.GetBaseException().Message}");
             }
         }
 
@@ -138,7 +140,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
         WeakReference<INatsSub>[] subRefs;
         lock (_gate)
         {
-            subRefs = _bySid.Values.ToArray();
+            subRefs = _bySid.Values.Select(m => m.WeakReference).ToArray();
             _bySid.Clear();
         }
 
@@ -172,7 +174,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
         var sid = GetNextSid();
         lock (_gate)
         {
-            _bySid[sid] = new WeakReference<INatsSub>(sub);
+            _bySid[sid] = new SidMetadata(Subject: subject, WeakReference: new WeakReference<INatsSub>(sub));
             _bySub.AddOrUpdate(sub, new SubscriptionMetadata(Sid: sid));
         }
 
@@ -203,15 +205,16 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
 
             lock (_gate)
             {
-                foreach (var (sid, subRef) in _bySid)
+                foreach (var (sid, sidMetadata) in _bySid)
                 {
                     if (_cts.Token.IsCancellationRequested)
                         break;
 
-                    if (subRef.TryGetTarget(out _))
+                    if (sidMetadata.WeakReference.TryGetTarget(out _))
                         continue;
 
                     // NatsSub object GCed
+                    _logger.LogWarning($"Subscription GCd but was never disposed {sidMetadata.Subject}/{sid}");
                     orphanSids ??= new List<int>();
                     orphanSids.Add(sid);
                 }

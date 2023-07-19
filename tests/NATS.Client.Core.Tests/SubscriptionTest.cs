@@ -1,6 +1,3 @@
-using System.Buffers;
-using System.Text;
-
 namespace NATS.Client.Core.Tests;
 
 public class SubscriptionTest
@@ -183,6 +180,42 @@ public class SubscriptionTest
 
             Assert.Equal(0, count);
             Assert.Equal(NatsSubEndReason.None, sub.EndReason);
+        }
+
+        // Auto unsubscribe on max messages with Inbox Subscription
+        {
+            var subject = nats.NewInbox();
+
+            await using var sub1 = await nats.SubscribeAsync<int>(subject, new NatsSubOpts { MaxMsgs = 1 });
+            await using var sub2 = await nats.SubscribeAsync<int>(subject, new NatsSubOpts { MaxMsgs = 2 });
+
+            for (var i = 0; i < 3; i++)
+            {
+                await nats.PublishAsync(subject, i);
+            }
+
+            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var cancellationToken = cts.Token;
+
+            var count1 = 0;
+            await foreach (var natsMsg in sub1.Msgs.ReadAllAsync(cancellationToken))
+            {
+                Assert.Equal(count1, natsMsg.Data);
+                count1++;
+            }
+
+            Assert.Equal(1, count1);
+            Assert.Equal(NatsSubEndReason.MaxMsgs, sub1.EndReason);
+
+            var count2 = 0;
+            await foreach (var natsMsg in sub2.Msgs.ReadAllAsync(cancellationToken))
+            {
+                Assert.Equal(count2, natsMsg.Data);
+                count2++;
+            }
+
+            Assert.Equal(2, count2);
+            Assert.Equal(NatsSubEndReason.MaxMsgs, sub2.EndReason);
         }
     }
 }
