@@ -1,10 +1,12 @@
 namespace NATS.Client.JetStream.Models;
 
+// TODO: enum member naming with JSON serialization isn't working for some reason
+#pragma warning disable SA1300
 public enum StreamConfigurationDiscard
 {
     [System.Runtime.Serialization.EnumMember(Value = @"old")]
-    Old = 0,
+    old = 0,
 
     [System.Runtime.Serialization.EnumMember(Value = @"new")]
-    New = 1,
+    @new = 1,
 }

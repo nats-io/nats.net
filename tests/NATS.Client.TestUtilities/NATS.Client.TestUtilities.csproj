@@ -4,8 +4,10 @@
     <TargetFramework>net6.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);CS8002</NoWarn>
   </PropertyGroup>
-  
+
   <ItemGroup>
     <PackageReference Include="FluentAssertions" Version="6.5.1" />
     <PackageReference Include="ProcessX" Version="1.5.4" />
@@ -21,9 +23,9 @@
     <Using Include="NATS.Client.Core.Internal" />
     <Using Include="NATS.Client.Core.Commands" />
   </ItemGroup>
-  
+
   <ItemGroup>
     <ProjectReference Include="..\..\src\NATS.Client.Core\NATS.Client.Core.csproj" />
   </ItemGroup>
-  
+
 </Project>

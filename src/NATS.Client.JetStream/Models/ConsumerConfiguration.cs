@@ -52,7 +52,7 @@ public record ConsumerConfiguration
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
     [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
-    public ConsumerConfigurationAckPolicy AckPolicy { get; set; } = NATS.Client.JetStream.Models.ConsumerConfigurationAckPolicy.None;
+    public ConsumerConfigurationAckPolicy AckPolicy { get; set; } = ConsumerConfigurationAckPolicy.none;
 
     /// <summary>
     /// How long (in nanoseconds) to allow messages to remain un-acknowledged before attempting redelivery
@@ -88,7 +88,7 @@ public record ConsumerConfiguration
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
     [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
-    public ConsumerConfigurationReplayPolicy ReplayPolicy { get; set; } = NATS.Client.JetStream.Models.ConsumerConfigurationReplayPolicy.Instant;
+    public ConsumerConfigurationReplayPolicy ReplayPolicy { get; set; } = NATS.Client.JetStream.Models.ConsumerConfigurationReplayPolicy.instant;
 
     [System.Text.Json.Serialization.JsonPropertyName("sample_freq")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]

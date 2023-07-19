@@ -1,10 +1,12 @@
 namespace NATS.Client.JetStream.Models;
 
+// TODO: enum member naming with JSON serialization isn't working for some reason
+#pragma warning disable SA1300
 public enum StreamConfigurationCompression
 {
     [System.Runtime.Serialization.EnumMember(Value = @"none")]
-    None = 0,
+    none = 0,
 
     [System.Runtime.Serialization.EnumMember(Value = @"s2")]
-    S2 = 1,
+    s2 = 1,
 }

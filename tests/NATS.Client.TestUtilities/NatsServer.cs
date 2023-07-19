@@ -28,6 +28,7 @@ public class NatsServer : IAsyncDisposable
 
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     private readonly string? _configFileName;
+    private readonly string? _jetStreamStoreDir;
     private readonly ITestOutputHelper _outputHelper;
     private readonly Task<string[]> _processOut;
     private readonly Task<string[]> _processErr;
@@ -68,6 +69,14 @@ public class NatsServer : IAsyncDisposable
         _outputHelper = outputHelper;
         _transportType = options.TransportType;
         Options = options;
+
+        if (options.EnableJetStream)
+        {
+            _jetStreamStoreDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("n"));
+            Directory.CreateDirectory(_jetStreamStoreDir);
+            options.JetStreamStoreDir = _jetStreamStoreDir;
+        }
+
         _configFileName = Path.GetTempFileName();
         var config = options.ConfigFileContents;
         File.WriteAllText(_configFileName, config);
@@ -167,6 +176,18 @@ public class NatsServer : IAsyncDisposable
             if (_configFileName != null)
             {
                 File.Delete(_configFileName);
+            }
+
+            if (_jetStreamStoreDir != null)
+            {
+                try
+                {
+                    Directory.Delete(_jetStreamStoreDir, true);
+                }
+                catch
+                {
+                    /* best effort */
+                }
             }
 
             if (Options.ServerDisposeReturnsPorts)
