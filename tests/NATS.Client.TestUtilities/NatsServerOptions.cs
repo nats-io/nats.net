@@ -116,6 +116,8 @@ public sealed class NatsServerOptions : IDisposable
 
     public bool EnableJetStream { get; init; }
 
+    public string? JetStreamStoreDir { get; set; }
+
     public bool ServerDisposeReturnsPorts { get; init; } = true;
 
     public string? TlsClientCertFile { get; init; }
@@ -190,9 +192,7 @@ public sealed class NatsServerOptions : IDisposable
             if (EnableJetStream)
             {
                 sb.AppendLine("jetstream {");
-                var storeDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("n"));
-                Directory.CreateDirectory(storeDir);
-                sb.AppendLine($"  store_dir: '{storeDir}'");
+                sb.AppendLine($"  store_dir: '{JetStreamStoreDir}'");
                 sb.AppendLine("}");
             }
 

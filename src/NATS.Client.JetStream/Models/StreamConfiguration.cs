@@ -40,7 +40,7 @@ public record StreamConfiguration
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
     [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
-    public StreamConfigurationRetention Retention { get; set; } = NATS.Client.JetStream.Models.StreamConfigurationRetention.Limits;
+    public StreamConfigurationRetention Retention { get; set; } = NATS.Client.JetStream.Models.StreamConfigurationRetention.limits;
 
     /// <summary>
     /// How many Consumers can be defined for a given Stream. -1 for unlimited.
@@ -97,7 +97,7 @@ public record StreamConfiguration
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
     [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
-    public StreamConfigurationStorage Storage { get; set; } = NATS.Client.JetStream.Models.StreamConfigurationStorage.File;
+    public StreamConfigurationStorage Storage { get; set; } = StreamConfigurationStorage.file;
 
     /// <summary>
     /// Optional compression algorithm used for the Stream.
@@ -105,7 +105,7 @@ public record StreamConfiguration
     [System.Text.Json.Serialization.JsonPropertyName("compression")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
-    public StreamConfigurationCompression Compression { get; set; } = NATS.Client.JetStream.Models.StreamConfigurationCompression.None;
+    public StreamConfigurationCompression Compression { get; set; } = NATS.Client.JetStream.Models.StreamConfigurationCompression.none;
 
     /// <summary>
     /// How many replicas to keep for each message.
@@ -135,7 +135,7 @@ public record StreamConfiguration
     [System.Text.Json.Serialization.JsonPropertyName("discard")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
-    public StreamConfigurationDiscard Discard { get; set; } = NATS.Client.JetStream.Models.StreamConfigurationDiscard.Old;
+    public StreamConfigurationDiscard Discard { get; set; } = StreamConfigurationDiscard.old;
 
     /// <summary>
     /// The time window to track duplicate messages for, expressed in nanoseconds. 0 for default
