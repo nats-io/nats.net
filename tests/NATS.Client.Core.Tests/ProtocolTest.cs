@@ -104,6 +104,7 @@ public class ProtocolTest
         {
             _output.WriteLine($"[TESTS] {DateTime.Now:HH:mm:ss.fff} {text}");
         }
+
         await using var server = new NatsServer(_output, new NatsServerOptionsBuilder().UseTransport(TransportType.Tcp).Trace().Build());
         var (nats, proxy) = server.CreateProxiedClientConnection();
 

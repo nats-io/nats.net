@@ -1,6 +1,5 @@
 using System.Buffers;
 using System.Runtime.CompilerServices;
-using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
 
@@ -28,14 +27,9 @@ public static class NatsRequestManyExtensions
         NatsSubOpts? replyOpts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        if (replyOpts == null || !replyOpts.Value.CanBeCancelled.HasValue)
-        {
-            replyOpts = (replyOpts ?? default) with { CanBeCancelled = true, };
-        }
-
         await using var sub = await nats.RequestSubAsync(subject, payload, requestOpts, replyOpts, cancellationToken).ConfigureAwait(false);
 
-        while (await sub.Msgs.WaitToReadAsync(CancellationToken.None).ConfigureAwait(false))
+        while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
             while (sub.Msgs.TryRead(out var msg))
             {
@@ -47,11 +41,6 @@ public static class NatsRequestManyExtensions
 
                 yield return msg;
             }
-        }
-
-        if (sub.EndReason == NatsSubEndReason.Cancelled)
-        {
-            throw new OperationCanceledException("Inbox subscription cancelled");
         }
     }
 
@@ -107,15 +96,10 @@ public static class NatsRequestManyExtensions
         NatsSubOpts? replyOpts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        if (replyOpts == null || !replyOpts.Value.CanBeCancelled.HasValue)
-        {
-            replyOpts = (replyOpts ?? default) with { CanBeCancelled = true, };
-        }
-
         await using var sub = await nats.RequestSubAsync<TRequest, TReply>(subject, data, requestOpts, replyOpts, cancellationToken)
             .ConfigureAwait(false);
 
-        while (await sub.Msgs.WaitToReadAsync(CancellationToken.None).ConfigureAwait(false))
+        while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
             while (sub.Msgs.TryRead(out var msg))
             {
@@ -127,11 +111,6 @@ public static class NatsRequestManyExtensions
 
                 yield return msg;
             }
-        }
-
-        if (sub.EndReason == NatsSubEndReason.Cancelled)
-        {
-            throw new OperationCanceledException("Inbox subscription cancelled");
         }
     }
 

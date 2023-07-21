@@ -58,11 +58,4 @@ public readonly record struct NatsSubOpts
     /// unsubscribed or disposed.
     /// </remarks>
     public TimeSpan? IdleTimeout { get; init; }
-
-    /// <summary>
-    /// Subscription's <see cref="CancellationToken"/> will be used to unsubscribe if
-    /// token is cancelled. Otherwise <see cref="CancellationToken"/> only applies to
-    /// server subscription request.
-    /// </summary>
-    public bool? CanBeCancelled { get; init; }
 }

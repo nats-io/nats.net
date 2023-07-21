@@ -92,7 +92,7 @@ public class JetStreamTest
                                stream: "events",
                                consumer: "consumer1",
                                request: new ConsumerGetnextRequest { Batch = 100 },
-                               requestOpts: new NatsSubOpts { CanBeCancelled = true },
+                               requestOpts: default,
                                cancellationToken: cts.Token))
             {
                 messages.Add(msg);
@@ -118,7 +118,7 @@ public class JetStreamTest
                                stream: "events",
                                consumer: "consumer1",
                                request: new ConsumerGetnextRequest { Batch = 100 },
-                               requestOpts: new NatsSubOpts { CanBeCancelled = true },
+                               requestOpts: default,
                                cancellationToken: cts.Token))
             {
                 Assert.Equal("events.foo", msg.Subject);
