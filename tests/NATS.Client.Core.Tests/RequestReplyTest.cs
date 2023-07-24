@@ -12,7 +12,7 @@ public class RequestReplyTest
     [Fact]
     public async Task Simple_request_reply_test()
     {
-        await using var server = new NatsServer();
+        await using var server = NatsServer.Start();
         await using var nats = server.CreateClientConnection();
 
         var sub = await nats.SubscribeAsync<int>("foo");
@@ -34,7 +34,7 @@ public class RequestReplyTest
     [Fact]
     public async Task Request_reply_command_timeout_test()
     {
-        await using var server = new NatsServer();
+        await using var server = NatsServer.Start();
 
         // Request timeout as default timeout
         {
@@ -62,7 +62,7 @@ public class RequestReplyTest
     [Fact]
     public async Task Request_reply_many_test()
     {
-        await using var server = new NatsServer();
+        await using var server = NatsServer.Start();
         await using var nats = server.CreateClientConnection();
 
         var sub = await nats.SubscribeAsync<int>("foo");
@@ -81,7 +81,7 @@ public class RequestReplyTest
                 await msg.ReplyAsync(msg.Data * 2);
                 await Task.Delay(100);
                 await msg.ReplyAsync(msg.Data * 3);
-                await Task.Delay(3_000);
+                await Task.Delay(5_000);
                 await msg.ReplyAsync(msg.Data * 4);
             }
 
@@ -150,7 +150,7 @@ public class RequestReplyTest
             var results = new[] { 6, 9 };
             var count = 0;
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            var opts = new NatsSubOpts { IdleTimeout = TimeSpan.FromSeconds(2) };
+            var opts = new NatsSubOpts { IdleTimeout = TimeSpan.FromSeconds(4) };
             await using var rep = await nats.RequestSubAsync<int, int>("foo", 3, replyOpts: opts);
             await foreach (var msg in rep.Msgs.ReadAllAsync(cts.Token))
             {
@@ -166,7 +166,7 @@ public class RequestReplyTest
             var results = new[] { 8, 12 };
             var count = 0;
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            var opts = new NatsSubOpts { Timeout = TimeSpan.FromSeconds(2) };
+            var opts = new NatsSubOpts { Timeout = TimeSpan.FromSeconds(4) };
             await using var rep = await nats.RequestSubAsync<int, int>("foo", 4, replyOpts: opts);
             await foreach (var msg in rep.Msgs.ReadAllAsync(cts.Token))
             {
@@ -194,7 +194,7 @@ public class RequestReplyTest
             return Encoding.ASCII.GetString(input.Span);
         }
 
-        await using var server = new NatsServer();
+        await using var server = NatsServer.Start();
         await using var nats = server.CreateClientConnection();
         await using var sub = await nats.SubscribeAsync("foo");
         var reg = sub.Register(async m =>

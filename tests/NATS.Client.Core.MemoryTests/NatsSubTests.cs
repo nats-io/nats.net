@@ -8,7 +8,7 @@ public class NatsSubTests
     [Test]
     public void Subject_manager_should_not_hold_on_to_subscription_if_collected()
     {
-        var server = new NatsServer();
+        var server = NatsServer.Start();
         try
         {
             var nats = server.CreateClientConnection();

@@ -9,7 +9,7 @@ public class SubscriptionTest
     [Fact]
     public async Task Subscription_periodic_cleanup_test()
     {
-        await using var server = new NatsServer(_output, TransportType.Tcp);
+        await using var server = NatsServer.Start(_output);
         var options = NatsOptions.Default with { SubscriptionCleanUpInterval = TimeSpan.FromSeconds(1) };
         var (nats, proxy) = server.CreateProxiedClientConnection(options);
 
@@ -43,7 +43,7 @@ public class SubscriptionTest
     [Fact]
     public async Task Subscription_cleanup_on_message_receive_test()
     {
-        await using var server = new NatsServer(_output, TransportType.Tcp);
+        await using var server = NatsServer.Start(_output, TransportType.Tcp);
 
         // Make sure time won't kick-in and unsubscribe
         var options = NatsOptions.Default with { SubscriptionCleanUpInterval = TimeSpan.MaxValue };
@@ -80,7 +80,7 @@ public class SubscriptionTest
     public async Task Auto_unsubscribe_test()
     {
         // Use a single server to test multiple scenarios to make test runs more efficient
-        await using var server = new NatsServer();
+        await using var server = NatsServer.Start();
         await using var nats = server.CreateClientConnection();
 
         // Auto unsubscribe on max messages

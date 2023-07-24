@@ -98,13 +98,13 @@ public abstract partial class NatsConnectionTest
             .AddServerConfig(serverConfig)
             .Build();
 
-        await using var server = new NatsServer(_output, serverOptions);
+        await using var server = NatsServer.Start(_output, serverOptions, clientOptions);
 
         var subject = Guid.NewGuid().ToString("N");
 
         _output.WriteLine("TRY ANONYMOUS CONNECTION");
         {
-            await using var failConnection = server.CreateClientConnection();
+            await using var failConnection = server.CreateClientConnection(ignoreAuthorizationException: true);
             var natsException =
                 await Assert.ThrowsAsync<NatsException>(async () => await failConnection.PublishAsync(subject, 0));
             Assert.Contains("Authorization Violation", natsException.GetBaseException().Message);
@@ -141,7 +141,7 @@ public abstract partial class NatsConnectionTest
         await disconnectSignal2;
 
         _output.WriteLine("START NEW SERVER");
-        await using var newServer = new NatsServer(_output, serverOptions);
+        await using var newServer = NatsServer.Start(_output, serverOptions, clientOptions);
         await subConnection.ConnectAsync(); // wait open again
         await pubConnection.ConnectAsync(); // wait open again
 
