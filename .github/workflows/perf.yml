@@ -1,4 +1,4 @@
-name: Perf Tests
+name: Perf
 
 on:
   pull_request: {}
@@ -7,8 +7,8 @@ on:
     - main
 
 jobs:
-  dotnet:
-    name: perf test
+  test:
+    name: test
     strategy:
       fail-fast: false
       matrix:
