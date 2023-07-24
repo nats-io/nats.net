@@ -208,20 +208,46 @@ public abstract class NatsSubBase : INatsSub
 
 public sealed class NatsSub : NatsSubBase
 {
-    private readonly Channel<NatsMsg> _msgs = Channel.CreateBounded<NatsMsg>(new BoundedChannelOptions(1_000)
-    {
-        FullMode = BoundedChannelFullMode.Wait,
-        SingleWriter = true,
-        SingleReader = false,
-        AllowSynchronousContinuations = false,
-    });
+    private static readonly BoundedChannelOptions DefaultChannelOptions =
+        new BoundedChannelOptions(1_000)
+        {
+            FullMode = BoundedChannelFullMode.Wait,
+            SingleWriter = true,
+            SingleReader = false,
+            AllowSynchronousContinuations = false,
+        };
+
+    private readonly Channel<NatsMsg> _msgs;
 
     internal NatsSub(NatsConnection connection, ISubscriptionManager manager, string subject, NatsSubOpts? opts)
-        : base(connection, manager, subject, opts)
-    {
-    }
+        : base(connection, manager, subject, opts) =>
+        _msgs = Channel.CreateBounded<NatsMsg>(
+            GetChannelOptions(opts?.ChannelOptions));
 
     public ChannelReader<NatsMsg> Msgs => _msgs.Reader;
+
+    internal static BoundedChannelOptions GetChannelOptions(
+        NatsSubChannelOpts? subChannelOpts)
+    {
+        if (subChannelOpts != null)
+        {
+            var overrideOpts = subChannelOpts.Value;
+            return new BoundedChannelOptions(overrideOpts.Capacity ??
+                                             DefaultChannelOptions.Capacity)
+            {
+                AllowSynchronousContinuations =
+                    DefaultChannelOptions.AllowSynchronousContinuations,
+                FullMode =
+                    overrideOpts.FullMode ?? DefaultChannelOptions.FullMode,
+                SingleWriter = DefaultChannelOptions.SingleWriter,
+                SingleReader = DefaultChannelOptions.SingleReader,
+            };
+        }
+        else
+        {
+            return DefaultChannelOptions;
+        }
+    }
 
     protected override async ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
     {
@@ -245,17 +271,21 @@ public sealed class NatsSub : NatsSubBase
 
 public sealed class NatsSub<T> : NatsSubBase
 {
-    private readonly Channel<NatsMsg<T?>> _msgs = Channel.CreateBounded<NatsMsg<T?>>(
-        new BoundedChannelOptions(capacity: 1_000)
-        {
-            FullMode = BoundedChannelFullMode.Wait,
-            SingleWriter = true,
-            SingleReader = false,
-            AllowSynchronousContinuations = false,
-        });
+    private readonly Channel<NatsMsg<T?>> _msgs;
 
-    internal NatsSub(NatsConnection connection, ISubscriptionManager manager, string subject, NatsSubOpts? opts, INatsSerializer serializer)
-        : base(connection, manager, subject, opts) => Serializer = serializer;
+    internal NatsSub(
+        NatsConnection connection,
+        ISubscriptionManager manager,
+        string subject,
+        NatsSubOpts? opts,
+        INatsSerializer serializer)
+        : base(connection, manager, subject, opts)
+    {
+        _msgs = Channel.CreateBounded<NatsMsg<T?>>(
+            NatsSub.GetChannelOptions(opts?.ChannelOptions));
+
+        Serializer = serializer;
+    }
 
     public ChannelReader<NatsMsg<T?>> Msgs => _msgs.Reader;
 

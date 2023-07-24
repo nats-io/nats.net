@@ -1,3 +1,5 @@
+using System.Threading.Channels;
+
 namespace NATS.Client.Core;
 
 public readonly record struct NatsSubOpts
@@ -58,4 +60,9 @@ public readonly record struct NatsSubOpts
     /// unsubscribed or disposed.
     /// </remarks>
     public TimeSpan? IdleTimeout { get; init; }
+
+    /// <summary>
+    /// Allows Configuration of <see cref="Channel"/> options for a subscription.
+    /// </summary>
+    public NatsSubChannelOpts? ChannelOptions { get; init; }
 }
