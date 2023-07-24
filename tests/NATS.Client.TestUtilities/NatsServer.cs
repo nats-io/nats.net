@@ -54,17 +54,7 @@ public class NatsServer : IAsyncDisposable
         Version = new Version(value);
     }
 
-    public NatsServer()
-        : this(new NullOutputHelper(), TransportType.Tcp)
-    {
-    }
-
-    public NatsServer(ITestOutputHelper outputHelper, TransportType transportType)
-        : this(outputHelper, new NatsServerOptionsBuilder().UseTransport(transportType).Build())
-    {
-    }
-
-    public NatsServer(ITestOutputHelper outputHelper, NatsServerOptions options)
+    private NatsServer(ITestOutputHelper outputHelper, NatsServerOptions options)
     {
         _outputHelper = outputHelper;
         _transportType = options.TransportType;
@@ -147,6 +137,40 @@ public class NatsServer : IAsyncDisposable
         }
     }
 
+    public static NatsServer Start() => Start(new NullOutputHelper(), TransportType.Tcp);
+
+    public static NatsServer Start(ITestOutputHelper outputHelper) => Start(outputHelper, TransportType.Tcp);
+
+    public static NatsServer Start(ITestOutputHelper outputHelper, TransportType transportType) =>
+        Start(outputHelper, new NatsServerOptionsBuilder().UseTransport(transportType).Build());
+
+    public static NatsServer Start(ITestOutputHelper outputHelper, NatsServerOptions options, NatsOptions? clientOptions = default)
+    {
+        NatsServer? server = null;
+        NatsConnection? nats = null;
+        for (int i = 0; i < 10; i++)
+        {
+            try
+            {
+                server = new NatsServer(outputHelper, options);
+                nats = server.CreateClientConnection(clientOptions ?? NatsOptions.Default, reTryCount: 3);
+#pragma warning disable CA2012
+                return server;
+            }
+            catch
+            {
+                server?.DisposeAsync();
+            }
+            finally
+            {
+                nats?.DisposeAsync();
+#pragma warning restore CA2012
+            }
+        }
+
+        throw new Exception("Can't start nats-server and connect to it");
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (Interlocked.Increment(ref _disposed) != 1)
@@ -216,11 +240,38 @@ public class NatsServer : IAsyncDisposable
         return (client, proxy);
     }
 
-    public NatsConnection CreateClientConnection() => CreateClientConnection(NatsOptions.Default);
-
-    public NatsConnection CreateClientConnection(NatsOptions options)
+    public NatsConnection CreateClientConnection(NatsOptions? options = default, int reTryCount = 10, bool ignoreAuthorizationException = false)
     {
-        return new NatsConnection(ClientOptions(options));
+        for (var i = 0; i < reTryCount; i++)
+        {
+            try
+            {
+                var nats = new NatsConnection(ClientOptions(options ?? NatsOptions.Default));
+
+                try
+                {
+#pragma warning disable CA2012
+                    nats.PingAsync().GetAwaiter().GetResult();
+#pragma warning restore CA2012
+                }
+                catch (NatsException e)
+                {
+                    if (!ignoreAuthorizationException)
+                        throw;
+
+                    if (e.GetBaseException().Message == "Authorization Violation")
+                        return nats;
+                }
+
+                return nats;
+            }
+            catch
+            {
+                // ignore
+            }
+        }
+
+        throw new Exception("Can't create a connection to nats-server");
     }
 
     public NatsConnectionPool CreatePooledClientConnection() => CreatePooledClientConnection(NatsOptions.Default);
@@ -297,9 +348,9 @@ public class NatsCluster : IAsyncDisposable
             opt.SetRoutes(routes);
         }
 
-        Server1 = new NatsServer(outputHelper, opts1);
-        Server2 = new NatsServer(outputHelper, opts2);
-        Server3 = new NatsServer(outputHelper, opts3);
+        Server1 = NatsServer.Start(outputHelper, opts1);
+        Server2 = NatsServer.Start(outputHelper, opts2);
+        Server3 = NatsServer.Start(outputHelper, opts3);
     }
 
     public NatsServer Server1 { get; }

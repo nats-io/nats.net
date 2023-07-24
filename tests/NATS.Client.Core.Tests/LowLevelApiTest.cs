@@ -12,7 +12,7 @@ public class LowLevelApiTest
     [Fact]
     public async Task Sub_custom_builder_test()
     {
-        await using var server = new NatsServer();
+        await using var server = NatsServer.Start();
         var nats = server.CreateClientConnection();
 
         var builder = new NatsSubCustomTestBuilder(_output);
@@ -119,7 +119,7 @@ public class LowLevelApiTest
             }
         }
 
-        public NatsSubTest Build(string subject, NatsSubOpts? opts, NatsConnection connection, ISubscriptionManager manager, CancellationToken cancellationToken)
+        public NatsSubTest Build(string subject, NatsSubOpts? opts, NatsConnection connection, ISubscriptionManager manager)
         {
             return new NatsSubTest(builder: this, _output, manager);
         }

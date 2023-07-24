@@ -19,7 +19,7 @@ public abstract partial class NatsConnectionTest
     [Fact]
     public async Task SimplePubSubTest()
     {
-        await using var server = new NatsServer(_output, _transportType);
+        await using var server = NatsServer.Start(_output, _transportType);
 
         await using var subConnection = server.CreateClientConnection();
         await using var pubConnection = server.CreateClientConnection();
@@ -55,7 +55,7 @@ public abstract partial class NatsConnectionTest
     [Fact]
     public async Task EncodingTest()
     {
-        await using var server = new NatsServer(_output, _transportType);
+        await using var server = NatsServer.Start(_output, _transportType);
 
         var serializer1 = NatsOptions.Default.Serializer;
 
@@ -98,7 +98,7 @@ public abstract partial class NatsConnectionTest
     [InlineData(32768)] // 32 KiB
     public async Task RequestTest(int minSize)
     {
-        await using var server = new NatsServer(_output, _transportType);
+        await using var server = NatsServer.Start(_output, _transportType);
 
         var options = NatsOptions.Default with { RequestTimeout = TimeSpan.FromSeconds(5) };
         await using var subConnection = server.CreateClientConnection(options);
@@ -156,7 +156,7 @@ public abstract partial class NatsConnectionTest
             EnableWebSocket = _transportType == TransportType.WebSocket,
             ServerDisposeReturnsPorts = false,
         };
-        await using var server = new NatsServer(_output, options);
+        await using var server = NatsServer.Start(_output, options);
         var subject = Guid.NewGuid().ToString();
 
         await using var subConnection = server.CreateClientConnection();
@@ -212,7 +212,7 @@ public abstract partial class NatsConnectionTest
 
         // start new nats server on same port
         _output.WriteLine("START NEW SERVER");
-        await using var newServer = new NatsServer(_output, options);
+        await using var newServer = NatsServer.Start(_output, options);
         await subConnection.ConnectAsync(); // wait open again
         await pubConnection.ConnectAsync(); // wait open again
 

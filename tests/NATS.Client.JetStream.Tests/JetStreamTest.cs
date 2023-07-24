@@ -15,7 +15,7 @@ public class JetStreamTest
     [Fact]
     public async Task Create_stream_test()
     {
-        await using var server = new NatsServer(new NullOutputHelper(), new NatsServerOptionsBuilder().UseTransport(TransportType.Tcp).UseJetStream().Build());
+        await using var server = NatsServer.Start(new NullOutputHelper(), new NatsServerOptionsBuilder().UseTransport(TransportType.Tcp).UseJetStream().Build());
         var nats = server.CreateClientConnection();
 
         // Happy user
@@ -92,7 +92,7 @@ public class JetStreamTest
                                stream: "events",
                                consumer: "consumer1",
                                request: new ConsumerGetnextRequest { Batch = 100 },
-                               requestOpts: new NatsSubOpts { CanBeCancelled = true },
+                               requestOpts: default,
                                cancellationToken: cts.Token))
             {
                 messages.Add(msg);
@@ -118,7 +118,7 @@ public class JetStreamTest
                                stream: "events",
                                consumer: "consumer1",
                                request: new ConsumerGetnextRequest { Batch = 100 },
-                               requestOpts: new NatsSubOpts { CanBeCancelled = true },
+                               requestOpts: default,
                                cancellationToken: cts.Token))
             {
                 Assert.Equal("events.foo", msg.Subject);

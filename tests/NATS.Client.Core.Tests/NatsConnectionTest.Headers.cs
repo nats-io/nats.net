@@ -5,7 +5,7 @@ public abstract partial class NatsConnectionTest
     [Fact]
     public async Task HeaderParsingTest()
     {
-        await using var server = new NatsServer(_output, _transportType);
+        await using var server = NatsServer.Start(_output, _transportType);
 
         await using var nats = server.CreateClientConnection();
 

@@ -15,7 +15,7 @@ public class CancellationTest
     [Fact]
     public async Task CommandTimeoutTest()
     {
-        await using var server = new NatsServer(_output, TransportType.Tcp);
+        await using var server = NatsServer.Start(_output, TransportType.Tcp);
 
         await using var subConnection = server.CreateClientConnection(NatsOptions.Default with { CommandTimeout = TimeSpan.FromSeconds(1) });
         await using var pubConnection = server.CreateClientConnection(NatsOptions.Default with { CommandTimeout = TimeSpan.FromSeconds(1) });

@@ -11,7 +11,6 @@ internal enum NatsSubEndReason
     Timeout,
     IdleTimeout,
     StartUpTimeout,
-    Cancelled,
     Exception,
 }
 
@@ -24,7 +23,6 @@ public abstract class NatsSubBase : INatsSub
     private readonly TimeSpan _startUpTimeout;
     private readonly TimeSpan _timeout;
     private readonly bool _countPendingMsgs;
-    private readonly CancellationTokenSource? _cts;
     private volatile Timer? _startUpTimeoutTimer;
     private bool _disposed;
     private bool _unsubscribed;
@@ -37,8 +35,7 @@ public abstract class NatsSubBase : INatsSub
         NatsConnection connection,
         ISubscriptionManager manager,
         string subject,
-        NatsSubOpts? opts,
-        CancellationToken cancellationToken = default)
+        NatsSubOpts? opts)
     {
         _manager = manager;
         _pendingMsgs = opts is { MaxMsgs: > 0 } ? opts.Value.MaxMsgs ?? -1 : -1;
@@ -50,17 +47,6 @@ public abstract class NatsSubBase : INatsSub
         Connection = connection;
         Subject = subject;
         QueueGroup = opts?.QueueGroup;
-
-        if ((opts?.CanBeCancelled ?? false) && cancellationToken != default)
-        {
-            _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            _cts.Token.UnsafeRegister(
-                static (self, _) =>
-                {
-                    ((NatsSubBase)self!).EndSubscription(NatsSubEndReason.Cancelled);
-                },
-                this);
-        }
 
         // Only allocate timers if necessary to reduce GC pressure
         if (_idleTimeout != default)
@@ -100,11 +86,11 @@ public abstract class NatsSubBase : INatsSub
     /// </summary>
     public string? QueueGroup { get; }
 
+    public Exception? Exception => Volatile.Read(ref _exception);
+
     // Hide from public API using explicit interface implementations
     // since INatsSub is marked as internal.
     int? INatsSub.PendingMsgs => _pendingMsgs == -1 ? null : Volatile.Read(ref _pendingMsgs);
-
-    public Exception? Exception => Volatile.Read(ref _exception);
 
     internal NatsSubEndReason EndReason => (NatsSubEndReason)Volatile.Read(ref _endReasonRaw);
 
@@ -159,8 +145,6 @@ public abstract class NatsSubBase : INatsSub
         _timeoutTimer?.Dispose();
         _idleTimeoutTimer?.Dispose();
         _startUpTimeoutTimer?.Dispose();
-
-        _cts?.Dispose();
 
         return unsubscribeAsync;
     }
@@ -235,8 +219,8 @@ public sealed class NatsSub : NatsSubBase
 
     private readonly Channel<NatsMsg> _msgs;
 
-    internal NatsSub(NatsConnection connection, ISubscriptionManager manager, string subject, NatsSubOpts? opts, CancellationToken cancellationToken = default)
-        : base(connection, manager, subject, opts, cancellationToken) =>
+    internal NatsSub(NatsConnection connection, ISubscriptionManager manager, string subject, NatsSubOpts? opts)
+        : base(connection, manager, subject, opts) =>
         _msgs = Channel.CreateBounded<NatsMsg>(
             GetChannelOptions(opts?.ChannelOptions));
 
@@ -294,9 +278,8 @@ public sealed class NatsSub<T> : NatsSubBase
         ISubscriptionManager manager,
         string subject,
         NatsSubOpts? opts,
-        INatsSerializer serializer,
-        CancellationToken cancellationToken = default)
-        : base(connection, manager, subject, opts, cancellationToken)
+        INatsSerializer serializer)
+        : base(connection, manager, subject, opts)
     {
         _msgs = Channel.CreateBounded<NatsMsg<T?>>(
             NatsSub.GetChannelOptions(opts?.ChannelOptions));

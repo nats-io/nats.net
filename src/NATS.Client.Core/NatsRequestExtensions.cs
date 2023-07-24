@@ -1,5 +1,4 @@
 using System.Buffers;
-using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
 
@@ -42,17 +41,12 @@ public static class NatsRequestExtensions
         await using var sub = await nats.RequestSubAsync<TRequest, TReply>(subject, data, requestOpts, opts, cancellationToken)
             .ConfigureAwait(false);
 
-        if (await sub.Msgs.WaitToReadAsync(CancellationToken.None).ConfigureAwait(false))
+        if (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
             if (sub.Msgs.TryRead(out var msg))
             {
                 return msg;
             }
-        }
-
-        if (sub.EndReason == NatsSubEndReason.Cancelled)
-        {
-            throw new OperationCanceledException("Inbox subscription cancelled");
         }
 
         if (sub is { EndReason: NatsSubEndReason.Exception, Exception: not null })
@@ -123,17 +117,12 @@ public static class NatsRequestExtensions
 
         await using var sub = await nats.RequestSubAsync(subject, payload, requestOpts, opts, cancellationToken).ConfigureAwait(false);
 
-        if (await sub.Msgs.WaitToReadAsync(CancellationToken.None).ConfigureAwait(false))
+        if (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
             if (sub.Msgs.TryRead(out var msg))
             {
                 return msg;
             }
-        }
-
-        if (sub.EndReason == NatsSubEndReason.Cancelled)
-        {
-            throw new OperationCanceledException("Inbox subscription cancelled");
         }
 
         if (sub is { EndReason: NatsSubEndReason.Exception, Exception: not null })
@@ -184,11 +173,6 @@ public static class NatsRequestExtensions
         if ((opts.Timeout ?? default) == default)
         {
             opts = opts with { Timeout = nats.Options.RequestTimeout };
-        }
-
-        if (!opts.CanBeCancelled.HasValue)
-        {
-            opts = opts with { CanBeCancelled = true, };
         }
 
         return opts;

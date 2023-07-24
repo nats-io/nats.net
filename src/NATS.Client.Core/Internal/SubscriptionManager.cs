@@ -39,7 +39,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
         _logger = _connection.Options.LoggerFactory.CreateLogger<SubscriptionManager>();
         _cts = new CancellationTokenSource();
         _cleanupInterval = _connection.Options.SubscriptionCleanUpInterval;
-        _timer = Task.Run(CleanupAsync, _cts.Token);
+        _timer = Task.Run(CleanupAsync);
         _inboxSubBuilder = new InboxSubBuilder(connection.Options.LoggerFactory.CreateLogger<InboxSubBuilder>());
         _inboxSubSentinel = new InboxSub(_inboxSubBuilder, nameof(_inboxSubSentinel), default, connection, this);
         _inboxSub = _inboxSubSentinel;
@@ -85,7 +85,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
                 }
             }
 
-            var sub = builder.Build(subject, opts, connection: _connection, _inboxSubBuilder, cancellationToken);
+            var sub = builder.Build(subject, opts, connection: _connection, _inboxSubBuilder);
             _inboxSubBuilder.Register(sub);
             return sub;
         }
@@ -170,7 +170,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
     private async ValueTask<T> SubscribeInternalAsync<T>(string subject, NatsSubOpts? opts, INatsSubBuilder<T> builder, CancellationToken cancellationToken)
         where T : INatsSub
     {
-        var sub = builder.Build(subject, opts, connection: _connection, this, cancellationToken);
+        var sub = builder.Build(subject, opts, connection: _connection, this);
         var sid = GetNextSid();
         lock (_gate)
         {
@@ -198,7 +198,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
     {
         while (!_cts.Token.IsCancellationRequested)
         {
-            await Task.Delay(_cleanupInterval).ConfigureAwait(false);
+            await Task.Delay(_cleanupInterval, _cts.Token).ConfigureAwait(false);
 
             // Avoid allocations most of the time
             List<int>? orphanSids = null;

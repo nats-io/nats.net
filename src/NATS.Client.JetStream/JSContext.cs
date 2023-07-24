@@ -1,8 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using NATS.Client.Core;
 using NATS.Client.Core.Internal;
 using NATS.Client.JetStream.Internal;
@@ -59,7 +56,7 @@ public class JSContext
                 cancellationToken)
             .ConfigureAwait(false);
 
-        if (await sub.Msgs.WaitToReadAsync(CancellationToken.None).ConfigureAwait(false))
+        if (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
             if (sub.Msgs.TryRead(out var msg))
             {
@@ -70,11 +67,6 @@ public class JSContext
 
                 return msg.Data;
             }
-        }
-
-        if (sub.EndReason == NatsSubEndReason.Cancelled)
-        {
-            throw new OperationCanceledException("Publishing inbox subscription was cancelled");
         }
 
         if (sub is { EndReason: NatsSubEndReason.Exception, Exception: not null })
@@ -108,14 +100,9 @@ public class JSContext
             headers: default,
             cancellationToken);
 
-        await foreach (var msg in sub.Msgs.ReadAllAsync(CancellationToken.None))
+        await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken))
         {
             yield return msg;
-        }
-
-        if (sub.EndReason == NatsSubEndReason.Cancelled)
-        {
-            throw new OperationCanceledException("Consumer's inbox subscription was cancelled");
         }
 
         if (sub is { EndReason: NatsSubEndReason.Exception, Exception: not null })
@@ -144,7 +131,7 @@ public class JSContext
                 cancellationToken)
             .ConfigureAwait(false);
 
-        if (await sub.Msgs.WaitToReadAsync(CancellationToken.None).ConfigureAwait(false))
+        if (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
             if (sub.Msgs.TryRead(out var msg))
             {
@@ -155,11 +142,6 @@ public class JSContext
 
                 return new JSResponse<TResponse>(msg.Data, default);
             }
-        }
-
-        if (sub.EndReason == NatsSubEndReason.Cancelled)
-        {
-            throw new OperationCanceledException("Request's inbox subscription was cancelled");
         }
 
         if (sub is { EndReason: NatsSubEndReason.Exception, Exception: not null })

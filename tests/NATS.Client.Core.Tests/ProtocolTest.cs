@@ -9,7 +9,7 @@ public class ProtocolTest
     [Fact]
     public async Task Subscription_with_same_subject()
     {
-        await using var server = new NatsServer(_output, TransportType.Tcp);
+        await using var server = NatsServer.Start(_output, TransportType.Tcp);
         var nats1 = server.CreateClientConnection();
         var (nats2, proxy) = server.CreateProxiedClientConnection();
 
@@ -104,7 +104,8 @@ public class ProtocolTest
         {
             _output.WriteLine($"[TESTS] {DateTime.Now:HH:mm:ss.fff} {text}");
         }
-        await using var server = new NatsServer(_output, new NatsServerOptionsBuilder().UseTransport(TransportType.Tcp).Trace().Build());
+
+        await using var server = NatsServer.Start(_output, new NatsServerOptionsBuilder().UseTransport(TransportType.Tcp).Trace().Build());
         var (nats, proxy) = server.CreateProxiedClientConnection();
 
         var sync = 0;
@@ -171,7 +172,7 @@ public class ProtocolTest
         }
 
         // Use a single server to test multiple scenarios to make test runs more efficient
-        await using var server = new NatsServer(_output, new NatsServerOptionsBuilder().UseTransport(TransportType.Tcp).Trace().Build());
+        await using var server = NatsServer.Start(_output, new NatsServerOptionsBuilder().UseTransport(TransportType.Tcp).Trace().Build());
         var (nats, proxy) = server.CreateProxiedClientConnection();
         var sid = 0;
 

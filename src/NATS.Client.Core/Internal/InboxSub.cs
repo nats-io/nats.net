@@ -51,7 +51,7 @@ internal class InboxSubBuilder : INatsSubBuilder<InboxSub>, ISubscriptionManager
 
     public InboxSubBuilder(ILogger<InboxSubBuilder> logger) => _logger = logger;
 
-    public InboxSub Build(string subject, NatsSubOpts? opts, NatsConnection connection, ISubscriptionManager manager, CancellationToken cancellationToken)
+    public InboxSub Build(string subject, NatsSubOpts? opts, NatsConnection connection, ISubscriptionManager manager)
     {
         return new InboxSub(this, subject, opts, connection, manager);
     }
