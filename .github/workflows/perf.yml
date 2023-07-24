@@ -47,4 +47,4 @@ jobs:
         run: dotnet build -c Release tests/NATS.Client.Perf/NATS.Client.Perf.csproj
 
       - name: Perf Test
-        run: ./tests/NATS.Client.Perf/bin/Release/net6.0/NATS.Client.Perf.exe
+        run: ./tests/NATS.Client.Perf/bin/Release/net6.0/NATS.Client.Perf
