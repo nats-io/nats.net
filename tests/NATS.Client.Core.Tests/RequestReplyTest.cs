@@ -62,120 +62,189 @@ public class RequestReplyTest
     [Fact]
     public async Task Request_reply_many_test()
     {
+        const int msgs = 10;
+
         await using var server = NatsServer.Start();
         await using var nats = server.CreateClientConnection();
 
         var sub = await nats.SubscribeAsync<int>("foo");
         var reg = sub.Register(async msg =>
         {
-            // Start-up timeout
-            if (msg.Data == 2)
+            for (var i = 0; i < msgs; i++)
             {
-                await Task.Delay(2_000);
-                await msg.ReplyAsync(msg.Data * 2);
+                await msg.ReplyAsync(msg.Data * i);
             }
 
-            // Idle timeout
-            else if (msg.Data == 3)
-            {
-                await msg.ReplyAsync(msg.Data * 2);
-                await Task.Delay(100);
-                await msg.ReplyAsync(msg.Data * 3);
-                await Task.Delay(5_000);
-                await msg.ReplyAsync(msg.Data * 4);
-            }
-
-            // Overall timeout
-            else if (msg.Data == 4)
-            {
-                await msg.ReplyAsync(msg.Data * 2);
-                await msg.ReplyAsync(msg.Data * 3);
-            }
-
-            // Sentinel
-            else
-            {
-                await msg.ReplyAsync(msg.Data * 2);
-                await msg.ReplyAsync(msg.Data * 3);
-                await msg.ReplyAsync(msg.Data * 4);
-                await msg.ReplyAsync<int?>(null); // sentinel
-            }
+            await msg.ReplyAsync<int?>(null); // stop iteration with a sentinel
         });
 
-        // Sentinel
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        const int data = 2;
+        var results = Enumerable.Range(0, msgs).Select(x => x * data).ToArray();
+        var count = 0;
+        await foreach (var msg in nats.RequestManyAsync<int, int?>("foo", data, cancellationToken: cts.Token))
         {
-            var results = new[] { 2, 3, 4 };
-            var count = 0;
-            await foreach (var msg in nats.RequestManyAsync<int, int?>("foo", 1))
-            {
-                Assert.Equal(results[count++], msg.Data);
-            }
-
-            Assert.Equal(3, count);
+            Assert.Equal(results[count++], msg.Data);
         }
 
-        // Max Count
-        {
-            var results = new[] { 2, 3, 4 };
-            var count = 0;
-            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            var opts = new NatsSubOpts { MaxMsgs = 2 };
-            await using var rep = await nats.RequestSubAsync<int, int>("foo", 1, replyOpts: opts);
-            await foreach (var msg in rep.Msgs.ReadAllAsync(cts.Token))
-            {
-                Assert.Equal(results[count++], msg.Data);
-            }
+        Assert.Equal(results.Length, count);
 
-            Assert.Equal(2, count);
-            Assert.Equal(NatsSubEndReason.MaxMsgs, rep.EndReason);
+        await sub.DisposeAsync();
+        await reg;
+    }
+
+    [Fact]
+    public async Task Request_reply_many_test_overall_timeout()
+    {
+        await using var server = NatsServer.Start();
+        await using var nats = server.CreateClientConnection();
+
+        var sub = await nats.SubscribeAsync<int>("foo");
+        var reg = sub.Register(async msg =>
+        {
+            await msg.ReplyAsync(msg.Data * 2);
+            await msg.ReplyAsync(msg.Data * 3);
+        });
+
+        var results = new[] { 8, 12 };
+        var count = 0;
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var opts = new NatsSubOpts { Timeout = TimeSpan.FromSeconds(4) };
+        await using var rep =
+            await nats.RequestSubAsync<int, int>("foo", 4, replyOpts: opts, cancellationToken: cts.Token);
+        await foreach (var msg in rep.Msgs.ReadAllAsync(cts.Token))
+        {
+            Assert.Equal(results[count++], msg.Data);
         }
 
-        // Start-up Timeout
-        {
-            var count = 0;
-            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            var opts = new NatsSubOpts { StartUpTimeout = TimeSpan.FromSeconds(1) };
-            await using var rep = await nats.RequestSubAsync<int, int>("foo", 2, replyOpts: opts);
-            await foreach (var msg in rep.Msgs.ReadAllAsync(cts.Token))
-            {
-                count++;
-            }
+        Assert.Equal(2, count);
+        Assert.Equal(NatsSubEndReason.Timeout, rep.EndReason);
 
-            Assert.Equal(0, count);
-            Assert.Equal(NatsSubEndReason.StartUpTimeout, rep.EndReason);
+        await sub.DisposeAsync();
+        await reg;
+    }
+
+    [Fact]
+    public async Task Request_reply_many_test_idle_timeout()
+    {
+        await using var server = NatsServer.Start();
+        await using var nats = server.CreateClientConnection();
+
+        var sub = await nats.SubscribeAsync<int>("foo");
+        var reg = sub.Register(async msg =>
+        {
+            await msg.ReplyAsync(msg.Data * 2);
+            await Task.Delay(100);
+            await msg.ReplyAsync(msg.Data * 3);
+            await Task.Delay(5_000);
+            await msg.ReplyAsync(msg.Data * 4);
+        });
+
+        var results = new[] { 6, 9 };
+        var count = 0;
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var opts = new NatsSubOpts { IdleTimeout = TimeSpan.FromSeconds(4) };
+        await using var rep =
+            await nats.RequestSubAsync<int, int>("foo", 3, replyOpts: opts, cancellationToken: cts.Token);
+        await foreach (var msg in rep.Msgs.ReadAllAsync(cts.Token))
+        {
+            Assert.Equal(results[count++], msg.Data);
         }
 
-        // Idle Timeout
-        {
-            var results = new[] { 6, 9 };
-            var count = 0;
-            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            var opts = new NatsSubOpts { IdleTimeout = TimeSpan.FromSeconds(4) };
-            await using var rep = await nats.RequestSubAsync<int, int>("foo", 3, replyOpts: opts);
-            await foreach (var msg in rep.Msgs.ReadAllAsync(cts.Token))
-            {
-                Assert.Equal(results[count++], msg.Data);
-            }
+        Assert.Equal(2, count);
+        Assert.Equal(NatsSubEndReason.IdleTimeout, rep.EndReason);
 
-            Assert.Equal(2, count);
-            Assert.Equal(NatsSubEndReason.IdleTimeout, rep.EndReason);
+        await sub.DisposeAsync();
+        await reg;
+    }
+
+    [Fact]
+    public async Task Request_reply_many_test_start_up_timeout()
+    {
+        await using var server = NatsServer.Start();
+        await using var nats = server.CreateClientConnection();
+
+        var sub = await nats.SubscribeAsync<int>("foo");
+        var reg = sub.Register(async msg =>
+        {
+            await Task.Delay(2_000);
+            await msg.ReplyAsync(msg.Data * 2);
+        });
+
+        var count = 0;
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var opts = new NatsSubOpts { StartUpTimeout = TimeSpan.FromSeconds(1) };
+        await using var rep =
+            await nats.RequestSubAsync<int, int>("foo", 2, replyOpts: opts, cancellationToken: cts.Token);
+        await foreach (var msg in rep.Msgs.ReadAllAsync(cts.Token))
+        {
+            count++;
         }
 
-        // Overall Timeout
-        {
-            var results = new[] { 8, 12 };
-            var count = 0;
-            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            var opts = new NatsSubOpts { Timeout = TimeSpan.FromSeconds(4) };
-            await using var rep = await nats.RequestSubAsync<int, int>("foo", 4, replyOpts: opts);
-            await foreach (var msg in rep.Msgs.ReadAllAsync(cts.Token))
-            {
-                Assert.Equal(results[count++], msg.Data);
-            }
+        Assert.Equal(0, count);
+        Assert.Equal(NatsSubEndReason.StartUpTimeout, rep.EndReason);
 
-            Assert.Equal(2, count);
-            Assert.Equal(NatsSubEndReason.Timeout, rep.EndReason);
+        await sub.DisposeAsync();
+        await reg;
+    }
+
+    [Fact]
+    public async Task Request_reply_many_test_max_count()
+    {
+        await using var server = NatsServer.Start();
+        await using var nats = server.CreateClientConnection();
+
+        var sub = await nats.SubscribeAsync<int>("foo");
+        var reg = sub.Register(async msg =>
+        {
+            await msg.ReplyAsync(msg.Data * 2);
+            await msg.ReplyAsync(msg.Data * 3);
+            await msg.ReplyAsync(msg.Data * 4);
+            await msg.ReplyAsync<int?>(null); // sentinel
+        });
+
+        var results = new[] { 2, 3, 4 };
+        var count = 0;
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var opts = new NatsSubOpts { MaxMsgs = 2 };
+        await using var rep =
+            await nats.RequestSubAsync<int, int>("foo", 1, replyOpts: opts, cancellationToken: cts.Token);
+        await foreach (var msg in rep.Msgs.ReadAllAsync(cts.Token))
+        {
+            Assert.Equal(results[count++], msg.Data);
         }
+
+        Assert.Equal(2, count);
+        Assert.Equal(NatsSubEndReason.MaxMsgs, rep.EndReason);
+
+        await sub.DisposeAsync();
+        await reg;
+    }
+
+    [Fact]
+    public async Task Request_reply_many_test_sentinel()
+    {
+        await using var server = NatsServer.Start();
+        await using var nats = server.CreateClientConnection();
+
+        var sub = await nats.SubscribeAsync<int>("foo");
+        var reg = sub.Register(async msg =>
+        {
+            await msg.ReplyAsync(msg.Data * 2);
+            await msg.ReplyAsync(msg.Data * 3);
+            await msg.ReplyAsync(msg.Data * 4);
+            await msg.ReplyAsync<int?>(null); // sentinel
+        });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var results = new[] { 2, 3, 4 };
+        var count = 0;
+        await foreach (var msg in nats.RequestManyAsync<int, int?>("foo", 1, cancellationToken: cts.Token))
+        {
+            Assert.Equal(results[count++], msg.Data);
+        }
+
+        Assert.Equal(3, count);
 
         await sub.DisposeAsync();
         await reg;
