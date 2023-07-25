@@ -10,7 +10,7 @@ var t = new TestParams
     Size = 128,
     Subject = "test",
     PubTasks = 10,
-    MaxNatsBenchRatio = 0.30,
+    MaxNatsBenchRatio = 0.20,
     MaxMemoryMb = 500,
     MaxAllocatedMb = 750,
 };
