@@ -7,25 +7,39 @@ public partial class NatsConnection
     /// <inheritdoc />
     public ValueTask PublishAsync(string subject, ReadOnlySequence<byte> payload = default, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
-        return PubAsync(subject, opts?.ReplyTo, payload, opts?.Headers, cancellationToken);
+        if (opts?.WaitUntilSent ?? false)
+        {
+            return PubAsync(subject, opts?.ReplyTo, payload, opts?.Headers, cancellationToken);
+        }
+        else
+        {
+            return PubPostAsync(subject, opts?.ReplyTo, payload, opts?.Headers, cancellationToken);
+        }
     }
 
     /// <inheritdoc />
-    public ValueTask PublishAsync(in NatsMsg msg, CancellationToken cancellationToken = default)
+    public ValueTask PublishAsync(in NatsMsg msg, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
-        return PublishAsync(msg.Subject, msg.Data, default, cancellationToken);
+        return PublishAsync(msg.Subject, msg.Data, opts, cancellationToken);
     }
 
     /// <inheritdoc />
     public ValueTask PublishAsync<T>(string subject, T? data, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         var serializer = opts?.Serializer ?? Options.Serializer;
-        return PubModelAsync<T>(subject, data, serializer, opts?.ReplyTo, opts?.Headers, cancellationToken);
+        if (opts?.WaitUntilSent ?? false)
+        {
+            return PubModelAsync<T>(subject, data, serializer, opts?.ReplyTo, opts?.Headers, cancellationToken);
+        }
+        else
+        {
+            return PubModelPostAsync<T>(subject, data, serializer, opts?.ReplyTo, opts?.Headers, cancellationToken);
+        }
     }
 
     /// <inheritdoc />
-    public ValueTask PublishAsync<T>(in NatsMsg<T> msg, CancellationToken cancellationToken = default)
+    public ValueTask PublishAsync<T>(in NatsMsg<T> msg, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
-        return PublishAsync<T>(msg.Subject, msg.Data, default, cancellationToken);
+        return PublishAsync<T>(msg.Subject, msg.Data, opts, cancellationToken);
     }
 }

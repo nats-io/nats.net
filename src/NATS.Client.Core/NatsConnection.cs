@@ -545,7 +545,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
                     }
                 }
 
-                PostPing();
+                await PingOnlyAsync(cancellationToken).ConfigureAwait(false);
                 await periodicTimer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false);
             }
         }

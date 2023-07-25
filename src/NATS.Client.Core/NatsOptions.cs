@@ -85,7 +85,7 @@ public sealed record NatsOptions
         RequestTimeout: TimeSpan.FromMinutes(1),
         CommandTimeout: TimeSpan.FromMinutes(1),
         SubscriptionCleanUpInterval: TimeSpan.FromMinutes(5),
-        WriterCommandBufferLimit: null,
+        WriterCommandBufferLimit: 1_000,
         HeaderEncoding: Encoding.ASCII);
 
     internal NatsUri[] GetSeedUris()

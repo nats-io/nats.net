@@ -16,7 +16,7 @@ internal abstract class CommandBase<TSelf> : ICommand, IObjectPoolNode<TSelf>
     private CancellationTokenRegistration _timerRegistration;
     private CancellationTimer? _timer;
 
-    public bool IsCanceled { get; private set; }
+    public virtual bool IsCanceled { get; private set; }
 
     public ref TSelf? NextNode => ref _next;
 

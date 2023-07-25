@@ -29,15 +29,21 @@ public partial class NatsConnection
         }
     }
 
-    private void PostPing(CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Send PING command to writers channel waiting on the chanel if necessary.
+    /// This is to make sure the PING time window is not missed in case the writer
+    /// channel is full with other commands and we will wait to enqueue rather than
+    /// just trying which might not happen in time on a busy channel.
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the Ping command</param>
+    /// <returns><see cref="ValueTask"/> representing the asynchronous operation</returns>
+    private ValueTask PingOnlyAsync(CancellationToken cancellationToken = default)
     {
         if (ConnectionState == NatsConnectionState.Open)
         {
-            EnqueueCommandSync(PingCommand.Create(_pool, GetCancellationTimer(cancellationToken)));
+            return EnqueueCommandAsync(PingCommand.Create(_pool, GetCancellationTimer(cancellationToken)));
         }
-        else
-        {
-            WithConnect(cancellationToken, static (self, token) => self.EnqueueCommandSync(PingCommand.Create(self._pool, self.GetCancellationTimer(token))));
-        }
+
+        return ValueTask.CompletedTask;
     }
 }
