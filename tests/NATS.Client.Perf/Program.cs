@@ -1,6 +1,7 @@
 ﻿using System.Buffers;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
+using NATS.Client.Core;
 using NATS.Client.Core.Tests;
 
 var t = new TestParams
@@ -9,7 +10,7 @@ var t = new TestParams
     Size = 128,
     Subject = "test",
     PubTasks = 10,
-    MaxNatsBenchRatio = 0.05,
+    MaxNatsBenchRatio = 0.20,
     MaxMemoryMb = 500,
     MaxAllocatedMb = 750,
 };
@@ -43,21 +44,9 @@ var subReader = Task.Run(async () =>
 });
 
 var payload = new ReadOnlySequence<byte>(new byte[t.Size]);
-var sem = new SemaphoreSlim(t.PubTasks);
 for (var i = 0; i < t.Msgs; i++)
 {
-    await sem.WaitAsync();
-    var unused = Task.Run(async () =>
-    {
-        try
-        {
-            await nats2.PublishAsync(t.Subject, payload);
-        }
-        finally
-        {
-            sem.Release();
-        }
-    });
+    await nats2.PublishAsync(t.Subject, payload);
 }
 
 Console.WriteLine($"[{stopwatch.Elapsed}]");

@@ -62,7 +62,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
     public async ValueTask<T> SubscribeAsync<T>(string subject, NatsSubOpts? opts, INatsSubBuilder<T> builder, CancellationToken cancellationToken)
         where T : INatsSub
     {
-        if (subject.StartsWith(_inboxPrefix))
+        if (subject.StartsWith(_inboxPrefix, StringComparison.Ordinal))
         {
             if (Interlocked.CompareExchange(ref _inboxSub, _inboxSubSentinel, _inboxSubSentinel) == _inboxSubSentinel)
             {

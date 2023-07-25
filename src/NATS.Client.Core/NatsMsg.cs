@@ -40,10 +40,10 @@ public readonly record struct NatsMsg(
         return Connection.PublishAsync(ReplyTo!, payload, opts, cancellationToken);
     }
 
-    public ValueTask ReplyAsync(NatsMsg msg, CancellationToken cancellationToken = default)
+    public ValueTask ReplyAsync(NatsMsg msg, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         CheckReplyPreconditions();
-        return Connection.PublishAsync(msg with { Subject = ReplyTo! }, cancellationToken);
+        return Connection.PublishAsync(msg with { Subject = ReplyTo! }, opts, cancellationToken);
     }
 
     [MemberNotNull(nameof(Connection))]
