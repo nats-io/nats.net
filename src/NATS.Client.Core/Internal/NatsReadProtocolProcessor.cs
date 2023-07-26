@@ -75,6 +75,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
 
             _waitForInfoSignal.TrySetCanceled();
             _waitForPongOrErrorSignal.TrySetCanceled();
+            await _socketConnection.DisposeAsync().ConfigureAwait(false);
         }
     }
 
@@ -157,6 +158,11 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
             {
                 var memory = writer.GetMemory(_minimumBufferSize / 2);
                 var read = await _socketConnection.ReceiveAsync(memory).ConfigureAwait(false);
+                if (read == 0)
+                {
+                    throw new SocketClosedException(null);
+                }
+
                 writer.Advance(read);
                 Interlocked.Add(ref _counter.ReceivedBytes, read);
 
@@ -170,10 +176,12 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         }
         catch (Exception ex) when (ex is OperationCanceledException or SocketException or SocketClosedException)
         {
+            _socketConnection.SignalDisconnected(ex);
             _waitForInfoSignal.TrySetException(ex);
         }
         catch (Exception ex)
         {
+            _socketConnection.SignalDisconnected(ex);
             _waitForInfoSignal.TrySetException(ex);
             _logger.LogError(ex, "Error occured during read loop.");
         }
@@ -399,6 +407,9 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                     reader.AdvanceTo(buffer.GetPosition(1, position.Value));
                 }
             }
+        }
+        catch (OperationCanceledException)
+        {
         }
         catch (Exception ex)
         {
