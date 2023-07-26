@@ -1,15 +1,17 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.Core.Tests;
+using ZLogger;
 
 var t = new TestParams
 {
     Msgs = 1_000_000,
     Size = 128,
     Subject = "test",
-    PubTasks = 10,
     MaxNatsBenchRatio = 0.20,
     MaxMemoryMb = 500,
     MaxAllocatedMb = 750,
@@ -23,8 +25,19 @@ await using var server = NatsServer.Start();
 Console.WriteLine("\nRunning nats bench");
 var natsBenchTotalMsgs = RunNatsBench(server.ClientUrl, t);
 
-await using var nats1 = server.CreateClientConnection();
-await using var nats2 = server.CreateClientConnection();
+var provider = new ServiceCollection()
+    .AddLogging(x =>
+    {
+        x.ClearProviders();
+        x.SetMinimumLevel(LogLevel.Error);
+        x.AddZLoggerConsole();
+    })
+    .BuildServiceProvider();
+
+var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
+
+await using var nats1 = server.CreateClientConnection(NatsOptions.Default with { LoggerFactory = loggerFactory });
+await using var nats2 = server.CreateClientConnection(NatsOptions.Default with { LoggerFactory = loggerFactory });
 
 await nats1.PingAsync();
 await nats2.PingAsync();
@@ -126,7 +139,8 @@ internal class Result
             var test = result._test();
             var ok = test ? "OK" : "NOT OK";
             Console.WriteLine($"[{ok}] {result._message}");
-            if (test == false) failed++;
+            if (test == false)
+                failed++;
         }
 
         Console.WriteLine(failed == 0 ? "PASS" : "FAILED");
@@ -146,8 +160,6 @@ internal record TestParams
     public int MaxMemoryMb { get; init; }
 
     public double MaxNatsBenchRatio { get; init; }
-
-    public int PubTasks { get; init; }
 
     public int MaxAllocatedMb { get; init; }
 }

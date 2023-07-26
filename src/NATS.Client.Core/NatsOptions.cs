@@ -71,7 +71,7 @@ public sealed record NatsOptions
         TlsOptions: TlsOptions.Default,
         Serializer: JsonNatsSerializer.Default,
         LoggerFactory: NullLoggerFactory.Instance,
-        WriterBufferSize: 65534, // 32767
+        WriterBufferSize: 65536,
         ReaderBufferSize: 1048576,
         UseThreadPoolCallback: false,
         InboxPrefix: "_INBOX",
