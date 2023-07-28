@@ -1,10 +1,8 @@
 ﻿using System.Buffers;
-using System.Text;
-using Microsoft.Extensions.Logging;
-using NATS.Client.JetStream;
+using NATS.Client.Core.Tests;
 using NATS.Client.JetStream.Models;
 
-namespace NATS.Client.Core.Tests;
+namespace NATS.Client.JetStream.Tests;
 
 public class JetStreamTest
 {
@@ -15,25 +13,24 @@ public class JetStreamTest
     [Fact]
     public async Task Create_stream_test()
     {
-        await using var server = NatsServer.Start(new NullOutputHelper(), new NatsServerOptionsBuilder().UseTransport(TransportType.Tcp).UseJetStream().Build());
+        await using var server = NatsServer.StartJS();
         var nats = server.CreateClientConnection();
 
         // Happy user
         {
-            var context = new JSContext(nats, new JSOptions());
+            var context = new NatsJSContext(nats, new NatsJSOptions());
+            var streams = new NatsJSManageStreams(context);
+            var consumers = new NatsJSManageConsumers(context);
 
             // Create stream
-            var response = await context.CreateStreamAsync(request: new StreamConfiguration
+            var info = await streams.CreateAsync(request: new StreamConfiguration
             {
                 Name = "events", Subjects = new[] { "events.*" },
             });
-            Assert.True(response.Success);
-            Assert.Null(response.Error);
-            Assert.NotNull(response.Response);
-            Assert.Equal("events", response.Response.Config.Name);
+            Assert.Equal("events", info.Config.Name);
 
             // Create consumer
-            var consumerInfo = await context.CreateConsumerAsync(new ConsumerCreateRequest
+            var consumerInfo = await consumers.CreateAsync(new ConsumerCreateRequest
             {
                 StreamName = "events",
                 Config = new ConsumerConfiguration
@@ -51,11 +48,8 @@ public class JetStreamTest
                     AckWait = 2_000_000_000, // 2 seconds
                 },
             });
-            Assert.True(consumerInfo.Success);
-            Assert.Null(consumerInfo.Error);
-            Assert.NotNull(consumerInfo.Response);
-            Assert.Equal("events", consumerInfo.Response.StreamName);
-            Assert.Equal("consumer1", consumerInfo.Response.Config.Name);
+            Assert.Equal("events", consumerInfo.StreamName);
+            Assert.Equal("consumer1", consumerInfo.Config.Name);
 
             // Publish
             PubAckResponse ack;
@@ -88,9 +82,8 @@ public class JetStreamTest
             // Consume
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             var messages = new List<NatsMsg>();
-            await foreach (var msg in context.ConsumeAsync(
-                               stream: "events",
-                               consumer: "consumer1",
+            var consumer = new NatsJSConsumer(context, new ConsumerInfo { Name = "consumer1", StreamName = "events" });
+            await foreach (var msg in consumer.ConsumeAsync(
                                request: new ConsumerGetnextRequest { Batch = 100 },
                                requestOpts: default,
                                cancellationToken: cts.Token))
@@ -114,9 +107,7 @@ public class JetStreamTest
             Assert.Equal("events.foo", messages[1].Subject);
 
             // Consume the unacknowledged message
-            await foreach (var msg in context.ConsumeAsync(
-                               stream: "events",
-                               consumer: "consumer1",
+            await foreach (var msg in consumer.ConsumeAsync(
                                request: new ConsumerGetnextRequest { Batch = 100 },
                                requestOpts: default,
                                cancellationToken: cts.Token))
@@ -128,38 +119,40 @@ public class JetStreamTest
 
         // Handle errors
         {
-            var context = new JSContext(nats, new JSOptions());
+            var context = new NatsJSContext(nats, new NatsJSOptions());
+            var streams = new NatsJSManageStreams(context);
 
-            var response = await context.CreateStreamAsync(request: new StreamConfiguration
+            var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () =>
             {
-                Name = "events2", Subjects = new[] { "events.*" },
+                await streams.CreateAsync(request: new StreamConfiguration
+                {
+                    Name = "events2", Subjects = new[] { "events.*" },
+                });
             });
-            Assert.False(response.Success);
-            Assert.Null(response.Response);
-            Assert.NotNull(response.Error);
-            Assert.Equal(400, response.Error.Code);
+            Assert.Equal(400, exception.Error.Code);
 
             // subjects overlap with an existing stream
-            Assert.Equal(10065, response.Error.ErrCode);
+            Assert.Equal(10065, exception.Error.ErrCode);
         }
 
         // Delete stream
         {
-            var context = new JSContext(nats, new JSOptions());
-            JSResponse<StreamMsgDeleteResponse> response;
+            var context = new NatsJSContext(nats, new NatsJSOptions());
+            var streams = new NatsJSManageStreams(context);
 
             // Success
-            response = await context.DeleteStreamAsync("events");
-            Assert.True(response.Success);
-            Assert.True(response.Response!.Success);
+            await streams.DeleteAsync("events");
 
             // Error
-            response = await context.DeleteStreamAsync("events2");
-            Assert.False(response.Success);
-            Assert.Equal(404, response.Error!.Code);
+            var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () =>
+            {
+                await streams.DeleteAsync("events2");
+            });
+
+            Assert.Equal(404, exception.Error.Code);
 
             // stream not found
-            Assert.Equal(10059, response.Error!.ErrCode);
+            Assert.Equal(10059, exception.Error.ErrCode);
         }
     }
 }

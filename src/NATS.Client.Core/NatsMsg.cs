@@ -6,6 +6,7 @@ namespace NATS.Client.Core;
 public readonly record struct NatsMsg(
     string Subject,
     string? ReplyTo,
+    int Size,
     NatsHeaders? Headers,
     ReadOnlyMemory<byte> Data,
     INatsConnection? Connection)
@@ -31,7 +32,12 @@ public readonly record struct NatsMsg(
             headers.SetReadOnly();
         }
 
-        return new NatsMsg(subject, replyTo, headers, payloadBuffer.ToArray(), connection);
+        var size = subject.Length
+                   + replyTo?.Length ?? 0
+                   + headersBuffer?.Length ?? 0
+                   + payloadBuffer.Length;
+
+        return new NatsMsg(subject, replyTo, (int)size, headers, payloadBuffer.ToArray(), connection);
     }
 
     public ValueTask ReplyAsync(ReadOnlySequence<byte> payload = default, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
@@ -64,6 +70,7 @@ public readonly record struct NatsMsg(
 public readonly record struct NatsMsg<T>(
     string Subject,
     string? ReplyTo,
+    int Size,
     NatsHeaders? Headers,
     T? Data,
     INatsConnection? Connection)
@@ -97,7 +104,12 @@ public readonly record struct NatsMsg<T>(
             headers.SetReadOnly();
         }
 
-        return new NatsMsg<T>(subject, replyTo, headers, data, connection);
+        var size = subject.Length
+            + replyTo?.Length ?? 0
+            + headersBuffer?.Length ?? 0
+            + payloadBuffer.Length;
+
+        return new NatsMsg<T>(subject, replyTo, (int)size, headers, data, connection);
     }
 
     public ValueTask ReplyAsync<TReply>(TReply data, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
