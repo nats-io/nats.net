@@ -11,12 +11,18 @@ public class NatsJSManageConsumers
     public ValueTask<ConsumerInfo> CreateAsync(
         string stream,
         string consumer,
+        ConsumerConfigurationAckPolicy ackPolicy = ConsumerConfigurationAckPolicy.@explicit,
         CancellationToken cancellationToken = default) =>
         CreateAsync(
             new ConsumerCreateRequest
             {
                 StreamName = stream,
-                Config = new ConsumerConfiguration { Name = consumer },
+                Config = new ConsumerConfiguration
+                {
+                    Name = consumer,
+                    DurableName = consumer,
+                    AckPolicy = ackPolicy,
+                },
             },
             cancellationToken);
 

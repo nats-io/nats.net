@@ -7,6 +7,11 @@ namespace NATS.Client.JetStream;
 
 public class NatsJSContext
 {
+    public NatsJSContext(NatsConnection nats)
+        : this(nats, new NatsJSOptions())
+    {
+    }
+
     public NatsJSContext(NatsConnection nats, NatsJSOptions options)
     {
         Nats = nats;
@@ -115,4 +120,13 @@ public class NatsJSContext
 
         throw new NatsJSException("No response received");
     }
+}
+
+public class NatsJSDuplicateMessageException : NatsJSException
+{
+    public NatsJSDuplicateMessageException(long sequence)
+        : base($"Duplicate of {sequence}") =>
+        Sequence = sequence;
+
+    public long Sequence { get; }
 }

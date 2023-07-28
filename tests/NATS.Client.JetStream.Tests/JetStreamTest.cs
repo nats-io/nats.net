@@ -1,11 +1,15 @@
-﻿using System.Buffers;
-using NATS.Client.Core.Tests;
+﻿using NATS.Client.Core.Tests;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Tests;
 
 public class JetStreamTest
 {
+    private class TestData
+    {
+        public int Test { get; set; }
+    }
+
     private readonly ITestOutputHelper _output;
 
     public JetStreamTest(ITestOutputHelper output) => _output = output;
@@ -81,9 +85,9 @@ public class JetStreamTest
 
             // Consume
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            var messages = new List<NatsMsg>();
-            var consumer = new NatsJSConsumer(context, new ConsumerInfo { Name = "consumer1", StreamName = "events" });
-            await foreach (var msg in consumer.ConsumeAsync(
+            var messages = new List<NatsJSControlMsg>();
+            var consumer = new NatsJSConsumer(context, new ConsumerInfo { Name = "consumer1", StreamName = "events" }, new ConsumerOpts());
+            await foreach (var msg in consumer.ConsumeRawAsync(
                                request: new ConsumerGetnextRequest { Batch = 100 },
                                requestOpts: default,
                                cancellationToken: cts.Token))
@@ -93,7 +97,7 @@ public class JetStreamTest
                 // Only ACK one message so we can consume again
                 if (messages.Count == 1)
                 {
-                    await msg.ReplyAsync(new ReadOnlySequence<byte>("+ACK"u8.ToArray()), cancellationToken: cts.Token);
+                    await msg.JSMsg!.Value.Ack(cts.Token);
                 }
 
                 if (messages.Count == 2)
@@ -103,16 +107,16 @@ public class JetStreamTest
             }
 
             Assert.Equal(2, messages.Count);
-            Assert.Equal("events.foo", messages[0].Subject);
-            Assert.Equal("events.foo", messages[1].Subject);
+            Assert.Equal("events.foo", messages[0].JSMsg!.Value.Msg.Subject);
+            Assert.Equal("events.foo", messages[1].JSMsg!.Value.Msg.Subject);
 
             // Consume the unacknowledged message
-            await foreach (var msg in consumer.ConsumeAsync(
+            await foreach (var msg in consumer.ConsumeRawAsync(
                                request: new ConsumerGetnextRequest { Batch = 100 },
                                requestOpts: default,
                                cancellationToken: cts.Token))
             {
-                Assert.Equal("events.foo", msg.Subject);
+                Assert.Equal("events.foo", msg.JSMsg!.Value.Msg.Subject);
                 break;
             }
         }
@@ -155,9 +159,4 @@ public class JetStreamTest
             Assert.Equal(10059, exception.Error.ErrCode);
         }
     }
-}
-
-public class TestData
-{
-    public int Test { get; set; }
 }
