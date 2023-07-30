@@ -157,7 +157,7 @@ public class NatsServer : IAsyncDisposable
     {
         NatsServer? server = null;
         NatsConnection? nats = null;
-        for (int i = 0; i < 10; i++)
+        for (var i = 0; i < 10; i++)
         {
             try
             {

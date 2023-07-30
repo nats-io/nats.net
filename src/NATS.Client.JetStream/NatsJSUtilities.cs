@@ -1,4 +1,4 @@
-﻿using NATS.Client.JetStream.Models;
+using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
 

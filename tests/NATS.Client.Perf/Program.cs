@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using NATS.Client.Core;
@@ -126,7 +126,8 @@ internal class Result
             var test = result._test();
             var ok = test ? "OK" : "NOT OK";
             Console.WriteLine($"[{ok}] {result._message}");
-            if (test == false) failed++;
+            if (test == false)
+                failed++;
         }
 
         Console.WriteLine(failed == 0 ? "PASS" : "FAILED");
