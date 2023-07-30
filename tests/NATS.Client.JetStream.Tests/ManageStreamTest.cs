@@ -1,4 +1,4 @@
-﻿using NATS.Client.Core.Tests;
+using NATS.Client.Core.Tests;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Tests;
@@ -27,7 +27,8 @@ public class ManageStreamTest
         {
             var info = await streams.CreateAsync(request: new StreamConfiguration
             {
-                Name = "events", Subjects = new[] { "events.*" },
+                Name = "events",
+                Subjects = new[] { "events.*" },
             });
             Assert.Equal("events", info.Config.Name);
 
@@ -72,9 +73,9 @@ public class ManageStreamTest
             var response = await streams.ListAsync(new StreamListRequest());
             var list = response.Streams.ToList();
             Assert.Equal(3, list.Count);
-            Assert.True(list.Any(s => s.Config.Name == "s1"));
-            Assert.True(list.Any(s => s.Config.Name == "s2"));
-            Assert.True(list.Any(s => s.Config.Name == "s3"));
+            Assert.Contains(list, s => s.Config.Name == "s1");
+            Assert.Contains(list, s => s.Config.Name == "s2");
+            Assert.Contains(list, s => s.Config.Name == "s3");
         }
 
         // Delete
@@ -84,7 +85,7 @@ public class ManageStreamTest
 
             var response = await streams.ListAsync(new StreamListRequest());
             var list = response.Streams.ToList();
-            Assert.False(list.Any(s => s.Config.Name == "s1"));
+            Assert.DoesNotContain(list, s => s.Config.Name == "s1");
         }
     }
 }

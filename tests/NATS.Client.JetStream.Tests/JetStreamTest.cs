@@ -1,15 +1,10 @@
-﻿using NATS.Client.Core.Tests;
+using NATS.Client.Core.Tests;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Tests;
 
 public class JetStreamTest
 {
-    private class TestData
-    {
-        public int Test { get; set; }
-    }
-
     private readonly ITestOutputHelper _output;
 
     public JetStreamTest(ITestOutputHelper output) => _output = output;
@@ -29,7 +24,8 @@ public class JetStreamTest
             // Create stream
             var info = await streams.CreateAsync(request: new StreamConfiguration
             {
-                Name = "events", Subjects = new[] { "events.*" },
+                Name = "events",
+                Subjects = new[] { "events.*" },
             });
             Assert.Equal("events", info.Config.Name);
 
@@ -130,7 +126,8 @@ public class JetStreamTest
             {
                 await streams.CreateAsync(request: new StreamConfiguration
                 {
-                    Name = "events2", Subjects = new[] { "events.*" },
+                    Name = "events2",
+                    Subjects = new[] { "events.*" },
                 });
             });
             Assert.Equal(400, exception.Error.Code);
@@ -158,5 +155,10 @@ public class JetStreamTest
             // stream not found
             Assert.Equal(10059, exception.Error.ErrCode);
         }
+    }
+
+    private record TestData
+    {
+        public int Test { get; init; }
     }
 }

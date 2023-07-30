@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Threading.Channels;
 using NATS.Client.Core;
@@ -99,7 +99,6 @@ internal class NatsJSSubModelBuilder<T> : INatsSubBuilder<NatsJSSub<T>>
     }
 }
 
-
 /// <summary>
 /// NATS JetStream Subscription with JetStream control message support.
 /// </summary>
@@ -177,4 +176,3 @@ internal class NatsJSSubBuilder : INatsSubBuilder<NatsJSSub>
         return new NatsJSSub(connection, manager, subject, opts);
     }
 }
-

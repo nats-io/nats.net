@@ -1,14 +1,9 @@
-﻿using NATS.Client.Core.Tests;
+using NATS.Client.Core.Tests;
 
 namespace NATS.Client.JetStream.Tests;
 
 public class PublishTest
 {
-    private class TestData
-    {
-        public int Test { get; set; }
-    }
-
     private readonly ITestOutputHelper _output;
 
     public PublishTest(ITestOutputHelper output) => _output = output;
@@ -50,5 +45,10 @@ public class PublishTest
             Assert.Null(ack2.Error);
             Assert.True(ack2.Duplicate);
         }
+    }
+
+    private record TestData
+    {
+        public int Test { get; init; }
     }
 }

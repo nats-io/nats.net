@@ -1,15 +1,10 @@
-﻿using NATS.Client.Core.Tests;
+using NATS.Client.Core.Tests;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Tests;
 
 public class ConsumerConsumeTest
 {
-    private record TestData
-    {
-        public int Test { get; set; }
-    }
-
     private readonly ITestOutputHelper _output;
 
     public ConsumerConsumeTest(ITestOutputHelper output) => _output = output;
@@ -63,5 +58,10 @@ public class ConsumerConsumeTest
             // Consequent fetches should top up to the prefetch value
             Assert.Matches(@"^PUB.*{""batch"":5}", frame.Message);
         }
+    }
+
+    private record TestData
+    {
+        public int Test { get; init; }
     }
 }

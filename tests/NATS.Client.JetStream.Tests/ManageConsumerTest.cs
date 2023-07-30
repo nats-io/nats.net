@@ -1,4 +1,4 @@
-﻿using NATS.Client.Core.Tests;
+using NATS.Client.Core.Tests;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Tests;
@@ -23,7 +23,8 @@ public class ManageConsumerTest
         {
             var consumerInfo = await consumers.CreateAsync(new ConsumerCreateRequest
             {
-                StreamName = "s1", Config = new ConsumerConfiguration { Name = "c1", DurableName = "c1" },
+                StreamName = "s1",
+                Config = new ConsumerConfiguration { Name = "c1", DurableName = "c1" },
             });
             Assert.Equal("s1", consumerInfo.StreamName);
             Assert.Equal("c1", consumerInfo.Config.Name);
@@ -56,9 +57,9 @@ public class ManageConsumerTest
             var list = consumerList.Consumers.ToList();
             Assert.Equal(3, list.Count);
             Assert.True(list.All(c => c.StreamName == "s1"));
-            Assert.True(list.Any(c => c.Config.Name == "c1"));
-            Assert.True(list.Any(c => c.Config.Name == "c2"));
-            Assert.True(list.Any(c => c.Config.Name == "c3"));
+            Assert.Contains(list, c => c.Config.Name == "c1");
+            Assert.Contains(list, c => c.Config.Name == "c2");
+            Assert.Contains(list, c => c.Config.Name == "c3");
         }
 
         // Delete
@@ -69,7 +70,7 @@ public class ManageConsumerTest
             var consumerList = await consumers.ListAsync("s1", new ConsumerListRequest());
             var list = consumerList.Consumers.ToList();
             Assert.Equal(2, list.Count);
-            Assert.False(list.Any(c => c.Config.Name == "c1"));
+            Assert.DoesNotContain(list, c => c.Config.Name == "c1");
         }
     }
 }

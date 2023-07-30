@@ -1,15 +1,10 @@
-﻿using NATS.Client.Core.Tests;
+using NATS.Client.Core.Tests;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Tests;
 
 public class ConsumerFetchTest
 {
-    private record TestData
-    {
-        public int Test { get; set; }
-    }
-
     private readonly ITestOutputHelper _output;
 
     public ConsumerFetchTest(ITestOutputHelper output) => _output = output;
@@ -42,5 +37,10 @@ public class ConsumerFetchTest
         }
 
         Assert.Equal(10, count);
+    }
+
+    private record TestData
+    {
+        public int Test { get; init; }
     }
 }

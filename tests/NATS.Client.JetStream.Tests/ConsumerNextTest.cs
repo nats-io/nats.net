@@ -1,15 +1,10 @@
-﻿using NATS.Client.Core.Tests;
+using NATS.Client.Core.Tests;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Tests;
 
 public class ConsumerNextTest
 {
-    private record TestData
-    {
-        public int Test { get; set; }
-    }
-
     private readonly ITestOutputHelper _output;
 
     public ConsumerNextTest(ITestOutputHelper output) => _output = output;
@@ -36,5 +31,10 @@ public class ConsumerNextTest
             await msg.Ack(cts.Token);
             Assert.Equal(i, msg.Msg.Data!.Test);
         }
+    }
+
+    private record TestData
+    {
+        public int Test { get; init; }
     }
 }

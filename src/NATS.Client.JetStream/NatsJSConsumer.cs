@@ -1,4 +1,4 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
 using NATS.Client.Core;
 using NATS.Client.JetStream.Models;
 
@@ -125,7 +125,6 @@ public class NatsJSConsumer
             }
         }
     }
-
 
     internal async IAsyncEnumerable<NatsJSControlMsg> ConsumeRawAsync(
         ConsumerGetnextRequest request,

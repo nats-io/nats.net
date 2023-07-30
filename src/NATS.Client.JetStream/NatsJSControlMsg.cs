@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using NATS.Client.Core;
 
 namespace NATS.Client.JetStream;
@@ -29,5 +29,5 @@ internal readonly struct NatsJSControlMsg
 
 public static class NatsJSConstants
 {
-    public static ReadOnlySequence<byte> Ack = new("+ACK"u8.ToArray());
+    public static readonly ReadOnlySequence<byte> Ack = new("+ACK"u8.ToArray());
 }
