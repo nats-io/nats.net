@@ -3,11 +3,15 @@ using System.Text.Json.Serialization;
 
 namespace NATS.Client.Core.Internal;
 
+// SYSLIB1037: The type 'ClientOptions' defines init-only properties,
+// deserialization of which is currently not supported in source generation mode
+#pragma warning disable SYSLIB1037
+
 // These connections options are serialized and sent to the server.
 // https://github.com/nats-io/nats-server/blob/a23b1b7/server/client.go#L536
 internal sealed class ClientOptions
 {
-    public ClientOptions(NatsOptions options)
+    private ClientOptions(NatsOptions options)
     {
         Name = options.Name;
         Echo = options.Echo;
@@ -85,6 +89,11 @@ internal sealed class ClientOptions
 
     [JsonPropertyName("no_responders")]
     public bool NoResponders { get; init; } = false;
+
+    public static ClientOptions Create(NatsOptions options)
+    {
+        return new ClientOptions(options);
+    }
 
     private static string GetAssemblyVersion()
     {

@@ -29,10 +29,7 @@ internal sealed class ProtocolWriter
         WriteConstant(CommandConstants.ConnectWithPadding);
 
         var jsonWriter = new Utf8JsonWriter(_writer);
-        JsonSerializer.Serialize(jsonWriter, options, new JsonSerializerOptions
-        {
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        });
+        JsonSerializer.Serialize(jsonWriter, options, JsonContext.Default.ClientOptions);
 
         WriteConstant(CommandConstants.NewLine);
     }

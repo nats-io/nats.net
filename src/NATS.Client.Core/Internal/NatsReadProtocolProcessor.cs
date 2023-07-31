@@ -102,7 +102,8 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         // skip `INFO`
         var jsonReader = new Utf8JsonReader(buffer.Slice(5));
 
-        var serverInfo = JsonSerializer.Deserialize<ServerInfo>(ref jsonReader) ?? throw new NatsException("Can not parse ServerInfo.");
+        var serverInfo = JsonSerializer.Deserialize(ref jsonReader, JsonContext.Default.ServerInfo)
+                         ?? throw new NatsException("Can not parse ServerInfo.");
         return serverInfo;
     }
 

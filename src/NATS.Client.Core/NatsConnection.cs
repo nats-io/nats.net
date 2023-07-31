@@ -71,7 +71,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         InboxPrefix = $"{options.InboxPrefix}.{Guid.NewGuid():n}.";
         _subscriptionManager = new SubscriptionManager(this, InboxPrefix);
         _logger = options.LoggerFactory.CreateLogger<NatsConnection>();
-        _clientOptions = new ClientOptions(Options);
+        _clientOptions = ClientOptions.Create(Options);
         HeaderParser = new HeaderParser(options.HeaderEncoding);
     }
 
