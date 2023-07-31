@@ -1,7 +1,4 @@
-#if DEBUG
-
 using System.Buffers;
-using System.Diagnostics;
 using System.Text;
 
 namespace NATS.Client.Core.Internal;
@@ -61,5 +58,3 @@ public static class DebuggingExtensions
         return sb.ToString();
     }
 }
-
-#endif
