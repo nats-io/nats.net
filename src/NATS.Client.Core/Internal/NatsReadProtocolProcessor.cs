@@ -392,7 +392,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                 var newPosition = newBuffer.PositionOf((byte)'\n');
 
                 var serverInfo = ParseInfo(newBuffer);
-                _connection.ServerInfo = serverInfo;
+                _connection.WritableServerInfo = serverInfo;
                 _logger.LogInformation("Received ServerInfo: {0}", serverInfo);
                 _waitForInfoSignal.TrySetResult();
                 await _infoParsed.ConfigureAwait(false);
@@ -401,7 +401,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
             else
             {
                 var serverInfo = ParseInfo(buffer);
-                _connection.ServerInfo = serverInfo;
+                _connection.WritableServerInfo = serverInfo;
                 _logger.LogInformation("Received ServerInfo: {0}", serverInfo);
                 _waitForInfoSignal.TrySetResult();
                 await _infoParsed.ConfigureAwait(false);

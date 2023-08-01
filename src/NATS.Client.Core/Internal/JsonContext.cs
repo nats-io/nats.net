@@ -10,6 +10,6 @@ namespace NATS.Client.Core.Internal;
     WriteIndented = false)]
 [JsonSerializable(typeof(ServerInfo), GenerationMode = JsonSourceGenerationMode.Metadata)]
 [JsonSerializable(typeof(ClientOptions), GenerationMode = JsonSourceGenerationMode.Serialization)]
-internal partial class JsonContext : JsonSerializerContext
+internal sealed partial class JsonContext : JsonSerializerContext
 {
 }

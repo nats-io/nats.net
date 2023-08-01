@@ -116,3 +116,5 @@ internal sealed class ClientOptions
         return version;
     }
 }
+
+#pragma warning restore SYSLIB1037
