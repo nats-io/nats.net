@@ -7,24 +7,23 @@ namespace NATS.Client.JetStream;
 public class NatsJSConsumer
 {
     private readonly NatsJSContext _context;
-    private readonly ConsumerInfo _info;
-    private readonly ConsumerOpts _opts;
     private readonly string _stream;
     private readonly string _consumer;
 
-    public NatsJSConsumer(NatsJSContext context, ConsumerInfo info, ConsumerOpts opts)
+    public NatsJSConsumer(NatsJSContext context, ConsumerInfo info)
     {
         _context = context;
-        _info = info;
-        _opts = opts;
-        _stream = _info.StreamName;
-        _consumer = _info.Name;
+        Info = info;
+        _stream = Info.StreamName;
+        _consumer = Info.Name;
     }
 
-    public async IAsyncEnumerable<NatsJSMsg<T?>> ConsumeAsync<T>(int maxMsgs, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public ConsumerInfo Info { get; }
+
+    public async IAsyncEnumerable<NatsJSMsg<T?>> ConsumeAsync<T>(int maxMsgs, ConsumerOpts opts, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var prefetch = _opts.Prefetch;
-        var lowWatermark = _opts.LowWatermark;
+        var prefetch = opts.Prefetch;
+        var lowWatermark = opts.LowWatermark;
         var shouldPrefetch = true;
 
         if (maxMsgs <= prefetch)

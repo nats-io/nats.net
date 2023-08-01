@@ -17,20 +17,18 @@ public class JetStreamTest
 
         // Happy user
         {
-            var context = new NatsJSContext(nats, new NatsJSOptions());
-            var streams = new NatsJSManageStreams(context);
-            var consumers = new NatsJSManageConsumers(context);
+            var js = new NatsJSContext(nats, new NatsJSOptions());
 
             // Create stream
-            var info = await streams.CreateAsync(request: new StreamConfiguration
+            var stream = await js.CreateStreamAsync(request: new StreamConfiguration
             {
                 Name = "events",
                 Subjects = new[] { "events.*" },
             });
-            Assert.Equal("events", info.Config.Name);
+            Assert.Equal("events", stream.Info.Config.Name);
 
             // Create consumer
-            var consumerInfo = await consumers.CreateAsync(new ConsumerCreateRequest
+            var consumer = await js.CreateConsumerAsync(new ConsumerCreateRequest
             {
                 StreamName = "events",
                 Config = new ConsumerConfiguration
@@ -48,19 +46,19 @@ public class JetStreamTest
                     AckWait = 2_000_000_000, // 2 seconds
                 },
             });
-            Assert.Equal("events", consumerInfo.StreamName);
-            Assert.Equal("consumer1", consumerInfo.Config.Name);
+            Assert.Equal("events", consumer.Info.StreamName);
+            Assert.Equal("consumer1", consumer.Info.Config.Name);
 
             // Publish
             PubAckResponse ack;
-            ack = await context.PublishAsync("events.foo", new TestData { Test = 1 });
+            ack = await js.PublishAsync("events.foo", new TestData { Test = 1 });
             Assert.Null(ack.Error);
             Assert.Equal("events", ack.Stream);
             Assert.Equal(1, ack.Seq);
             Assert.False(ack.Duplicate);
 
             // Message ID
-            ack = await context.PublishAsync("events.foo", new TestData { Test = 2 }, new NatsPubOpts
+            ack = await js.PublishAsync("events.foo", new TestData { Test = 2 }, new NatsPubOpts
             {
                 Headers = new NatsHeaders { { "Nats-Msg-Id", "test2" } },
             });
@@ -70,7 +68,7 @@ public class JetStreamTest
             Assert.False(ack.Duplicate);
 
             // Duplicate
-            ack = await context.PublishAsync("events.foo", new TestData { Test = 2 }, new NatsPubOpts
+            ack = await js.PublishAsync("events.foo", new TestData { Test = 2 }, new NatsPubOpts
             {
                 Headers = new NatsHeaders { { "Nats-Msg-Id", "test2" } },
             });
@@ -82,7 +80,6 @@ public class JetStreamTest
             // Consume
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             var messages = new List<NatsJSControlMsg>();
-            var consumer = new NatsJSConsumer(context, new ConsumerInfo { Name = "consumer1", StreamName = "events" }, new ConsumerOpts());
             await foreach (var msg in consumer.ConsumeRawAsync(
                                request: new ConsumerGetnextRequest { Batch = 100 },
                                requestOpts: default,
@@ -119,12 +116,10 @@ public class JetStreamTest
 
         // Handle errors
         {
-            var context = new NatsJSContext(nats, new NatsJSOptions());
-            var streams = new NatsJSManageStreams(context);
-
+            var js = new NatsJSContext(nats, new NatsJSOptions());
             var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () =>
             {
-                await streams.CreateAsync(request: new StreamConfiguration
+                await js.CreateStreamAsync(request: new StreamConfiguration
                 {
                     Name = "events2",
                     Subjects = new[] { "events.*" },
@@ -138,16 +133,15 @@ public class JetStreamTest
 
         // Delete stream
         {
-            var context = new NatsJSContext(nats, new NatsJSOptions());
-            var streams = new NatsJSManageStreams(context);
+            var js = new NatsJSContext(nats, new NatsJSOptions());
 
             // Success
-            await streams.DeleteAsync("events");
+            await js.DeleteStreamAsync("events");
 
             // Error
             var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () =>
             {
-                await streams.DeleteAsync("events2");
+                await js.DeleteStreamAsync("events2");
             });
 
             Assert.Equal(404, exception.Error.Code);

@@ -5,7 +5,7 @@ using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
 
-public class NatsJSContext
+public partial class NatsJSContext
 {
     public NatsJSContext(NatsConnection nats)
         : this(nats, new NatsJSOptions())

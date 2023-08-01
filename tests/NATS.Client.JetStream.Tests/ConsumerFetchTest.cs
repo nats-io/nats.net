@@ -1,5 +1,4 @@
 using NATS.Client.Core.Tests;
-using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -15,10 +14,8 @@ public class ConsumerFetchTest
         await using var server = NatsServer.StartJS();
         await using var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats);
-        var streams = new NatsJSManageStreams(js);
-        var consumers = new NatsJSManageConsumers(js);
-        await streams.CreateAsync("s1", "s1.*");
-        var consumerInfo = await consumers.CreateAsync("s1", "c1");
+        await js.CreateStreamAsync("s1", "s1.*");
+        await js.CreateConsumerAsync("s1", "c1");
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
         for (var i = 0; i < 10; i++)
@@ -27,7 +24,7 @@ public class ConsumerFetchTest
             ack.EnsureSuccess();
         }
 
-        var consumer = new NatsJSConsumer(js, consumerInfo, new ConsumerOpts());
+        var consumer = await js.GetConsumerAsync("s1", "c1", cts.Token);
         var count = 0;
         await foreach (var msg in consumer.FetchAsync<TestData>(10, cts.Token))
         {

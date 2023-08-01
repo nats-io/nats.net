@@ -14,45 +14,44 @@ public class ManageStreamTest
     {
         await using var server = NatsServer.StartJS();
         var nats = server.CreateClientConnection();
-        var context = new NatsJSContext(nats, new NatsJSOptions());
-        var streams = new NatsJSManageStreams(context);
+        var js = new NatsJSContext(nats, new NatsJSOptions());
 
         // Account Info
         {
-            var accountInfo = await context.GetAccountInfoAsync();
+            var accountInfo = await js.GetAccountInfoAsync();
             Assert.Equal(0, accountInfo.Streams);
         }
 
         // Create
         {
-            var info = await streams.CreateAsync(request: new StreamConfiguration
+            var stream = await js.CreateStreamAsync(request: new StreamConfiguration
             {
                 Name = "events",
                 Subjects = new[] { "events.*" },
             });
-            Assert.Equal("events", info.Config.Name);
+            Assert.Equal("events", stream.Info.Config.Name);
 
-            var accountInfo = await context.GetAccountInfoAsync();
+            var accountInfo = await js.GetAccountInfoAsync();
             Assert.Equal(1, accountInfo.Streams);
         }
 
         // Get
         {
-            var info = await streams.GetAsync("events");
-            Assert.Equal("events", info.Config.Name);
-            Assert.Equal(new[] { "events.*" }, info.Config.Subjects);
+            var stream = await js.GetStreamAsync("events");
+            Assert.Equal("events", stream.Info.Config.Name);
+            Assert.Equal(new[] { "events.*" }, stream.Info.Config.Subjects);
         }
 
         // Update
         {
-            var info = await streams.GetAsync("events");
-            Assert.Equal(-1, info.Config.MaxMsgs);
+            var stream1 = await js.GetStreamAsync("events");
+            Assert.Equal(-1, stream1.Info.Config.MaxMsgs);
 
-            var response = await streams.UpdateAsync(new StreamUpdateRequest { Name = "events", MaxMsgs = 10 });
-            Assert.Equal(10, response.Config.MaxMsgs);
+            var stream2 = await js.UpdateStreamAsync(new StreamUpdateRequest { Name = "events", MaxMsgs = 10 });
+            Assert.Equal(10, stream2.Info.Config.MaxMsgs);
 
-            var info2 = await streams.GetAsync("events");
-            Assert.Equal(10, info2.Config.MaxMsgs);
+            var stream3 = await js.GetStreamAsync("events");
+            Assert.Equal(10, stream3.Info.Config.MaxMsgs);
         }
     }
 
@@ -61,31 +60,38 @@ public class ManageStreamTest
     {
         await using var server = NatsServer.StartJS();
         var nats = server.CreateClientConnection();
-        var context = new NatsJSContext(nats, new NatsJSOptions());
-        var streams = new NatsJSManageStreams(context);
+        var js = new NatsJSContext(nats, new NatsJSOptions());
 
-        await streams.CreateAsync("s1", "s1.*");
-        await streams.CreateAsync("s2", "s2.*");
-        await streams.CreateAsync("s3", "s3.*");
+        await js.CreateStreamAsync("s1", "s1.*");
+        await js.CreateStreamAsync("s2", "s2.*");
+        await js.CreateStreamAsync("s3", "s3.*");
 
         // List
         {
-            var response = await streams.ListAsync(new StreamListRequest());
-            var list = response.Streams.ToList();
+            var list = new List<NatsJSStream>();
+            await foreach (var stream in js.ListStreamsAsync(new StreamListRequest()))
+            {
+                list.Add(stream);
+            }
+
             Assert.Equal(3, list.Count);
-            Assert.Contains(list, s => s.Config.Name == "s1");
-            Assert.Contains(list, s => s.Config.Name == "s2");
-            Assert.Contains(list, s => s.Config.Name == "s3");
+            Assert.Contains(list, s => s.Info.Config.Name == "s1");
+            Assert.Contains(list, s => s.Info.Config.Name == "s2");
+            Assert.Contains(list, s => s.Info.Config.Name == "s3");
         }
 
         // Delete
         {
-            var deleteResponse = await streams.DeleteAsync("s1");
-            Assert.True(deleteResponse.Success);
+            var deleteResponse = await js.DeleteStreamAsync("s1");
+            Assert.True(deleteResponse);
 
-            var response = await streams.ListAsync(new StreamListRequest());
-            var list = response.Streams.ToList();
-            Assert.DoesNotContain(list, s => s.Config.Name == "s1");
+            var list = new List<NatsJSStream>();
+            await foreach (var stream in js.ListStreamsAsync(new StreamListRequest()))
+            {
+                list.Add(stream);
+            }
+
+            Assert.DoesNotContain(list, s => s.Info.Config.Name == "s1");
         }
     }
 }

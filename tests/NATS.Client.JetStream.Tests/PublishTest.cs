@@ -14,10 +14,8 @@ public class PublishTest
         await using var server = NatsServer.StartJS();
         await using var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats);
-        var streams = new NatsJSManageStreams(js);
-        var consumers = new NatsJSManageConsumers(js);
-        await streams.CreateAsync("s1", "s1.*");
-        await consumers.CreateAsync("s1", "c1");
+        await js.CreateStreamAsync("s1", "s1.*");
+        await js.CreateConsumerAsync("s1", "c1");
 
         // Publish
         {

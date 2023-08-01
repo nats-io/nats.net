@@ -1,5 +1,4 @@
 using NATS.Client.Core.Tests;
-using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -12,16 +11,13 @@ public class ConsumerNextTest
     [Fact]
     public async Task Next_test()
     {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
         await using var server = NatsServer.StartJS();
         await using var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats);
-        var streams = new NatsJSManageStreams(js);
-        var consumers = new NatsJSManageConsumers(js);
-        await streams.CreateAsync("s1", "s1.*");
-        var consumerInfo = await consumers.CreateAsync("s1", "c1");
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-
-        var consumer = new NatsJSConsumer(js, consumerInfo, new ConsumerOpts());
+        await js.CreateStreamAsync("s1", "s1.*");
+        var consumer = await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
 
         for (var i = 0; i < 10; i++)
         {

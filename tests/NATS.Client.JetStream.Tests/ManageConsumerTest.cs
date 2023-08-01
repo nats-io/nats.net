@@ -14,27 +14,25 @@ public class ManageConsumerTest
     {
         await using var server = NatsServer.StartJS();
         var nats = server.CreateClientConnection();
-        var context = new NatsJSContext(nats, new NatsJSOptions());
-        var streams = new NatsJSManageStreams(context);
-        var consumers = new NatsJSManageConsumers(context);
-        await streams.CreateAsync("s1", "s1.*");
+        var js = new NatsJSContext(nats, new NatsJSOptions());
+        await js.CreateStreamAsync("s1", "s1.*");
 
         // Create
         {
-            var consumerInfo = await consumers.CreateAsync(new ConsumerCreateRequest
+            var consumer = await js.CreateConsumerAsync(new ConsumerCreateRequest
             {
                 StreamName = "s1",
                 Config = new ConsumerConfiguration { Name = "c1", DurableName = "c1" },
             });
-            Assert.Equal("s1", consumerInfo.StreamName);
-            Assert.Equal("c1", consumerInfo.Config.Name);
+            Assert.Equal("s1", consumer.Info.StreamName);
+            Assert.Equal("c1", consumer.Info.Config.Name);
         }
 
         // Get
         {
-            var consumerInfo = await consumers.GetAsync("s1", "c1");
-            Assert.Equal("s1", consumerInfo.StreamName);
-            Assert.Equal("c1", consumerInfo.Config.Name);
+            var consumer = await js.GetConsumerAsync("s1", "c1");
+            Assert.Equal("s1", consumer.Info.StreamName);
+            Assert.Equal("c1", consumer.Info.Config.Name);
         }
     }
 
@@ -43,34 +41,40 @@ public class ManageConsumerTest
     {
         await using var server = NatsServer.StartJS();
         var nats = server.CreateClientConnection();
-        var context = new NatsJSContext(nats, new NatsJSOptions());
-        var streams = new NatsJSManageStreams(context);
-        var consumers = new NatsJSManageConsumers(context);
-        await streams.CreateAsync("s1", "s1.*");
-        await consumers.CreateAsync("s1", "c1");
-        await consumers.CreateAsync("s1", "c2");
-        await consumers.CreateAsync("s1", "c3");
+        var js = new NatsJSContext(nats, new NatsJSOptions());
+        await js.CreateStreamAsync("s1", "s1.*");
+        await js.CreateConsumerAsync("s1", "c1");
+        await js.CreateConsumerAsync("s1", "c2");
+        await js.CreateConsumerAsync("s1", "c3");
 
         // List
         {
-            var consumerList = await consumers.ListAsync("s1", new ConsumerListRequest());
-            var list = consumerList.Consumers.ToList();
+            var list = new List<NatsJSConsumer>();
+            await foreach (var consumer in js.ListConsumersAsync("s1", new ConsumerListRequest()))
+            {
+                list.Add(consumer);
+            }
+
             Assert.Equal(3, list.Count);
-            Assert.True(list.All(c => c.StreamName == "s1"));
-            Assert.Contains(list, c => c.Config.Name == "c1");
-            Assert.Contains(list, c => c.Config.Name == "c2");
-            Assert.Contains(list, c => c.Config.Name == "c3");
+            Assert.True(list.All(c => c.Info.StreamName == "s1"));
+            Assert.Contains(list, c => c.Info.Config.Name == "c1");
+            Assert.Contains(list, c => c.Info.Config.Name == "c2");
+            Assert.Contains(list, c => c.Info.Config.Name == "c3");
         }
 
         // Delete
         {
-            var response = await consumers.DeleteAsync("s1", "c1");
-            Assert.True(response.Success);
+            var response = await js.DeleteConsumerAsync("s1", "c1");
+            Assert.True(response);
 
-            var consumerList = await consumers.ListAsync("s1", new ConsumerListRequest());
-            var list = consumerList.Consumers.ToList();
+            var list = new List<NatsJSConsumer>();
+            await foreach (var consumer in js.ListConsumersAsync("s1", new ConsumerListRequest()))
+            {
+                list.Add(consumer);
+            }
+
             Assert.Equal(2, list.Count);
-            Assert.DoesNotContain(list, c => c.Config.Name == "c1");
+            Assert.DoesNotContain(list, c => c.Info.Config.Name == "c1");
         }
     }
 }
