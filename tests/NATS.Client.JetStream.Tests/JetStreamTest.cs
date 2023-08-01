@@ -17,80 +17,83 @@ public class JetStreamTest
 
         // Happy user
         {
+            var cts1 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
             var js = new NatsJSContext(nats, new NatsJSOptions());
 
             // Create stream
-            var stream = await js.CreateStreamAsync(request: new StreamConfiguration
-            {
-                Name = "events",
-                Subjects = new[] { "events.*" },
-            });
+            var stream = await js.CreateStreamAsync(
+                request: new StreamConfiguration { Name = "events", Subjects = new[] { "events.*" }, },
+                cancellationToken: cts1.Token);
             Assert.Equal("events", stream.Info.Config.Name);
 
             // Create consumer
-            var consumer = await js.CreateConsumerAsync(new ConsumerCreateRequest
-            {
-                StreamName = "events",
-                Config = new ConsumerConfiguration
+            var consumer = await js.CreateConsumerAsync(
+                new ConsumerCreateRequest
                 {
-                    Name = "consumer1",
-                    DurableName = "consumer1",
+                    StreamName = "events",
+                    Config = new ConsumerConfiguration
+                    {
+                        Name = "consumer1",
+                        DurableName = "consumer1",
 
-                    // Turn on ACK so we can test them below
-                    AckPolicy = ConsumerConfigurationAckPolicy.@explicit,
+                        // Turn on ACK so we can test them below
+                        AckPolicy = ConsumerConfigurationAckPolicy.@explicit,
 
-                    // Effectively set message expiry for the consumer
-                    // so that unacknowledged messages can be put back into
-                    // the consumer to be delivered again (in a sense).
-                    // This is to make below consumer tests work.
-                    AckWait = 2_000_000_000, // 2 seconds
+                        // Effectively set message expiry for the consumer
+                        // so that unacknowledged messages can be put back into
+                        // the consumer to be delivered again (in a sense).
+                        // This is to make below consumer tests work.
+                        AckWait = 2_000_000_000, // 2 seconds
+                    },
                 },
-            });
+                cts1.Token);
             Assert.Equal("events", consumer.Info.StreamName);
             Assert.Equal("consumer1", consumer.Info.Config.Name);
 
             // Publish
-            PubAckResponse ack;
-            ack = await js.PublishAsync("events.foo", new TestData { Test = 1 });
+            var ack = await js.PublishAsync("events.foo", new TestData { Test = 1 }, cancellationToken: cts1.Token);
             Assert.Null(ack.Error);
             Assert.Equal("events", ack.Stream);
             Assert.Equal(1, ack.Seq);
             Assert.False(ack.Duplicate);
 
             // Message ID
-            ack = await js.PublishAsync("events.foo", new TestData { Test = 2 }, new NatsPubOpts
-            {
-                Headers = new NatsHeaders { { "Nats-Msg-Id", "test2" } },
-            });
+            ack = await js.PublishAsync(
+                "events.foo",
+                new TestData { Test = 2 },
+                new NatsPubOpts { Headers = new NatsHeaders { { "Nats-Msg-Id", "test2" } }, },
+                cts1.Token);
             Assert.Null(ack.Error);
             Assert.Equal("events", ack.Stream);
             Assert.Equal(2, ack.Seq);
             Assert.False(ack.Duplicate);
 
             // Duplicate
-            ack = await js.PublishAsync("events.foo", new TestData { Test = 2 }, new NatsPubOpts
-            {
-                Headers = new NatsHeaders { { "Nats-Msg-Id", "test2" } },
-            });
+            ack = await js.PublishAsync(
+                "events.foo",
+                new TestData { Test = 2 },
+                new NatsPubOpts { Headers = new NatsHeaders { { "Nats-Msg-Id", "test2" } }, },
+                cts1.Token);
             Assert.Null(ack.Error);
             Assert.Equal("events", ack.Stream);
             Assert.Equal(2, ack.Seq);
             Assert.True(ack.Duplicate);
 
             // Consume
-            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var cts2 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             var messages = new List<NatsJSControlMsg>();
             await foreach (var msg in consumer.ConsumeRawAsync(
                                request: new ConsumerGetnextRequest { Batch = 100 },
                                requestOpts: default,
-                               cancellationToken: cts.Token))
+                               cancellationToken: cts2.Token))
             {
                 messages.Add(msg);
 
                 // Only ACK one message so we can consume again
                 if (messages.Count == 1)
                 {
-                    await msg.JSMsg!.Value.Ack(cts.Token);
+                    await msg.JSMsg!.Value.Ack(cts2.Token);
                 }
 
                 if (messages.Count == 2)
@@ -107,7 +110,7 @@ public class JetStreamTest
             await foreach (var msg in consumer.ConsumeRawAsync(
                                request: new ConsumerGetnextRequest { Batch = 100 },
                                requestOpts: default,
-                               cancellationToken: cts.Token))
+                               cancellationToken: cts2.Token))
             {
                 Assert.Equal("events.foo", msg.JSMsg!.Value.Msg.Subject);
                 break;
@@ -116,14 +119,18 @@ public class JetStreamTest
 
         // Handle errors
         {
+            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
             var js = new NatsJSContext(nats, new NatsJSOptions());
             var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () =>
             {
-                await js.CreateStreamAsync(request: new StreamConfiguration
-                {
-                    Name = "events2",
-                    Subjects = new[] { "events.*" },
-                });
+                await js.CreateStreamAsync(
+                    request: new StreamConfiguration
+                    {
+                        Name = "events2",
+                        Subjects = new[] { "events.*" },
+                    },
+                    cancellationToken: cts.Token);
             });
             Assert.Equal(400, exception.Error.Code);
 
@@ -133,15 +140,17 @@ public class JetStreamTest
 
         // Delete stream
         {
+            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
             var js = new NatsJSContext(nats, new NatsJSOptions());
 
             // Success
-            await js.DeleteStreamAsync("events");
+            await js.DeleteStreamAsync("events", cts.Token);
 
             // Error
             var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () =>
             {
-                await js.DeleteStreamAsync("events2");
+                await js.DeleteStreamAsync("events2", cts.Token);
             });
 
             Assert.Equal(404, exception.Error.Code);

@@ -5,8 +5,8 @@ namespace NATS.Client.JetStream;
 
 public partial class NatsJSContext
 {
-    public ValueTask<NatsJSStream> CreateStreamAsync(string stream, params string[] subjects) =>
-        CreateStreamAsync(new StreamCreateRequest { Name = stream, Subjects = subjects });
+    public ValueTask<NatsJSStream> CreateStreamAsync(string stream, string[] subjects, CancellationToken cancellationToken = default) =>
+        CreateStreamAsync(new StreamCreateRequest { Name = stream, Subjects = subjects }, cancellationToken);
 
     public async ValueTask<NatsJSStream> CreateStreamAsync(
         StreamConfiguration request,

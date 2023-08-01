@@ -58,18 +58,20 @@ public class ManageStreamTest
     [Fact]
     public async Task List_delete_stream()
     {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
         await using var server = NatsServer.StartJS();
         var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats, new NatsJSOptions());
 
-        await js.CreateStreamAsync("s1", "s1.*");
-        await js.CreateStreamAsync("s2", "s2.*");
-        await js.CreateStreamAsync("s3", "s3.*");
+        await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
+        await js.CreateStreamAsync("s2", new[] { "s2.*" }, cts.Token);
+        await js.CreateStreamAsync("s3", new[] { "s3.*" }, cts.Token);
 
         // List
         {
             var list = new List<NatsJSStream>();
-            await foreach (var stream in js.ListStreamsAsync(new StreamListRequest()))
+            await foreach (var stream in js.ListStreamsAsync(new StreamListRequest(), cts.Token))
             {
                 list.Add(stream);
             }
@@ -82,11 +84,11 @@ public class ManageStreamTest
 
         // Delete
         {
-            var deleteResponse = await js.DeleteStreamAsync("s1");
+            var deleteResponse = await js.DeleteStreamAsync("s1", cts.Token);
             Assert.True(deleteResponse);
 
             var list = new List<NatsJSStream>();
-            await foreach (var stream in js.ListStreamsAsync(new StreamListRequest()))
+            await foreach (var stream in js.ListStreamsAsync(new StreamListRequest(), cts.Token))
             {
                 list.Add(stream);
             }

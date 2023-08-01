@@ -11,12 +11,12 @@ public class ConsumerFetchTest
     [Fact]
     public async Task Fetch_test()
     {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         await using var server = NatsServer.StartJS();
         await using var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats);
-        await js.CreateStreamAsync("s1", "s1.*");
-        await js.CreateConsumerAsync("s1", "c1");
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
+        await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
 
         for (var i = 0; i < 10; i++)
         {

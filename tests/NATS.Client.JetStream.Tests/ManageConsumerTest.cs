@@ -12,25 +12,34 @@ public class ManageConsumerTest
     [Fact]
     public async Task Create_get_consumer()
     {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
         await using var server = NatsServer.StartJS();
         var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats, new NatsJSOptions());
-        await js.CreateStreamAsync("s1", "s1.*");
+        await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
 
         // Create
         {
-            var consumer = await js.CreateConsumerAsync(new ConsumerCreateRequest
-            {
-                StreamName = "s1",
-                Config = new ConsumerConfiguration { Name = "c1", DurableName = "c1" },
-            });
+            var consumer = await js.CreateConsumerAsync(
+                new ConsumerCreateRequest
+                {
+                    StreamName = "s1",
+                    Config = new ConsumerConfiguration
+                    {
+                        Name = "c1",
+                        DurableName = "c1",
+                        AckPolicy = ConsumerConfigurationAckPolicy.@explicit,
+                    },
+                },
+                cts.Token);
             Assert.Equal("s1", consumer.Info.StreamName);
             Assert.Equal("c1", consumer.Info.Config.Name);
         }
 
         // Get
         {
-            var consumer = await js.GetConsumerAsync("s1", "c1");
+            var consumer = await js.GetConsumerAsync("s1", "c1", cts.Token);
             Assert.Equal("s1", consumer.Info.StreamName);
             Assert.Equal("c1", consumer.Info.Config.Name);
         }
@@ -39,18 +48,20 @@ public class ManageConsumerTest
     [Fact]
     public async Task List_delete_consumer()
     {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
         await using var server = NatsServer.StartJS();
         var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats, new NatsJSOptions());
-        await js.CreateStreamAsync("s1", "s1.*");
-        await js.CreateConsumerAsync("s1", "c1");
-        await js.CreateConsumerAsync("s1", "c2");
-        await js.CreateConsumerAsync("s1", "c3");
+        await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
+        await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+        await js.CreateConsumerAsync("s1", "c2", cancellationToken: cts.Token);
+        await js.CreateConsumerAsync("s1", "c3", cancellationToken: cts.Token);
 
         // List
         {
             var list = new List<NatsJSConsumer>();
-            await foreach (var consumer in js.ListConsumersAsync("s1", new ConsumerListRequest()))
+            await foreach (var consumer in js.ListConsumersAsync("s1", new ConsumerListRequest(), cts.Token))
             {
                 list.Add(consumer);
             }
@@ -64,11 +75,11 @@ public class ManageConsumerTest
 
         // Delete
         {
-            var response = await js.DeleteConsumerAsync("s1", "c1");
+            var response = await js.DeleteConsumerAsync("s1", "c1", cts.Token);
             Assert.True(response);
 
             var list = new List<NatsJSConsumer>();
-            await foreach (var consumer in js.ListConsumersAsync("s1", new ConsumerListRequest()))
+            await foreach (var consumer in js.ListConsumersAsync("s1", new ConsumerListRequest(), cts.Token))
             {
                 list.Add(consumer);
             }

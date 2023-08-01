@@ -9,6 +9,7 @@ public class NatsJSConsumer
     private readonly NatsJSContext _context;
     private readonly string _stream;
     private readonly string _consumer;
+    private bool _deleted;
 
     public NatsJSConsumer(NatsJSContext context, ConsumerInfo info)
     {
@@ -20,8 +21,15 @@ public class NatsJSConsumer
 
     public ConsumerInfo Info { get; }
 
+    public async ValueTask<bool> DeleteAsync(CancellationToken cancellationToken = default)
+    {
+        ThrowIfDeleted();
+        return _deleted = await _context.DeleteConsumerAsync(_stream, _consumer, cancellationToken);
+    }
+
     public async IAsyncEnumerable<NatsJSMsg<T?>> ConsumeAsync<T>(int maxMsgs, ConsumerOpts opts, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        ThrowIfDeleted();
         var prefetch = opts.Prefetch;
         var lowWatermark = opts.LowWatermark;
         var shouldPrefetch = true;
@@ -187,6 +195,12 @@ public class NatsJSConsumer
         {
             throw sub.Exception;
         }
+    }
+
+    private void ThrowIfDeleted()
+    {
+        if (_deleted)
+            throw new NatsJSException($"Consumer '{_stream}:{_consumer}' is deleted");
     }
 }
 
