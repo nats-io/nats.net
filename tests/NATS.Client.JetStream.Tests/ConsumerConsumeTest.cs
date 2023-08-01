@@ -12,7 +12,14 @@ public class ConsumerConsumeTest
     public async Task Consume_test()
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        await using var server = NatsServer.StartJS();
+        await using var server = NatsServer.Start(
+            outputHelper: _output,
+            options: new NatsServerOptionsBuilder()
+                .UseTransport(TransportType.Tcp)
+                .Trace()
+                .UseJetStream()
+                .Build());
+
         var (nats, proxy) = server.CreateProxiedClientConnection();
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
