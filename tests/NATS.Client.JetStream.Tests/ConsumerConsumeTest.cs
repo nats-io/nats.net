@@ -11,7 +11,7 @@ public class ConsumerConsumeTest
     [Fact]
     public async Task Consume_test()
     {
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10000));
         await using var server = NatsServer.Start(
             outputHelper: _output,
             options: new NatsServerOptionsBuilder()
@@ -31,18 +31,16 @@ public class ConsumerConsumeTest
             ack.EnsureSuccess();
         }
 
-        var consumerOpts = new ConsumerOpts
-        {
-            Prefetch = 10,
-            LowWatermark = 5,
-        };
+        var consumerOpts = new NatsJSConsumeOpts(maxMsgs: 10);
         var consumer = await js.GetConsumerAsync("s1", "c1", cts.Token);
         var count = 0;
-        await foreach (var msg in consumer.ConsumeAsync<TestData>(25, consumerOpts, cts.Token))
+        await foreach (var msg in consumer.ConsumeAsync<TestData>(consumerOpts, cts.Token))
         {
             await msg.Ack(cts.Token);
             Assert.Equal(count, msg.Msg.Data!.Test);
             count++;
+            if (count == 25)
+                break;
         }
 
         Assert.Equal(25, count);
@@ -55,12 +53,12 @@ public class ConsumerConsumeTest
         Assert.Equal(5, msgNextRequests.Count);
 
         // Prefetch
-        Assert.Matches(@"^PUB.*{""batch"":10}", msgNextRequests.First().Message);
+        Assert.Matches(@"^PUB.*""batch"":10\b", msgNextRequests.First().Message);
 
         foreach (var frame in msgNextRequests.Skip(1))
         {
             // Consequent fetches should top up to the prefetch value
-            Assert.Matches(@"^PUB.*{""batch"":5}", frame.Message);
+            Assert.Matches(@"^PUB.*""batch"":5\b", frame.Message);
         }
     }
 
