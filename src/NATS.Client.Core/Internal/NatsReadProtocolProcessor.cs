@@ -21,13 +21,14 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
     private readonly Task _infoParsed; // wait for an upgrade
     private readonly ConcurrentQueue<AsyncPingCommand> _pingCommands; // wait for pong
     private readonly ILogger<NatsReadProtocolProcessor> _logger;
+    private readonly bool _trace;
     private int _disposed;
 
     public NatsReadProtocolProcessor(ISocketConnection socketConnection, NatsConnection connection, TaskCompletionSource waitForInfoSignal, TaskCompletionSource waitForPongOrErrorSignal, Task infoParsed)
     {
         _connection = connection;
         _logger = connection.Options.LoggerFactory.CreateLogger<NatsReadProtocolProcessor>();
-        _logger.IsEnabled(LogLevel.Trace);
+        _trace = _logger.IsEnabled(LogLevel.Trace);
         _waitForInfoSignal = waitForInfoSignal;
         _waitForPongOrErrorSignal = waitForPongOrErrorSignal;
         _infoParsed = infoParsed;
@@ -237,7 +238,19 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                         }
 
                         var msgHeader = buffer.Slice(0, positionBeforeNatsHeader.Value);
+
+                        if (_trace)
+                        {
+                            _logger.LogTrace("HMSG trace dump: {MsgHeader}", msgHeader.Dump());
+                        }
+
                         var (subject, sid, replyTo, headersLength, totalLength) = ParseHMessageHeader(msgHeader);
+
+                        if (_trace)
+                        {
+                            _logger.LogTrace("HMSG trace parsed: {Subject} {Sid} {ReplyTo} {HeadersLength} {TotalLength}", subject, sid, replyTo, headersLength, totalLength);
+                        }
+
                         var payloadLength = totalLength - headersLength;
                         Debug.Assert(payloadLength >= 0, "Protocol error: illogical header and total lengths");
 

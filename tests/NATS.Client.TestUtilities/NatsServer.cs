@@ -137,6 +137,15 @@ public class NatsServer : IAsyncDisposable
         }
     }
 
+    public static NatsServer StartJS() => StartJS(new NullOutputHelper(), TransportType.Tcp);
+
+    public static NatsServer StartJS(ITestOutputHelper outputHelper, TransportType transportType) => Start(
+        outputHelper: outputHelper,
+        options: new NatsServerOptionsBuilder()
+            .UseTransport(transportType)
+            .UseJetStream()
+            .Build());
+
     public static NatsServer Start() => Start(new NullOutputHelper(), TransportType.Tcp);
 
     public static NatsServer Start(ITestOutputHelper outputHelper) => Start(outputHelper, TransportType.Tcp);
@@ -148,7 +157,7 @@ public class NatsServer : IAsyncDisposable
     {
         NatsServer? server = null;
         NatsConnection? nats = null;
-        for (int i = 0; i < 10; i++)
+        for (var i = 0; i < 10; i++)
         {
             try
             {

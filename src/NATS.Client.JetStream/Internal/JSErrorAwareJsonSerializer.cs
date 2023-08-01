@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Text.Json;
 using NATS.Client.Core;
 using NATS.Client.JetStream.Models;
@@ -21,9 +21,7 @@ internal sealed class JSErrorAwareJsonSerializer : INatsSerializer
         var jsonDocument = JsonDocument.Parse(buffer);
         if (jsonDocument.RootElement.TryGetProperty("error", out var errorElement))
         {
-            var error = errorElement.Deserialize<ApiError>();
-            if (error == null)
-                throw new NatsJetStreamException("Can't parse JetStream error JSON payload");
+            var error = errorElement.Deserialize<ApiError>() ?? throw new NatsJSException("Can't parse JetStream error JSON payload");
             throw new JSErrorException(error);
         }
 

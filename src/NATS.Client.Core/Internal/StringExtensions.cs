@@ -1,4 +1,4 @@
-﻿namespace NATS.Client.Core.Internal;
+namespace NATS.Client.Core.Internal;
 
 internal static class StringExtensions
 {

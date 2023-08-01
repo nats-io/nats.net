@@ -1,4 +1,4 @@
-﻿namespace NATS.Client.Core.Internal;
+namespace NATS.Client.Core.Internal;
 
 // Support efficiently cancellation support for connection-dispose/timeout/cancel-per-operation
 internal sealed class CancellationTimerPool
