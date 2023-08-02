@@ -146,6 +146,9 @@ public abstract class NatsSubBase : INatsSub
         _idleTimeoutTimer?.Dispose();
         _startUpTimeoutTimer?.Dispose();
 
+        if (Exception != null)
+            throw Exception;
+
         return unsubscribeAsync;
     }
 
@@ -155,6 +158,8 @@ public abstract class NatsSubBase : INatsSub
         ReadOnlySequence<byte>? headersBuffer,
         ReadOnlySequence<byte> payloadBuffer) =>
         ReceiveInternalAsync(subject, replyTo, headersBuffer, payloadBuffer);
+
+    internal void ClearException() => Interlocked.Exchange(ref _exception, null);
 
     protected abstract ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer);
 

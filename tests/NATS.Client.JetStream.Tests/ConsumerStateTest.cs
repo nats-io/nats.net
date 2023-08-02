@@ -1,9 +1,11 @@
-﻿namespace NATS.Client.JetStream.Tests;
+using Microsoft.Extensions.Logging.Abstractions;
 
-public class ConsumerOptsTest
+namespace NATS.Client.JetStream.Tests;
+
+public class ConsumerStateTest
 {
     [Fact]
-    public void Default_test()
+    public void Default_options()
     {
         var opts = new NatsJSConsumeOpts();
         Assert.Equal(1_000, opts.MaxMsgs);
@@ -15,11 +17,11 @@ public class ConsumerOptsTest
     }
 
     [Fact]
-    public void Allow_only_max_msgs_or_bytes() =>
+    public void Allow_only_max_msgs_or_bytes_options() =>
         Assert.Throws<NatsJSException>(() => new NatsJSConsumeOpts(maxBytes: 1, maxMsgs: 1));
 
     [Fact]
-    public void Set_bytes()
+    public void Set_bytes_option()
     {
         var opts = new NatsJSConsumeOpts(maxBytes: 1024);
         Assert.Equal(1_000_000, opts.MaxMsgs);
@@ -29,7 +31,7 @@ public class ConsumerOptsTest
     }
 
     [Fact]
-    public void Set_msgs()
+    public void Set_msgs_option()
     {
         var opts = new NatsJSConsumeOpts(maxMsgs: 10_000);
         Assert.Equal(10_000, opts.MaxMsgs);
@@ -39,7 +41,7 @@ public class ConsumerOptsTest
     }
 
     [Fact]
-    public void Set_idle_heartbeat_within_limits()
+    public void Set_idle_heartbeat_within_limits_option()
     {
         Assert.Equal(
             TimeSpan.FromSeconds(10),
@@ -55,7 +57,7 @@ public class ConsumerOptsTest
     }
 
     [Fact]
-    public void Set_idle_expires_within_limits()
+    public void Set_idle_expires_within_limits_option()
     {
         Assert.Equal(
             TimeSpan.FromSeconds(10),
@@ -74,7 +76,7 @@ public class ConsumerOptsTest
     [InlineData(10, 1, 1)]
     [InlineData(10, null, 5)]
     [InlineData(10, 100, 10)]
-    public void Set_threshold(int max, int? threshold, int expected)
+    public void Set_threshold_option(int max, int? threshold, int expected)
     {
         // Msgs
         {
@@ -90,15 +92,14 @@ public class ConsumerOptsTest
     }
 
     [Fact]
-    public void Pending_msgs()
+    public void Calculate_pending_msgs()
     {
-        var pending = new NatsJSConsumer.Pending(new NatsJSConsumeOpts(maxMsgs: 100, thresholdMsgs: 10));
+        var pending = new NatsJSConsumer.State<TestData>(new NatsJSConsumeOpts(maxMsgs: 100, thresholdMsgs: 10), NullLogger.Instance);
 
         // initial pull
         var init = pending.GetRequest();
         Assert.Equal(100, init.Batch);
         Assert.Equal(0, init.MaxBytes);
-
 
         for (var i = 0; i < 89; i++)
         {
@@ -114,15 +115,14 @@ public class ConsumerOptsTest
     }
 
     [Fact]
-    public void Pending_bytes()
+    public void Calculate_pending_bytes()
     {
-        var pending = new NatsJSConsumer.Pending(new NatsJSConsumeOpts(maxBytes: 1000, thresholdBytes: 100));
+        var pending = new NatsJSConsumer.State<TestData>(new NatsJSConsumeOpts(maxBytes: 1000, thresholdBytes: 100), NullLogger.Instance);
 
         // initial pull
         var init = pending.GetRequest();
         Assert.Equal(1_000_000, init.Batch);
         Assert.Equal(1000, init.MaxBytes);
-
 
         for (var i = 0; i < 89; i++)
         {
@@ -135,5 +135,9 @@ public class ConsumerOptsTest
         var request = pending.GetRequest();
         Assert.Equal(1_000_000, request.Batch);
         Assert.Equal(900, request.MaxBytes);
+    }
+
+    private class TestData
+    {
     }
 }

@@ -22,13 +22,21 @@ internal class NatsJSSub<T> : NatsSubBase
         INatsSerializer serializer)
         : base(connection, manager, subject, opts)
     {
+        var channelOptions = NatsSub.GetChannelOptions(opts?.ChannelOptions);
         _msgs = Channel.CreateBounded<NatsJSControlMsg<T?>>(
-            NatsSub.GetChannelOptions(opts?.ChannelOptions));
-
+            new BoundedChannelOptions(channelOptions.Capacity)
+            {
+                FullMode = BoundedChannelFullMode.Wait,
+                SingleReader = false,
+                SingleWriter = false,
+                AllowSynchronousContinuations = false,
+            });
         Serializer = serializer;
     }
 
     public ChannelReader<NatsJSControlMsg<T?>> Msgs => _msgs.Reader;
+
+    public ChannelWriter<NatsJSControlMsg<T?>> MsgWriter => _msgs.Writer;
 
     private INatsSerializer Serializer { get; }
 
@@ -37,9 +45,17 @@ internal class NatsJSSub<T> : NatsSubBase
         if (subject == Subject)
         {
             // TODO: introspect JS control messages
+            var msg = NatsMsg<T?>.Build(
+                subject,
+                replyTo,
+                headersBuffer,
+                payloadBuffer,
+                Connection,
+                Connection.HeaderParser,
+                Serializer);
             await _msgs.Writer.WriteAsync(new NatsJSControlMsg<T?>
             {
-                JSMsg = default,
+                JSMsg = new NatsJSMsg<T?> { Msg = msg },
                 ControlMsgType = NatsJSControlMsgType.Heartbeat,
             }).ConfigureAwait(false);
         }

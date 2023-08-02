@@ -1,5 +1,4 @@
 using System.Buffers;
-using NATS.Client.Core;
 
 namespace NATS.Client.JetStream;
 
@@ -7,11 +6,12 @@ internal enum NatsJSControlMsgType
 {
     None,
     Heartbeat,
+    Timeout,
 }
 
 internal readonly struct NatsJSControlMsg<T>
 {
-    public NatsJSMsg<T?>? JSMsg { get; init; }
+    public NatsJSMsg<T?> JSMsg { get; init; }
 
     public bool IsControlMsg => ControlMsgType != NatsJSControlMsgType.None;
 

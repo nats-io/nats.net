@@ -10,6 +10,21 @@ namespace NATS.Client.Core.Internal;
 internal static class BufferExtensions
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Split(this ReadOnlySpan<byte> span, out ReadOnlySpan<byte> left, out ReadOnlySpan<byte> right)
+    {
+        var i = span.IndexOf((byte)' ');
+        if (i == -1)
+        {
+            left = span;
+            right = default;
+            return;
+        }
+
+        left = span.Slice(0, i);
+        right = span.Slice(i + 1);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static ReadOnlySpan<byte> ToSpan(this ReadOnlySequence<byte> buffer)
     {
         if (buffer.IsSingleSegment)

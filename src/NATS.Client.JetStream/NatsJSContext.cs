@@ -112,6 +112,9 @@ public partial class NatsJSContext
         {
             if (sub.Exception is NatsSubException { InnerException: JSErrorException jsError })
             {
+                // Clear exception here so that subscription disposal won't throw it.
+                sub.ClearException();
+
                 return new NatsJSResponse<TResponse>(default, jsError.Error);
             }
 

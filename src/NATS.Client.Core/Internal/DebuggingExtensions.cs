@@ -47,6 +47,7 @@ public static class DebuggingExtensions
             return "<NULL>";
 
         var sb = new StringBuilder();
+        sb.AppendLine($"{headers.Version} {headers.Code} {headers.Message} {headers.MessageText}");
         foreach (var (key, stringValues) in headers)
         {
             foreach (var value in stringValues)

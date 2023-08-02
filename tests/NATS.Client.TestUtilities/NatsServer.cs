@@ -430,12 +430,12 @@ public class NatsProxy : IDisposable
 
                     Task.Run(() =>
                     {
-                        while (NatsProtoDump(n, "C", sr1, sw2))
+                        while (NatsProtoDump(n, "C", sr1, sw2, ClientInterceptor))
                         {
                         }
                     });
 
-                    while (NatsProtoDump(n, $"S", sr2, sw1))
+                    while (NatsProtoDump(n, $"S", sr2, sw1, ServerInterceptor))
                     {
                     }
                 });
@@ -457,8 +457,12 @@ public class NatsProxy : IDisposable
             }
         }
 
-        throw new TimeoutException("Wiretap server didn't start");
+        throw new TimeoutException("Proxy server didn't start");
     }
+
+    public List<Func<string?, string?>> ClientInterceptors { get; } = new();
+
+    public List<Func<string?, string?>> ServerInterceptors { get; } = new();
 
     public int Port => ((IPEndPoint)_tcpListener.Server.LocalEndPoint!).Port;
 
@@ -529,8 +533,65 @@ public class NatsProxy : IDisposable
 
     public void Dispose() => _tcpListener.Server.Dispose();
 
-    private bool NatsProtoDump(int client, string origin, TextReader sr, TextWriter sw)
+    public string Dump(ReadOnlySpan<char> buffer)
     {
+        var sb = new StringBuilder();
+        foreach (var c in buffer)
+        {
+            switch (c)
+            {
+            case >= ' ' and <= '~':
+                sb.Append(c);
+                break;
+            case '\n':
+                sb.Append('␊');
+                break;
+            case '\r':
+                sb.Append('␍');
+                break;
+            default:
+                sb.Append('.');
+                break;
+            }
+        }
+
+        return sb.ToString();
+    }
+
+    private string? ClientInterceptor(string? message)
+    {
+        foreach (var interceptor in ClientInterceptors)
+        {
+            message = interceptor(message);
+        }
+
+        return message;
+    }
+
+    private string? ServerInterceptor(string? message)
+    {
+        foreach (var interceptor in ServerInterceptors)
+        {
+            message = interceptor(message);
+        }
+
+        return message;
+    }
+
+    private bool NatsProtoDump(int client, string origin, TextReader sr, TextWriter sw, Func<string?, string?>? interceptor)
+    {
+        void Write(string? rawFrame)
+        {
+            if (interceptor != null)
+                rawFrame = interceptor(rawFrame);
+
+            if (rawFrame == null)
+                return;
+
+            sw.Write(rawFrame);
+            sw.Flush();
+        }
+
         string? message;
         try
         {
@@ -549,8 +610,16 @@ public class NatsProxy : IDisposable
             if (client > 0)
                 AddFrame(new Frame(_watch.Elapsed, client, origin, message));
 
-            sw.WriteLine(message);
-            sw.Flush();
+            try
+            {
+                Write($"{message}\r\n");
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                return false;
+            }
+
             return true;
         }
 
@@ -570,32 +639,12 @@ public class NatsProxy : IDisposable
                 span = span[read..];
             }
 
-            var sb = new StringBuilder();
-            foreach (var c in buffer.AsSpan()[..size])
-            {
-                switch (c)
-                {
-                case >= ' ' and <= '~':
-                    sb.Append(c);
-                    break;
-                case '\n':
-                    sb.Append('␊');
-                    break;
-                case '\r':
-                    sb.Append('␍');
-                    break;
-                default:
-                    sb.Append('.');
-                    break;
-                }
-            }
+            var bufferDump = Dump(buffer.AsSpan()[..size]);
 
-            sw.WriteLine(message);
-            sw.Write(buffer);
-            sw.Flush();
+            Write($"{message}\r\n{new string(buffer)}");
 
             if (client > 0)
-                AddFrame(new Frame(_watch.Elapsed, client, origin, Message: $"{message}␍␊{sb}"));
+                AddFrame(new Frame(_watch.Elapsed, client, origin, Message: $"{message}␍␊{bufferDump}"));
 
             return true;
         }
