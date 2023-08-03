@@ -1,3 +1,4 @@
+using System.Threading.Channels;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace NATS.Client.JetStream.Tests;
@@ -94,7 +95,8 @@ public class ConsumerStateTest
     [Fact]
     public void Calculate_pending_msgs()
     {
-        var pending = new NatsJSConsumer.State<TestData>(new NatsJSConsumeOpts(maxMsgs: 100, thresholdMsgs: 10), NullLogger.Instance);
+        var notifications = Channel.CreateUnbounded<int>();
+        var pending = new NatsJSConsumer.State<TestData>(new NatsJSConsumeOpts(maxMsgs: 100, thresholdMsgs: 10), notifications, NullLogger.Instance);
 
         // initial pull
         var init = pending.GetRequest();
@@ -117,7 +119,8 @@ public class ConsumerStateTest
     [Fact]
     public void Calculate_pending_bytes()
     {
-        var pending = new NatsJSConsumer.State<TestData>(new NatsJSConsumeOpts(maxBytes: 1000, thresholdBytes: 100), NullLogger.Instance);
+        var notifications = Channel.CreateUnbounded<int>();
+        var pending = new NatsJSConsumer.State<TestData>(new NatsJSConsumeOpts(maxBytes: 1000, thresholdBytes: 100), notifications, NullLogger.Instance);
 
         // initial pull
         var init = pending.GetRequest();

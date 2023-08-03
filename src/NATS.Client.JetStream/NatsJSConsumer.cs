@@ -1,5 +1,3 @@
-using System.ComponentModel;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
@@ -14,7 +12,7 @@ public class NatsJSConsumer
     private readonly NatsJSContext _context;
     private readonly string _stream;
     private readonly string _consumer;
-    private bool _deleted;
+    private volatile bool _deleted;
 
     public NatsJSConsumer(NatsJSContext context, ConsumerInfo info)
     {
@@ -33,13 +31,40 @@ public class NatsJSConsumer
         return _deleted = await _context.DeleteConsumerAsync(_stream, _consumer, cancellationToken);
     }
 
-    public async IAsyncEnumerable<NatsJSMsg<T?>> ConsumeAsync<T>(NatsJSConsumeOpts opts, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    /*
+     *  Channel Connections
+     *  -------------------
+     *  - Sub CH: NatsJSSub message channel where all the inbox messages are delivered here.
+     *  - User Messages CH: These are all the user messages (i.e. subject != inbox)
+     *  - User Notifications CH: Anything we wan to let user know about the state of consuming.
+     *
+     *  The main idea is to deliver user, control and internal messages to a 'controller' where
+     *  all messages will be processed in order and state managed in one place in a non-concurrent
+     *  manner. User Notifications also have their own channel so they can be prioritized and can
+     *  run in their own Task where User error handler will be dispatched.
+     *
+     *    NATS-SERVER
+     *        |
+     *        |                +---> [User Messages CH]---------> User (await foreach)
+     *        v              /
+     *    [Sub CH] ---> Controller (with state)
+     *        ^              \
+     *        |               +---> [User Notifications CH]-----> User error handler (Action<>)
+     *        |
+     *        | Internal control msgs
+     *        | (timeout)
+     *        |
+     *  Heartbeat Timer
+     *
+     */
+    public async IAsyncEnumerable<NatsJSMsg<T?>> ConsumeAsync<T>(
+        NatsJSConsumeOpts opts,
+        NatsSubOpts requestOpts = default,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
 
         var inbox = $"_INBOX.{Guid.NewGuid():n}";
-
-        var requestOpts = default(NatsSubOpts);
 
         await using var sub = await _context.Nats.SubAsync(
             subject: inbox,
@@ -50,10 +75,15 @@ public class NatsJSConsumer
         // We drop the old message if notification handler isn't able to keep up.
         // This is to avoid blocking the control loop and making sure we deliver all the messages.
         // Assuming newer messages would be more relevant and worth keeping than older ones.
-        Channel<int> notificationChannel = Channel.CreateBounded<int>(new BoundedChannelOptions(1_000)
+        var notificationChannel = Channel.CreateBounded<int>(new BoundedChannelOptions(1_000)
         {
             FullMode = BoundedChannelFullMode.DropOldest,
             AllowSynchronousContinuations = false,
+        });
+
+        var notifier = Task.Run(async () =>
+        {
+            await NotificationLoop(opts, notificationChannel, cancellationToken);
         });
 
         // User messages are buffered here separately to allow smoother flow while control loop
@@ -67,49 +97,13 @@ public class NatsJSConsumer
             AllowSynchronousContinuations = false,
         });
 
-        var subMsgs = sub.Msgs;
-        var subMsgWriter = sub.MsgWriter;
-        var timeoutMsg = new NatsJSControlMsg<T?> { ControlMsgType = NatsJSControlMsgType.Timeout };
-
-        // Heartbeat timeouts are signaled through the subscription internal channel
-        // so that state transitions can be done in the same loop as other messages
-        // to ensure state consistency.
-        // TODO: Having them on the same channel might delay user notifications going out on time.
-        Timer heartbeatTimer = new Timer(
-            callback: _ =>
-            {
-                subMsgWriter.WriteAsync(timeoutMsg, cancellationToken).GetAwaiter().GetResult();
-            },
-            state: default,
-            dueTime: Timeout.Infinite,
-            period: Timeout.Infinite);
-
-        var notifier = Task.Run(async () =>
-        {
-            await foreach (var notification in notificationChannel.Reader.ReadAllAsync(cancellationToken))
-            {
-                try
-                {
-                    opts.ErrorHandler?.Invoke(notification);
-                }
-                catch (Exception e)
-                {
-                    _logger.LogError(e, "User notification callback error");
-                }
-            }
-        });
+        var subMsgsChannel = sub.MsgsChannel;
 
         var controller = Task.Run(async () =>
         {
-            await ControlLoop(opts, cancellationToken, inbox, subMsgs, userMessageChannel, notificationChannel, heartbeatTimer);
+            await ControlLoop(opts, inbox, subMsgsChannel, userMessageChannel, notificationChannel, cancellationToken);
         });
 
-        if (sub is { EndReason: NatsSubEndReason.Exception, Exception: not null })
-        {
-            throw sub.Exception;
-        }
-
-        // Deliver user messages as enumerable
         while (await userMessageChannel.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
             while (userMessageChannel.Reader.TryRead(out var item))
@@ -118,7 +112,6 @@ public class NatsJSConsumer
             }
         }
 
-        await heartbeatTimer.DisposeAsync();
         notificationChannel.Writer.Complete();
         await notifier;
         await controller;
@@ -189,7 +182,110 @@ public class NatsJSConsumer
         }
     }
 
-    internal async IAsyncEnumerable<NatsJSControlMsg<T?>> ConsumeRawAsync<T>(
+    private static ValueTask CallMsgNextAsync(NatsJSContext context, string stream, string consumer, ConsumerGetnextRequest request, string inbox, CancellationToken cancellationToken) =>
+        context.Nats.PubModelAsync(
+            subject: $"$JS.API.CONSUMER.MSG.NEXT.{stream}.{consumer}",
+            data: request,
+            serializer: JsonNatsSerializer.Default,
+            replyTo: inbox,
+            headers: default,
+            cancellationToken);
+
+    private async Task NotificationLoop(
+        NatsJSConsumeOpts opts,
+        Channel<int, int> notificationChannel,
+        CancellationToken cancellationToken)
+    {
+        {
+            await foreach (var notification in notificationChannel.Reader.ReadAllAsync(cancellationToken))
+            {
+                try
+                {
+                    opts.ErrorHandler?.Invoke(notification);
+                }
+                catch (Exception e)
+                {
+                    _logger.LogError(e, "User notification callback error");
+                }
+            }
+        }
+    }
+
+    private async Task ControlLoop<T>(
+        NatsJSConsumeOpts opts,
+        string inbox,
+        Channel<NatsJSControlMsg<T?>> subMsgsChannel,
+        Channel<NatsJSMsg<T?>, NatsJSMsg<T?>> userChannel,
+        Channel<int, int> notificationChannel,
+        CancellationToken cancellationToken)
+    {
+        var timeoutMsg = new NatsJSControlMsg<T?> { ControlMsgType = NatsJSControlMsgType.Timeout };
+        var hearthBeatTimeout = opts.IdleHeartbeat * 2;
+
+        // Heartbeat timeouts are signaled through the subscription internal channel
+        // so that state transitions can be done in the same loop as other messages
+        // to ensure state consistency.
+        var heartbeatTimer = new Timer(
+            callback: _ =>
+            {
+                var valueTask = subMsgsChannel.Writer.WriteAsync(timeoutMsg, cancellationToken);
+                if (!valueTask.IsCompleted)
+                    valueTask.GetAwaiter().GetResult();
+            },
+            state: default,
+            dueTime: Timeout.Infinite,
+            period: Timeout.Infinite);
+
+        // State is handled in a single-threaded fashion to make sure all decisions
+        // are made in order e.g. control messages may change pending counts which are
+        // also effected by user messages.
+        await using var state = new State<T>(opts, notificationChannel, _logger);
+
+        await CallMsgNextAsync(_context, _stream, _consumer, state.GetRequest(), inbox, cancellationToken);
+
+        ResetHeartbeatTimer(heartbeatTimer, hearthBeatTimeout);
+
+        while (await subMsgsChannel.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            while (subMsgsChannel.Reader.TryRead(out var msg))
+            {
+                if (msg.ControlMsgType != NatsJSControlMsgType.Timeout)
+                {
+                    // Except for the internal Timeout message
+                    ResetHeartbeatTimer(heartbeatTimer, hearthBeatTimeout);
+                }
+
+                if (msg.IsControlMsg)
+                {
+                    state.WriteControlMsg(msg);
+                }
+                else
+                {
+                    var jsMsg = msg.JSMsg;
+
+                    state.MsgReceived(jsMsg.Msg.Size);
+
+                    await userChannel.Writer.WriteAsync(msg.JSMsg, cancellationToken);
+
+                    if (state.CanFetch())
+                    {
+                        await CallMsgNextAsync(_context, _stream, _consumer, state.GetRequest(), inbox, cancellationToken);
+                    }
+                }
+            }
+        }
+
+        await heartbeatTimer.DisposeAsync();
+
+        return;
+
+        static void ResetHeartbeatTimer(Timer timer, TimeSpan timeSpan)
+        {
+            timer.Change(timeSpan, Timeout.InfiniteTimeSpan);
+        }
+    }
+
+    private async IAsyncEnumerable<NatsJSControlMsg<T?>> ConsumeRawAsync<T>(
         ConsumerGetnextRequest request,
         NatsSubOpts requestOpts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -202,85 +298,14 @@ public class NatsJSConsumer
             builder: NatsJSSubModelBuilder<T>.For(requestOpts.Serializer ?? _context.Nats.Options.Serializer),
             cancellationToken);
 
-        await _context.Nats.PubModelAsync(
-            subject: $"$JS.API.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
-            data: request,
-            serializer: JsonNatsSerializer.Default,
-            replyTo: inbox,
-            headers: default,
-            cancellationToken);
+        await CallMsgNextAsync(_context, _stream, _consumer, request, inbox, cancellationToken);
 
-        await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken))
+        // Avoid additional AsyncEnumerable allocations
+        while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            yield return msg;
-        }
-
-        if (sub is { EndReason: NatsSubEndReason.Exception, Exception: not null })
-        {
-            throw sub.Exception;
-        }
-    }
-
-    private async Task ControlLoop<T>(
-        NatsJSConsumeOpts opts,
-        CancellationToken cancellationToken,
-        string inbox,
-        ChannelReader<NatsJSControlMsg<T?>> subMsgs,
-        Channel<NatsJSMsg<T?>> userChannel,
-        Channel<int> notificationChannel,
-        Timer heartbeatTimer)
-    {
-        var hearthBeatTimeout = opts.IdleHeartbeat * 2;
-
-        static async ValueTask MsgNextAsync(NatsJSContext context, string stream, string consumer, ConsumerGetnextRequest request, string inbox, CancellationToken cancellationtoken)
-        {
-            await context.Nats.PubModelAsync(
-                subject: $"$JS.API.CONSUMER.MSG.NEXT.{stream}.{consumer}",
-                data: request,
-                serializer: JsonNatsSerializer.Default,
-                replyTo: inbox,
-                headers: default,
-                cancellationtoken);
-        }
-
-        // State is handled in a single-threaded fashion to make sure all decisions
-        // are made in order e.g. control messages may change pending counts which are
-        // also effected by user messages.
-        await using var state = new State<T>(opts, _logger);
-
-        await MsgNextAsync(_context, _stream, _consumer, state.GetRequest(), inbox, cancellationToken);
-
-        while (await subMsgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
-        {
-            while (subMsgs.TryRead(out var msg))
+            while (sub.Msgs.TryRead(out var msg))
             {
-                if (msg.IsControlMsg)
-                {
-                    if (msg.ControlMsgType == NatsJSControlMsgType.Timeout)
-                    {
-                        notificationChannel.Writer.TryWrite(1);
-                    }
-                    else
-                    {
-                        heartbeatTimer.Change(hearthBeatTimeout, Timeout.InfiniteTimeSpan);
-                        state.WriteControlMsg(msg);
-                    }
-                }
-                else
-                {
-                    heartbeatTimer.Change(hearthBeatTimeout, Timeout.InfiniteTimeSpan);
-
-                    var jsMsg = msg.JSMsg;
-
-                    state.MsgReceived(jsMsg.Msg.Size);
-
-                    await userChannel.Writer.WriteAsync(msg.JSMsg, cancellationToken);
-
-                    if (state.CanFetch())
-                    {
-                        await MsgNextAsync(_context, _stream, _consumer, state.GetRequest(), inbox, cancellationToken);
-                    }
-                }
+                yield return msg;
             }
         }
     }
@@ -293,26 +318,31 @@ public class NatsJSConsumer
 
     internal class State<T> : IAsyncDisposable
     {
+        private const int LargeMsgsBatchSize = 1_000_000;
+
         private readonly ILogger _logger;
+        private readonly bool _trace;
         private readonly long _optsMaxBytes;
         private readonly long _optsMaxMsgs;
-        private readonly TimeSpan _optsIdleHeartbeat;
         private readonly long _optsIdleHeartbeatNanos;
         private readonly long _optsExpiresNanos;
         private readonly long _optsThresholdMsgs;
         private readonly long _optsThresholdBytes;
+        private readonly Channel<int, int> _notificationChannel;
+
         private long _pendingMsgs;
         private long _pendingBytes;
         private long _totalRequests;
 
-        public State(NatsJSConsumeOpts opts, ILogger logger)
+        public State(NatsJSConsumeOpts opts, Channel<int, int> notificationChannel, ILogger logger)
         {
+            _notificationChannel = notificationChannel;
             _logger = logger;
+            _trace = logger.IsEnabled(LogLevel.Trace);
             _optsMaxBytes = opts.MaxBytes;
             _optsMaxMsgs = opts.MaxMsgs;
-            _optsIdleHeartbeat = opts.IdleHeartbeat;
-            _optsIdleHeartbeatNanos = (long)(opts.IdleHeartbeat.TotalMilliseconds * 1_000);
-            _optsExpiresNanos = (long)(opts.Expires.TotalMilliseconds * 1_000);
+            _optsIdleHeartbeatNanos = (long)(opts.IdleHeartbeat.TotalMilliseconds * 1_000_000);
+            _optsExpiresNanos = (long)(opts.Expires.TotalMilliseconds * 1_000_000);
             _optsThresholdMsgs = opts.ThresholdMsgs;
             _optsThresholdBytes = opts.ThresholdBytes;
         }
@@ -322,7 +352,7 @@ public class NatsJSConsumer
             _totalRequests++;
             var request = new ConsumerGetnextRequest
             {
-                Batch = _optsMaxBytes > 0 ? 1_000_000 : _optsMaxMsgs - _pendingMsgs,
+                Batch = _optsMaxBytes > 0 ? LargeMsgsBatchSize : _optsMaxMsgs - _pendingMsgs,
                 MaxBytes = _optsMaxBytes > 0 ? _optsMaxBytes - _pendingBytes : 0,
                 IdleHeartbeat = _optsIdleHeartbeatNanos,
                 Expires = _optsExpiresNanos,
@@ -354,19 +384,27 @@ public class NatsJSConsumer
                 if (headers.TryGetValue("Nats-Pending-Messages", out var pendingMsgsStr)
                     && long.TryParse(pendingMsgsStr.ToString(), out var pendingMsgs))
                 {
-                    Interlocked.Add(ref _pendingMsgs, -pendingMsgs);
+                    _pendingMsgs -= pendingMsgs;
                 }
 
                 if (headers.TryGetValue("Nats-Pending-Bytes", out var pendingBytesStr)
                     && long.TryParse(pendingBytesStr.ToString(), out var pendingBytes))
                 {
-                    Interlocked.Add(ref _pendingBytes, -pendingBytes);
+                    _pendingBytes -= pendingBytes;
                 }
             }
 
-            if (msg.JSMsg.Msg.Headers is { Code: 100, Message: NatsHeaders.Messages.IdleHeartbeat })
+            if (msg.JSMsg.Msg.Headers is { Code: 100, Message: NatsHeaders.Messages.IdleHeartbeat } hb)
             {
                 // Do nothing. Timer is reset for every message already.
+                if (_trace)
+                {
+                    _logger.LogTrace("Heartbeat received {Code} {Message}", hb.Code, hb.Message);
+                }
+            }
+            else if (msg.ControlMsgType == NatsJSControlMsgType.Timeout)
+            {
+                _notificationChannel.Writer.TryWrite(1);
             }
             else
             {

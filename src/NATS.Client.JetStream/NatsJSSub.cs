@@ -36,7 +36,7 @@ internal class NatsJSSub<T> : NatsSubBase
 
     public ChannelReader<NatsJSControlMsg<T?>> Msgs => _msgs.Reader;
 
-    public ChannelWriter<NatsJSControlMsg<T?>> MsgWriter => _msgs.Writer;
+    internal Channel<NatsJSControlMsg<T?>> MsgsChannel => _msgs;
 
     private INatsSerializer Serializer { get; }
 
