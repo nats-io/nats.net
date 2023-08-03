@@ -377,40 +377,81 @@ public class NatsJSConsumer
 
         public void WriteControlMsg(NatsJSControlMsg<T?> msg)
         {
-            // Read the values of Nats-Pending-Messages and Nats-Pending-Bytes headers.
-            // Subtract the values from pending messages count and pending bytes count respectively.                    if (msg.JSMsg.Msg.Headers is { Code: 100, Message: NatsHeaders.Messages.IdleHeartbeat } headers)
-            if (msg.JSMsg.Msg.Headers is { } headers)
+            if (msg.ControlMsgType == NatsJSControlMsgType.Timeout)
             {
-                if (headers.TryGetValue("Nats-Pending-Messages", out var pendingMsgsStr)
-                    && long.TryParse(pendingMsgsStr.ToString(), out var pendingMsgs))
-                {
-                    _pendingMsgs -= pendingMsgs;
-                }
-
-                if (headers.TryGetValue("Nats-Pending-Bytes", out var pendingBytesStr)
-                    && long.TryParse(pendingBytesStr.ToString(), out var pendingBytes))
-                {
-                    _pendingBytes -= pendingBytes;
-                }
-            }
-
-            if (msg.JSMsg.Msg.Headers is { Code: 100, Message: NatsHeaders.Messages.IdleHeartbeat } hb)
-            {
-                // Do nothing. Timer is reset for every message already.
-                if (_trace)
-                {
-                    _logger.LogTrace("Heartbeat received {Code} {Message}", hb.Code, hb.Message);
-                }
-            }
-            else if (msg.ControlMsgType == NatsJSControlMsgType.Timeout)
-            {
-                _notificationChannel.Writer.TryWrite(1);
+                // Timeout is an internal message. Handle here and there is no
+                // need to check for anything else.
+                NotifyUser(1);
             }
             else
             {
-                _logger.LogError("Unhandled control message {ControlMsgType}", msg.ControlMsgType);
+                if (msg.JSMsg.Msg.Headers is { } headers)
+                {
+                    if (_trace)
+                    {
+                        _logger.LogTrace("Control message received {Code} {Message}", headers.Code, headers.Message);
+                    }
+
+                    // Read the values of Nats-Pending-Messages and Nats-Pending-Bytes headers.
+                    // Subtract the values from pending messages count and pending bytes count respectively.                    if (msg.JSMsg.Msg.Headers is { Code: 100, Message: NatsHeaders.Messages.IdleHeartbeat } headers)
+                    if (headers.TryGetValue("Nats-Pending-Messages", out var pendingMsgsStr)
+                        && long.TryParse(pendingMsgsStr.ToString(), out var pendingMsgs))
+                    {
+                        _pendingMsgs -= pendingMsgs;
+                    }
+
+                    if (headers.TryGetValue("Nats-Pending-Bytes", out var pendingBytesStr)
+                        && long.TryParse(pendingBytesStr.ToString(), out var pendingBytes))
+                    {
+                        _pendingBytes -= pendingBytes;
+                    }
+
+                    // React on other headers
+                    if (headers is { Code: 100, Message: NatsHeaders.Messages.IdleHeartbeat })
+                    {
+                        // Do nothing. Timer is reset for every message already.
+                    }
+
+                    // Stop
+                    else if (headers is { Code: 409, Message: NatsHeaders.Messages.ConsumerDeleted })
+                    {
+                        // TODO: signal channel complete
+                    }
+
+                    // Errors
+                    else if (headers is { Code: 400, Message: NatsHeaders.Messages.BadRequest }
+                             or { Code: 409, Message: NatsHeaders.Messages.ConsumerIsPushBased })
+                    {
+                        NotifyUser(headers.Code);
+                    }
+
+                    // Warnings
+                    else if (headers is { Code: 409 }
+                             && (headers.MessageText.StartsWith("Exceeded MaxRequestBatch of")
+                                 || headers.MessageText.StartsWith("Exceeded MaxRequestExpires of ")
+                                 || headers.MessageText.StartsWith("Exceeded MaxRequestMaxBytes of ")
+                                 || headers.MessageText == "Exceeded MaxWaiting"))
+                    {
+                        NotifyUser(headers.Code);
+                    }
+
+                    // Not Telegraphed
+                    else if (headers is { Code: 404, Message: NatsHeaders.Messages.NoMessages }
+                             or { Code: 408, Message: NatsHeaders.Messages.RequestTimeout }
+                             or { Code: 409, Message: NatsHeaders.Messages.MessageSizeExceedsMaxBytes })
+                    {
+                        // TODO: Now what?
+                    }
+                    else
+                    {
+                        NotifyUser(headers.Code);
+                        _logger.LogError("Unhandled control message {ControlMsgType}", msg.ControlMsgType);
+                    }
+                }
             }
         }
+
+        private void NotifyUser(int i) => _notificationChannel.Writer.TryWrite(i);
     }
 }
 

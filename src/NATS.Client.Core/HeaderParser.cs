@@ -252,32 +252,37 @@ public class HeaderParser
                 if (headerLine.SequenceEqual(NatsHeaders.MessageIdleHeartbeat))
                 {
                     headers.Message = NatsHeaders.Messages.IdleHeartbeat;
-                    headers.MessageText = string.Empty;
+                    headers.MessageText = NatsHeaders.MessageIdleHeartbeatStr;
                 }
                 else if (headerLine.SequenceEqual(NatsHeaders.MessageBadRequest))
                 {
                     headers.Message = NatsHeaders.Messages.BadRequest;
-                    headers.MessageText = string.Empty;
+                    headers.MessageText = NatsHeaders.MessageBadRequestStr;
                 }
                 else if (headerLine.SequenceEqual(NatsHeaders.MessageConsumerDeleted))
                 {
                     headers.Message = NatsHeaders.Messages.ConsumerDeleted;
-                    headers.MessageText = string.Empty;
+                    headers.MessageText = NatsHeaders.MessageConsumerDeletedStr;
                 }
                 else if (headerLine.SequenceEqual(NatsHeaders.MessageConsumerIsPushBased))
                 {
                     headers.Message = NatsHeaders.Messages.ConsumerIsPushBased;
-                    headers.MessageText = string.Empty;
+                    headers.MessageText = NatsHeaders.MessageConsumerIsPushBasedStr;
                 }
                 else if (headerLine.SequenceEqual(NatsHeaders.MessageNoMessages))
                 {
                     headers.Message = NatsHeaders.Messages.NoMessages;
-                    headers.MessageText = string.Empty;
+                    headers.MessageText = NatsHeaders.MessageNoMessagesStr;
                 }
                 else if (headerLine.SequenceEqual(NatsHeaders.MessageRequestTimeout))
                 {
                     headers.Message = NatsHeaders.Messages.RequestTimeout;
-                    headers.MessageText = string.Empty;
+                    headers.MessageText = NatsHeaders.MessageRequestTimeoutStr;
+                }
+                else if (headerLine.SequenceEqual(NatsHeaders.MessageMessageSizeExceedsMaxBytes))
+                {
+                    headers.Message = NatsHeaders.Messages.MessageSizeExceedsMaxBytes;
+                    headers.MessageText = NatsHeaders.MessageMessageSizeExceedsMaxBytesStr;
                 }
                 else
                 {

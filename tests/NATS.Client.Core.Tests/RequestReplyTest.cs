@@ -143,7 +143,7 @@ public class RequestReplyTest
         var results = new[] { 6, 9 };
         var count = 0;
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var opts = new NatsSubOpts { IdleTimeout = TimeSpan.FromSeconds(4) };
+        var opts = new NatsSubOpts { IdleTimeout = TimeSpan.FromSeconds(3) };
         await using var rep =
             await nats.RequestSubAsync<int, int>("foo", 3, replyOpts: opts, cancellationToken: cts.Token);
         await foreach (var msg in rep.Msgs.ReadAllAsync(cts.Token))

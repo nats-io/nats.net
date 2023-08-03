@@ -73,6 +73,7 @@ public class NatsHeaderTest
     [InlineData("Consumer is push based", NatsHeaders.Messages.ConsumerIsPushBased)]
     [InlineData("No Messages", NatsHeaders.Messages.NoMessages)]
     [InlineData("Request Timeout", NatsHeaders.Messages.RequestTimeout)]
+    [InlineData("Message Size Exceeds MaxBytes", NatsHeaders.Messages.MessageSizeExceedsMaxBytes)]
     [InlineData("test message", NatsHeaders.Messages.Text)]
     public void ParserMessageEnumTests(string message, NatsHeaders.Messages result)
     {
@@ -82,7 +83,7 @@ public class NatsHeaderTest
         var headers = new NatsHeaders();
         parser.ParseHeaders(input, headers);
         Assert.Equal(result, headers.Message);
-        Assert.Equal(result == NatsHeaders.Messages.Text ? message : string.Empty, headers.MessageText);
+        Assert.Equal(message, headers.MessageText);
     }
 
     [Fact]
