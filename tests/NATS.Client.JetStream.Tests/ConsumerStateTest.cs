@@ -8,13 +8,14 @@ public class ConsumerStateTest
     [Fact]
     public void Default_options()
     {
-        var opts = new NatsJSConsumeOpts();
-        Assert.Equal(1_000, opts.MaxMsgs);
-        Assert.Equal(0, opts.MaxBytes);
-        Assert.Equal(TimeSpan.FromSeconds(30), opts.Expires);
-        Assert.Equal(TimeSpan.FromSeconds(15), opts.IdleHeartbeat);
-        Assert.Equal(500, opts.ThresholdMsgs);
-        Assert.Equal(0, opts.ThresholdBytes);
+        var m = NatsJSOpsDefaults.SetMax();
+        var t = NatsJSOpsDefaults.SetTimeouts();
+        Assert.Equal(1_000, m.MaxMsgs);
+        Assert.Equal(0, m.MaxBytes);
+        Assert.Equal(TimeSpan.FromSeconds(30), t.Expires);
+        Assert.Equal(TimeSpan.FromSeconds(15), t.IdleHeartbeat);
+        Assert.Equal(500, m.ThresholdMsgs);
+        Assert.Equal(0, m.ThresholdBytes);
     }
 
     [Fact]
