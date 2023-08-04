@@ -34,25 +34,40 @@ public class NatsJSConsumer
     /*
      *  Channel Connections
      *  -------------------
-     *  - Sub CH: NatsJSSub message channel where all the inbox messages are delivered here.
-     *  - User Messages CH: These are all the user messages (i.e. subject != inbox)
-     *  - User Notifications CH: Anything we wan to let user know about the state of consuming.
      *
-     *  The main idea is to deliver user, control and internal messages to a 'controller' where
-     *  all messages will be processed in order and state managed in one place in a non-concurrent
-     *  manner. User Notifications also have their own channel so they can be prioritized and can
-     *  run in their own Task where User error handler will be dispatched.
+     *  - Sub CH:
+     *      NatsJSSub message channel where all the inbox messages are
+     *      delivered to.
+     *
+     *  - User Messages CH:
+     *      These are all the user messages (i.e. subject != inbox)
+     *
+     *  - User Notifications CH:
+     *      Anything we want to let user know about the state of the
+     *      consumer, connection status, timeouts etc.
+     *
+     *  The main idea is to deliver user and control messages from the server
+     *  inbox subscription and internal control messages (e.g. heartbeat
+     *  timeouts) to a single 'controller' where all messages would be
+     *  processed in order and state managed in one place in a non-concurrent
+     *  manner so that races are avoided and it's easier to reason with state
+     *  changes.
+     *
+     *  User Notifications also have their own channel so they can be
+     *  prioritized and can run in their own Task where User error handler
+     *  will be dispatched.
+     *
      *
      *    NATS-SERVER
-     *        |
-     *        |                +---> [User Messages CH]---------> User (await foreach)
-     *        v              /
+     *        |                                              User
+     *        |             +--> [User Messages CH] -------> message loop
+     *        v           /                                  (await foreach)
      *    [Sub CH] ---> Controller (with state)
-     *        ^              \
-     *        |               +---> [User Notifications CH]-----> User error handler (Action<>)
-     *        |
+     *        ^           \                                  User error
+     *        |            +--> [User Notifications CH] ---> handler
+     *        |                                              (Action<>)
      *        | Internal control msgs
-     *        | (timeout)
+     *        | (e.g. heartbeat timeout)
      *        |
      *  Heartbeat Timer
      *
@@ -64,7 +79,7 @@ public class NatsJSConsumer
     {
         ThrowIfDeleted();
 
-        var inbox = $"_INBOX.{Guid.NewGuid():n}";
+        var inbox = $"{_context.Opts.InboxPrefix}.{Guid.NewGuid():n}";
 
         await using var sub = await _context.Nats.SubAsync(
             subject: inbox,
@@ -119,7 +134,7 @@ public class NatsJSConsumer
 
     public async ValueTask<NatsJSMsg<T?>> NextAsync<T>(CancellationToken cancellationToken = default)
     {
-        await foreach (var natsJSMsg in FetchAsync<T>(1, cancellationToken))
+        await foreach (var natsJSMsg in FetchAsync<T>(new NatsJSFetchOpts { MaxMsgs = 1 }, cancellationToken: cancellationToken))
         {
             return natsJSMsg;
         }
@@ -128,57 +143,49 @@ public class NatsJSConsumer
     }
 
     public async IAsyncEnumerable<NatsJSMsg<T?>> FetchAsync<T>(
-        int maxMsgs,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
-    {
-        var request = new ConsumerGetnextRequest { Batch = maxMsgs, };
-
-        var count = 0;
-        await foreach (var msg in ConsumeRawAsync<T>(request, default, cancellationToken).ConfigureAwait(false))
-        {
-            if (msg.IsControlMsg)
-            {
-                // TODO: control messages
-            }
-            else
-            {
-                yield return msg.JSMsg;
-
-                if (++count == maxMsgs)
-                    break;
-            }
-        }
-    }
-
-    internal async IAsyncEnumerable<NatsJSControlMsg> ConsumeRawAsync(
-        ConsumerGetnextRequest request,
-        NatsSubOpts requestOpts = default,
+        NatsJSFetchOpts opts,
+        NatsSubOpts? requestOpts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var inbox = $"_INBOX.{Guid.NewGuid():n}";
+        var m = NatsJSOpsDefaults.SetMax(_context.Opts, opts.MaxMsgs, opts.MaxBytes);
+        var t = NatsJSOpsDefaults.SetTimeouts(opts.Expires, opts.IdleHeartbeat);
+        var request = new ConsumerGetnextRequest
+        {
+            Batch = m.MaxMsgs,
+            MaxBytes = m.MaxBytes,
+            IdleHeartbeat = t.IdleHeartbeat.ToNanos(),
+            Expires = t.Expires.ToNanos(),
+            NoWait = true,
+        };
+
+        var count = 0;
+        var inbox = $"{_context.Opts.InboxPrefix}.{Guid.NewGuid():n}";
 
         await using var sub = await _context.Nats.SubAsync(
             subject: inbox,
             opts: requestOpts,
-            builder: NatsJSSubBuilder.Default,
+            builder: NatsJSSubModelBuilder<T>.For(requestOpts?.Serializer ?? _context.Nats.Options.Serializer),
             cancellationToken);
 
-        await _context.Nats.PubModelAsync(
-            subject: $"$JS.API.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
-            data: request,
-            serializer: JsonNatsSerializer.Default,
-            replyTo: inbox,
-            headers: default,
-            cancellationToken);
+        await CallMsgNextAsync(_context, _stream, _consumer, request, inbox, cancellationToken);
 
-        await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken))
+        // Avoid additional AsyncEnumerable allocations
+        while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            yield return msg;
-        }
+            while (sub.Msgs.TryRead(out var msg))
+            {
+                if (msg.IsControlMsg)
+                {
+                    // TODO: control messages
+                }
+                else
+                {
+                    yield return msg.JSMsg;
 
-        if (sub is { EndReason: NatsSubEndReason.Exception, Exception: not null })
-        {
-            throw sub.Exception;
+                    if (++count == m.MaxMsgs)
+                        break;
+                }
+            }
         }
     }
 
@@ -220,7 +227,11 @@ public class NatsJSConsumer
         CancellationToken cancellationToken)
     {
         var timeoutMsg = new NatsJSControlMsg<T?> { ControlMsgType = NatsJSControlMsgType.Timeout };
-        var hearthBeatTimeout = opts.IdleHeartbeat * 2;
+
+        var m = NatsJSOpsDefaults.SetMax(_context.Opts, opts.MaxMsgs, opts.MaxBytes, opts.ThresholdMsgs, opts.ThresholdBytes);
+        var t = NatsJSOpsDefaults.SetTimeouts(opts.Expires, opts.IdleHeartbeat);
+
+        var hearthBeatTimeout = t.IdleHeartbeat * 2;
 
         // Heartbeat timeouts are signaled through the subscription internal channel
         // so that state transitions can be done in the same loop as other messages
@@ -239,7 +250,15 @@ public class NatsJSConsumer
         // State is handled in a single-threaded fashion to make sure all decisions
         // are made in order e.g. control messages may change pending counts which are
         // also effected by user messages.
-        await using var state = new State<T>(opts, notificationChannel, _logger);
+        await using var state = new State<T>(
+            m.MaxMsgs,
+            m.MaxBytes,
+            t.IdleHeartbeat,
+            t.Expires,
+            m.ThresholdMsgs,
+            m.ThresholdBytes,
+            notificationChannel,
+            _logger);
 
         await CallMsgNextAsync(_context, _stream, _consumer, state.GetRequest(), inbox, cancellationToken);
 
@@ -285,31 +304,6 @@ public class NatsJSConsumer
         }
     }
 
-    private async IAsyncEnumerable<NatsJSControlMsg<T?>> ConsumeRawAsync<T>(
-        ConsumerGetnextRequest request,
-        NatsSubOpts requestOpts = default,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
-    {
-        var inbox = $"_INBOX.{Guid.NewGuid():n}";
-
-        await using var sub = await _context.Nats.SubAsync(
-            subject: inbox,
-            opts: requestOpts,
-            builder: NatsJSSubModelBuilder<T>.For(requestOpts.Serializer ?? _context.Nats.Options.Serializer),
-            cancellationToken);
-
-        await CallMsgNextAsync(_context, _stream, _consumer, request, inbox, cancellationToken);
-
-        // Avoid additional AsyncEnumerable allocations
-        while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
-        {
-            while (sub.Msgs.TryRead(out var msg))
-            {
-                yield return msg;
-            }
-        }
-    }
-
     private void ThrowIfDeleted()
     {
         if (_deleted)
@@ -332,19 +326,28 @@ public class NatsJSConsumer
 
         private long _pendingMsgs;
         private long _pendingBytes;
+
         private long _totalRequests;
 
-        public State(NatsJSConsumeOpts opts, Channel<int, int> notificationChannel, ILogger logger)
+        public State(
+            int optsMaxMsgs,
+            int optsMaxBytes,
+            TimeSpan optsIdleHeartbeat,
+            TimeSpan optsExpires,
+            int optsThresholdMsgs,
+            int optsThresholdBytes,
+            Channel<int, int> notificationChannel,
+            ILogger logger)
         {
             _notificationChannel = notificationChannel;
             _logger = logger;
             _trace = logger.IsEnabled(LogLevel.Trace);
-            _optsMaxBytes = opts.MaxBytes;
-            _optsMaxMsgs = opts.MaxMsgs;
-            _optsIdleHeartbeatNanos = (long)(opts.IdleHeartbeat.TotalMilliseconds * 1_000_000);
-            _optsExpiresNanos = (long)(opts.Expires.TotalMilliseconds * 1_000_000);
-            _optsThresholdMsgs = opts.ThresholdMsgs;
-            _optsThresholdBytes = opts.ThresholdBytes;
+            _optsMaxBytes = optsMaxBytes;
+            _optsMaxMsgs = optsMaxMsgs;
+            _optsIdleHeartbeatNanos = optsIdleHeartbeat.ToNanos();
+            _optsExpiresNanos = optsExpires.ToNanos();
+            _optsThresholdMsgs = optsThresholdMsgs;
+            _optsThresholdBytes = optsThresholdBytes;
         }
 
         public ConsumerGetnextRequest GetRequest()
@@ -356,6 +359,7 @@ public class NatsJSConsumer
                 MaxBytes = _optsMaxBytes > 0 ? _optsMaxBytes - _pendingBytes : 0,
                 IdleHeartbeat = _optsIdleHeartbeatNanos,
                 Expires = _optsExpiresNanos,
+                NoWait = true,
             };
 
             _pendingMsgs += request.Batch;
@@ -457,95 +461,40 @@ public class NatsJSConsumer
 
 public record NatsJSConsumeOpts
 {
-    private static readonly TimeSpan ExpiresDefault = TimeSpan.FromSeconds(30);
-    private static readonly TimeSpan ExpiresMin = TimeSpan.FromSeconds(1);
-    private static readonly TimeSpan HeartbeatCap = TimeSpan.FromSeconds(30);
-    private static readonly TimeSpan HeartbeatMin = TimeSpan.FromSeconds(.5);
-
-    public NatsJSConsumeOpts(
-        int? maxMsgs = default,
-        TimeSpan? expires = default,
-        int? maxBytes = default,
-        TimeSpan? idleHeartbeat = default,
-        int? thresholdMsgs = default,
-        int? thresholdBytes = default,
-        Action<int>? errorHandler = default)
-    {
-        if (maxMsgs.HasValue && maxBytes.HasValue)
-        {
-            throw new NatsJSException($"You can only set {nameof(MaxBytes)} or {nameof(MaxMsgs)}");
-        }
-        else if (!maxMsgs.HasValue && !maxBytes.HasValue)
-        {
-            MaxMsgs = 1_000;
-            MaxBytes = 0;
-        }
-        else if (maxMsgs.HasValue && !maxBytes.HasValue)
-        {
-            MaxMsgs = maxMsgs.Value;
-            MaxBytes = 0;
-        }
-        else if (!maxMsgs.HasValue && maxBytes.HasValue)
-        {
-            MaxMsgs = 1_000_000;
-            MaxBytes = maxBytes.Value;
-        }
-
-        Expires = expires ?? ExpiresDefault;
-        if (Expires < ExpiresMin)
-            Expires = ExpiresMin;
-
-        IdleHeartbeat = idleHeartbeat ?? Expires / 2;
-        if (IdleHeartbeat > HeartbeatCap)
-            IdleHeartbeat = HeartbeatCap;
-        if (IdleHeartbeat < HeartbeatMin)
-            IdleHeartbeat = HeartbeatMin;
-
-        ThresholdMsgs = thresholdMsgs ?? MaxMsgs / 2;
-        if (ThresholdMsgs > MaxMsgs)
-            ThresholdMsgs = MaxMsgs;
-
-        ThresholdBytes = thresholdBytes ?? MaxBytes / 2;
-        if (ThresholdBytes > MaxBytes)
-            ThresholdBytes = MaxBytes;
-
-        ErrorHandler = errorHandler;
-    }
+    /// <summary>
+    /// Maximum number of messages stored in the buffer
+    /// </summary>
+    public Action<int>? ErrorHandler { get; init; }
 
     /// <summary>
     /// Maximum number of messages stored in the buffer
     /// </summary>
-    public Action<int>? ErrorHandler { get; }
-
-    /// <summary>
-    /// Maximum number of messages stored in the buffer
-    /// </summary>
-    public long MaxMsgs { get; }
+    public int? MaxMsgs { get; init; }
 
     /// <summary>
     /// Amount of time to wait for a single pull request to expire
     /// </summary>
-    public TimeSpan Expires { get; }
+    public TimeSpan? Expires { get; init; }
 
     /// <summary>
     /// Maximum number of bytes stored in the buffer
     /// </summary>
-    public long MaxBytes { get; }
+    public int? MaxBytes { get; init; }
 
     /// <summary>
     /// Amount idle time the server should wait before sending a heartbeat
     /// </summary>
-    public TimeSpan IdleHeartbeat { get; }
+    public TimeSpan? IdleHeartbeat { get; init; }
 
     /// <summary>
     /// Number of messages left in the buffer that should trigger a low watermark on the client, and influence it to request more messages
     /// </summary>
-    public long ThresholdMsgs { get; }
+    public int? ThresholdMsgs { get; init; }
 
     /// <summary>
     /// Hint for the number of bytes left in buffer that should trigger a low watermark on the client, and influence it to request more data.
     /// </summary>
-    public long ThresholdBytes { get; }
+    public int? ThresholdBytes { get; init; }
 }
 
 public record NatsJSNextOpts
@@ -553,7 +502,7 @@ public record NatsJSNextOpts
     /// <summary>
     /// Amount of time to wait for the request to expire (in nanoseconds)
     /// </summary>
-    public TimeSpan Expires { get; init; }
+    public TimeSpan? Expires { get; init; }
 
     /// <summary>
     /// Amount idle time the server should wait before sending a heartbeat. For requests with expires > 30s, heartbeats should be enabled by default
@@ -566,12 +515,12 @@ public record NatsJSFetchOpts
     /// <summary>
     /// Maximum number of messages to return
     /// </summary>
-    public int? MaxMessages { get; init; }
+    public int? MaxMsgs { get; init; }
 
     /// <summary>
     /// Amount of time to wait for the request to expire
     /// </summary>
-    public TimeSpan Expires { get; init; }
+    public TimeSpan? Expires { get; init; }
 
     /// <summary>
     /// Maximum number of bytes to return
@@ -582,4 +531,75 @@ public record NatsJSFetchOpts
     /// Amount idle time the server should wait before sending a heartbeat. For requests with expires > 30s, heartbeats should be enabled by default
     /// </summary>
     public TimeSpan? IdleHeartbeat { get; init; }
+}
+
+internal static class NatsJSOpsDefaults
+{
+    private static readonly TimeSpan ExpiresDefault = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan ExpiresMin = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan HeartbeatCap = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan HeartbeatMin = TimeSpan.FromSeconds(.5);
+
+    internal static (int MaxMsgs, int MaxBytes, int ThresholdMsgs, int ThresholdBytes) SetMax(
+        NatsJSOpts? opts = default,
+        int? maxMsgs = default,
+        int? maxBytes = default,
+        int? thresholdMsgs = default,
+        int? thresholdBytes = default)
+    {
+        var jsOpts = opts ?? new NatsJSOpts();
+        int maxMsgsOut;
+        int maxBytesOut;
+
+        if (maxMsgs.HasValue && maxBytes.HasValue)
+        {
+            throw new NatsJSException($"You can only set {nameof(maxBytes)} or {nameof(maxMsgs)}");
+        }
+        else if (!maxMsgs.HasValue && !maxBytes.HasValue)
+        {
+            maxMsgsOut = jsOpts.MaxMsgs;
+            maxBytesOut = 0;
+        }
+        else if (maxMsgs.HasValue && !maxBytes.HasValue)
+        {
+            maxMsgsOut = maxMsgs.Value;
+            maxBytesOut = 0;
+        }
+        else if (!maxMsgs.HasValue && maxBytes.HasValue)
+        {
+            maxMsgsOut = 1_000_000;
+            maxBytesOut = maxBytes.Value;
+        }
+        else
+        {
+            throw new NatsJSException($"Invalid state: {nameof(NatsJSOpsDefaults)}: {nameof(SetMax)}");
+        }
+
+        var thresholdMsgsOut = thresholdMsgs ?? maxMsgsOut / 2;
+        if (thresholdMsgsOut > maxMsgsOut)
+            thresholdMsgsOut = maxMsgsOut;
+
+        var thresholdBytesOut = thresholdBytes ?? maxBytesOut / 2;
+        if (thresholdBytesOut > maxBytesOut)
+            thresholdBytesOut = maxBytesOut;
+
+        return (maxMsgsOut, maxBytesOut, thresholdMsgsOut, thresholdBytesOut);
+    }
+
+    internal static (TimeSpan Expires, TimeSpan IdleHeartbeat) SetTimeouts(
+        TimeSpan? expires = default,
+        TimeSpan? idleHeartbeat = default)
+    {
+        var expiresOut = expires ?? ExpiresDefault;
+        if (expiresOut < ExpiresMin)
+            expiresOut = ExpiresMin;
+
+        var idleHeartbeatOut = idleHeartbeat ?? expiresOut / 2;
+        if (idleHeartbeatOut > HeartbeatCap)
+            idleHeartbeatOut = HeartbeatCap;
+        if (idleHeartbeatOut < HeartbeatMin)
+            idleHeartbeatOut = HeartbeatMin;
+
+        return (expiresOut, idleHeartbeatOut);
+    }
 }

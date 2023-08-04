@@ -19,7 +19,7 @@ public class JetStreamTest
         {
             var cts1 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-            var js = new NatsJSContext(nats, new NatsJSOptions());
+            var js = new NatsJSContext(nats, new NatsJSOpts());
 
             // Create stream
             var stream = await js.CreateStreamAsync(
@@ -82,10 +82,9 @@ public class JetStreamTest
 
             // Consume
             var cts2 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            var messages = new List<NatsJSControlMsg>();
-            await foreach (var msg in consumer.ConsumeRawAsync(
-                               request: new ConsumerGetnextRequest { Batch = 100 },
-                               requestOpts: default,
+            var messages = new List<NatsJSMsg<TestData?>>();
+            await foreach (var msg in consumer.ConsumeAsync<TestData>(
+                               new NatsJSConsumeOpts { MaxMsgs = 100 },
                                cancellationToken: cts2.Token))
             {
                 messages.Add(msg);
@@ -93,7 +92,7 @@ public class JetStreamTest
                 // Only ACK one message so we can consume again
                 if (messages.Count == 1)
                 {
-                    await msg.JSMsg!.Value.Ack(cts2.Token);
+                    await msg.Ack(cts2.Token);
                 }
 
                 if (messages.Count == 2)
@@ -103,16 +102,15 @@ public class JetStreamTest
             }
 
             Assert.Equal(2, messages.Count);
-            Assert.Equal("events.foo", messages[0].JSMsg!.Value.Msg.Subject);
-            Assert.Equal("events.foo", messages[1].JSMsg!.Value.Msg.Subject);
+            Assert.Equal("events.foo", messages[0].Msg.Subject);
+            Assert.Equal("events.foo", messages[1].Msg.Subject);
 
             // Consume the unacknowledged message
-            await foreach (var msg in consumer.ConsumeRawAsync(
-                               request: new ConsumerGetnextRequest { Batch = 100 },
-                               requestOpts: default,
+            await foreach (var msg in consumer.ConsumeAsync<TestData>(
+                               new NatsJSConsumeOpts { MaxMsgs = 100 },
                                cancellationToken: cts2.Token))
             {
-                Assert.Equal("events.foo", msg.JSMsg!.Value.Msg.Subject);
+                Assert.Equal("events.foo", msg.Msg.Subject);
                 break;
             }
         }
@@ -121,7 +119,7 @@ public class JetStreamTest
         {
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-            var js = new NatsJSContext(nats, new NatsJSOptions());
+            var js = new NatsJSContext(nats, new NatsJSOpts());
             var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () =>
             {
                 await js.CreateStreamAsync(
@@ -142,7 +140,7 @@ public class JetStreamTest
         {
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-            var js = new NatsJSContext(nats, new NatsJSOptions());
+            var js = new NatsJSContext(nats, new NatsJSOpts());
 
             // Success
             await js.DeleteStreamAsync("events", cts.Token);

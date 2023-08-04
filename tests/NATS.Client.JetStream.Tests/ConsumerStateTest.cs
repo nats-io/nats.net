@@ -19,12 +19,12 @@ public class ConsumerStateTest
 
     [Fact]
     public void Allow_only_max_msgs_or_bytes_options() =>
-        Assert.Throws<NatsJSException>(() => new NatsJSConsumeOpts(maxBytes: 1, maxMsgs: 1));
+        Assert.Throws<NatsJSException>(() => _ = NatsJSOpsDefaults.SetMax(new NatsJSOpts(), 1, 1));
 
     [Fact]
     public void Set_bytes_option()
     {
-        var opts = new NatsJSConsumeOpts(maxBytes: 1024);
+        var opts = NatsJSOpsDefaults.SetMax(new NatsJSOpts(), maxBytes: 1024);
         Assert.Equal(1_000_000, opts.MaxMsgs);
         Assert.Equal(1024, opts.MaxBytes);
         Assert.Equal(500_000, opts.ThresholdMsgs);
@@ -34,7 +34,7 @@ public class ConsumerStateTest
     [Fact]
     public void Set_msgs_option()
     {
-        var opts = new NatsJSConsumeOpts(maxMsgs: 10_000);
+        var opts = NatsJSOpsDefaults.SetMax(maxMsgs: 10_000);
         Assert.Equal(10_000, opts.MaxMsgs);
         Assert.Equal(0, opts.MaxBytes);
         Assert.Equal(5_000, opts.ThresholdMsgs);
@@ -46,15 +46,15 @@ public class ConsumerStateTest
     {
         Assert.Equal(
             TimeSpan.FromSeconds(10),
-            new NatsJSConsumeOpts(idleHeartbeat: TimeSpan.FromSeconds(10)).IdleHeartbeat);
+            NatsJSOpsDefaults.SetTimeouts(idleHeartbeat: TimeSpan.FromSeconds(10)).IdleHeartbeat);
 
         Assert.Equal(
             TimeSpan.FromSeconds(.5),
-            new NatsJSConsumeOpts(idleHeartbeat: TimeSpan.FromSeconds(.1)).IdleHeartbeat);
+            NatsJSOpsDefaults.SetTimeouts(idleHeartbeat: TimeSpan.FromSeconds(.1)).IdleHeartbeat);
 
         Assert.Equal(
             TimeSpan.FromSeconds(30),
-            new NatsJSConsumeOpts(idleHeartbeat: TimeSpan.FromSeconds(60)).IdleHeartbeat);
+            NatsJSOpsDefaults.SetTimeouts(idleHeartbeat: TimeSpan.FromSeconds(60)).IdleHeartbeat);
     }
 
     [Fact]
@@ -62,15 +62,15 @@ public class ConsumerStateTest
     {
         Assert.Equal(
             TimeSpan.FromSeconds(10),
-            new NatsJSConsumeOpts(expires: TimeSpan.FromSeconds(10)).Expires);
+            NatsJSOpsDefaults.SetTimeouts(expires: TimeSpan.FromSeconds(10)).Expires);
 
         Assert.Equal(
             TimeSpan.FromSeconds(1),
-            new NatsJSConsumeOpts(expires: TimeSpan.FromSeconds(.1)).Expires);
+            NatsJSOpsDefaults.SetTimeouts(expires: TimeSpan.FromSeconds(.1)).Expires);
 
         Assert.Equal(
             TimeSpan.FromSeconds(300),
-            new NatsJSConsumeOpts(expires: TimeSpan.FromSeconds(300)).Expires);
+            NatsJSOpsDefaults.SetTimeouts(expires: TimeSpan.FromSeconds(300)).Expires);
     }
 
     [Theory]
@@ -81,13 +81,13 @@ public class ConsumerStateTest
     {
         // Msgs
         {
-            var opts = new NatsJSConsumeOpts(maxMsgs: max, thresholdMsgs: threshold);
+            var opts = NatsJSOpsDefaults.SetMax(maxMsgs: max, thresholdMsgs: threshold);
             Assert.Equal(expected, opts.ThresholdMsgs);
         }
 
         // Bytes
         {
-            var opts = new NatsJSConsumeOpts(maxBytes: max, thresholdBytes: threshold);
+            var opts = NatsJSOpsDefaults.SetMax(maxBytes: max, thresholdBytes: threshold);
             Assert.Equal(expected, opts.ThresholdBytes);
         }
     }
@@ -96,22 +96,32 @@ public class ConsumerStateTest
     public void Calculate_pending_msgs()
     {
         var notifications = Channel.CreateUnbounded<int>();
-        var pending = new NatsJSConsumer.State<TestData>(new NatsJSConsumeOpts(maxMsgs: 100, thresholdMsgs: 10), notifications, NullLogger.Instance);
+        var m = NatsJSOpsDefaults.SetMax(maxMsgs: 100, thresholdMsgs: 10);
+        var t = NatsJSOpsDefaults.SetTimeouts();
+        var state = new NatsJSConsumer.State<TestData>(
+            optsMaxMsgs: m.MaxMsgs,
+            optsThresholdMsgs: m.ThresholdMsgs,
+            optsMaxBytes: m.MaxBytes,
+            optsThresholdBytes: m.ThresholdBytes,
+            optsIdleHeartbeat: t.IdleHeartbeat,
+            optsExpires: t.Expires,
+            notificationChannel: notifications,
+            logger: NullLogger.Instance);
 
         // initial pull
-        var init = pending.GetRequest();
+        var init = state.GetRequest();
         Assert.Equal(100, init.Batch);
         Assert.Equal(0, init.MaxBytes);
 
         for (var i = 0; i < 89; i++)
         {
-            pending.MsgReceived(128);
-            Assert.False(pending.CanFetch(), $"iter:{i}");
+            state.MsgReceived(128);
+            Assert.False(state.CanFetch(), $"iter:{i}");
         }
 
-        pending.MsgReceived(128);
-        Assert.True(pending.CanFetch());
-        var request = pending.GetRequest();
+        state.MsgReceived(128);
+        Assert.True(state.CanFetch());
+        var request = state.GetRequest();
         Assert.Equal(90, request.Batch);
         Assert.Equal(0, request.MaxBytes);
     }
@@ -120,22 +130,32 @@ public class ConsumerStateTest
     public void Calculate_pending_bytes()
     {
         var notifications = Channel.CreateUnbounded<int>();
-        var pending = new NatsJSConsumer.State<TestData>(new NatsJSConsumeOpts(maxBytes: 1000, thresholdBytes: 100), notifications, NullLogger.Instance);
+        var m = NatsJSOpsDefaults.SetMax(maxBytes: 1000, thresholdBytes: 100);
+        var t = NatsJSOpsDefaults.SetTimeouts();
+        var state = new NatsJSConsumer.State<TestData>(
+            optsMaxMsgs: m.MaxMsgs,
+            optsThresholdMsgs: m.ThresholdMsgs,
+            optsMaxBytes: m.MaxBytes,
+            optsThresholdBytes: m.ThresholdBytes,
+            optsIdleHeartbeat: t.IdleHeartbeat,
+            optsExpires: t.Expires,
+            notificationChannel: notifications,
+            logger: NullLogger.Instance);
 
         // initial pull
-        var init = pending.GetRequest();
+        var init = state.GetRequest();
         Assert.Equal(1_000_000, init.Batch);
         Assert.Equal(1000, init.MaxBytes);
 
         for (var i = 0; i < 89; i++)
         {
-            pending.MsgReceived(10);
-            Assert.False(pending.CanFetch(), $"iter:{i}");
+            state.MsgReceived(10);
+            Assert.False(state.CanFetch(), $"iter:{i}");
         }
 
-        pending.MsgReceived(10);
-        Assert.True(pending.CanFetch());
-        var request = pending.GetRequest();
+        state.MsgReceived(10);
+        Assert.True(state.CanFetch());
+        var request = state.GetRequest();
         Assert.Equal(1_000_000, request.Batch);
         Assert.Equal(900, request.MaxBytes);
     }

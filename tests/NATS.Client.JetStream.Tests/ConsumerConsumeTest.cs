@@ -31,7 +31,7 @@ public class ConsumerConsumeTest
             ack.EnsureSuccess();
         }
 
-        var consumerOpts = new NatsJSConsumeOpts(maxMsgs: 10);
+        var consumerOpts = new NatsJSConsumeOpts { MaxMsgs = 10 };
         var consumer = await js.GetConsumerAsync("s1", "c1", cts.Token);
         var count = 0;
         await foreach (var msg in consumer.ConsumeAsync<TestData>(consumerOpts, cancellationToken: cts.Token))
@@ -91,13 +91,15 @@ public class ConsumerConsumeTest
         ack.EnsureSuccess();
 
         var signal = new WaitSignal(TimeSpan.FromSeconds(30));
-        var consumerOpts = new NatsJSConsumeOpts(
-            maxMsgs: 10,
-            idleHeartbeat: TimeSpan.FromSeconds(5),
-            errorHandler: e =>
+        var consumerOpts = new NatsJSConsumeOpts
+        {
+            MaxMsgs = 10,
+            IdleHeartbeat = TimeSpan.FromSeconds(5),
+            ErrorHandler = _ =>
             {
                 signal.Pulse();
-            });
+            },
+        };
         var consumer = await js.GetConsumerAsync("s1", "c1", cts.Token);
         var count = 0;
         await foreach (var msg in consumer.ConsumeAsync<TestData>(consumerOpts, cancellationToken: cts.Token))

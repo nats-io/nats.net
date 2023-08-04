@@ -16,7 +16,7 @@ public class ManageConsumerTest
 
         await using var server = NatsServer.StartJS();
         var nats = server.CreateClientConnection();
-        var js = new NatsJSContext(nats, new NatsJSOptions());
+        var js = new NatsJSContext(nats, new NatsJSOpts());
         await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
 
         // Create
@@ -52,7 +52,7 @@ public class ManageConsumerTest
 
         await using var server = NatsServer.StartJS();
         var nats = server.CreateClientConnection();
-        var js = new NatsJSContext(nats, new NatsJSOptions());
+        var js = new NatsJSContext(nats, new NatsJSOpts());
         await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
         await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
         await js.CreateConsumerAsync("s1", "c2", cancellationToken: cts.Token);

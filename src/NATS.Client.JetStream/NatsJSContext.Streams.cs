@@ -13,7 +13,7 @@ public partial class NatsJSContext
         CancellationToken cancellationToken = default)
     {
         var response = await JSRequestResponseAsync<StreamConfiguration, StreamInfo>(
-            subject: $"{Options.Prefix}.STREAM.CREATE.{request.Name}",
+            subject: $"{Opts.ApiPrefix}.STREAM.CREATE.{request.Name}",
             request,
             cancellationToken);
         return new NatsJSStream(this, response);
@@ -24,7 +24,7 @@ public partial class NatsJSContext
         CancellationToken cancellationToken = default)
     {
         var response = await JSRequestResponseAsync<object, StreamMsgDeleteResponse>(
-            subject: $"{Options.Prefix}.STREAM.DELETE.{stream}",
+            subject: $"{Opts.ApiPrefix}.STREAM.DELETE.{stream}",
             request: null,
             cancellationToken);
         return response.Success;
@@ -35,7 +35,7 @@ public partial class NatsJSContext
         CancellationToken cancellationToken = default)
     {
         var response = await JSRequestResponseAsync<object, StreamInfoResponse>(
-            subject: $"{Options.Prefix}.STREAM.INFO.{stream}",
+            subject: $"{Opts.ApiPrefix}.STREAM.INFO.{stream}",
             request: null,
             cancellationToken);
         return new NatsJSStream(this, response);
@@ -46,7 +46,7 @@ public partial class NatsJSContext
         CancellationToken cancellationToken = default)
     {
         var response = await JSRequestResponseAsync<object, StreamUpdateResponse>(
-            subject: $"{Options.Prefix}.STREAM.UPDATE.{request.Name}",
+            subject: $"{Opts.ApiPrefix}.STREAM.UPDATE.{request.Name}",
             request: request,
             cancellationToken);
         return new NatsJSStream(this, response);
@@ -57,7 +57,7 @@ public partial class NatsJSContext
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var response = await JSRequestResponseAsync<object, StreamListResponse>(
-            subject: $"{Options.Prefix}.STREAM.LIST",
+            subject: $"{Opts.ApiPrefix}.STREAM.LIST",
             request: request,
             cancellationToken);
         foreach (var stream in response.Streams)

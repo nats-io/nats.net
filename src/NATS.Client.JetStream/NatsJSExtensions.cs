@@ -2,7 +2,7 @@ using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
 
-public static class NatsJSUtilities
+public static class NatsJSExtensions
 {
     public static void EnsureSuccess(this PubAckResponse ack)
     {
@@ -15,4 +15,6 @@ public static class NatsJSUtilities
         if (ack.Duplicate)
             throw new NatsJSDuplicateMessageException(ack.Seq);
     }
+
+    internal static long ToNanos(this TimeSpan timeSpan) => (long)(timeSpan.TotalMilliseconds * 1_000_000);
 }

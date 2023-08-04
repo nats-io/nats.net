@@ -40,7 +40,7 @@ public partial class NatsJSContext
         }
 
         var response = await JSRequestResponseAsync<ConsumerCreateRequest, ConsumerInfo>(
-            subject: $"{Options.Prefix}.CONSUMER.CREATE.{request.StreamName}.{request.Config.Name}",
+            subject: $"{Opts.ApiPrefix}.CONSUMER.CREATE.{request.StreamName}.{request.Config.Name}",
             request,
             cancellationToken);
         return new NatsJSConsumer(this, response);
@@ -49,7 +49,7 @@ public partial class NatsJSContext
     public async ValueTask<NatsJSConsumer> GetConsumerAsync(string stream, string consumer, CancellationToken cancellationToken = default)
     {
         var response = await JSRequestResponseAsync<object, ConsumerInfo>(
-            subject: $"{Options.Prefix}.CONSUMER.INFO.{stream}.{consumer}",
+            subject: $"{Opts.ApiPrefix}.CONSUMER.INFO.{stream}.{consumer}",
             request: null,
             cancellationToken);
         return new NatsJSConsumer(this, response);
@@ -58,7 +58,7 @@ public partial class NatsJSContext
     public async IAsyncEnumerable<NatsJSConsumer> ListConsumersAsync(string stream, ConsumerListRequest request, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var response = await JSRequestResponseAsync<ConsumerListRequest, ConsumerListResponse>(
-            subject: $"{Options.Prefix}.CONSUMER.LIST.{stream}",
+            subject: $"{Opts.ApiPrefix}.CONSUMER.LIST.{stream}",
             request,
             cancellationToken);
         foreach (var consumer in response.Consumers)
@@ -70,7 +70,7 @@ public partial class NatsJSContext
     public async ValueTask<bool> DeleteConsumerAsync(string stream, string consumer, CancellationToken cancellationToken = default)
     {
         var response = await JSRequestResponseAsync<object, ConsumerDeleteResponse>(
-            subject: $"{Options.Prefix}.CONSUMER.DELETE.{stream}.{consumer}",
+            subject: $"{Opts.ApiPrefix}.CONSUMER.DELETE.{stream}.{consumer}",
             request: null,
             cancellationToken);
         return response.Success;

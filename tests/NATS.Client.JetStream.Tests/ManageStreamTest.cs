@@ -14,7 +14,7 @@ public class ManageStreamTest
     {
         await using var server = NatsServer.StartJS();
         var nats = server.CreateClientConnection();
-        var js = new NatsJSContext(nats, new NatsJSOptions());
+        var js = new NatsJSContext(nats, new NatsJSOpts());
 
         // Account Info
         {
@@ -62,7 +62,7 @@ public class ManageStreamTest
 
         await using var server = NatsServer.StartJS();
         var nats = server.CreateClientConnection();
-        var js = new NatsJSContext(nats, new NatsJSOptions());
+        var js = new NatsJSContext(nats, new NatsJSOpts());
 
         await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
         await js.CreateStreamAsync("s2", new[] { "s2.*" }, cts.Token);
