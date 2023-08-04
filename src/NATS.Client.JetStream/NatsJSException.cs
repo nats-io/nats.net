@@ -14,3 +14,11 @@ public class NatsJSException : NatsException
     {
     }
 }
+
+public class NatsJSConsumerPullTerminated : NatsJSException
+{
+    public NatsJSConsumerPullTerminated(int code, string message)
+        : base(message)
+    {
+    }
+}

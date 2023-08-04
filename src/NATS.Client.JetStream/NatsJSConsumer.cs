@@ -90,7 +90,7 @@ public class NatsJSConsumer
         // We drop the old message if notification handler isn't able to keep up.
         // This is to avoid blocking the control loop and making sure we deliver all the messages.
         // Assuming newer messages would be more relevant and worth keeping than older ones.
-        var notificationChannel = Channel.CreateBounded<int>(new BoundedChannelOptions(1_000)
+        var notificationChannel = Channel.CreateBounded<NatsJSNotification>(new BoundedChannelOptions(1_000)
         {
             FullMode = BoundedChannelFullMode.DropOldest,
             AllowSynchronousContinuations = false,
@@ -175,7 +175,20 @@ public class NatsJSConsumer
             {
                 if (msg.IsControlMsg)
                 {
-                    // TODO: control messages
+                    if (msg.JSMsg.Msg.Headers is { } headers)
+                    {
+                        if (headers is { Code: 404, Message: NatsHeaders.Messages.NoMessages })
+                        {
+                            yield break;
+                        }
+
+                        if (headers.Code >= 400)
+                        {
+                            throw new NatsJSConsumerPullTerminated(headers.Code, headers.MessageText);
+                        }
+                    }
+
+                    // TODO: handle heartbeat etc.
                 }
                 else
                 {
@@ -199,7 +212,7 @@ public class NatsJSConsumer
 
     private async Task NotificationLoop(
         NatsJSConsumeOpts opts,
-        Channel<int, int> notificationChannel,
+        Channel<NatsJSNotification, NatsJSNotification> notificationChannel,
         CancellationToken cancellationToken)
     {
         {
@@ -222,7 +235,7 @@ public class NatsJSConsumer
         string inbox,
         Channel<NatsJSControlMsg<T?>> subMsgsChannel,
         Channel<NatsJSMsg<T?>, NatsJSMsg<T?>> userChannel,
-        Channel<int, int> notificationChannel,
+        Channel<NatsJSNotification, NatsJSNotification> notificationChannel,
         CancellationToken cancellationToken)
     {
         var timeoutMsg = new NatsJSControlMsg<T?> { ControlMsgType = NatsJSControlMsgType.Timeout };
@@ -321,12 +334,12 @@ public class NatsJSConsumer
         private readonly long _optsExpiresNanos;
         private readonly long _optsThresholdMsgs;
         private readonly long _optsThresholdBytes;
-        private readonly Channel<int, int> _notificationChannel;
+        private readonly Channel<NatsJSNotification, NatsJSNotification> _notificationChannel;
 
         private long _pendingMsgs;
         private long _pendingBytes;
-
         private long _totalRequests;
+        private bool _pullTerminated;
 
         public State(
             int optsMaxMsgs,
@@ -335,7 +348,7 @@ public class NatsJSConsumer
             TimeSpan optsExpires,
             int optsThresholdMsgs,
             int optsThresholdBytes,
-            Channel<int, int> notificationChannel,
+            Channel<NatsJSNotification, NatsJSNotification> notificationChannel,
             ILogger logger)
         {
             _notificationChannel = notificationChannel;
@@ -351,6 +364,7 @@ public class NatsJSConsumer
 
         public ConsumerGetnextRequest GetRequest()
         {
+            _pullTerminated = false;
             _totalRequests++;
             var request = new ConsumerGetnextRequest
             {
@@ -374,7 +388,9 @@ public class NatsJSConsumer
         }
 
         public bool CanFetch() =>
-            _optsThresholdMsgs >= _pendingMsgs || (_optsThresholdBytes > 0 && _optsThresholdBytes >= _pendingBytes);
+            _pullTerminated
+            || _optsThresholdMsgs >= _pendingMsgs
+            || (_optsThresholdBytes > 0 && _optsThresholdBytes >= _pendingBytes);
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
@@ -384,7 +400,7 @@ public class NatsJSConsumer
             {
                 // Timeout is an internal message. Handle here and there is no
                 // need to check for anything else.
-                NotifyUser(1);
+                NotifyUser(NatsJSNotification.Timeout);
             }
             else
             {
@@ -418,14 +434,14 @@ public class NatsJSConsumer
                     // Stop
                     else if (headers is { Code: 409, Message: NatsHeaders.Messages.ConsumerDeleted })
                     {
-                        // TODO: signal channel complete
+                        throw new NatsJSConsumerPullTerminated(headers.Code, headers.MessageText);
                     }
 
                     // Errors
                     else if (headers is { Code: 400, Message: NatsHeaders.Messages.BadRequest }
                              or { Code: 409, Message: NatsHeaders.Messages.ConsumerIsPushBased })
                     {
-                        NotifyUser(headers.Code);
+                        NotifyUser(new NatsJSNotification(headers.Code, headers.MessageText));
                     }
 
                     // Warnings
@@ -435,7 +451,7 @@ public class NatsJSConsumer
                                  || headers.MessageText.StartsWith("Exceeded MaxRequestMaxBytes of ")
                                  || headers.MessageText == "Exceeded MaxWaiting"))
                     {
-                        NotifyUser(headers.Code);
+                        NotifyUser(new NatsJSNotification(headers.Code, headers.MessageText));
                     }
 
                     // Not Telegraphed
@@ -443,17 +459,32 @@ public class NatsJSConsumer
                              or { Code: 408, Message: NatsHeaders.Messages.RequestTimeout }
                              or { Code: 409, Message: NatsHeaders.Messages.MessageSizeExceedsMaxBytes })
                     {
-                        // TODO: Now what?
+                        _pullTerminated = true;
                     }
                     else
                     {
-                        NotifyUser(headers.Code);
+                        NotifyUser(new NatsJSNotification(headers.Code, headers.MessageText));
                         _logger.LogError("Unhandled control message {ControlMsgType}", msg.ControlMsgType);
                     }
                 }
             }
         }
 
-        private void NotifyUser(int i) => _notificationChannel.Writer.TryWrite(i);
+        private void NotifyUser(NatsJSNotification notification) => _notificationChannel.Writer.TryWrite(notification);
     }
+}
+
+public class NatsJSNotification
+{
+    public static readonly NatsJSNotification Timeout = new(code: 100, message: "Timeout");
+
+    public NatsJSNotification(int code, string message)
+    {
+        Code = code;
+        Message = message;
+    }
+
+    public int Code { get; }
+
+    public string Message { get; }
 }

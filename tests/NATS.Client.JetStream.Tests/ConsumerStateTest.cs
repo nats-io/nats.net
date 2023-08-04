@@ -96,7 +96,7 @@ public class ConsumerStateTest
     [Fact]
     public void Calculate_pending_msgs()
     {
-        var notifications = Channel.CreateUnbounded<int>();
+        var notifications = Channel.CreateUnbounded<NatsJSNotification>();
         var m = NatsJSOpsDefaults.SetMax(maxMsgs: 100, thresholdMsgs: 10);
         var t = NatsJSOpsDefaults.SetTimeouts();
         var state = new NatsJSConsumer.State<TestData>(
@@ -130,7 +130,7 @@ public class ConsumerStateTest
     [Fact]
     public void Calculate_pending_bytes()
     {
-        var notifications = Channel.CreateUnbounded<int>();
+        var notifications = Channel.CreateUnbounded<NatsJSNotification>();
         var m = NatsJSOpsDefaults.SetMax(maxBytes: 1000, thresholdBytes: 100);
         var t = NatsJSOpsDefaults.SetTimeouts();
         var state = new NatsJSConsumer.State<TestData>(

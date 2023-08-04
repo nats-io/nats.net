@@ -26,7 +26,7 @@ public record NatsJSConsumeOpts
     /// <summary>
     /// Maximum number of messages stored in the buffer
     /// </summary>
-    public Action<int>? ErrorHandler { get; init; }
+    public Action<NatsJSNotification>? ErrorHandler { get; init; }
 
     /// <summary>
     /// Maximum number of messages stored in the buffer
