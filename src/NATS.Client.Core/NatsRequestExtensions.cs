@@ -38,7 +38,7 @@ public static class NatsRequestExtensions
     {
         var opts = nats.SetReplyOptsDefaults(replyOpts);
 
-        await using var sub = (NatsSub<TReply>)await nats.RequestSubAsync<TRequest, TReply>(subject, data, requestOpts, opts, cancellationToken)
+        await using var sub = await nats.RequestSubAsync<TRequest, TReply>(subject, data, requestOpts, opts, cancellationToken)
             .ConfigureAwait(false);
 
         if (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
@@ -47,11 +47,6 @@ public static class NatsRequestExtensions
             {
                 return msg;
             }
-        }
-
-        if (sub is { EndReason: NatsSubEndReason.Exception, Exception: not null })
-        {
-            throw sub.Exception;
         }
 
         return null;
@@ -115,7 +110,7 @@ public static class NatsRequestExtensions
     {
         var opts = nats.SetReplyOptsDefaults(replyOpts);
 
-        await using var sub = (NatsSub)await nats.RequestSubAsync(subject, payload, requestOpts, opts, cancellationToken).ConfigureAwait(false);
+        await using var sub = await nats.RequestSubAsync(subject, payload, requestOpts, opts, cancellationToken).ConfigureAwait(false);
 
         if (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
@@ -123,11 +118,6 @@ public static class NatsRequestExtensions
             {
                 return msg;
             }
-        }
-
-        if (sub is { EndReason: NatsSubEndReason.Exception, Exception: not null })
-        {
-            throw sub.Exception;
         }
 
         return null;

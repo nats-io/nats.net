@@ -9,7 +9,6 @@ internal class InboxSub : NatsSubBase
 {
     private readonly InboxSubBuilder _inbox;
     private readonly NatsConnection _connection;
-    private readonly ISubscriptionManager _manager;
 
     public InboxSub(
         InboxSubBuilder inbox,
@@ -21,13 +20,8 @@ internal class InboxSub : NatsSubBase
     {
         _inbox = inbox;
         _connection = connection;
-        _manager = manager;
     }
 
-    // public ValueTask ReceiveAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
-    // {
-    //     return _inbox.ReceivedAsync(subject, replyTo, headersBuffer, payloadBuffer, _connection);
-    // }
     protected override ValueTask ReceiveInternalAsync(
         string subject,
         string? replyTo,
