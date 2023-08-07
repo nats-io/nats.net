@@ -5,7 +5,7 @@ namespace NATS.Client.Core;
 
 public partial class NatsConnection
 {
-    internal async ValueTask<NatsSub> RequestSubAsync(
+    internal async ValueTask<INatsSub> RequestSubAsync(
         string subject,
         ReadOnlySequence<byte> payload = default,
         NatsPubOpts? requestOpts = default,
@@ -13,12 +13,13 @@ public partial class NatsConnection
         CancellationToken cancellationToken = default)
     {
         var replyTo = $"{InboxPrefix}{Guid.NewGuid():n}";
-        var sub = await SubAsync(replyTo, replyOpts, NatsSubBuilder.Default, cancellationToken).ConfigureAwait(false);
+        var sub = new NatsSub(this, SubscriptionManager.InboxSubBuilder, replyTo, replyOpts);
+        await SubAsync(replyTo, replyOpts, sub, cancellationToken).ConfigureAwait(false);
         await PubAsync(subject, replyTo, payload, requestOpts?.Headers, cancellationToken).ConfigureAwait(false);
         return sub;
     }
 
-    internal async ValueTask<NatsSub<TReply>> RequestSubAsync<TRequest, TReply>(
+    internal async ValueTask<INatsSub<TReply>> RequestSubAsync<TRequest, TReply>(
         string subject,
         TRequest? data,
         NatsPubOpts? requestOpts = default,
@@ -27,8 +28,9 @@ public partial class NatsConnection
     {
         var replyTo = $"{InboxPrefix}{Guid.NewGuid():n}";
 
-        var builder = NatsSubModelBuilder<TReply>.For(replyOpts?.Serializer ?? Options.Serializer);
-        var sub = await SubAsync(replyTo, replyOpts, builder, cancellationToken).ConfigureAwait(false);
+        var replySerializer = replyOpts?.Serializer ?? Options.Serializer;
+        var sub = new NatsSub<TReply>(this, SubscriptionManager.InboxSubBuilder, replyTo, replyOpts, replySerializer);
+        await SubAsync(replyTo, replyOpts, sub, cancellationToken).ConfigureAwait(false);
 
         await PubModelAsync(
             subject,

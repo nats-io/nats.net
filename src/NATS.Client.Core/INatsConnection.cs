@@ -19,7 +19,7 @@ public interface INatsConnection
     /// <param name="opts">A <see cref="NatsPubOpts"/> for publishing options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous send operation.</returns>
-    ValueTask PublishAsync(string subject, ReadOnlySequence<byte> payload = default, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
+    ValueTask PublishAsync(string subject, ReadOnlySequence<byte> payload = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Publishes the message payload to the given subject name, optionally supplying a reply subject.
@@ -28,7 +28,7 @@ public interface INatsConnection
     /// <param name="opts">A <see cref="NatsPubOpts"/> for publishing options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous send operation.</returns>
-    ValueTask PublishAsync(in NatsMsg msg, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
+    ValueTask PublishAsync(in NatsMsg msg, NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Publishes a serializable message payload to the given subject name, optionally supplying a reply subject.
@@ -39,7 +39,7 @@ public interface INatsConnection
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
     /// <typeparam name="T">Specifies the type of data that may be send to the NATS Server.</typeparam>
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous send operation.</returns>
-    ValueTask PublishAsync<T>(string subject, T data, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
+    ValueTask PublishAsync<T>(string subject, T data, NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Publishes a serializable message payload to the given subject name, optionally supplying a reply subject.
@@ -49,7 +49,7 @@ public interface INatsConnection
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
     /// <typeparam name="T">Specifies the type of data that may be send to the NATS Server.</typeparam>
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous send operation.</returns>
-    ValueTask PublishAsync<T>(in NatsMsg<T> msg, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
+    ValueTask PublishAsync<T>(in NatsMsg<T> msg, NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Initiates a subscription to a subject, optionally joining a distributed queue group.
@@ -58,7 +58,7 @@ public interface INatsConnection
     /// <param name="opts">A <see cref="NatsSubOpts"/> for subscription options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
     /// <returns>A <see cref="ValueTask{TResult}"/> that represents the asynchronous send operation.</returns>
-    ValueTask<NatsSub> SubscribeAsync(string subject, in NatsSubOpts? opts = default, CancellationToken cancellationToken = default);
+    ValueTask<INatsSub> SubscribeAsync(string subject, NatsSubOpts? opts = default, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Initiates a subscription to a subject, optionally joining a distributed queue group.
@@ -68,5 +68,5 @@ public interface INatsConnection
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
     /// <typeparam name="T">Specifies the type of data that may be received from the NATS Server.</typeparam>
     /// <returns>A <see cref="ValueTask{TResult}"/> that represents the asynchronous send operation.</returns>
-    ValueTask<NatsSub<T>> SubscribeAsync<T>(string subject, in NatsSubOpts? opts = default, CancellationToken cancellationToken = default);
+    ValueTask<INatsSub<T>> SubscribeAsync<T>(string subject, NatsSubOpts? opts = default, CancellationToken cancellationToken = default);
 }

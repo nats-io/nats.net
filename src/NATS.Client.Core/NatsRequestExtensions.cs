@@ -49,11 +49,6 @@ public static class NatsRequestExtensions
             }
         }
 
-        if (sub is { EndReason: NatsSubEndReason.Exception, Exception: not null })
-        {
-            throw sub.Exception;
-        }
-
         return null;
     }
 
@@ -123,11 +118,6 @@ public static class NatsRequestExtensions
             {
                 return msg;
             }
-        }
-
-        if (sub is { EndReason: NatsSubEndReason.Exception, Exception: not null })
-        {
-            throw sub.Exception;
         }
 
         return null;

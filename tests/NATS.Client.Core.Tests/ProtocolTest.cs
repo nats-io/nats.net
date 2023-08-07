@@ -202,7 +202,7 @@ public class ProtocolTest
             }
 
             Assert.Equal(maxMsgs, count);
-            Assert.Equal(NatsSubEndReason.MaxMsgs, sub.EndReason);
+            Assert.Equal(NatsSubEndReason.MaxMsgs, ((NatsSubBase)sub).EndReason);
         }
 
         Log("### Manual unsubscribe");
@@ -235,7 +235,7 @@ public class ProtocolTest
             }
 
             Assert.Equal(0, count);
-            Assert.Equal(NatsSubEndReason.None, sub.EndReason);
+            Assert.Equal(NatsSubEndReason.None, ((NatsSubBase)sub).EndReason);
         }
 
         Log("### Reconnect");
@@ -258,7 +258,7 @@ public class ProtocolTest
             await Retry.Until("received", () => Volatile.Read(ref count) == pubMsgs);
 
             var pending = maxMsgs - pubMsgs;
-            Assert.Equal(pending, ((INatsSub)sub).PendingMsgs);
+            Assert.Equal(pending, ((NatsSubBase)sub).PendingMsgs);
 
             proxy.Reset();
 
@@ -281,7 +281,7 @@ public class ProtocolTest
 
             await Retry.Until(
                 "unsubscribed with max-msgs",
-                () => sub.EndReason == NatsSubEndReason.MaxMsgs);
+                () => ((NatsSubBase)sub).EndReason == NatsSubEndReason.MaxMsgs);
 
             Assert.Equal(maxMsgs, Volatile.Read(ref count));
 

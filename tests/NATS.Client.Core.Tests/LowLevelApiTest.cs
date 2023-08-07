@@ -15,8 +15,10 @@ public class LowLevelApiTest
         await using var server = NatsServer.Start();
         var nats = server.CreateClientConnection();
 
+        var subject = "foo.*";
         var builder = new NatsSubCustomTestBuilder(_output);
-        var sub = await nats.SubAsync<NatsSubTest>("foo.*", opts: default, builder);
+        var sub = builder.Build(subject, default, nats, nats.SubscriptionManager);
+        await nats.SubAsync(subject, opts: default, sub);
 
         await Retry.Until(
             "subscription is ready",
@@ -37,34 +39,19 @@ public class LowLevelApiTest
         await sub.DisposeAsync();
     }
 
-    private class NatsSubTest : INatsSub
+    private class NatsSubTest : NatsSubBase
     {
         private readonly NatsSubCustomTestBuilder _builder;
         private readonly ITestOutputHelper _output;
-        private readonly ISubscriptionManager _manager;
 
-        public NatsSubTest(NatsSubCustomTestBuilder builder, ITestOutputHelper output, ISubscriptionManager manager)
+        public NatsSubTest(string subject, NatsConnection connection, NatsSubCustomTestBuilder builder, ITestOutputHelper output, ISubscriptionManager manager)
+        : base(connection, manager, subject, default)
         {
             _builder = builder;
             _output = output;
-            _manager = manager;
         }
 
-        public string Subject => string.Empty;
-
-        public string QueueGroup => string.Empty;
-
-        public int? PendingMsgs => 0;
-
-        public int Sid => 0;
-
-        public void Ready()
-        {
-        }
-
-        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-
-        public ValueTask ReceiveAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
+        protected override ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
         {
             if (subject.EndsWith(".sync"))
             {
@@ -95,9 +82,13 @@ public class LowLevelApiTest
 
             return ValueTask.CompletedTask;
         }
+
+        protected override void TryComplete()
+        {
+        }
     }
 
-    private class NatsSubCustomTestBuilder : INatsSubBuilder<NatsSubTest>
+    private class NatsSubCustomTestBuilder
     {
         private readonly ITestOutputHelper _output;
         private readonly WaitSignal _done = new();
@@ -121,7 +112,7 @@ public class LowLevelApiTest
 
         public NatsSubTest Build(string subject, NatsSubOpts? opts, NatsConnection connection, ISubscriptionManager manager)
         {
-            return new NatsSubTest(builder: this, _output, manager);
+            return new NatsSubTest(subject, connection, builder: this, _output, manager);
         }
 
         public void Sync() => Interlocked.Exchange(ref _sync, 1);

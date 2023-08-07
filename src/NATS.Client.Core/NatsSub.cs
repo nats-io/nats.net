@@ -14,7 +14,7 @@ internal enum NatsSubEndReason
     Exception,
 }
 
-public abstract class NatsSubBase : INatsSub
+public abstract class NatsSubBase
 {
     private readonly ISubscriptionManager _manager;
     private readonly Timer? _timeoutTimer;
@@ -90,13 +90,13 @@ public abstract class NatsSubBase : INatsSub
 
     // Hide from public API using explicit interface implementations
     // since INatsSub is marked as internal.
-    int? INatsSub.PendingMsgs => _pendingMsgs == -1 ? null : Volatile.Read(ref _pendingMsgs);
+    public int? PendingMsgs => _pendingMsgs == -1 ? null : Volatile.Read(ref _pendingMsgs);
 
     internal NatsSubEndReason EndReason => (NatsSubEndReason)Volatile.Read(ref _endReasonRaw);
 
     protected NatsConnection Connection { get; }
 
-    void INatsSub.Ready()
+    public void Ready()
     {
         // Let idle timer start with the first message, in case
         // we're allowed to wait longer for the first message.
@@ -149,7 +149,7 @@ public abstract class NatsSubBase : INatsSub
         return unsubscribeAsync;
     }
 
-    ValueTask INatsSub.ReceiveAsync(
+    public ValueTask ReceiveAsync(
         string subject,
         string? replyTo,
         ReadOnlySequence<byte>? headersBuffer,
@@ -206,7 +206,7 @@ public abstract class NatsSubBase : INatsSub
     }
 }
 
-public sealed class NatsSub : NatsSubBase
+public sealed class NatsSub : NatsSubBase, INatsSub
 {
     private static readonly BoundedChannelOptions DefaultChannelOptions =
         new BoundedChannelOptions(1_000)
@@ -269,7 +269,7 @@ public sealed class NatsSub : NatsSubBase
     protected override void TryComplete() => _msgs.Writer.TryComplete();
 }
 
-public sealed class NatsSub<T> : NatsSubBase
+public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
 {
     private readonly Channel<NatsMsg<T?>> _msgs;
 
