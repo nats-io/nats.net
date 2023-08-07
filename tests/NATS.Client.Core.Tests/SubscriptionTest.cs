@@ -114,7 +114,7 @@ public class SubscriptionTest
             }
 
             Assert.Equal(maxMsgs, count);
-            Assert.Equal(NatsSubEndReason.MaxMsgs, sub.EndReason);
+            Assert.Equal(NatsSubEndReason.MaxMsgs, ((NatsSubBase)sub).EndReason);
         }
 
         // Auto unsubscribe on timeout
@@ -132,7 +132,7 @@ public class SubscriptionTest
                 count++;
             }
 
-            Assert.Equal(NatsSubEndReason.Timeout, sub.EndReason);
+            Assert.Equal(NatsSubEndReason.Timeout, ((NatsSubBase)sub).EndReason);
             Assert.Equal(0, count);
         }
 
@@ -160,7 +160,7 @@ public class SubscriptionTest
                 count++;
             }
 
-            Assert.Equal(NatsSubEndReason.IdleTimeout, sub.EndReason);
+            Assert.Equal(NatsSubEndReason.IdleTimeout, ((NatsSubBase)sub).EndReason);
             Assert.Equal(4, count);
         }
 
@@ -186,7 +186,7 @@ public class SubscriptionTest
             }
 
             Assert.Equal(0, count);
-            Assert.Equal(NatsSubEndReason.None, sub.EndReason);
+            Assert.Equal(NatsSubEndReason.None, ((NatsSubBase)sub).EndReason);
         }
 
         // Auto unsubscribe on max messages with Inbox Subscription
@@ -212,7 +212,7 @@ public class SubscriptionTest
             }
 
             Assert.Equal(1, count1);
-            Assert.Equal(NatsSubEndReason.MaxMsgs, sub1.EndReason);
+            Assert.Equal(NatsSubEndReason.MaxMsgs, ((NatsSubBase)sub1).EndReason);
 
             var count2 = 0;
             await foreach (var natsMsg in sub2.Msgs.ReadAllAsync(cancellationToken))
@@ -222,7 +222,7 @@ public class SubscriptionTest
             }
 
             Assert.Equal(2, count2);
-            Assert.Equal(NatsSubEndReason.MaxMsgs, sub2.EndReason);
+            Assert.Equal(NatsSubEndReason.MaxMsgs, ((NatsSubBase)sub2).EndReason);
         }
     }
 }

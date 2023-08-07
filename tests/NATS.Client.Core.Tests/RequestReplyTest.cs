@@ -118,7 +118,7 @@ public class RequestReplyTest
         }
 
         Assert.Equal(2, count);
-        Assert.Equal(NatsSubEndReason.Timeout, rep.EndReason);
+        Assert.Equal(NatsSubEndReason.Timeout, ((NatsSubBase)rep).EndReason);
 
         await sub.DisposeAsync();
         await reg;
@@ -152,7 +152,7 @@ public class RequestReplyTest
         }
 
         Assert.Equal(2, count);
-        Assert.Equal(NatsSubEndReason.IdleTimeout, rep.EndReason);
+        Assert.Equal(NatsSubEndReason.IdleTimeout, ((NatsSubBase)rep).EndReason);
 
         await sub.DisposeAsync();
         await reg;
@@ -182,7 +182,7 @@ public class RequestReplyTest
         }
 
         Assert.Equal(0, count);
-        Assert.Equal(NatsSubEndReason.StartUpTimeout, rep.EndReason);
+        Assert.Equal(NatsSubEndReason.StartUpTimeout, ((NatsSubBase)rep).EndReason);
 
         await sub.DisposeAsync();
         await reg;
@@ -215,7 +215,7 @@ public class RequestReplyTest
         }
 
         Assert.Equal(2, count);
-        Assert.Equal(NatsSubEndReason.MaxMsgs, rep.EndReason);
+        Assert.Equal(NatsSubEndReason.MaxMsgs, ((NatsSubBase)rep).EndReason);
 
         await sub.DisposeAsync();
         await reg;

@@ -52,10 +52,17 @@ public class NatsJSConsumer
             fetch = new ConsumerGetnextRequest { Batch = prefetch - lowWatermark };
         }
 
-        await using var sub = await _context.Nats.SubAsync(
+        await using var sub = new NatsJSSub<T>(
+            connection: _context.Nats,
+            manager: _context.Nats._subscriptionManager,
             subject: inbox,
             opts: requestOpts,
-            builder: NatsJSSubModelBuilder<T>.For(requestOpts.Serializer ?? _context.Nats.Options.Serializer),
+            serializer: requestOpts.Serializer ?? _context.Nats.Options.Serializer);
+
+        await _context.Nats.SubAsync(
+            subject: inbox,
+            opts: requestOpts,
+            sub: sub,
             cancellationToken);
 
         static async ValueTask MsgNextAsync(NatsJSContext context, string stream, string consumer, ConsumerGetnextRequest request, string inbox, CancellationToken cancellationtoken)
@@ -140,10 +147,11 @@ public class NatsJSConsumer
     {
         var inbox = $"_INBOX.{Guid.NewGuid():n}";
 
-        await using var sub = await _context.Nats.SubAsync(
+        await using var sub = new NatsJSSub(_context.Nats, _context.Nats._subscriptionManager, inbox, requestOpts);
+        await _context.Nats.SubAsync(
             subject: inbox,
             opts: requestOpts,
-            builder: NatsJSSubBuilder.Default,
+            sub: sub,
             cancellationToken);
 
         await _context.Nats.PubModelAsync(
@@ -157,11 +165,6 @@ public class NatsJSConsumer
         await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken))
         {
             yield return msg;
-        }
-
-        if (sub is { EndReason: NatsSubEndReason.Exception, Exception: not null })
-        {
-            throw sub.Exception;
         }
     }
 
@@ -172,10 +175,11 @@ public class NatsJSConsumer
     {
         var inbox = $"_INBOX.{Guid.NewGuid():n}";
 
-        await using var sub = await _context.Nats.SubAsync(
+        await using var sub = new NatsJSSub<T>(_context.Nats, _context.Nats._subscriptionManager, inbox, requestOpts, requestOpts.Serializer ?? _context.Nats.Options.Serializer);
+        await _context.Nats.SubAsync(
             subject: inbox,
             opts: requestOpts,
-            builder: NatsJSSubModelBuilder<T>.For(requestOpts.Serializer ?? _context.Nats.Options.Serializer),
+            sub,
             cancellationToken);
 
         await _context.Nats.PubModelAsync(
@@ -189,11 +193,6 @@ public class NatsJSConsumer
         await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken))
         {
             yield return msg;
-        }
-
-        if (sub is { EndReason: NatsSubEndReason.Exception, Exception: not null })
-        {
-            throw sub.Exception;
         }
     }
 

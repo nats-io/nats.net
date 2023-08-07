@@ -28,7 +28,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
     private readonly object _gate = new object();
     private readonly WriterState _writerState;
     private readonly ChannelWriter<ICommand> _commandWriter;
-    private readonly SubscriptionManager _subscriptionManager;
+    internal readonly SubscriptionManager _subscriptionManager;
     private readonly ILogger<NatsConnection> _logger;
     private readonly ObjectPool _pool;
     private readonly CancellationTimerPool _cancellationTimerPool;
@@ -383,13 +383,13 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
             _writerState.PriorityCommands.Add(connectCommand);
             _writerState.PriorityCommands.Add(PingCommand.Create(_pool, GetCancellationTimer(CancellationToken.None)));
 
-            if (reconnect)
-            {
-                // Add SUBSCRIBE command to priority lane
-                var subscribeCommand =
-                    AsyncSubscribeBatchCommand.Create(_pool, GetCancellationTimer(CancellationToken.None), _subscriptionManager.GetExistingSubscriptions().ToArray());
-                _writerState.PriorityCommands.Add(subscribeCommand);
-            }
+            // if (reconnect)
+            // {
+            //     // Add SUBSCRIBE command to priority lane
+            //     var subscribeCommand =
+            //         AsyncSubscribeBatchCommand.Create(_pool, GetCancellationTimer(CancellationToken.None), _subscriptionManager.GetExistingSubscriptions().ToArray());
+            //     _writerState.PriorityCommands.Add(subscribeCommand);
+            // }
 
             // create the socket writer
             _socketWriter = new NatsPipeliningWriteProtocolProcessor(_socket!, _writerState, _pool, Counter);
@@ -399,6 +399,8 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
             // receive COMMAND response (PONG or ERROR)
             await waitForPongOrErrorSignal.Task.ConfigureAwait(false);
+
+            await _subscriptionManager.ReconnectAsync(_disposedCancellationTokenSource.Token).ConfigureAwait(false);
         }
         catch (Exception)
         {
