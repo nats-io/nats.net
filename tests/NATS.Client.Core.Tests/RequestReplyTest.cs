@@ -118,7 +118,7 @@ public class RequestReplyTest
         }
 
         Assert.Equal(2, count);
-        Assert.Equal(NatsSubEndReason.Timeout, rep.EndReason);
+        Assert.Equal(NatsSubEndReason.Timeout, ((NatsSubBase)rep).EndReason);
 
         await sub.DisposeAsync();
         await reg;
@@ -152,7 +152,7 @@ public class RequestReplyTest
         }
 
         Assert.Equal(2, count);
-        Assert.Equal(NatsSubEndReason.IdleTimeout, rep.EndReason);
+        Assert.Equal(NatsSubEndReason.IdleTimeout, ((NatsSubBase)rep).EndReason);
 
         await sub.DisposeAsync();
         await reg;
@@ -182,7 +182,7 @@ public class RequestReplyTest
         }
 
         Assert.Equal(0, count);
-        Assert.Equal(NatsSubEndReason.StartUpTimeout, rep.EndReason);
+        Assert.Equal(NatsSubEndReason.StartUpTimeout, ((NatsSubBase)rep).EndReason);
 
         await sub.DisposeAsync();
         await reg;
@@ -215,7 +215,7 @@ public class RequestReplyTest
         }
 
         Assert.Equal(2, count);
-        Assert.Equal(NatsSubEndReason.MaxMsgs, rep.EndReason);
+        Assert.Equal(NatsSubEndReason.MaxMsgs, ((NatsSubBase)rep).EndReason);
 
         await sub.DisposeAsync();
         await reg;
@@ -263,22 +263,24 @@ public class RequestReplyTest
             return Encoding.ASCII.GetString(input.Span);
         }
 
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
         await using var server = NatsServer.Start();
         await using var nats = server.CreateClientConnection();
-        await using var sub = await nats.SubscribeAsync("foo");
+        await using var sub = await nats.SubscribeAsync("foo", cancellationToken: cts.Token);
         var reg = sub.Register(async m =>
         {
             if (ToStr(m.Data) == "1")
             {
-                await m.ReplyAsync(payload: ToSeq("qw"));
-                await m.ReplyAsync(payload: ToSeq("er"));
-                await m.ReplyAsync(payload: ToSeq("ty"));
-                await m.ReplyAsync(payload: default); // sentinel
+                await m.ReplyAsync(payload: ToSeq("qw"), cancellationToken: cts.Token);
+                await m.ReplyAsync(payload: ToSeq("er"), cancellationToken: cts.Token);
+                await m.ReplyAsync(payload: ToSeq("ty"), cancellationToken: cts.Token);
+                await m.ReplyAsync(payload: default, cancellationToken: cts.Token); // sentinel
             }
         });
 
         var writer = new ArrayBufferWriter<byte>();
-        await foreach (var msg in nats.RequestManyAsync("foo", ToSeq("1")))
+        await foreach (var msg in nats.RequestManyAsync("foo", ToSeq("1"), cancellationToken: cts.Token))
         {
             writer.Write(msg.Data.Span);
         }

@@ -57,11 +57,6 @@ public partial class NatsJSContext
             }
         }
 
-        if (sub is { EndReason: NatsSubEndReason.Exception, Exception: not null })
-        {
-            throw sub.Exception;
-        }
-
         throw new NatsJSException("No response received");
     }
 
@@ -110,17 +105,17 @@ public partial class NatsJSContext
             }
         }
 
-        if (sub is { EndReason: NatsSubEndReason.Exception, Exception: not null })
+        if (sub is NatsSubBase { EndReason: NatsSubEndReason.Exception, Exception: not null } sb)
         {
-            if (sub.Exception is NatsSubException { InnerException: JSErrorException jsError })
+            if (sb.Exception is NatsSubException { InnerException: JSErrorException jsError })
             {
                 // Clear exception here so that subscription disposal won't throw it.
-                sub.ClearException();
+                sb.ClearException();
 
                 return new NatsJSResponse<TResponse>(default, jsError.Error);
             }
 
-            throw sub.Exception;
+            throw sb.Exception;
         }
 
         throw new NatsJSException("No response received");

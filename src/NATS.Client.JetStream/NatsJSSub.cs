@@ -99,22 +99,6 @@ internal class NatsJSSub<T> : NatsSubBase
     protected override void TryComplete() => _msgs.Writer.TryComplete();
 }
 
-internal class NatsJSSubModelBuilder<T> : INatsSubBuilder<NatsJSSub<T>>
-{
-    private static readonly ConcurrentDictionary<INatsSerializer, NatsJSSubModelBuilder<T>> Cache = new();
-    private readonly INatsSerializer _serializer;
-
-    public NatsJSSubModelBuilder(INatsSerializer serializer) => _serializer = serializer;
-
-    public static NatsJSSubModelBuilder<T> For(INatsSerializer serializer) =>
-        Cache.GetOrAdd(serializer, static s => new NatsJSSubModelBuilder<T>(s));
-
-    public NatsJSSub<T> Build(string subject, NatsSubOpts? opts, NatsConnection connection, ISubscriptionManager manager)
-    {
-        return new NatsJSSub<T>(connection, manager, subject, opts, _serializer);
-    }
-}
-
 /// <summary>
 /// NATS JetStream Subscription with JetStream control message support.
 /// </summary>
@@ -181,14 +165,4 @@ internal class NatsJSSub : NatsSubBase
     }
 
     protected override void TryComplete() => _msgs.Writer.TryComplete();
-}
-
-internal class NatsJSSubBuilder : INatsSubBuilder<NatsJSSub>
-{
-    public static readonly NatsJSSubBuilder Default = new();
-
-    public NatsJSSub Build(string subject, NatsSubOpts? opts, NatsConnection connection, ISubscriptionManager manager)
-    {
-        return new NatsJSSub(connection, manager, subject, opts);
-    }
 }

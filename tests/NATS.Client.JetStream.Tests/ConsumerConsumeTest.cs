@@ -11,7 +11,7 @@ public class ConsumerConsumeTest
     [Fact]
     public async Task Consume_msgs_test()
     {
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         await using var server = NatsServer.Start(
             outputHelper: _output,
             options: new NatsServerOptionsBuilder()

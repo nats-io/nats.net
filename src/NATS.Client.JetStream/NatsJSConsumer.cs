@@ -81,10 +81,17 @@ public class NatsJSConsumer
 
         var inbox = $"{_context.Opts.InboxPrefix}.{Guid.NewGuid():n}";
 
-        await using var sub = await _context.Nats.SubAsync(
+        await using var sub = new NatsJSSub<T>(
+            connection: _context.Nats,
+            manager: _context.Nats.SubscriptionManager,
             subject: inbox,
             opts: requestOpts,
-            builder: NatsJSSubModelBuilder<T>.For(requestOpts.Serializer ?? _context.Nats.Options.Serializer),
+            serializer: requestOpts.Serializer ?? _context.Nats.Options.Serializer);
+
+        await _context.Nats.SubAsync(
+            subject: inbox,
+            opts: requestOpts,
+            sub: sub,
             cancellationToken);
 
         // We drop the old message if notification handler isn't able to keep up.
@@ -160,10 +167,11 @@ public class NatsJSConsumer
         var count = 0;
         var inbox = $"{_context.Opts.InboxPrefix}.{Guid.NewGuid():n}";
 
-        await using var sub = await _context.Nats.SubAsync(
+        await using var sub = new NatsJSSub<T>(_context.Nats, _context.Nats.SubscriptionManager, inbox, requestOpts, requestOpts?.Serializer ?? _context.Nats.Options.Serializer);
+        await _context.Nats.SubAsync(
             subject: inbox,
             opts: requestOpts,
-            builder: NatsJSSubModelBuilder<T>.For(requestOpts?.Serializer ?? _context.Nats.Options.Serializer),
+            sub,
             cancellationToken);
 
         await CallMsgNextAsync(_context, _stream, _consumer, request, inbox, cancellationToken);
