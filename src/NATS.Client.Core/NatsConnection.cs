@@ -81,8 +81,6 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
     public event EventHandler<string>? ReconnectFailed;
 
-    internal SubscriptionManager SubscriptionManager { get; }
-
     public NatsOptions Options { get; }
 
     public NatsConnectionState ConnectionState { get; private set; }
@@ -90,6 +88,8 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
     public ServerInfo? ServerInfo { get; internal set; } // server info is set when received INFO
 
     public HeaderParser HeaderParser { get; }
+
+    internal SubscriptionManager SubscriptionManager { get; }
 
     internal string InboxPrefix { get; }
 
