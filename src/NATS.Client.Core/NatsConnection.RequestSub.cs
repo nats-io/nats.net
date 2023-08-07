@@ -13,7 +13,7 @@ public partial class NatsConnection
         CancellationToken cancellationToken = default)
     {
         var replyTo = $"{InboxPrefix}{Guid.NewGuid():n}";
-        var sub = new NatsSub(this, _subscriptionManager, subject, replyOpts);
+        var sub = new NatsSub(this, _subscriptionManager._inboxSubBuilder, replyTo, replyOpts);
         await SubAsync(replyTo, replyOpts, sub, cancellationToken).ConfigureAwait(false);
         await PubAsync(subject, replyTo, payload, requestOpts?.Headers, cancellationToken).ConfigureAwait(false);
         return sub;
@@ -29,7 +29,7 @@ public partial class NatsConnection
         var replyTo = $"{InboxPrefix}{Guid.NewGuid():n}";
 
         var replySerializer = replyOpts?.Serializer ?? Options.Serializer;
-        var sub = new NatsSub<TReply>(this, _subscriptionManager, subject, replyOpts, replySerializer);
+        var sub = new NatsSub<TReply>(this, _subscriptionManager._inboxSubBuilder, replyTo, replyOpts, replySerializer);
         await SubAsync(replyTo, replyOpts, sub, cancellationToken).ConfigureAwait(false);
 
         await PubModelAsync(

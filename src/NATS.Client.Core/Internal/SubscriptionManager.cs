@@ -25,7 +25,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
     private readonly CancellationTokenSource _cts;
     private readonly Task _timer;
     private readonly TimeSpan _cleanupInterval;
-    private readonly InboxSubBuilder _inboxSubBuilder;
+    internal readonly InboxSubBuilder _inboxSubBuilder;
     private readonly InboxSub _inboxSubSentinel;
     private readonly SemaphoreSlim _inboxSubLock = new(initialCount: 1, maxCount: 1);
 
