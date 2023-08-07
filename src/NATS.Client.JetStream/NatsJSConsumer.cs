@@ -54,7 +54,7 @@ public class NatsJSConsumer
 
         await using var sub = new NatsJSSub<T>(
             connection: _context.Nats,
-            manager: _context.Nats._subscriptionManager,
+            manager: _context.Nats.SubscriptionManager,
             subject: inbox,
             opts: requestOpts,
             serializer: requestOpts.Serializer ?? _context.Nats.Options.Serializer);
@@ -147,7 +147,7 @@ public class NatsJSConsumer
     {
         var inbox = $"_INBOX.{Guid.NewGuid():n}";
 
-        await using var sub = new NatsJSSub(_context.Nats, _context.Nats._subscriptionManager, inbox, requestOpts);
+        await using var sub = new NatsJSSub(_context.Nats, _context.Nats.SubscriptionManager, inbox, requestOpts);
         await _context.Nats.SubAsync(
             subject: inbox,
             opts: requestOpts,
@@ -175,7 +175,7 @@ public class NatsJSConsumer
     {
         var inbox = $"_INBOX.{Guid.NewGuid():n}";
 
-        await using var sub = new NatsJSSub<T>(_context.Nats, _context.Nats._subscriptionManager, inbox, requestOpts, requestOpts.Serializer ?? _context.Nats.Options.Serializer);
+        await using var sub = new NatsJSSub<T>(_context.Nats, _context.Nats.SubscriptionManager, inbox, requestOpts, requestOpts.Serializer ?? _context.Nats.Options.Serializer);
         await _context.Nats.SubAsync(
             subject: inbox,
             opts: requestOpts,

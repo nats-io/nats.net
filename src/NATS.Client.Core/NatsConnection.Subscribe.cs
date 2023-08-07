@@ -8,7 +8,7 @@ public partial class NatsConnection
     /// <inheritdoc />
     public async ValueTask<INatsSub> SubscribeAsync(string subject, NatsSubOpts? opts = default, CancellationToken cancellationToken = default)
     {
-        var sub = new NatsSub(this, _subscriptionManager, subject, opts);
+        var sub = new NatsSub(this, SubscriptionManager, subject, opts);
         await SubAsync(subject, opts, sub, cancellationToken).ConfigureAwait(false);
         return sub;
     }
@@ -17,7 +17,7 @@ public partial class NatsConnection
     public async ValueTask<INatsSub<T>> SubscribeAsync<T>(string subject, NatsSubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         var serializer = opts?.Serializer ?? Options.Serializer;
-        var sub = new NatsSub<T>(this, _subscriptionManager, subject, opts, serializer);
+        var sub = new NatsSub<T>(this, SubscriptionManager, subject, opts, serializer);
         await SubAsync(subject, opts, sub, cancellationToken).ConfigureAwait(false);
         return sub;
     }

@@ -104,13 +104,13 @@ public partial class NatsConnection
     {
         if (ConnectionState == NatsConnectionState.Open)
         {
-            return _subscriptionManager.SubscribeAsync(subject, opts, sub, cancellationToken);
+            return SubscriptionManager.SubscribeAsync(subject, opts, sub, cancellationToken);
         }
         else
         {
             return WithConnectAsync(subject, opts, sub, cancellationToken, static (self, s, o, b, token) =>
             {
-                return self._subscriptionManager.SubscribeAsync(s, o, b, token);
+                return self.SubscriptionManager.SubscribeAsync(s, o, b, token);
             });
         }
     }

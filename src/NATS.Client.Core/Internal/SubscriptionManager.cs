@@ -25,7 +25,6 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
     private readonly CancellationTokenSource _cts;
     private readonly Task _timer;
     private readonly TimeSpan _cleanupInterval;
-    internal readonly InboxSubBuilder _inboxSubBuilder;
     private readonly InboxSub _inboxSubSentinel;
     private readonly SemaphoreSlim _inboxSubLock = new(initialCount: 1, maxCount: 1);
 
@@ -40,51 +39,12 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
         _cts = new CancellationTokenSource();
         _cleanupInterval = _connection.Options.SubscriptionCleanUpInterval;
         _timer = Task.Run(CleanupAsync);
-        _inboxSubBuilder = new InboxSubBuilder(connection.Options.LoggerFactory.CreateLogger<InboxSubBuilder>());
-        _inboxSubSentinel = new InboxSub(_inboxSubBuilder, nameof(_inboxSubSentinel), default, connection, this);
+        InboxSubBuilder = new InboxSubBuilder(connection.Options.LoggerFactory.CreateLogger<InboxSubBuilder>());
+        _inboxSubSentinel = new InboxSub(InboxSubBuilder, nameof(_inboxSubSentinel), default, connection, this);
         _inboxSub = _inboxSubSentinel;
     }
 
-    public IEnumerable<(int Sid, string Subject, string? QueueGroup, int? maxMsgs)> GetExistingSubscriptions()
-    {
-        lock (_gate)
-        {
-            foreach (var (sid, sidMetadata) in _bySid)
-            {
-                if (sidMetadata.WeakReference.TryGetTarget(out var sub))
-                {
-                    yield return (sid, sub.Subject, sub.QueueGroup, sub.PendingMsgs);
-                }
-            }
-        }
-    }
-
-    private async ValueTask SubscribeInboxAsync(string subject, NatsSubOpts? opts, NatsSubBase sub, CancellationToken cancellationToken)
-    {
-        if (Interlocked.CompareExchange(ref _inboxSub, _inboxSubSentinel, _inboxSubSentinel) == _inboxSubSentinel)
-        {
-            await _inboxSubLock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
-            try
-            {
-                if (Interlocked.CompareExchange(ref _inboxSub, _inboxSubSentinel, _inboxSubSentinel) == _inboxSubSentinel)
-                {
-                    var inboxSubject = $"{_inboxPrefix}*";
-                    _inboxSub = _inboxSubBuilder.Build(subject, opts, _connection, manager: this);
-                    await SubscribeInternalAsync(
-                        inboxSubject,
-                        opts: default,
-                        _inboxSub,
-                        cancellationToken).ConfigureAwait(false);
-                }
-            }
-            finally
-            {
-                _inboxSubLock.Release();
-            }
-        }
-
-        _inboxSubBuilder.Register(sub);
-    }
+    internal InboxSubBuilder InboxSubBuilder { get; }
 
     public async ValueTask SubscribeAsync(string subject, NatsSubOpts? opts, NatsSubBase sub, CancellationToken cancellationToken)
     {
@@ -170,6 +130,48 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
         return _connection.UnsubscribeAsync(subMetadata.Sid);
     }
 
+    public async ValueTask ReconnectAsync(CancellationToken cancellationToken)
+    {
+        foreach (var (sid, sidMetadata) in _bySid)
+        {
+            if (sidMetadata.WeakReference.TryGetTarget(out var sub))
+            {
+                // yield return (sid, sub.Subject, sub.QueueGroup, sub.PendingMsgs);
+                await _connection
+                    .SubscribeCoreAsync(sid, sub.Subject, sub.QueueGroup, sub.PendingMsgs, cancellationToken)
+                    .ConfigureAwait(false);
+                sub.Ready();
+            }
+        }
+    }
+
+    private async ValueTask SubscribeInboxAsync(string subject, NatsSubOpts? opts, NatsSubBase sub, CancellationToken cancellationToken)
+    {
+        if (Interlocked.CompareExchange(ref _inboxSub, _inboxSubSentinel, _inboxSubSentinel) == _inboxSubSentinel)
+        {
+            await _inboxSubLock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+            try
+            {
+                if (Interlocked.CompareExchange(ref _inboxSub, _inboxSubSentinel, _inboxSubSentinel) == _inboxSubSentinel)
+                {
+                    var inboxSubject = $"{_inboxPrefix}*";
+                    _inboxSub = InboxSubBuilder.Build(subject, opts, _connection, manager: this);
+                    await SubscribeInternalAsync(
+                        inboxSubject,
+                        opts: default,
+                        _inboxSub,
+                        cancellationToken).ConfigureAwait(false);
+                }
+            }
+            finally
+            {
+                _inboxSubLock.Release();
+            }
+        }
+
+        InboxSubBuilder.Register(sub);
+    }
+
     private async ValueTask SubscribeInternalAsync(string subject, NatsSubOpts? opts, NatsSubBase sub, CancellationToken cancellationToken)
     {
         var sid = GetNextSid();
@@ -236,21 +238,6 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
             catch (Exception e)
             {
                 _logger.LogWarning($"Error unsubscribing during cleanup: {e.GetBaseException().Message}");
-            }
-        }
-    }
-
-    public async ValueTask ReconnectAsync(CancellationToken cancellationToken)
-    {
-        foreach (var (sid, sidMetadata) in _bySid)
-        {
-            if (sidMetadata.WeakReference.TryGetTarget(out var sub))
-            {
-                // yield return (sid, sub.Subject, sub.QueueGroup, sub.PendingMsgs);
-                await _connection
-                    .SubscribeCoreAsync(sid, sub.Subject, sub.QueueGroup, sub.PendingMsgs, cancellationToken)
-                    .ConfigureAwait(false);
-                sub.Ready();
             }
         }
     }
