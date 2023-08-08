@@ -1,5 +1,4 @@
-using System.Threading.Channels;
-using Microsoft.Extensions.Logging.Abstractions;
+using NATS.Client.JetStream.Internal;
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -96,18 +95,7 @@ public class ConsumerStateTest
     [Fact]
     public void Calculate_pending_msgs()
     {
-        var notifications = Channel.CreateUnbounded<NatsJSNotification>();
-        var m = NatsJSOpsDefaults.SetMax(maxMsgs: 100, thresholdMsgs: 10);
-        var t = NatsJSOpsDefaults.SetTimeouts();
-        var state = new NatsJSConsumer.State<TestData>(
-            optsMaxMsgs: m.MaxMsgs,
-            optsThresholdMsgs: m.ThresholdMsgs,
-            optsMaxBytes: m.MaxBytes,
-            optsThresholdBytes: m.ThresholdBytes,
-            optsIdleHeartbeat: t.IdleHeartbeat,
-            optsExpires: t.Expires,
-            notificationChannel: notifications,
-            logger: NullLogger.Instance);
+        var state = new NatsJSSubState(optsMaxMsgs: 100, optsThresholdMsgs: 10);
 
         // initial pull
         var init = state.GetRequest();
@@ -130,18 +118,7 @@ public class ConsumerStateTest
     [Fact]
     public void Calculate_pending_bytes()
     {
-        var notifications = Channel.CreateUnbounded<NatsJSNotification>();
-        var m = NatsJSOpsDefaults.SetMax(maxBytes: 1000, thresholdBytes: 100);
-        var t = NatsJSOpsDefaults.SetTimeouts();
-        var state = new NatsJSConsumer.State<TestData>(
-            optsMaxMsgs: m.MaxMsgs,
-            optsThresholdMsgs: m.ThresholdMsgs,
-            optsMaxBytes: m.MaxBytes,
-            optsThresholdBytes: m.ThresholdBytes,
-            optsIdleHeartbeat: t.IdleHeartbeat,
-            optsExpires: t.Expires,
-            notificationChannel: notifications,
-            logger: NullLogger.Instance);
+        var state = new NatsJSSubState(optsMaxBytes: 1000, optsThresholdBytes: 100);
 
         // initial pull
         var init = state.GetRequest();
@@ -159,9 +136,5 @@ public class ConsumerStateTest
         var request = state.GetRequest();
         Assert.Equal(1_000_000, request.Batch);
         Assert.Equal(900, request.MaxBytes);
-    }
-
-    private class TestData
-    {
     }
 }

@@ -34,7 +34,8 @@ public class ConsumerConsumeTest
         var consumerOpts = new NatsJSConsumeOpts { MaxMsgs = 10 };
         var consumer = await js.GetConsumerAsync("s1", "c1", cts.Token);
         var count = 0;
-        await foreach (var msg in consumer.ConsumeAsync<TestData>(consumerOpts, cancellationToken: cts.Token))
+        var cc = await consumer.ConsumeAsync<TestData>(consumerOpts, cancellationToken: cts.Token);
+        await foreach (var msg in cc.Msgs.ReadAllAsync(cts.Token))
         {
             await msg.Ack(cts.Token);
             Assert.Equal(count, msg.Msg.Data!.Test);
@@ -102,7 +103,8 @@ public class ConsumerConsumeTest
         };
         var consumer = await js.GetConsumerAsync("s1", "c1", cts.Token);
         var count = 0;
-        await foreach (var msg in consumer.ConsumeAsync<TestData>(consumerOpts, cancellationToken: cts.Token))
+        var cc = await consumer.ConsumeAsync<TestData>(consumerOpts, cancellationToken: cts.Token);
+        await foreach (var msg in cc.Msgs.ReadAllAsync(cts.Token))
         {
             await msg.Ack(cts.Token);
             Assert.Equal(count, msg.Msg.Data!.Test);

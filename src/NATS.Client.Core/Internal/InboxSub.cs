@@ -46,7 +46,7 @@ internal class InboxSubBuilder : ISubscriptionManager
         return new InboxSub(this, subject, opts, connection, manager);
     }
 
-    public void Register(NatsSubBase sub)
+    public ValueTask RegisterAsync(NatsSubBase sub)
     {
         _bySubject.AddOrUpdate(
                 sub.Subject,
@@ -70,7 +70,7 @@ internal class InboxSubBuilder : ISubscriptionManager
                 },
                 sub);
 
-        sub.Ready();
+        return sub.ReadyAsync();
     }
 
     public async ValueTask ReceivedAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer, NatsConnection connection)

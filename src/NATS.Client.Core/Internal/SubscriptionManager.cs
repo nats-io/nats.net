@@ -140,7 +140,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
                 await _connection
                     .SubscribeCoreAsync(sid, sub.Subject, sub.QueueGroup, sub.PendingMsgs, cancellationToken)
                     .ConfigureAwait(false);
-                sub.Ready();
+                await sub.ReadyAsync().ConfigureAwait(false);
             }
         }
     }
@@ -169,7 +169,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
             }
         }
 
-        InboxSubBuilder.Register(sub);
+        await InboxSubBuilder.RegisterAsync(sub).ConfigureAwait(false);
     }
 
     private async ValueTask SubscribeInternalAsync(string subject, NatsSubOpts? opts, NatsSubBase sub, CancellationToken cancellationToken)
@@ -185,7 +185,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
         {
             await _connection.SubscribeCoreAsync(sid, subject, opts?.QueueGroup, opts?.MaxMsgs, cancellationToken)
                 .ConfigureAwait(false);
-            sub.Ready();
+            await sub.ReadyAsync().ConfigureAwait(false);
         }
         catch
         {

@@ -15,6 +15,4 @@ public static class NatsJSExtensions
         if (ack.Duplicate)
             throw new NatsJSDuplicateMessageException(ack.Seq);
     }
-
-    internal static long ToNanos(this TimeSpan timeSpan) => (long)(timeSpan.TotalMilliseconds * 1_000_000);
 }
