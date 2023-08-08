@@ -5,6 +5,47 @@ using NATS.Client.Core.Internal;
 
 namespace NATS.Client.JetStream.Internal;
 
+/*
+ *  Channel Connections
+ *  -------------------
+ *
+ *  - Sub CH:
+ *      NatsJSSub message channel where all the inbox messages are
+ *      delivered to.
+ *
+ *  - User Messages CH:
+ *      These are all the user messages (i.e. subject != inbox)
+ *
+ *  - User Notifications CH:
+ *      Anything we want to let user know about the state of the
+ *      consumer, connection status, timeouts etc.
+ *
+ *  The main idea is to deliver user and control messages from the server
+ *  inbox subscription and internal control messages (e.g. heartbeat
+ *  timeouts) to a single 'controller' where all messages would be
+ *  processed in order and state managed in one place in a non-concurrent
+ *  manner so that races are avoided and it's easier to reason with state
+ *  changes.
+ *
+ *  User Notifications also have their own channel so they can be
+ *  prioritized and can run in their own Task where User error handler
+ *  will be dispatched.
+ *
+ *
+ *    NATS-SERVER
+ *        |                                              User
+ *        |             +--> [User Messages CH] -------> message loop
+ *        v           /                                  (await foreach)
+ *    [Sub CH] ---> Controller (with state)
+ *        ^           \                                  User error
+ *        |            +--> [User Notifications CH] ---> handler
+ *        |                                              (Action<>)
+ *        | Internal control msgs
+ *        | (e.g. heartbeat timeout)
+ *        |
+ *  Heartbeat Timer
+ *
+ */
 internal class NatsNatsJSSubBaseConsume<T> : NatsJSSubBase<T>, INatsJSSubConsume<T>
 {
     private readonly Action<NatsJSNotification>? _errorHandler;
@@ -13,47 +54,6 @@ internal class NatsNatsJSSubBaseConsume<T> : NatsJSSubBase<T>, INatsJSSubConsume
     private readonly Channel<NatsJSNotification> _notificationChannel;
     private readonly Channel<NatsJSMsg<T?>> _userMessageChannel;
 
-    /*
-     *  Channel Connections
-     *  -------------------
-     *
-     *  - Sub CH:
-     *      NatsJSSub message channel where all the inbox messages are
-     *      delivered to.
-     *
-     *  - User Messages CH:
-     *      These are all the user messages (i.e. subject != inbox)
-     *
-     *  - User Notifications CH:
-     *      Anything we want to let user know about the state of the
-     *      consumer, connection status, timeouts etc.
-     *
-     *  The main idea is to deliver user and control messages from the server
-     *  inbox subscription and internal control messages (e.g. heartbeat
-     *  timeouts) to a single 'controller' where all messages would be
-     *  processed in order and state managed in one place in a non-concurrent
-     *  manner so that races are avoided and it's easier to reason with state
-     *  changes.
-     *
-     *  User Notifications also have their own channel so they can be
-     *  prioritized and can run in their own Task where User error handler
-     *  will be dispatched.
-     *
-     *
-     *    NATS-SERVER
-     *        |                                              User
-     *        |             +--> [User Messages CH] -------> message loop
-     *        v           /                                  (await foreach)
-     *    [Sub CH] ---> Controller (with state)
-     *        ^           \                                  User error
-     *        |            +--> [User Notifications CH] ---> handler
-     *        |                                              (Action<>)
-     *        | Internal control msgs
-     *        | (e.g. heartbeat timeout)
-     *        |
-     *  Heartbeat Timer
-     *
-     */
     internal NatsNatsJSSubBaseConsume(
         string stream,
         string consumer,
@@ -99,6 +99,9 @@ internal class NatsNatsJSSubBaseConsume<T> : NatsJSSubBase<T>, INatsJSSubConsume
         await base.DisposeAsync();
         await _notifier;
     }
+
+    protected override void HeartbeatTimerCallback() =>
+        _notificationChannel.Writer.WriteAsync(new NatsJSNotification(-1, "Heartbeat timeout"), _cancellationToken);
 
     protected override ValueTask ReceivedControlMsg(NatsJSNotification notification)
     {

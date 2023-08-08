@@ -48,7 +48,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
 
     public async ValueTask SubscribeAsync(string subject, NatsSubOpts? opts, NatsSubBase sub, CancellationToken cancellationToken)
     {
-        if (subject.StartsWith(_inboxPrefix, StringComparison.Ordinal))
+        if (IsInboxSubject(subject))
         {
             await SubscribeInboxAsync(subject, opts, sub, cancellationToken).ConfigureAwait(false);
         }
@@ -143,6 +143,13 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
                 await sub.ReadyAsync().ConfigureAwait(false);
             }
         }
+    }
+
+    public ISubscriptionManager GetManagerFor(string subject)
+    {
+        if (IsInboxSubject(subject))
+            return InboxSubBuilder;
+        return this;
     }
 
     private async ValueTask SubscribeInboxAsync(string subject, NatsSubOpts? opts, NatsSubBase sub, CancellationToken cancellationToken)
@@ -241,4 +248,6 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
             }
         }
     }
+
+    private bool IsInboxSubject(string subject) => subject.StartsWith(_inboxPrefix, StringComparison.Ordinal);
 }

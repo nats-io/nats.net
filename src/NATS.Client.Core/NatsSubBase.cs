@@ -161,17 +161,14 @@ public abstract class NatsSubBase
         return unsubscribeAsync;
     }
 
-    public ValueTask ReceiveAsync(
-        string subject,
-        string? replyTo,
-        ReadOnlySequence<byte>? headersBuffer,
-        ReadOnlySequence<byte> payloadBuffer)
+    public virtual async ValueTask ReceiveAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
     {
         ResetIdleTimeout();
 
         try
         {
-            return ReceiveInternalAsync(subject, replyTo, headersBuffer, payloadBuffer);
+            // Need to await to handle any exceptions
+            await ReceiveInternalAsync(subject, replyTo, headersBuffer, payloadBuffer).ConfigureAwait(false);
         }
         catch (Exception e)
         {
@@ -186,8 +183,6 @@ public abstract class NatsSubBase
 
             SetException(new NatsSubException($"Message error: {e.Message}", ExceptionDispatchInfo.Capture(e), payload, headers));
         }
-
-        return ValueTask.CompletedTask;
     }
 
     internal void ClearException() => Interlocked.Exchange(ref _exception, null);

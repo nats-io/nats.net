@@ -46,13 +46,7 @@ internal abstract class NatsJSSubBase<T> : NatsSubBase
         // so that state transitions can be done in the same loop as other messages
         // to ensure state consistency.
         _heartbeatTimer = new Timer(
-            callback: _ =>
-            {
-                // TODO: heartbeat timer callback
-                // var valueTask = subMsgsChannel.Writer.WriteAsync(timeoutMsg, cancellationToken);
-                // if (!valueTask.IsCompleted)
-                //     valueTask.GetAwaiter().GetResult();
-            },
+            callback: _ => HeartbeatTimerCallback(),
             state: default,
             dueTime: Timeout.Infinite,
             period: Timeout.Infinite);
@@ -64,6 +58,7 @@ internal abstract class NatsJSSubBase<T> : NatsSubBase
     {
         await base.ReadyAsync().ConfigureAwait(false);
         await CallMsgNextAsync(_state.GetRequest()).ConfigureAwait(false);
+        ResetHeartbeatTimer();
     }
 
     protected override async ValueTask ReceiveInternalAsync(
@@ -180,7 +175,7 @@ internal abstract class NatsJSSubBase<T> : NatsSubBase
                     await CallMsgNextAsync(_state.GetRequest());
                 }
 
-                await ReceivedUserMsg(msg);
+                await ReceivedUserMsg(msg).ConfigureAwait(false);
 
                 DecrementMaxMsgs();
             }
@@ -199,6 +194,8 @@ internal abstract class NatsJSSubBase<T> : NatsSubBase
             }
         }
     }
+
+    protected abstract void HeartbeatTimerCallback();
 
     protected abstract ValueTask ReceivedControlMsg(NatsJSNotification notification);
 

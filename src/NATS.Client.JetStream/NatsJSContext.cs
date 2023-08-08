@@ -107,7 +107,7 @@ public partial class NatsJSContext
 
         if (sub is NatsSubBase { EndReason: NatsSubEndReason.Exception, Exception: not null } sb)
         {
-            if (sb.Exception is NatsSubException { InnerException: JSErrorException jsError })
+            if (sb.Exception is NatsSubException { Exception.SourceException: JSApiErrorException jsError })
             {
                 // Clear exception here so that subscription disposal won't throw it.
                 sb.ClearException();
