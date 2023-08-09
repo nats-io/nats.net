@@ -46,7 +46,7 @@ namespace NATS.Client.JetStream.Internal;
  *  Heartbeat Timer
  *
  */
-internal class NatsNatsJSSubBaseConsume<T> : NatsJSSubBase<T>, INatsJSSubConsume<T>
+internal class NatsJSSubBaseConsume<T> : NatsJSSubBase<T>, INatsJSSubConsume<T>
 {
     private readonly Action<NatsJSNotification>? _errorHandler;
     private readonly CancellationToken _cancellationToken;
@@ -54,7 +54,7 @@ internal class NatsNatsJSSubBaseConsume<T> : NatsJSSubBase<T>, INatsJSSubConsume
     private readonly Channel<NatsJSNotification> _notificationChannel;
     private readonly Channel<NatsJSMsg<T?>> _userMessageChannel;
 
-    internal NatsNatsJSSubBaseConsume(
+    internal NatsJSSubBaseConsume(
         string stream,
         string consumer,
         NatsJSContext context,
@@ -75,11 +75,7 @@ internal class NatsNatsJSSubBaseConsume<T> : NatsJSSubBase<T>, INatsJSSubConsume
         // in the same loop as the control messages to keep state updates consistent. This is as
         // opposed to having a control and a message channel at the point of serializing the messages
         // in NatsJSSub class.
-        _userMessageChannel = Channel.CreateBounded<NatsJSMsg<T?>>(new BoundedChannelOptions(1_000)
-        {
-            FullMode = BoundedChannelFullMode.Wait,
-            AllowSynchronousContinuations = false,
-        });
+        _userMessageChannel = Channel.CreateBounded<NatsJSMsg<T?>>(NatsSub.GetChannelOptions(opts?.ChannelOptions));
 
         // We drop the old message if notification handler isn't able to keep up.
         // This is to avoid blocking the control loop and making sure we deliver all the messages.
