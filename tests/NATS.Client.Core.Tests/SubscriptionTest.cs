@@ -109,7 +109,7 @@ public class SubscriptionTest
         }
 
         Assert.Equal(1, count1);
-        Assert.Equal(NatsSubEndReason.MaxMsgs, ((NatsSubBase) sub1).EndReason);
+        Assert.Equal(NatsSubEndReason.MaxMsgs, ((NatsSubBase)sub1).EndReason);
 
         var count2 = 0;
         await foreach (var natsMsg in sub2.Msgs.ReadAllAsync(cancellationToken))
@@ -119,7 +119,7 @@ public class SubscriptionTest
         }
 
         Assert.Equal(2, count2);
-        Assert.Equal(NatsSubEndReason.MaxMsgs, ((NatsSubBase) sub2).EndReason);
+        Assert.Equal(NatsSubEndReason.MaxMsgs, ((NatsSubBase)sub2).EndReason);
     }
 
     [Fact]
@@ -149,7 +149,7 @@ public class SubscriptionTest
         }
 
         Assert.Equal(maxMsgs, count);
-        Assert.Equal(NatsSubEndReason.MaxMsgs, ((NatsSubBase) sub).EndReason);
+        Assert.Equal(NatsSubEndReason.MaxMsgs, ((NatsSubBase)sub).EndReason);
     }
 
     [Fact]
@@ -171,7 +171,7 @@ public class SubscriptionTest
             count++;
         }
 
-        Assert.Equal(NatsSubEndReason.Timeout, ((NatsSubBase) sub).EndReason);
+        Assert.Equal(NatsSubEndReason.Timeout, ((NatsSubBase)sub).EndReason);
         Assert.Equal(0, count);
     }
 
@@ -202,7 +202,7 @@ public class SubscriptionTest
             count++;
         }
 
-        Assert.Equal(NatsSubEndReason.IdleTimeout, ((NatsSubBase) sub).EndReason);
+        Assert.Equal(NatsSubEndReason.IdleTimeout, ((NatsSubBase)sub).EndReason);
         Assert.Equal(4, count);
     }
 
@@ -231,6 +231,6 @@ public class SubscriptionTest
         }
 
         Assert.Equal(0, count);
-        Assert.Equal(NatsSubEndReason.None, ((NatsSubBase) sub).EndReason);
+        Assert.Equal(NatsSubEndReason.None, ((NatsSubBase)sub).EndReason);
     }
 }
