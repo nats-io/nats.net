@@ -14,6 +14,47 @@ namespace NATS.Client.Core;
 [SuppressMessage("StyleCop.CSharp.OrderingRules", "SA1214:Readonly fields should appear before non-readonly fields", Justification = "Keep class format as is for reference")]
 public class NatsHeaders : IDictionary<string, StringValues>
 {
+    public enum Messages
+    {
+        Text,
+        IdleHeartbeat,
+        BadRequest,
+        ConsumerDeleted,
+        ConsumerIsPushBased,
+        NoMessages,
+        RequestTimeout,
+        MessageSizeExceedsMaxBytes,
+    }
+
+    // Uses C# compiler's optimization for static byte[] data
+    // string.Join(",", Encoding.ASCII.GetBytes("Idle Heartbeat"))
+    internal static ReadOnlySpan<byte> MessageIdleHeartbeat => new byte[] { 73, 100, 108, 101, 32, 72, 101, 97, 114, 116, 98, 101, 97, 116 };
+    internal static readonly string MessageIdleHeartbeatStr = "Idle Heartbeat";
+
+    // Bad Request
+    internal static ReadOnlySpan<byte> MessageBadRequest => new byte[] { 66, 97, 100, 32, 82, 101, 113, 117, 101, 115, 116 };
+    internal static readonly string MessageBadRequestStr = "Bad Request";
+
+    // Consumer Deleted
+    internal static ReadOnlySpan<byte> MessageConsumerDeleted => new byte[] { 67, 111, 110, 115, 117, 109, 101, 114, 32, 68, 101, 108, 101, 116, 101, 100 };
+    internal static readonly string MessageConsumerDeletedStr = "Consumer Deleted";
+
+    // Consumer is push based
+    internal static ReadOnlySpan<byte> MessageConsumerIsPushBased => new byte[] { 67, 111, 110, 115, 117, 109, 101, 114, 32, 105, 115, 32, 112, 117, 115, 104, 32, 98, 97, 115, 101, 100 };
+    internal static readonly string MessageConsumerIsPushBasedStr = "Consumer is push based";
+
+    // No Messages
+    internal static ReadOnlySpan<byte> MessageNoMessages => new byte[] { 78, 111, 32, 77, 101, 115, 115, 97, 103, 101, 115 };
+    internal static readonly string MessageNoMessagesStr = "No Messages";
+
+    // Request Timeout
+    internal static ReadOnlySpan<byte> MessageRequestTimeout => new byte[] { 82, 101, 113, 117, 101, 115, 116, 32, 84, 105, 109, 101, 111, 117, 116 };
+    internal static readonly string MessageRequestTimeoutStr = "Request Timeout";
+
+    // Message Size Exceeds MaxBytes
+    internal static ReadOnlySpan<byte> MessageMessageSizeExceedsMaxBytes => new byte[] { 77, 101, 115, 115, 97, 103, 101, 32, 83, 105, 122, 101, 32, 69, 120, 99, 101, 101, 100, 115, 32, 77, 97, 120, 66, 121, 116, 101, 115 };
+    internal static readonly string MessageMessageSizeExceedsMaxBytesStr = "Message Size Exceeds MaxBytes";
+
     private static readonly string[] EmptyKeys = Array.Empty<string>();
     private static readonly StringValues[] EmptyValues = Array.Empty<StringValues>();
 
@@ -22,6 +63,14 @@ public class NatsHeaders : IDictionary<string, StringValues>
     private static readonly IEnumerator EmptyIEnumerator = default(Enumerator);
 
     private int _readonly = 0;
+
+    public int Version => 1;
+
+    public int Code { get; internal set; }
+
+    public string MessageText { get; internal set; } = string.Empty;
+
+    public Messages Message { get; internal set; } = Messages.Text;
 
     /// <summary>
     /// Initializes a new instance of <see cref="NatsHeaders"/>.

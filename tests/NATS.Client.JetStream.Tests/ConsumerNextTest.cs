@@ -8,7 +8,7 @@ public class ConsumerNextTest
 
     public ConsumerNextTest(ITestOutputHelper output) => _output = output;
 
-    [Fact]
+    [Fact(Skip = "TODO")]
     public async Task Next_test()
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));

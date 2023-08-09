@@ -1,11 +1,15 @@
 // Adapted from https://github.com/dotnet/aspnetcore/blob/v6.0.18/src/Servers/Kestrel/Core/src/Internal/Http/HttpParser.cs
 
 using System.Buffers;
+using System.Buffers.Text;
 using System.Diagnostics;
 using System.Text;
 using Microsoft.Extensions.Primitives;
+using NATS.Client.Core.Commands;
 using NATS.Client.Core.Internal;
 
+// ReSharper disable ConditionIsAlwaysTrueOrFalse
+// ReSharper disable PossiblyImpureMethodCallOnReadonlyVariable
 namespace NATS.Client.Core;
 
 public class HeaderParser
@@ -18,13 +22,12 @@ public class HeaderParser
 
     private readonly Encoding _encoding;
 
-    public HeaderParser(Encoding encoding)
-    {
-        _encoding = encoding;
-    }
+    public HeaderParser(Encoding encoding) => _encoding = encoding;
 
     public bool ParseHeaders(in SequenceReader<byte> reader, NatsHeaders headers)
     {
+        var isVersionLineRead = false;
+
         while (!reader.End)
         {
             var span = reader.UnreadSpan;
@@ -73,7 +76,7 @@ public class HeaderParser
                     // Headers don't end in CRLF line.
                     Debug.Assert(readAhead == 0 || readAhead == 2, "readAhead == 0 || readAhead == 2");
 
-                    throw new NatsException($"Protocol error: invalid headers, no ending CRLFCRLF");
+                    throw new NatsException($"Protocol error: invalid headers, no ending CRLF+CRLF");
                 }
 
                 var length = 0;
@@ -113,7 +116,7 @@ public class HeaderParser
                                 length < 5 ||
 
                                 // Exclude the CRLF from the headerLine and parse the header name:value pair
-                                !TryTakeSingleHeader(span[..(length - 2)], headers))
+                                !TryTakeSingleHeader(span[..(length - 2)], headers, ref isVersionLineRead))
                             {
                                 // Sequence needs to be CRLF and not contain an inner CR not part of terminator.
                                 // Less than min possible headerSpan of 5 bytes a:b\r\n
@@ -145,7 +148,7 @@ public class HeaderParser
                     reader.Rewind(readAhead);
                 }
 
-                length = ParseMultiSpanHeader(reader, headers);
+                length = ParseMultiSpanHeader(reader, headers, ref isVersionLineRead);
                 if (length < 0)
                 {
                     // Not there
@@ -163,7 +166,7 @@ public class HeaderParser
         return false;
     }
 
-    private int ParseMultiSpanHeader(in SequenceReader<byte> reader, NatsHeaders headers)
+    private int ParseMultiSpanHeader(in SequenceReader<byte> reader, NatsHeaders headers, ref bool isVersionLineRead)
     {
         var currentSlice = reader.UnreadSequence;
         var lineEndPosition = currentSlice.PositionOfAny(ByteCR, ByteLF);
@@ -211,7 +214,7 @@ public class HeaderParser
         if (headerSpan[^1] != ByteLF ||
 
             // Exclude the CRLF from the headerLine and parse the header name:value pair
-            !TryTakeSingleHeader(headerSpan[..^2], headers))
+            !TryTakeSingleHeader(headerSpan[..^2], headers, ref isVersionLineRead))
         {
             // Sequence needs to be CRLF and not contain an inner CR not part of terminator.
             // Not parsable as a valid name:value header pair.
@@ -221,8 +224,77 @@ public class HeaderParser
         return headerSpan.Length;
     }
 
-    private bool TryTakeSingleHeader(ReadOnlySpan<byte> headerLine, NatsHeaders headers)
+    private bool TryTakeSingleHeader(ReadOnlySpan<byte> headerLine, NatsHeaders headers, ref bool isVersionLineRead)
     {
+        // We are first looking for a version line
+        // e.g. NATS/1.0 100 Idle Heartbeat
+        if (!isVersionLineRead)
+        {
+            headerLine.Split(out var versionBytes, out headerLine);
+
+            if (!versionBytes.SequenceEqual(CommandConstants.NatsHeaders10))
+            {
+                throw new NatsException("Protocol error: header version mismatch");
+            }
+
+            if (headerLine.Length != 0)
+            {
+                headerLine.Split(out var codeBytes, out headerLine);
+                if (!Utf8Parser.TryParse(codeBytes, out int code, out _))
+                    throw new NatsException("Protocol error: header code is not a number");
+                headers.Code = code;
+            }
+
+            if (headerLine.Length != 0)
+            {
+                // We can reduce string allocations by detecting commonly used
+                // header messages.
+                if (headerLine.SequenceEqual(NatsHeaders.MessageIdleHeartbeat))
+                {
+                    headers.Message = NatsHeaders.Messages.IdleHeartbeat;
+                    headers.MessageText = NatsHeaders.MessageIdleHeartbeatStr;
+                }
+                else if (headerLine.SequenceEqual(NatsHeaders.MessageBadRequest))
+                {
+                    headers.Message = NatsHeaders.Messages.BadRequest;
+                    headers.MessageText = NatsHeaders.MessageBadRequestStr;
+                }
+                else if (headerLine.SequenceEqual(NatsHeaders.MessageConsumerDeleted))
+                {
+                    headers.Message = NatsHeaders.Messages.ConsumerDeleted;
+                    headers.MessageText = NatsHeaders.MessageConsumerDeletedStr;
+                }
+                else if (headerLine.SequenceEqual(NatsHeaders.MessageConsumerIsPushBased))
+                {
+                    headers.Message = NatsHeaders.Messages.ConsumerIsPushBased;
+                    headers.MessageText = NatsHeaders.MessageConsumerIsPushBasedStr;
+                }
+                else if (headerLine.SequenceEqual(NatsHeaders.MessageNoMessages))
+                {
+                    headers.Message = NatsHeaders.Messages.NoMessages;
+                    headers.MessageText = NatsHeaders.MessageNoMessagesStr;
+                }
+                else if (headerLine.SequenceEqual(NatsHeaders.MessageRequestTimeout))
+                {
+                    headers.Message = NatsHeaders.Messages.RequestTimeout;
+                    headers.MessageText = NatsHeaders.MessageRequestTimeoutStr;
+                }
+                else if (headerLine.SequenceEqual(NatsHeaders.MessageMessageSizeExceedsMaxBytes))
+                {
+                    headers.Message = NatsHeaders.Messages.MessageSizeExceedsMaxBytes;
+                    headers.MessageText = NatsHeaders.MessageMessageSizeExceedsMaxBytesStr;
+                }
+                else
+                {
+                    headers.Message = NatsHeaders.Messages.Text;
+                    headers.MessageText = _encoding.GetString(headerLine);
+                }
+            }
+
+            isVersionLineRead = true;
+            return true;
+        }
+
         // We are looking for a colon to terminate the header name.
         // However, the header name cannot contain a space or tab so look for all three
         // and see which is found first.
@@ -332,5 +404,5 @@ public class HeaderParser
     [StackTraceHidden]
     private void RejectRequestHeader(ReadOnlySpan<byte> headerLine)
         => throw new NatsException(
-            $"Protocol error: invalid request header line '{_encoding.GetString(headerLine)}'");
+            $"Protocol error: invalid request header line '{headerLine.Dump()}'");
 }

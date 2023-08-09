@@ -22,12 +22,13 @@ internal class InboxSub : NatsSubBase
         _connection = connection;
     }
 
-    protected override ValueTask ReceiveInternalAsync(
-        string subject,
-        string? replyTo,
-        ReadOnlySequence<byte>? headersBuffer,
-        ReadOnlySequence<byte> payloadBuffer) =>
+    // Avoid base class error handling since inboxed subscribers will be responsible for that.
+    public override ValueTask ReceiveAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer) =>
         _inbox.ReceivedAsync(subject, replyTo, headersBuffer, payloadBuffer, _connection);
+
+    // Not used. Dummy implementation to keep base happy.
+    protected override ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
+        => ValueTask.CompletedTask;
 
     protected override void TryComplete()
     {
@@ -46,7 +47,7 @@ internal class InboxSubBuilder : ISubscriptionManager
         return new InboxSub(this, subject, opts, connection, manager);
     }
 
-    public void Register(NatsSubBase sub)
+    public ValueTask RegisterAsync(NatsSubBase sub)
     {
         _bySubject.AddOrUpdate(
                 sub.Subject,
@@ -70,7 +71,7 @@ internal class InboxSubBuilder : ISubscriptionManager
                 },
                 sub);
 
-        sub.Ready();
+        return sub.ReadyAsync();
     }
 
     public async ValueTask ReceivedAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer, NatsConnection connection)

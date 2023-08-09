@@ -116,21 +116,6 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         return Encoding.UTF8.GetString(errorSlice.Slice(5));
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void Split(ReadOnlySpan<byte> span, out ReadOnlySpan<byte> left, out ReadOnlySpan<byte> right)
-    {
-        var i = span.IndexOf((byte)' ');
-        if (i == -1)
-        {
-            left = span;
-            right = default;
-            return;
-        }
-
-        left = span.Slice(0, i);
-        right = span.Slice(i + 1);
-    }
-
     private async Task ReadLoopAsync()
     {
         while (true)
@@ -276,14 +261,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                         // Prepare buffer for the next message by removing 'headers + payload + \r\n' from it
                         buffer = buffer.Slice(buffer.GetPosition(2, totalSlice.End));
 
-                        var versionLength = CommandConstants.NatsHeaders10NewLine.Length;
-                        var versionSlice = totalSlice.Slice(0, versionLength);
-                        if (!versionSlice.ToSpan().SequenceEqual(CommandConstants.NatsHeaders10NewLine))
-                        {
-                            throw new NatsException("Protocol error: header version mismatch");
-                        }
-
-                        var headerSlice = totalSlice.Slice(versionLength, headersLength - versionLength);
+                        var headerSlice = totalSlice.Slice(0, headersLength);
                         var payloadSlice = totalSlice.Slice(headersLength, payloadLength);
 
                         await _connection.PublishToClientHandlersAsync(subject, replyTo, sid, headerSlice, payloadSlice)
@@ -447,9 +425,9 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
     private (string subject, int sid, int payloadLength, string? replyTo) ParseMessageHeader(ReadOnlySpan<byte> msgHeader)
     {
         msgHeader = msgHeader.Slice(4);
-        Split(msgHeader, out var subjectBytes, out msgHeader);
-        Split(msgHeader, out var sidBytes, out msgHeader);
-        Split(msgHeader, out var replyToOrSizeBytes, out msgHeader);
+        msgHeader.Split(out var subjectBytes, out msgHeader);
+        msgHeader.Split(out var sidBytes, out msgHeader);
+        msgHeader.Split(out var replyToOrSizeBytes, out msgHeader);
 
         var subject = Encoding.ASCII.GetString(subjectBytes);
 
@@ -499,12 +477,12 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
     private (string subject, int sid, string? replyTo, int headersLength, int totalLength) ParseHMessageHeader(ReadOnlySpan<byte> msgHeader)
     {
         // 'HMSG' literal
-        Split(msgHeader, out _, out msgHeader);
+        msgHeader.Split(out _, out msgHeader);
 
-        Split(msgHeader, out var subjectBytes, out msgHeader);
-        Split(msgHeader, out var sidBytes, out msgHeader);
-        Split(msgHeader, out var replyToOrHeaderLenBytes, out msgHeader);
-        Split(msgHeader, out var headerLenOrTotalLenBytes, out msgHeader);
+        msgHeader.Split(out var subjectBytes, out msgHeader);
+        msgHeader.Split(out var sidBytes, out msgHeader);
+        msgHeader.Split(out var replyToOrHeaderLenBytes, out msgHeader);
+        msgHeader.Split(out var headerLenOrTotalLenBytes, out msgHeader);
 
         var subject = Encoding.ASCII.GetString(subjectBytes);
         var sid = GetInt32(sidBytes);

@@ -1,5 +1,6 @@
-using System.Runtime.CompilerServices;
+using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
+using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
@@ -9,7 +10,7 @@ public class NatsJSConsumer
     private readonly NatsJSContext _context;
     private readonly string _stream;
     private readonly string _consumer;
-    private bool _deleted;
+    private volatile bool _deleted;
 
     public NatsJSConsumer(NatsJSContext context, ConsumerInfo info)
     {
@@ -27,37 +28,35 @@ public class NatsJSConsumer
         return _deleted = await _context.DeleteConsumerAsync(_stream, _consumer, cancellationToken);
     }
 
-    public async IAsyncEnumerable<NatsJSMsg<T?>> ConsumeAsync<T>(int maxMsgs, ConsumerOpts opts, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async ValueTask<INatsJSSubConsume<T>> ConsumeAsync<T>(
+        NatsJSConsumeOpts opts,
+        NatsSubOpts requestOpts = default,
+        CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
-        var prefetch = opts.Prefetch;
-        var lowWatermark = opts.LowWatermark;
-        var shouldPrefetch = true;
 
-        if (maxMsgs <= prefetch)
-        {
-            prefetch = maxMsgs;
-            lowWatermark = maxMsgs;
-            shouldPrefetch = false;
-        }
+        var inbox = $"{_context.Opts.InboxPrefix}.{Guid.NewGuid():n}";
 
-        var inbox = $"_INBOX.{Guid.NewGuid():n}";
+        var state = new NatsJSSubState(
+            opts: _context.Opts,
+            optsMaxBytes: opts.MaxBytes,
+            optsMaxMsgs: opts.MaxMsgs,
+            optsThresholdMsgs: opts.ThresholdMsgs,
+            optsThresholdBytes: opts.ThresholdBytes,
+            optsExpires: opts.Expires,
+            optsIdleHeartbeat: opts.IdleHeartbeat);
 
-        var requestOpts = default(NatsSubOpts);
-        var request = new ConsumerGetnextRequest { Batch = prefetch };
-
-        ConsumerGetnextRequest? fetch = default;
-        if (shouldPrefetch)
-        {
-            fetch = new ConsumerGetnextRequest { Batch = prefetch - lowWatermark };
-        }
-
-        await using var sub = new NatsJSSub<T>(
-            connection: _context.Nats,
+        var sub = new NatsJSSubBaseConsume<T>(
+            stream: _stream,
+            consumer: _consumer,
+            context: _context,
             manager: _context.Nats.SubscriptionManager,
             subject: inbox,
             opts: requestOpts,
-            serializer: requestOpts.Serializer ?? _context.Nats.Options.Serializer);
+            state: state,
+            serializer: requestOpts.Serializer ?? _context.Nats.Options.Serializer,
+            errorHandler: opts.ErrorHandler,
+            cancellationToken: cancellationToken);
 
         await _context.Nats.SubAsync(
             subject: inbox,
@@ -65,51 +64,12 @@ public class NatsJSConsumer
             sub: sub,
             cancellationToken);
 
-        static async ValueTask MsgNextAsync(NatsJSContext context, string stream, string consumer, ConsumerGetnextRequest request, string inbox, CancellationToken cancellationtoken)
-        {
-            await context.Nats.PubModelAsync(
-                subject: $"$JS.API.CONSUMER.MSG.NEXT.{stream}.{consumer}",
-                data: request,
-                serializer: JsonNatsSerializer.Default,
-                replyTo: inbox,
-                headers: default,
-                cancellationtoken);
-        }
-
-        await MsgNextAsync(_context, _stream, _consumer, request, inbox, cancellationToken);
-
-        var count = 0;
-        await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken))
-        {
-            if (msg.IsControlMsg)
-            {
-                // TODO: Heartbeats etc.
-            }
-            else
-            {
-                yield return msg.JSMsg!.Value;
-
-                if (++count == maxMsgs)
-                {
-                    break;
-                }
-
-                if (shouldPrefetch && count % lowWatermark == 0)
-                {
-                    await MsgNextAsync(_context, _stream, _consumer, fetch!, inbox, cancellationToken);
-                }
-            }
-        }
-
-        if (sub is { EndReason: NatsSubEndReason.Exception, Exception: not null })
-        {
-            throw sub.Exception;
-        }
+        return sub;
     }
 
     public async ValueTask<NatsJSMsg<T?>> NextAsync<T>(CancellationToken cancellationToken = default)
     {
-        await foreach (var natsJSMsg in FetchAsync<T>(1, cancellationToken))
+        await foreach (var natsJSMsg in FetchAsync<T>(new NatsJSFetchOpts { MaxMsgs = 1 }, cancellationToken: cancellationToken))
         {
             return natsJSMsg;
         }
@@ -117,95 +77,15 @@ public class NatsJSConsumer
         throw new NatsJSException("No data");
     }
 
-    public async IAsyncEnumerable<NatsJSMsg<T?>> FetchAsync<T>(
-        int maxMsgs,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
-    {
-        var request = new ConsumerGetnextRequest { Batch = maxMsgs, };
-
-        var count = 0;
-        await foreach (var msg in ConsumeRawAsync<T>(request, default, cancellationToken).ConfigureAwait(false))
-        {
-            if (msg.IsControlMsg)
-            {
-                // TODO: Heartbeats etc.
-            }
-            else
-            {
-                yield return msg.JSMsg!.Value;
-
-                if (++count == maxMsgs)
-                    break;
-            }
-        }
-    }
-
-    internal async IAsyncEnumerable<NatsJSControlMsg> ConsumeRawAsync(
-        ConsumerGetnextRequest request,
-        NatsSubOpts requestOpts = default,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
-    {
-        var inbox = $"_INBOX.{Guid.NewGuid():n}";
-
-        await using var sub = new NatsJSSub(_context.Nats, _context.Nats.SubscriptionManager, inbox, requestOpts);
-        await _context.Nats.SubAsync(
-            subject: inbox,
-            opts: requestOpts,
-            sub: sub,
-            cancellationToken);
-
-        await _context.Nats.PubModelAsync(
-            subject: $"$JS.API.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
-            data: request,
-            serializer: JsonNatsSerializer.Default,
-            replyTo: inbox,
-            headers: default,
-            cancellationToken);
-
-        await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken))
-        {
-            yield return msg;
-        }
-    }
-
-    internal async IAsyncEnumerable<NatsJSControlMsg<T?>> ConsumeRawAsync<T>(
-        ConsumerGetnextRequest request,
-        NatsSubOpts requestOpts = default,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
-    {
-        var inbox = $"_INBOX.{Guid.NewGuid():n}";
-
-        await using var sub = new NatsJSSub<T>(_context.Nats, _context.Nats.SubscriptionManager, inbox, requestOpts, requestOpts.Serializer ?? _context.Nats.Options.Serializer);
-        await _context.Nats.SubAsync(
-            subject: inbox,
-            opts: requestOpts,
-            sub,
-            cancellationToken);
-
-        await _context.Nats.PubModelAsync(
-            subject: $"$JS.API.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
-            data: request,
-            serializer: JsonNatsSerializer.Default,
-            replyTo: inbox,
-            headers: default,
-            cancellationToken);
-
-        await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken))
-        {
-            yield return msg;
-        }
-    }
+    public IAsyncEnumerable<NatsJSMsg<T?>> FetchAsync<T>(
+        NatsJSFetchOpts opts,
+        NatsSubOpts? requestOpts = default,
+        CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
 
     private void ThrowIfDeleted()
     {
         if (_deleted)
             throw new NatsJSException($"Consumer '{_stream}:{_consumer}' is deleted");
     }
-}
-
-public record ConsumerOpts
-{
-    public int Prefetch { get; set; } = 1_000;
-
-    public int LowWatermark { get; set; } = 500;
 }

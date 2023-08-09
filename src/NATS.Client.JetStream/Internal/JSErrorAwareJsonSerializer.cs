@@ -22,7 +22,7 @@ internal sealed class JSErrorAwareJsonSerializer : INatsSerializer
         if (jsonDocument.RootElement.TryGetProperty("error", out var errorElement))
         {
             var error = errorElement.Deserialize<ApiError>() ?? throw new NatsJSException("Can't parse JetStream error JSON payload");
-            throw new JSErrorException(error);
+            throw new JSApiErrorException(error);
         }
 
         return jsonDocument.Deserialize<T>();
@@ -32,9 +32,9 @@ internal sealed class JSErrorAwareJsonSerializer : INatsSerializer
         throw new NotSupportedException();
 }
 
-internal class JSErrorException : Exception
+internal class JSApiErrorException : Exception
 {
-    public JSErrorException(ApiError error) => Error = error;
+    public JSApiErrorException(ApiError error) => Error = error;
 
     public ApiError Error { get; }
 }

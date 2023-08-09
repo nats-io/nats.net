@@ -2,7 +2,7 @@ using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
 
-public static class NatsJSUtilities
+public static class NatsJSExtensions
 {
     public static void EnsureSuccess(this PubAckResponse ack)
     {

@@ -28,6 +28,9 @@ internal static class CommandConstants
     // string.Join(",", Encoding.ASCII.GetBytes("PONG\r\n"))
     public static ReadOnlySpan<byte> PongNewLine => new byte[] { 80, 79, 78, 71, 13, 10 };
 
+    // string.Join(",", Encoding.ASCII.GetBytes("NATS/1.0"))
+    public static ReadOnlySpan<byte> NatsHeaders10 => new byte[] { 78, 65, 84, 83, 47, 49, 46, 48 };
+
     // string.Join(",", Encoding.ASCII.GetBytes("NATS/1.0\r\n"))
     public static ReadOnlySpan<byte> NatsHeaders10NewLine => new byte[] { 78, 65, 84, 83, 47, 49, 46, 48, 13, 10 };
 }

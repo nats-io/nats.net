@@ -1,4 +1,5 @@
 using NATS.Client.Core;
+using NATS.Client.JetStream.Internal;
 
 namespace NATS.Client.JetStream;
 
@@ -23,7 +24,9 @@ public readonly struct NatsJSMsg
 /// <typeparam name="T">User message type</typeparam>
 public readonly struct NatsJSMsg<T>
 {
-    public NatsMsg<T> Msg { get; init; }
+    public NatsJSMsg(NatsMsg<T> msg) => Msg = msg;
+
+    public NatsMsg<T> Msg { get; }
 
     public ValueTask Ack(CancellationToken cancellationToken = default)
     {
