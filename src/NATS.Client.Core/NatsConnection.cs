@@ -24,6 +24,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
     public Func<(string Host, int Port), ValueTask<(string Host, int Port)>>? OnConnectingAsync;
 
     internal readonly ConnectionStatsCounter Counter; // allow to call from external sources
+    internal ServerInfo? WritableServerInfo;
 #pragma warning restore SA1401
     private readonly object _gate = new object();
     private readonly WriterState _writerState;
@@ -70,7 +71,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         InboxPrefix = $"{options.InboxPrefix}.{Guid.NewGuid():n}.";
         SubscriptionManager = new SubscriptionManager(this, InboxPrefix);
         _logger = options.LoggerFactory.CreateLogger<NatsConnection>();
-        _clientOptions = new ClientOptions(Options);
+        _clientOptions = ClientOptions.Create(Options);
         HeaderParser = new HeaderParser(options.HeaderEncoding);
     }
 
@@ -85,7 +86,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
     public NatsConnectionState ConnectionState { get; private set; }
 
-    public ServerInfo? ServerInfo { get; internal set; } // server info is set when received INFO
+    public IServerInfo? ServerInfo => WritableServerInfo; // server info is set when received INFO
 
     public HeaderParser HeaderParser { get; }
 
@@ -328,19 +329,19 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
             // check to see if we should upgrade to TLS
             if (_socket is TcpConnection tcpConnection)
             {
-                if (Options.TlsOptions.Disabled && ServerInfo!.TlsRequired)
+                if (Options.TlsOptions.Disabled && WritableServerInfo!.TlsRequired)
                 {
                     throw new NatsException(
                         $"Server {_currentConnectUri} requires TLS but TlsOptions.Disabled is set to true");
                 }
 
-                if (Options.TlsOptions.Required && !ServerInfo!.TlsRequired && !ServerInfo.TlsAvailable)
+                if (Options.TlsOptions.Required && !WritableServerInfo!.TlsRequired && !WritableServerInfo.TlsAvailable)
                 {
                     throw new NatsException(
                         $"Server {_currentConnectUri} does not support TLS but TlsOptions.Disabled is set to true");
                 }
 
-                if (Options.TlsOptions.Required || ServerInfo!.TlsRequired || ServerInfo.TlsAvailable)
+                if (Options.TlsOptions.Required || WritableServerInfo!.TlsRequired || WritableServerInfo.TlsAvailable)
                 {
                     // do TLS upgrade
                     // if the current URI is not a seed URI and is not a DNS hostname, check the server cert against the
@@ -376,7 +377,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
             infoParsedSignal.SetResult();
 
             // Authentication
-            _userCredentials?.Authenticate(_clientOptions, ServerInfo);
+            _userCredentials?.Authenticate(_clientOptions, WritableServerInfo);
 
             // add CONNECT and PING command to priority lane
             _writerState.PriorityCommands.Clear();
@@ -428,8 +429,8 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
             var defaultScheme = _currentConnectUri!.Uri.Scheme;
             var urls = (Options.NoRandomize
-                ? ServerInfo?.ClientConnectUrls?.Select(x => new NatsUri(x, false, defaultScheme)).Distinct().ToArray()
-                : ServerInfo?.ClientConnectUrls?.Select(x => new NatsUri(x, false, defaultScheme)).OrderBy(_ => Guid.NewGuid()).Distinct().ToArray())
+                ? WritableServerInfo?.ClientConnectUrls?.Select(x => new NatsUri(x, false, defaultScheme)).Distinct().ToArray()
+                : WritableServerInfo?.ClientConnectUrls?.Select(x => new NatsUri(x, false, defaultScheme)).OrderBy(_ => Guid.NewGuid()).Distinct().ToArray())
                     ?? Array.Empty<NatsUri>();
             if (urls.Length == 0)
                 urls = Options.GetSeedUris();
