@@ -56,7 +56,7 @@ public class WaitSignal
     {
         _timeout = timeout;
         _count = count;
-        _tcs = new TaskCompletionSource();
+        _tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
     public TimeSpan Timeout => _timeout;
@@ -106,7 +106,7 @@ public class WaitSignal<T>
     {
         _timeout = timeout;
         _count = count;
-        _tcs = new TaskCompletionSource<T>();
+        _tcs = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
     public TimeSpan Timeout => _timeout;
