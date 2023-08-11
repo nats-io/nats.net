@@ -116,9 +116,11 @@ public abstract partial class NatsConnectionTest
         var signalComplete1 = new WaitSignal();
         var signalComplete2 = new WaitSignal();
 
+        var syncCount = 0;
         var natsSub = await subConnection.SubscribeAsync<int>(subject);
         var register = natsSub.Register(x =>
         {
+            Interlocked.Increment(ref syncCount);
             _output.WriteLine($"Received: {x}");
             if (x.Data == 1)
                 signalComplete1.Pulse();
@@ -126,7 +128,11 @@ public abstract partial class NatsConnectionTest
                 signalComplete2.Pulse();
         });
 
-        await subConnection.PingAsync(); // wait for subscribe complete
+        var syncCount1 = Volatile.Read(ref syncCount);
+        await Retry.Until(
+            "subscribed",
+            () => syncCount1 != Volatile.Read(ref syncCount),
+            async () => await pubConnection.PublishAsync(subject, 0));
 
         _output.WriteLine("AUTHENTICATED CONNECTION");
         await pubConnection.PublishAsync(subject, 1);
@@ -146,6 +152,13 @@ public abstract partial class NatsConnectionTest
         await pubConnection.ConnectAsync(); // wait open again
 
         _output.WriteLine("AUTHENTICATED RE-CONNECTION");
+
+        var syncCount2 = Volatile.Read(ref syncCount);
+        await Retry.Until(
+            "re-subscribed",
+            () => syncCount2 != Volatile.Read(ref syncCount),
+            async () => await pubConnection.PublishAsync(subject, 0));
+
         await pubConnection.PublishAsync(subject, 2);
         await signalComplete2;
 
