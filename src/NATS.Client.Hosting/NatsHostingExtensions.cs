@@ -28,6 +28,11 @@ public static class NatsHostingExtensions
                 return new NatsConnectionPool(poolSize, options, configureConnection ?? (_ => { }));
             });
 
+            services.TryAddSingleton<INatsConnectionPool>(static provider =>
+            {
+                return provider.GetRequiredService<NatsConnectionPool>();
+            });
+
             services.TryAddTransient<NatsConnection>(static provider =>
             {
                 var pool = provider.GetRequiredService<NatsConnectionPool>();
@@ -37,7 +42,7 @@ public static class NatsHostingExtensions
             services.TryAddTransient<INatsConnection>(static provider =>
             {
                 var pool = provider.GetRequiredService<NatsConnectionPool>();
-                return pool.GetCommand();
+                return pool.GetConnection();
             });
         }
         else

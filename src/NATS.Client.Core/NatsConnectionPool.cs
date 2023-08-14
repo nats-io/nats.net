@@ -1,6 +1,6 @@
 namespace NATS.Client.Core;
 
-public sealed class NatsConnectionPool : IAsyncDisposable
+public sealed class NatsConnectionPool : INatsConnectionPool
 {
     private readonly NatsConnection[] _connections;
     private int _index = -1;
@@ -38,11 +38,15 @@ public sealed class NatsConnectionPool : IAsyncDisposable
         }
     }
 
+    INatsConnection INatsConnectionPool.GetConnection() => GetConnection();
+
     public NatsConnection GetConnection()
     {
         var i = Interlocked.Increment(ref _index);
         return _connections[i % _connections.Length];
     }
+
+    IEnumerable<INatsConnection> INatsConnectionPool.GetConnections() => GetConnections();
 
     public IEnumerable<NatsConnection> GetConnections()
     {
@@ -50,11 +54,6 @@ public sealed class NatsConnectionPool : IAsyncDisposable
         {
             yield return item;
         }
-    }
-
-    public INatsConnection GetCommand()
-    {
-        return GetConnection();
     }
 
     public async ValueTask DisposeAsync()
