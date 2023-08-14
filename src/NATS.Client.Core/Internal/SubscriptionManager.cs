@@ -138,7 +138,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
     /// Commands returned form all the subscriptions will be run as a priority right after reconnection is established.
     /// </remarks>
     /// <returns>Enumerable list of commands</returns>
-    internal IEnumerable<ICommand> GetReconnectCommands()
+    public IEnumerable<ICommand> GetReconnectCommands()
     {
         var subs = new List<(NatsSubBase, int)>();
         lock (_gate)

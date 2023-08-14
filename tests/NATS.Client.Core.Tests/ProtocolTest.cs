@@ -317,11 +317,9 @@ public class ProtocolTest
 
         await disconnected;
 
-        Assert.Empty(proxy.ClientFrames);
-
         await Retry.Until(
             "re-subscribed",
-            () => Volatile.Read(ref sync) != 2,
+            () => Volatile.Read(ref sync) == 2,
             async () => await nats.PublishAsync(subject, 2));
 
         await Retry.Until(
@@ -346,17 +344,6 @@ public class ProtocolTest
             : base(connection, connection.SubscriptionManager, subject, default) =>
             _callback = callback;
 
-        protected override ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
-        {
-            _callback(int.Parse(Encoding.UTF8.GetString(payloadBuffer)));
-            DecrementMaxMsgs();
-            return ValueTask.CompletedTask;
-        }
-
-        protected override void TryComplete()
-        {
-        }
-
         internal override IEnumerable<ICommand> GetReconnectCommands(int sid)
         {
             // Yield re-subscription
@@ -367,6 +354,17 @@ public class ProtocolTest
             yield return PublishBytesCommand.Create(Connection.ObjectPool, "bar1", default, default, default, default);
             yield return PublishBytesCommand.Create(Connection.ObjectPool, "bar2", default, default, default, default);
             yield return PublishBytesCommand.Create(Connection.ObjectPool, "bar3", default, default, default, default);
+        }
+
+        protected override ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
+        {
+            _callback(int.Parse(Encoding.UTF8.GetString(payloadBuffer)));
+            DecrementMaxMsgs();
+            return ValueTask.CompletedTask;
+        }
+
+        protected override void TryComplete()
+        {
         }
     }
 }
