@@ -81,7 +81,6 @@ public partial class NatsConnection
         }
     }
 
-
     /// <inheritdoc />
     public async IAsyncEnumerable<NatsMsg> RequestManyAsync(
         string subject,
@@ -106,7 +105,6 @@ public partial class NatsConnection
             }
         }
     }
-
 
     private NatsSubOpts SetReplyOptsDefaults(in NatsSubOpts? replyOpts)
     {
