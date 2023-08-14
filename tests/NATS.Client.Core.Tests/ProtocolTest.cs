@@ -1,3 +1,6 @@
+using System.Buffers;
+using System.Text;
+
 namespace NATS.Client.Core.Tests;
 
 public class ProtocolTest
@@ -287,6 +290,83 @@ public class ProtocolTest
 
             await sub.DisposeAsync();
             await reg;
+        }
+    }
+
+    [Fact]
+    public async Task Reconnect_with_sub_and_additional_commands()
+    {
+        await using var server = NatsServer.Start();
+        var (nats, proxy) = server.CreateProxiedClientConnection();
+
+        const string subject = "foo";
+
+        var sync = 0;
+        await using var sub = new NatsSubReconnectTest(nats, subject, i => Interlocked.Exchange(ref sync, i));
+        await nats.SubAsync(sub.Subject, opts: default, sub);
+
+        await Retry.Until(
+            "subscribed",
+            () => Volatile.Read(ref sync) == 1,
+            async () => await nats.PublishAsync(subject, 1));
+
+        var disconnected = new WaitSignal();
+        nats.ConnectionDisconnected += (_, _) => disconnected.Pulse();
+
+        proxy.Reset();
+
+        await disconnected;
+
+        Assert.Empty(proxy.ClientFrames);
+
+        await Retry.Until(
+            "re-subscribed",
+            () => Volatile.Read(ref sync) != 2,
+            async () => await nats.PublishAsync(subject, 2));
+
+        await Retry.Until(
+            "frames collected",
+            () => proxy.ClientFrames.Any(f => f.Message.StartsWith("PUB foo")));
+
+        var frames = proxy.ClientFrames.Select(f => f.Message).ToList();
+        Assert.StartsWith("SUB foo", frames[0]);
+        Assert.StartsWith("PUB bar1", frames[1]);
+        Assert.StartsWith("PUB bar2", frames[2]);
+        Assert.StartsWith("PUB bar3", frames[3]);
+        Assert.StartsWith("PUB foo", frames[4]);
+
+        await nats.DisposeAsync();
+    }
+
+    private sealed class NatsSubReconnectTest : NatsSubBase
+    {
+        private readonly Action<int> _callback;
+
+        internal NatsSubReconnectTest(NatsConnection connection, string subject, Action<int> callback)
+            : base(connection, connection.SubscriptionManager, subject, default) =>
+            _callback = callback;
+
+        protected override ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
+        {
+            _callback(int.Parse(Encoding.UTF8.GetString(payloadBuffer)));
+            DecrementMaxMsgs();
+            return ValueTask.CompletedTask;
+        }
+
+        protected override void TryComplete()
+        {
+        }
+
+        internal override IEnumerable<ICommand> GetReconnectCommands(int sid)
+        {
+            // Yield re-subscription
+            foreach (var command in base.GetReconnectCommands(sid))
+                yield return command;
+
+            // Any additional commands to send on reconnect
+            yield return PublishBytesCommand.Create(Connection.ObjectPool, "bar1", default, default, default, default);
+            yield return PublishBytesCommand.Create(Connection.ObjectPool, "bar2", default, default, default, default);
+            yield return PublishBytesCommand.Create(Connection.ObjectPool, "bar3", default, default, default, default);
         }
     }
 }

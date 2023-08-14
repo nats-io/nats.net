@@ -94,6 +94,8 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
     internal string InboxPrefix { get; }
 
+    internal ObjectPool ObjectPool => _pool;
+
     /// <summary>
     /// Connect socket and write CONNECT command to nats server.
     /// </summary>
@@ -385,6 +387,12 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
             _writerState.PriorityCommands.Add(connectCommand);
             _writerState.PriorityCommands.Add(PingCommand.Create(_pool, GetCancellationTimer(CancellationToken.None)));
 
+            if (reconnect)
+            {
+                // Reestablish subscriptions and consumers
+                _writerState.PriorityCommands.AddRange(SubscriptionManager.GetReconnectCommands());
+            }
+
             // create the socket writer
             _socketWriter = new NatsPipeliningWriteProtocolProcessor(_socket!, _writerState, _pool, Counter);
 
@@ -393,9 +401,6 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
             // receive COMMAND response (PONG or ERROR)
             await waitForPongOrErrorSignal.Task.ConfigureAwait(false);
-
-            // Reestablish subscriptions and consumers
-            await SubscriptionManager.ReconnectAsync(_disposedCancellationTokenSource.Token).ConfigureAwait(false);
         }
         catch (Exception)
         {
