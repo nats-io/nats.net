@@ -41,8 +41,7 @@ public static class NatsHostingExtensions
 
             services.TryAddTransient<INatsConnection>(static provider =>
             {
-                var pool = provider.GetRequiredService<NatsConnectionPool>();
-                return pool.GetConnection();
+                return provider.GetRequiredService<NatsConnection>();
             });
         }
         else
