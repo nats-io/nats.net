@@ -1,5 +1,6 @@
 ﻿using System.Buffers;
 using System.Runtime.ExceptionServices;
+using NATS.Client.Core.Commands;
 using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
@@ -186,6 +187,21 @@ public abstract class NatsSubBase
     }
 
     internal void ClearException() => Interlocked.Exchange(ref _exception, null);
+
+    /// <summary>
+    /// Collect commands when reconnecting.
+    /// </summary>
+    /// <remarks>
+    /// By default this will yield the required subscription command.
+    /// When overriden base must be called to yield the re-subscription command.
+    /// Additional command (e.g. publishing pull requests in case of JetStream consumers) can be yielded as part of the reconnect routine.
+    /// </remarks>
+    /// <param name="sid">SID which might be required to create subscription commands</param>
+    /// <returns>IEnumerable list of commands</returns>
+    internal virtual IEnumerable<ICommand> GetReconnectCommands(int sid)
+    {
+        yield return AsyncSubscribeCommand.Create(Connection.ObjectPool, Connection.GetCancellationTimer(default), sid, Subject, QueueGroup, PendingMsgs);
+    }
 
     /// <summary>
     /// Invoked when a MSG or HMSG arrives for the subscription.

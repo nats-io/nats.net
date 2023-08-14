@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
+using NATS.Client.Core.Commands;
 
 namespace NATS.Client.Core.Internal;
 
@@ -130,18 +131,31 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
         return _connection.UnsubscribeAsync(subMetadata.Sid);
     }
 
-    public async ValueTask ReconnectAsync(CancellationToken cancellationToken)
+    /// <summary>
+    /// Returns commands for all the live subscriptions to be used on reconnect so that they can rebuild their connection state on the server.
+    /// </summary>
+    /// <remarks>
+    /// Commands returned form all the subscriptions will be run as a priority right after reconnection is established.
+    /// </remarks>
+    /// <returns>Enumerable list of commands</returns>
+    public IEnumerable<ICommand> GetReconnectCommands()
     {
-        foreach (var (sid, sidMetadata) in _bySid)
+        var subs = new List<(NatsSubBase, int)>();
+        lock (_gate)
         {
-            if (sidMetadata.WeakReference.TryGetTarget(out var sub))
+            foreach (var (sid, sidMetadata) in _bySid)
             {
-                // yield return (sid, sub.Subject, sub.QueueGroup, sub.PendingMsgs);
-                await _connection
-                    .SubscribeCoreAsync(sid, sub.Subject, sub.QueueGroup, sub.PendingMsgs, cancellationToken)
-                    .ConfigureAwait(false);
-                await sub.ReadyAsync().ConfigureAwait(false);
+                if (sidMetadata.WeakReference.TryGetTarget(out var sub))
+                {
+                    subs.Add((sub, sid));
+                }
             }
+        }
+
+        foreach (var (sub, sid) in subs)
+        {
+            foreach (var command in sub.GetReconnectCommands(sid))
+                yield return command;
         }
     }
 
