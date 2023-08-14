@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Runtime.CompilerServices;
 
 namespace NATS.Client.Core;
 
@@ -69,4 +70,92 @@ public interface INatsConnection
     /// <typeparam name="T">Specifies the type of data that may be received from the NATS Server.</typeparam>
     /// <returns>A <see cref="ValueTask{TResult}"/> that represents the asynchronous send operation.</returns>
     ValueTask<INatsSub<T>> SubscribeAsync<T>(string subject, NatsSubOpts? opts = default, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Request and receive a single reply from a responder.
+    /// </summary>
+    /// <param name="subject">Subject of the responder</param>
+    /// <param name="data">Data to send to responder</param>
+    /// <param name="requestOpts">Request publish options</param>
+    /// <param name="replyOpts">Reply handler subscription options</param>
+    /// <param name="cancellationToken">Cancel this request</param>
+    /// <typeparam name="TRequest">Request type</typeparam>
+    /// <typeparam name="TReply">Reply type</typeparam>
+    /// <returns>Returns the <see cref="NatsMsg{T}"/> received from the responder as reply.</returns>
+    /// <exception cref="OperationCanceledException">Raised when cancellation token is used</exception>
+    /// <remarks>
+    /// Response can be (null) or one <see cref="NatsMsg"/>.
+    /// Reply option's max messages will be set to 1.
+    /// if reply option's timeout is not defined then it will be set to NatsOptions.RequestTimeout.
+    /// </remarks>
+    ValueTask<NatsMsg<TReply?>?> RequestAsync<TRequest, TReply>(
+        string subject,
+        TRequest? data,
+        NatsPubOpts? requestOpts = default,
+        NatsSubOpts? replyOpts = default,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Request and receive a single reply from a responder.
+    /// </summary>
+    /// <param name="subject">Subject of the responder</param>
+    /// <param name="payload">Payload to send to responder</param>
+    /// <param name="requestOpts">Request publish options</param>
+    /// <param name="replyOpts">Reply handler subscription options</param>
+    /// <param name="cancellationToken">Cancel this request</param>
+    /// <returns>Returns the <see cref="NatsMsg"/> received from the responder as reply.</returns>
+    /// <exception cref="OperationCanceledException">Raised when cancellation token is used</exception>
+    /// <remarks>
+    /// Response can be (null) or one <see cref="NatsMsg"/>.
+    /// Reply option's max messages will be set to 1 (one).
+    /// if reply option's timeout is not defined then it will be set to NatsOptions.RequestTimeout.
+    /// </remarks>
+    ValueTask<NatsMsg?> RequestAsync(
+        string subject,
+        ReadOnlySequence<byte> payload = default,
+        NatsPubOpts? requestOpts = default,
+        NatsSubOpts? replyOpts = default,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Request and receive zero or more replies from a responder.
+    /// </summary>
+    /// <param name="subject">Subject of the responder</param>
+    /// <param name="data">Data to send to responder</param>
+    /// <param name="requestOpts">Request publish options</param>
+    /// <param name="replyOpts">Reply handler subscription options</param>
+    /// <param name="cancellationToken">Cancel this request</param>
+    /// <typeparam name="TRequest">Request type</typeparam>
+    /// <typeparam name="TReply">Reply type</typeparam>
+    /// <returns>An asynchronous enumerable of <see cref="NatsMsg"/> objects</returns>
+    /// <exception cref="OperationCanceledException">Raised when cancellation token is used</exception>
+    /// <remarks>
+    /// if reply option's timeout is not defined then it will be set to NatsOptions.RequestTimeout.
+    /// </remarks>
+    IAsyncEnumerable<NatsMsg<TReply?>> RequestManyAsync<TRequest, TReply>(
+        string subject,
+        TRequest? data,
+        NatsPubOpts? requestOpts = default,
+        NatsSubOpts? replyOpts = default,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Request and receive zero or more replies from a responder.
+    /// </summary>
+    /// <param name="subject">Subject of the responder</param>
+    /// <param name="payload">Payload to send to responder</param>
+    /// <param name="requestOpts">Request publish options</param>
+    /// <param name="replyOpts">Reply handler subscription options</param>
+    /// <param name="cancellationToken">Cancel this request</param>
+    /// <returns>An asynchronous enumerable of <see cref="NatsMsg"/> objects</returns>
+    /// <exception cref="OperationCanceledException">Raised when cancellation token is used</exception>
+    /// <remarks>
+    /// if reply option's timeout is not defined then it will be set to NatsOptions.RequestTimeout.
+    /// </remarks>
+    IAsyncEnumerable<NatsMsg> RequestManyAsync(
+        string subject,
+        ReadOnlySequence<byte> payload = default,
+        NatsPubOpts? requestOpts = default,
+        NatsSubOpts? replyOpts = default,
+        CancellationToken cancellationToken = default);
 }
