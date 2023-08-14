@@ -6,91 +6,85 @@ public abstract partial class NatsConnectionTest
     {
         yield return new object[]
         {
-            "TOKEN",
-            "resources/configs/auth/token.conf",
-            NatsOptions.Default with
-            {
-                AuthOptions = NatsAuthOptions.Default with
-                {
-                    Token = "s3cr3t",
-                },
-            },
+            new Auth(
+                "TOKEN",
+                "resources/configs/auth/token.conf",
+                NatsOptions.Default with { AuthOptions = NatsAuthOptions.Default with { Token = "s3cr3t", }, }),
         };
 
         yield return new object[]
         {
-            "USER-PASSWORD",
-            "resources/configs/auth/password.conf",
-            NatsOptions.Default with
-            {
-                AuthOptions = NatsAuthOptions.Default with
+            new Auth(
+                "USER-PASSWORD",
+                "resources/configs/auth/password.conf",
+                NatsOptions.Default with
                 {
-                    Username = "a",
-                    Password = "b",
-                },
-            },
+                    AuthOptions = NatsAuthOptions.Default with { Username = "a", Password = "b", },
+                }),
         };
 
         yield return new object[]
         {
-            "NKEY",
-            "resources/configs/auth/nkey.conf",
-            NatsOptions.Default with
-            {
-                AuthOptions = NatsAuthOptions.Default with
+            new Auth(
+                "NKEY",
+                "resources/configs/auth/nkey.conf",
+                NatsOptions.Default with
                 {
-                    Nkey = "UALQSMXRSAA7ZXIGDDJBJ2JOYJVQIWM3LQVDM5KYIPG4EP3FAGJ47BOJ",
-                    Seed = "SUAAVWRZG6M5FA5VRRGWSCIHKTOJC7EWNIT4JV3FTOIPO4OBFR5WA7X5TE",
-                },
-            },
+                    AuthOptions = NatsAuthOptions.Default with
+                    {
+                        Nkey = "UALQSMXRSAA7ZXIGDDJBJ2JOYJVQIWM3LQVDM5KYIPG4EP3FAGJ47BOJ",
+                        Seed = "SUAAVWRZG6M5FA5VRRGWSCIHKTOJC7EWNIT4JV3FTOIPO4OBFR5WA7X5TE",
+                    },
+                }),
         };
 
         yield return new object[]
         {
-            "NKEY (FROM FILE)",
-            "resources/configs/auth/nkey.conf",
-            NatsOptions.Default with
-            {
-                AuthOptions = NatsAuthOptions.Default with
+            new Auth(
+                "NKEY (FROM FILE)",
+                "resources/configs/auth/nkey.conf",
+                NatsOptions.Default with
                 {
-                    NKeyFile = "resources/configs/auth/user.nk",
-                },
-            },
+                    AuthOptions = NatsAuthOptions.Default with { NKeyFile = "resources/configs/auth/user.nk", },
+                }),
         };
 
         yield return new object[]
         {
-            "USER-CREDS",
-            "resources/configs/auth/operator.conf",
-            NatsOptions.Default with
-            {
-                AuthOptions = NatsAuthOptions.Default with
+            new Auth(
+                "USER-CREDS",
+                "resources/configs/auth/operator.conf",
+                NatsOptions.Default with
                 {
-                    Jwt =
-                    "eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ.eyJqdGkiOiJOVDJTRkVIN0pNSUpUTzZIQ09GNUpYRFNDUU1WRlFNV0MyWjI1TFk3QVNPTklYTjZFVlhBIiwiaWF0IjoxNjc5MTQ0MDkwLCJpc3MiOiJBREpOSlpZNUNXQlI0M0NOSzJBMjJBMkxPSkVBSzJSS1RaTk9aVE1HUEVCRk9QVE5FVFBZTUlLNSIsIm5hbWUiOiJteS11c2VyIiwic3ViIjoiVUJPWjVMUVJPTEpRRFBBQUNYSk1VRkJaS0Q0R0JaSERUTFo3TjVQS1dSWFc1S1dKM0VBMlc0UloiLCJuYXRzIjp7InB1YiI6e30sInN1YiI6e30sInN1YnMiOi0xLCJkYXRhIjotMSwicGF5bG9hZCI6LTEsInR5cGUiOiJ1c2VyIiwidmVyc2lvbiI6Mn19.ElYEknDixe9pZdl55S9PjduQhhqR1OQLglI1JO7YK7ECYb1mLUjGd8ntcR7ISS04-_yhygSDzX8OS8buBIxMDA",
-                    Seed = "SUAJR32IC6D45J3URHJ5AOQZWBBO6QTID27NZQKXE3GC5U3SPFEYDJK6RQ",
-                },
-            },
+                    AuthOptions = NatsAuthOptions.Default with
+                    {
+                        Jwt =
+                        "eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ.eyJqdGkiOiJOVDJTRkVIN0pNSUpUTzZIQ09GNUpYRFNDUU1WRlFNV0MyWjI1TFk3QVNPTklYTjZFVlhBIiwiaWF0IjoxNjc5MTQ0MDkwLCJpc3MiOiJBREpOSlpZNUNXQlI0M0NOSzJBMjJBMkxPSkVBSzJSS1RaTk9aVE1HUEVCRk9QVE5FVFBZTUlLNSIsIm5hbWUiOiJteS11c2VyIiwic3ViIjoiVUJPWjVMUVJPTEpRRFBBQUNYSk1VRkJaS0Q0R0JaSERUTFo3TjVQS1dSWFc1S1dKM0VBMlc0UloiLCJuYXRzIjp7InB1YiI6e30sInN1YiI6e30sInN1YnMiOi0xLCJkYXRhIjotMSwicGF5bG9hZCI6LTEsInR5cGUiOiJ1c2VyIiwidmVyc2lvbiI6Mn19.ElYEknDixe9pZdl55S9PjduQhhqR1OQLglI1JO7YK7ECYb1mLUjGd8ntcR7ISS04-_yhygSDzX8OS8buBIxMDA",
+                        Seed = "SUAJR32IC6D45J3URHJ5AOQZWBBO6QTID27NZQKXE3GC5U3SPFEYDJK6RQ",
+                    },
+                }),
         };
 
         yield return new object[]
         {
-            "USER-CREDS (FROM FILE)",
-            "resources/configs/auth/operator.conf",
-            NatsOptions.Default with
-            {
-                AuthOptions = NatsAuthOptions.Default with
+            new Auth(
+                "USER-CREDS (FROM FILE)",
+                "resources/configs/auth/operator.conf",
+                NatsOptions.Default with
                 {
-                    CredsFile = "resources/configs/auth/user.creds",
-                },
-            },
+                    AuthOptions = NatsAuthOptions.Default with { CredsFile = "resources/configs/auth/user.creds", },
+                }),
         };
     }
 
     [Theory]
     [MemberData(nameof(GetAuthConfigs))]
-    public async Task UserCredentialAuthTest(string name, string serverConfig, NatsOptions clientOptions)
+    public async Task UserCredentialAuthTest(Auth auth)
     {
+        var name = auth.Name;
+        var serverConfig = auth.ServerConfig;
+        var clientOptions = auth.ClientOptions;
+
         _output.WriteLine($"AUTH TEST {name}");
 
         var serverOptions = new NatsServerOptionsBuilder()
@@ -164,5 +158,23 @@ public abstract partial class NatsConnectionTest
 
         await natsSub.DisposeAsync();
         await register;
+    }
+
+    public class Auth
+    {
+        public Auth(string name, string serverConfig, NatsOptions clientOptions)
+        {
+            Name = name;
+            ServerConfig = serverConfig;
+            ClientOptions = clientOptions;
+        }
+
+        public string Name { get; }
+
+        public string ServerConfig { get; }
+
+        public NatsOptions ClientOptions { get; }
+
+        public override string ToString() => Name;
     }
 }
