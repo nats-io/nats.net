@@ -6,6 +6,9 @@ namespace NATS.Client.Core;
 public partial class NatsConnection
 {
     /// <inheritdoc />
+    public string NewInbox() => $"{InboxPrefix}{Guid.NewGuid():n}";
+
+    /// <inheritdoc />
     public async ValueTask<NatsMsg<TReply?>?> RequestAsync<TRequest, TReply>(
         string subject,
         TRequest? data,

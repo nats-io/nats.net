@@ -72,6 +72,12 @@ public interface INatsConnection
     ValueTask<INatsSub<T>> SubscribeAsync<T>(string subject, NatsSubOpts? opts = default, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Create a new inbox subject with the form {Inbox Prefix}.{Unique Connection ID}.{Unique Inbox ID}
+    /// </summary>
+    /// <returns>A <see cref="string"/> containing a unique inbox subject.</returns>
+    string NewInbox();
+
+    /// <summary>
     /// Request and receive a single reply from a responder.
     /// </summary>
     /// <param name="subject">Subject of the responder</param>
