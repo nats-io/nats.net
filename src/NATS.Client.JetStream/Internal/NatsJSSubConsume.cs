@@ -46,7 +46,7 @@ namespace NATS.Client.JetStream.Internal;
  *  Heartbeat Timer
  *
  */
-internal class NatsJSSubBaseConsume<T> : NatsJSSubBase<T>, INatsJSSubConsume<T>
+internal class NatsJSSubConsume<T> : NatsJSSubBase<T>, INatsJSSubConsume<T>
 {
     private readonly Action<NatsJSNotification>? _errorHandler;
     private readonly CancellationToken _cancellationToken;
@@ -54,7 +54,7 @@ internal class NatsJSSubBaseConsume<T> : NatsJSSubBase<T>, INatsJSSubConsume<T>
     private readonly Channel<NatsJSNotification> _notificationChannel;
     private readonly Channel<NatsJSMsg<T?>> _userMessageChannel;
 
-    internal NatsJSSubBaseConsume(
+    internal NatsJSSubConsume(
         string stream,
         string consumer,
         NatsJSContext context,

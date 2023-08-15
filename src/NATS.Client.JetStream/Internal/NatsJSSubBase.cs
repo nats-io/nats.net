@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
+using NATS.Client.Core.Commands;
 using NATS.Client.Core.Internal;
 using NATS.Client.JetStream.Models;
 
@@ -201,6 +202,21 @@ internal abstract class NatsJSSubBase<T> : NatsSubBase
 
     protected abstract ValueTask ReceivedUserMsg(NatsMsg<T?> msg);
 
+    internal override IEnumerable<ICommand> GetReconnectCommands(int sid)
+    {
+        foreach (var command in base.GetReconnectCommands(sid))
+            yield return command;
+
+        yield return PublishCommand<ConsumerGetnextRequest>.Create(
+            pool: Connection.ObjectPool,
+            subject: $"{_context.Opts.ApiPrefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
+            replyTo: Subject,
+            headers: default,
+            value: _state.GetRequest(),
+            serializer: JsonNatsSerializer.Default,
+            cancellationToken: default);
+    }
+
     private void ResetHeartbeatTimer() => _heartbeatTimer.Change(_hearthBeatTimeout, Timeout.InfiniteTimeSpan);
 
     private ValueTask CallMsgNextAsync(ConsumerGetnextRequest request)
@@ -269,11 +285,12 @@ internal class NatsJSSubState
         _totalRequests++;
         var request = new ConsumerGetnextRequest
         {
-            Batch = _optsMaxBytes > 0 ? LargeMsgsBatchSize : _optsMaxMsgs - _pendingMsgs,
-            MaxBytes = _optsMaxBytes > 0 ? _optsMaxBytes - _pendingBytes : 0,
+            Batch = _optsMaxBytes > 0 ? LargeMsgsBatchSize : _optsMaxMsgs,
+            MaxBytes = _optsMaxBytes > 0 ? _optsMaxBytes : 0,
             IdleHeartbeat = _optsIdleHeartbeatNanos,
             Expires = _optsExpiresNanos,
-            NoWait = true,
+            NoWait = false,
+            // TODO: Check pull logic
         };
 
         _pendingMsgs += request.Batch;
