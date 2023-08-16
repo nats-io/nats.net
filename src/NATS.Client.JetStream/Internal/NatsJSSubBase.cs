@@ -113,12 +113,14 @@ internal abstract class NatsJSSubBase<T> : NatsSubBase
                     && long.TryParse(pendingMsgsStr.ToString(), out var pendingMsgs))
                 {
                     _state.ReceivedPendingMsgs(pendingMsgs);
+                    _state.MarkForPull();
                 }
 
                 if (headers.TryGetValue("Nats-Pending-Bytes", out var pendingBytesStr)
                     && long.TryParse(pendingBytesStr.ToString(), out var pendingBytes))
                 {
                     _state.ReceivedPendingBytes(pendingBytes);
+                    _state.MarkForPull();
                 }
 
                 // React on other headers
@@ -155,7 +157,7 @@ internal abstract class NatsJSSubBase<T> : NatsSubBase
                          or { Code: 408, Message: NatsHeaders.Messages.RequestTimeout }
                          or { Code: 409, Message: NatsHeaders.Messages.MessageSizeExceedsMaxBytes })
                 {
-                    _state.MarkPullAsTerminated();
+                    _state.MarkForPull();
                 }
                 else
                 {
@@ -170,6 +172,11 @@ internal abstract class NatsJSSubBase<T> : NatsSubBase
 
             if (notification != null)
                 await ReceivedControlMsg(notification);
+
+            if (_state.CanFetch())
+            {
+                await CallMsgNextAsync(_state.GetRequest());
+            }
         }
         else
         {
@@ -246,7 +253,7 @@ internal class NatsJSSubState
     private long _pendingMsgs;
     private long _pendingBytes;
     private long _totalRequests;
-    private bool _pullTerminated;
+    private bool _pull;
 
     public NatsJSSubState(
         NatsJSOpts? opts = default,
@@ -275,13 +282,20 @@ internal class NatsJSSubState
 
     public void ReceivedPendingBytes(long pendingBytes) => _pendingBytes -= pendingBytes;
 
-    public void MarkPullAsTerminated() => _pullTerminated = true;
+    public void MarkForPull() => _pull = true;
 
     public void IncrementTotalRequests() => Interlocked.Increment(ref _totalRequests);
 
     public ConsumerGetnextRequest GetRequest(bool init = false)
     {
-        _pullTerminated = false;
+        if (init)
+        {
+            _pendingBytes = 0;
+            _pendingMsgs = 0;
+            _totalRequests = 0;
+        }
+
+        _pull = false;
         _totalRequests++;
 
         long batch;
@@ -319,7 +333,7 @@ internal class NatsJSSubState
     }
 
     public bool CanFetch() =>
-        _pullTerminated
+        _pull
         || _optsThresholdMsgs >= _pendingMsgs
         || (_optsThresholdBytes > 0 && _optsThresholdBytes >= _pendingBytes);
 }
