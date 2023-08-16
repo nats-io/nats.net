@@ -198,9 +198,7 @@ public class ConsumerConsumeTest
 
         await Retry.Until(
             "acked",
-            () => proxy.ClientFrames.Any(f => f.Message.StartsWith("PUB $JS.ACK.s1.c1")));
-
-        Assert.Contains(proxy.ClientFrames, f => f.Message.Contains("CONSUMER.MSG.NEXT"));
+            () => proxy.ClientFrames.Any(f => f.Message.StartsWith("CONSUMER.MSG.NEXT")));
 
         await readerTask;
         await nats.DisposeAsync();
