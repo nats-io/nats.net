@@ -38,17 +38,13 @@ public sealed class NatsConnectionPool : INatsConnectionPool
         }
     }
 
-    INatsConnection INatsConnectionPool.GetConnection() => GetConnection();
-
-    public NatsConnection GetConnection()
+    public INatsConnection GetConnection()
     {
         var i = Interlocked.Increment(ref _index);
         return _connections[i % _connections.Length];
     }
 
-    IEnumerable<INatsConnection> INatsConnectionPool.GetConnections() => GetConnections();
-
-    public IEnumerable<NatsConnection> GetConnections()
+    public IEnumerable<INatsConnection> GetConnections()
     {
         foreach (var item in _connections)
         {
