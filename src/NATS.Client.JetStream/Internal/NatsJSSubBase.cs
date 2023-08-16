@@ -62,6 +62,21 @@ internal abstract class NatsJSSubBase<T> : NatsSubBase
         ResetHeartbeatTimer();
     }
 
+    internal override IEnumerable<ICommand> GetReconnectCommands(int sid)
+    {
+        foreach (var command in base.GetReconnectCommands(sid))
+            yield return command;
+
+        yield return PublishCommand<ConsumerGetnextRequest>.Create(
+            pool: Connection.ObjectPool,
+            subject: $"{_context.Opts.ApiPrefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
+            replyTo: Subject,
+            headers: default,
+            value: _state.GetRequest(init: true),
+            serializer: JsonNatsSerializer.Default,
+            cancellationToken: default);
+    }
+
     protected override async ValueTask ReceiveInternalAsync(
         string subject,
         string? replyTo,
@@ -202,21 +217,6 @@ internal abstract class NatsJSSubBase<T> : NatsSubBase
 
     protected abstract ValueTask ReceivedUserMsg(NatsMsg<T?> msg);
 
-    internal override IEnumerable<ICommand> GetReconnectCommands(int sid)
-    {
-        foreach (var command in base.GetReconnectCommands(sid))
-            yield return command;
-
-        yield return PublishCommand<ConsumerGetnextRequest>.Create(
-            pool: Connection.ObjectPool,
-            subject: $"{_context.Opts.ApiPrefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
-            replyTo: Subject,
-            headers: default,
-            value: _state.GetRequest(init: true),
-            serializer: JsonNatsSerializer.Default,
-            cancellationToken: default);
-    }
-
     private void ResetHeartbeatTimer() => _heartbeatTimer.Change(_hearthBeatTimeout, Timeout.InfiniteTimeSpan);
 
     private ValueTask CallMsgNextAsync(ConsumerGetnextRequest request)
@@ -304,7 +304,6 @@ internal class NatsJSSubState
             IdleHeartbeat = _optsIdleHeartbeatNanos,
             Expires = _optsExpiresNanos,
             NoWait = false,
-            // TODO: Check pull logic
         };
 
         _pendingMsgs += request.Batch;

@@ -188,7 +188,12 @@ public class ConsumerConsumeTest
         Assert.Contains(proxy.ClientFrames, f => f.Message.Contains("CONSUMER.MSG.NEXT"));
 
         // Simulate server disconnect
+        var disconnected = nats.ConnectionDisconnectedAsAwaitable();
         proxy.Reset();
+        await disconnected;
+
+        // Make sure reconnected
+        await nats.PingAsync(cts.Token);
 
         // Send a message to be received after reconnect
         {
@@ -198,7 +203,7 @@ public class ConsumerConsumeTest
 
         await Retry.Until(
             "acked",
-            () => proxy.ClientFrames.Any(f => f.Message.StartsWith("CONSUMER.MSG.NEXT")));
+            () => proxy.ClientFrames.Any(f => f.Message.Contains("CONSUMER.MSG.NEXT")));
 
         await readerTask;
         await nats.DisposeAsync();

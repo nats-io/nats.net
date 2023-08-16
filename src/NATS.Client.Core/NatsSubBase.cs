@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Runtime.ExceptionServices;
 using NATS.Client.Core.Commands;
 using NATS.Client.Core.Internal;
