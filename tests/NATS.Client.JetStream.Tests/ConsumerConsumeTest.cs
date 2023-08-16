@@ -147,7 +147,6 @@ public class ConsumerConsumeTest
         var consumerOpts = new NatsJSConsumeOpts
         {
             MaxMsgs = 10,
-            //Expires = TimeSpan.FromSeconds(30),
             ErrorHandler = e =>
             {
                 _output.WriteLine($"Consume error: {e.Code} {e.Message}");
@@ -170,11 +169,13 @@ public class ConsumerConsumeTest
                 Assert.Equal(count, msg.Msg.Data!.Test);
                 count++;
 
-                // TODO: XXX
-                if (count == 2) break;
+                // We only need two test messages; before and after reconnect.
+                if (count == 2)
+                    break;
             }
         });
 
+        // Send a message before reconnect
         {
             var ack = await js2.PublishAsync("s1.foo", new TestData { Test = 0 }, cancellationToken: cts.Token);
             ack.EnsureSuccess();
@@ -184,14 +185,12 @@ public class ConsumerConsumeTest
             "acked",
             () => proxy.ClientFrames.Any(f => f.Message.StartsWith("PUB $JS.ACK.s1.c1")));
 
-        foreach (var frame in proxy.Frames)
-        {
-            _output.WriteLine($"{frame.Origin}: {frame.Message}");
-        }
+        Assert.Contains(proxy.ClientFrames, f => f.Message.Contains("CONSUMER.MSG.NEXT"));
 
-        _output.WriteLine("### RESET");
+        // Simulate server disconnect
         proxy.Reset();
 
+        // Send a message to be received after reconnect
         {
             var ack = await js2.PublishAsync("s1.foo", new TestData { Test = 1 }, cancellationToken: cts.Token);
             ack.EnsureSuccess();
@@ -201,11 +200,7 @@ public class ConsumerConsumeTest
             "acked",
             () => proxy.ClientFrames.Any(f => f.Message.StartsWith("PUB $JS.ACK.s1.c1")));
 
-        // TODO: Asserts
-        foreach (var frame in proxy.Frames)
-        {
-            _output.WriteLine($"{frame.Origin}: {frame.Message}");
-        }
+        Assert.Contains(proxy.ClientFrames, f => f.Message.Contains("CONSUMER.MSG.NEXT"));
 
         await readerTask;
         await nats.DisposeAsync();

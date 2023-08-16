@@ -58,7 +58,7 @@ internal abstract class NatsJSSubBase<T> : NatsSubBase
     public override async ValueTask ReadyAsync()
     {
         await base.ReadyAsync().ConfigureAwait(false);
-        await CallMsgNextAsync(_state.GetRequest()).ConfigureAwait(false);
+        await CallMsgNextAsync(_state.GetRequest(init: true)).ConfigureAwait(false);
         ResetHeartbeatTimer();
     }
 
@@ -212,7 +212,7 @@ internal abstract class NatsJSSubBase<T> : NatsSubBase
             subject: $"{_context.Opts.ApiPrefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
             replyTo: Subject,
             headers: default,
-            value: _state.GetRequest(),
+            value: _state.GetRequest(init: true),
             serializer: JsonNatsSerializer.Default,
             cancellationToken: default);
     }
@@ -279,14 +279,28 @@ internal class NatsJSSubState
 
     public void IncrementTotalRequests() => Interlocked.Increment(ref _totalRequests);
 
-    public ConsumerGetnextRequest GetRequest()
+    public ConsumerGetnextRequest GetRequest(bool init = false)
     {
         _pullTerminated = false;
         _totalRequests++;
+
+        long batch;
+        long maxBytes;
+        if (init)
+        {
+            batch = _optsMaxBytes > 0 ? LargeMsgsBatchSize : _optsMaxMsgs;
+            maxBytes = _optsMaxBytes > 0 ? _optsMaxBytes : 0;
+        }
+        else
+        {
+            batch = _optsMaxBytes > 0 ? LargeMsgsBatchSize : _optsMaxMsgs - _pendingMsgs;
+            maxBytes = _optsMaxBytes > 0 ? _optsMaxBytes - _pendingBytes : 0;
+        }
+
         var request = new ConsumerGetnextRequest
         {
-            Batch = _optsMaxBytes > 0 ? LargeMsgsBatchSize : _optsMaxMsgs,
-            MaxBytes = _optsMaxBytes > 0 ? _optsMaxBytes : 0,
+            Batch = batch,
+            MaxBytes = maxBytes,
             IdleHeartbeat = _optsIdleHeartbeatNanos,
             Expires = _optsExpiresNanos,
             NoWait = false,
