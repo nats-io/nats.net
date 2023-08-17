@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
+using NATS.Client.Core.Commands;
 using NATS.Client.Core.Internal;
 using NATS.Client.JetStream.Models;
 
@@ -57,8 +58,23 @@ internal abstract class NatsJSSubBase<T> : NatsSubBase
     public override async ValueTask ReadyAsync()
     {
         await base.ReadyAsync().ConfigureAwait(false);
-        await CallMsgNextAsync(_state.GetRequest()).ConfigureAwait(false);
+        await CallMsgNextAsync(_state.GetRequest(init: true)).ConfigureAwait(false);
         ResetHeartbeatTimer();
+    }
+
+    internal override IEnumerable<ICommand> GetReconnectCommands(int sid)
+    {
+        foreach (var command in base.GetReconnectCommands(sid))
+            yield return command;
+
+        yield return PublishCommand<ConsumerGetnextRequest>.Create(
+            pool: Connection.ObjectPool,
+            subject: $"{_context.Opts.ApiPrefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
+            replyTo: Subject,
+            headers: default,
+            value: _state.GetRequest(init: true),
+            serializer: JsonNatsSerializer.Default,
+            cancellationToken: default);
     }
 
     protected override async ValueTask ReceiveInternalAsync(
@@ -97,12 +113,14 @@ internal abstract class NatsJSSubBase<T> : NatsSubBase
                     && long.TryParse(pendingMsgsStr.ToString(), out var pendingMsgs))
                 {
                     _state.ReceivedPendingMsgs(pendingMsgs);
+                    _state.MarkForPull();
                 }
 
                 if (headers.TryGetValue("Nats-Pending-Bytes", out var pendingBytesStr)
                     && long.TryParse(pendingBytesStr.ToString(), out var pendingBytes))
                 {
                     _state.ReceivedPendingBytes(pendingBytes);
+                    _state.MarkForPull();
                 }
 
                 // React on other headers
@@ -139,7 +157,7 @@ internal abstract class NatsJSSubBase<T> : NatsSubBase
                          or { Code: 408, Message: NatsHeaders.Messages.RequestTimeout }
                          or { Code: 409, Message: NatsHeaders.Messages.MessageSizeExceedsMaxBytes })
                 {
-                    _state.MarkPullAsTerminated();
+                    _state.MarkForPull();
                 }
                 else
                 {
@@ -154,6 +172,11 @@ internal abstract class NatsJSSubBase<T> : NatsSubBase
 
             if (notification != null)
                 await ReceivedControlMsg(notification);
+
+            if (_state.CanFetch())
+            {
+                await CallMsgNextAsync(_state.GetRequest());
+            }
         }
         else
         {
@@ -230,7 +253,7 @@ internal class NatsJSSubState
     private long _pendingMsgs;
     private long _pendingBytes;
     private long _totalRequests;
-    private bool _pullTerminated;
+    private bool _pull;
 
     public NatsJSSubState(
         NatsJSOpts? opts = default,
@@ -259,21 +282,42 @@ internal class NatsJSSubState
 
     public void ReceivedPendingBytes(long pendingBytes) => _pendingBytes -= pendingBytes;
 
-    public void MarkPullAsTerminated() => _pullTerminated = true;
+    public void MarkForPull() => _pull = true;
 
     public void IncrementTotalRequests() => Interlocked.Increment(ref _totalRequests);
 
-    public ConsumerGetnextRequest GetRequest()
+    public ConsumerGetnextRequest GetRequest(bool init = false)
     {
-        _pullTerminated = false;
+        if (init)
+        {
+            _pendingBytes = 0;
+            _pendingMsgs = 0;
+            _totalRequests = 0;
+        }
+
+        _pull = false;
         _totalRequests++;
+
+        long batch;
+        long maxBytes;
+        if (init)
+        {
+            batch = _optsMaxBytes > 0 ? LargeMsgsBatchSize : _optsMaxMsgs;
+            maxBytes = _optsMaxBytes > 0 ? _optsMaxBytes : 0;
+        }
+        else
+        {
+            batch = _optsMaxBytes > 0 ? LargeMsgsBatchSize : _optsMaxMsgs - _pendingMsgs;
+            maxBytes = _optsMaxBytes > 0 ? _optsMaxBytes - _pendingBytes : 0;
+        }
+
         var request = new ConsumerGetnextRequest
         {
-            Batch = _optsMaxBytes > 0 ? LargeMsgsBatchSize : _optsMaxMsgs - _pendingMsgs,
-            MaxBytes = _optsMaxBytes > 0 ? _optsMaxBytes - _pendingBytes : 0,
+            Batch = batch,
+            MaxBytes = maxBytes,
             IdleHeartbeat = _optsIdleHeartbeatNanos,
             Expires = _optsExpiresNanos,
-            NoWait = true,
+            NoWait = false,
         };
 
         _pendingMsgs += request.Batch;
@@ -289,7 +333,7 @@ internal class NatsJSSubState
     }
 
     public bool CanFetch() =>
-        _pullTerminated
+        _pull
         || _optsThresholdMsgs >= _pendingMsgs
         || (_optsThresholdBytes > 0 && _optsThresholdBytes >= _pendingBytes);
 }

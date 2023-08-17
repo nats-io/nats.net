@@ -1,4 +1,4 @@
-﻿namespace NATS.Client.Core;
+namespace NATS.Client.Core;
 
 public interface IServerInfo
 {
@@ -44,7 +44,7 @@ public interface IServerInfo
 
     string[]? ClientConnectUrls { get; }
 
-    string[]? WebSocketConnectUrls { get;  }
+    string[]? WebSocketConnectUrls { get; }
 
-    bool LameDuckMode { get;  }
+    bool LameDuckMode { get; }
 }

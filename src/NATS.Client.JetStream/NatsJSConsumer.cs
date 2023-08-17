@@ -46,7 +46,7 @@ public class NatsJSConsumer
             optsExpires: opts.Expires,
             optsIdleHeartbeat: opts.IdleHeartbeat);
 
-        var sub = new NatsJSSubBaseConsume<T>(
+        var sub = new NatsJSSubConsume<T>(
             stream: _stream,
             consumer: _consumer,
             context: _context,
