@@ -7,20 +7,20 @@ namespace NATS.Client.JetStream;
 
 public partial class NatsJSContext
 {
-    public NatsJSContext(NatsConnection nats)
-        : this(nats, new NatsJSOpts())
+    public NatsJSContext(NatsConnection connection)
+        : this(connection, new NatsJSOpts())
     {
     }
 
-    public NatsJSContext(NatsConnection nats, NatsJSOpts opts)
+    public NatsJSContext(NatsConnection connection, NatsJSOpts opts)
     {
-        Nats = nats;
+        Connection = connection;
         if (opts.InboxPrefix == string.Empty)
-            opts = opts with { InboxPrefix = nats.Options.InboxPrefix };
+            opts = opts with { InboxPrefix = connection.Opts.InboxPrefix };
         Opts = opts;
     }
 
-    internal NatsConnection Nats { get; }
+    internal NatsConnection Connection { get; }
 
     internal NatsJSOpts Opts { get; }
 
@@ -36,7 +36,7 @@ public partial class NatsJSContext
         NatsPubOpts opts = default,
         CancellationToken cancellationToken = default)
     {
-        await using var sub = await Nats.RequestSubAsync<T, PubAckResponse>(
+        await using var sub = await Connection.RequestSubAsync<T, PubAckResponse>(
                 subject: subject,
                 data: data,
                 requestOpts: opts,
@@ -84,7 +84,7 @@ public partial class NatsJSContext
             Validator.ValidateObject(request, new ValidationContext(request));
         }
 
-        await using var sub = await Nats.RequestSubAsync<TRequest, TResponse>(
+        await using var sub = await Connection.RequestSubAsync<TRequest, TResponse>(
                 subject: subject,
                 data: request,
                 requestOpts: default,

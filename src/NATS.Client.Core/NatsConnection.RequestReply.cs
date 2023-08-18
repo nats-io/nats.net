@@ -112,7 +112,7 @@ public partial class NatsConnection
 
         if ((opts.Timeout ?? default) == default)
         {
-            opts = opts with { Timeout = Options.RequestTimeout };
+            opts = opts with { Timeout = Opts.RequestTimeout };
         }
 
         return opts;

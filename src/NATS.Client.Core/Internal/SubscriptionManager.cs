@@ -6,7 +6,7 @@ using NATS.Client.Core.Commands;
 
 namespace NATS.Client.Core.Internal;
 
-internal interface ISubscriptionManager
+public interface ISubscriptionManager
 {
     public ValueTask RemoveAsync(NatsSubBase sub);
 }
@@ -36,11 +36,11 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
     {
         _connection = connection;
         _inboxPrefix = inboxPrefix;
-        _logger = _connection.Options.LoggerFactory.CreateLogger<SubscriptionManager>();
+        _logger = _connection.Opts.LoggerFactory.CreateLogger<SubscriptionManager>();
         _cts = new CancellationTokenSource();
-        _cleanupInterval = _connection.Options.SubscriptionCleanUpInterval;
+        _cleanupInterval = _connection.Opts.SubscriptionCleanUpInterval;
         _timer = Task.Run(CleanupAsync);
-        InboxSubBuilder = new InboxSubBuilder(connection.Options.LoggerFactory.CreateLogger<InboxSubBuilder>());
+        InboxSubBuilder = new InboxSubBuilder(connection.Opts.LoggerFactory.CreateLogger<InboxSubBuilder>());
         _inboxSubSentinel = new InboxSub(InboxSubBuilder, nameof(_inboxSubSentinel), default, connection, this);
         _inboxSub = _inboxSubSentinel;
     }

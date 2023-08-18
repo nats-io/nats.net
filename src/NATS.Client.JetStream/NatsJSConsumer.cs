@@ -50,15 +50,15 @@ public class NatsJSConsumer
             stream: _stream,
             consumer: _consumer,
             context: _context,
-            manager: _context.Nats.SubscriptionManager,
+            manager: _context.Connection.SubscriptionManager,
             subject: inbox,
             opts: requestOpts,
             state: state,
-            serializer: requestOpts.Serializer ?? _context.Nats.Options.Serializer,
+            serializer: requestOpts.Serializer ?? _context.Connection.Opts.Serializer,
             errorHandler: opts.ErrorHandler,
             cancellationToken: cancellationToken);
 
-        await _context.Nats.SubAsync(
+        await _context.Connection.SubAsync(
             subject: inbox,
             opts: requestOpts,
             sub: sub,
@@ -87,5 +87,29 @@ public class NatsJSConsumer
     {
         if (_deleted)
             throw new NatsJSException($"Consumer '{_stream}:{_consumer}' is deleted");
+    }
+
+    public async ValueTask<NatsJSSub<T>> CreateSubscription<T>(
+        Func<NatsJSSub<T>, NatsJSControlMsg, Task> controlHandler,
+        Func<ConsumerGetnextRequest?> reconnectRequestFactory,
+        TimeSpan heartBeat,
+        NatsSubOpts? opts = default,
+        CancellationToken cancellationToken = default)
+    {
+        var inbox = $"{_context.Opts.InboxPrefix}.{Guid.NewGuid():n}";
+
+        var sub = new NatsJSSub<T>(
+            context: _context,
+            stream: _stream,
+            consumer: _consumer,
+            subject: inbox,
+            opts: opts,
+            heartbeat: heartBeat,
+            controlHandler: controlHandler,
+            reconnectRequestFactory: reconnectRequestFactory);
+
+        await _context.Connection.SubAsync(inbox, opts, sub, cancellationToken);
+
+        return sub;
     }
 }

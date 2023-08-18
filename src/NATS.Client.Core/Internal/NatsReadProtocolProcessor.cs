@@ -27,13 +27,13 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
     public NatsReadProtocolProcessor(ISocketConnection socketConnection, NatsConnection connection, TaskCompletionSource waitForInfoSignal, TaskCompletionSource waitForPongOrErrorSignal, Task infoParsed)
     {
         _connection = connection;
-        _logger = connection.Options.LoggerFactory.CreateLogger<NatsReadProtocolProcessor>();
+        _logger = connection.Opts.LoggerFactory.CreateLogger<NatsReadProtocolProcessor>();
         _trace = _logger.IsEnabled(LogLevel.Trace);
         _waitForInfoSignal = waitForInfoSignal;
         _waitForPongOrErrorSignal = waitForPongOrErrorSignal;
         _infoParsed = infoParsed;
         _pingCommands = new ConcurrentQueue<AsyncPingCommand>();
-        _socketReader = new SocketReader(socketConnection, connection.Options.ReaderBufferSize, connection.Counter, connection.Options.LoggerFactory);
+        _socketReader = new SocketReader(socketConnection, connection.Opts.ReaderBufferSize, connection.Counter, connection.Opts.LoggerFactory);
         _readLoop = Task.Run(ReadLoopAsync);
     }
 

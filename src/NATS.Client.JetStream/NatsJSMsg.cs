@@ -28,7 +28,7 @@ public readonly struct NatsJSMsg<T>
 
     public NatsMsg<T> Msg { get; }
 
-    public ValueTask Ack(CancellationToken cancellationToken = default)
+    public ValueTask AckAsync(CancellationToken cancellationToken = default)
     {
         if (Msg == default)
             throw new NatsJSException("No user message, can't acknowledge");

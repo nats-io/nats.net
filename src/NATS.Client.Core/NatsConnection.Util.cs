@@ -70,7 +70,7 @@ public partial class NatsConnection
     internal CancellationTimer GetCancellationTimer(CancellationToken cancellationToken, TimeSpan timeout = default)
     {
         if (timeout == default)
-            timeout = Options.CommandTimeout;
+            timeout = Opts.CommandTimeout;
         return _cancellationTimerPool.Start(timeout, cancellationToken);
     }
 

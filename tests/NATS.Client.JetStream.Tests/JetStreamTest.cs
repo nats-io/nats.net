@@ -93,7 +93,7 @@ public class JetStreamTest
                 // Only ACK one message so we can consume again
                 if (messages.Count == 1)
                 {
-                    await msg.Ack(cts2.Token);
+                    await msg.AckAsync(cts2.Token);
                 }
 
                 if (messages.Count == 2)

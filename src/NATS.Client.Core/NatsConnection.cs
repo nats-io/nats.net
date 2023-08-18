@@ -56,23 +56,23 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
     {
     }
 
-    public NatsConnection(NatsOptions options)
+    public NatsConnection(NatsOptions opts)
     {
-        Options = options;
+        Opts = opts;
         ConnectionState = NatsConnectionState.Closed;
         _waitForOpenConnection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         _disposedCancellationTokenSource = new CancellationTokenSource();
-        _pool = new ObjectPool(options.ObjectPoolSize);
+        _pool = new ObjectPool(opts.ObjectPoolSize);
         _cancellationTimerPool = new CancellationTimerPool(_pool, _disposedCancellationTokenSource.Token);
-        _name = options.Name;
+        _name = opts.Name;
         Counter = new ConnectionStatsCounter();
-        _writerState = new WriterState(options);
+        _writerState = new WriterState(opts);
         _commandWriter = _writerState.CommandBuffer.Writer;
-        InboxPrefix = $"{options.InboxPrefix}.{Guid.NewGuid():n}.";
+        InboxPrefix = $"{opts.InboxPrefix}.{Guid.NewGuid():n}.";
         SubscriptionManager = new SubscriptionManager(this, InboxPrefix);
-        _logger = options.LoggerFactory.CreateLogger<NatsConnection>();
-        _clientOptions = ClientOptions.Create(Options);
-        HeaderParser = new HeaderParser(options.HeaderEncoding);
+        _logger = opts.LoggerFactory.CreateLogger<NatsConnection>();
+        _clientOptions = ClientOptions.Create(Opts);
+        HeaderParser = new HeaderParser(opts.HeaderEncoding);
     }
 
     // events
@@ -82,7 +82,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
     public event EventHandler<string>? ReconnectFailed;
 
-    public NatsOptions Options { get; }
+    public NatsOptions Opts { get; }
 
     public NatsConnectionState ConnectionState { get; private set; }
 
@@ -221,15 +221,15 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
     {
         Debug.Assert(ConnectionState == NatsConnectionState.Connecting, "Connection state");
 
-        var uris = Options.GetSeedUris();
-        if (Options.TlsOptions.Disabled && uris.Any(u => u.IsTls))
+        var uris = Opts.GetSeedUris();
+        if (Opts.TlsOptions.Disabled && uris.Any(u => u.IsTls))
             throw new NatsException($"URI {uris.First(u => u.IsTls)} requires TLS but TlsOptions.Disabled is set to true");
-        if (Options.TlsOptions.Required)
-            _tlsCerts = new TlsCerts(Options.TlsOptions);
+        if (Opts.TlsOptions.Required)
+            _tlsCerts = new TlsCerts(Opts.TlsOptions);
 
-        if (!Options.AuthOptions.IsAnonymous)
+        if (!Opts.AuthOptions.IsAnonymous)
         {
-            _userCredentials = new UserCredentials(Options.AuthOptions);
+            _userCredentials = new UserCredentials(Opts.AuthOptions);
         }
 
         foreach (var uri in uris)
@@ -247,13 +247,13 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
                 if (uri.IsWebSocket)
                 {
                     var conn = new WebSocketConnection();
-                    await conn.ConnectAsync(uri.Uri, Options.ConnectTimeout).ConfigureAwait(false);
+                    await conn.ConnectAsync(uri.Uri, Opts.ConnectTimeout).ConfigureAwait(false);
                     _socket = conn;
                 }
                 else
                 {
                     var conn = new TcpConnection();
-                    await conn.ConnectAsync(target.Host, target.Port, Options.ConnectTimeout).ConfigureAwait(false);
+                    await conn.ConnectAsync(target.Host, target.Port, Opts.ConnectTimeout).ConfigureAwait(false);
                     _socket = conn;
                 }
 
@@ -331,19 +331,19 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
             // check to see if we should upgrade to TLS
             if (_socket is TcpConnection tcpConnection)
             {
-                if (Options.TlsOptions.Disabled && WritableServerInfo!.TlsRequired)
+                if (Opts.TlsOptions.Disabled && WritableServerInfo!.TlsRequired)
                 {
                     throw new NatsException(
                         $"Server {_currentConnectUri} requires TLS but TlsOptions.Disabled is set to true");
                 }
 
-                if (Options.TlsOptions.Required && !WritableServerInfo!.TlsRequired && !WritableServerInfo.TlsAvailable)
+                if (Opts.TlsOptions.Required && !WritableServerInfo!.TlsRequired && !WritableServerInfo.TlsAvailable)
                 {
                     throw new NatsException(
                         $"Server {_currentConnectUri} does not support TLS but TlsOptions.Disabled is set to true");
                 }
 
-                if (Options.TlsOptions.Required || WritableServerInfo!.TlsRequired || WritableServerInfo.TlsAvailable)
+                if (Opts.TlsOptions.Required || WritableServerInfo!.TlsRequired || WritableServerInfo.TlsAvailable)
                 {
                     // do TLS upgrade
                     // if the current URI is not a seed URI and is not a DNS hostname, check the server cert against the
@@ -364,7 +364,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
                     _socketReader = null;
 
                     // upgrade TcpConnection to SslConnection
-                    var sslConnection = tcpConnection.UpgradeToSslStreamConnection(Options.TlsOptions, _tlsCerts);
+                    var sslConnection = tcpConnection.UpgradeToSslStreamConnection(Opts.TlsOptions, _tlsCerts);
                     await sslConnection.AuthenticateAsClientAsync(targetHost).ConfigureAwait(false);
                     _socket = sslConnection;
 
@@ -433,12 +433,12 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
             await DisposeSocketAsync(true).ConfigureAwait(false);
 
             var defaultScheme = _currentConnectUri!.Uri.Scheme;
-            var urls = (Options.NoRandomize
+            var urls = (Opts.NoRandomize
                 ? WritableServerInfo?.ClientConnectUrls?.Select(x => new NatsUri(x, false, defaultScheme)).Distinct().ToArray()
                 : WritableServerInfo?.ClientConnectUrls?.Select(x => new NatsUri(x, false, defaultScheme)).OrderBy(_ => Guid.NewGuid()).Distinct().ToArray())
                     ?? Array.Empty<NatsUri>();
             if (urls.Length == 0)
-                urls = Options.GetSeedUris();
+                urls = Opts.GetSeedUris();
 
             // add last.
             urls = urls.Where(x => x != _currentConnectUri).Append(_currentConnectUri).ToArray();
@@ -463,13 +463,13 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
                     if (url.IsWebSocket)
                     {
                         var conn = new WebSocketConnection();
-                        await conn.ConnectAsync(url.Uri, Options.ConnectTimeout).ConfigureAwait(false);
+                        await conn.ConnectAsync(url.Uri, Opts.ConnectTimeout).ConfigureAwait(false);
                         _socket = conn;
                     }
                     else
                     {
                         var conn = new TcpConnection();
-                        await conn.ConnectAsync(target.Host, target.Port, Options.ConnectTimeout).ConfigureAwait(false);
+                        await conn.ConnectAsync(target.Host, target.Port, Opts.ConnectTimeout).ConfigureAwait(false);
                         _socket = conn;
                     }
 
@@ -517,8 +517,8 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
     private async Task WaitWithJitterAsync()
     {
-        var jitter = Random.Shared.NextDouble() * Options.ReconnectJitter.TotalMilliseconds;
-        var waitTime = Options.ReconnectWait + TimeSpan.FromMilliseconds(jitter);
+        var jitter = Random.Shared.NextDouble() * Opts.ReconnectJitter.TotalMilliseconds;
+        var waitTime = Opts.ReconnectWait + TimeSpan.FromMilliseconds(jitter);
         if (waitTime != TimeSpan.Zero)
         {
             _logger.LogTrace("Wait {0}ms to reconnect.", waitTime.TotalMilliseconds);
@@ -528,16 +528,16 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
     private async void StartPingTimer(CancellationToken cancellationToken)
     {
-        if (Options.PingInterval == TimeSpan.Zero)
+        if (Opts.PingInterval == TimeSpan.Zero)
             return;
 
-        var periodicTimer = new PeriodicTimer(Options.PingInterval);
+        var periodicTimer = new PeriodicTimer(Opts.PingInterval);
         ResetPongCount();
         try
         {
             while (!cancellationToken.IsCancellationRequested)
             {
-                if (Interlocked.Increment(ref _pongCount) > Options.MaxPingOut)
+                if (Interlocked.Increment(ref _pongCount) > Opts.MaxPingOut)
                 {
                     _logger.LogInformation("Detect MaxPingOut, try to connection abort.");
                     if (_socket != null)
@@ -559,7 +559,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
     private CancellationTimer GetRequestCommandTimer(CancellationToken cancellationToken)
     {
-        return _cancellationTimerPool.Start(Options.RequestTimeout, cancellationToken);
+        return _cancellationTimerPool.Start(Opts.RequestTimeout, cancellationToken);
     }
 
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]

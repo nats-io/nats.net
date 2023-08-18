@@ -28,7 +28,7 @@ public class ConsumerFetchTest
         var count = 0;
         await foreach (var msg in consumer.FetchAsync<TestData>(new NatsJSFetchOpts { MaxMsgs = 10 }, cancellationToken: cts.Token))
         {
-            await msg.Ack(cts.Token);
+            await msg.AckAsync(cts.Token);
             Assert.Equal(count, msg.Msg.Data!.Test);
             count++;
         }

@@ -30,7 +30,7 @@ internal abstract class NatsJSSubBase<T> : NatsSubBase
         NatsJSSubState state,
         INatsSerializer serializer,
         CancellationToken cancellationToken = default)
-        : base(context.Nats, manager, subject, opts)
+        : base(context.Connection, manager, subject, opts)
     {
         _stream = stream;
         _consumer = consumer;
@@ -38,7 +38,7 @@ internal abstract class NatsJSSubBase<T> : NatsSubBase
         _state = state;
         _serializer = serializer;
         _cancellationToken = cancellationToken;
-        Logger = Connection.Options.LoggerFactory.CreateLogger<NatsJSSubBase<T>>();
+        Logger = Connection.Opts.LoggerFactory.CreateLogger<NatsJSSubBase<T>>();
         _trace = Logger.IsEnabled(LogLevel.Trace);
 
         _hearthBeatTimeout = state.HearthBeatTimeout;
