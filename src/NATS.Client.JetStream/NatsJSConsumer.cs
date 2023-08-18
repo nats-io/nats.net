@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
@@ -83,33 +82,50 @@ public class NatsJSConsumer
         CancellationToken cancellationToken = default) =>
         throw new NotImplementedException();
 
-    private void ThrowIfDeleted()
-    {
-        if (_deleted)
-            throw new NatsJSException($"Consumer '{_stream}:{_consumer}' is deleted");
-    }
-
-    public async ValueTask<NatsJSSub<T>> CreateSubscription<T>(
-        Func<NatsJSSub<T>, NatsJSControlMsg, Task> controlHandler,
-        Func<ConsumerGetnextRequest?> reconnectRequestFactory,
+    public async ValueTask<NatsJSSub<TMsg, TState>> CreateSubscription<TMsg, TState>(
+        Func<NatsJSSub<TMsg, TState>, NatsJSControlMsg, Task> controlHandler,
+        Func<NatsJSSub<TMsg, TState>, ConsumerGetnextRequest?> reconnectRequestFactory,
+        TState state,
         TimeSpan heartBeat,
+        NatsJSSubOpts consumerOpts,
         NatsSubOpts? opts = default,
         CancellationToken cancellationToken = default)
     {
         var inbox = $"{_context.Opts.InboxPrefix}.{Guid.NewGuid():n}";
 
-        var sub = new NatsJSSub<T>(
+        var sub = new NatsJSSub<TMsg, TState>(
             context: _context,
             stream: _stream,
             consumer: _consumer,
             subject: inbox,
+            consumerOpts: consumerOpts,
             opts: opts,
             heartbeat: heartBeat,
             controlHandler: controlHandler,
-            reconnectRequestFactory: reconnectRequestFactory);
+            reconnectRequestFactory: reconnectRequestFactory,
+            state: state);
 
         await _context.Connection.SubAsync(inbox, opts, sub, cancellationToken);
 
         return sub;
     }
+
+    private void ThrowIfDeleted()
+    {
+        if (_deleted)
+            throw new NatsJSException($"Consumer '{_stream}:{_consumer}' is deleted");
+    }
+}
+
+public class NatsJSSubOpts
+{
+    public NatsJSSubOpts(int maxMsgs, int threshHoldMaxMsgs)
+    {
+        MaxMsgs = maxMsgs;
+        ThreshHoldMaxMsgs = threshHoldMaxMsgs;
+    }
+
+    public int MaxMsgs { get; }
+
+    public int ThreshHoldMaxMsgs { get; }
 }

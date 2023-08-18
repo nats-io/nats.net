@@ -8,44 +8,51 @@ using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
 
-public class NatsJSSub<T> : NatsSubBase
+public class NatsJSSub<TMsg, TState> : NatsSubBase
 {
     private readonly ILogger _logger;
-    private readonly Channel<NatsJSMsg<T?>> _userMsgs;
+    private readonly Channel<NatsJSMsg<TMsg?>> _userMsgs;
     private readonly Channel<NatsJSControlMsg> _controlMsgs;
     private readonly NatsJSContext _context;
     private readonly string _stream;
     private readonly string _consumer;
+    private readonly NatsJSSubOpts _consumerOpts;
     private readonly INatsSerializer _serializer;
     private readonly TimeSpan _heartbeat;
-    private readonly Func<NatsJSSub<T>, NatsJSControlMsg, Task> _controlHandler;
-    private readonly Func<ConsumerGetnextRequest?> _reconnectRequestFactory;
+    private readonly Func<NatsJSSub<TMsg, TState>, NatsJSControlMsg, Task> _controlHandler;
+    private readonly Func<NatsJSSub<TMsg, TState>, ConsumerGetnextRequest?> _reconnectRequestFactory;
     private readonly Timer _heartbeatTimer;
+
+    private int _userMessageCount;
 
     public NatsJSSub(
         NatsJSContext context,
         string stream,
         string consumer,
         string subject,
+        NatsJSSubOpts consumerOpts,
         NatsSubOpts? opts,
         TimeSpan heartbeat,
-        Func<NatsJSSub<T>, NatsJSControlMsg, Task> controlHandler,
-        Func<ConsumerGetnextRequest?> reconnectRequestFactory)
+        Func<NatsJSSub<TMsg, TState>, NatsJSControlMsg, Task> controlHandler,
+        Func<NatsJSSub<TMsg, TState>, ConsumerGetnextRequest?> reconnectRequestFactory,
+        TState state)
         : base(context.Connection, context.Connection.SubscriptionManager, subject, opts)
     {
-        _logger = Connection.Opts.LoggerFactory.CreateLogger<NatsJSSub<T>>();
+        State = state;
+        _logger = Connection.Opts.LoggerFactory.CreateLogger<NatsJSSub<TMsg, TState>>();
         _context = context;
         _stream = stream;
         _consumer = consumer;
+        _consumerOpts = consumerOpts;
         _serializer = opts?.Serializer ?? context.Connection.Opts.Serializer;
         _heartbeat = heartbeat;
         _controlHandler = controlHandler;
         _reconnectRequestFactory = reconnectRequestFactory;
-        _userMsgs = Channel.CreateBounded<NatsJSMsg<T?>>(NatsSub.GetChannelOptions(opts?.ChannelOptions));
+        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg?>>(NatsSub.GetChannelOptions(opts?.ChannelOptions));
         _controlMsgs = Channel.CreateBounded<NatsJSControlMsg>(new BoundedChannelOptions(1_000)
         {
             FullMode = BoundedChannelFullMode.DropOldest,
-            SingleWriter = true,
+            SingleWriter = false,
             SingleReader = true,
             AllowSynchronousContinuations = false,
         });
@@ -60,7 +67,9 @@ public class NatsJSSub<T> : NatsSubBase
             period: Timeout.Infinite);
     }
 
-    private void ResetHeartbeatTimer(TimeSpan dueTime) => _heartbeatTimer.Change(dueTime, Timeout.InfiniteTimeSpan);
+    public ChannelReader<NatsJSMsg<TMsg?>> Msgs { get; }
+
+    public TState State { get; }
 
     public ValueTask CallMsgNextAsync(ConsumerGetnextRequest request, CancellationToken cancellationToken = default) =>
         Connection.PubModelAsync(
@@ -71,17 +80,14 @@ public class NatsJSSub<T> : NatsSubBase
             headers: default,
             cancellationToken);
 
-    private void HeartbeatTimerCallback() =>
-        _controlMsgs.Writer.TryWrite(NatsJSControlMsg.HeartBeat);
-
-    public ChannelReader<NatsJSMsg<T?>> Msgs { get; }
+    public void ResetHeartbeatTimer(TimeSpan dueTime) => _heartbeatTimer.Change(dueTime, Timeout.InfiniteTimeSpan);
 
     internal override IEnumerable<ICommand> GetReconnectCommands(int sid)
     {
         foreach (var command in base.GetReconnectCommands(sid))
             yield return command;
 
-        var request = _reconnectRequestFactory();
+        var request = _reconnectRequestFactory(this);
 
         if (request != null)
         {
@@ -116,7 +122,7 @@ public class NatsJSSub<T> : NatsSubBase
                     var headers = new NatsHeaders();
                     if (!Connection.HeaderParser.ParseHeaders(reader, headers))
                     {
-                        controlMsg = new NatsJSControlMsg
+                        controlMsg = new NatsJSControlMsg("Error")
                         {
                             Error = new NatsJSControlError("Can't parse headers")
                             {
@@ -126,23 +132,23 @@ public class NatsJSSub<T> : NatsSubBase
                     }
                     else
                     {
-                        controlMsg = new NatsJSControlMsg { Headers = headers };
+                        controlMsg = new NatsJSControlMsg("Headers") { Headers = headers };
                     }
                 }
                 else
                 {
-                    controlMsg = new NatsJSControlMsg { Error = new NatsJSControlError("No header found") };
+                    controlMsg = new NatsJSControlMsg("Error") { Error = new NatsJSControlError("No header found") };
                 }
             }
             catch (Exception e)
             {
-                controlMsg = new NatsJSControlMsg { Error = new NatsJSControlError(e.Message) { Exception = e } };
+                controlMsg = new NatsJSControlMsg("Error") { Error = new NatsJSControlError(e.Message) { Exception = e } };
             }
 
             return _controlMsgs.Writer.WriteAsync(controlMsg);
         }
 
-        var msg = new NatsJSMsg<T?>(NatsMsg<T?>.Build(
+        var msg = new NatsJSMsg<TMsg?>(NatsMsg<TMsg?>.Build(
             subject,
             replyTo,
             headersBuffer,
@@ -150,6 +156,19 @@ public class NatsJSSub<T> : NatsSubBase
             Connection,
             Connection.HeaderParser,
             _serializer));
+
+        var count = Interlocked.Increment(ref _userMessageCount);
+        if (count == _consumerOpts.ThreshHoldMaxMsgs)
+        {
+            _controlMsgs.Writer.TryWrite(NatsJSControlMsg.BatchHighWatermark);
+            Interlocked.Exchange(ref _userMessageCount, 0);
+        }
+
+        if (count == _consumerOpts.MaxMsgs)
+        {
+            _controlMsgs.Writer.TryWrite(NatsJSControlMsg.BatchComplete);
+            Interlocked.Exchange(ref _userMessageCount, 0);
+        }
 
         return _userMsgs.Writer.WriteAsync(msg);
     }
@@ -159,6 +178,9 @@ public class NatsJSSub<T> : NatsSubBase
         _controlMsgs.Writer.TryComplete();
         _userMsgs.Writer.TryComplete();
     }
+
+    private void HeartbeatTimerCallback() =>
+        _controlMsgs.Writer.TryWrite(NatsJSControlMsg.HeartBeat);
 
     private async Task ControlHandlerLoop()
     {
@@ -178,32 +200,4 @@ public class NatsJSSub<T> : NatsSubBase
             }
         }
     }
-}
-
-public class NatsJSControlMsg
-{
-    public static readonly NatsJSControlMsg HeartBeat = new();
-
-    public NatsHeaders? Headers { get; init; }
-
-    public NatsJSControlError? Error { get; init; }
-}
-
-public enum NatsJSControlErrorType
-{
-    Internal,
-    Server,
-}
-
-public class NatsJSControlError
-{
-    public NatsJSControlError(string error) => Error = error;
-
-    public NatsJSControlErrorType Type { get; init; } = NatsJSControlErrorType.Internal;
-
-    public string Error { get; }
-
-    public Exception? Exception { get; init; }
-
-    public string Details { get; init; } = string.Empty;
 }

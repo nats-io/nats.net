@@ -1,6 +1,4 @@
-﻿using System.Buffers;
-using System.Runtime.CompilerServices;
-using System.Text;
+﻿using Example.JetStream.PullConsumer;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
@@ -13,26 +11,78 @@ await using var nats = new NatsConnection(options);
 
 var js = new NatsJSContext(nats);
 
-var stream = await js.CreateStreamAsync("s1", new[] { "s1.*" });
 var consumer = await js.CreateConsumerAsync("s1", "c1");
-await using var sub = await consumer.CreateSubscription<RawData>(
-    controlHandler: async (thisSub, msg) =>
+
+static async Task ControlHandler(NatsJSSub<RawData, object> s, NatsJSControlMsg msg)
+{
+    Console.WriteLine($"________________________________________________");
+    Console.WriteLine($"| {msg.Name} | {msg.Headers?.Code} {msg.Headers?.MessageText}");
+    var error = msg.Error?.Error;
+    if (error != null) Console.WriteLine($"| Error: {error}");
+    Console.WriteLine($"------------------------------------------------");
+
+    if (msg == NatsJSControlMsg.HeartBeat)
     {
-        Console.WriteLine($"____");
-        Console.WriteLine($"{msg.Headers?.Code} {msg.Headers?.MessageText}");
-        var error = msg.Error?.Error;
-        if (error != null)
-            Console.WriteLine($"Error: {error}");
-    },
-    reconnectRequestFactory: () => default,
+        Console.WriteLine(">>HeartBeat");
+        s.ResetHeartbeatTimer(TimeSpan.FromSeconds(5));
+        await s.CallMsgNextAsync(new ConsumerGetnextRequest
+        {
+            Batch = 10,
+            Expires = TimeSpan.FromSeconds(10).ToNanos(),
+            IdleHeartbeat = TimeSpan.FromSeconds(1).ToNanos(),
+        });
+    }
+    else if (msg == NatsJSControlMsg.BatchComplete)
+    {
+        Console.WriteLine(">>BatchComplete");
+        s.ResetHeartbeatTimer(TimeSpan.FromSeconds(5));
+        await s.CallMsgNextAsync(new ConsumerGetnextRequest
+        {
+            Batch = 10,
+            Expires = TimeSpan.FromSeconds(10).ToNanos(),
+            IdleHeartbeat = TimeSpan.FromSeconds(1).ToNanos(),
+        });
+    }
+    else if (msg == NatsJSControlMsg.BatchHighWatermark)
+    {
+        Console.WriteLine(">>BatchHighWatermark");
+        s.ResetHeartbeatTimer(TimeSpan.FromSeconds(5));
+        await s.CallMsgNextAsync(new ConsumerGetnextRequest
+        {
+            Batch = 10,
+            Expires = TimeSpan.FromSeconds(10).ToNanos(),
+            IdleHeartbeat = TimeSpan.FromSeconds(1).ToNanos(),
+        });
+    }
+    else if (msg.Headers != null)
+    {
+        if (msg.Headers.Code == 408 && msg.Headers.Message == NatsHeaders.Messages.RequestTimeout)
+        {
+            // await s.CallMsgNextAsync(new ConsumerGetnextRequest
+            // {
+            //     Batch = 10,
+            //     Expires = TimeSpan.FromSeconds(10).ToNanos(),
+            //     IdleHeartbeat = TimeSpan.FromSeconds(1).ToNanos(),
+            // });
+        }
+    }
+}
+
+static ConsumerGetnextRequest? ReconnectRequestFactory(NatsJSSub<RawData, object> s) => default;
+
+await using var sub = await consumer.CreateSubscription<RawData, object>(
+    controlHandler: ControlHandler,
+    reconnectRequestFactory: ReconnectRequestFactory,
+    state: new object(),
     heartBeat: TimeSpan.FromSeconds(5),
+    consumerOpts: new NatsJSSubOpts(10, 5),
     opts: new NatsSubOpts { Serializer = new RawDataSerializer() });
 
 await sub.CallMsgNextAsync(new ConsumerGetnextRequest
 {
-    Batch = 100,
-    IdleHeartbeat = TimeSpan.FromSeconds(3).ToNanos(),
-    Expires = TimeSpan.FromSeconds(12).ToNanos(),
+    Batch = 10,
+    IdleHeartbeat = TimeSpan.FromSeconds(1).ToNanos(),
+    Expires = TimeSpan.FromSeconds(10).ToNanos(),
 });
 
 await foreach (var jsMsg in sub.Msgs.ReadAllAsync())
@@ -42,37 +92,4 @@ await foreach (var jsMsg in sub.Msgs.ReadAllAsync())
     Console.WriteLine($"____");
     Console.WriteLine($"subject: {msg.Subject}");
     Console.WriteLine($"data: {msg.Data}");
-}
-
-class RawData
-{
-    public RawData(byte[] buffer) => Buffer = buffer;
-
-    public byte[] Buffer { get; }
-
-    public override string ToString() => Encoding.ASCII.GetString(Buffer);
-}
-
-class RawDataSerializer : INatsSerializer
-{
-    public int Serialize<T>(ICountableBufferWriter bufferWriter, T? value)
-    {
-        if (value is RawData data)
-        {
-            bufferWriter.Write(data.Buffer);
-            return data.Buffer.Length;
-        }
-
-        throw new Exception($"Can only work with '{typeof(RawData)}'");
-    }
-
-    public T? Deserialize<T>(in ReadOnlySequence<byte> buffer) => (T?)Deserialize(buffer, typeof(T));
-
-    public object? Deserialize(in ReadOnlySequence<byte> buffer, Type type)
-    {
-        if (type != typeof(RawData))
-            throw new Exception($"Can only work with '{typeof(RawData)}'");
-
-        return new RawData(buffer.ToArray());
-    }
 }
