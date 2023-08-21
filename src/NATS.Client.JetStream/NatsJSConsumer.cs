@@ -83,13 +83,10 @@ public class NatsJSConsumer
         throw new NotImplementedException();
 
     public async ValueTask<NatsJSSub<TMsg, TState>> CreateSubscription<TMsg, TState>(
-        Func<NatsJSSub<TMsg, TState>, NatsJSControlMsg, Task> controlHandler,
-        Func<NatsJSSub<TMsg, TState>, ConsumerGetnextRequest?> reconnectRequestFactory,
         TState state,
-        TimeSpan heartBeat,
-        NatsJSSubOpts consumerOpts,
         NatsSubOpts? opts = default,
         CancellationToken cancellationToken = default)
+    where TState : INatsJSSubState
     {
         var inbox = $"{_context.Opts.InboxPrefix}.{Guid.NewGuid():n}";
 
@@ -98,11 +95,7 @@ public class NatsJSConsumer
             stream: _stream,
             consumer: _consumer,
             subject: inbox,
-            consumerOpts: consumerOpts,
             opts: opts,
-            heartbeat: heartBeat,
-            controlHandler: controlHandler,
-            reconnectRequestFactory: reconnectRequestFactory,
             state: state);
 
         await _context.Connection.SubAsync(inbox, opts, sub, cancellationToken);
@@ -115,6 +108,19 @@ public class NatsJSConsumer
         if (_deleted)
             throw new NatsJSException($"Consumer '{_stream}:{_consumer}' is deleted");
     }
+}
+
+public interface INatsJSSubState
+{
+    ValueTask ReceivedControlMsgAsync(INatsJSSub sub, NatsJSControlMsg controlMsg);
+
+    void ResetHeartbeatTimer(INatsJSSub sub);
+
+    void ReceivedUserMsg(INatsJSSub sub);
+
+    ConsumerGetnextRequest? ReconnectRequestFactory(INatsJSSub sub);
+
+    ValueTask ReadyAsync(INatsJSSub sub);
 }
 
 public class NatsJSSubOpts

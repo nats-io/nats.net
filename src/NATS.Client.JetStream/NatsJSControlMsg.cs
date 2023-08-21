@@ -24,8 +24,6 @@ public class NatsJSControlError
 public class NatsJSControlMsg
 {
     public static readonly NatsJSControlMsg HeartBeat = new("Heartbeat");
-    public static readonly NatsJSControlMsg BatchComplete = new("BatchComplete");
-    public static readonly NatsJSControlMsg BatchHighWatermark = new("BatchHighWatermark");
 
     public NatsJSControlMsg(string name) => Name = name;
 

@@ -13,69 +13,8 @@ var js = new NatsJSContext(nats);
 
 var consumer = await js.CreateConsumerAsync("s1", "c1");
 
-static async Task ControlHandler(NatsJSSub<RawData, object> s, NatsJSControlMsg msg)
-{
-    Console.WriteLine($"________________________________________________");
-    Console.WriteLine($"| {msg.Name} | {msg.Headers?.Code} {msg.Headers?.MessageText}");
-    var error = msg.Error?.Error;
-    if (error != null) Console.WriteLine($"| Error: {error}");
-    Console.WriteLine($"------------------------------------------------");
-
-    if (msg == NatsJSControlMsg.HeartBeat)
-    {
-        Console.WriteLine(">>HeartBeat");
-        s.ResetHeartbeatTimer(TimeSpan.FromSeconds(5));
-        await s.CallMsgNextAsync(new ConsumerGetnextRequest
-        {
-            Batch = 10,
-            Expires = TimeSpan.FromSeconds(10).ToNanos(),
-            IdleHeartbeat = TimeSpan.FromSeconds(1).ToNanos(),
-        });
-    }
-    else if (msg == NatsJSControlMsg.BatchComplete)
-    {
-        Console.WriteLine(">>BatchComplete");
-        s.ResetHeartbeatTimer(TimeSpan.FromSeconds(5));
-        await s.CallMsgNextAsync(new ConsumerGetnextRequest
-        {
-            Batch = 10,
-            Expires = TimeSpan.FromSeconds(10).ToNanos(),
-            IdleHeartbeat = TimeSpan.FromSeconds(1).ToNanos(),
-        });
-    }
-    else if (msg == NatsJSControlMsg.BatchHighWatermark)
-    {
-        Console.WriteLine(">>BatchHighWatermark");
-        s.ResetHeartbeatTimer(TimeSpan.FromSeconds(5));
-        await s.CallMsgNextAsync(new ConsumerGetnextRequest
-        {
-            Batch = 10,
-            Expires = TimeSpan.FromSeconds(10).ToNanos(),
-            IdleHeartbeat = TimeSpan.FromSeconds(1).ToNanos(),
-        });
-    }
-    else if (msg.Headers != null)
-    {
-        if (msg.Headers.Code == 408 && msg.Headers.Message == NatsHeaders.Messages.RequestTimeout)
-        {
-            // await s.CallMsgNextAsync(new ConsumerGetnextRequest
-            // {
-            //     Batch = 10,
-            //     Expires = TimeSpan.FromSeconds(10).ToNanos(),
-            //     IdleHeartbeat = TimeSpan.FromSeconds(1).ToNanos(),
-            // });
-        }
-    }
-}
-
-static ConsumerGetnextRequest? ReconnectRequestFactory(NatsJSSub<RawData, object> s) => default;
-
-await using var sub = await consumer.CreateSubscription<RawData, object>(
-    controlHandler: ControlHandler,
-    reconnectRequestFactory: ReconnectRequestFactory,
-    state: new object(),
-    heartBeat: TimeSpan.FromSeconds(5),
-    consumerOpts: new NatsJSSubOpts(10, 5),
+await using var sub = await consumer.CreateSubscription<RawData, State>(
+    state: new State(),
     opts: new NatsSubOpts { Serializer = new RawDataSerializer() });
 
 await sub.CallMsgNextAsync(new ConsumerGetnextRequest
@@ -92,4 +31,39 @@ await foreach (var jsMsg in sub.Msgs.ReadAllAsync())
     Console.WriteLine($"____");
     Console.WriteLine($"subject: {msg.Subject}");
     Console.WriteLine($"data: {msg.Data}");
+}
+
+public class State : INatsJSSubState
+{
+    public ValueTask ReceivedControlMsgAsync(INatsJSSub sub, NatsJSControlMsg controlMsg)
+    {
+        Console.WriteLine($"CTRL: {controlMsg.Name}");
+        return ValueTask.CompletedTask;
+    }
+
+    public void ResetHeartbeatTimer(INatsJSSub sub)
+    {
+        Console.WriteLine($"RESET HB");
+    }
+
+    public void ReceivedUserMsg(INatsJSSub sub)
+    {
+        Console.WriteLine($"RCV MSG");
+    }
+
+    public ConsumerGetnextRequest? ReconnectRequestFactory(INatsJSSub sub)
+    {
+        Console.WriteLine("RECONNECT");
+        return null;
+    }
+
+    public ValueTask ReadyAsync(INatsJSSub sub)
+    {
+        return sub.CallMsgNextAsync(new ConsumerGetnextRequest
+        {
+            Batch = 10,
+            Expires = TimeSpan.FromSeconds(30).ToNanos(),
+            IdleHeartbeat = TimeSpan.FromSeconds(15).ToNanos(),
+        });
+    }
 }
