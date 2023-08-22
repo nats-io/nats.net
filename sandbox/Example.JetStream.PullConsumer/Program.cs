@@ -50,7 +50,7 @@ public class State : INatsJSSubState
     private readonly long _expires;
     private readonly long _idle;
     private readonly Timer _timer;
-    private readonly TimeSpan _timeout;
+    private readonly int _timeout;
     private int _pending;
     private volatile INatsJSSub? _sub;
 
@@ -59,7 +59,7 @@ public class State : INatsJSSubState
         _batch = batch;
         _expires = expires.ToNanos();
         _idle = idle.ToNanos();
-        _timeout = idle * 2;
+        _timeout = (int)(idle * 2).TotalMilliseconds;
         _pending = _batch;
 
         _timer = new Timer(
@@ -113,7 +113,7 @@ public class State : INatsJSSubState
     public void ResetHeartbeatTimer()
     {
         // Console.WriteLine($"RESET HB");
-        _timer.Change(_timeout, _timeout);
+        _timer.Change(_timeout, Timeout.Infinite);
     }
 
     public void ReceivedUserMsg()
