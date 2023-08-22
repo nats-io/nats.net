@@ -112,13 +112,15 @@ public class NatsJSConsumer
 
 public interface INatsJSSubState
 {
-    ValueTask ReceivedControlMsgAsync(INatsJSSub sub, NatsJSControlMsg controlMsg);
+    void SetSub(INatsJSSub sub);
 
-    void ResetHeartbeatTimer(INatsJSSub sub);
+    ValueTask ReceivedControlMsgAsync(NatsJSControlMsg controlMsg);
 
-    void ReceivedUserMsg(INatsJSSub sub);
+    void ResetHeartbeatTimer();
 
-    ConsumerGetnextRequest? ReconnectRequestFactory(INatsJSSub sub);
+    void ReceivedUserMsg();
+
+    ConsumerGetnextRequest? ReconnectRequestFactory();
 }
 
 public class NatsJSSubOpts

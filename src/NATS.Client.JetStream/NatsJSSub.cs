@@ -37,7 +37,7 @@ where TState : INatsJSSubState
         _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg?>>(NatsSub.GetChannelOptions(opts?.ChannelOptions));
         _pullRequests = Channel.CreateBounded<ConsumerGetnextRequest>(NatsSub.GetChannelOptions(opts?.ChannelOptions));
         Task.Run(PullRequestProcessorLoop);
-
+        State.SetSub(this);
         Msgs = _userMsgs.Reader;
     }
 
@@ -59,7 +59,7 @@ where TState : INatsJSSubState
         foreach (var command in base.GetReconnectCommands(sid))
             yield return command;
 
-        var request = State.ReconnectRequestFactory(this);
+        var request = State.ReconnectRequestFactory();
 
         if (request != null)
         {
@@ -80,7 +80,7 @@ where TState : INatsJSSubState
         ReadOnlySequence<byte>? headersBuffer,
         ReadOnlySequence<byte> payloadBuffer)
     {
-        State.ResetHeartbeatTimer(this);
+        State.ResetHeartbeatTimer();
 
         if (subject == Subject)
         {
@@ -116,7 +116,7 @@ where TState : INatsJSSubState
                 controlMsg = new NatsJSControlMsg(NatsJSControlType.Error) { Error = new NatsJSControlError(e.Message) { Exception = e } };
             }
 
-            await State.ReceivedControlMsgAsync(this, controlMsg);
+            await State.ReceivedControlMsgAsync(controlMsg);
         }
         else
         {
@@ -129,7 +129,7 @@ where TState : INatsJSSubState
                 Connection.HeaderParser,
                 _serializer));
 
-            State.ReceivedUserMsg(this);
+            State.ReceivedUserMsg();
 
             await _userMsgs.Writer.WriteAsync(msg);
         }
