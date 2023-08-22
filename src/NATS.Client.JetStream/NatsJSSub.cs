@@ -54,12 +54,6 @@ where TState : INatsJSSubState
             headers: default,
             cancellationToken);
 
-    public override async ValueTask ReadyAsync()
-    {
-        await base.ReadyAsync();
-        await State.ReadyAsync(this);
-    }
-
     internal override IEnumerable<ICommand> GetReconnectCommands(int sid)
     {
         foreach (var command in base.GetReconnectCommands(sid))
@@ -99,7 +93,7 @@ where TState : INatsJSSubState
                     var headers = new NatsHeaders();
                     if (!Connection.HeaderParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), headers))
                     {
-                        controlMsg = new NatsJSControlMsg("Error")
+                        controlMsg = new NatsJSControlMsg(NatsJSControlType.Error)
                         {
                             Error = new NatsJSControlError("Can't parse headers")
                             {
@@ -109,34 +103,36 @@ where TState : INatsJSSubState
                     }
                     else
                     {
-                        controlMsg = new NatsJSControlMsg("Headers") { Headers = headers };
+                        controlMsg = new NatsJSControlMsg(NatsJSControlType.Headers) { Headers = headers };
                     }
                 }
                 else
                 {
-                    controlMsg = new NatsJSControlMsg("Error") { Error = new NatsJSControlError("No header found") };
+                    controlMsg = new NatsJSControlMsg(NatsJSControlType.Error) { Error = new NatsJSControlError("No header found") };
                 }
             }
             catch (Exception e)
             {
-                controlMsg = new NatsJSControlMsg("Error") { Error = new NatsJSControlError(e.Message) { Exception = e } };
+                controlMsg = new NatsJSControlMsg(NatsJSControlType.Error) { Error = new NatsJSControlError(e.Message) { Exception = e } };
             }
 
             await State.ReceivedControlMsgAsync(this, controlMsg);
         }
+        else
+        {
+            var msg = new NatsJSMsg<TMsg?>(NatsMsg<TMsg?>.Build(
+                subject,
+                replyTo,
+                headersBuffer,
+                payloadBuffer,
+                Connection,
+                Connection.HeaderParser,
+                _serializer));
 
-        var msg = new NatsJSMsg<TMsg?>(NatsMsg<TMsg?>.Build(
-            subject,
-            replyTo,
-            headersBuffer,
-            payloadBuffer,
-            Connection,
-            Connection.HeaderParser,
-            _serializer));
+            State.ReceivedUserMsg(this);
 
-        State.ReceivedUserMsg(this);
-
-        await _userMsgs.Writer.WriteAsync(msg);
+            await _userMsgs.Writer.WriteAsync(msg);
+        }
     }
 
     protected override void TryComplete()

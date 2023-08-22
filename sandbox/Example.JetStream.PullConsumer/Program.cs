@@ -5,6 +5,8 @@ using NATS.Client.JetStream;
 using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
 
+
+
 var options = NatsOptions.Default with { LoggerFactory = new MinimumConsoleLoggerFactory(LogLevel.Error) };
 
 await using var nats = new NatsConnection(options);
@@ -27,23 +29,43 @@ await sub.CallMsgNextAsync(new ConsumerGetnextRequest
 await foreach (var jsMsg in sub.Msgs.ReadAllAsync())
 {
     var msg = jsMsg.Msg;
-    await jsMsg.AckAsync();
     Console.WriteLine($"____");
     Console.WriteLine($"subject: {msg.Subject}");
     Console.WriteLine($"data: {msg.Data}");
+    await jsMsg.AckAsync();
 }
 
 public class State : INatsJSSubState
 {
+    private readonly Timer _timer;
+
+    public State()
+    {
+        _timer = new Timer(
+            state =>
+            {
+                Console.WriteLine($"{DateTime.Now:HH:mm:ss} HB tick");
+            },
+            null,
+            Timeout.Infinite,
+            Timeout.Infinite);
+    }
+
     public ValueTask ReceivedControlMsgAsync(INatsJSSub sub, NatsJSControlMsg controlMsg)
     {
-        Console.WriteLine($"CTRL: {controlMsg.Name}");
+        Console.WriteLine($"CTRL: {controlMsg.Type}");
+        if (controlMsg.Type == NatsJSControlType.Headers)
+        {
+            Console.WriteLine($"    : {controlMsg.Headers?.Code} {controlMsg.Headers?.MessageText}");
+        }
+
         return ValueTask.CompletedTask;
     }
 
     public void ResetHeartbeatTimer(INatsJSSub sub)
     {
         Console.WriteLine($"RESET HB");
+        _timer.Change(2000, 1000);
     }
 
     public void ReceivedUserMsg(INatsJSSub sub)
@@ -55,15 +77,5 @@ public class State : INatsJSSubState
     {
         Console.WriteLine("RECONNECT");
         return null;
-    }
-
-    public ValueTask ReadyAsync(INatsJSSub sub)
-    {
-        return sub.CallMsgNextAsync(new ConsumerGetnextRequest
-        {
-            Batch = 10,
-            Expires = TimeSpan.FromSeconds(30).ToNanos(),
-            IdleHeartbeat = TimeSpan.FromSeconds(15).ToNanos(),
-        });
     }
 }

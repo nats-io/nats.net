@@ -2,17 +2,15 @@
 
 namespace NATS.Client.JetStream;
 
-public enum NatsJSControlErrorType
+public enum NatsJSControlType
 {
-    Internal,
-    Server,
+    Error,
+    Headers,
 }
 
 public class NatsJSControlError
 {
     public NatsJSControlError(string error) => Error = error;
-
-    public NatsJSControlErrorType Type { get; init; } = NatsJSControlErrorType.Internal;
 
     public string Error { get; }
 
@@ -23,11 +21,10 @@ public class NatsJSControlError
 
 public class NatsJSControlMsg
 {
-    public static readonly NatsJSControlMsg HeartBeat = new("Heartbeat");
+    public NatsJSControlMsg(NatsJSControlType type) => Type = type;
 
-    public NatsJSControlMsg(string name) => Name = name;
+    public NatsJSControlType Type { get; }
 
-    public string Name { get; }
 
     public NatsHeaders? Headers { get; init; }
 

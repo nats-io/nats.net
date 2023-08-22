@@ -119,8 +119,6 @@ public interface INatsJSSubState
     void ReceivedUserMsg(INatsJSSub sub);
 
     ConsumerGetnextRequest? ReconnectRequestFactory(INatsJSSub sub);
-
-    ValueTask ReadyAsync(INatsJSSub sub);
 }
 
 public class NatsJSSubOpts
