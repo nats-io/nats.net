@@ -1,15 +1,17 @@
 ﻿using System.Buffers;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.Core.Commands;
+using NATS.Client.Core.Internal;
+using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
 
-public class NatsJSSub<TMsg, TState> : NatsSubBase, INatsJSSub
-where TState : INatsJSSubState
+public class NatsJSSub<TMsg> : NatsSubBase
 {
     private readonly ILogger _logger;
     private readonly Channel<NatsJSMsg<TMsg?>> _userMsgs;
@@ -18,32 +20,81 @@ where TState : INatsJSSubState
     private readonly string _stream;
     private readonly string _consumer;
     private readonly INatsSerializer _serializer;
+    private readonly Timer _timer;
+    private readonly Task _pullTask;
+    private readonly int _batch;
+    private readonly long _expires;
+    private readonly long _idle;
+    private readonly int _hbTimeout;
+    private int _pending;
+    private readonly int _thershold;
 
     public NatsJSSub(
+        int batch,
+        TimeSpan expires,
+        TimeSpan idle,
         NatsJSContext context,
         string stream,
         string consumer,
         string subject,
-        NatsSubOpts? opts,
-        TState state)
+        NatsSubOpts? opts)
         : base(context.Connection, context.Connection.SubscriptionManager, subject, opts)
     {
-        State = state;
-        _logger = Connection.Opts.LoggerFactory.CreateLogger<NatsJSSub<TMsg, TState>>();
+        _logger = Connection.Opts.LoggerFactory.CreateLogger<NatsJSSub<TMsg>>();
         _context = context;
         _stream = stream;
         _consumer = consumer;
         _serializer = opts?.Serializer ?? context.Connection.Opts.Serializer;
         _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg?>>(NatsSub.GetChannelOptions(opts?.ChannelOptions));
         _pullRequests = Channel.CreateBounded<ConsumerGetnextRequest>(NatsSub.GetChannelOptions(opts?.ChannelOptions));
+
+        _batch = batch;
+        _thershold = batch / 2;
+        _expires = expires.ToNanos();
+        _idle = idle.ToNanos();
+        _hbTimeout = (int)(idle * 2).TotalMilliseconds;
+
         Task.Run(PullRequestProcessorLoop);
-        State.SetSub(this);
         Msgs = _userMsgs.Reader;
+        _timer = new Timer(
+            state =>
+            {
+                var self = (NatsJSSub<TMsg>)state!;
+                self.Pull(_batch);
+                ResetPending();
+            },
+            this,
+            Timeout.Infinite,
+            Timeout.Infinite);
+
+        _pullRequests = Channel.CreateBounded<ConsumerGetnextRequest>(new BoundedChannelOptions(10)
+        {
+            FullMode = BoundedChannelFullMode.DropOldest,
+        });
+        _pullTask = Task.Run(PullLoop);
     }
 
-    public ChannelReader<NatsJSMsg<TMsg?>> Msgs { get; }
+    private void Pull(long batch)
+    {
+        _pullRequests.Writer.TryWrite(new ConsumerGetnextRequest
+        {
+            Batch = batch,
+            IdleHeartbeat = _idle,
+            Expires = _expires,
+        });
+    }
 
-    public TState State { get; }
+    private async Task PullLoop()
+    {
+        await foreach (var pr in _pullRequests.Reader.ReadAllAsync())
+        {
+            await CallMsgNextAsync(pr);
+        }
+    }
+
+    public void ResetHeartbeatTimer() => _timer.Change(_hbTimeout, Timeout.Infinite);
+
+    public ChannelReader<NatsJSMsg<TMsg?>> Msgs { get; }
 
     public ValueTask CallMsgNextAsync(ConsumerGetnextRequest request, CancellationToken cancellationToken = default) =>
         Connection.PubModelAsync(
@@ -59,7 +110,7 @@ where TState : INatsJSSubState
         foreach (var command in base.GetReconnectCommands(sid))
             yield return command;
 
-        var request = State.ReconnectRequestFactory();
+        var request = ReconnectRequestFactory();
 
         if (request != null)
         {
@@ -74,64 +125,101 @@ where TState : INatsJSSubState
         }
     }
 
-    protected override async ValueTask ReceiveInternalAsync(
+    public ConsumerGetnextRequest? ReconnectRequestFactory()
+    {
+        ResetPending();
+        return new ConsumerGetnextRequest
+        {
+            Batch = _batch,
+            IdleHeartbeat = _idle,
+            Expires = _expires,
+        };
+    }
+
+    public void ResetPending()
+    {
+        _pending = _batch;
+    }
+
+    protected override ValueTask ReceiveInternalAsync(
         string subject,
         string? replyTo,
         ReadOnlySequence<byte>? headersBuffer,
         ReadOnlySequence<byte> payloadBuffer)
     {
-        State.ResetHeartbeatTimer();
-
-        if (subject == Subject)
+        ResetHeartbeatTimer();
+        try
         {
-            // Control messages
-            NatsJSControlMsg controlMsg;
-            try
+            if (subject == Subject)
             {
                 if (headersBuffer.HasValue)
                 {
                     var headers = new NatsHeaders();
-                    if (!Connection.HeaderParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), headers))
+                    if (Connection.HeaderParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), headers))
                     {
-                        controlMsg = new NatsJSControlMsg(NatsJSControlType.Error)
+                        if (headers.TryGetValue("Nats-Pending-Messages", out var natsPendingMsgs))
                         {
-                            Error = new NatsJSControlError("Can't parse headers")
+                            if (int.TryParse(natsPendingMsgs, out var pendingMsgs))
                             {
-                                Details = Encoding.ASCII.GetString(headersBuffer.Value.ToArray()),
-                            },
-                        };
+                                _pending -= pendingMsgs;
+                                if (_pending < 0)
+                                    _pending = 0;
+                            }
+                        }
+
+                        if (headers is { Code: 408, Message: NatsHeaders.Messages.RequestTimeout })
+                        {
+                        }
+                        else if (headers is { Code: 100, Message: NatsHeaders.Messages.IdleHeartbeat })
+                        {
+                        }
+                        else
+                        {
+                            Console.WriteLine($"{headers.Dump()}");
+                        }
                     }
                     else
                     {
-                        controlMsg = new NatsJSControlMsg(NatsJSControlType.Headers) { Headers = headers };
+                        _logger.LogError("Can't parse headers: {HeadersBuffer}",
+                            Encoding.ASCII.GetString(headersBuffer.Value.ToArray()));
+                        throw new NatsJSException("Can't parse headers");
                     }
                 }
                 else
                 {
-                    controlMsg = new NatsJSControlMsg(NatsJSControlType.Error) { Error = new NatsJSControlError("No header found") };
+                    throw new NatsJSException("No header found");
                 }
+
+                return ValueTask.CompletedTask;
             }
-            catch (Exception e)
+            else
             {
-                controlMsg = new NatsJSControlMsg(NatsJSControlType.Error) { Error = new NatsJSControlError(e.Message) { Exception = e } };
+                var msg = new NatsJSMsg<TMsg?>(NatsMsg<TMsg?>.Build(
+                    subject,
+                    replyTo,
+                    headersBuffer,
+                    payloadBuffer,
+                    Connection,
+                    Connection.HeaderParser,
+                    _serializer));
+
+                _pending--;
+
+                return _userMsgs.Writer.WriteAsync(msg);
             }
-
-            await State.ReceivedControlMsgAsync(controlMsg);
         }
-        else
+        finally
         {
-            var msg = new NatsJSMsg<TMsg?>(NatsMsg<TMsg?>.Build(
-                subject,
-                replyTo,
-                headersBuffer,
-                payloadBuffer,
-                Connection,
-                Connection.HeaderParser,
-                _serializer));
+            CheckPending();
+        }
+    }
 
-            State.ReceivedUserMsg();
-
-            await _userMsgs.Writer.WriteAsync(msg);
+    public void CheckPending()
+    {
+        if (_pending <= _thershold)
+        {
+            Pull(_batch - _pending);
+            ResetPending();
         }
     }
 

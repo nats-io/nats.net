@@ -32,6 +32,9 @@ public readonly struct NatsJSMsg<T>
     {
         if (Msg == default)
             throw new NatsJSException("No user message, can't acknowledge");
-        return Msg.ReplyAsync(NatsJSConstants.Ack, cancellationToken: cancellationToken);
+        return Msg.ReplyAsync(NatsJSConstants.Ack, opts: new NatsPubOpts
+        {
+            WaitUntilSent = true,
+        }, cancellationToken: cancellationToken);
     }
 }
