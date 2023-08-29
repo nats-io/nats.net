@@ -14,13 +14,6 @@ public class ConsumerConsumeTest
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
-        // await using var server = NatsServer.Start(
-        //     outputHelper: _output,
-        //     options: new NatsServerOptionsBuilder()
-        //         .UseTransport(TransportType.Tcp)
-        //         .Trace()
-        //         .UseJetStream()
-        //         .Build());
         await using var server = NatsServer.StartJS();
         var (nats, proxy) = server.CreateProxiedClientConnection();
         var js = new NatsJSContext(nats);
