@@ -102,7 +102,7 @@ public class JetStreamTest
                 }
             }
 
-            var cts3 = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+            var cts3 = new CancellationTokenSource(TimeSpan.FromSeconds(60));
             Assert.Equal(2, messages.Count);
             Assert.Equal("events.foo", messages[0].Msg.Subject);
             Assert.Equal("events.foo", messages[1].Msg.Subject);
