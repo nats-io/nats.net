@@ -118,14 +118,12 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubFetch<TMsg>
             cancellationToken: default);
     }
 
-    protected override ValueTask ReceiveInternalAsync(
+    protected override async ValueTask ReceiveInternalAsync(
         string subject,
         string? replyTo,
         ReadOnlySequence<byte>? headersBuffer,
         ReadOnlySequence<byte> payloadBuffer)
     {
-        try
-        {
             ResetHeartbeatTimer();
             if (subject == Subject)
             {
@@ -162,8 +160,6 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubFetch<TMsg>
                 {
                     throw new NatsJSException("No header found");
                 }
-
-                return ValueTask.CompletedTask;
             }
             else
             {
@@ -179,11 +175,9 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubFetch<TMsg>
                 _pendingMsgs--;
                 _pendingBytes -= msg.Msg.Size;
 
-                return _userMsgs.Writer.WriteAsync(msg);
+                await _userMsgs.Writer.WriteAsync(msg);
             }
-        }
-        finally
-        {
+
             if (_maxBytes > 0 && _pendingBytes <= 0)
             {
                 EndSubscription(NatsSubEndReason.MaxBytes);
@@ -192,7 +186,6 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubFetch<TMsg>
             {
                 EndSubscription(NatsSubEndReason.MaxMsgs);
             }
-        }
     }
 
     protected override void TryComplete()

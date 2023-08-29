@@ -113,20 +113,21 @@ public class ConsumerConsumeTest
             break;
         }
 
+        await Retry.Until(
+            "all pull requests are received",
+            () => proxy.ClientFrames.Count(f => f.Message.StartsWith("PUB $JS.API.CONSUMER.MSG.NEXT.s1.c1")) == 2);
+
         var msgNextRequests = proxy
             .ClientFrames
             .Where(f => f.Message.StartsWith("PUB $JS.API.CONSUMER.MSG.NEXT.s1.c1"))
             .ToList();
 
-        Assert.Single(msgNextRequests);
+        Assert.Equal(2, msgNextRequests.Count);
 
-        // Prefetch
-        Assert.Matches(@"^PUB.*""batch"":10\b", msgNextRequests.First().Message);
-
-        foreach (var frame in msgNextRequests.Skip(1))
+        // Pull requests
+        foreach (var frame in msgNextRequests)
         {
-            // Consequent fetches should top up to the prefetch value
-            Assert.Matches(@"^PUB.*""batch"":5\b", frame.Message);
+            Assert.Matches(@"^PUB.*""batch"":10\b", frame.Message);
         }
     }
 

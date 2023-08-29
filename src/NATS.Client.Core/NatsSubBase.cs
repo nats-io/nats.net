@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Runtime.ExceptionServices;
+using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
 using NATS.Client.Core.Internal;
 
@@ -18,6 +19,8 @@ public enum NatsSubEndReason
 
 public abstract class NatsSubBase
 {
+    private readonly ILogger _logger;
+    private readonly bool _debug;
     private readonly ISubscriptionManager _manager;
     private readonly Timer? _timeoutTimer;
     private readonly Timer? _idleTimeoutTimer;
@@ -39,6 +42,8 @@ public abstract class NatsSubBase
         string subject,
         NatsSubOpts? opts)
     {
+        _logger = connection.Opts.LoggerFactory.CreateLogger<NatsSubBase>();
+        _debug = _logger.IsEnabled(LogLevel.Debug);
         _manager = manager;
         _pendingMsgs = opts is { MaxMsgs: > 0 } ? opts.Value.MaxMsgs ?? -1 : -1;
         _countPendingMsgs = _pendingMsgs > 0;
@@ -251,6 +256,9 @@ public abstract class NatsSubBase
 
     protected void EndSubscription(NatsSubEndReason reason)
     {
+        if (_debug)
+            _logger.LogDebug("End subscription {Reason}", reason);
+
         lock (this)
         {
             if (_endSubscription)

@@ -89,6 +89,7 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
                 var self = (NatsJSSubConsume<TMsg>)state!;
                 self.Pull(self._maxMsgs, self._maxBytes);
                 self.ResetPending();
+                self._notifications.Writer.TryWrite(NatsJSNotification.HeartbeatTimeout);
             },
             this,
             Timeout.Infinite,
@@ -156,127 +157,123 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
             cancellationToken: default);
     }
 
-    protected override ValueTask ReceiveInternalAsync(
+    protected override async ValueTask ReceiveInternalAsync(
         string subject,
         string? replyTo,
         ReadOnlySequence<byte>? headersBuffer,
         ReadOnlySequence<byte> payloadBuffer)
     {
         ResetHeartbeatTimer();
-        try
+
+        if (subject == Subject)
         {
-            if (subject == Subject)
+            if (headersBuffer.HasValue)
             {
-                if (headersBuffer.HasValue)
+                var headers = new NatsHeaders();
+                if (Connection.HeaderParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), headers))
                 {
-                    var headers = new NatsHeaders();
-                    if (Connection.HeaderParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), headers))
+                    if (_maxBytes == 0 && headers.TryGetValue("Nats-Pending-Messages", out var natsPendingMsgs))
                     {
-                        if (_maxBytes == 0 && headers.TryGetValue("Nats-Pending-Messages", out var natsPendingMsgs))
+                        if (long.TryParse(natsPendingMsgs, out var pendingMsgs))
                         {
-                            if (long.TryParse(natsPendingMsgs, out var pendingMsgs))
+                            if (_debug)
                             {
-                                if (_debug)
-                                {
-                                    _logger.LogDebug("Header pending messages current {Pending}", _pendingMsgs);
-                                }
-
-                                _pendingMsgs -= pendingMsgs;
-                                if (_pendingMsgs < 0)
-                                    _pendingMsgs = 0;
-
-                                if (_debug)
-                                {
-                                    _logger.LogDebug("Header pending messages {Header} {Pending}", natsPendingMsgs, _pendingMsgs);
-                                }
+                                _logger.LogDebug("Header pending messages current {Pending}", _pendingMsgs);
                             }
-                            else
+
+                            _pendingMsgs -= pendingMsgs;
+                            if (_pendingMsgs < 0)
+                                _pendingMsgs = 0;
+
+                            if (_debug)
                             {
-                                _logger.LogError("Can't parse Nats-Pending-Messages {Header}", natsPendingMsgs);
+                                _logger.LogDebug("Header pending messages {Header} {Pending}", natsPendingMsgs,
+                                    _pendingMsgs);
                             }
-                        }
-
-                        if (_maxBytes > 0 && headers.TryGetValue("Nats-Pending-Bytes", out var natsPendingBytes))
-                        {
-                            if (long.TryParse(natsPendingBytes, out var pendingBytes))
-                            {
-                                if (_debug)
-                                {
-                                    _logger.LogDebug("Header pending bytes current {Pending}", _pendingBytes);
-                                }
-
-                                _pendingBytes -= pendingBytes;
-                                if (_pendingBytes < 0)
-                                    _pendingBytes = 0;
-
-                                if (_debug)
-                                {
-                                    _logger.LogDebug("Header pending bytes {Header} {Pending}", natsPendingBytes, _pendingBytes);
-                                }
-                            }
-                            else
-                            {
-                                _logger.LogError("Can't parse Nats-Pending-Bytes {Header}", natsPendingBytes);
-                            }
-                        }
-
-                        if (headers is { Code: 408, Message: NatsHeaders.Messages.RequestTimeout })
-                        {
-                        }
-                        else if (headers is { Code: 409, Message: NatsHeaders.Messages.MessageSizeExceedsMaxBytes })
-                        {
-                        }
-                        else if (headers is { Code: 100, Message: NatsHeaders.Messages.IdleHeartbeat })
-                        {
                         }
                         else
                         {
-                            _notifications.Writer.TryWrite(new NatsJSNotification(headers.Code, headers.MessageText));
+                            _logger.LogError("Can't parse Nats-Pending-Messages {Header}", natsPendingMsgs);
                         }
+                    }
+
+                    if (_maxBytes > 0 && headers.TryGetValue("Nats-Pending-Bytes", out var natsPendingBytes))
+                    {
+                        if (long.TryParse(natsPendingBytes, out var pendingBytes))
+                        {
+                            if (_debug)
+                            {
+                                _logger.LogDebug("Header pending bytes current {Pending}", _pendingBytes);
+                            }
+
+                            _pendingBytes -= pendingBytes;
+                            if (_pendingBytes < 0)
+                                _pendingBytes = 0;
+
+                            if (_debug)
+                            {
+                                _logger.LogDebug("Header pending bytes {Header} {Pending}", natsPendingBytes,
+                                    _pendingBytes);
+                            }
+                        }
+                        else
+                        {
+                            _logger.LogError("Can't parse Nats-Pending-Bytes {Header}", natsPendingBytes);
+                        }
+                    }
+
+                    if (headers is { Code: 408, Message: NatsHeaders.Messages.RequestTimeout })
+                    {
+                    }
+                    else if (headers is { Code: 409, Message: NatsHeaders.Messages.MessageSizeExceedsMaxBytes })
+                    {
+                    }
+                    else if (headers is { Code: 100, Message: NatsHeaders.Messages.IdleHeartbeat })
+                    {
                     }
                     else
                     {
-                        _logger.LogError(
-                            "Can't parse headers: {HeadersBuffer}",
-                            Encoding.ASCII.GetString(headersBuffer.Value.ToArray()));
-                        throw new NatsJSException("Can't parse headers");
+                        _notifications.Writer.TryWrite(new NatsJSNotification(headers.Code, headers.MessageText));
                     }
                 }
                 else
                 {
-                    throw new NatsJSException("No header found");
+                    _logger.LogError(
+                        "Can't parse headers: {HeadersBuffer}",
+                        Encoding.ASCII.GetString(headersBuffer.Value.ToArray()));
+                    throw new NatsJSException("Can't parse headers");
                 }
-
-                return ValueTask.CompletedTask;
             }
             else
             {
-                var msg = new NatsJSMsg<TMsg?>(NatsMsg<TMsg?>.Build(
-                    subject,
-                    replyTo,
-                    headersBuffer,
-                    payloadBuffer,
-                    Connection,
-                    Connection.HeaderParser,
-                    _serializer));
-
-                _pendingMsgs--;
-
-                if (_maxBytes > 0)
-                {
-                    if (_debug)
-                        _logger.LogDebug("Message size {Size}", msg.Msg.Size);
-
-                    _pendingBytes -= msg.Msg.Size;
-                }
-
-                return _userMsgs.Writer.WriteAsync(msg);
+                throw new NatsJSException("No header found");
             }
         }
-        finally
+        else
         {
-            CheckPending();
+            var msg = new NatsJSMsg<TMsg?>(NatsMsg<TMsg?>.Build(
+                subject,
+                replyTo,
+                headersBuffer,
+                payloadBuffer,
+                Connection,
+                Connection.HeaderParser,
+                _serializer));
+
+            _pendingMsgs--;
+
+            if (_maxBytes > 0)
+            {
+                if (_debug)
+                    _logger.LogDebug("Message size {Size}", msg.Msg.Size);
+
+                _pendingBytes -= msg.Msg.Size;
+            }
+
+            await _userMsgs.Writer.WriteAsync(msg);
         }
+
+        CheckPending();
     }
 
     protected override void TryComplete()
