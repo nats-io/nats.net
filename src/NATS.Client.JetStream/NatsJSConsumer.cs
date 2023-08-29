@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using NATS.Client.Core;
 using NATS.Client.JetStream.Internal;
@@ -26,6 +27,17 @@ public class NatsJSConsumer
     {
         ThrowIfDeleted();
         return _deleted = await _context.DeleteConsumerAsync(_stream, _consumer, cancellationToken);
+    }
+
+    public async IAsyncEnumerable<NatsJSMsg<T?>> ConsumeAllAsync<T>(
+        NatsJSConsumeOpts opts,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        await using var cc = await ConsumeAsync<T>(opts, cancellationToken);
+        await foreach (var jsMsg in cc.Msgs.ReadAllAsync(cancellationToken))
+        {
+            yield return jsMsg;
+        }
     }
 
     public async ValueTask<INatsJSSubConsume<T>> ConsumeAsync<T>(NatsJSConsumeOpts opts, CancellationToken cancellationToken = default)
@@ -100,6 +112,17 @@ public class NatsJSConsumer
         }
 
         return default;
+    }
+
+    public async IAsyncEnumerable<NatsJSMsg<T?>> FetchAllAsync<T>(
+        NatsJSFetchOpts opts,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        await using var fc = await FetchAsync<T>(opts, cancellationToken);
+        await foreach (var jsMsg in fc.Msgs.ReadAllAsync(cancellationToken))
+        {
+            yield return jsMsg;
+        }
     }
 
     public async ValueTask<INatsJSSubConsume<T>> FetchAsync<T>(

@@ -32,6 +32,23 @@ if (args.Length > 0 && args[0] == "fetch")
         }
     }
 }
+else if (args.Length > 0 && args[0] == "fetch-all")
+{
+    while (true)
+    {
+        Console.WriteLine($"___\nFETCH {batch}");
+        var opts = new NatsJSFetchOpts
+        {
+            MaxMsgs = batch, Expires = expires, IdleHeartbeat = idle, Serializer = new RawDataSerializer(),
+        };
+        await foreach (var jsMsg in consumer.FetchAllAsync<RawData>(opts))
+        {
+            var msg = jsMsg.Msg;
+            Console.WriteLine($"data: {msg.Data}");
+            await jsMsg.AckAsync();
+        }
+    }
+}
 else if (args.Length > 0 && args[0] == "next")
 {
     while (true)
@@ -49,7 +66,7 @@ else if (args.Length > 0 && args[0] == "next")
         }
     }
 }
-else
+else if (args.Length > 0 && args[0] == "consume")
 {
     Console.WriteLine("___\nCONSUME");
     await using var sub = await consumer.ConsumeAsync<RawData>(new NatsJSConsumeOpts
@@ -58,6 +75,21 @@ else
     });
 
     await foreach (var jsMsg in sub.Msgs.ReadAllAsync())
+    {
+        var msg = jsMsg.Msg;
+        Console.WriteLine($"data: {msg.Data}");
+        await jsMsg.AckAsync();
+    }
+}
+else if (args.Length > 0 && args[0] == "consume-all")
+{
+    Console.WriteLine("___\nCONSUME-ALL");
+    var opts = new NatsJSConsumeOpts
+    {
+        MaxMsgs = batch, Expires = expires, IdleHeartbeat = idle, Serializer = new RawDataSerializer(),
+    };
+
+    await foreach (var jsMsg in consumer.ConsumeAllAsync<RawData>(opts))
     {
         var msg = jsMsg.Msg;
         Console.WriteLine($"data: {msg.Data}");
