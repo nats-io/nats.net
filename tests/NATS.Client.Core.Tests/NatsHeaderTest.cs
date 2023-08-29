@@ -152,4 +152,3 @@ public class NatsHeaderTest
         _output.WriteLine($"{headers.Dump()}");
     }
 }
-

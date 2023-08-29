@@ -21,10 +21,10 @@ var consumer = await js.CreateConsumerAsync("s1", "c1");
 var idle = TimeSpan.FromSeconds(1);
 var expires = TimeSpan.FromSeconds(10);
 
-int? maxMsgs = null;
-int? maxBytes = 128;
-// int? maxMsgs = 10;
-// int? maxBytes = null;
+// int? maxMsgs = null;
+// int? maxBytes = 128;
+int? maxMsgs = 10;
+int? maxBytes = null;
 
 static void ErrorHandler(NatsJSNotification notification)
 {

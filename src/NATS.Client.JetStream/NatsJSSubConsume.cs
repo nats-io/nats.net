@@ -187,8 +187,7 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
 
                             if (_debug)
                             {
-                                _logger.LogDebug("Header pending messages {Header} {Pending}", natsPendingMsgs,
-                                    _pendingMsgs);
+                                _logger.LogDebug("Header pending messages {Header} {Pending}", natsPendingMsgs, _pendingMsgs);
                             }
                         }
                         else
@@ -212,8 +211,7 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
 
                             if (_debug)
                             {
-                                _logger.LogDebug("Header pending bytes {Header} {Pending}", natsPendingBytes,
-                                    _pendingBytes);
+                                _logger.LogDebug("Header pending bytes {Header} {Pending}", natsPendingBytes, _pendingBytes);
                             }
                         }
                         else
