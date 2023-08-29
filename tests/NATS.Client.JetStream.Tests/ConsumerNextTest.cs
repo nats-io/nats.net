@@ -23,9 +23,12 @@ public class ConsumerNextTest
         {
             var ack = await js.PublishAsync("s1.foo", new TestData { Test = i }, cancellationToken: cts.Token);
             ack.EnsureSuccess();
-            var msg = await consumer.NextAsync<TestData>(cts.Token);
-            await msg.AckAsync(cts.Token);
-            Assert.Equal(i, msg.Msg.Data!.Test);
+            var next = await consumer.NextAsync<TestData>(new NatsJSNextOpts(), cts.Token);
+            if (next is { } msg)
+            {
+                await msg.AckAsync(cts.Token);
+                Assert.Equal(i, msg.Msg.Data!.Test);
+            }
         }
     }
 

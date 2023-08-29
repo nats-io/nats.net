@@ -1,3 +1,4 @@
+using System.Buffers;
 using NATS.Client.Core;
 using NATS.Client.JetStream.Internal;
 
@@ -28,14 +29,23 @@ public readonly struct NatsJSMsg<T>
 
     public NatsMsg<T> Msg { get; }
 
-    public ValueTask AckAsync(CancellationToken cancellationToken = default)
+    public ValueTask AckAsync(CancellationToken cancellationToken = default) => SendAckAsync(NatsJSConstants.Ack, cancellationToken);
+
+    public ValueTask NackAsync(CancellationToken cancellationToken = default) => SendAckAsync(NatsJSConstants.Nack, cancellationToken);
+
+    public ValueTask AckProgressAsync(CancellationToken cancellationToken = default) => SendAckAsync(NatsJSConstants.AckProgress, cancellationToken);
+
+    public ValueTask AckTerminateAsync(CancellationToken cancellationToken = default) => SendAckAsync(NatsJSConstants.AckTerminate, cancellationToken);
+
+    private ValueTask SendAckAsync(ReadOnlySequence<byte> payload, CancellationToken cancellationToken = default)
     {
         if (Msg == default)
             throw new NatsJSException("No user message, can't acknowledge");
 
         return Msg.ReplyAsync(
-            payload: NatsJSConstants.Ack,
+            payload: payload,
             opts: new NatsPubOpts { WaitUntilSent = true, },
             cancellationToken: cancellationToken);
     }
+
 }

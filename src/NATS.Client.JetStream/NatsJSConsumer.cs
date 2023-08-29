@@ -68,7 +68,10 @@ public class NatsJSConsumer
             context: _context,
             subject: inbox,
             opts: requestOpts,
-            batch: max.MaxMsgs,
+            maxMsgs: max.MaxMsgs,
+            maxBytes: max.MaxBytes,
+            thresholdMsgs: max.ThresholdMsgs,
+            thresholdBytes: max.ThresholdBytes,
             expires: timeouts.Expires,
             idle: timeouts.IdleHeartbeat,
             errorHandler: opts.ErrorHandler);
@@ -125,7 +128,7 @@ public class NatsJSConsumer
         }
     }
 
-    public async ValueTask<INatsJSSubConsume<T>> FetchAsync<T>(
+    public async ValueTask<INatsJSSubFetch<T>> FetchAsync<T>(
         NatsJSFetchOpts opts,
         CancellationToken cancellationToken = default)
     {
@@ -155,7 +158,8 @@ public class NatsJSConsumer
             context: _context,
             subject: inbox,
             opts: requestOpts,
-            batch: max.MaxMsgs,
+            maxMsgs: max.MaxMsgs,
+            maxBytes: max.MaxBytes,
             expires: timeouts.Expires,
             idle: timeouts.IdleHeartbeat,
             errorHandler: opts.ErrorHandler);
@@ -185,17 +189,4 @@ public class NatsJSConsumer
         if (_deleted)
             throw new NatsJSException($"Consumer '{_stream}:{_consumer}' is deleted");
     }
-}
-
-public class NatsJSSubOpts
-{
-    public NatsJSSubOpts(int maxMsgs, int threshHoldMaxMsgs)
-    {
-        MaxMsgs = maxMsgs;
-        ThreshHoldMaxMsgs = threshHoldMaxMsgs;
-    }
-
-    public int MaxMsgs { get; }
-
-    public int ThreshHoldMaxMsgs { get; }
 }

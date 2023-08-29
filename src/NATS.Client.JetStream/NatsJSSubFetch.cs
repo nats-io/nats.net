@@ -9,7 +9,7 @@ using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
 
-public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
+public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubFetch<TMsg>
 {
     private readonly ILogger _logger;
     private readonly Channel<NatsJSMsg<TMsg?>> _userMsgs;
@@ -22,15 +22,18 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
     private readonly Timer _timer;
     private readonly Task _notificationsTask;
 
-    private readonly long _batch;
+    private readonly long _maxMsgs;
+    private readonly long _maxBytes;
     private readonly long _expires;
     private readonly long _idle;
     private readonly long _hbTimeout;
 
-    private long _pending;
+    private long _pendingMsgs;
+    private long _pendingBytes;
 
     public NatsJSSubFetch(
-        long batch,
+        long maxMsgs,
+        long maxBytes,
         TimeSpan expires,
         TimeSpan idle,
         NatsJSContext context,
@@ -48,11 +51,13 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
         _errorHandler = errorHandler;
         _serializer = opts?.Serializer ?? context.Connection.Opts.Serializer;
 
-        _batch = batch;
+        _maxMsgs = maxMsgs;
+        _maxBytes = maxBytes;
         _expires = expires.ToNanos();
         _idle = idle.ToNanos();
         _hbTimeout = (int)(idle * 2).TotalMilliseconds;
-        _pending = _batch;
+        _pendingMsgs = _maxMsgs;
+        _pendingBytes = _maxBytes;
 
         _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg?>>(NatsSub.GetChannelOptions(opts?.ChannelOptions));
         Msgs = _userMsgs.Reader;
@@ -61,10 +66,10 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
         _notificationsTask = Task.Run(NotificationsLoop);
 
         _timer = new Timer(
-            state =>
+            static state =>
             {
                 var self = (NatsJSSubFetch<TMsg>)state!;
-                _notifications.Writer.TryWrite(NatsJSNotification.HeartbeatTimeout);
+                self._notifications.Writer.TryWrite(NatsJSNotification.HeartbeatTimeout);
             },
             this,
             Timeout.Infinite,
@@ -98,7 +103,7 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
 
         var request = new ConsumerGetnextRequest
         {
-            Batch = _batch,
+            Batch = _maxMsgs,
             IdleHeartbeat = _idle,
             Expires = _expires,
         };
@@ -167,14 +172,19 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
                     Connection.HeaderParser,
                     _serializer));
 
-                _pending--;
+                _pendingMsgs--;
+                _pendingBytes -= msg.Msg.Size;
 
                 return _userMsgs.Writer.WriteAsync(msg);
             }
         }
         finally
         {
-            if (_pending == 0)
+            if (_maxBytes > 0 && _pendingBytes <= 0)
+            {
+                EndSubscription(NatsSubEndReason.MaxBytes);
+            }
+            else if (_pendingMsgs == 0)
             {
                 EndSubscription(NatsSubEndReason.MaxMsgs);
             }

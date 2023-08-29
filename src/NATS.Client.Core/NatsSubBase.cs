@@ -9,6 +9,7 @@ public enum NatsSubEndReason
 {
     None,
     MaxMsgs,
+    MaxBytes,
     Timeout,
     IdleTimeout,
     StartUpTimeout,

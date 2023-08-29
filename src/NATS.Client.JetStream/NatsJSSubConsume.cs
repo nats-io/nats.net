@@ -24,16 +24,22 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
     private readonly Task _pullTask;
     private readonly Task _notificationsTask;
 
-    private readonly long _batch;
+    private readonly long _maxMsgs;
     private readonly long _expires;
     private readonly long _idle;
     private readonly long _hbTimeout;
-    private readonly long _threshold;
+    private readonly long _thresholdMsgs;
+    private readonly long _maxBytes;
+    private readonly long _thresholdBytes;
 
-    private long _pending;
+    private long _pendingMsgs;
+    private long _pendingBytes;
 
     public NatsJSSubConsume(
-        long batch,
+        long maxMsgs,
+        long thresholdMsgs,
+        long maxBytes,
+        long thresholdBytes,
         TimeSpan expires,
         TimeSpan idle,
         NatsJSContext context,
@@ -51,8 +57,10 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
         _errorHandler = errorHandler;
         _serializer = opts?.Serializer ?? context.Connection.Opts.Serializer;
 
-        _batch = batch;
-        _threshold = batch / 2;
+        _maxMsgs = maxMsgs;
+        _thresholdMsgs = thresholdMsgs;
+        _maxBytes = maxBytes;
+        _thresholdBytes = thresholdBytes;
         _expires = expires.ToNanos();
         _idle = idle.ToNanos();
         _hbTimeout = (int)(idle * 2).TotalMilliseconds;
@@ -61,7 +69,7 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
             state =>
             {
                 var self = (NatsJSSubConsume<TMsg>)state!;
-                self.Pull(_batch);
+                self.Pull(_maxMsgs);
                 ResetPending();
             },
             this,
@@ -89,7 +97,11 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
             headers: default,
             cancellationToken);
 
-    public void ResetPending() => _pending = _batch;
+    public void ResetPending()
+    {
+        _pendingMsgs = _maxMsgs;
+        _pendingBytes = _maxBytes;
+    }
 
     public void ResetHeartbeatTimer() => _timer.Change(_hbTimeout, Timeout.Infinite);
 
@@ -110,7 +122,7 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
 
         var request = new ConsumerGetnextRequest
         {
-            Batch = _batch,
+            Batch = _maxMsgs,
             IdleHeartbeat = _idle,
             Expires = _expires,
         };
@@ -145,9 +157,9 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
                         {
                             if (int.TryParse(natsPendingMsgs, out var pendingMsgs))
                             {
-                                _pending -= pendingMsgs;
-                                if (_pending < 0)
-                                    _pending = 0;
+                                _pendingMsgs -= pendingMsgs;
+                                if (_pendingMsgs < 0)
+                                    _pendingMsgs = 0;
                             }
                         }
 
@@ -188,7 +200,8 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
                     Connection.HeaderParser,
                     _serializer));
 
-                _pending--;
+                _pendingMsgs--;
+                _pendingBytes -= msg.Msg.Size;
 
                 return _userMsgs.Writer.WriteAsync(msg);
             }
@@ -208,9 +221,14 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
 
     private void CheckPending()
     {
-        if (_pending <= _threshold)
+        if (_maxBytes > 0 && _pendingBytes <= _thresholdBytes)
         {
-            Pull(_batch - _pending);
+            Pull(_maxMsgs - _pendingMsgs);
+            ResetPending();
+        }
+        else if (_pendingMsgs <= _thresholdMsgs)
+        {
+            Pull(_maxMsgs - _pendingMsgs);
             ResetPending();
         }
     }
