@@ -102,15 +102,16 @@ public class JetStreamTest
                 }
             }
 
+            var cts3 = new CancellationTokenSource(TimeSpan.FromSeconds(20));
             Assert.Equal(2, messages.Count);
             Assert.Equal("events.foo", messages[0].Msg.Subject);
             Assert.Equal("events.foo", messages[1].Msg.Subject);
             var cc2 = await consumer.ConsumeAsync<TestData>(
                 new NatsJSConsumeOpts { MaxMsgs = 100 },
-                cancellationToken: cts2.Token);
+                cancellationToken: cts3.Token);
 
             // Consume the unacknowledged message
-            await foreach (var msg in cc2.Msgs.ReadAllAsync(cts2.Token))
+            await foreach (var msg in cc2.Msgs.ReadAllAsync(cts3.Token))
             {
                 Assert.Equal("events.foo", msg.Msg.Subject);
                 break;
