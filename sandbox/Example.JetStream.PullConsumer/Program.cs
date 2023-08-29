@@ -10,7 +10,7 @@ Console.CancelKeyPress += (_, e) =>
     cts.Cancel();
 };
 
-var options = NatsOptions.Default with { LoggerFactory = new MinimumConsoleLoggerFactory(LogLevel.Error) };
+var options = NatsOptions.Default with { LoggerFactory = new MinimumConsoleLoggerFactory(LogLevel.Debug) };
 
 await using var nats = new NatsConnection(options);
 
@@ -20,8 +20,11 @@ var consumer = await js.CreateConsumerAsync("s1", "c1");
 
 var idle = TimeSpan.FromSeconds(1);
 var expires = TimeSpan.FromSeconds(10);
-int? maxMsgs = null; // 10;
+
+int? maxMsgs = null;
 int? maxBytes = 128;
+// int? maxMsgs = 10;
+// int? maxBytes = null;
 
 static void ErrorHandler(NatsJSNotification notification)
 {

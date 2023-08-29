@@ -19,7 +19,7 @@ public class HeaderParser
     private const byte ByteColon = (byte)':';
     private const byte ByteSpace = (byte)' ';
     private const byte ByteTab = (byte)'\t';
-    private static readonly byte[] ByteCRLF = new[] { ByteCR, ByteLF };
+    private static readonly byte[] ByteCRLF = { ByteCR, ByteLF };
 
     private readonly Encoding _encoding;
 
@@ -50,7 +50,6 @@ public class HeaderParser
                     {
                         RejectRequestHeader(line);
                     }
-
                 }
             }
             else

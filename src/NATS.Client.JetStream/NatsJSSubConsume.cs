@@ -12,6 +12,7 @@ namespace NATS.Client.JetStream;
 public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
 {
     private readonly ILogger _logger;
+    private readonly bool _debug;
     private readonly Channel<NatsJSMsg<TMsg?>> _userMsgs;
     private readonly Channel<NatsJSNotification> _notifications;
     private readonly Channel<ConsumerGetnextRequest> _pullRequests;
@@ -51,6 +52,7 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
         : base(context.Connection, context.Connection.SubscriptionManager, subject, opts)
     {
         _logger = Connection.Opts.LoggerFactory.CreateLogger<NatsJSSubConsume<TMsg>>();
+        _debug = _logger.IsEnabled(LogLevel.Debug);
         _context = context;
         _stream = stream;
         _consumer = consumer;
@@ -65,12 +67,28 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
         _idle = idle.ToNanos();
         _hbTimeout = (int)(idle * 2).TotalMilliseconds;
 
+        if (_debug)
+        {
+            _logger.LogDebug(
+                "Consumer setup {@Config}",
+                new
+                {
+                    maxMsgs,
+                    thresholdMsgs,
+                    maxBytes,
+                    thresholdBytes,
+                    expires,
+                    idle,
+                    _hbTimeout,
+                });
+        }
+
         _timer = new Timer(
-            state =>
+            static state =>
             {
                 var self = (NatsJSSubConsume<TMsg>)state!;
-                self.Pull(_maxMsgs, _maxBytes);
-                ResetPending();
+                self.Pull(self._maxMsgs, self._maxBytes);
+                self.ResetPending();
             },
             this,
             Timeout.Infinite,
@@ -158,9 +176,23 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
                         {
                             if (long.TryParse(natsPendingMsgs, out var pendingMsgs))
                             {
+                                if (_debug)
+                                {
+                                    _logger.LogDebug("Header pending messages current {Pending}", _pendingMsgs);
+                                }
+
                                 _pendingMsgs -= pendingMsgs;
                                 if (_pendingMsgs < 0)
                                     _pendingMsgs = 0;
+
+                                if (_debug)
+                                {
+                                    _logger.LogDebug("Header pending messages {Header} {Pending}", natsPendingMsgs, _pendingMsgs);
+                                }
+                            }
+                            else
+                            {
+                                _logger.LogError("Can't parse Nats-Pending-Messages {Header}", natsPendingMsgs);
                             }
                         }
 
@@ -168,9 +200,23 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
                         {
                             if (long.TryParse(natsPendingBytes, out var pendingBytes))
                             {
+                                if (_debug)
+                                {
+                                    _logger.LogDebug("Header pending bytes current {Pending}", _pendingBytes);
+                                }
+
                                 _pendingBytes -= pendingBytes;
                                 if (_pendingBytes < 0)
                                     _pendingBytes = 0;
+
+                                if (_debug)
+                                {
+                                    _logger.LogDebug("Header pending bytes {Header} {Pending}", natsPendingBytes, _pendingBytes);
+                                }
+                            }
+                            else
+                            {
+                                _logger.LogError("Can't parse Nats-Pending-Bytes {Header}", natsPendingBytes);
                             }
                         }
 
@@ -217,7 +263,12 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
                 _pendingMsgs--;
 
                 if (_maxBytes > 0)
+                {
+                    if (_debug)
+                        _logger.LogDebug("Message size {Size}", msg.Msg.Size);
+
                     _pendingBytes -= msg.Msg.Size;
+                }
 
                 return _userMsgs.Writer.WriteAsync(msg);
             }
@@ -239,11 +290,17 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
     {
         if (_maxBytes > 0 && _pendingBytes <= _thresholdBytes)
         {
+            if (_debug)
+                _logger.LogDebug("Check pending bytes {Pending}", _pendingBytes);
+
             Pull(_maxMsgs, _maxBytes - _pendingBytes);
             ResetPending();
         }
         else if (_maxBytes == 0 && _pendingMsgs <= _thresholdMsgs)
         {
+            if (_debug)
+                _logger.LogDebug("Check pending messages {Pending}", _pendingMsgs);
+
             Pull(_maxMsgs - _pendingMsgs, 0);
             ResetPending();
         }
