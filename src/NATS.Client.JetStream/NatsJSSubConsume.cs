@@ -1,65 +1,66 @@
 ﻿using System.Buffers;
-using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.Core.Commands;
-using NATS.Client.Core.Internal;
 using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
 
-public class NatsJSSub<TMsg> : NatsSubBase
+public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
 {
     private readonly ILogger _logger;
     private readonly Channel<NatsJSMsg<TMsg?>> _userMsgs;
+    private readonly Channel<NatsJSNotification> _notifications;
     private readonly Channel<ConsumerGetnextRequest> _pullRequests;
     private readonly NatsJSContext _context;
     private readonly string _stream;
     private readonly string _consumer;
+    private readonly Action<NatsJSNotification>? _errorHandler;
     private readonly INatsSerializer _serializer;
     private readonly Timer _timer;
     private readonly Task _pullTask;
-    private readonly int _batch;
+    private readonly Task _notificationsTask;
+
+    private readonly long _batch;
     private readonly long _expires;
     private readonly long _idle;
-    private readonly int _hbTimeout;
-    private int _pending;
-    private readonly int _thershold;
+    private readonly long _hbTimeout;
+    private readonly long _threshold;
 
-    public NatsJSSub(
-        int batch,
+    private long _pending;
+
+    public NatsJSSubConsume(
+        long batch,
         TimeSpan expires,
         TimeSpan idle,
         NatsJSContext context,
         string stream,
         string consumer,
         string subject,
-        NatsSubOpts? opts)
+        NatsSubOpts? opts,
+        Action<NatsJSNotification>? errorHandler)
         : base(context.Connection, context.Connection.SubscriptionManager, subject, opts)
     {
-        _logger = Connection.Opts.LoggerFactory.CreateLogger<NatsJSSub<TMsg>>();
+        _logger = Connection.Opts.LoggerFactory.CreateLogger<NatsJSSubConsume<TMsg>>();
         _context = context;
         _stream = stream;
         _consumer = consumer;
+        _errorHandler = errorHandler;
         _serializer = opts?.Serializer ?? context.Connection.Opts.Serializer;
-        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg?>>(NatsSub.GetChannelOptions(opts?.ChannelOptions));
-        _pullRequests = Channel.CreateBounded<ConsumerGetnextRequest>(NatsSub.GetChannelOptions(opts?.ChannelOptions));
 
         _batch = batch;
-        _thershold = batch / 2;
+        _threshold = batch / 2;
         _expires = expires.ToNanos();
         _idle = idle.ToNanos();
         _hbTimeout = (int)(idle * 2).TotalMilliseconds;
 
-        Task.Run(PullRequestProcessorLoop);
-        Msgs = _userMsgs.Reader;
         _timer = new Timer(
             state =>
             {
-                var self = (NatsJSSub<TMsg>)state!;
+                var self = (NatsJSSubConsume<TMsg>)state!;
                 self.Pull(_batch);
                 ResetPending();
             },
@@ -67,32 +68,15 @@ public class NatsJSSub<TMsg> : NatsSubBase
             Timeout.Infinite,
             Timeout.Infinite);
 
-        _pullRequests = Channel.CreateBounded<ConsumerGetnextRequest>(new BoundedChannelOptions(10)
-        {
-            FullMode = BoundedChannelFullMode.DropOldest,
-        });
+        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg?>>(NatsSub.GetChannelOptions(opts?.ChannelOptions));
+        Msgs = _userMsgs.Reader;
+
+        _pullRequests = Channel.CreateBounded<ConsumerGetnextRequest>(NatsSub.GetChannelOptions(opts?.ChannelOptions));
         _pullTask = Task.Run(PullLoop);
-    }
 
-    private void Pull(long batch)
-    {
-        _pullRequests.Writer.TryWrite(new ConsumerGetnextRequest
-        {
-            Batch = batch,
-            IdleHeartbeat = _idle,
-            Expires = _expires,
-        });
+        _notifications = Channel.CreateBounded<NatsJSNotification>(NatsSub.GetChannelOptions(opts?.ChannelOptions));
+        _notificationsTask = Task.Run(NotificationsLoop);
     }
-
-    private async Task PullLoop()
-    {
-        await foreach (var pr in _pullRequests.Reader.ReadAllAsync())
-        {
-            await CallMsgNextAsync(pr);
-        }
-    }
-
-    public void ResetHeartbeatTimer() => _timer.Change(_hbTimeout, Timeout.Infinite);
 
     public ChannelReader<NatsJSMsg<TMsg?>> Msgs { get; }
 
@@ -105,40 +89,38 @@ public class NatsJSSub<TMsg> : NatsSubBase
             headers: default,
             cancellationToken);
 
+    public void ResetPending() => _pending = _batch;
+
+    public override async ValueTask DisposeAsync()
+    {
+        await base.DisposeAsync();
+        await _pullTask;
+        await _notificationsTask;
+        await _timer.DisposeAsync();
+    }
+
     internal override IEnumerable<ICommand> GetReconnectCommands(int sid)
     {
         foreach (var command in base.GetReconnectCommands(sid))
             yield return command;
 
-        var request = ReconnectRequestFactory();
-
-        if (request != null)
-        {
-            yield return PublishCommand<ConsumerGetnextRequest>.Create(
-                pool: Connection.ObjectPool,
-                subject: $"{_context.Opts.ApiPrefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
-                replyTo: Subject,
-                headers: default,
-                value: request,
-                serializer: JsonNatsSerializer.Default,
-                cancellationToken: default);
-        }
-    }
-
-    public ConsumerGetnextRequest? ReconnectRequestFactory()
-    {
         ResetPending();
-        return new ConsumerGetnextRequest
+
+        var request = new ConsumerGetnextRequest
         {
             Batch = _batch,
             IdleHeartbeat = _idle,
             Expires = _expires,
         };
-    }
 
-    public void ResetPending()
-    {
-        _pending = _batch;
+        yield return PublishCommand<ConsumerGetnextRequest>.Create(
+            pool: Connection.ObjectPool,
+            subject: $"{_context.Opts.ApiPrefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
+            replyTo: Subject,
+            headers: default,
+            value: request,
+            serializer: JsonNatsSerializer.Default,
+            cancellationToken: default);
     }
 
     protected override ValueTask ReceiveInternalAsync(
@@ -175,12 +157,13 @@ public class NatsJSSub<TMsg> : NatsSubBase
                         }
                         else
                         {
-                            Console.WriteLine($"{headers.Dump()}");
+                            _notifications.Writer.TryWrite(new NatsJSNotification(headers.Code, headers.MessageText));
                         }
                     }
                     else
                     {
-                        _logger.LogError("Can't parse headers: {HeadersBuffer}",
+                        _logger.LogError(
+                            "Can't parse headers: {HeadersBuffer}",
                             Encoding.ASCII.GetString(headersBuffer.Value.ToArray()));
                         throw new NatsJSException("Can't parse headers");
                     }
@@ -214,47 +197,49 @@ public class NatsJSSub<TMsg> : NatsSubBase
         }
     }
 
-    public void CheckPending()
+    protected override void TryComplete()
     {
-        if (_pending <= _thershold)
+        _pullRequests.Writer.TryComplete();
+        _userMsgs.Writer.TryComplete();
+        _notifications.Writer.TryComplete();
+    }
+
+    private void ResetHeartbeatTimer() => _timer.Change(_hbTimeout, Timeout.Infinite);
+
+    private void CheckPending()
+    {
+        if (_pending <= _threshold)
         {
             Pull(_batch - _pending);
             ResetPending();
         }
     }
 
-    protected override void TryComplete()
+    private void Pull(long batch) => _pullRequests.Writer.TryWrite(new ConsumerGetnextRequest
     {
-        _pullRequests.Writer.TryComplete();
-        _userMsgs.Writer.TryComplete();
+        Batch = batch, IdleHeartbeat = _idle, Expires = _expires,
+    });
+
+    private async Task PullLoop()
+    {
+        await foreach (var pr in _pullRequests.Reader.ReadAllAsync())
+        {
+            await CallMsgNextAsync(pr);
+        }
     }
 
-    private async Task PullRequestProcessorLoop()
+    private async Task NotificationsLoop()
     {
-        var reader = _pullRequests.Reader;
-        while (await reader.WaitToReadAsync().ConfigureAwait(false))
+        await foreach (var notification in _notifications.Reader.ReadAllAsync())
         {
-            while (reader.TryRead(out var request))
+            try
             {
-                try
-                {
-                    await Connection.PubModelAsync(
-                        subject: $"{_context.Opts.ApiPrefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
-                        data: request,
-                        serializer: JsonNatsSerializer.Default,
-                        replyTo: Subject,
-                        headers: default);
-                }
-                catch (Exception e)
-                {
-                    _logger.LogError(e, "Pull request processor error");
-                }
+                _errorHandler?.Invoke(notification);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "Notification error handler error");
             }
         }
     }
-}
-
-public interface INatsJSSub
-{
-    ValueTask CallMsgNextAsync(ConsumerGetnextRequest request, CancellationToken cancellationToken = default);
 }

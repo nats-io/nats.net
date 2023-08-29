@@ -1,3 +1,4 @@
+using System.Threading.Channels;
 using NATS.Client.Core;
 using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
@@ -27,35 +28,38 @@ public class NatsJSConsumer
         return _deleted = await _context.DeleteConsumerAsync(_stream, _consumer, cancellationToken);
     }
 
-    public async ValueTask<INatsJSSubConsume<T>> ConsumeAsync<T>(
-        NatsJSConsumeOpts opts,
-        NatsSubOpts requestOpts = default,
-        CancellationToken cancellationToken = default)
+    public async ValueTask<INatsJSSubConsume<T>> ConsumeAsync<T>(NatsJSConsumeOpts opts, CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
 
-        var inbox = $"{_context.Opts.InboxPrefix}.{Guid.NewGuid():n}";
+        var inbox = _context.NewInbox();
 
-        var state = new NatsJSSubState(
-            opts: _context.Opts,
-            optsMaxBytes: opts.MaxBytes,
-            optsMaxMsgs: opts.MaxMsgs,
-            optsThresholdMsgs: opts.ThresholdMsgs,
-            optsThresholdBytes: opts.ThresholdBytes,
-            optsExpires: opts.Expires,
-            optsIdleHeartbeat: opts.IdleHeartbeat);
+        var max = NatsJSOpsDefaults.SetMax(_context.Opts, opts.MaxMsgs, opts.MaxBytes, opts.ThresholdMsgs, opts.ThresholdBytes);
+        var timeouts = NatsJSOpsDefaults.SetTimeouts(opts.Expires, opts.IdleHeartbeat);
+
+        var requestOpts = new NatsSubOpts
+        {
+            Serializer = opts.Serializer,
+            ChannelOptions = new NatsSubChannelOpts
+            {
+                // Keep capacity at 1 to make sure message acknowledgements are sent
+                // right after the message is processed and messages aren't queued up
+                // which might cause timeouts for acknowledgments.
+                Capacity = 1,
+                FullMode = BoundedChannelFullMode.Wait,
+            },
+        };
 
         var sub = new NatsJSSubConsume<T>(
             stream: _stream,
             consumer: _consumer,
             context: _context,
-            manager: _context.Connection.SubscriptionManager,
             subject: inbox,
             opts: requestOpts,
-            state: state,
-            serializer: requestOpts.Serializer ?? _context.Connection.Opts.Serializer,
-            errorHandler: opts.ErrorHandler,
-            cancellationToken: cancellationToken);
+            batch: max.MaxMsgs,
+            expires: timeouts.Expires,
+            idle: timeouts.IdleHeartbeat,
+            errorHandler: opts.ErrorHandler);
 
         await _context.Connection.SubAsync(
             subject: inbox,
@@ -63,12 +67,24 @@ public class NatsJSConsumer
             sub: sub,
             cancellationToken);
 
+        await sub.CallMsgNextAsync(
+            new ConsumerGetnextRequest
+            {
+                Batch = max.MaxMsgs,
+                IdleHeartbeat = timeouts.IdleHeartbeat.ToNanos(),
+                Expires = timeouts.Expires.ToNanos(),
+            },
+            cancellationToken);
+
+        sub.ResetPending();
+
         return sub;
     }
 
     public async ValueTask<NatsJSMsg<T?>> NextAsync<T>(CancellationToken cancellationToken = default)
     {
-        await foreach (var natsJSMsg in FetchAsync<T>(new NatsJSFetchOpts { MaxMsgs = 1 }, cancellationToken: cancellationToken))
+        await using var f = await FetchAsync<T>(new NatsJSFetchOpts { MaxMsgs = 1 }, cancellationToken: cancellationToken);
+        await foreach (var natsJSMsg in f.Msgs.ReadAllAsync(cancellationToken))
         {
             return natsJSMsg;
         }
@@ -76,32 +92,57 @@ public class NatsJSConsumer
         throw new NatsJSException("No data");
     }
 
-    public IAsyncEnumerable<NatsJSMsg<T?>> FetchAsync<T>(
+    public async ValueTask<INatsJSSubConsume<T>> FetchAsync<T>(
         NatsJSFetchOpts opts,
-        NatsSubOpts? requestOpts = default,
-        CancellationToken cancellationToken = default) =>
-        throw new NotImplementedException();
-
-    public async ValueTask<NatsJSSub<TMsg>> CreateSubscription<TMsg>(
-        int batch,
-        TimeSpan expires,
-        TimeSpan idle,
-        NatsSubOpts? opts = default,
         CancellationToken cancellationToken = default)
     {
-        var inbox = $"{_context.Opts.InboxPrefix}.{Guid.NewGuid():n}";
+        ThrowIfDeleted();
 
-        var sub = new NatsJSSub<TMsg>(
-            batch: batch,
-            expires: expires,
-            idle: idle,
-            context: _context,
+        var inbox = _context.NewInbox();
+
+        var max = NatsJSOpsDefaults.SetMax(_context.Opts, opts.MaxMsgs, opts.MaxBytes);
+        var timeouts = NatsJSOpsDefaults.SetTimeouts(opts.Expires, opts.IdleHeartbeat);
+
+        var requestOpts = new NatsSubOpts
+        {
+            Serializer = opts.Serializer,
+            ChannelOptions = new NatsSubChannelOpts
+            {
+                // Keep capacity at 1 to make sure message acknowledgements are sent
+                // right after the message is processed and messages aren't queued up
+                // which might cause timeouts for acknowledgments.
+                Capacity = 1,
+                FullMode = BoundedChannelFullMode.Wait,
+            },
+            MaxMsgs = (int)max.MaxMsgs,
+            Timeout = timeouts.Expires,
+        };
+
+        var sub = new NatsJSSubFetch<T>(
             stream: _stream,
             consumer: _consumer,
+            context: _context,
             subject: inbox,
-            opts: opts);
+            opts: requestOpts,
+            batch: max.MaxMsgs,
+            expires: timeouts.Expires,
+            idle: timeouts.IdleHeartbeat,
+            errorHandler: opts.ErrorHandler);
 
-        await _context.Connection.SubAsync(inbox, opts, sub, cancellationToken);
+        await _context.Connection.SubAsync(
+            subject: inbox,
+            opts: requestOpts,
+            sub: sub,
+            cancellationToken);
+
+        await sub.CallMsgNextAsync(
+            new ConsumerGetnextRequest
+            {
+                Batch = max.MaxMsgs,
+                IdleHeartbeat = timeouts.IdleHeartbeat.ToNanos(),
+                Expires = timeouts.Expires.ToNanos(),
+            },
+            cancellationToken);
 
         return sub;
     }

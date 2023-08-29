@@ -5,7 +5,7 @@ using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
 
-internal enum NatsSubEndReason
+public enum NatsSubEndReason
 {
     None,
     MaxMsgs,
@@ -93,7 +93,7 @@ public abstract class NatsSubBase
     // since INatsSub is marked as internal.
     public int? PendingMsgs => _pendingMsgs == -1 ? null : Volatile.Read(ref _pendingMsgs);
 
-    internal NatsSubEndReason EndReason => (NatsSubEndReason)Volatile.Read(ref _endReasonRaw);
+    public NatsSubEndReason EndReason => (NatsSubEndReason)Volatile.Read(ref _endReasonRaw);
 
     protected NatsConnection Connection { get; }
 
@@ -248,7 +248,7 @@ public abstract class NatsSubBase
     /// </summary>
     protected abstract void TryComplete();
 
-    private void EndSubscription(NatsSubEndReason reason)
+    protected void EndSubscription(NatsSubEndReason reason)
     {
         lock (this)
         {

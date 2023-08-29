@@ -1,3 +1,5 @@
+using NATS.Client.Core;
+
 namespace NATS.Client.JetStream;
 
 public record NatsJSOpts
@@ -24,7 +26,7 @@ public record NatsJSOpts
 public record NatsJSConsumeOpts
 {
     /// <summary>
-    /// Maximum number of messages stored in the buffer
+    /// Errors and notifications handler
     /// </summary>
     public Action<NatsJSNotification>? ErrorHandler { get; init; }
 
@@ -57,6 +59,15 @@ public record NatsJSConsumeOpts
     /// Hint for the number of bytes left in buffer that should trigger a low watermark on the client, and influence it to request more data.
     /// </summary>
     public int? ThresholdBytes { get; init; }
+
+    /// <summary>
+    /// Serializer to use to deserialize the message if a model is being used.
+    /// </summary>
+    /// <remarks>
+    /// If not set, serializer set in connection options or the default JSON serializer
+    /// will be used.
+    /// </remarks>
+    public INatsSerializer? Serializer { get; init; }
 }
 
 public record NatsJSNextOpts
@@ -74,6 +85,11 @@ public record NatsJSNextOpts
 
 public record NatsJSFetchOpts
 {
+    /// <summary>
+    /// Errors and notifications handler
+    /// </summary>
+    public Action<NatsJSNotification>? ErrorHandler { get; init; }
+
     /// <summary>
     /// Maximum number of messages to return
     /// </summary>
@@ -93,4 +109,13 @@ public record NatsJSFetchOpts
     /// Amount idle time the server should wait before sending a heartbeat. For requests with expires > 30s, heartbeats should be enabled by default
     /// </summary>
     public TimeSpan? IdleHeartbeat { get; init; }
+
+    /// <summary>
+    /// Serializer to use to deserialize the message if a model is being used.
+    /// </summary>
+    /// <remarks>
+    /// If not set, serializer set in connection options or the default JSON serializer
+    /// will be used.
+    /// </remarks>
+    public INatsSerializer? Serializer { get; init; }
 }

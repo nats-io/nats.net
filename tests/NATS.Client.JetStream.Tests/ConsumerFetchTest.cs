@@ -26,7 +26,9 @@ public class ConsumerFetchTest
 
         var consumer = await js.GetConsumerAsync("s1", "c1", cts.Token);
         var count = 0;
-        await foreach (var msg in consumer.FetchAsync<TestData>(new NatsJSFetchOpts { MaxMsgs = 10 }, cancellationToken: cts.Token))
+        await using var fc =
+            await consumer.FetchAsync<TestData>(new NatsJSFetchOpts { MaxMsgs = 10 }, cancellationToken: cts.Token);
+        await foreach (var msg in fc.Msgs.ReadAllAsync(cts.Token))
         {
             await msg.AckAsync(cts.Token);
             Assert.Equal(count, msg.Msg.Data!.Test);

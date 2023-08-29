@@ -149,7 +149,7 @@ public class ConsumerConsumeTest
             MaxMsgs = 10,
             ErrorHandler = e =>
             {
-                _output.WriteLine($"Consume error: {e.Code} {e.Message}");
+                _output.WriteLine($"Consume error: {e.Code} {e.Description}");
             },
         };
 
