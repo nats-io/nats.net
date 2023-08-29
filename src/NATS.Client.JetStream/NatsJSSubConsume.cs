@@ -69,7 +69,7 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
             state =>
             {
                 var self = (NatsJSSubConsume<TMsg>)state!;
-                self.Pull(_maxMsgs);
+                self.Pull(_maxMsgs, _maxBytes);
                 ResetPending();
             },
             this,
@@ -123,6 +123,7 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
         var request = new ConsumerGetnextRequest
         {
             Batch = _maxMsgs,
+            MaxBytes = _maxBytes,
             IdleHeartbeat = _idle,
             Expires = _expires,
         };
@@ -153,9 +154,9 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
                     var headers = new NatsHeaders();
                     if (Connection.HeaderParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), headers))
                     {
-                        if (headers.TryGetValue("Nats-Pending-Messages", out var natsPendingMsgs))
+                        if (_maxBytes == 0 && headers.TryGetValue("Nats-Pending-Messages", out var natsPendingMsgs))
                         {
-                            if (int.TryParse(natsPendingMsgs, out var pendingMsgs))
+                            if (long.TryParse(natsPendingMsgs, out var pendingMsgs))
                             {
                                 _pendingMsgs -= pendingMsgs;
                                 if (_pendingMsgs < 0)
@@ -163,7 +164,20 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
                             }
                         }
 
+                        if (_maxBytes > 0 && headers.TryGetValue("Nats-Pending-Bytes", out var natsPendingBytes))
+                        {
+                            if (long.TryParse(natsPendingBytes, out var pendingBytes))
+                            {
+                                _pendingBytes -= pendingBytes;
+                                if (_pendingBytes < 0)
+                                    _pendingBytes = 0;
+                            }
+                        }
+
                         if (headers is { Code: 408, Message: NatsHeaders.Messages.RequestTimeout })
+                        {
+                        }
+                        else if (headers is { Code: 409, Message: NatsHeaders.Messages.MessageSizeExceedsMaxBytes })
                         {
                         }
                         else if (headers is { Code: 100, Message: NatsHeaders.Messages.IdleHeartbeat })
@@ -201,7 +215,9 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
                     _serializer));
 
                 _pendingMsgs--;
-                _pendingBytes -= msg.Msg.Size;
+
+                if (_maxBytes > 0)
+                    _pendingBytes -= msg.Msg.Size;
 
                 return _userMsgs.Writer.WriteAsync(msg);
             }
@@ -223,19 +239,22 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
     {
         if (_maxBytes > 0 && _pendingBytes <= _thresholdBytes)
         {
-            Pull(_maxMsgs - _pendingMsgs);
+            Pull(_maxMsgs, _maxBytes - _pendingBytes);
             ResetPending();
         }
-        else if (_pendingMsgs <= _thresholdMsgs)
+        else if (_maxBytes == 0 && _pendingMsgs <= _thresholdMsgs)
         {
-            Pull(_maxMsgs - _pendingMsgs);
+            Pull(_maxMsgs - _pendingMsgs, 0);
             ResetPending();
         }
     }
 
-    private void Pull(long batch) => _pullRequests.Writer.TryWrite(new ConsumerGetnextRequest
+    private void Pull(long batch, long maxBytes) => _pullRequests.Writer.TryWrite(new ConsumerGetnextRequest
     {
-        Batch = batch, IdleHeartbeat = _idle, Expires = _expires,
+        Batch = batch,
+        MaxBytes = maxBytes,
+        IdleHeartbeat = _idle,
+        Expires = _expires,
     });
 
     private async Task PullLoop()

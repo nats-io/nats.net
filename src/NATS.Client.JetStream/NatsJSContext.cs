@@ -90,7 +90,7 @@ public partial class NatsJSContext
                 subject: subject,
                 data: request,
                 requestOpts: default,
-                replyOpts: new NatsSubOpts { Serializer = JSErrorAwareJsonSerializer.Default },
+                replyOpts: new NatsSubOpts { Serializer = NatsJSErrorAwareJsonSerializer.Default },
                 cancellationToken)
             .ConfigureAwait(false);
 
@@ -109,7 +109,7 @@ public partial class NatsJSContext
 
         if (sub is NatsSubBase { EndReason: NatsSubEndReason.Exception, Exception: not null } sb)
         {
-            if (sb.Exception is NatsSubException { Exception.SourceException: JSApiErrorException jsError })
+            if (sb.Exception is NatsSubException { Exception.SourceException: NatsJSApiErrorException jsError })
             {
                 // Clear exception here so that subscription disposal won't throw it.
                 sb.ClearException();

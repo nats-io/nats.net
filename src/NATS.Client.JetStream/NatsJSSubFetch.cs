@@ -138,6 +138,10 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubFetch<TMsg>
                         {
                             EndSubscription(NatsSubEndReason.Timeout);
                         }
+                        else if (headers is { Code: 409, Message: NatsHeaders.Messages.MessageSizeExceedsMaxBytes })
+                        {
+                            EndSubscription(NatsSubEndReason.MaxBytes);
+                        }
                         else if (headers is { Code: 100, Message: NatsHeaders.Messages.IdleHeartbeat })
                         {
                         }
@@ -184,7 +188,7 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubFetch<TMsg>
             {
                 EndSubscription(NatsSubEndReason.MaxBytes);
             }
-            else if (_pendingMsgs == 0)
+            else if (_maxBytes == 0 && _pendingMsgs == 0)
             {
                 EndSubscription(NatsSubEndReason.MaxMsgs);
             }

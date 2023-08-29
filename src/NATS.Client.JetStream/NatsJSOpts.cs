@@ -73,6 +73,11 @@ public record NatsJSConsumeOpts
 public record NatsJSNextOpts
 {
     /// <summary>
+    /// Errors and notifications handler
+    /// </summary>
+    public Action<NatsJSNotification>? ErrorHandler { get; init; }
+
+    /// <summary>
     /// Amount of time to wait for the request to expire (in nanoseconds)
     /// </summary>
     public TimeSpan? Expires { get; init; }

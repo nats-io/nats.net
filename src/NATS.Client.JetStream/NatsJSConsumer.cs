@@ -86,6 +86,7 @@ public class NatsJSConsumer
             new ConsumerGetnextRequest
             {
                 Batch = max.MaxMsgs,
+                MaxBytes = max.MaxBytes,
                 IdleHeartbeat = timeouts.IdleHeartbeat.ToNanos(),
                 Expires = timeouts.Expires.ToNanos(),
             },
@@ -106,6 +107,7 @@ public class NatsJSConsumer
                 IdleHeartbeat = opts.IdleHeartbeat,
                 Expires = opts.Expires,
                 Serializer = opts.Serializer,
+                ErrorHandler = opts.ErrorHandler,
             },
             cancellationToken: cancellationToken);
 
@@ -174,6 +176,7 @@ public class NatsJSConsumer
             new ConsumerGetnextRequest
             {
                 Batch = max.MaxMsgs,
+                MaxBytes = max.MaxBytes,
                 IdleHeartbeat = timeouts.IdleHeartbeat.ToNanos(),
                 Expires = timeouts.Expires.ToNanos(),
             },

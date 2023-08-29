@@ -1,8 +1,8 @@
 ﻿using System.Text;
 
-namespace Example.JetStream.PullConsumer;
+namespace NATS.Client.Core;
 
-internal class RawData
+public class RawData
 {
     public RawData(byte[] buffer) => Buffer = buffer;
 

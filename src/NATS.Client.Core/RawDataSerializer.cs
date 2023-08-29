@@ -1,9 +1,8 @@
 ﻿using System.Buffers;
-using NATS.Client.Core;
 
-namespace Example.JetStream.PullConsumer;
+namespace NATS.Client.Core;
 
-internal class RawDataSerializer : INatsSerializer
+public class RawDataSerializer : INatsSerializer
 {
     public int Serialize<T>(ICountableBufferWriter bufferWriter, T? value)
     {
