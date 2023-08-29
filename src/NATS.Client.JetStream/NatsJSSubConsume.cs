@@ -91,6 +91,8 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
 
     public void ResetPending() => _pending = _batch;
 
+    public void ResetHeartbeatTimer() => _timer.Change(_hbTimeout, Timeout.Infinite);
+
     public override async ValueTask DisposeAsync()
     {
         await base.DisposeAsync();
@@ -203,8 +205,6 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
         _userMsgs.Writer.TryComplete();
         _notifications.Writer.TryComplete();
     }
-
-    private void ResetHeartbeatTimer() => _timer.Change(_hbTimeout, Timeout.Infinite);
 
     private void CheckPending()
     {

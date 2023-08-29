@@ -27,6 +27,8 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
     private readonly long _idle;
     private readonly long _hbTimeout;
 
+    private long _pending;
+
     public NatsJSSubFetch(
         long batch,
         TimeSpan expires,
@@ -50,6 +52,7 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
         _expires = expires.ToNanos();
         _idle = idle.ToNanos();
         _hbTimeout = (int)(idle * 2).TotalMilliseconds;
+        _pending = _batch;
 
         _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg?>>(NatsSub.GetChannelOptions(opts?.ChannelOptions));
         Msgs = _userMsgs.Reader;
@@ -78,6 +81,8 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
             replyTo: Subject,
             headers: default,
             cancellationToken);
+
+    public void ResetHeartbeatTimer() => _timer.Change(_hbTimeout, Timeout.Infinite);
 
     public override async ValueTask DisposeAsync()
     {
@@ -114,55 +119,65 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
         ReadOnlySequence<byte>? headersBuffer,
         ReadOnlySequence<byte> payloadBuffer)
     {
-        ResetHeartbeatTimer();
-        if (subject == Subject)
+        try
         {
-            if (headersBuffer.HasValue)
+            ResetHeartbeatTimer();
+            if (subject == Subject)
             {
-                var headers = new NatsHeaders();
-                if (Connection.HeaderParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), headers))
+                if (headersBuffer.HasValue)
                 {
-                    if (headers is { Code: 408, Message: NatsHeaders.Messages.RequestTimeout })
+                    var headers = new NatsHeaders();
+                    if (Connection.HeaderParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), headers))
                     {
-                    }
-                    else if (headers is { Code: 100, Message: NatsHeaders.Messages.IdleHeartbeat })
-                    {
-                        EndSubscription(NatsSubEndReason.Timeout);
+                        if (headers is { Code: 408, Message: NatsHeaders.Messages.RequestTimeout })
+                        {
+                            EndSubscription(NatsSubEndReason.Timeout);
+                        }
+                        else if (headers is { Code: 100, Message: NatsHeaders.Messages.IdleHeartbeat })
+                        {
+                        }
+                        else
+                        {
+                            _notifications.Writer.TryWrite(new NatsJSNotification(headers.Code, headers.MessageText));
+                        }
                     }
                     else
                     {
-                        _notifications.Writer.TryWrite(new NatsJSNotification(headers.Code, headers.MessageText));
+                        _logger.LogError(
+                            "Can't parse headers: {HeadersBuffer}",
+                            Encoding.ASCII.GetString(headersBuffer.Value.ToArray()));
+                        throw new NatsJSException("Can't parse headers");
                     }
                 }
                 else
                 {
-                    _logger.LogError(
-                        "Can't parse headers: {HeadersBuffer}",
-                        Encoding.ASCII.GetString(headersBuffer.Value.ToArray()));
-                    throw new NatsJSException("Can't parse headers");
+                    throw new NatsJSException("No header found");
                 }
+
+                return ValueTask.CompletedTask;
             }
             else
             {
-                throw new NatsJSException("No header found");
+                var msg = new NatsJSMsg<TMsg?>(NatsMsg<TMsg?>.Build(
+                    subject,
+                    replyTo,
+                    headersBuffer,
+                    payloadBuffer,
+                    Connection,
+                    Connection.HeaderParser,
+                    _serializer));
+
+                _pending--;
+
+                return _userMsgs.Writer.WriteAsync(msg);
             }
-
-            return ValueTask.CompletedTask;
         }
-        else
+        finally
         {
-            var msg = new NatsJSMsg<TMsg?>(NatsMsg<TMsg?>.Build(
-                subject,
-                replyTo,
-                headersBuffer,
-                payloadBuffer,
-                Connection,
-                Connection.HeaderParser,
-                _serializer));
-
-            DecrementMaxMsgs();
-
-            return _userMsgs.Writer.WriteAsync(msg);
+            if (_pending == 0)
+            {
+                EndSubscription(NatsSubEndReason.MaxMsgs);
+            }
         }
     }
 
@@ -171,8 +186,6 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
         _userMsgs.Writer.TryComplete();
         _notifications.Writer.TryComplete();
     }
-
-    private void ResetHeartbeatTimer() => _timer.Change(_hbTimeout, Timeout.Infinite);
 
     private async Task NotificationsLoop()
     {

@@ -1,11 +1,7 @@
-﻿using System.Threading.Channels;
-using Example.JetStream.PullConsumer;
+﻿using Example.JetStream.PullConsumer;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
-using NATS.Client.Core.Internal;
 using NATS.Client.JetStream;
-using NATS.Client.JetStream.Internal;
-using NATS.Client.JetStream.Models;
 
 var options = NatsOptions.Default with { LoggerFactory = new MinimumConsoleLoggerFactory(LogLevel.Error) };
 
@@ -19,17 +15,52 @@ var idle = TimeSpan.FromSeconds(1);
 var expires = TimeSpan.FromSeconds(10);
 var batch = 10;
 
-await using var sub = await consumer.ConsumeAsync<RawData>(new NatsJSConsumeOpts
+if (args.Length > 0 && args[0] == "fetch")
 {
-    MaxMsgs = batch,
-    Expires = expires,
-    IdleHeartbeat = idle,
-    Serializer = new RawDataSerializer(),
-});
+    while (true)
+    {
+        Console.WriteLine($"___\nFETCH {batch}");
+        await using var sub = await consumer.FetchAsync<RawData>(new NatsJSFetchOpts
+        {
+            MaxMsgs = batch, Expires = expires, IdleHeartbeat = idle, Serializer = new RawDataSerializer(),
+        });
+        await foreach (var jsMsg in sub.Msgs.ReadAllAsync())
+        {
+            var msg = jsMsg.Msg;
+            Console.WriteLine($"data: {msg.Data}");
+            await jsMsg.AckAsync();
+        }
+    }
+}
+else if (args.Length > 0 && args[0] == "next")
+{
+    while (true)
+    {
+        Console.WriteLine("___\nNEXT");
+        var next = await consumer.NextAsync<RawData>(new NatsJSNextOpts
+        {
+            Expires = expires, IdleHeartbeat = idle, Serializer = new RawDataSerializer(),
+        });
+        if (next is { } jsMsg)
+        {
+            var msg = jsMsg.Msg;
+            Console.WriteLine($"data: {msg.Data}");
+            await jsMsg.AckAsync();
+        }
+    }
+}
+else
+{
+    Console.WriteLine("___\nCONSUME");
+    await using var sub = await consumer.ConsumeAsync<RawData>(new NatsJSConsumeOpts
+    {
+        MaxMsgs = batch, Expires = expires, IdleHeartbeat = idle, Serializer = new RawDataSerializer(),
+    });
 
-await foreach (var jsMsg in sub.Msgs.ReadAllAsync())
-{
-    var msg = jsMsg.Msg;
-    Console.WriteLine($"data: {msg.Data}");
-    await jsMsg.AckAsync();
+    await foreach (var jsMsg in sub.Msgs.ReadAllAsync())
+    {
+        var msg = jsMsg.Msg;
+        Console.WriteLine($"data: {msg.Data}");
+        await jsMsg.AckAsync();
+    }
 }

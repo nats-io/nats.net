@@ -81,6 +81,15 @@ public record NatsJSNextOpts
     /// Amount idle time the server should wait before sending a heartbeat. For requests with expires > 30s, heartbeats should be enabled by default
     /// </summary>
     public TimeSpan? IdleHeartbeat { get; init; }
+
+    /// <summary>
+    /// Serializer to use to deserialize the message if a model is being used.
+    /// </summary>
+    /// <remarks>
+    /// If not set, serializer set in connection options or the default JSON serializer
+    /// will be used.
+    /// </remarks>
+    public INatsSerializer? Serializer { get; init; }
 }
 
 public record NatsJSFetchOpts

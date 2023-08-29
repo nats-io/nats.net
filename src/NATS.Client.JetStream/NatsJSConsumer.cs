@@ -77,19 +77,29 @@ public class NatsJSConsumer
             cancellationToken);
 
         sub.ResetPending();
+        sub.ResetHeartbeatTimer();
 
         return sub;
     }
 
-    public async ValueTask<NatsJSMsg<T?>> NextAsync<T>(CancellationToken cancellationToken = default)
+    public async ValueTask<NatsJSMsg<T?>?> NextAsync<T>(NatsJSNextOpts opts, CancellationToken cancellationToken = default)
     {
-        await using var f = await FetchAsync<T>(new NatsJSFetchOpts { MaxMsgs = 1 }, cancellationToken: cancellationToken);
+        await using var f = await FetchAsync<T>(
+            new NatsJSFetchOpts
+            {
+                MaxMsgs = 1,
+                IdleHeartbeat = opts.IdleHeartbeat,
+                Expires = opts.Expires,
+                Serializer = opts.Serializer,
+            },
+            cancellationToken: cancellationToken);
+
         await foreach (var natsJSMsg in f.Msgs.ReadAllAsync(cancellationToken))
         {
             return natsJSMsg;
         }
 
-        throw new NatsJSException("No data");
+        return default;
     }
 
     public async ValueTask<INatsJSSubConsume<T>> FetchAsync<T>(
@@ -114,8 +124,6 @@ public class NatsJSConsumer
                 Capacity = 1,
                 FullMode = BoundedChannelFullMode.Wait,
             },
-            MaxMsgs = (int)max.MaxMsgs,
-            Timeout = timeouts.Expires,
         };
 
         var sub = new NatsJSSubFetch<T>(
@@ -143,6 +151,8 @@ public class NatsJSConsumer
                 Expires = timeouts.Expires.ToNanos(),
             },
             cancellationToken);
+
+        sub.ResetHeartbeatTimer();
 
         return sub;
     }
