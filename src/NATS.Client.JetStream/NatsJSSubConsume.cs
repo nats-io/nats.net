@@ -126,10 +126,10 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
 
     public override async ValueTask DisposeAsync()
     {
-        await base.DisposeAsync();
-        await _pullTask;
-        await _notificationsTask;
-        await _timer.DisposeAsync();
+        await base.DisposeAsync().ConfigureAwait(false);
+        await _pullTask.ConfigureAwait(false);
+        await _notificationsTask.ConfigureAwait(false);
+        await _timer.DisposeAsync().ConfigureAwait(false);
     }
 
     internal override IEnumerable<ICommand> GetReconnectCommands(int sid)
@@ -270,7 +270,7 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
                 _pendingBytes -= msg.Msg.Size;
             }
 
-            await _userMsgs.Writer.WriteAsync(msg);
+            await _userMsgs.Writer.WriteAsync(msg).ConfigureAwait(false);
         }
 
         CheckPending();
@@ -315,7 +315,7 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
     {
         await foreach (var pr in _pullRequests.Reader.ReadAllAsync())
         {
-            await CallMsgNextAsync(pr);
+            await CallMsgNextAsync(pr).ConfigureAwait(false);
         }
     }
 

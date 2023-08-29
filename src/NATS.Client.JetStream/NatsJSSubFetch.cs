@@ -91,9 +91,9 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubFetch<TMsg>
 
     public override async ValueTask DisposeAsync()
     {
-        await base.DisposeAsync();
-        await _notificationsTask;
-        await _timer.DisposeAsync();
+        await base.DisposeAsync().ConfigureAwait(false);
+        await _notificationsTask.ConfigureAwait(false);
+        await _timer.DisposeAsync().ConfigureAwait(false);
     }
 
     internal override IEnumerable<ICommand> GetReconnectCommands(int sid)
@@ -175,7 +175,7 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubFetch<TMsg>
                 _pendingMsgs--;
                 _pendingBytes -= msg.Msg.Size;
 
-                await _userMsgs.Writer.WriteAsync(msg);
+                await _userMsgs.Writer.WriteAsync(msg).ConfigureAwait(false);
             }
 
             if (_maxBytes > 0 && _pendingBytes <= 0)

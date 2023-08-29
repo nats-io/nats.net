@@ -13,14 +13,15 @@ public class ConsumerConsumeTest
     public async Task Consume_msgs_test()
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        await using var server = NatsServer.Start(
-            outputHelper: _output,
-            options: new NatsServerOptionsBuilder()
-                .UseTransport(TransportType.Tcp)
-                .Trace()
-                .UseJetStream()
-                .Build());
 
+        // await using var server = NatsServer.Start(
+        //     outputHelper: _output,
+        //     options: new NatsServerOptionsBuilder()
+        //         .UseTransport(TransportType.Tcp)
+        //         .Trace()
+        //         .UseJetStream()
+        //         .Build());
+        await using var server = NatsServer.StartJS();
         var (nats, proxy) = server.CreateProxiedClientConnection();
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
@@ -47,13 +48,12 @@ public class ConsumerConsumeTest
 
         Assert.Equal(25, count);
 
-        // TODO: we seem to be getting inconsistent number of pulls here!
-        // It's sometimes 5 sometimes 7!
-        // await Retry.Until(
-        //     "receiving all pulls",
-        //     () => proxy
-        //               .ClientFrames
-        //               .Count(f => f.Message.StartsWith("PUB $JS.API.CONSUMER.MSG.NEXT.s1.c1")) == 7);
+        await Retry.Until(
+            "receiving all pulls",
+            () => proxy
+                      .ClientFrames
+                      .Count(f => f.Message.StartsWith("PUB $JS.API.CONSUMER.MSG.NEXT.s1.c1")) == 6);
+
         var msgNextRequests = proxy
             .ClientFrames
             .Where(f => f.Message.StartsWith("PUB $JS.API.CONSUMER.MSG.NEXT.s1.c1"))
