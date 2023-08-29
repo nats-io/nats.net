@@ -12,7 +12,13 @@ public class JetStreamTest
     [Fact]
     public async Task Create_stream_test()
     {
-        await using var server = NatsServer.StartJS();
+        await using var server = NatsServer.Start(
+            outputHelper: _output,
+            options: new NatsServerOptionsBuilder()
+                .UseTransport(TransportType.Tcp)
+                .Trace()
+                .UseJetStream()
+                .Build());
         var nats = server.CreateClientConnection();
 
         // Happy user
