@@ -19,12 +19,12 @@ public class ConsumerStateTest
 
     [Fact]
     public void Allow_only_max_msgs_or_bytes_options() =>
-        Assert.Throws<NatsJSException>(() => _ = NatsJSOpsDefaults.SetMax(new NatsJSOpts(), 1, 1));
+        Assert.Throws<NatsJSException>(() => _ = NatsJSOpsDefaults.SetMax(new NatsJSOpts(NatsOpts.Default), 1, 1));
 
     [Fact]
     public void Set_bytes_option()
     {
-        var opts = NatsJSOpsDefaults.SetMax(new NatsJSOpts(), maxBytes: 1024);
+        var opts = NatsJSOpsDefaults.SetMax(new NatsJSOpts(NatsOpts.Default), maxBytes: 1024);
         Assert.Equal(1_000_000, opts.MaxMsgs);
         Assert.Equal(1024, opts.MaxBytes);
         Assert.Equal(500_000, opts.ThresholdMsgs);

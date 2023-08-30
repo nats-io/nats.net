@@ -33,7 +33,8 @@ namespace NATS.Client.Core;
 /// <param name="SubscriptionCleanUpInterval"></param>
 /// <param name="WriterCommandBufferLimit"></param>
 /// <param name="HeaderEncoding"></param>
-public sealed record NatsOptions
+/// <param name="WaitUntilSent"></param>
+public sealed record NatsOpts
 (
     string Url,
     string Name,
@@ -59,9 +60,10 @@ public sealed record NatsOptions
     TimeSpan CommandTimeout,
     TimeSpan SubscriptionCleanUpInterval,
     int? WriterCommandBufferLimit,
-    Encoding HeaderEncoding)
+    Encoding HeaderEncoding,
+    bool WaitUntilSent)
 {
-    public static readonly NatsOptions Default = new(
+    public static readonly NatsOpts Default = new(
         Url: "nats://localhost:4222",
         Name: "NATS .Net Client",
         Echo: true,
@@ -86,7 +88,8 @@ public sealed record NatsOptions
         CommandTimeout: TimeSpan.FromMinutes(1),
         SubscriptionCleanUpInterval: TimeSpan.FromMinutes(5),
         WriterCommandBufferLimit: 1_000,
-        HeaderEncoding: Encoding.ASCII);
+        HeaderEncoding: Encoding.ASCII,
+        WaitUntilSent: false);
 
     internal NatsUri[] GetSeedUris()
     {

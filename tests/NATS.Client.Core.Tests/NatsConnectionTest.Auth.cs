@@ -9,7 +9,7 @@ public abstract partial class NatsConnectionTest
             new Auth(
                 "TOKEN",
                 "resources/configs/auth/token.conf",
-                NatsOptions.Default with { AuthOptions = NatsAuthOptions.Default with { Token = "s3cr3t", }, }),
+                NatsOpts.Default with { AuthOptions = NatsAuthOptions.Default with { Token = "s3cr3t", }, }),
         };
 
         yield return new object[]
@@ -17,7 +17,7 @@ public abstract partial class NatsConnectionTest
             new Auth(
                 "USER-PASSWORD",
                 "resources/configs/auth/password.conf",
-                NatsOptions.Default with
+                NatsOpts.Default with
                 {
                     AuthOptions = NatsAuthOptions.Default with { Username = "a", Password = "b", },
                 }),
@@ -28,7 +28,7 @@ public abstract partial class NatsConnectionTest
             new Auth(
                 "NKEY",
                 "resources/configs/auth/nkey.conf",
-                NatsOptions.Default with
+                NatsOpts.Default with
                 {
                     AuthOptions = NatsAuthOptions.Default with
                     {
@@ -43,7 +43,7 @@ public abstract partial class NatsConnectionTest
             new Auth(
                 "NKEY (FROM FILE)",
                 "resources/configs/auth/nkey.conf",
-                NatsOptions.Default with
+                NatsOpts.Default with
                 {
                     AuthOptions = NatsAuthOptions.Default with { NKeyFile = "resources/configs/auth/user.nk", },
                 }),
@@ -54,7 +54,7 @@ public abstract partial class NatsConnectionTest
             new Auth(
                 "USER-CREDS",
                 "resources/configs/auth/operator.conf",
-                NatsOptions.Default with
+                NatsOpts.Default with
                 {
                     AuthOptions = NatsAuthOptions.Default with
                     {
@@ -70,7 +70,7 @@ public abstract partial class NatsConnectionTest
             new Auth(
                 "USER-CREDS (FROM FILE)",
                 "resources/configs/auth/operator.conf",
-                NatsOptions.Default with
+                NatsOpts.Default with
                 {
                     AuthOptions = NatsAuthOptions.Default with { CredsFile = "resources/configs/auth/user.creds", },
                 }),
@@ -83,7 +83,7 @@ public abstract partial class NatsConnectionTest
     {
         var name = auth.Name;
         var serverConfig = auth.ServerConfig;
-        var clientOptions = auth.ClientOptions;
+        var clientOptions = auth.ClientOpts;
 
         _output.WriteLine($"AUTH TEST {name}");
 
@@ -162,18 +162,18 @@ public abstract partial class NatsConnectionTest
 
     public class Auth
     {
-        public Auth(string name, string serverConfig, NatsOptions clientOptions)
+        public Auth(string name, string serverConfig, NatsOpts clientOpts)
         {
             Name = name;
             ServerConfig = serverConfig;
-            ClientOptions = clientOptions;
+            ClientOpts = clientOpts;
         }
 
         public string Name { get; }
 
         public string ServerConfig { get; }
 
-        public NatsOptions ClientOptions { get; }
+        public NatsOpts ClientOpts { get; }
 
         public override string ToString() => Name;
     }

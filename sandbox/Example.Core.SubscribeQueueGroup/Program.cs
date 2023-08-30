@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 
 var subject = "foo.*";
-var options = NatsOptions.Default with { LoggerFactory = new MinimumConsoleLoggerFactory(LogLevel.Error) };
+var options = NatsOpts.Default with { LoggerFactory = new MinimumConsoleLoggerFactory(LogLevel.Error) };
 
 // ---
 // Worker 1

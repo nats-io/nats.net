@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using NATS.Client.Core.Tests;
 
 namespace NATS.Client.JetStream.Tests;
@@ -32,7 +31,7 @@ public class ConsumerConsumeTest
         var cc = await consumer.ConsumeAsync<TestData>(consumerOpts, cancellationToken: cts.Token);
         await foreach (var msg in cc.Msgs.ReadAllAsync(cts.Token))
         {
-            await msg.AckAsync(cts.Token);
+            await msg.AckAsync(new AckOpts(true), cts.Token);
             Assert.Equal(count, msg.Msg.Data!.Test);
             count++;
             if (count == 25)
@@ -100,7 +99,7 @@ public class ConsumerConsumeTest
         var cc = await consumer.ConsumeAsync<TestData>(consumerOpts, cancellationToken: cts.Token);
         await foreach (var msg in cc.Msgs.ReadAllAsync(cts.Token))
         {
-            await msg.AckAsync(cts.Token);
+            await msg.AckAsync(new AckOpts(WaitUntilSent: true), cts.Token);
             Assert.Equal(count, msg.Msg.Data!.Test);
             await signal;
             break;
@@ -159,7 +158,7 @@ public class ConsumerConsumeTest
             var count = 0;
             await foreach (var msg in cc.Msgs.ReadAllAsync(cts.Token))
             {
-                await msg.AckAsync(cts.Token);
+                await msg.AckAsync(new AckOpts(WaitUntilSent: true), cts.Token);
                 Assert.Equal(count, msg.Msg.Data!.Test);
                 count++;
 

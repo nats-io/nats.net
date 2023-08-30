@@ -8,15 +8,13 @@ namespace NATS.Client.JetStream;
 public partial class NatsJSContext
 {
     public NatsJSContext(NatsConnection connection)
-        : this(connection, new NatsJSOpts())
+        : this(connection, new NatsJSOpts(connection.Opts))
     {
     }
 
     public NatsJSContext(NatsConnection connection, NatsJSOpts opts)
     {
         Connection = connection;
-        if (opts.InboxPrefix == string.Empty)
-            opts = opts with { InboxPrefix = connection.Opts.InboxPrefix };
         Opts = opts;
     }
 

@@ -249,14 +249,16 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
         }
         else
         {
-            var msg = new NatsJSMsg<TMsg?>(NatsMsg<TMsg?>.Build(
-                subject,
-                replyTo,
-                headersBuffer,
-                payloadBuffer,
-                Connection,
-                Connection.HeaderParser,
-                _serializer));
+            var msg = new NatsJSMsg<TMsg?>(
+                NatsMsg<TMsg?>.Build(
+                    subject,
+                    replyTo,
+                    headersBuffer,
+                    payloadBuffer,
+                    Connection,
+                    Connection.HeaderParser,
+                    _serializer),
+                _context);
 
             _pendingMsgs--;
 

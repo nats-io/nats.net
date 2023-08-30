@@ -13,7 +13,7 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
     private readonly ConnectionStatsCounter _counter;
     private readonly FixedArrayBufferWriter _bufferWriter;
     private readonly Channel<ICommand> _channel;
-    private readonly NatsOptions _options;
+    private readonly NatsOpts _opts;
     private readonly Task _writeLoop;
     private readonly Stopwatch _stopwatch = new Stopwatch();
     private readonly CancellationTokenSource _cancellationTokenSource;
@@ -27,7 +27,7 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
         _counter = counter;
         _bufferWriter = state.BufferWriter;
         _channel = state.CommandBuffer;
-        _options = state.Options;
+        _opts = state.Opts;
         _cancellationTokenSource = new CancellationTokenSource();
         _writeLoop = Task.Run(WriteLoopAsync);
     }
@@ -45,8 +45,8 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
     {
         var reader = _channel.Reader;
         var protocolWriter = new ProtocolWriter(_bufferWriter);
-        var logger = _options.LoggerFactory.CreateLogger<NatsPipeliningWriteProtocolProcessor>();
-        var writerBufferSize = _options.WriterBufferSize;
+        var logger = _opts.LoggerFactory.CreateLogger<NatsPipeliningWriteProtocolProcessor>();
+        var writerBufferSize = _opts.WriterBufferSize;
         var promiseList = new List<IPromise>(100);
         var isEnabledTraceLogging = logger.IsEnabled(LogLevel.Trace);
 

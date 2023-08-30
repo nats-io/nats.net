@@ -4,10 +4,18 @@ namespace NATS.Client.JetStream;
 
 public record NatsJSOpts
 {
+    public NatsJSOpts(NatsOpts opts, string? apiPrefix = default, int? maxMsgs = default, AckOpts? ackOpts = default, string? inboxPrefix = default)
+    {
+        ApiPrefix = apiPrefix ?? "$JS.API";
+        MaxMsgs = maxMsgs ?? 1000;
+        AckOpts = ackOpts ?? new AckOpts(opts.WaitUntilSent);
+        InboxPrefix = inboxPrefix ?? opts.InboxPrefix;
+    }
+
     /// <summary>
     /// Prefix to prepend to JetStream API subjects. (default: $JS.API)
     /// </summary>
-    public string ApiPrefix { get; init; } = "$JS.API";
+    public string ApiPrefix { get; init; }
 
     /// <summary>
     /// Prefix to use in inbox subscription subjects to receive messages from JetStream. (default: _INBOX)
@@ -15,12 +23,14 @@ public record NatsJSOpts
     /// Default is taken from NatsOptions (on the parent NatsConnection) which is '_INBOX' if not set.
     /// </para>
     /// </summary>
-    public string InboxPrefix { get; init; } = string.Empty;
+    public string InboxPrefix { get; init; }
 
     /// <summary>
     /// Maximum number of messages to receive in a batch. (default: 1000)
     /// </summary>
     public int MaxMsgs { get; init; } = 1000;
+
+    public AckOpts AckOpts { get; init; }
 }
 
 public record NatsJSConsumeOpts

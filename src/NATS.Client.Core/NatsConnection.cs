@@ -52,11 +52,11 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
     private UserCredentials? _userCredentials;
 
     public NatsConnection()
-        : this(NatsOptions.Default)
+        : this(NatsOpts.Default)
     {
     }
 
-    public NatsConnection(NatsOptions opts)
+    public NatsConnection(NatsOpts opts)
     {
         Opts = opts;
         ConnectionState = NatsConnectionState.Closed;
@@ -82,7 +82,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
     public event EventHandler<string>? ReconnectFailed;
 
-    public NatsOptions Opts { get; }
+    public NatsOpts Opts { get; }
 
     public NatsConnectionState ConnectionState { get; private set; }
 
@@ -787,12 +787,12 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 // This writer state is reused when reconnecting.
 internal sealed class WriterState
 {
-    public WriterState(NatsOptions options)
+    public WriterState(NatsOpts opts)
     {
-        Options = options;
+        Opts = opts;
         BufferWriter = new FixedArrayBufferWriter();
 
-        if (options.WriterCommandBufferLimit == null)
+        if (opts.WriterCommandBufferLimit == null)
         {
             CommandBuffer = Channel.CreateUnbounded<ICommand>(new UnboundedChannelOptions
             {
@@ -803,7 +803,7 @@ internal sealed class WriterState
         }
         else
         {
-            CommandBuffer = Channel.CreateBounded<ICommand>(new BoundedChannelOptions(options.WriterCommandBufferLimit.Value)
+            CommandBuffer = Channel.CreateBounded<ICommand>(new BoundedChannelOptions(opts.WriterCommandBufferLimit.Value)
             {
                 FullMode = BoundedChannelFullMode.Wait,
                 AllowSynchronousContinuations = false, // always should be in async loop.
@@ -820,7 +820,7 @@ internal sealed class WriterState
 
     public Channel<ICommand> CommandBuffer { get; }
 
-    public NatsOptions Options { get; }
+    public NatsOpts Opts { get; }
 
     public List<ICommand> PriorityCommands { get; }
 

@@ -26,7 +26,7 @@ public class ConsumerNextTest
             var next = await consumer.NextAsync<TestData>(new NatsJSNextOpts(), cts.Token);
             if (next is { } msg)
             {
-                await msg.AckAsync(cts.Token);
+                await msg.AckAsync(new AckOpts(WaitUntilSent: true), cts.Token);
                 Assert.Equal(i, msg.Msg.Data!.Test);
             }
         }

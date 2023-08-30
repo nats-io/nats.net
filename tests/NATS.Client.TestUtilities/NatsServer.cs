@@ -151,7 +151,7 @@ public class NatsServer : IAsyncDisposable
     public static NatsServer Start(ITestOutputHelper outputHelper, TransportType transportType) =>
         Start(outputHelper, new NatsServerOptionsBuilder().UseTransport(transportType).Build());
 
-    public static NatsServer Start(ITestOutputHelper outputHelper, NatsServerOptions options, NatsOptions? clientOptions = default)
+    public static NatsServer Start(ITestOutputHelper outputHelper, NatsServerOptions options, NatsOpts? clientOptions = default)
     {
         NatsServer? server = null;
         NatsConnection? nats = null;
@@ -160,7 +160,7 @@ public class NatsServer : IAsyncDisposable
             try
             {
                 server = new NatsServer(outputHelper, options);
-                nats = server.CreateClientConnection(clientOptions ?? NatsOptions.Default, reTryCount: 3);
+                nats = server.CreateClientConnection(clientOptions ?? NatsOpts.Default, reTryCount: 3);
 #pragma warning disable CA2012
                 return server;
             }
@@ -228,7 +228,7 @@ public class NatsServer : IAsyncDisposable
         }
     }
 
-    public (NatsConnection, NatsProxy) CreateProxiedClientConnection(NatsOptions? options = null)
+    public (NatsConnection, NatsProxy) CreateProxiedClientConnection(NatsOpts? options = null)
     {
         if (Options.EnableTls)
         {
@@ -237,7 +237,7 @@ public class NatsServer : IAsyncDisposable
 
         var proxy = new NatsProxy(Options.ServerPort, _outputHelper, Options.Trace);
 
-        var client = new NatsConnection((options ?? NatsOptions.Default) with
+        var client = new NatsConnection((options ?? NatsOpts.Default) with
         {
             LoggerFactory = new OutputHelperLoggerFactory(_outputHelper),
             Url = $"nats://localhost:{proxy.Port}",
@@ -247,13 +247,13 @@ public class NatsServer : IAsyncDisposable
         return (client, proxy);
     }
 
-    public NatsConnection CreateClientConnection(NatsOptions? options = default, int reTryCount = 10, bool ignoreAuthorizationException = false)
+    public NatsConnection CreateClientConnection(NatsOpts? options = default, int reTryCount = 10, bool ignoreAuthorizationException = false)
     {
         for (var i = 0; i < reTryCount; i++)
         {
             try
             {
-                var nats = new NatsConnection(ClientOptions(options ?? NatsOptions.Default));
+                var nats = new NatsConnection(ClientOptions(options ?? NatsOpts.Default));
 
                 try
                 {
@@ -281,16 +281,16 @@ public class NatsServer : IAsyncDisposable
         throw new Exception("Can't create a connection to nats-server");
     }
 
-    public NatsConnectionPool CreatePooledClientConnection() => CreatePooledClientConnection(NatsOptions.Default);
+    public NatsConnectionPool CreatePooledClientConnection() => CreatePooledClientConnection(NatsOpts.Default);
 
-    public NatsConnectionPool CreatePooledClientConnection(NatsOptions options)
+    public NatsConnectionPool CreatePooledClientConnection(NatsOpts opts)
     {
-        return new NatsConnectionPool(4, ClientOptions(options));
+        return new NatsConnectionPool(4, ClientOptions(opts));
     }
 
-    public NatsOptions ClientOptions(NatsOptions options)
+    public NatsOpts ClientOptions(NatsOpts opts)
     {
-        return options with
+        return opts with
         {
             LoggerFactory = new OutputHelperLoggerFactory(_outputHelper),
 

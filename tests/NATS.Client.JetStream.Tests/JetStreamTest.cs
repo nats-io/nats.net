@@ -25,7 +25,7 @@ public class JetStreamTest
         {
             var cts1 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-            var js = new NatsJSContext(nats, new NatsJSOpts());
+            var js = new NatsJSContext(nats);
 
             // Create stream
             var stream = await js.CreateStreamAsync(
@@ -93,7 +93,7 @@ public class JetStreamTest
                 // Only ACK one message so we can consume again
                 if (messages.Count == 1)
                 {
-                    await msg.AckAsync(cts2.Token);
+                    await msg.AckAsync(new AckOpts(WaitUntilSent: true), cancellationToken: cts2.Token);
                 }
 
                 if (messages.Count == 2)
@@ -111,7 +111,7 @@ public class JetStreamTest
         {
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-            var js = new NatsJSContext(nats, new NatsJSOpts());
+            var js = new NatsJSContext(nats);
             var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () =>
             {
                 await js.CreateStreamAsync(
@@ -132,7 +132,7 @@ public class JetStreamTest
         {
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-            var js = new NatsJSContext(nats, new NatsJSOpts());
+            var js = new NatsJSContext(nats);
 
             // Success
             await js.DeleteStreamAsync("events", cts.Token);

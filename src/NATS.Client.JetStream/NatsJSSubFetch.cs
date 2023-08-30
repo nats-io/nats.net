@@ -175,14 +175,16 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubFetch<TMsg>
             }
             else
             {
-                var msg = new NatsJSMsg<TMsg?>(NatsMsg<TMsg?>.Build(
-                    subject,
-                    replyTo,
-                    headersBuffer,
-                    payloadBuffer,
-                    Connection,
-                    Connection.HeaderParser,
-                    _serializer));
+                var msg = new NatsJSMsg<TMsg?>(
+                    NatsMsg<TMsg?>.Build(
+                        subject,
+                        replyTo,
+                        headersBuffer,
+                        payloadBuffer,
+                        Connection,
+                        Connection.HeaderParser,
+                        _serializer),
+                    _context);
 
                 _pendingMsgs--;
                 _pendingBytes -= msg.Msg.Size;

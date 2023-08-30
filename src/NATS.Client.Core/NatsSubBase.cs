@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Runtime.ExceptionServices;
+using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
 using NATS.Client.Core.Internal;
@@ -176,6 +177,13 @@ public abstract class NatsSubBase
         {
             // Need to await to handle any exceptions
             await ReceiveInternalAsync(subject, replyTo, headersBuffer, payloadBuffer).ConfigureAwait(false);
+        }
+        catch (ChannelClosedException)
+        {
+            // When user disposes or unsubscribes there maybe be messages still coming in
+            // (e.g. JetStream consumer batch might not be finished) even though we're not
+            // interested in the messages anymore. Hence we ignore any messages being
+            // fed into the channel and rejected.
         }
         catch (Exception e)
         {

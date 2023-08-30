@@ -57,11 +57,11 @@ public abstract partial class NatsConnectionTest
     {
         await using var server = NatsServer.Start(_output, _transportType);
 
-        var serializer1 = NatsOptions.Default.Serializer;
+        var serializer1 = NatsOpts.Default.Serializer;
 
         foreach (var serializer in new INatsSerializer[] { serializer1 })
         {
-            var options = NatsOptions.Default with { Serializer = serializer };
+            var options = NatsOpts.Default with { Serializer = serializer };
             await using var subConnection = server.CreateClientConnection(options);
             await using var pubConnection = server.CreateClientConnection(options);
 
@@ -100,7 +100,7 @@ public abstract partial class NatsConnectionTest
     {
         await using var server = NatsServer.Start(_output, _transportType);
 
-        var options = NatsOptions.Default with { RequestTimeout = TimeSpan.FromSeconds(5) };
+        var options = NatsOpts.Default with { RequestTimeout = TimeSpan.FromSeconds(5) };
         await using var subConnection = server.CreateClientConnection(options);
         await using var pubConnection = server.CreateClientConnection(options);
 
