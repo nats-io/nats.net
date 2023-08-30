@@ -19,7 +19,8 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubFetch<TMsg>
     private readonly string _consumer;
     private readonly Action<NatsJSNotification>? _errorHandler;
     private readonly INatsSerializer _serializer;
-    private readonly Timer _timer;
+    private readonly Timer _hbTimer;
+    private readonly Timer _expiresTimer;
     private readonly Task _notificationsTask;
 
     private readonly long _maxMsgs;
@@ -65,7 +66,7 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubFetch<TMsg>
         _notifications = Channel.CreateBounded<NatsJSNotification>(NatsSub.GetChannelOptions(opts?.ChannelOptions));
         _notificationsTask = Task.Run(NotificationsLoop);
 
-        _timer = new Timer(
+        _hbTimer = new Timer(
             static state =>
             {
                 var self = (NatsJSSubFetch<TMsg>)state!;
@@ -74,6 +75,16 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubFetch<TMsg>
             this,
             Timeout.Infinite,
             Timeout.Infinite);
+
+        _expiresTimer = new Timer(
+            static state =>
+            {
+                var self = (NatsJSSubFetch<TMsg>)state!;
+                self.EndSubscription(NatsSubEndReason.Timeout);
+            },
+            this,
+            expires + TimeSpan.FromSeconds(5),
+            Timeout.InfiniteTimeSpan);
     }
 
     public ChannelReader<NatsJSMsg<TMsg?>> Msgs { get; }
@@ -87,13 +98,14 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubFetch<TMsg>
             headers: default,
             cancellationToken);
 
-    public void ResetHeartbeatTimer() => _timer.Change(_hbTimeout, Timeout.Infinite);
+    public void ResetHeartbeatTimer() => _hbTimer.Change(_hbTimeout, Timeout.Infinite);
 
     public override async ValueTask DisposeAsync()
     {
         await base.DisposeAsync().ConfigureAwait(false);
         await _notificationsTask.ConfigureAwait(false);
-        await _timer.DisposeAsync().ConfigureAwait(false);
+        await _hbTimer.DisposeAsync().ConfigureAwait(false);
+        await _expiresTimer.DisposeAsync().ConfigureAwait(false);
     }
 
     internal override IEnumerable<ICommand> GetReconnectCommands(int sid)
