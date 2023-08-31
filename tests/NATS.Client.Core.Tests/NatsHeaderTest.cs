@@ -140,15 +140,20 @@ public class NatsHeaderTest
     [Fact]
     public void ParserMultiSpanTests()
     {
+        const string text1 = "NATS/1.0 123 Test ";
+        const string text2 = "Message\r\n\r\n";
+
         var parser = new HeaderParser(Encoding.UTF8);
-        var text1 = "NATS/1.0 123 Test ";
-        var text2 = "Message\r\n\r\n";
         var builder = new SeqeunceBuilder();
         builder.Append(Encoding.UTF8.GetBytes(text1));
         builder.Append(Encoding.UTF8.GetBytes(text2));
         var input = new SequenceReader<byte>(builder.ToReadOnlySequence());
+
         var headers = new NatsHeaders();
         parser.ParseHeaders(input, headers);
-        _output.WriteLine($"{headers.Dump()}");
+
+        Assert.Equal(1, headers.Version);
+        Assert.Equal(123, headers.Code);
+        Assert.Equal("Test Message", headers.MessageText);
     }
 }
