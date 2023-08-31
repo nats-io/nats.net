@@ -23,7 +23,10 @@ jobs:
     steps:
       - name: Install nats-server
         run: |
-          curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@${{ matrix.config.branch }} | PREFIX=. sh
+          for i in 1 2 3
+          do
+            curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@${{ matrix.config.branch }} | PREFIX=. sh && break || sleep 30
+          done
           sudo mv nats-server /usr/local/bin
 
       - name: Check nats-server
@@ -74,7 +77,10 @@ jobs:
         shell: bash
         run: |
           mkdir tools-nats-server && cd tools-nats-server
-          curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@${{ matrix.config.branch }} | PREFIX=. sh
+          for i in 1 2 3
+          do
+            curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@${{ matrix.config.branch }} | PREFIX=. sh && break || sleep 30
+          done
           mv nats-server nats-server.exe
           cygpath -w "$(pwd)" | tee -a "$GITHUB_PATH"
 
