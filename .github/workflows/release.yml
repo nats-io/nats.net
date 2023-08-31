@@ -49,12 +49,6 @@ jobs:
         run: dotnet nuget push dist/*.nupkg -s https://api.nuget.org/v3/index.json -k "${{ secrets.NUGET_API_KEY }}" --skip-duplicate
 
       - if: ${{ fromJSON(steps.tag.outputs.create) }}
-        name: Tag
-        run: |
-          git tag "${{ steps.tag.outputs.ref-name }}"
-          git push origin "${{ steps.tag.outputs.ref-name }}"
-
-      - if: ${{ fromJSON(steps.tag.outputs.create) }}
         run: dotnet tool update -g docfx
 
       - if: ${{ fromJSON(steps.tag.outputs.create) }}
@@ -70,3 +64,9 @@ jobs:
         name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v2
+
+      - if: ${{ fromJSON(steps.tag.outputs.create) }}
+        name: Tag
+        run: |
+          git tag "${{ steps.tag.outputs.ref-name }}"
+          git push origin "${{ steps.tag.outputs.ref-name }}"
