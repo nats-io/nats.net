@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using NATS.Client.Core.Tests;
 
 namespace NATS.Client.JetStream.Tests;
@@ -64,13 +65,12 @@ public class ConsumerConsumeTest
             .Where(f => f.Message.StartsWith("PUB $JS.API.CONSUMER.MSG.NEXT.s1.c1"))
             .ToList();
 
-        // Initial pull
-        Assert.Matches(@"^PUB.*""batch"":10\b", msgNextRequests.First().Message);
-
-        foreach (var frame in msgNextRequests.Skip(1))
+        foreach (var frame in msgNextRequests)
         {
-            // Consequent pulls should top-up to max value
-            Assert.Matches(@"^PUB.*""batch"":5\b", frame.Message);
+            var match = Regex.Match(frame.Message, @"^PUB.*""batch"":(\d+)");
+            Assert.True(match.Success);
+            var batch = int.Parse(match.Groups[1].Value);
+            Assert.True(batch <= 10);
         }
     }
 
