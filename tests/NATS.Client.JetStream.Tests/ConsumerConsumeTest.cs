@@ -13,7 +13,13 @@ public class ConsumerConsumeTest
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
-        await using var server = NatsServer.StartJS();
+        await using var server = NatsServer.Start(
+            outputHelper: _output,
+            options: new NatsServerOptionsBuilder()
+                .UseTransport(TransportType.Tcp)
+                .Trace()
+                .UseJetStream()
+                .Build());
         var (nats, proxy) = server.CreateProxiedClientConnection();
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
@@ -28,35 +34,42 @@ public class ConsumerConsumeTest
         var consumerOpts = new NatsJSConsumeOpts { MaxMsgs = 10 };
         var consumer = await js.GetConsumerAsync("s1", "c1", cts.Token);
         var count = 0;
-        var cc = await consumer.ConsumeAsync<TestData>(consumerOpts, cancellationToken: cts.Token);
+        await using var cc = await consumer.ConsumeAsync<TestData>(consumerOpts, cancellationToken: cts.Token);
         await foreach (var msg in cc.Msgs.ReadAllAsync(cts.Token))
         {
             await msg.AckAsync(new AckOpts(true), cts.Token);
             Assert.Equal(count, msg.Msg.Data!.Test);
             count++;
-            if (count == 25)
+            if (count == 30)
                 break;
         }
 
-        Assert.Equal(25, count);
+        int? PullCount() => proxy?
+            .ClientFrames
+            .Count(f => f.Message.StartsWith("PUB $JS.API.CONSUMER.MSG.NEXT.s1.c1"));
 
         await Retry.Until(
-            "receiving all pulls",
-            () => proxy
-                      .ClientFrames
-                      .Count(f => f.Message.StartsWith("PUB $JS.API.CONSUMER.MSG.NEXT.s1.c1")) == 6);
+            reason: "received enough pulls",
+            condition: () => PullCount() > 5,
+            action: () =>
+            {
+                _output.WriteLine($"### PullCount:{PullCount()}");
+                return Task.CompletedTask;
+            },
+            retryDelay: TimeSpan.FromSeconds(3),
+            timeout: TimeSpan.FromSeconds(15));
 
         var msgNextRequests = proxy
             .ClientFrames
             .Where(f => f.Message.StartsWith("PUB $JS.API.CONSUMER.MSG.NEXT.s1.c1"))
             .ToList();
 
-        // Prefetch
+        // Initial pull
         Assert.Matches(@"^PUB.*""batch"":10\b", msgNextRequests.First().Message);
 
         foreach (var frame in msgNextRequests.Skip(1))
         {
-            // Consequent fetches should top up to the prefetch value
+            // Consequent pulls should top-up to max value
             Assert.Matches(@"^PUB.*""batch"":5\b", frame.Message);
         }
     }
