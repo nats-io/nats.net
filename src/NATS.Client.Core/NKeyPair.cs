@@ -7,7 +7,7 @@ namespace NATS.Client.Core;
 /// Partial implementation of the NATS Ed25519 KeyPair.  This is not complete, but provides enough
 /// functionality to implement the client side NATS 2.0 security scheme.
 /// </summary>
-public class NkeyPair : IDisposable
+public class NKeyPair : IDisposable
 {
     private byte[] _seed;
     private byte[] _expandedPrivateKey;
@@ -15,7 +15,7 @@ public class NkeyPair : IDisposable
 
     private bool _disposedValue = false; // To detect redundant calls
 
-    internal NkeyPair(byte[] userSeed)
+    internal NKeyPair(byte[] userSeed)
     {
         if (userSeed == null)
             throw new NatsException("seed cannot be null");
@@ -50,8 +50,8 @@ public class NkeyPair : IDisposable
     /// </summary>
     public void Wipe()
     {
-        Nkeys.Wipe(ref _seed);
-        Nkeys.Wipe(ref _expandedPrivateKey);
+        NKeys.Wipe(ref _seed);
+        NKeys.Wipe(ref _expandedPrivateKey);
     }
 
     /// <summary>
@@ -67,7 +67,7 @@ public class NkeyPair : IDisposable
     }
 
     /// <summary>
-    /// Releases all resources used by the NkeyPair.
+    /// Releases all resources used by the NKeyPair.
     /// </summary>
     public void Dispose()
     {
@@ -75,7 +75,7 @@ public class NkeyPair : IDisposable
     }
 
     /// <summary>
-    /// Releases the unmanaged resources used by the NkeyPair and optionally releases the managed resources.
+    /// Releases the unmanaged resources used by the NKeyPair and optionally releases the managed resources.
     /// </summary>
     /// <param name="disposing">true to release both managed and unmanaged resources; false to release only unmanaged resources.</param>
     protected virtual void Dispose(bool disposing)
@@ -93,9 +93,9 @@ public class NkeyPair : IDisposable
 }
 
 /// <summary>
-/// Nkeys is a class provided to manipulate Nkeys and generate NkeyPairs.
+/// NKeys is a class provided to manipulate NKeys and generate NKeyPairs.
 /// </summary>
-public class Nkeys
+public class NKeys
 {
     // PrefixByteSeed is the version byte used for encoded NATS Seeds
     private const byte PrefixByteSeed = 18 << 3; // Base32-encodes to 'S...'
@@ -124,7 +124,7 @@ public class Nkeys
     /// <summary>
     /// Decodes a base 32 encoded NKey into a nkey seed and verifies the checksum.
     /// </summary>
-    /// <param name="src">Base 32 encoded Nkey.</param>
+    /// <param name="src">Base 32 encoded NKey.</param>
     /// <returns></returns>
     public static byte[] Decode(string src)
     {
@@ -163,16 +163,16 @@ public class Nkeys
     }
 
     /// <summary>
-    /// Creates an NkeyPair from a private seed String.
+    /// Creates an NKeyPair from a private seed String.
     /// </summary>
     /// <param name="seed"></param>
     /// <returns>A NATS Ed25519 Keypair</returns>
-    public static NkeyPair FromSeed(string seed)
+    public static NKeyPair FromSeed(string seed)
     {
         var userSeed = DecodeSeed(seed);
         try
         {
-            var kp = new NkeyPair(userSeed);
+            var kp = new NKeyPair(userSeed);
             return kp;
         }
         finally
@@ -215,7 +215,7 @@ public class Nkeys
     /// <returns>A the public key corresponding to Seed</returns>
     public static string PublicKeyFromSeed(string seed)
     {
-        var s = Nkeys.Decode(seed);
+        var s = NKeys.Decode(seed);
         if ((s[0] & (31 << 3)) != PrefixByteSeed)
         {
             throw new NatsException("Not a seed");
@@ -258,7 +258,7 @@ public class Nkeys
 
     internal static byte[] DecodeSeed(string src)
     {
-        return DecodeSeed(Nkeys.Decode(src));
+        return DecodeSeed(NKeys.Decode(src));
     }
 
     internal static string Encode(byte prefixbyte, bool seed, byte[] src)

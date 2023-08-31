@@ -93,7 +93,7 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubFetch<TMsg>
         Connection.PubModelAsync(
             subject: $"{_context.Opts.ApiPrefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
             data: request,
-            serializer: JsonNatsSerializer.Default,
+            serializer: NatsJsonSerializer.Default,
             replyTo: Subject,
             headers: default,
             cancellationToken);
@@ -126,7 +126,7 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubFetch<TMsg>
             replyTo: Subject,
             headers: default,
             value: request,
-            serializer: JsonNatsSerializer.Default,
+            serializer: NatsJsonSerializer.Default,
             cancellationToken: default);
     }
 

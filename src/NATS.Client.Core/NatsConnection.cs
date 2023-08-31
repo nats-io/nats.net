@@ -72,7 +72,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         SubscriptionManager = new SubscriptionManager(this, InboxPrefix);
         _logger = opts.LoggerFactory.CreateLogger<NatsConnection>();
         _clientOpts = ClientOpts.Create(Opts);
-        HeaderParser = new HeaderParser(opts.HeaderEncoding);
+        HeaderParser = new NatsHeaderParser(opts.HeaderEncoding);
     }
 
     // events
@@ -86,9 +86,9 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
     public NatsConnectionState ConnectionState { get; private set; }
 
-    public IServerInfo? ServerInfo => WritableServerInfo; // server info is set when received INFO
+    public INatsServerInfo? ServerInfo => WritableServerInfo; // server info is set when received INFO
 
-    public HeaderParser HeaderParser { get; }
+    public NatsHeaderParser HeaderParser { get; }
 
     internal SubscriptionManager SubscriptionManager { get; }
 

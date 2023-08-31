@@ -1,6 +1,6 @@
 namespace NATS.Client.Core;
 
-public interface IServerInfo
+public interface INatsServerInfo
 {
     string Id { get; }
 

@@ -4,7 +4,7 @@ namespace NATS.Client.Core.Internal;
 
 // Defined from `type Info struct` in nats-server
 // https://github.com/nats-io/nats-server/blob/a23b1b7/server/server.go#L61
-internal sealed record ServerInfo : IServerInfo
+internal sealed record ServerInfo : INatsServerInfo
 {
     [JsonPropertyName("server_id")]
     public string Id { get; set; } = string.Empty;

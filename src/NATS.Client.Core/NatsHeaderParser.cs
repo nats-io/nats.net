@@ -12,7 +12,7 @@ using NATS.Client.Core.Internal;
 // ReSharper disable PossiblyImpureMethodCallOnReadonlyVariable
 namespace NATS.Client.Core;
 
-public class HeaderParser
+public class NatsHeaderParser
 {
     private const byte ByteCR = (byte)'\r';
     private const byte ByteLF = (byte)'\n';
@@ -23,7 +23,7 @@ public class HeaderParser
 
     private readonly Encoding _encoding;
 
-    public HeaderParser(Encoding encoding) => _encoding = encoding;
+    public NatsHeaderParser(Encoding encoding) => _encoding = encoding;
 
     public bool ParseHeaders(SequenceReader<byte> reader, NatsHeaders headers)
     {

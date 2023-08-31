@@ -17,7 +17,7 @@ public readonly record struct NatsMsg(
         in ReadOnlySequence<byte>? headersBuffer,
         in ReadOnlySequence<byte> payloadBuffer,
         INatsConnection? connection,
-        HeaderParser headerParser)
+        NatsHeaderParser headerParser)
     {
         NatsHeaders? headers = null;
 
@@ -81,7 +81,7 @@ public readonly record struct NatsMsg<T>(
         in ReadOnlySequence<byte>? headersBuffer,
         in ReadOnlySequence<byte> payloadBuffer,
         INatsConnection? connection,
-        HeaderParser headerParser,
+        NatsHeaderParser headerParser,
         INatsSerializer serializer)
     {
         // Consider an empty payload as null or default value for value types. This way we are able to

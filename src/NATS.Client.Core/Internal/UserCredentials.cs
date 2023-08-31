@@ -9,7 +9,7 @@ internal class UserCredentials
     {
         Jwt = authOpts.Jwt;
         Seed = authOpts.Seed;
-        Nkey = authOpts.Nkey;
+        NKey = authOpts.NKey;
         Token = authOpts.Token;
 
         if (!string.IsNullOrEmpty(authOpts.CredsFile))
@@ -19,7 +19,7 @@ internal class UserCredentials
 
         if (!string.IsNullOrEmpty(authOpts.NKeyFile))
         {
-            (Seed, Nkey) = LoadNKeyFile(authOpts.NKeyFile);
+            (Seed, NKey) = LoadNKeyFile(authOpts.NKeyFile);
         }
     }
 
@@ -27,7 +27,7 @@ internal class UserCredentials
 
     public string? Seed { get; }
 
-    public string? Nkey { get; }
+    public string? NKey { get; }
 
     public string? Token { get; }
 
@@ -36,7 +36,7 @@ internal class UserCredentials
         if (Seed == null || nonce == null)
             return null;
 
-        using var kp = Nkeys.FromSeed(Seed);
+        using var kp = NKeys.FromSeed(Seed);
         var bytes = kp.Sign(Encoding.ASCII.GetBytes(nonce));
         var sig = CryptoBytes.ToBase64String(bytes);
 
@@ -46,7 +46,7 @@ internal class UserCredentials
     internal void Authenticate(ClientOpts opts, ServerInfo? info)
     {
         opts.JWT = Jwt;
-        opts.Nkey = Nkey;
+        opts.NKey = NKey;
         opts.AuthToken = Token;
         opts.Sig = info is { AuthRequired: true, Nonce: { } } ? Sign(info.Nonce) : null;
     }
