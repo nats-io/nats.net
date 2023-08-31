@@ -12,7 +12,7 @@ public record NatsAuthOpts
 
     public string? Jwt { get; init; }
 
-    public string? Nkey { get; init; }
+    public string? NKey { get; init; }
 
     public string? Seed { get; init; }
 

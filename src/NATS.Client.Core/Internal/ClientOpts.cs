@@ -40,7 +40,7 @@ internal sealed class ClientOpts
     public bool TLSRequired { get; init; }
 
     [JsonPropertyName("nkey")]
-    public string? Nkey { get; set; }
+    public string? NKey { get; set; }
 
     /// <summary>The JWT that identifies a user permissions and account.</summary>
     [JsonPropertyName("jwt")]

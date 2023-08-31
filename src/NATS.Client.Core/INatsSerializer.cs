@@ -18,9 +18,9 @@ public interface ICountableBufferWriter : IBufferWriter<byte>
     int WrittenCount { get; }
 }
 
-public sealed class JsonNatsSerializer : INatsSerializer
+public sealed class NatsJsonSerializer : INatsSerializer
 {
-    private static readonly JsonWriterOptions JsonWriterOptions = new JsonWriterOptions
+    private static readonly JsonWriterOptions JsonWriterOpts = new JsonWriterOptions
     {
         Indented = false,
         SkipValidation = true,
@@ -29,11 +29,11 @@ public sealed class JsonNatsSerializer : INatsSerializer
     [ThreadStatic]
     private static Utf8JsonWriter? _jsonWriter;
 
-    private readonly JsonSerializerOptions _options;
+    private readonly JsonSerializerOptions _opts;
 
-    public JsonNatsSerializer(JsonSerializerOptions options) => _options = options;
+    public NatsJsonSerializer(JsonSerializerOptions opts) => _opts = opts;
 
-    public static JsonNatsSerializer Default { get; } =
+    public static NatsJsonSerializer Default { get; } =
         new(new JsonSerializerOptions
         {
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -44,7 +44,7 @@ public sealed class JsonNatsSerializer : INatsSerializer
         Utf8JsonWriter writer;
         if (_jsonWriter == null)
         {
-            writer = _jsonWriter = new Utf8JsonWriter(bufferWriter, JsonWriterOptions);
+            writer = _jsonWriter = new Utf8JsonWriter(bufferWriter, JsonWriterOpts);
         }
         else
         {
@@ -52,7 +52,7 @@ public sealed class JsonNatsSerializer : INatsSerializer
             writer.Reset(bufferWriter);
         }
 
-        JsonSerializer.Serialize(writer, value, _options);
+        JsonSerializer.Serialize(writer, value, _opts);
 
         var bytesCommitted = (int)writer.BytesCommitted;
         writer.Reset(NullBufferWriter.Instance);
@@ -62,13 +62,13 @@ public sealed class JsonNatsSerializer : INatsSerializer
     public T? Deserialize<T>(in ReadOnlySequence<byte> buffer)
     {
         var reader = new Utf8JsonReader(buffer); // Utf8JsonReader is ref struct, no allocate.
-        return JsonSerializer.Deserialize<T>(ref reader, _options);
+        return JsonSerializer.Deserialize<T>(ref reader, _opts);
     }
 
     public object? Deserialize(in ReadOnlySequence<byte> buffer, Type type)
     {
         var reader = new Utf8JsonReader(buffer); // Utf8JsonReader is ref struct, no allocate.
-        return JsonSerializer.Deserialize(ref reader, type, _options);
+        return JsonSerializer.Deserialize(ref reader, type, _opts);
     }
 
     private sealed class NullBufferWriter : IBufferWriter<byte>

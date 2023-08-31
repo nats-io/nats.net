@@ -32,7 +32,7 @@ public abstract partial class NatsConnectionTest
                 {
                     AuthOpts = NatsAuthOpts.Default with
                     {
-                        Nkey = "UALQSMXRSAA7ZXIGDDJBJ2JOYJVQIWM3LQVDM5KYIPG4EP3FAGJ47BOJ",
+                        NKey = "UALQSMXRSAA7ZXIGDDJBJ2JOYJVQIWM3LQVDM5KYIPG4EP3FAGJ47BOJ",
                         Seed = "SUAAVWRZG6M5FA5VRRGWSCIHKTOJC7EWNIT4JV3FTOIPO4OBFR5WA7X5TE",
                     },
                 }),

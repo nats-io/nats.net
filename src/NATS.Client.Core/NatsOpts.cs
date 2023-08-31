@@ -71,7 +71,7 @@ public sealed record NatsOpts
         Headers: true,
         AuthOpts: NatsAuthOpts.Default,
         TlsOpts: NatsTlsOpts.Default,
-        Serializer: JsonNatsSerializer.Default,
+        Serializer: NatsJsonSerializer.Default,
         LoggerFactory: NullLoggerFactory.Instance,
         WriterBufferSize: 65534, // 32767
         ReaderBufferSize: 1048576,

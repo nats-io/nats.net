@@ -34,7 +34,7 @@ public class NatsHeaderTest
     [Fact]
     public void ParserTests()
     {
-        var parser = new HeaderParser(Encoding.UTF8);
+        var parser = new NatsHeaderParser(Encoding.UTF8);
         var text = "NATS/1.0 123 Test Message\r\nk1: v1\r\nk2: v2-0\r\nk2: v2-1\r\na-long-header-key: value\r\nkey: a-long-header-value\r\n\r\n";
         var input = new SequenceReader<byte>(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(text)));
         var headers = new NatsHeaders();
@@ -77,7 +77,7 @@ public class NatsHeaderTest
     [InlineData("test message", NatsHeaders.Messages.Text)]
     public void ParserMessageEnumTests(string message, NatsHeaders.Messages result)
     {
-        var parser = new HeaderParser(Encoding.UTF8);
+        var parser = new NatsHeaderParser(Encoding.UTF8);
         var text = $"NATS/1.0 100 {message}\r\n\r\n";
         var input = new SequenceReader<byte>(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(text)));
         var headers = new NatsHeaders();
@@ -91,7 +91,7 @@ public class NatsHeaderTest
     {
         var exception = Assert.Throws<NatsException>(() =>
         {
-            var parser = new HeaderParser(Encoding.UTF8);
+            var parser = new NatsHeaderParser(Encoding.UTF8);
             var text = "NATS/2.0\r\n\r\n";
             var input = new SequenceReader<byte>(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(text)));
             var headers = new NatsHeaders();
@@ -105,7 +105,7 @@ public class NatsHeaderTest
     {
         var exception = Assert.Throws<NatsException>(() =>
         {
-            var parser = new HeaderParser(Encoding.UTF8);
+            var parser = new NatsHeaderParser(Encoding.UTF8);
             var text = "NATS/1.0 x\r\n\r\n";
             var input = new SequenceReader<byte>(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(text)));
             var headers = new NatsHeaders();
@@ -126,7 +126,7 @@ public class NatsHeaderTest
     [InlineData("NATS/1.0 123456 test test 3\r\nk:v\r\n\r\n", 123456, "test test 3", 1)]
     public void ParserHeaderVersionOnlyTests(string text, int code, string message, int headerCount)
     {
-        var parser = new HeaderParser(Encoding.UTF8);
+        var parser = new NatsHeaderParser(Encoding.UTF8);
         var input = new SequenceReader<byte>(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(text)));
         var headers = new NatsHeaders();
         parser.ParseHeaders(input, headers);
@@ -143,7 +143,7 @@ public class NatsHeaderTest
         const string text1 = "NATS/1.0 123 Test ";
         const string text2 = "Message\r\n\r\n";
 
-        var parser = new HeaderParser(Encoding.UTF8);
+        var parser = new NatsHeaderParser(Encoding.UTF8);
         var builder = new SeqeunceBuilder();
         builder.Append(Encoding.UTF8.GetBytes(text1));
         builder.Append(Encoding.UTF8.GetBytes(text2));
