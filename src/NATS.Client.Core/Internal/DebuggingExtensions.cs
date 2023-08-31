@@ -27,10 +27,10 @@ public static class DebuggingExtensions
                 sb.Append(b);
                 break;
             case '\r':
-                sb.Append('␍');
+                sb.Append("\\r");
                 break;
             case '\n':
-                sb.Append('␊');
+                sb.Append("\\n");
                 break;
             default:
                 sb.Append('.');

@@ -11,16 +11,16 @@ namespace NATS.Client.Core.Internal;
 // https://github.com/nats-io/nats-server/blob/a23b1b7/server/client.go#L536
 internal sealed class ClientOptions
 {
-    private ClientOptions(NatsOptions options)
+    private ClientOptions(NatsOpts opts)
     {
-        Name = options.Name;
-        Echo = options.Echo;
-        Verbose = options.Verbose;
-        Headers = options.Headers;
-        Username = options.AuthOptions.Username;
-        Password = options.AuthOptions.Password;
-        AuthToken = options.AuthOptions.Token;
-        JWT = options.AuthOptions.Jwt;
+        Name = opts.Name;
+        Echo = opts.Echo;
+        Verbose = opts.Verbose;
+        Headers = opts.Headers;
+        Username = opts.AuthOptions.Username;
+        Password = opts.AuthOptions.Password;
+        AuthToken = opts.AuthOptions.Token;
+        JWT = opts.AuthOptions.Jwt;
     }
 
     /// <summary>Optional boolean. If set to true, the server (version 1.2.0+) will not send originating messages from this connection to its own subscriptions. Clients should set this to true only for server supporting this feature, which is when proto in the INFO protocol is set to at least 1.</summary>
@@ -90,9 +90,9 @@ internal sealed class ClientOptions
     [JsonPropertyName("no_responders")]
     public bool NoResponders { get; init; } = false;
 
-    public static ClientOptions Create(NatsOptions options)
+    public static ClientOptions Create(NatsOpts opts)
     {
-        return new ClientOptions(options);
+        return new ClientOptions(opts);
     }
 
     private static string GetAssemblyVersion()

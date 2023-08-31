@@ -14,7 +14,7 @@ public class SubscriptionTest
             .UseTransport(TransportType.Tcp)
             .Build();
         await using var server = NatsServer.Start(_output, serverOptions);
-        var options = NatsOptions.Default with { SubscriptionCleanUpInterval = TimeSpan.FromSeconds(1) };
+        var options = NatsOpts.Default with { SubscriptionCleanUpInterval = TimeSpan.FromSeconds(1) };
         var (nats, proxy) = server.CreateProxiedClientConnection(options);
 
         async Task Isolator()
@@ -53,7 +53,7 @@ public class SubscriptionTest
         await using var server = NatsServer.Start(_output, TransportType.Tcp);
 
         // Make sure time won't kick-in and unsubscribe
-        var options = NatsOptions.Default with { SubscriptionCleanUpInterval = TimeSpan.MaxValue };
+        var options = NatsOpts.Default with { SubscriptionCleanUpInterval = TimeSpan.MaxValue };
         var (nats, proxy) = server.CreateProxiedClientConnection(options);
 
         async Task Isolator()

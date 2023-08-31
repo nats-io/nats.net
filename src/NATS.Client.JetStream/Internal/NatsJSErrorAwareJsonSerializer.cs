@@ -5,9 +5,9 @@ using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Internal;
 
-internal sealed class JSErrorAwareJsonSerializer : INatsSerializer
+internal sealed class NatsJSErrorAwareJsonSerializer : INatsSerializer
 {
-    public static readonly JSErrorAwareJsonSerializer Default = new();
+    public static readonly NatsJSErrorAwareJsonSerializer Default = new();
 
     public int Serialize<T>(ICountableBufferWriter bufferWriter, T? value) =>
         throw new NotSupportedException();
@@ -22,7 +22,7 @@ internal sealed class JSErrorAwareJsonSerializer : INatsSerializer
         if (jsonDocument.RootElement.TryGetProperty("error", out var errorElement))
         {
             var error = errorElement.Deserialize<ApiError>() ?? throw new NatsJSException("Can't parse JetStream error JSON payload");
-            throw new JSApiErrorException(error);
+            throw new NatsJSApiErrorException(error);
         }
 
         return jsonDocument.Deserialize<T>();
@@ -32,9 +32,9 @@ internal sealed class JSErrorAwareJsonSerializer : INatsSerializer
         throw new NotSupportedException();
 }
 
-internal class JSApiErrorException : Exception
+internal class NatsJSApiErrorException : Exception
 {
-    public JSApiErrorException(ApiError error) => Error = error;
+    public NatsJSApiErrorException(ApiError error) => Error = error;
 
     public ApiError Error { get; }
 }

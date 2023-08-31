@@ -1,3 +1,5 @@
+using NATS.Client.Core;
+
 namespace NATS.Client.JetStream.Internal;
 
 internal static class NatsJSOpsDefaults
@@ -14,7 +16,7 @@ internal static class NatsJSOpsDefaults
         long? thresholdMsgs = default,
         long? thresholdBytes = default)
     {
-        var jsOpts = opts ?? new NatsJSOpts();
+        var jsOpts = opts ?? new NatsJSOpts(NatsOpts.Default);
         long maxMsgsOut;
         long maxBytesOut;
 

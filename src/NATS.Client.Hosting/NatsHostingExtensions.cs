@@ -11,7 +11,7 @@ public static class NatsHostingExtensions
     /// Add NatsConnection/Pool to ServiceCollection. When poolSize = 1, registered `NatsConnection` and `INatsCommand` as singleton.
     /// Others, registered `NatsConnectionPool` as singleton, `NatsConnection` and `INatsCommand` as transient(get from pool).
     /// </summary>
-    public static IServiceCollection AddNats(this IServiceCollection services, int poolSize = 1, Func<NatsOptions, NatsOptions>? configureOptions = null, Action<NatsConnection>? configureConnection = null)
+    public static IServiceCollection AddNats(this IServiceCollection services, int poolSize = 1, Func<NatsOpts, NatsOpts>? configureOptions = null, Action<NatsConnection>? configureConnection = null)
     {
         poolSize = Math.Max(poolSize, 1);
 
@@ -19,7 +19,7 @@ public static class NatsHostingExtensions
         {
             services.TryAddSingleton<NatsConnectionPool>(provider =>
             {
-                var options = NatsOptions.Default with { LoggerFactory = provider.GetRequiredService<ILoggerFactory>() };
+                var options = NatsOpts.Default with { LoggerFactory = provider.GetRequiredService<ILoggerFactory>() };
                 if (configureOptions != null)
                 {
                     options = configureOptions(options);
@@ -48,7 +48,7 @@ public static class NatsHostingExtensions
         {
             services.TryAddSingleton<NatsConnection>(provider =>
             {
-                var options = NatsOptions.Default with { LoggerFactory = provider.GetRequiredService<ILoggerFactory>() };
+                var options = NatsOpts.Default with { LoggerFactory = provider.GetRequiredService<ILoggerFactory>() };
                 if (configureOptions != null)
                 {
                     options = configureOptions(options);

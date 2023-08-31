@@ -33,8 +33,8 @@ public readonly record struct NatsMsg(
         }
 
         var size = subject.Length
-                   + replyTo?.Length ?? 0
-                   + headersBuffer?.Length ?? 0
+                   + (replyTo?.Length ?? 0)
+                   + (headersBuffer?.Length ?? 0)
                    + payloadBuffer.Length;
 
         return new NatsMsg(subject, replyTo, (int)size, headers, payloadBuffer.ToArray(), connection);
@@ -105,8 +105,8 @@ public readonly record struct NatsMsg<T>(
         }
 
         var size = subject.Length
-            + replyTo?.Length ?? 0
-            + headersBuffer?.Length ?? 0
+            + (replyTo?.Length ?? 0)
+            + (headersBuffer?.Length ?? 0)
             + payloadBuffer.Length;
 
         return new NatsMsg<T>(subject, replyTo, (int)size, headers, data, connection);

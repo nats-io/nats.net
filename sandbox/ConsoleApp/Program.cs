@@ -53,7 +53,7 @@ _ = Task.Run(async () =>
 await conn.PublishAsync("foo", new Person(30, "bar"));
 
 // Options can configure `with` expression
-var options = NatsOptions.Default with
+var options = NatsOpts.Default with
 {
     Url = "nats://127.0.0.1:9999",
     LoggerFactory = new MinimumConsoleLoggerFactory(LogLevel.Information),

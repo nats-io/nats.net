@@ -6,33 +6,33 @@ public sealed class NatsConnectionPool : INatsConnectionPool
     private int _index = -1;
 
     public NatsConnectionPool()
-        : this(Environment.ProcessorCount / 2, NatsOptions.Default, _ => { })
+        : this(Environment.ProcessorCount / 2, NatsOpts.Default, _ => { })
     {
     }
 
     public NatsConnectionPool(int poolSize)
-        : this(poolSize, NatsOptions.Default, _ => { })
+        : this(poolSize, NatsOpts.Default, _ => { })
     {
     }
 
-    public NatsConnectionPool(NatsOptions options)
-        : this(Environment.ProcessorCount / 2, options, _ => { })
+    public NatsConnectionPool(NatsOpts opts)
+        : this(Environment.ProcessorCount / 2, opts, _ => { })
     {
     }
 
-    public NatsConnectionPool(int poolSize, NatsOptions options)
-        : this(poolSize, options, _ => { })
+    public NatsConnectionPool(int poolSize, NatsOpts opts)
+        : this(poolSize, opts, _ => { })
     {
     }
 
-    public NatsConnectionPool(int poolSize, NatsOptions options, Action<NatsConnection> configureConnection)
+    public NatsConnectionPool(int poolSize, NatsOpts opts, Action<NatsConnection> configureConnection)
     {
         poolSize = Math.Max(1, poolSize);
         _connections = new NatsConnection[poolSize];
         for (var i = 0; i < _connections.Length; i++)
         {
-            var name = (options.Name == null) ? $"#{i}" : $"{options.Name}#{i}";
-            var conn = new NatsConnection(options with { Name = name });
+            var name = (opts.Name == null) ? $"#{i}" : $"{opts.Name}#{i}";
+            var conn = new NatsConnection(opts with { Name = name });
             configureConnection(conn);
             _connections[i] = conn;
         }

@@ -38,7 +38,7 @@ public class RequestReplyTest
 
         // Request timeout as default timeout
         {
-            await using var nats = server.CreateClientConnection(NatsOptions.Default with
+            await using var nats = server.CreateClientConnection(NatsOpts.Default with
             {
                 RequestTimeout = TimeSpan.FromSeconds(1),
             });

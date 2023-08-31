@@ -1,4 +1,5 @@
-using Microsoft.Extensions.Logging;
+using System.Runtime.CompilerServices;
+using System.Threading.Channels;
 using NATS.Client.Core;
 using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
@@ -28,60 +29,163 @@ public class NatsJSConsumer
         return _deleted = await _context.DeleteConsumerAsync(_stream, _consumer, cancellationToken);
     }
 
-    public async ValueTask<INatsJSSubConsume<T>> ConsumeAsync<T>(
+    public async IAsyncEnumerable<NatsJSMsg<T?>> ConsumeAllAsync<T>(
         NatsJSConsumeOpts opts,
-        NatsSubOpts requestOpts = default,
-        CancellationToken cancellationToken = default)
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        await using var cc = await ConsumeAsync<T>(opts, cancellationToken);
+        await foreach (var jsMsg in cc.Msgs.ReadAllAsync(cancellationToken))
+        {
+            yield return jsMsg;
+        }
+    }
+
+    public async ValueTask<INatsJSSubConsume<T>> ConsumeAsync<T>(NatsJSConsumeOpts opts, CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
 
-        var inbox = $"{_context.Opts.InboxPrefix}.{Guid.NewGuid():n}";
+        var inbox = _context.NewInbox();
 
-        var state = new NatsJSSubState(
-            opts: _context.Opts,
-            optsMaxBytes: opts.MaxBytes,
-            optsMaxMsgs: opts.MaxMsgs,
-            optsThresholdMsgs: opts.ThresholdMsgs,
-            optsThresholdBytes: opts.ThresholdBytes,
-            optsExpires: opts.Expires,
-            optsIdleHeartbeat: opts.IdleHeartbeat);
+        var max = NatsJSOpsDefaults.SetMax(_context.Opts, opts.MaxMsgs, opts.MaxBytes, opts.ThresholdMsgs, opts.ThresholdBytes);
+        var timeouts = NatsJSOpsDefaults.SetTimeouts(opts.Expires, opts.IdleHeartbeat);
+
+        var requestOpts = new NatsSubOpts
+        {
+            Serializer = opts.Serializer,
+            ChannelOptions = new NatsSubChannelOpts
+            {
+                // Keep capacity at 1 to make sure message acknowledgements are sent
+                // right after the message is processed and messages aren't queued up
+                // which might cause timeouts for acknowledgments.
+                Capacity = 1,
+                FullMode = BoundedChannelFullMode.Wait,
+            },
+        };
 
         var sub = new NatsJSSubConsume<T>(
             stream: _stream,
             consumer: _consumer,
             context: _context,
-            manager: _context.Nats.SubscriptionManager,
             subject: inbox,
             opts: requestOpts,
-            state: state,
-            serializer: requestOpts.Serializer ?? _context.Nats.Options.Serializer,
-            errorHandler: opts.ErrorHandler,
-            cancellationToken: cancellationToken);
+            maxMsgs: max.MaxMsgs,
+            maxBytes: max.MaxBytes,
+            thresholdMsgs: max.ThresholdMsgs,
+            thresholdBytes: max.ThresholdBytes,
+            expires: timeouts.Expires,
+            idle: timeouts.IdleHeartbeat,
+            errorHandler: opts.ErrorHandler);
 
-        await _context.Nats.SubAsync(
+        await _context.Connection.SubAsync(
             subject: inbox,
             opts: requestOpts,
             sub: sub,
             cancellationToken);
 
+        await sub.CallMsgNextAsync(
+            new ConsumerGetnextRequest
+            {
+                Batch = max.MaxMsgs,
+                MaxBytes = max.MaxBytes,
+                IdleHeartbeat = timeouts.IdleHeartbeat.ToNanos(),
+                Expires = timeouts.Expires.ToNanos(),
+            },
+            cancellationToken);
+
+        sub.ResetPending();
+        sub.ResetHeartbeatTimer();
+
         return sub;
     }
 
-    public async ValueTask<NatsJSMsg<T?>> NextAsync<T>(CancellationToken cancellationToken = default)
+    public async ValueTask<NatsJSMsg<T?>?> NextAsync<T>(NatsJSNextOpts opts, CancellationToken cancellationToken = default)
     {
-        await foreach (var natsJSMsg in FetchAsync<T>(new NatsJSFetchOpts { MaxMsgs = 1 }, cancellationToken: cancellationToken))
+        await using var f = await FetchAsync<T>(
+            new NatsJSFetchOpts
+            {
+                MaxMsgs = 1,
+                IdleHeartbeat = opts.IdleHeartbeat,
+                Expires = opts.Expires,
+                Serializer = opts.Serializer,
+                ErrorHandler = opts.ErrorHandler,
+            },
+            cancellationToken: cancellationToken);
+
+        await foreach (var natsJSMsg in f.Msgs.ReadAllAsync(cancellationToken))
         {
             return natsJSMsg;
         }
 
-        throw new NatsJSException("No data");
+        return default;
     }
 
-    public IAsyncEnumerable<NatsJSMsg<T?>> FetchAsync<T>(
+    public async IAsyncEnumerable<NatsJSMsg<T?>> FetchAllAsync<T>(
         NatsJSFetchOpts opts,
-        NatsSubOpts? requestOpts = default,
-        CancellationToken cancellationToken = default) =>
-        throw new NotImplementedException();
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        await using var fc = await FetchAsync<T>(opts, cancellationToken);
+        await foreach (var jsMsg in fc.Msgs.ReadAllAsync(cancellationToken))
+        {
+            yield return jsMsg;
+        }
+    }
+
+    public async ValueTask<INatsJSSubFetch<T>> FetchAsync<T>(
+        NatsJSFetchOpts opts,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfDeleted();
+
+        var inbox = _context.NewInbox();
+
+        var max = NatsJSOpsDefaults.SetMax(_context.Opts, opts.MaxMsgs, opts.MaxBytes);
+        var timeouts = NatsJSOpsDefaults.SetTimeouts(opts.Expires, opts.IdleHeartbeat);
+
+        var requestOpts = new NatsSubOpts
+        {
+            Serializer = opts.Serializer,
+            ChannelOptions = new NatsSubChannelOpts
+            {
+                // Keep capacity at 1 to make sure message acknowledgements are sent
+                // right after the message is processed and messages aren't queued up
+                // which might cause timeouts for acknowledgments.
+                Capacity = 1,
+                FullMode = BoundedChannelFullMode.Wait,
+            },
+        };
+
+        var sub = new NatsJSSubFetch<T>(
+            stream: _stream,
+            consumer: _consumer,
+            context: _context,
+            subject: inbox,
+            opts: requestOpts,
+            maxMsgs: max.MaxMsgs,
+            maxBytes: max.MaxBytes,
+            expires: timeouts.Expires,
+            idle: timeouts.IdleHeartbeat,
+            errorHandler: opts.ErrorHandler);
+
+        await _context.Connection.SubAsync(
+            subject: inbox,
+            opts: requestOpts,
+            sub: sub,
+            cancellationToken);
+
+        await sub.CallMsgNextAsync(
+            new ConsumerGetnextRequest
+            {
+                Batch = max.MaxMsgs,
+                MaxBytes = max.MaxBytes,
+                IdleHeartbeat = timeouts.IdleHeartbeat.ToNanos(),
+                Expires = timeouts.Expires.ToNanos(),
+            },
+            cancellationToken);
+
+        sub.ResetHeartbeatTimer();
+
+        return sub;
+    }
 
     private void ThrowIfDeleted()
     {

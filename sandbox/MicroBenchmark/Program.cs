@@ -58,7 +58,7 @@ public class DefaultRun
 
         var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
         var logger = loggerFactory.CreateLogger<ILogger<DefaultRun>>();
-        var options = NatsOptions.Default with
+        var options = NatsOpts.Default with
         {
             LoggerFactory = loggerFactory,
             Echo = true,

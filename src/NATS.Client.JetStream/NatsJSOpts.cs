@@ -1,11 +1,21 @@
+using NATS.Client.Core;
+
 namespace NATS.Client.JetStream;
 
 public record NatsJSOpts
 {
+    public NatsJSOpts(NatsOpts opts, string? apiPrefix = default, int? maxMsgs = default, AckOpts? ackOpts = default, string? inboxPrefix = default)
+    {
+        ApiPrefix = apiPrefix ?? "$JS.API";
+        MaxMsgs = maxMsgs ?? 1000;
+        AckOpts = ackOpts ?? new AckOpts(opts.WaitUntilSent);
+        InboxPrefix = inboxPrefix ?? opts.InboxPrefix;
+    }
+
     /// <summary>
     /// Prefix to prepend to JetStream API subjects. (default: $JS.API)
     /// </summary>
-    public string ApiPrefix { get; init; } = "$JS.API";
+    public string ApiPrefix { get; init; }
 
     /// <summary>
     /// Prefix to use in inbox subscription subjects to receive messages from JetStream. (default: _INBOX)
@@ -13,18 +23,20 @@ public record NatsJSOpts
     /// Default is taken from NatsOptions (on the parent NatsConnection) which is '_INBOX' if not set.
     /// </para>
     /// </summary>
-    public string InboxPrefix { get; init; } = string.Empty;
+    public string InboxPrefix { get; init; }
 
     /// <summary>
     /// Maximum number of messages to receive in a batch. (default: 1000)
     /// </summary>
     public int MaxMsgs { get; init; } = 1000;
+
+    public AckOpts AckOpts { get; init; }
 }
 
 public record NatsJSConsumeOpts
 {
     /// <summary>
-    /// Maximum number of messages stored in the buffer
+    /// Errors and notifications handler
     /// </summary>
     public Action<NatsJSNotification>? ErrorHandler { get; init; }
 
@@ -57,10 +69,24 @@ public record NatsJSConsumeOpts
     /// Hint for the number of bytes left in buffer that should trigger a low watermark on the client, and influence it to request more data.
     /// </summary>
     public int? ThresholdBytes { get; init; }
+
+    /// <summary>
+    /// Serializer to use to deserialize the message if a model is being used.
+    /// </summary>
+    /// <remarks>
+    /// If not set, serializer set in connection options or the default JSON serializer
+    /// will be used.
+    /// </remarks>
+    public INatsSerializer? Serializer { get; init; }
 }
 
 public record NatsJSNextOpts
 {
+    /// <summary>
+    /// Errors and notifications handler
+    /// </summary>
+    public Action<NatsJSNotification>? ErrorHandler { get; init; }
+
     /// <summary>
     /// Amount of time to wait for the request to expire (in nanoseconds)
     /// </summary>
@@ -70,10 +96,24 @@ public record NatsJSNextOpts
     /// Amount idle time the server should wait before sending a heartbeat. For requests with expires > 30s, heartbeats should be enabled by default
     /// </summary>
     public TimeSpan? IdleHeartbeat { get; init; }
+
+    /// <summary>
+    /// Serializer to use to deserialize the message if a model is being used.
+    /// </summary>
+    /// <remarks>
+    /// If not set, serializer set in connection options or the default JSON serializer
+    /// will be used.
+    /// </remarks>
+    public INatsSerializer? Serializer { get; init; }
 }
 
 public record NatsJSFetchOpts
 {
+    /// <summary>
+    /// Errors and notifications handler
+    /// </summary>
+    public Action<NatsJSNotification>? ErrorHandler { get; init; }
+
     /// <summary>
     /// Maximum number of messages to return
     /// </summary>
@@ -93,4 +133,13 @@ public record NatsJSFetchOpts
     /// Amount idle time the server should wait before sending a heartbeat. For requests with expires > 30s, heartbeats should be enabled by default
     /// </summary>
     public TimeSpan? IdleHeartbeat { get; init; }
+
+    /// <summary>
+    /// Serializer to use to deserialize the message if a model is being used.
+    /// </summary>
+    /// <remarks>
+    /// If not set, serializer set in connection options or the default JSON serializer
+    /// will be used.
+    /// </remarks>
+    public INatsSerializer? Serializer { get; init; }
 }

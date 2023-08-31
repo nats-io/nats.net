@@ -19,12 +19,12 @@ public class ConsumerStateTest
 
     [Fact]
     public void Allow_only_max_msgs_or_bytes_options() =>
-        Assert.Throws<NatsJSException>(() => _ = NatsJSOpsDefaults.SetMax(new NatsJSOpts(), 1, 1));
+        Assert.Throws<NatsJSException>(() => _ = NatsJSOpsDefaults.SetMax(new NatsJSOpts(NatsOpts.Default), 1, 1));
 
     [Fact]
     public void Set_bytes_option()
     {
-        var opts = NatsJSOpsDefaults.SetMax(new NatsJSOpts(), maxBytes: 1024);
+        var opts = NatsJSOpsDefaults.SetMax(new NatsJSOpts(NatsOpts.Default), maxBytes: 1024);
         Assert.Equal(1_000_000, opts.MaxMsgs);
         Assert.Equal(1024, opts.MaxBytes);
         Assert.Equal(500_000, opts.ThresholdMsgs);
@@ -90,51 +90,5 @@ public class ConsumerStateTest
             var opts = NatsJSOpsDefaults.SetMax(maxBytes: max, thresholdBytes: threshold);
             Assert.Equal(expected, opts.ThresholdBytes);
         }
-    }
-
-    [Fact]
-    public void Calculate_pending_msgs()
-    {
-        var state = new NatsJSSubState(optsMaxMsgs: 100, optsThresholdMsgs: 10);
-
-        // initial pull
-        var init = state.GetRequest();
-        Assert.Equal(100, init.Batch);
-        Assert.Equal(0, init.MaxBytes);
-
-        for (var i = 0; i < 89; i++)
-        {
-            state.MsgReceived(128);
-            Assert.False(state.CanFetch(), $"iter:{i}");
-        }
-
-        state.MsgReceived(128);
-        Assert.True(state.CanFetch());
-        var request = state.GetRequest();
-        Assert.Equal(90, request.Batch);
-        Assert.Equal(0, request.MaxBytes);
-    }
-
-    [Fact]
-    public void Calculate_pending_bytes()
-    {
-        var state = new NatsJSSubState(optsMaxBytes: 1000, optsThresholdBytes: 100);
-
-        // initial pull
-        var init = state.GetRequest();
-        Assert.Equal(1_000_000, init.Batch);
-        Assert.Equal(1000, init.MaxBytes);
-
-        for (var i = 0; i < 89; i++)
-        {
-            state.MsgReceived(10);
-            Assert.False(state.CanFetch(), $"iter:{i}");
-        }
-
-        state.MsgReceived(10);
-        Assert.True(state.CanFetch());
-        var request = state.GetRequest();
-        Assert.Equal(1_000_000, request.Batch);
-        Assert.Equal(900, request.MaxBytes);
     }
 }

@@ -28,14 +28,14 @@ public partial class NatsConnection
     {
         var replyTo = $"{InboxPrefix}{Guid.NewGuid():n}";
 
-        var replySerializer = replyOpts?.Serializer ?? Options.Serializer;
+        var replySerializer = replyOpts?.Serializer ?? Opts.Serializer;
         var sub = new NatsSub<TReply>(this, SubscriptionManager.InboxSubBuilder, replyTo, replyOpts, replySerializer);
         await SubAsync(replyTo, replyOpts, sub, cancellationToken).ConfigureAwait(false);
 
         await PubModelAsync(
             subject,
             data,
-            requestOpts?.Serializer ?? Options.Serializer,
+            requestOpts?.Serializer ?? Opts.Serializer,
             replyTo,
             requestOpts?.Headers,
             cancellationToken).ConfigureAwait(false);
