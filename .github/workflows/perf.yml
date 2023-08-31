@@ -27,7 +27,10 @@ jobs:
           wget https://github.com/nats-io/natscli/releases/download/v$rel/nats-$rel-linux-amd64.zip
           unzip nats-$rel-linux-amd64.zip
           sudo mv nats-$rel-linux-amd64/nats /usr/local/bin
-          curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@${{ matrix.config.branch }} | PREFIX=. sh
+          for i in 1 2 3
+          do
+            curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@${{ matrix.config.branch }} | PREFIX=. sh && break || sleep 30
+          done
           sudo mv nats-server /usr/local/bin
 
       - name: Check nats
