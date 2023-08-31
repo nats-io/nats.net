@@ -18,7 +18,7 @@ public static class NatsRequestExtensions
     /// <remarks>
     /// Response can be (null) or one <see cref="NatsMsg"/>.
     /// Reply option's max messages will be set to 1.
-    /// if reply option's timeout is not defined then it will be set to NatsOptions.RequestTimeout.
+    /// if reply option's timeout is not defined then it will be set to NatsOpts.RequestTimeout.
     /// </remarks>
     public static ValueTask<NatsMsg<TReply?>?> RequestAsync<TRequest, TReply>(
         this INatsConnection nats,
@@ -47,7 +47,7 @@ public static class NatsRequestExtensions
     /// <remarks>
     /// Response can be (null) or one <see cref="NatsMsg"/>.
     /// Reply option's max messages will be set to 1.
-    /// if reply option's timeout is not defined then it will be set to NatsOptions.RequestTimeout.
+    /// if reply option's timeout is not defined then it will be set to NatsOpts.RequestTimeout.
     /// </remarks>
     public static ValueTask<NatsMsg?> RequestAsync(
         this INatsConnection nats,

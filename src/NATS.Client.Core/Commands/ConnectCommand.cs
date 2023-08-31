@@ -4,20 +4,20 @@ namespace NATS.Client.Core.Commands;
 
 internal sealed class AsyncConnectCommand : AsyncCommandBase<AsyncConnectCommand>
 {
-    private ClientOptions? _clientOptions;
+    private ClientOpts? _clientOpts;
 
     private AsyncConnectCommand()
     {
     }
 
-    public static AsyncConnectCommand Create(ObjectPool pool, ClientOptions connectOptions, CancellationTimer timer)
+    public static AsyncConnectCommand Create(ObjectPool pool, ClientOpts connectOpts, CancellationTimer timer)
     {
         if (!TryRent(pool, out var result))
         {
             result = new AsyncConnectCommand();
         }
 
-        result._clientOptions = connectOptions;
+        result._clientOpts = connectOpts;
         result.SetCancellationTimer(timer);
 
         return result;
@@ -25,11 +25,11 @@ internal sealed class AsyncConnectCommand : AsyncCommandBase<AsyncConnectCommand
 
     public override void Write(ProtocolWriter writer)
     {
-        writer.WriteConnect(_clientOptions!);
+        writer.WriteConnect(_clientOpts!);
     }
 
     protected override void Reset()
     {
-        _clientOptions = null;
+        _clientOpts = null;
     }
 }

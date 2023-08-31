@@ -3,24 +3,24 @@ using System.Text.Json.Serialization;
 
 namespace NATS.Client.Core.Internal;
 
-// SYSLIB1037: The type 'ClientOptions' defines init-only properties,
+// SYSLIB1037: The type 'ClientOpts' defines init-only properties,
 // deserialization of which is currently not supported in source generation mode
 #pragma warning disable SYSLIB1037
 
 // These connections options are serialized and sent to the server.
 // https://github.com/nats-io/nats-server/blob/a23b1b7/server/client.go#L536
-internal sealed class ClientOptions
+internal sealed class ClientOpts
 {
-    private ClientOptions(NatsOpts opts)
+    private ClientOpts(NatsOpts opts)
     {
         Name = opts.Name;
         Echo = opts.Echo;
         Verbose = opts.Verbose;
         Headers = opts.Headers;
-        Username = opts.AuthOptions.Username;
-        Password = opts.AuthOptions.Password;
-        AuthToken = opts.AuthOptions.Token;
-        JWT = opts.AuthOptions.Jwt;
+        Username = opts.AuthOpts.Username;
+        Password = opts.AuthOpts.Password;
+        AuthToken = opts.AuthOpts.Token;
+        JWT = opts.AuthOpts.Jwt;
     }
 
     /// <summary>Optional boolean. If set to true, the server (version 1.2.0+) will not send originating messages from this connection to its own subscriptions. Clients should set this to true only for server supporting this feature, which is when proto in the INFO protocol is set to at least 1.</summary>
@@ -90,14 +90,14 @@ internal sealed class ClientOptions
     [JsonPropertyName("no_responders")]
     public bool NoResponders { get; init; } = false;
 
-    public static ClientOptions Create(NatsOpts opts)
+    public static ClientOpts Create(NatsOpts opts)
     {
-        return new ClientOptions(opts);
+        return new ClientOpts(opts);
     }
 
     private static string GetAssemblyVersion()
     {
-        var asm = typeof(ClientOptions);
+        var asm = typeof(ClientOpts);
         var version = "1.0.0";
         var infoVersion = asm!.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
         if (infoVersion != null)

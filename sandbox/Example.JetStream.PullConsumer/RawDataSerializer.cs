@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using NATS.Client.Core;
 
 namespace Example.JetStream.PullConsumer;

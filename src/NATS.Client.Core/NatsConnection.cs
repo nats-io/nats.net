@@ -48,7 +48,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
     private NatsPipeliningWriteProtocolProcessor? _socketWriter;
     private TaskCompletionSource _waitForOpenConnection;
     private TlsCerts? _tlsCerts;
-    private ClientOptions _clientOptions;
+    private ClientOpts _clientOpts;
     private UserCredentials? _userCredentials;
 
     public NatsConnection()
@@ -71,7 +71,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         InboxPrefix = $"{opts.InboxPrefix}.{Guid.NewGuid():n}.";
         SubscriptionManager = new SubscriptionManager(this, InboxPrefix);
         _logger = opts.LoggerFactory.CreateLogger<NatsConnection>();
-        _clientOptions = ClientOptions.Create(Opts);
+        _clientOpts = ClientOpts.Create(Opts);
         HeaderParser = new HeaderParser(opts.HeaderEncoding);
     }
 
@@ -222,14 +222,14 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         Debug.Assert(ConnectionState == NatsConnectionState.Connecting, "Connection state");
 
         var uris = Opts.GetSeedUris();
-        if (Opts.TlsOptions.Disabled && uris.Any(u => u.IsTls))
-            throw new NatsException($"URI {uris.First(u => u.IsTls)} requires TLS but TlsOptions.Disabled is set to true");
-        if (Opts.TlsOptions.Required)
-            _tlsCerts = new TlsCerts(Opts.TlsOptions);
+        if (Opts.TlsOpts.Disabled && uris.Any(u => u.IsTls))
+            throw new NatsException($"URI {uris.First(u => u.IsTls)} requires TLS but NatsTlsOpts.Disabled is set to true");
+        if (Opts.TlsOpts.Required)
+            _tlsCerts = new TlsCerts(Opts.TlsOpts);
 
-        if (!Opts.AuthOptions.IsAnonymous)
+        if (!Opts.AuthOpts.IsAnonymous)
         {
-            _userCredentials = new UserCredentials(Opts.AuthOptions);
+            _userCredentials = new UserCredentials(Opts.AuthOpts);
         }
 
         foreach (var uri in uris)
@@ -331,19 +331,19 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
             // check to see if we should upgrade to TLS
             if (_socket is TcpConnection tcpConnection)
             {
-                if (Opts.TlsOptions.Disabled && WritableServerInfo!.TlsRequired)
+                if (Opts.TlsOpts.Disabled && WritableServerInfo!.TlsRequired)
                 {
                     throw new NatsException(
-                        $"Server {_currentConnectUri} requires TLS but TlsOptions.Disabled is set to true");
+                        $"Server {_currentConnectUri} requires TLS but NatsTlsOpts.Disabled is set to true");
                 }
 
-                if (Opts.TlsOptions.Required && !WritableServerInfo!.TlsRequired && !WritableServerInfo.TlsAvailable)
+                if (Opts.TlsOpts.Required && !WritableServerInfo!.TlsRequired && !WritableServerInfo.TlsAvailable)
                 {
                     throw new NatsException(
-                        $"Server {_currentConnectUri} does not support TLS but TlsOptions.Disabled is set to true");
+                        $"Server {_currentConnectUri} does not support TLS but NatsTlsOpts.Disabled is set to true");
                 }
 
-                if (Opts.TlsOptions.Required || WritableServerInfo!.TlsRequired || WritableServerInfo.TlsAvailable)
+                if (Opts.TlsOpts.Required || WritableServerInfo!.TlsRequired || WritableServerInfo.TlsAvailable)
                 {
                     // do TLS upgrade
                     // if the current URI is not a seed URI and is not a DNS hostname, check the server cert against the
@@ -364,7 +364,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
                     _socketReader = null;
 
                     // upgrade TcpConnection to SslConnection
-                    var sslConnection = tcpConnection.UpgradeToSslStreamConnection(Opts.TlsOptions, _tlsCerts);
+                    var sslConnection = tcpConnection.UpgradeToSslStreamConnection(Opts.TlsOpts, _tlsCerts);
                     await sslConnection.AuthenticateAsClientAsync(targetHost).ConfigureAwait(false);
                     _socket = sslConnection;
 
@@ -379,11 +379,11 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
             infoParsedSignal.SetResult();
 
             // Authentication
-            _userCredentials?.Authenticate(_clientOptions, WritableServerInfo);
+            _userCredentials?.Authenticate(_clientOpts, WritableServerInfo);
 
             // add CONNECT and PING command to priority lane
             _writerState.PriorityCommands.Clear();
-            var connectCommand = AsyncConnectCommand.Create(_pool, _clientOptions, GetCancellationTimer(CancellationToken.None));
+            var connectCommand = AsyncConnectCommand.Create(_pool, _clientOpts, GetCancellationTimer(CancellationToken.None));
             _writerState.PriorityCommands.Add(connectCommand);
             _writerState.PriorityCommands.Add(PingCommand.Create(_pool, GetCancellationTimer(CancellationToken.None)));
 

@@ -92,7 +92,7 @@ public interface INatsConnection
     /// <remarks>
     /// Response can be (null) or one <see cref="NatsMsg"/>.
     /// Reply option's max messages will be set to 1.
-    /// if reply option's timeout is not defined then it will be set to NatsOptions.RequestTimeout.
+    /// if reply option's timeout is not defined then it will be set to NatsOpts.RequestTimeout.
     /// </remarks>
     ValueTask<NatsMsg<TReply?>?> RequestAsync<TRequest, TReply>(
         string subject,
@@ -114,7 +114,7 @@ public interface INatsConnection
     /// <remarks>
     /// Response can be (null) or one <see cref="NatsMsg"/>.
     /// Reply option's max messages will be set to 1 (one).
-    /// if reply option's timeout is not defined then it will be set to NatsOptions.RequestTimeout.
+    /// if reply option's timeout is not defined then it will be set to NatsOpts.RequestTimeout.
     /// </remarks>
     ValueTask<NatsMsg?> RequestAsync(
         string subject,
@@ -136,7 +136,7 @@ public interface INatsConnection
     /// <returns>An asynchronous enumerable of <see cref="NatsMsg"/> objects</returns>
     /// <exception cref="OperationCanceledException">Raised when cancellation token is used</exception>
     /// <remarks>
-    /// if reply option's timeout is not defined then it will be set to NatsOptions.RequestTimeout.
+    /// if reply option's timeout is not defined then it will be set to NatsOpts.RequestTimeout.
     /// </remarks>
     IAsyncEnumerable<NatsMsg<TReply?>> RequestManyAsync<TRequest, TReply>(
         string subject,
@@ -156,7 +156,7 @@ public interface INatsConnection
     /// <returns>An asynchronous enumerable of <see cref="NatsMsg"/> objects</returns>
     /// <exception cref="OperationCanceledException">Raised when cancellation token is used</exception>
     /// <remarks>
-    /// if reply option's timeout is not defined then it will be set to NatsOptions.RequestTimeout.
+    /// if reply option's timeout is not defined then it will be set to NatsOpts.RequestTimeout.
     /// </remarks>
     IAsyncEnumerable<NatsMsg> RequestManyAsync(
         string subject,

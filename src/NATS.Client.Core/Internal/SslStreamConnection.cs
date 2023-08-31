@@ -9,15 +9,15 @@ internal sealed class SslStreamConnection : ISocketConnection
 {
     private readonly SslStream _sslStream;
     private readonly TaskCompletionSource<Exception> _waitForClosedSource;
-    private readonly TlsOptions _tlsOptions;
+    private readonly NatsTlsOpts _tlsOpts;
     private readonly TlsCerts? _tlsCerts;
     private readonly CancellationTokenSource _closeCts = new();
     private int _disposed;
 
-    public SslStreamConnection(SslStream sslStream, TlsOptions tlsOptions, TlsCerts? tlsCerts, TaskCompletionSource<Exception> waitForClosedSource)
+    public SslStreamConnection(SslStream sslStream, NatsTlsOpts tlsOpts, TlsCerts? tlsCerts, TaskCompletionSource<Exception> waitForClosedSource)
     {
         _sslStream = sslStream;
-        _tlsOptions = tlsOptions;
+        _tlsOpts = tlsOpts;
         _tlsCerts = tlsCerts;
         _waitForClosedSource = waitForClosedSource;
     }
@@ -125,7 +125,7 @@ internal sealed class SslStreamConnection : ISocketConnection
 
     private SslClientAuthenticationOptions SslClientAuthenticationOptions(string targetHost)
     {
-        if (_tlsOptions.Disabled)
+        if (_tlsOpts.Disabled)
         {
             throw new InvalidOperationException("TLS is not permitted when TlsOptions.Disabled is set");
         }
@@ -137,7 +137,7 @@ internal sealed class SslStreamConnection : ISocketConnection
         }
 
         RemoteCertificateValidationCallback? rcsCb = default;
-        if (_tlsOptions.InsecureSkipVerify)
+        if (_tlsOpts.InsecureSkipVerify)
         {
             rcsCb = RcsCbInsecureSkipVerify;
         }

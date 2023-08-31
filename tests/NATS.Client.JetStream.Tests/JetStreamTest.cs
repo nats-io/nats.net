@@ -14,7 +14,7 @@ public class JetStreamTest
     {
         await using var server = NatsServer.Start(
             outputHelper: _output,
-            options: new NatsServerOptionsBuilder()
+            opts: new NatsServerOptsBuilder()
                 .UseTransport(TransportType.Tcp)
                 .Trace()
                 .UseJetStream()

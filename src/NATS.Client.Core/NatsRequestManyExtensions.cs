@@ -14,7 +14,7 @@ public static class NatsRequestManyExtensions
     /// <returns>An asynchronous enumerable of <see cref="NatsMsg"/> objects</returns>
     /// <exception cref="OperationCanceledException">Raised when cancellation token is used</exception>
     /// <remarks>
-    /// if reply option's timeout is not defined then it will be set to NatsOptions.RequestTimeout.
+    /// if reply option's timeout is not defined then it will be set to NatsOpts.RequestTimeout.
     /// </remarks>
     public static IAsyncEnumerable<NatsMsg> RequestManyAsync(
         this INatsConnection nats,
@@ -43,7 +43,7 @@ public static class NatsRequestManyExtensions
     /// <returns>An asynchronous enumerable of <see cref="NatsMsg"/> objects</returns>
     /// <exception cref="OperationCanceledException">Raised when cancellation token is used</exception>
     /// <remarks>
-    /// if reply option's timeout is not defined then it will be set to NatsOptions.RequestTimeout.
+    /// if reply option's timeout is not defined then it will be set to NatsOpts.RequestTimeout.
     /// </remarks>
     public static IAsyncEnumerable<NatsMsg<TReply?>> RequestManyAsync<TRequest, TReply>(
         this INatsConnection nats,

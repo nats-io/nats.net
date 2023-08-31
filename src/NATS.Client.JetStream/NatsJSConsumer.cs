@@ -52,7 +52,7 @@ public class NatsJSConsumer
         var requestOpts = new NatsSubOpts
         {
             Serializer = opts.Serializer,
-            ChannelOptions = new NatsSubChannelOpts
+            ChannelOpts = new NatsSubChannelOpts
             {
                 // Keep capacity at 1 to make sure message acknowledgements are sent
                 // right after the message is processed and messages aren't queued up
@@ -144,7 +144,7 @@ public class NatsJSConsumer
         var requestOpts = new NatsSubOpts
         {
             Serializer = opts.Serializer,
-            ChannelOptions = new NatsSubChannelOpts
+            ChannelOpts = new NatsSubChannelOpts
             {
                 // Keep capacity at 1 to make sure message acknowledgements are sent
                 // right after the message is processed and messages aren't queued up

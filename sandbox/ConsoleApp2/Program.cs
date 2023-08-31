@@ -4,7 +4,7 @@
 var natsKey1 = new NatsKey("subject1");
 var natsKey2 = new NatsKey("subject2");
 
-await using var subConnection1 = new NatsConnection(NatsOptions.Default with
+await using var subConnection1 = new NatsConnection(NatsOpts.Default with
 {
     Url = "localhost:4222"
 });
@@ -20,7 +20,7 @@ using var d1n = await subConnection1.SubscribeAsync<int>(natsKey2, x =>
     Console.WriteLine($"\tSUB1:{x}");
 });
 
-await using var subConnection2 = new NatsConnection(NatsOptions.Default with
+await using var subConnection2 = new NatsConnection(NatsOpts.Default with
 {
     Url = "localhost:4222"
 });
@@ -41,14 +41,14 @@ var cts = new CancellationTokenSource();
 
 Task.Run(async () =>
 {
-    await using var pubConnection1 = new NatsConnection(NatsOptions.Default with
+    await using var pubConnection1 = new NatsConnection(NatsOpts.Default with
     {
         Url = "localhost:4222"
     });
 
     await pubConnection1.ConnectAsync();
 
-    await using var pubConnection2 = new NatsConnection(NatsOptions.Default with
+    await using var pubConnection2 = new NatsConnection(NatsOpts.Default with
     {
         Url = "localhost:4222"
     });

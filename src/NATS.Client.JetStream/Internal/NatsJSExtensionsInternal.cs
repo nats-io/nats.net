@@ -1,4 +1,4 @@
-﻿namespace NATS.Client.JetStream.Internal;
+namespace NATS.Client.JetStream.Internal;
 
 public static class NatsJSExtensionsInternal
 {
