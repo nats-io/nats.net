@@ -265,9 +265,9 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
             if (_maxBytes > 0)
             {
                 if (_debug)
-                    _logger.LogDebug("Message size {Size}", msg.Msg.Size);
+                    _logger.LogDebug("Message size {Size}", msg.Size);
 
-                _pendingBytes -= msg.Msg.Size;
+                _pendingBytes -= msg.Size;
             }
 
             await _userMsgs.Writer.WriteAsync(msg).ConfigureAwait(false);

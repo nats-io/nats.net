@@ -187,7 +187,7 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubFetch<TMsg>
                     _context);
 
                 _pendingMsgs--;
-                _pendingBytes -= msg.Msg.Size;
+                _pendingBytes -= msg.Size;
 
                 await _userMsgs.Writer.WriteAsync(msg).ConfigureAwait(false);
             }

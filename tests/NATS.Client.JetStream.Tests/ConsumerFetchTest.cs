@@ -31,7 +31,7 @@ public class ConsumerFetchTest
         await foreach (var msg in fc.Msgs.ReadAllAsync(cts.Token))
         {
             await msg.AckAsync(new AckOpts(WaitUntilSent: true), cts.Token);
-            Assert.Equal(count, msg.Msg.Data!.Test);
+            Assert.Equal(count, msg.Data!.Test);
             count++;
         }
 

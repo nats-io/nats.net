@@ -38,7 +38,7 @@ public class ConsumerConsumeTest
         await foreach (var msg in cc.Msgs.ReadAllAsync(cts.Token))
         {
             await msg.AckAsync(new AckOpts(true), cts.Token);
-            Assert.Equal(count, msg.Msg.Data!.Test);
+            Assert.Equal(count, msg.Data!.Test);
             count++;
             if (count == 30)
                 break;
@@ -113,7 +113,7 @@ public class ConsumerConsumeTest
         await foreach (var msg in cc.Msgs.ReadAllAsync(cts.Token))
         {
             await msg.AckAsync(new AckOpts(WaitUntilSent: true), cts.Token);
-            Assert.Equal(count, msg.Msg.Data!.Test);
+            Assert.Equal(count, msg.Data!.Test);
             await signal;
             break;
         }
@@ -172,7 +172,7 @@ public class ConsumerConsumeTest
             await foreach (var msg in cc.Msgs.ReadAllAsync(cts.Token))
             {
                 await msg.AckAsync(new AckOpts(WaitUntilSent: true), cts.Token);
-                Assert.Equal(count, msg.Msg.Data!.Test);
+                Assert.Equal(count, msg.Data!.Test);
                 count++;
 
                 // We only need two test messages; before and after reconnect.

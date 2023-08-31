@@ -1,6 +1,6 @@
 ﻿using System.Text;
 
-namespace NATS.Client.Core;
+namespace Example.JetStream.PullConsumer;
 
 public class RawData
 {

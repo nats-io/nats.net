@@ -103,8 +103,8 @@ public class JetStreamTest
             }
 
             Assert.Equal(2, messages.Count);
-            Assert.Equal("events.foo", messages[0].Msg.Subject);
-            Assert.Equal("events.foo", messages[1].Msg.Subject);
+            Assert.Equal("events.foo", messages[0].Subject);
+            Assert.Equal("events.foo", messages[1].Subject);
         }
 
         // Handle errors

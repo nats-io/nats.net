@@ -27,7 +27,7 @@ public class ConsumerNextTest
             if (next is { } msg)
             {
                 await msg.AckAsync(new AckOpts(WaitUntilSent: true), cts.Token);
-                Assert.Equal(i, msg.Msg.Data!.Test);
+                Assert.Equal(i, msg.Data!.Test);
             }
         }
     }

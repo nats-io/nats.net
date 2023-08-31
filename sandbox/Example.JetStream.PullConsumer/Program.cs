@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using Example.JetStream.PullConsumer;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
@@ -75,10 +76,9 @@ try
         {
             Console.WriteLine($"___\nFETCH {maxMsgs}");
             await using var sub = await consumer.FetchAsync<RawData>(fetchOpts, cts.Token);
-            await foreach (var jsMsg in sub.Msgs.ReadAllAsync(cts.Token))
+            await foreach (var msg in sub.Msgs.ReadAllAsync(cts.Token))
             {
-                var msg = jsMsg.Msg;
-                await jsMsg.AckAsync(cancellationToken: cts.Token);
+                await msg.AckAsync(cancellationToken: cts.Token);
                 Report(++count, stopwatch, $"data: {msg.Data}");
             }
         }
@@ -88,10 +88,9 @@ try
         while (!cts.Token.IsCancellationRequested)
         {
             Console.WriteLine($"___\nFETCH {maxMsgs}");
-            await foreach (var jsMsg in consumer.FetchAllAsync<RawData>(fetchOpts, cts.Token))
+            await foreach (var msg in consumer.FetchAllAsync<RawData>(fetchOpts, cts.Token))
             {
-                var msg = jsMsg.Msg;
-                await jsMsg.AckAsync(cancellationToken: cts.Token);
+                await msg.AckAsync(cancellationToken: cts.Token);
                 Report(++count, stopwatch, $"data: {msg.Data}");
             }
         }
@@ -102,10 +101,9 @@ try
         {
             Console.WriteLine("___\nNEXT");
             var next = await consumer.NextAsync<RawData>(nextOpts, cts.Token);
-            if (next is { } jsMsg)
+            if (next is { } msg)
             {
-                var msg = jsMsg.Msg;
-                await jsMsg.AckAsync(cancellationToken: cts.Token);
+                await msg.AckAsync(cancellationToken: cts.Token);
                 Report(++count, stopwatch, $"data: {msg.Data}");
             }
         }
@@ -117,10 +115,9 @@ try
             consumeOpts,
             cts.Token);
 
-        await foreach (var jsMsg in sub.Msgs.ReadAllAsync(cts.Token))
+        await foreach (var msg in sub.Msgs.ReadAllAsync(cts.Token))
         {
-            var msg = jsMsg.Msg;
-            await jsMsg.AckAsync(cancellationToken: cts.Token);
+            await msg.AckAsync(cancellationToken: cts.Token);
             Report(++count, stopwatch, $"data: {msg.Data}");
         }
 
@@ -130,10 +127,9 @@ try
     else if (args.Length > 0 && args[0] == "consume-all")
     {
         Console.WriteLine("___\nCONSUME-ALL");
-        await foreach (var jsMsg in consumer.ConsumeAllAsync<RawData>(consumeOpts, cts.Token))
+        await foreach (var msg in consumer.ConsumeAllAsync<RawData>(consumeOpts, cts.Token))
         {
-            var msg = jsMsg.Msg;
-            await jsMsg.AckAsync(cancellationToken: cts.Token);
+            await msg.AckAsync(cancellationToken: cts.Token);
             Report(++count, stopwatch, $"data: {msg.Data}");
         }
     }

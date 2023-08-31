@@ -10,15 +10,24 @@ namespace NATS.Client.JetStream;
 /// <typeparam name="T">User message type</typeparam>
 public readonly struct NatsJSMsg<T>
 {
-    public NatsJSMsg(NatsMsg<T> msg, NatsJSContext jsContext)
+    private readonly NatsJSContext _context;
+    private readonly NatsMsg<T> _msg;
+
+    internal NatsJSMsg(NatsMsg<T> msg, NatsJSContext context)
     {
-        Msg = msg;
-        JSContext = jsContext;
+        _msg = msg;
+        _context = context;
     }
 
-    public NatsJSContext JSContext { get; }
+    public string Subject => _msg.Subject;
 
-    public NatsMsg<T> Msg { get; }
+    public int Size => _msg.Size;
+
+    public NatsHeaders? Headers => _msg.Headers;
+
+    public T? Data => _msg.Data;
+
+    public INatsConnection? Connection => _msg.Connection;
 
     public ValueTask AckAsync(AckOpts opts = default, CancellationToken cancellationToken = default) => SendAckAsync(NatsJSConstants.Ack, opts, cancellationToken);
 
@@ -30,14 +39,14 @@ public readonly struct NatsJSMsg<T>
 
     private ValueTask SendAckAsync(ReadOnlySequence<byte> payload, AckOpts opts = default, CancellationToken cancellationToken = default)
     {
-        if (Msg == default)
+        if (_msg == default)
             throw new NatsJSException("No user message, can't acknowledge");
 
-        return Msg.ReplyAsync(
+        return _msg.ReplyAsync(
             payload: payload,
             opts: new NatsPubOpts
             {
-                WaitUntilSent = opts.WaitUntilSent ?? JSContext.Opts.AckOpts.WaitUntilSent,
+                WaitUntilSent = opts.WaitUntilSent ?? _context.Opts.AckOpts.WaitUntilSent,
             },
             cancellationToken: cancellationToken);
     }

@@ -22,7 +22,7 @@ public partial class NatsJSContext
 
     internal NatsJSOpts Opts { get; }
 
-    public string NewInbox() => $"{Opts.InboxPrefix}.{Guid.NewGuid():n}";
+    internal string NewInbox() => $"{Opts.InboxPrefix}.{Guid.NewGuid():n}";
 
     public ValueTask<AccountInfoResponse> GetAccountInfoAsync(CancellationToken cancellationToken = default) =>
         JSRequestResponseAsync<object, AccountInfoResponse>(
