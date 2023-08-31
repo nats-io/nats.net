@@ -13,8 +13,8 @@ namespace NATS.Client.Core;
 /// <param name="Echo"></param>
 /// <param name="Verbose"></param>
 /// <param name="Headers"></param>
-/// <param name="AuthOptions"></param>
-/// <param name="TlsOptions"></param>
+/// <param name="AuthOpts"></param>
+/// <param name="TlsOpts"></param>
 /// <param name="Serializer"></param>
 /// <param name="LoggerFactory"></param>
 /// <param name="WriterBufferSize"></param>
@@ -41,8 +41,8 @@ public sealed record NatsOpts
     bool Echo,
     bool Verbose,
     bool Headers,
-    NatsAuthOptions AuthOptions,
-    TlsOptions TlsOptions,
+    NatsAuthOpts AuthOpts,
+    NatsTlsOpts TlsOpts,
     INatsSerializer Serializer,
     ILoggerFactory LoggerFactory,
     int WriterBufferSize,
@@ -69,8 +69,8 @@ public sealed record NatsOpts
         Echo: true,
         Verbose: false,
         Headers: true,
-        AuthOptions: NatsAuthOptions.Default,
-        TlsOptions: TlsOptions.Default,
+        AuthOpts: NatsAuthOpts.Default,
+        TlsOpts: NatsTlsOpts.Default,
         Serializer: JsonNatsSerializer.Default,
         LoggerFactory: NullLoggerFactory.Instance,
         WriterBufferSize: 65534, // 32767

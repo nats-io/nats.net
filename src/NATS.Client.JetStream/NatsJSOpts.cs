@@ -20,7 +20,7 @@ public record NatsJSOpts
     /// <summary>
     /// Prefix to use in inbox subscription subjects to receive messages from JetStream. (default: _INBOX)
     /// <para>
-    /// Default is taken from NatsOptions (on the parent NatsConnection) which is '_INBOX' if not set.
+    /// Default is taken from NatsOpts (on the parent NatsConnection) which is '_INBOX' if not set.
     /// </para>
     /// </summary>
     public string InboxPrefix { get; init; }

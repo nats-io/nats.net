@@ -52,21 +52,21 @@ public class NatsServer : IAsyncDisposable
         Version = new Version(value);
     }
 
-    private NatsServer(ITestOutputHelper outputHelper, NatsServerOptions options)
+    private NatsServer(ITestOutputHelper outputHelper, NatsServerOpts opts)
     {
         _outputHelper = outputHelper;
-        _transportType = options.TransportType;
-        Options = options;
+        _transportType = opts.TransportType;
+        Opts = opts;
 
-        if (options.EnableJetStream)
+        if (opts.EnableJetStream)
         {
             _jetStreamStoreDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("n"));
             Directory.CreateDirectory(_jetStreamStoreDir);
-            options.JetStreamStoreDir = _jetStreamStoreDir;
+            opts.JetStreamStoreDir = _jetStreamStoreDir;
         }
 
         _configFileName = Path.GetTempFileName();
-        var config = options.ConfigFileContents;
+        var config = opts.ConfigFileContents;
         File.WriteAllText(_configFileName, config);
         var cmd = $"{NatsServerPath} -c {_configFileName}";
 
@@ -84,7 +84,7 @@ public class NatsServer : IAsyncDisposable
             {
                 try
                 {
-                    await client.ConnectAsync("localhost", Options.ServerPort, _cancellationTokenSource.Token);
+                    await client.ConnectAsync("localhost", Opts.ServerPort, _cancellationTokenSource.Token);
                     if (client.Connected)
                         return;
                 }
@@ -107,16 +107,16 @@ public class NatsServer : IAsyncDisposable
             _processErr.GetAwaiter().GetResult(); // throw exception
         }
 
-        outputHelper.WriteLine("OK to Process Start, Port:" + Options.ServerPort);
+        outputHelper.WriteLine("OK to Process Start, Port:" + Opts.ServerPort);
     }
 
-    public NatsServerOptions Options { get; }
+    public NatsServerOpts Opts { get; }
 
     public string ClientUrl => _transportType switch
     {
-        TransportType.Tcp => $"nats://localhost:{Options.ServerPort}",
-        TransportType.Tls => $"tls://localhost:{Options.ServerPort}",
-        TransportType.WebSocket => $"ws://localhost:{Options.WebSocketPort}",
+        TransportType.Tcp => $"nats://localhost:{Opts.ServerPort}",
+        TransportType.Tls => $"tls://localhost:{Opts.ServerPort}",
+        TransportType.WebSocket => $"ws://localhost:{Opts.WebSocketPort}",
         _ => throw new ArgumentOutOfRangeException(),
     };
 
@@ -126,11 +126,11 @@ public class NatsServer : IAsyncDisposable
         {
             if (_transportType == TransportType.WebSocket && ServerVersions.V2_9_19 <= Version)
             {
-                return Options.WebSocketPort!.Value;
+                return Opts.WebSocketPort!.Value;
             }
             else
             {
-                return Options.ServerPort;
+                return Opts.ServerPort;
             }
         }
     }
@@ -139,7 +139,7 @@ public class NatsServer : IAsyncDisposable
 
     public static NatsServer StartJS(ITestOutputHelper outputHelper, TransportType transportType) => Start(
         outputHelper: outputHelper,
-        options: new NatsServerOptionsBuilder()
+        opts: new NatsServerOptsBuilder()
             .UseTransport(transportType)
             .UseJetStream()
             .Build());
@@ -149,9 +149,9 @@ public class NatsServer : IAsyncDisposable
     public static NatsServer Start(ITestOutputHelper outputHelper) => Start(outputHelper, TransportType.Tcp);
 
     public static NatsServer Start(ITestOutputHelper outputHelper, TransportType transportType) =>
-        Start(outputHelper, new NatsServerOptionsBuilder().UseTransport(transportType).Build());
+        Start(outputHelper, new NatsServerOptsBuilder().UseTransport(transportType).Build());
 
-    public static NatsServer Start(ITestOutputHelper outputHelper, NatsServerOptions options, NatsOpts? clientOptions = default)
+    public static NatsServer Start(ITestOutputHelper outputHelper, NatsServerOpts opts, NatsOpts? clientOpts = default)
     {
         NatsServer? server = null;
         NatsConnection? nats = null;
@@ -159,8 +159,8 @@ public class NatsServer : IAsyncDisposable
         {
             try
             {
-                server = new NatsServer(outputHelper, options);
-                nats = server.CreateClientConnection(clientOptions ?? NatsOpts.Default, reTryCount: 3);
+                server = new NatsServer(outputHelper, opts);
+                nats = server.CreateClientConnection(clientOpts ?? NatsOpts.Default, reTryCount: 3);
 #pragma warning disable CA2012
                 return server;
             }
@@ -192,7 +192,7 @@ public class NatsServer : IAsyncDisposable
             var processLogs = await _processErr; // wait for process exit, nats output info to stderror
             if (processLogs.Length != 0)
             {
-                _outputHelper.WriteLine("Process Logs of " + Options.ServerPort);
+                _outputHelper.WriteLine("Process Logs of " + Opts.ServerPort);
                 foreach (var item in processLogs)
                 {
                     _outputHelper.WriteLine(item);
@@ -221,21 +221,21 @@ public class NatsServer : IAsyncDisposable
                 }
             }
 
-            if (Options.ServerDisposeReturnsPorts)
+            if (Opts.ServerDisposeReturnsPorts)
             {
-                Options.Dispose();
+                Opts.Dispose();
             }
         }
     }
 
     public (NatsConnection, NatsProxy) CreateProxiedClientConnection(NatsOpts? options = null)
     {
-        if (Options.EnableTls)
+        if (Opts.EnableTls)
         {
             throw new Exception("Tapped mode doesn't work wit TLS");
         }
 
-        var proxy = new NatsProxy(Options.ServerPort, _outputHelper, Options.Trace);
+        var proxy = new NatsProxy(Opts.ServerPort, _outputHelper, Opts.Trace);
 
         var client = new NatsConnection((options ?? NatsOpts.Default) with
         {
@@ -253,7 +253,7 @@ public class NatsServer : IAsyncDisposable
         {
             try
             {
-                var nats = new NatsConnection(ClientOptions(options ?? NatsOpts.Default));
+                var nats = new NatsConnection(ClientOpts(options ?? NatsOpts.Default));
 
                 try
                 {
@@ -285,10 +285,10 @@ public class NatsServer : IAsyncDisposable
 
     public NatsConnectionPool CreatePooledClientConnection(NatsOpts opts)
     {
-        return new NatsConnectionPool(4, ClientOptions(opts));
+        return new NatsConnectionPool(4, ClientOpts(opts));
     }
 
-    public NatsOpts ClientOptions(NatsOpts opts)
+    public NatsOpts ClientOpts(NatsOpts opts)
     {
         return opts with
         {
@@ -297,14 +297,14 @@ public class NatsServer : IAsyncDisposable
             // ConnectTimeout = TimeSpan.FromSeconds(1),
             // ReconnectWait = TimeSpan.Zero,
             // ReconnectJitter = TimeSpan.Zero,
-            TlsOptions = Options.EnableTls
-                ? TlsOptions.Default with
+            TlsOpts = Opts.EnableTls
+                ? NatsTlsOpts.Default with
                 {
-                    CertFile = Options.TlsClientCertFile,
-                    KeyFile = Options.TlsClientKeyFile,
-                    CaFile = Options.TlsCaFile,
+                    CertFile = Opts.TlsClientCertFile,
+                    KeyFile = Opts.TlsClientKeyFile,
+                    CaFile = Opts.TlsCaFile,
                 }
-                : TlsOptions.Default,
+                : NatsTlsOpts.Default,
             Url = ClientUrl,
         };
     }
@@ -331,19 +331,19 @@ public class NatsCluster : IAsyncDisposable
 {
     public NatsCluster(ITestOutputHelper outputHelper, TransportType transportType)
     {
-        var opts1 = new NatsServerOptions
+        var opts1 = new NatsServerOpts
         {
             TransportType = transportType,
             EnableWebSocket = transportType == TransportType.WebSocket,
             EnableClustering = true,
         };
-        var opts2 = new NatsServerOptions
+        var opts2 = new NatsServerOpts
         {
             TransportType = transportType,
             EnableWebSocket = transportType == TransportType.WebSocket,
             EnableClustering = true,
         };
-        var opts3 = new NatsServerOptions
+        var opts3 = new NatsServerOpts
         {
             TransportType = transportType,
             EnableWebSocket = transportType == TransportType.WebSocket,

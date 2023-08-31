@@ -4,28 +4,28 @@ namespace NATS.Client.Core.Internal;
 
 internal class TlsCerts
 {
-    public TlsCerts(TlsOptions tlsOptions)
+    public TlsCerts(NatsTlsOpts tlsOpts)
     {
-        if (tlsOptions.Disabled)
+        if (tlsOpts.Disabled)
         {
             return;
         }
 
-        if ((tlsOptions.CertFile != default && tlsOptions.KeyFile == default) ||
-            (tlsOptions.KeyFile != default && tlsOptions.CertFile == default))
+        if ((tlsOpts.CertFile != default && tlsOpts.KeyFile == default) ||
+            (tlsOpts.KeyFile != default && tlsOpts.CertFile == default))
         {
-            throw new ArgumentException("TlsOptions.CertFile and TlsOptions.KeyFile must both be set");
+            throw new ArgumentException("NatsTlsOpts.CertFile and NatsTlsOpts.KeyFile must both be set");
         }
 
-        if (tlsOptions.CaFile != default)
+        if (tlsOpts.CaFile != default)
         {
             CaCerts = new X509Certificate2Collection();
-            CaCerts.ImportFromPemFile(tlsOptions.CaFile);
+            CaCerts.ImportFromPemFile(tlsOpts.CaFile);
         }
 
-        if (tlsOptions.CertFile != default && tlsOptions.KeyFile != default)
+        if (tlsOpts.CertFile != default && tlsOpts.KeyFile != default)
         {
-            ClientCerts = new X509Certificate2Collection(X509Certificate2.CreateFromPemFile(tlsOptions.CertFile, tlsOptions.KeyFile));
+            ClientCerts = new X509Certificate2Collection(X509Certificate2.CreateFromPemFile(tlsOpts.CertFile, tlsOpts.KeyFile));
         }
     }
 

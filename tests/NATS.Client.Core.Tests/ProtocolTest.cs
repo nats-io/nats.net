@@ -108,7 +108,7 @@ public class ProtocolTest
             _output.WriteLine($"[TESTS] {DateTime.Now:HH:mm:ss.fff} {text}");
         }
 
-        await using var server = NatsServer.Start(_output, new NatsServerOptionsBuilder().UseTransport(TransportType.Tcp).Trace().Build());
+        await using var server = NatsServer.Start(_output, new NatsServerOptsBuilder().UseTransport(TransportType.Tcp).Trace().Build());
         var (nats, proxy) = server.CreateProxiedClientConnection();
 
         var sync = 0;
@@ -175,7 +175,7 @@ public class ProtocolTest
         }
 
         // Use a single server to test multiple scenarios to make test runs more efficient
-        await using var server = NatsServer.Start(_output, new NatsServerOptionsBuilder().UseTransport(TransportType.Tcp).Trace().Build());
+        await using var server = NatsServer.Start(_output, new NatsServerOptsBuilder().UseTransport(TransportType.Tcp).Trace().Build());
         var (nats, proxy) = server.CreateProxiedClientConnection();
         var sid = 0;
 

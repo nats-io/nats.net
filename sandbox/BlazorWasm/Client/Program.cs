@@ -8,6 +8,6 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
-builder.Services.AddNats(configureOptions: opt => opt with { Url = "ws://localhost:4280", Name = "BlazorClient" });
+builder.Services.AddNats(configureOpts: opt => opt with { Url = "ws://localhost:4280", Name = "BlazorClient" });
 
 await builder.Build().RunAsync();

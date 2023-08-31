@@ -7,7 +7,7 @@ namespace NATS.Client.Core;
 
 public sealed class NatsSub : NatsSubBase, INatsSub
 {
-    private static readonly BoundedChannelOptions DefaultChannelOptions =
+    private static readonly BoundedChannelOptions DefaultChannelOpts =
         new BoundedChannelOptions(1_000)
         {
             FullMode = BoundedChannelFullMode.Wait,
@@ -21,30 +21,30 @@ public sealed class NatsSub : NatsSubBase, INatsSub
     internal NatsSub(NatsConnection connection, ISubscriptionManager manager, string subject, NatsSubOpts? opts)
         : base(connection, manager, subject, opts) =>
         _msgs = Channel.CreateBounded<NatsMsg>(
-            GetChannelOptions(opts?.ChannelOptions));
+            GetChannelOpts(opts?.ChannelOpts));
 
     public ChannelReader<NatsMsg> Msgs => _msgs.Reader;
 
-    internal static BoundedChannelOptions GetChannelOptions(
+    internal static BoundedChannelOptions GetChannelOpts(
         NatsSubChannelOpts? subChannelOpts)
     {
         if (subChannelOpts != null)
         {
             var overrideOpts = subChannelOpts.Value;
             return new BoundedChannelOptions(overrideOpts.Capacity ??
-                                             DefaultChannelOptions.Capacity)
+                                             DefaultChannelOpts.Capacity)
             {
                 AllowSynchronousContinuations =
-                    DefaultChannelOptions.AllowSynchronousContinuations,
+                    DefaultChannelOpts.AllowSynchronousContinuations,
                 FullMode =
-                    overrideOpts.FullMode ?? DefaultChannelOptions.FullMode,
-                SingleWriter = DefaultChannelOptions.SingleWriter,
-                SingleReader = DefaultChannelOptions.SingleReader,
+                    overrideOpts.FullMode ?? DefaultChannelOpts.FullMode,
+                SingleWriter = DefaultChannelOpts.SingleWriter,
+                SingleReader = DefaultChannelOpts.SingleReader,
             };
         }
         else
         {
-            return DefaultChannelOptions;
+            return DefaultChannelOpts;
         }
     }
 
@@ -79,7 +79,7 @@ public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
         : base(connection, manager, subject, opts)
     {
         _msgs = Channel.CreateBounded<NatsMsg<T?>>(
-            NatsSub.GetChannelOptions(opts?.ChannelOptions));
+            NatsSub.GetChannelOpts(opts?.ChannelOpts));
 
         Serializer = serializer;
     }

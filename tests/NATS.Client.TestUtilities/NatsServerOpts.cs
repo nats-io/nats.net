@@ -11,7 +11,7 @@ public enum TransportType
     WebSocket,
 }
 
-public sealed class NatsServerOptionsBuilder
+public sealed class NatsServerOptsBuilder
 {
     private readonly List<string> _extraConfigs = new();
     private bool _enableWebSocket;
@@ -23,9 +23,9 @@ public sealed class NatsServerOptionsBuilder
     private TransportType? _transportType;
     private bool _trace;
 
-    public NatsServerOptions Build()
+    public NatsServerOpts Build()
     {
-        return new NatsServerOptions
+        return new NatsServerOpts
         {
             EnableWebSocket = _enableWebSocket,
             EnableTls = _enableTls,
@@ -39,13 +39,13 @@ public sealed class NatsServerOptionsBuilder
         };
     }
 
-    public NatsServerOptionsBuilder Trace()
+    public NatsServerOptsBuilder Trace()
     {
         _trace = true;
         return this;
     }
 
-    public NatsServerOptionsBuilder UseTransport(TransportType transportType)
+    public NatsServerOptsBuilder UseTransport(TransportType transportType)
     {
         _transportType = transportType;
 
@@ -64,20 +64,20 @@ public sealed class NatsServerOptionsBuilder
         return this;
     }
 
-    public NatsServerOptionsBuilder UseJetStream()
+    public NatsServerOptsBuilder UseJetStream()
     {
         _enableJetStream = true;
         return this;
     }
 
-    public NatsServerOptionsBuilder AddServerConfig(string config)
+    public NatsServerOptsBuilder AddServerConfig(string config)
     {
         _extraConfigs.Add(File.ReadAllText(config));
         return this;
     }
 }
 
-public sealed class NatsServerOptions : IDisposable
+public sealed class NatsServerOpts : IDisposable
 {
     private static readonly Lazy<ConcurrentQueue<int>> PortFactory = new(() =>
     {
@@ -101,7 +101,7 @@ public sealed class NatsServerOptions : IDisposable
     private int _disposed;
     private string _routes = string.Empty;
 
-    public NatsServerOptions()
+    public NatsServerOpts()
     {
         _lazyServerPort = new Lazy<int>(LeasePort);
         _lazyClusteringPort = new Lazy<int?>(() => EnableClustering ? LeasePort() : null);
@@ -203,7 +203,7 @@ public sealed class NatsServerOptions : IDisposable
         }
     }
 
-    public void SetRoutes(IEnumerable<NatsServerOptions> options)
+    public void SetRoutes(IEnumerable<NatsServerOpts> options)
     {
         _routes = string.Join(",", options.Select(o => $"nats://localhost:{o.ClusteringPort}"));
     }

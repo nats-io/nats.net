@@ -6,7 +6,7 @@ using NATS.Client.Hosting;
 var builder = ConsoleApp.CreateBuilder(args);
 builder.ConfigureServices(services =>
 {
-    services.AddNats(poolSize: 4, configureOptions: opt => opt with { Url = "localhost:4222", Name = "MyClient" });
+    services.AddNats(poolSize: 4, configureOpts: opt => opt with { Url = "localhost:4222", Name = "MyClient" });
 });
 
 // create connection(default, connect to nats://localhost:4222)
@@ -58,7 +58,7 @@ var options = NatsOpts.Default with
     Url = "nats://127.0.0.1:9999",
     LoggerFactory = new MinimumConsoleLoggerFactory(LogLevel.Information),
     Echo = true,
-    AuthOptions = NatsAuthOptions.Default with
+    AuthOpts = NatsAuthOpts.Default with
     {
         Username = "foo",
         Password = "bar",

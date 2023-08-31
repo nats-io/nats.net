@@ -15,7 +15,7 @@ public class ConsumerConsumeTest
 
         await using var server = NatsServer.Start(
             outputHelper: _output,
-            options: new NatsServerOptionsBuilder()
+            opts: new NatsServerOptsBuilder()
                 .UseTransport(TransportType.Tcp)
                 .Trace()
                 .UseJetStream()
@@ -80,7 +80,7 @@ public class ConsumerConsumeTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         await using var server = NatsServer.Start(
             outputHelper: new NullOutputHelper(),
-            options: new NatsServerOptionsBuilder()
+            opts: new NatsServerOptsBuilder()
                 .UseTransport(TransportType.Tcp)
                 .UseJetStream()
                 .Build());

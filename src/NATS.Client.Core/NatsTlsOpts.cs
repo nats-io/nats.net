@@ -4,9 +4,9 @@ namespace NATS.Client.Core;
 /// Immutable options for TlsOptions, you can configure via `with` operator.
 /// These options are ignored in WebSocket connections
 /// </summary>
-public sealed record TlsOptions
+public sealed record NatsTlsOpts
 {
-    public static readonly TlsOptions Default = new();
+    public static readonly NatsTlsOpts Default = new();
 
     /// <summary>Path to PEM-encoded X509 Certificate</summary>
     public string? CertFile { get; init; }

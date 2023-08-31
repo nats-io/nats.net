@@ -9,7 +9,7 @@ public class SubscriptionTest
     [Fact]
     public async Task Subscription_periodic_cleanup_test()
     {
-        var serverOptions = new NatsServerOptionsBuilder()
+        var serverOptions = new NatsServerOptsBuilder()
             .Trace()
             .UseTransport(TransportType.Tcp)
             .Build();

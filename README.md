@@ -59,7 +59,7 @@ for (int i = 0; i < 10; i++)
 You should also hook your logger to `NatsConnection` to make sure all is working as expected or
 to get help diagnosing any issues you might have:
 ```csharp
-var options = NatsOptions.Default with { LoggerFactory = new MinimumConsoleLoggerFactory(LogLevel.Error) };
+var options = NatsOpts.Default with { LoggerFactory = new MinimumConsoleLoggerFactory(LogLevel.Error) };
 await using var nats = new NatsConnection(options);
 ```
 

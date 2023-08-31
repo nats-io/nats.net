@@ -150,7 +150,7 @@ public abstract partial class NatsConnectionTest
     [Fact]
     public async Task ReconnectSingleTest()
     {
-        using var options = new NatsServerOptions
+        using var options = new NatsServerOpts
         {
             TransportType = _transportType,
             EnableWebSocket = _transportType == TransportType.WebSocket,
@@ -298,7 +298,7 @@ public abstract partial class NatsConnectionTest
 
         var disconnectSignal = connection1.ConnectionDisconnectedAsAwaitable(); // register disconnect before kill
 
-        _output.WriteLine($"TRY KILL SERVER1 Port:{cluster.Server1.Options.ServerPort}");
+        _output.WriteLine($"TRY KILL SERVER1 Port:{cluster.Server1.Opts.ServerPort}");
         await cluster.Server1.DisposeAsync(); // process kill
         await disconnectSignal;
 

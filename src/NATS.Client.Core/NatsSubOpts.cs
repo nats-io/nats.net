@@ -64,5 +64,5 @@ public readonly record struct NatsSubOpts
     /// <summary>
     /// Allows Configuration of <see cref="Channel"/> options for a subscription.
     /// </summary>
-    public NatsSubChannelOpts? ChannelOptions { get; init; }
+    public NatsSubChannelOpts? ChannelOpts { get; init; }
 }
