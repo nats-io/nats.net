@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using Example.JetStream.PullConsumer;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
@@ -62,7 +62,10 @@ var fetchOpts = new NatsJSFetchOpts
 
 var nextOpts = new NatsJSNextOpts
 {
-    Expires = expires, IdleHeartbeat = idle, Serializer = new RawDataSerializer(), ErrorHandler = ErrorHandler,
+    Expires = expires,
+    IdleHeartbeat = idle,
+    Serializer = new RawDataSerializer(),
+    ErrorHandler = ErrorHandler,
 };
 
 var stopwatch = Stopwatch.StartNew();

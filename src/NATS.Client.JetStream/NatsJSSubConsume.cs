@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Text;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;

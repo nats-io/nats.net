@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Text;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
@@ -136,70 +136,70 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubFetch<TMsg>
         ReadOnlySequence<byte>? headersBuffer,
         ReadOnlySequence<byte> payloadBuffer)
     {
-            ResetHeartbeatTimer();
-            if (subject == Subject)
+        ResetHeartbeatTimer();
+        if (subject == Subject)
+        {
+            if (headersBuffer.HasValue)
             {
-                if (headersBuffer.HasValue)
+                var headers = new NatsHeaders();
+                if (Connection.HeaderParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), headers))
                 {
-                    var headers = new NatsHeaders();
-                    if (Connection.HeaderParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), headers))
+                    if (headers is { Code: 408, Message: NatsHeaders.Messages.RequestTimeout })
                     {
-                        if (headers is { Code: 408, Message: NatsHeaders.Messages.RequestTimeout })
-                        {
-                            EndSubscription(NatsSubEndReason.Timeout);
-                        }
-                        else if (headers is { Code: 409, Message: NatsHeaders.Messages.MessageSizeExceedsMaxBytes })
-                        {
-                            EndSubscription(NatsSubEndReason.MaxBytes);
-                        }
-                        else if (headers is { Code: 100, Message: NatsHeaders.Messages.IdleHeartbeat })
-                        {
-                        }
-                        else
-                        {
-                            _notifications.Writer.TryWrite(new NatsJSNotification(headers.Code, headers.MessageText));
-                        }
+                        EndSubscription(NatsSubEndReason.Timeout);
+                    }
+                    else if (headers is { Code: 409, Message: NatsHeaders.Messages.MessageSizeExceedsMaxBytes })
+                    {
+                        EndSubscription(NatsSubEndReason.MaxBytes);
+                    }
+                    else if (headers is { Code: 100, Message: NatsHeaders.Messages.IdleHeartbeat })
+                    {
                     }
                     else
                     {
-                        _logger.LogError(
-                            "Can't parse headers: {HeadersBuffer}",
-                            Encoding.ASCII.GetString(headersBuffer.Value.ToArray()));
-                        throw new NatsJSException("Can't parse headers");
+                        _notifications.Writer.TryWrite(new NatsJSNotification(headers.Code, headers.MessageText));
                     }
                 }
                 else
                 {
-                    throw new NatsJSException("No header found");
+                    _logger.LogError(
+                        "Can't parse headers: {HeadersBuffer}",
+                        Encoding.ASCII.GetString(headersBuffer.Value.ToArray()));
+                    throw new NatsJSException("Can't parse headers");
                 }
             }
             else
             {
-                var msg = new NatsJSMsg<TMsg?>(
-                    NatsMsg<TMsg?>.Build(
-                        subject,
-                        replyTo,
-                        headersBuffer,
-                        payloadBuffer,
-                        Connection,
-                        Connection.HeaderParser,
-                        _serializer),
-                    _context);
-
-                _pendingMsgs--;
-                _pendingBytes -= msg.Size;
-
-                await _userMsgs.Writer.WriteAsync(msg).ConfigureAwait(false);
+                throw new NatsJSException("No header found");
             }
+        }
+        else
+        {
+            var msg = new NatsJSMsg<TMsg?>(
+                NatsMsg<TMsg?>.Build(
+                    subject,
+                    replyTo,
+                    headersBuffer,
+                    payloadBuffer,
+                    Connection,
+                    Connection.HeaderParser,
+                    _serializer),
+                _context);
 
-            if (_maxBytes > 0 && _pendingBytes <= 0)
-            {
-                EndSubscription(NatsSubEndReason.MaxBytes);
-            }
-            else if (_maxBytes == 0 && _pendingMsgs == 0)
-            {
-                EndSubscription(NatsSubEndReason.MaxMsgs);
-            }
+            _pendingMsgs--;
+            _pendingBytes -= msg.Size;
+
+            await _userMsgs.Writer.WriteAsync(msg).ConfigureAwait(false);
+        }
+
+        if (_maxBytes > 0 && _pendingBytes <= 0)
+        {
+            EndSubscription(NatsSubEndReason.MaxBytes);
+        }
+        else if (_maxBytes == 0 && _pendingMsgs == 0)
+        {
+            EndSubscription(NatsSubEndReason.MaxMsgs);
+        }
     }
 
     protected override void TryComplete()

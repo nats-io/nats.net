@@ -22,13 +22,13 @@ public partial class NatsJSContext
 
     internal NatsJSOpts Opts { get; }
 
-    internal string NewInbox() => $"{Opts.InboxPrefix}.{Guid.NewGuid():n}";
-
     public ValueTask<AccountInfoResponse> GetAccountInfoAsync(CancellationToken cancellationToken = default) =>
         JSRequestResponseAsync<object, AccountInfoResponse>(
             subject: $"{Opts.ApiPrefix}.INFO",
             request: null,
             cancellationToken);
+
+    internal string NewInbox() => $"{Opts.InboxPrefix}.{Guid.NewGuid():n}";
 
     public async ValueTask<PubAckResponse> PublishAsync<T>(
         string subject,
