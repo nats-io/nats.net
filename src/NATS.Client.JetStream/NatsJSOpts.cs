@@ -38,7 +38,7 @@ public record NatsJSConsumeOpts
     /// <summary>
     /// Errors and notifications handler
     /// </summary>
-    public Action<NatsJSNotification>? ErrorHandler { get; init; }
+    public Action<INatsJSSubConsume, NatsJSNotification>? ErrorHandler { get; init; }
 
     /// <summary>
     /// Maximum number of messages stored in the buffer
@@ -85,7 +85,7 @@ public record NatsJSNextOpts
     /// <summary>
     /// Errors and notifications handler
     /// </summary>
-    public Action<NatsJSNotification>? ErrorHandler { get; init; }
+    public Action<INatsJSSubFetch, NatsJSNotification>? ErrorHandler { get; init; }
 
     /// <summary>
     /// Amount of time to wait for the request to expire (in nanoseconds)
@@ -112,7 +112,7 @@ public record NatsJSFetchOpts
     /// <summary>
     /// Errors and notifications handler
     /// </summary>
-    public Action<NatsJSNotification>? ErrorHandler { get; init; }
+    public Action<INatsJSSubFetch, NatsJSNotification>? ErrorHandler { get; init; }
 
     /// <summary>
     /// Maximum number of messages to return

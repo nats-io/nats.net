@@ -28,7 +28,12 @@ var expires = TimeSpan.FromSeconds(30);
 int? maxMsgs = 1000;
 int? maxBytes = null;
 
-static void ErrorHandler(NatsJSNotification notification)
+static void ConsumeErrorHandler(INatsJSSubConsume c, NatsJSNotification notification)
+{
+    Console.WriteLine($"Error: {notification}");
+}
+
+static void FetchErrorHandler(INatsJSSubFetch f, NatsJSNotification notification)
 {
     Console.WriteLine($"Error: {notification}");
 }
@@ -47,7 +52,7 @@ var consumeOpts = new NatsJSConsumeOpts
     Expires = expires,
     IdleHeartbeat = idle,
     Serializer = new RawDataSerializer(),
-    ErrorHandler = ErrorHandler,
+    ErrorHandler = ConsumeErrorHandler,
 };
 
 var fetchOpts = new NatsJSFetchOpts
@@ -57,7 +62,7 @@ var fetchOpts = new NatsJSFetchOpts
     Expires = expires,
     IdleHeartbeat = idle,
     Serializer = new RawDataSerializer(),
-    ErrorHandler = ErrorHandler,
+    ErrorHandler = FetchErrorHandler,
 };
 
 var nextOpts = new NatsJSNextOpts
@@ -65,7 +70,7 @@ var nextOpts = new NatsJSNextOpts
     Expires = expires,
     IdleHeartbeat = idle,
     Serializer = new RawDataSerializer(),
-    ErrorHandler = ErrorHandler,
+    ErrorHandler = FetchErrorHandler,
 };
 
 var stopwatch = Stopwatch.StartNew();

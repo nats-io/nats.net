@@ -102,7 +102,7 @@ public class ConsumerConsumeTest
         {
             MaxMsgs = 10,
             IdleHeartbeat = TimeSpan.FromSeconds(5),
-            ErrorHandler = _ =>
+            ErrorHandler = (_, _) =>
             {
                 signal.Pulse();
             },
@@ -153,7 +153,7 @@ public class ConsumerConsumeTest
         var consumerOpts = new NatsJSConsumeOpts
         {
             MaxMsgs = 10,
-            ErrorHandler = e =>
+            ErrorHandler = (_, e) =>
             {
                 _output.WriteLine($"Consume error: {e.Code} {e.Description}");
             },

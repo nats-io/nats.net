@@ -18,7 +18,7 @@ public class NatsJSStream
 
     public StreamInfo Info { get; private set; }
 
-    public async ValueTask<bool> DeleteAsync(string stream, CancellationToken cancellationToken = default)
+    public async ValueTask<bool> DeleteAsync(CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
         return _deleted = await _context.DeleteStreamAsync(_name, cancellationToken);

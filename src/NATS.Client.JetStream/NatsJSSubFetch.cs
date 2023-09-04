@@ -17,7 +17,7 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubFetch<TMsg>
     private readonly NatsJSContext _context;
     private readonly string _stream;
     private readonly string _consumer;
-    private readonly Action<NatsJSNotification>? _errorHandler;
+    private readonly Action<INatsJSSubFetch, NatsJSNotification>? _errorHandler;
     private readonly INatsSerializer _serializer;
     private readonly Timer _hbTimer;
     private readonly Timer _expiresTimer;
@@ -42,10 +42,10 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubFetch<TMsg>
         string consumer,
         string subject,
         NatsSubOpts? opts,
-        Action<NatsJSNotification>? errorHandler)
+        Action<INatsJSSubFetch, NatsJSNotification>? errorHandler)
         : base(context.Connection, context.Connection.SubscriptionManager, subject, opts)
     {
-        _logger = Connection.Opts.LoggerFactory.CreateLogger<NatsJSSubConsume<TMsg>>();
+        _logger = Connection.Opts.LoggerFactory.CreateLogger<NatsJSSubFetch<TMsg>>();
         _context = context;
         _stream = stream;
         _consumer = consumer;
@@ -88,6 +88,8 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubFetch<TMsg>
     }
 
     public ChannelReader<NatsJSMsg<TMsg?>> Msgs { get; }
+
+    public void Stop() => EndSubscription(NatsSubEndReason.None);
 
     public ValueTask CallMsgNextAsync(ConsumerGetnextRequest request, CancellationToken cancellationToken = default) =>
         Connection.PubModelAsync(
@@ -214,7 +216,7 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubFetch<TMsg>
         {
             try
             {
-                _errorHandler?.Invoke(notification);
+                _errorHandler?.Invoke(this, notification);
             }
             catch (Exception e)
             {

@@ -2,12 +2,22 @@ using System.Threading.Channels;
 
 namespace NATS.Client.JetStream;
 
-public interface INatsJSSubConsume<T> : IAsyncDisposable
+public interface INatsJSSubConsume : IAsyncDisposable
+{
+    void Stop();
+}
+
+public interface INatsJSSubConsume<T> : INatsJSSubConsume
 {
     ChannelReader<NatsJSMsg<T?>> Msgs { get; }
 }
 
-public interface INatsJSSubFetch<T> : IAsyncDisposable
+public interface INatsJSSubFetch : IAsyncDisposable
+{
+    void Stop();
+}
+
+public interface INatsJSSubFetch<T> : INatsJSSubFetch
 {
     ChannelReader<NatsJSMsg<T?>> Msgs { get; }
 }
