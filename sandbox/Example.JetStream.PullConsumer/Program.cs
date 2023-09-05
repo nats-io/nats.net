@@ -28,12 +28,12 @@ var expires = TimeSpan.FromSeconds(30);
 int? maxMsgs = 1000;
 int? maxBytes = null;
 
-static void ConsumeErrorHandler(INatsJSSubConsume c, NatsJSNotification notification)
+static void ConsumeErrorHandler(INatsJSConsume c, NatsJSNotification notification)
 {
     Console.WriteLine($"Error: {notification}");
 }
 
-static void FetchErrorHandler(INatsJSSubFetch f, NatsJSNotification notification)
+static void FetchErrorHandler(INatsJSFetch f, NatsJSNotification notification)
 {
     Console.WriteLine($"Error: {notification}");
 }

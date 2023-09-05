@@ -9,7 +9,7 @@ using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
 
-public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
+public class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
 {
     private readonly ILogger _logger;
     private readonly bool _debug;
@@ -19,7 +19,7 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
     private readonly NatsJSContext _context;
     private readonly string _stream;
     private readonly string _consumer;
-    private readonly Action<INatsJSSubConsume, NatsJSNotification>? _errorHandler;
+    private readonly Action<INatsJSConsume, NatsJSNotification>? _errorHandler;
     private readonly INatsSerializer _serializer;
     private readonly Timer _timer;
     private readonly Task _pullTask;
@@ -36,7 +36,7 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
     private long _pendingMsgs;
     private long _pendingBytes;
 
-    public NatsJSSubConsume(
+    public NatsJSConsume(
         long maxMsgs,
         long thresholdMsgs,
         long maxBytes,
@@ -48,10 +48,10 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
         string consumer,
         string subject,
         NatsSubOpts? opts,
-        Action<INatsJSSubConsume, NatsJSNotification>? errorHandler)
+        Action<INatsJSConsume, NatsJSNotification>? errorHandler)
         : base(context.Connection, context.Connection.SubscriptionManager, subject, opts)
     {
-        _logger = Connection.Opts.LoggerFactory.CreateLogger<NatsJSSubConsume<TMsg>>();
+        _logger = Connection.Opts.LoggerFactory.CreateLogger<NatsJSConsume<TMsg>>();
         _debug = _logger.IsEnabled(LogLevel.Debug);
         _context = context;
         _stream = stream;
@@ -86,7 +86,7 @@ public class NatsJSSubConsume<TMsg> : NatsSubBase, INatsJSSubConsume<TMsg>
         _timer = new Timer(
             static state =>
             {
-                var self = (NatsJSSubConsume<TMsg>)state!;
+                var self = (NatsJSConsume<TMsg>)state!;
                 self.Pull(self._maxMsgs, self._maxBytes);
                 self.ResetPending();
                 self._notifications.Writer.TryWrite(NatsJSNotification.HeartbeatTimeout);

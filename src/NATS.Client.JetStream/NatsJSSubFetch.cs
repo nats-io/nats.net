@@ -9,7 +9,7 @@ using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
 
-public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubFetch<TMsg>
+public class NatsJSFetch<TMsg> : NatsSubBase, INatsJSFetch<TMsg>
 {
     private readonly ILogger _logger;
     private readonly Channel<NatsJSMsg<TMsg?>> _userMsgs;
@@ -17,7 +17,7 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubFetch<TMsg>
     private readonly NatsJSContext _context;
     private readonly string _stream;
     private readonly string _consumer;
-    private readonly Action<INatsJSSubFetch, NatsJSNotification>? _errorHandler;
+    private readonly Action<INatsJSFetch, NatsJSNotification>? _errorHandler;
     private readonly INatsSerializer _serializer;
     private readonly Timer _hbTimer;
     private readonly Timer _expiresTimer;
@@ -32,7 +32,7 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubFetch<TMsg>
     private long _pendingMsgs;
     private long _pendingBytes;
 
-    public NatsJSSubFetch(
+    public NatsJSFetch(
         long maxMsgs,
         long maxBytes,
         TimeSpan expires,
@@ -42,10 +42,10 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubFetch<TMsg>
         string consumer,
         string subject,
         NatsSubOpts? opts,
-        Action<INatsJSSubFetch, NatsJSNotification>? errorHandler)
+        Action<INatsJSFetch, NatsJSNotification>? errorHandler)
         : base(context.Connection, context.Connection.SubscriptionManager, subject, opts)
     {
-        _logger = Connection.Opts.LoggerFactory.CreateLogger<NatsJSSubFetch<TMsg>>();
+        _logger = Connection.Opts.LoggerFactory.CreateLogger<NatsJSFetch<TMsg>>();
         _context = context;
         _stream = stream;
         _consumer = consumer;
@@ -69,7 +69,7 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubFetch<TMsg>
         _hbTimer = new Timer(
             static state =>
             {
-                var self = (NatsJSSubFetch<TMsg>)state!;
+                var self = (NatsJSFetch<TMsg>)state!;
                 self._notifications.Writer.TryWrite(NatsJSNotification.HeartbeatTimeout);
             },
             this,
@@ -79,7 +79,7 @@ public class NatsJSSubFetch<TMsg> : NatsSubBase, INatsJSSubFetch<TMsg>
         _expiresTimer = new Timer(
             static state =>
             {
-                var self = (NatsJSSubFetch<TMsg>)state!;
+                var self = (NatsJSFetch<TMsg>)state!;
                 self.EndSubscription(NatsSubEndReason.Timeout);
             },
             this,

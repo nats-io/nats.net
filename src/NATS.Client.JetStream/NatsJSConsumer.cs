@@ -40,7 +40,7 @@ public class NatsJSConsumer
         }
     }
 
-    public async ValueTask<INatsJSSubConsume<T>> ConsumeAsync<T>(NatsJSConsumeOpts opts, CancellationToken cancellationToken = default)
+    public async ValueTask<INatsJSConsume<T>> ConsumeAsync<T>(NatsJSConsumeOpts opts, CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
 
@@ -62,7 +62,7 @@ public class NatsJSConsumer
             },
         };
 
-        var sub = new NatsJSSubConsume<T>(
+        var sub = new NatsJSConsume<T>(
             stream: _stream,
             consumer: _consumer,
             context: _context,
@@ -130,7 +130,7 @@ public class NatsJSConsumer
         }
     }
 
-    public async ValueTask<INatsJSSubFetch<T>> FetchAsync<T>(
+    public async ValueTask<INatsJSFetch<T>> FetchAsync<T>(
         NatsJSFetchOpts opts,
         CancellationToken cancellationToken = default)
     {
@@ -154,7 +154,7 @@ public class NatsJSConsumer
             },
         };
 
-        var sub = new NatsJSSubFetch<T>(
+        var sub = new NatsJSFetch<T>(
             stream: _stream,
             consumer: _consumer,
             context: _context,
