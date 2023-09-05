@@ -55,17 +55,11 @@ public partial class NatsJSContext
         return new NatsJSConsumer(this, response);
     }
 
-    public async IAsyncEnumerable<NatsJSConsumer> ListConsumersAsync(string stream, ConsumerListRequest request, [EnumeratorCancellation] CancellationToken cancellationToken = default)
-    {
-        var response = await JSRequestResponseAsync<ConsumerListRequest, ConsumerListResponse>(
+    public ValueTask<ConsumerListResponse> ListConsumersAsync(string stream, ConsumerListRequest request, CancellationToken cancellationToken = default) =>
+        JSRequestResponseAsync<ConsumerListRequest, ConsumerListResponse>(
             subject: $"{Opts.ApiPrefix}.CONSUMER.LIST.{stream}",
             request,
             cancellationToken);
-        foreach (var consumer in response.Consumers)
-        {
-            yield return new NatsJSConsumer(this, consumer);
-        }
-    }
 
     public async ValueTask<bool> DeleteConsumerAsync(string stream, string consumer, CancellationToken cancellationToken = default)
     {

@@ -52,17 +52,11 @@ public partial class NatsJSContext
         return new NatsJSStream(this, response);
     }
 
-    public async IAsyncEnumerable<NatsJSStream> ListStreamsAsync(
+    public ValueTask<StreamListResponse> ListStreamsAsync(
         StreamListRequest request,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
-    {
-        var response = await JSRequestResponseAsync<object, StreamListResponse>(
+        CancellationToken cancellationToken = default) =>
+        JSRequestResponseAsync<object, StreamListResponse>(
             subject: $"{Opts.ApiPrefix}.STREAM.LIST",
             request: request,
             cancellationToken);
-        foreach (var stream in response.Streams)
-        {
-            yield return new NatsJSStream(this, stream);
-        }
-    }
 }

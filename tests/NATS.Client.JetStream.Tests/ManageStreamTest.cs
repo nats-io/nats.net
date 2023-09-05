@@ -70,16 +70,13 @@ public class ManageStreamTest
 
         // List
         {
-            var list = new List<NatsJSStream>();
-            await foreach (var stream in js.ListStreamsAsync(new StreamListRequest(), cts.Token))
-            {
-                list.Add(stream);
-            }
+            var response = await js.ListStreamsAsync(new StreamListRequest(), cts.Token);
+            var list = response.Streams.ToList();
 
             Assert.Equal(3, list.Count);
-            Assert.Contains(list, s => s.Info.Config.Name == "s1");
-            Assert.Contains(list, s => s.Info.Config.Name == "s2");
-            Assert.Contains(list, s => s.Info.Config.Name == "s3");
+            Assert.Contains(list, s => s.Config.Name == "s1");
+            Assert.Contains(list, s => s.Config.Name == "s2");
+            Assert.Contains(list, s => s.Config.Name == "s3");
         }
 
         // Delete
@@ -87,13 +84,10 @@ public class ManageStreamTest
             var deleteResponse = await js.DeleteStreamAsync("s1", cts.Token);
             Assert.True(deleteResponse);
 
-            var list = new List<NatsJSStream>();
-            await foreach (var stream in js.ListStreamsAsync(new StreamListRequest(), cts.Token))
-            {
-                list.Add(stream);
-            }
+            var response = await js.ListStreamsAsync(new StreamListRequest(), cts.Token);
+            var list = response.Streams.ToList();
 
-            Assert.DoesNotContain(list, s => s.Info.Config.Name == "s1");
+            Assert.DoesNotContain(list, s => s.Config.Name == "s1");
         }
     }
 }

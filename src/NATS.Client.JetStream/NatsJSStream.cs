@@ -33,11 +33,10 @@ public class NatsJSStream
         Info = response.Info;
     }
 
-    public async IAsyncEnumerable<NatsJSConsumer> ListConsumersAsync(string stream, ConsumerListRequest request, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public ValueTask<ConsumerListResponse> ListConsumersAsync(string stream, ConsumerListRequest request, CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
-        await foreach (var consumer in _context.ListConsumersAsync(_name, request, cancellationToken))
-            yield return consumer;
+        return _context.ListConsumersAsync(_name, request, cancellationToken);
     }
 
     public ValueTask<NatsJSConsumer> CreateConsumerAsync(ConsumerCreateRequest request, CancellationToken cancellationToken = default)
