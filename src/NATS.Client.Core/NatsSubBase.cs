@@ -14,8 +14,10 @@ public enum NatsSubEndReason
     MaxBytes,
     Timeout,
     IdleTimeout,
+    IdleHeartbeatTimeout,
     StartUpTimeout,
     Exception,
+    JetStreamError,
 }
 
 public abstract class NatsSubBase

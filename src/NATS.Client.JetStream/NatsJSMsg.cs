@@ -52,4 +52,8 @@ public readonly struct NatsJSMsg<T>
     }
 }
 
+/// <summary>
+/// Options to be used when acknowledging messages received from a stream using a consumer.
+/// </summary>
+/// <param name="WaitUntilSent">Wait for the publish to be flushed down to the network.</param>
 public readonly record struct AckOpts(bool? WaitUntilSent);

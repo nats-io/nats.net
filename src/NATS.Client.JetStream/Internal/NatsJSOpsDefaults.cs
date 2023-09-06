@@ -10,13 +10,11 @@ internal static class NatsJSOpsDefaults
     private static readonly TimeSpan HeartbeatMin = TimeSpan.FromSeconds(.5);
 
     internal static (long MaxMsgs, long MaxBytes, long ThresholdMsgs, long ThresholdBytes) SetMax(
-        NatsJSOpts? opts = default,
         long? maxMsgs = default,
         long? maxBytes = default,
         long? thresholdMsgs = default,
         long? thresholdBytes = default)
     {
-        var jsOpts = opts ?? new NatsJSOpts(NatsOpts.Default);
         long maxMsgsOut;
         long maxBytesOut;
 
@@ -26,8 +24,7 @@ internal static class NatsJSOpsDefaults
         }
         else if (!maxMsgs.HasValue && !maxBytes.HasValue)
         {
-            maxMsgsOut = jsOpts.MaxMsgs;
-            maxBytesOut = 0;
+            throw new NatsJSException($"You must set {nameof(maxBytes)} or {nameof(maxMsgs)}");
         }
         else if (maxMsgs.HasValue && !maxBytes.HasValue)
         {
@@ -45,12 +42,18 @@ internal static class NatsJSOpsDefaults
         }
 
         var thresholdMsgsOut = thresholdMsgs ?? maxMsgsOut / 2;
+
         if (thresholdMsgsOut > maxMsgsOut)
-            thresholdMsgsOut = maxMsgsOut;
+        {
+            throw new NatsJSException($"{nameof(thresholdMsgs)} must be less than {nameof(maxMsgs)}");
+        }
 
         var thresholdBytesOut = thresholdBytes ?? maxBytesOut / 2;
+
         if (thresholdBytesOut > maxBytesOut)
-            thresholdBytesOut = maxBytesOut;
+        {
+            throw new NatsJSException($"{nameof(thresholdBytes)} must be less than {nameof(maxBytes)}");
+        }
 
         return (maxMsgsOut, maxBytesOut, thresholdMsgsOut, thresholdBytesOut);
     }
@@ -60,14 +63,23 @@ internal static class NatsJSOpsDefaults
         TimeSpan? idleHeartbeat = default)
     {
         var expiresOut = expires ?? ExpiresDefault;
+
         if (expiresOut < ExpiresMin)
-            expiresOut = ExpiresMin;
+        {
+            throw new NatsJSException($"{nameof(expires)} must be greater than {ExpiresMin}");
+        }
 
         var idleHeartbeatOut = idleHeartbeat ?? expiresOut / 2;
+
         if (idleHeartbeatOut > HeartbeatCap)
-            idleHeartbeatOut = HeartbeatCap;
+        {
+            throw new NatsJSException($"{nameof(idleHeartbeat)} must be less than {HeartbeatCap}");
+        }
+
         if (idleHeartbeatOut < HeartbeatMin)
-            idleHeartbeatOut = HeartbeatMin;
+        {
+            throw new NatsJSException($"{nameof(idleHeartbeat)} must be greater than {HeartbeatMin}");
+        }
 
         return (expiresOut, idleHeartbeatOut);
     }

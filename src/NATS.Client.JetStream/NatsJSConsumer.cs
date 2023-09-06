@@ -21,7 +21,7 @@ public class NatsJSConsumer
         _consumer = Info.Name;
     }
 
-    public ConsumerInfo Info { get; }
+    public ConsumerInfo Info { get; private set; }
 
     public async ValueTask<bool> DeleteAsync(CancellationToken cancellationToken = default)
     {
@@ -46,7 +46,7 @@ public class NatsJSConsumer
 
         var inbox = _context.NewInbox();
 
-        var max = NatsJSOpsDefaults.SetMax(_context.Opts, opts.MaxMsgs, opts.MaxBytes, opts.ThresholdMsgs, opts.ThresholdBytes);
+        var max = NatsJSOpsDefaults.SetMax(opts.MaxMsgs, opts.MaxBytes, opts.ThresholdMsgs, opts.ThresholdBytes);
         var timeouts = NatsJSOpsDefaults.SetTimeouts(opts.Expires, opts.IdleHeartbeat);
 
         var requestOpts = new NatsSubOpts
@@ -73,8 +73,7 @@ public class NatsJSConsumer
             thresholdMsgs: max.ThresholdMsgs,
             thresholdBytes: max.ThresholdBytes,
             expires: timeouts.Expires,
-            idle: timeouts.IdleHeartbeat,
-            errorHandler: opts.ErrorHandler);
+            idle: timeouts.IdleHeartbeat);
 
         await _context.Connection.SubAsync(
             subject: inbox,
@@ -107,7 +106,6 @@ public class NatsJSConsumer
                 IdleHeartbeat = opts.IdleHeartbeat,
                 Expires = opts.Expires,
                 Serializer = opts.Serializer,
-                ErrorHandler = opts.ErrorHandler,
             },
             cancellationToken: cancellationToken);
 
@@ -138,7 +136,7 @@ public class NatsJSConsumer
 
         var inbox = _context.NewInbox();
 
-        var max = NatsJSOpsDefaults.SetMax(_context.Opts, opts.MaxMsgs, opts.MaxBytes);
+        var max = NatsJSOpsDefaults.SetMax(opts.MaxMsgs, opts.MaxBytes);
         var timeouts = NatsJSOpsDefaults.SetTimeouts(opts.Expires, opts.IdleHeartbeat);
 
         var requestOpts = new NatsSubOpts
@@ -163,8 +161,7 @@ public class NatsJSConsumer
             maxMsgs: max.MaxMsgs,
             maxBytes: max.MaxBytes,
             expires: timeouts.Expires,
-            idle: timeouts.IdleHeartbeat,
-            errorHandler: opts.ErrorHandler);
+            idle: timeouts.IdleHeartbeat);
 
         await _context.Connection.SubAsync(
             subject: inbox,
@@ -186,6 +183,12 @@ public class NatsJSConsumer
 
         return sub;
     }
+
+    public async ValueTask RefreshAsync(CancellationToken cancellationToken = default) =>
+        Info = await _context.JSRequestResponseAsync<object, ConsumerInfo>(
+            subject: $"{_context.Opts.Prefix}.CONSUMER.INFO.{_stream}.{_consumer}",
+            request: null,
+            cancellationToken).ConfigureAwait(false);
 
     private void ThrowIfDeleted()
     {

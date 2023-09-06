@@ -24,7 +24,7 @@ public partial class NatsJSContext
 
     public ValueTask<AccountInfoResponse> GetAccountInfoAsync(CancellationToken cancellationToken = default) =>
         JSRequestResponseAsync<object, AccountInfoResponse>(
-            subject: $"{Opts.ApiPrefix}.INFO",
+            subject: $"{Opts.Prefix}.INFO",
             request: null,
             cancellationToken);
 

@@ -84,7 +84,7 @@ public sealed record NatsOpts
         ReconnectJitter: TimeSpan.FromMilliseconds(100),
         ConnectTimeout: TimeSpan.FromSeconds(2),
         ObjectPoolSize: 256,
-        RequestTimeout: TimeSpan.FromMinutes(1),
+        RequestTimeout: TimeSpan.FromSeconds(5),
         CommandTimeout: TimeSpan.FromMinutes(1),
         SubscriptionCleanUpInterval: TimeSpan.FromMinutes(5),
         WriterCommandBufferLimit: 1_000,

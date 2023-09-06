@@ -12,16 +12,14 @@ namespace NATS.Client.JetStream;
 public class NatsJSFetch<TMsg> : NatsSubBase, INatsJSFetch<TMsg>
 {
     private readonly ILogger _logger;
+    private readonly bool _debug;
     private readonly Channel<NatsJSMsg<TMsg?>> _userMsgs;
-    private readonly Channel<NatsJSNotification> _notifications;
     private readonly NatsJSContext _context;
     private readonly string _stream;
     private readonly string _consumer;
-    private readonly Action<INatsJSFetch, NatsJSNotification>? _errorHandler;
     private readonly INatsSerializer _serializer;
     private readonly Timer _hbTimer;
     private readonly Timer _expiresTimer;
-    private readonly Task _notificationsTask;
 
     private readonly long _maxMsgs;
     private readonly long _maxBytes;
@@ -41,15 +39,14 @@ public class NatsJSFetch<TMsg> : NatsSubBase, INatsJSFetch<TMsg>
         string stream,
         string consumer,
         string subject,
-        NatsSubOpts? opts,
-        Action<INatsJSFetch, NatsJSNotification>? errorHandler)
+        NatsSubOpts? opts)
         : base(context.Connection, context.Connection.SubscriptionManager, subject, opts)
     {
         _logger = Connection.Opts.LoggerFactory.CreateLogger<NatsJSFetch<TMsg>>();
+        _debug = _logger.IsEnabled(LogLevel.Debug);
         _context = context;
         _stream = stream;
         _consumer = consumer;
-        _errorHandler = errorHandler;
         _serializer = opts?.Serializer ?? context.Connection.Opts.Serializer;
 
         _maxMsgs = maxMsgs;
@@ -63,14 +60,33 @@ public class NatsJSFetch<TMsg> : NatsSubBase, INatsJSFetch<TMsg>
         _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg?>>(NatsSub.GetChannelOpts(opts?.ChannelOpts));
         Msgs = _userMsgs.Reader;
 
-        _notifications = Channel.CreateBounded<NatsJSNotification>(NatsSub.GetChannelOpts(opts?.ChannelOpts));
-        _notificationsTask = Task.Run(NotificationsLoop);
+        if (_debug)
+        {
+            _logger.LogDebug(
+                NatsJSLogEvents.Config,
+                "Fetch setup {@Config}",
+                new
+                {
+                    maxMsgs,
+                    maxBytes,
+                    expires,
+                    idle,
+                    _hbTimeout,
+                });
+        }
 
         _hbTimer = new Timer(
             static state =>
             {
                 var self = (NatsJSFetch<TMsg>)state!;
-                self._notifications.Writer.TryWrite(NatsJSNotification.HeartbeatTimeout);
+                self.EndSubscription(NatsSubEndReason.IdleHeartbeatTimeout);
+                if (self._debug)
+                {
+                    self._logger.LogDebug(
+                        NatsJSLogEvents.IdleTimeout,
+                        "Idle heartbeat timed-out after {Timeout}ns",
+                        self._idle);
+                }
             },
             this,
             Timeout.Infinite,
@@ -81,6 +97,13 @@ public class NatsJSFetch<TMsg> : NatsSubBase, INatsJSFetch<TMsg>
             {
                 var self = (NatsJSFetch<TMsg>)state!;
                 self.EndSubscription(NatsSubEndReason.Timeout);
+                if (self._debug)
+                {
+                    self._logger.LogDebug(
+                        NatsJSLogEvents.Expired,
+                        "JetStream pull request expired {Expires}ns",
+                        self._expires);
+                }
             },
             this,
             expires + TimeSpan.FromSeconds(5),
@@ -93,7 +116,7 @@ public class NatsJSFetch<TMsg> : NatsSubBase, INatsJSFetch<TMsg>
 
     public ValueTask CallMsgNextAsync(ConsumerGetnextRequest request, CancellationToken cancellationToken = default) =>
         Connection.PubModelAsync(
-            subject: $"{_context.Opts.ApiPrefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
+            subject: $"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
             data: request,
             serializer: NatsJsonSerializer.Default,
             replyTo: Subject,
@@ -105,7 +128,6 @@ public class NatsJSFetch<TMsg> : NatsSubBase, INatsJSFetch<TMsg>
     public override async ValueTask DisposeAsync()
     {
         await base.DisposeAsync().ConfigureAwait(false);
-        await _notificationsTask.ConfigureAwait(false);
         await _hbTimer.DisposeAsync().ConfigureAwait(false);
         await _expiresTimer.DisposeAsync().ConfigureAwait(false);
     }
@@ -124,7 +146,7 @@ public class NatsJSFetch<TMsg> : NatsSubBase, INatsJSFetch<TMsg>
 
         yield return PublishCommand<ConsumerGetnextRequest>.Create(
             pool: Connection.ObjectPool,
-            subject: $"{_context.Opts.ApiPrefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
+            subject: $"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
             replyTo: Subject,
             headers: default,
             value: request,
@@ -157,14 +179,27 @@ public class NatsJSFetch<TMsg> : NatsSubBase, INatsJSFetch<TMsg>
                     else if (headers is { Code: 100, Message: NatsHeaders.Messages.IdleHeartbeat })
                     {
                     }
+                    else if (headers.HasTerminalJSError())
+                    {
+                        _userMsgs.Writer.TryComplete(new NatsJSProtocolException($"JetStream server error: {headers.Code} {headers.MessageText}"));
+                        EndSubscription(NatsSubEndReason.JetStreamError);
+                    }
                     else
                     {
-                        _notifications.Writer.TryWrite(new NatsJSNotification(headers.Code, headers.MessageText));
+                        if (_debug)
+                        {
+                            _logger.LogDebug(
+                                NatsJSLogEvents.ProtocolMessage,
+                                "Protocol message: {Code} {Description}",
+                                headers.Code,
+                                headers.MessageText);
+                        }
                     }
                 }
                 else
                 {
                     _logger.LogError(
+                        NatsJSLogEvents.Headers,
                         "Can't parse headers: {HeadersBuffer}",
                         Encoding.ASCII.GetString(headersBuffer.Value.ToArray()));
                     throw new NatsJSException("Can't parse headers");
@@ -207,21 +242,5 @@ public class NatsJSFetch<TMsg> : NatsSubBase, INatsJSFetch<TMsg>
     protected override void TryComplete()
     {
         _userMsgs.Writer.TryComplete();
-        _notifications.Writer.TryComplete();
-    }
-
-    private async Task NotificationsLoop()
-    {
-        await foreach (var notification in _notifications.Reader.ReadAllAsync())
-        {
-            try
-            {
-                _errorHandler?.Invoke(this, notification);
-            }
-            catch (Exception e)
-            {
-                _logger.LogError(e, "Notification error handler error");
-            }
-        }
     }
 }

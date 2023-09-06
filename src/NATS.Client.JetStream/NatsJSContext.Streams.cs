@@ -13,7 +13,7 @@ public partial class NatsJSContext
         CancellationToken cancellationToken = default)
     {
         var response = await JSRequestResponseAsync<StreamConfiguration, StreamInfo>(
-            subject: $"{Opts.ApiPrefix}.STREAM.CREATE.{request.Name}",
+            subject: $"{Opts.Prefix}.STREAM.CREATE.{request.Name}",
             request,
             cancellationToken);
         return new NatsJSStream(this, response);
@@ -24,7 +24,7 @@ public partial class NatsJSContext
         CancellationToken cancellationToken = default)
     {
         var response = await JSRequestResponseAsync<object, StreamMsgDeleteResponse>(
-            subject: $"{Opts.ApiPrefix}.STREAM.DELETE.{stream}",
+            subject: $"{Opts.Prefix}.STREAM.DELETE.{stream}",
             request: null,
             cancellationToken);
         return response.Success;
@@ -35,7 +35,7 @@ public partial class NatsJSContext
         CancellationToken cancellationToken = default)
     {
         var response = await JSRequestResponseAsync<object, StreamInfoResponse>(
-            subject: $"{Opts.ApiPrefix}.STREAM.INFO.{stream}",
+            subject: $"{Opts.Prefix}.STREAM.INFO.{stream}",
             request: null,
             cancellationToken);
         return new NatsJSStream(this, response);
@@ -46,17 +46,21 @@ public partial class NatsJSContext
         CancellationToken cancellationToken = default)
     {
         var response = await JSRequestResponseAsync<object, StreamUpdateResponse>(
-            subject: $"{Opts.ApiPrefix}.STREAM.UPDATE.{request.Name}",
+            subject: $"{Opts.Prefix}.STREAM.UPDATE.{request.Name}",
             request: request,
             cancellationToken);
         return new NatsJSStream(this, response);
     }
 
-    public ValueTask<StreamListResponse> ListStreamsAsync(
-        StreamListRequest request,
-        CancellationToken cancellationToken = default) =>
-        JSRequestResponseAsync<object, StreamListResponse>(
-            subject: $"{Opts.ApiPrefix}.STREAM.LIST",
-            request: request,
+    public async IAsyncEnumerable<NatsJSStream> ListStreamsAsync(
+        string? subject = default,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var response = await JSRequestResponseAsync<StreamListRequest, StreamListResponse>(
+            subject: $"{Opts.Prefix}.STREAM.LIST",
+            request: new StreamListRequest { Offset = 0, Subject = subject! },
             cancellationToken);
+        foreach (var stream in response.Streams)
+            yield return new NatsJSStream(this, stream);
+    }
 }

@@ -40,7 +40,7 @@ public partial class NatsJSContext
         }
 
         var response = await JSRequestResponseAsync<ConsumerCreateRequest, ConsumerInfo>(
-            subject: $"{Opts.ApiPrefix}.CONSUMER.CREATE.{request.StreamName}.{request.Config.Name}",
+            subject: $"{Opts.Prefix}.CONSUMER.CREATE.{request.StreamName}.{request.Config.Name}",
             request,
             cancellationToken);
         return new NatsJSConsumer(this, response);
@@ -49,22 +49,28 @@ public partial class NatsJSContext
     public async ValueTask<NatsJSConsumer> GetConsumerAsync(string stream, string consumer, CancellationToken cancellationToken = default)
     {
         var response = await JSRequestResponseAsync<object, ConsumerInfo>(
-            subject: $"{Opts.ApiPrefix}.CONSUMER.INFO.{stream}.{consumer}",
+            subject: $"{Opts.Prefix}.CONSUMER.INFO.{stream}.{consumer}",
             request: null,
             cancellationToken);
         return new NatsJSConsumer(this, response);
     }
 
-    public ValueTask<ConsumerListResponse> ListConsumersAsync(string stream, ConsumerListRequest request, CancellationToken cancellationToken = default) =>
-        JSRequestResponseAsync<ConsumerListRequest, ConsumerListResponse>(
-            subject: $"{Opts.ApiPrefix}.CONSUMER.LIST.{stream}",
-            request,
+    public async IAsyncEnumerable<NatsJSConsumer> ListConsumersAsync(
+        string stream,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var response = await JSRequestResponseAsync<ConsumerListRequest, ConsumerListResponse>(
+            subject: $"{Opts.Prefix}.CONSUMER.LIST.{stream}",
+            new ConsumerListRequest { Offset = 0 },
             cancellationToken);
+        foreach (var consumer in response.Consumers)
+            yield return new NatsJSConsumer(this, consumer);
+    }
 
     public async ValueTask<bool> DeleteConsumerAsync(string stream, string consumer, CancellationToken cancellationToken = default)
     {
         var response = await JSRequestResponseAsync<object, ConsumerDeleteResponse>(
-            subject: $"{Opts.ApiPrefix}.CONSUMER.DELETE.{stream}.{consumer}",
+            subject: $"{Opts.Prefix}.CONSUMER.DELETE.{stream}.{consumer}",
             request: null,
             cancellationToken);
         return response.Success;

@@ -70,8 +70,11 @@ public class ManageStreamTest
 
         // List
         {
-            var response = await js.ListStreamsAsync(new StreamListRequest(), cts.Token);
-            var list = response.Streams.ToList();
+            var list = new List<StreamInfo>();
+            await foreach (var stream in js.ListStreamsAsync(cancellationToken: cts.Token))
+            {
+                list.Add(stream.Info);
+            }
 
             Assert.Equal(3, list.Count);
             Assert.Contains(list, s => s.Config.Name == "s1");
@@ -84,8 +87,11 @@ public class ManageStreamTest
             var deleteResponse = await js.DeleteStreamAsync("s1", cts.Token);
             Assert.True(deleteResponse);
 
-            var response = await js.ListStreamsAsync(new StreamListRequest(), cts.Token);
-            var list = response.Streams.ToList();
+            var list = new List<StreamInfo>();
+            await foreach (var stream in js.ListStreamsAsync(cancellationToken: cts.Token))
+            {
+                list.Add(stream.Info);
+            }
 
             Assert.DoesNotContain(list, s => s.Config.Name == "s1");
         }

@@ -60,9 +60,12 @@ public class ManageConsumerTest
 
         // List
         {
-            var response = await js.ListConsumersAsync("s1", new ConsumerListRequest(), cts.Token);
+            var list = new List<ConsumerInfo>();
+            await foreach (var consumer in js.ListConsumersAsync("s1", cts.Token))
+            {
+                list.Add(consumer.Info);
+            }
 
-            var list = response.Consumers.ToList();
             Assert.Equal(3, list.Count);
             Assert.True(list.All(c => c.StreamName == "s1"));
             Assert.Contains(list, c => c.Config.Name == "c1");
@@ -75,9 +78,11 @@ public class ManageConsumerTest
             var response = await js.DeleteConsumerAsync("s1", "c1", cts.Token);
             Assert.True(response);
 
-            var listResponse = await js.ListConsumersAsync("s1", new ConsumerListRequest(), cts.Token);
-
-            var list = listResponse.Consumers.ToList();
+            var list = new List<ConsumerInfo>();
+            await foreach (var consumer in js.ListConsumersAsync("s1", cts.Token))
+            {
+                list.Add(consumer.Info);
+            }
 
             Assert.Equal(2, list.Count);
             Assert.DoesNotContain(list, c => c.Config.Name == "c1");

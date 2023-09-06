@@ -7,10 +7,12 @@ namespace NATS.Client.Core.Tests;
 public class OutputHelperLoggerFactory : ILoggerFactory
 {
     private readonly ITestOutputHelper _testOutputHelper;
+    private readonly NatsServer _natsServer;
 
-    public OutputHelperLoggerFactory(ITestOutputHelper testOutputHelper)
+    public OutputHelperLoggerFactory(ITestOutputHelper testOutputHelper, NatsServer natsServer)
     {
         _testOutputHelper = testOutputHelper;
+        _natsServer = natsServer;
     }
 
     public void AddProvider(ILoggerProvider provider)
@@ -19,7 +21,7 @@ public class OutputHelperLoggerFactory : ILoggerFactory
 
     public ILogger CreateLogger(string categoryName)
     {
-        return new Logger(_testOutputHelper);
+        return new Logger(categoryName, _testOutputHelper, _natsServer);
     }
 
     public void Dispose()
@@ -28,11 +30,15 @@ public class OutputHelperLoggerFactory : ILoggerFactory
 
     private class Logger : ILogger
     {
+        private readonly string _categoryName;
         private readonly ITestOutputHelper _testOutputHelper;
+        private readonly NatsServer _natsServer;
 
-        public Logger(ITestOutputHelper testOutputHelper)
+        public Logger(string categoryName, ITestOutputHelper testOutputHelper, NatsServer natsServer)
         {
+            _categoryName = categoryName;
             _testOutputHelper = testOutputHelper;
+            _natsServer = natsServer;
         }
 
         public IDisposable BeginScope<TState>(TState state)
@@ -49,11 +55,14 @@ public class OutputHelperLoggerFactory : ILoggerFactory
         {
             try
             {
-                _testOutputHelper.WriteLine($"[NCLOG] {DateTime.Now:HH:mm:ss.fff} {logLevel}: {formatter(state, exception)}");
+                var text = formatter(state, exception);
+                _testOutputHelper.WriteLine($"[NCLOG] {DateTime.Now:HH:mm:ss.fff} {logLevel}: {text}");
                 if (exception != null)
                 {
                     _testOutputHelper.WriteLine($"[NCLOG] {DateTime.Now:HH:mm:ss.fff} Exception: {exception}");
                 }
+
+                _natsServer.LogMessage<TState>(_categoryName, logLevel, eventId, exception, text, state);
             }
             catch
             {

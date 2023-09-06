@@ -14,16 +14,13 @@ public class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
     private readonly ILogger _logger;
     private readonly bool _debug;
     private readonly Channel<NatsJSMsg<TMsg?>> _userMsgs;
-    private readonly Channel<NatsJSNotification> _notifications;
     private readonly Channel<ConsumerGetnextRequest> _pullRequests;
     private readonly NatsJSContext _context;
     private readonly string _stream;
     private readonly string _consumer;
-    private readonly Action<INatsJSConsume, NatsJSNotification>? _errorHandler;
     private readonly INatsSerializer _serializer;
     private readonly Timer _timer;
     private readonly Task _pullTask;
-    private readonly Task _notificationsTask;
 
     private readonly long _maxMsgs;
     private readonly long _expires;
@@ -47,8 +44,7 @@ public class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
         string stream,
         string consumer,
         string subject,
-        NatsSubOpts? opts,
-        Action<INatsJSConsume, NatsJSNotification>? errorHandler)
+        NatsSubOpts? opts)
         : base(context.Connection, context.Connection.SubscriptionManager, subject, opts)
     {
         _logger = Connection.Opts.LoggerFactory.CreateLogger<NatsJSConsume<TMsg>>();
@@ -56,7 +52,6 @@ public class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
         _context = context;
         _stream = stream;
         _consumer = consumer;
-        _errorHandler = errorHandler;
         _serializer = opts?.Serializer ?? context.Connection.Opts.Serializer;
 
         _maxMsgs = maxMsgs;
@@ -70,7 +65,8 @@ public class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
         if (_debug)
         {
             _logger.LogDebug(
-                "Consumer setup {@Config}",
+                NatsJSLogEvents.Config,
+                "Consume setup {@Config}",
                 new
                 {
                     maxMsgs,
@@ -89,7 +85,13 @@ public class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
                 var self = (NatsJSConsume<TMsg>)state!;
                 self.Pull(self._maxMsgs, self._maxBytes);
                 self.ResetPending();
-                self._notifications.Writer.TryWrite(NatsJSNotification.HeartbeatTimeout);
+                if (self._debug)
+                {
+                    self._logger.LogDebug(
+                        NatsJSLogEvents.IdleTimeout,
+                        "Idle heartbeat timed-out after {Timeout}ns",
+                        self._idle);
+                }
             },
             this,
             Timeout.Infinite,
@@ -100,9 +102,6 @@ public class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
 
         _pullRequests = Channel.CreateBounded<ConsumerGetnextRequest>(NatsSub.GetChannelOpts(opts?.ChannelOpts));
         _pullTask = Task.Run(PullLoop);
-
-        _notifications = Channel.CreateBounded<NatsJSNotification>(NatsSub.GetChannelOpts(opts?.ChannelOpts));
-        _notificationsTask = Task.Run(NotificationsLoop);
     }
 
     public ChannelReader<NatsJSMsg<TMsg?>> Msgs { get; }
@@ -111,7 +110,7 @@ public class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
 
     public ValueTask CallMsgNextAsync(ConsumerGetnextRequest request, CancellationToken cancellationToken = default) =>
         Connection.PubModelAsync(
-            subject: $"{_context.Opts.ApiPrefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
+            subject: $"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
             data: request,
             serializer: NatsJsonSerializer.Default,
             replyTo: Subject,
@@ -130,7 +129,6 @@ public class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
     {
         await base.DisposeAsync().ConfigureAwait(false);
         await _pullTask.ConfigureAwait(false);
-        await _notificationsTask.ConfigureAwait(false);
         await _timer.DisposeAsync().ConfigureAwait(false);
     }
 
@@ -151,7 +149,7 @@ public class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
 
         yield return PublishCommand<ConsumerGetnextRequest>.Create(
             pool: Connection.ObjectPool,
-            subject: $"{_context.Opts.ApiPrefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
+            subject: $"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
             replyTo: Subject,
             headers: default,
             value: request,
@@ -180,7 +178,10 @@ public class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
                         {
                             if (_debug)
                             {
-                                _logger.LogDebug("Header pending messages current {Pending}", _pendingMsgs);
+                                _logger.LogDebug(
+                                    NatsJSLogEvents.PendingCount,
+                                    "Header pending messages current {Pending}",
+                                    _pendingMsgs);
                             }
 
                             _pendingMsgs -= pendingMsgs;
@@ -189,12 +190,16 @@ public class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
 
                             if (_debug)
                             {
-                                _logger.LogDebug("Header pending messages {Header} {Pending}", natsPendingMsgs, _pendingMsgs);
+                                _logger.LogDebug(
+                                    NatsJSLogEvents.PendingCount,
+                                    "Header pending messages {Header} {Pending}",
+                                    natsPendingMsgs,
+                                    _pendingMsgs);
                             }
                         }
                         else
                         {
-                            _logger.LogError("Can't parse Nats-Pending-Messages {Header}", natsPendingMsgs);
+                            _logger.LogError(NatsJSLogEvents.PendingCount, "Can't parse Nats-Pending-Messages {Header}", natsPendingMsgs);
                         }
                     }
 
@@ -204,7 +209,7 @@ public class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
                         {
                             if (_debug)
                             {
-                                _logger.LogDebug("Header pending bytes current {Pending}", _pendingBytes);
+                                _logger.LogDebug(NatsJSLogEvents.PendingCount, "Header pending bytes current {Pending}", _pendingBytes);
                             }
 
                             _pendingBytes -= pendingBytes;
@@ -213,12 +218,12 @@ public class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
 
                             if (_debug)
                             {
-                                _logger.LogDebug("Header pending bytes {Header} {Pending}", natsPendingBytes, _pendingBytes);
+                                _logger.LogDebug(NatsJSLogEvents.PendingCount, "Header pending bytes {Header} {Pending}", natsPendingBytes, _pendingBytes);
                             }
                         }
                         else
                         {
-                            _logger.LogError("Can't parse Nats-Pending-Bytes {Header}", natsPendingBytes);
+                            _logger.LogError(NatsJSLogEvents.PendingCount, "Can't parse Nats-Pending-Bytes {Header}", natsPendingBytes);
                         }
                     }
 
@@ -231,14 +236,23 @@ public class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
                     else if (headers is { Code: 100, Message: NatsHeaders.Messages.IdleHeartbeat })
                     {
                     }
+                    else if (headers.HasTerminalJSError())
+                    {
+                        _userMsgs.Writer.TryComplete(new NatsJSProtocolException($"JetStream server error: {headers.Code} {headers.MessageText}"));
+                        EndSubscription(NatsSubEndReason.JetStreamError);
+                    }
                     else
                     {
-                        _notifications.Writer.TryWrite(new NatsJSNotification(headers.Code, headers.MessageText));
+                        if (_debug)
+                        {
+                            _logger.LogDebug(NatsJSLogEvents.ProtocolMessage, "Protocol message: {Code} {Description}", headers.Code, headers.MessageText);
+                        }
                     }
                 }
                 else
                 {
                     _logger.LogError(
+                        NatsJSLogEvents.Headers,
                         "Can't parse headers: {HeadersBuffer}",
                         Encoding.ASCII.GetString(headersBuffer.Value.ToArray()));
                     throw new NatsJSException("Can't parse headers");
@@ -267,7 +281,7 @@ public class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
             if (_maxBytes > 0)
             {
                 if (_debug)
-                    _logger.LogDebug("Message size {Size}", msg.Size);
+                    _logger.LogDebug(NatsJSLogEvents.MessageProperty, "Message size {Size}", msg.Size);
 
                 _pendingBytes -= msg.Size;
             }
@@ -282,7 +296,6 @@ public class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
     {
         _pullRequests.Writer.TryComplete();
         _userMsgs.Writer.TryComplete();
-        _notifications.Writer.TryComplete();
     }
 
     private void CheckPending()
@@ -290,7 +303,7 @@ public class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
         if (_maxBytes > 0 && _pendingBytes <= _thresholdBytes)
         {
             if (_debug)
-                _logger.LogDebug("Check pending bytes {Pending}", _pendingBytes);
+                _logger.LogDebug(NatsJSLogEvents.PendingCount, "Check pending bytes {Pending}", _pendingBytes);
 
             Pull(_maxMsgs, _maxBytes - _pendingBytes);
             ResetPending();
@@ -298,7 +311,7 @@ public class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
         else if (_maxBytes == 0 && _pendingMsgs <= _thresholdMsgs)
         {
             if (_debug)
-                _logger.LogDebug("Check pending messages {Pending}", _pendingMsgs);
+                _logger.LogDebug(NatsJSLogEvents.PendingCount, "Check pending messages {Pending}", _pendingMsgs);
 
             Pull(_maxMsgs - _pendingMsgs, 0);
             ResetPending();
@@ -318,20 +331,9 @@ public class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
         await foreach (var pr in _pullRequests.Reader.ReadAllAsync())
         {
             await CallMsgNextAsync(pr).ConfigureAwait(false);
-        }
-    }
-
-    private async Task NotificationsLoop()
-    {
-        await foreach (var notification in _notifications.Reader.ReadAllAsync())
-        {
-            try
+            if (_debug)
             {
-                _errorHandler?.Invoke(this, notification);
-            }
-            catch (Exception e)
-            {
-                _logger.LogError(e, "Notification error handler error");
+                _logger.LogDebug(NatsJSLogEvents.PullRequest, "Pull request issued for {Batch}, {MaxBytes}", pr.Batch, pr.MaxBytes);
             }
         }
     }

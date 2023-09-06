@@ -33,10 +33,10 @@ public class NatsJSStream
         Info = response.Info;
     }
 
-    public ValueTask<ConsumerListResponse> ListConsumersAsync(string stream, ConsumerListRequest request, CancellationToken cancellationToken = default)
+    public IAsyncEnumerable<NatsJSConsumer> ListConsumersAsync(CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
-        return _context.ListConsumersAsync(_name, request, cancellationToken);
+        return _context.ListConsumersAsync(_name, cancellationToken);
     }
 
     public ValueTask<NatsJSConsumer> CreateConsumerAsync(ConsumerCreateRequest request, CancellationToken cancellationToken = default)

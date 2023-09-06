@@ -28,16 +28,6 @@ var expires = TimeSpan.FromSeconds(30);
 int? maxMsgs = 1000;
 int? maxBytes = null;
 
-static void ConsumeErrorHandler(INatsJSConsume c, NatsJSNotification notification)
-{
-    Console.WriteLine($"Error: {notification}");
-}
-
-static void FetchErrorHandler(INatsJSFetch f, NatsJSNotification notification)
-{
-    Console.WriteLine($"Error: {notification}");
-}
-
 void Report(int i, Stopwatch sw, string data)
 {
     Console.WriteLine(data);
@@ -52,7 +42,6 @@ var consumeOpts = new NatsJSConsumeOpts
     Expires = expires,
     IdleHeartbeat = idle,
     Serializer = new RawDataSerializer(),
-    ErrorHandler = ConsumeErrorHandler,
 };
 
 var fetchOpts = new NatsJSFetchOpts
@@ -62,7 +51,6 @@ var fetchOpts = new NatsJSFetchOpts
     Expires = expires,
     IdleHeartbeat = idle,
     Serializer = new RawDataSerializer(),
-    ErrorHandler = FetchErrorHandler,
 };
 
 var nextOpts = new NatsJSNextOpts
@@ -70,7 +58,6 @@ var nextOpts = new NatsJSNextOpts
     Expires = expires,
     IdleHeartbeat = idle,
     Serializer = new RawDataSerializer(),
-    ErrorHandler = FetchErrorHandler,
 };
 
 var stopwatch = Stopwatch.StartNew();
@@ -82,12 +69,25 @@ try
     {
         while (!cts.Token.IsCancellationRequested)
         {
-            Console.WriteLine($"___\nFETCH {maxMsgs}");
-            await using var sub = await consumer.FetchAsync<RawData>(fetchOpts, cts.Token);
-            await foreach (var msg in sub.Msgs.ReadAllAsync(cts.Token))
+            try
             {
-                await msg.AckAsync(cancellationToken: cts.Token);
-                Report(++count, stopwatch, $"data: {msg.Data}");
+                Console.WriteLine($"___\nFETCH {maxMsgs}");
+                await consumer.RefreshAsync(cts.Token);
+                await using var sub = await consumer.FetchAsync<RawData>(fetchOpts, cts.Token);
+                await foreach (var msg in sub.Msgs.ReadAllAsync(cts.Token))
+                {
+                    await msg.AckAsync(cancellationToken: cts.Token);
+                    Report(++count, stopwatch, $"data: {msg.Data}");
+                }
+            }
+            catch (NatsJSProtocolException e)
+            {
+                Console.WriteLine(e.Message);
+            }
+            catch (NatsJSException e)
+            {
+                Console.WriteLine(e.Message);
+                await Task.Delay(1000);
             }
         }
     }
@@ -95,11 +95,24 @@ try
     {
         while (!cts.Token.IsCancellationRequested)
         {
-            Console.WriteLine($"___\nFETCH {maxMsgs}");
-            await foreach (var msg in consumer.FetchAllAsync<RawData>(fetchOpts, cts.Token))
+            try
             {
-                await msg.AckAsync(cancellationToken: cts.Token);
-                Report(++count, stopwatch, $"data: {msg.Data}");
+                Console.WriteLine($"___\nFETCH {maxMsgs}");
+                await consumer.RefreshAsync(cts.Token);
+                await foreach (var msg in consumer.FetchAllAsync<RawData>(fetchOpts, cts.Token))
+                {
+                    await msg.AckAsync(cancellationToken: cts.Token);
+                    Report(++count, stopwatch, $"data: {msg.Data}");
+                }
+            }
+            catch (NatsJSProtocolException e)
+            {
+                Console.WriteLine(e.Message);
+            }
+            catch (NatsJSException e)
+            {
+                Console.WriteLine(e.Message);
+                await Task.Delay(1000);
             }
         }
     }
@@ -107,38 +120,77 @@ try
     {
         while (!cts.Token.IsCancellationRequested)
         {
-            Console.WriteLine("___\nNEXT");
-            var next = await consumer.NextAsync<RawData>(nextOpts, cts.Token);
-            if (next is { } msg)
+            try
             {
-                await msg.AckAsync(cancellationToken: cts.Token);
-                Report(++count, stopwatch, $"data: {msg.Data}");
+                Console.WriteLine("___\nNEXT");
+                var next = await consumer.NextAsync<RawData>(nextOpts, cts.Token);
+                if (next is { } msg)
+                {
+                    await msg.AckAsync(cancellationToken: cts.Token);
+                    Report(++count, stopwatch, $"data: {msg.Data}");
+                }
+            }
+            catch (NatsJSProtocolException e)
+            {
+                Console.WriteLine(e.Message);
+            }
+            catch (NatsJSException e)
+            {
+                Console.WriteLine(e.Message);
+                await Task.Delay(1000);
             }
         }
     }
     else if (args.Length > 0 && args[0] == "consume")
     {
-        Console.WriteLine("___\nCONSUME");
-        await using var sub = await consumer.ConsumeAsync<RawData>(
-            consumeOpts,
-            cts.Token);
-
-        await foreach (var msg in sub.Msgs.ReadAllAsync(cts.Token))
+        while (!cts.Token.IsCancellationRequested)
         {
-            await msg.AckAsync(cancellationToken: cts.Token);
-            Report(++count, stopwatch, $"data: {msg.Data}");
-        }
+            try
+            {
+                Console.WriteLine("___\nCONSUME");
+                await using var sub = await consumer.ConsumeAsync<RawData>(
+                    consumeOpts,
+                    cts.Token);
 
-        // Console.WriteLine($"took {stopwatch.Elapsed}");
-        // await nats.PingAsync(cts.Token);
+                await foreach (var msg in sub.Msgs.ReadAllAsync(cts.Token))
+                {
+                    await msg.AckAsync(cancellationToken: cts.Token);
+                    Report(++count, stopwatch, $"data: {msg.Data}");
+                }
+            }
+            catch (NatsJSProtocolException e)
+            {
+                Console.WriteLine(e.Message);
+            }
+            catch (NatsJSException e)
+            {
+                Console.WriteLine(e.Message);
+                await Task.Delay(1000);
+            }
+        }
     }
     else if (args.Length > 0 && args[0] == "consume-all")
     {
-        Console.WriteLine("___\nCONSUME-ALL");
-        await foreach (var msg in consumer.ConsumeAllAsync<RawData>(consumeOpts, cts.Token))
+        while (!cts.Token.IsCancellationRequested)
         {
-            await msg.AckAsync(cancellationToken: cts.Token);
-            Report(++count, stopwatch, $"data: {msg.Data}");
+            try
+            {
+                Console.WriteLine("___\nCONSUME-ALL");
+                await foreach (var msg in consumer.ConsumeAllAsync<RawData>(consumeOpts, cts.Token))
+                {
+                    await msg.AckAsync(cancellationToken: cts.Token);
+                    Report(++count, stopwatch, $"data: {msg.Data}");
+                }
+            }
+            catch (NatsJSProtocolException e)
+            {
+                Console.WriteLine(e.Message);
+            }
+            catch (NatsJSException e)
+            {
+                Console.WriteLine(e.Message);
+                await Task.Delay(1000);
+            }
         }
     }
     else
