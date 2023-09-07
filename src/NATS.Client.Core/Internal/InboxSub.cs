@@ -16,7 +16,7 @@ internal class InboxSub : NatsSubBase
         NatsSubOpts? opts,
         NatsConnection connection,
         ISubscriptionManager manager)
-    : base(connection, manager, subject, opts)
+    : base(connection, manager, subject, queueGroup: default, opts)
     {
         _inbox = inbox;
         _connection = connection;

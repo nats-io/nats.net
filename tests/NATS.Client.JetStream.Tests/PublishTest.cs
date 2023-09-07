@@ -33,7 +33,7 @@ public class PublishTest
             var ack1 = await js.PublishAsync(
                 subject: "s1.foo",
                 data: new TestData { Test = 2 },
-                opts: new NatsPubOpts { Headers = new NatsHeaders { { "Nats-Msg-Id", "2" } } },
+                headers: new NatsHeaders { { "Nats-Msg-Id", "2" } },
                 cancellationToken: cts.Token);
             Assert.Null(ack1.Error);
             Assert.Equal(2, ack1.Seq);
@@ -42,7 +42,7 @@ public class PublishTest
             var ack2 = await js.PublishAsync(
                 subject: "s1.foo",
                 data: new TestData { Test = 2 },
-                opts: new NatsPubOpts { Headers = new NatsHeaders { { "Nats-Msg-Id", "2" } } },
+                headers: new NatsHeaders { { "Nats-Msg-Id", "2" } },
                 cancellationToken: cts.Token);
             Assert.Null(ack2.Error);
             Assert.True(ack2.Duplicate);

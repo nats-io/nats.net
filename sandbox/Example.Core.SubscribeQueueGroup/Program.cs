@@ -12,7 +12,7 @@ Print("[1][CON] Connecting...\n");
 await using var connection1 = new NatsConnection(options);
 
 Print($"[1][SUB] Subscribing to subject '{subject}'...\n");
-var sub1 = await connection1.SubscribeAsync(subject, new NatsSubOpts { QueueGroup = $"My-Workers" });
+var sub1 = await connection1.SubscribeAsync(subject, queueGroup: "My-Workers");
 var task1 = Task.Run(async () =>
 {
     await foreach (var msg in sub1.Msgs.ReadAllAsync())
@@ -28,7 +28,7 @@ Print("[2][CON] Connecting...\n");
 await using var connection2 = new NatsConnection(options);
 
 Print($"[2][SUB] Subscribing to subject '{subject}'...\n");
-var sub2 = await connection2.SubscribeAsync(subject, new NatsSubOpts { QueueGroup = $"My-Workers" });
+var sub2 = await connection2.SubscribeAsync(subject, queueGroup: "My-Workers");
 var task2 = Task.Run(async () =>
 {
     await foreach (var msg in sub2.Msgs.ReadAllAsync())

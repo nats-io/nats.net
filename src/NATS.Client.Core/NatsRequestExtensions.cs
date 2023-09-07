@@ -9,6 +9,8 @@ public static class NatsRequestExtensions
     /// </summary>
     /// <param name="nats">NATS connection</param>
     /// <param name="msg">Message to be sent as request</param>
+    /// <param name="queueGroup">If specified, the reply handler (subscriber) will join this queue group.</param>
+    /// <param name="requestOpts">Request publish options</param>
     /// <param name="replyOpts">Reply handler subscription options</param>
     /// <param name="cancellationToken">Cancel this request</param>
     /// <typeparam name="TRequest">Request type</typeparam>
@@ -23,23 +25,30 @@ public static class NatsRequestExtensions
     public static ValueTask<NatsMsg<TReply?>?> RequestAsync<TRequest, TReply>(
         this INatsConnection nats,
         in NatsMsg<TRequest> msg,
+        string? queueGroup = default,
+        NatsPubOpts? requestOpts = default,
         NatsSubOpts? replyOpts = default,
-        CancellationToken cancellationToken = default) =>
-        nats.RequestAsync<TRequest, TReply>(
+        CancellationToken cancellationToken = default)
+    {
+        CheckMsgForRequestReply(msg);
+
+        return nats.RequestAsync<TRequest, TReply>(
             msg.Subject,
             msg.Data,
-            requestOpts: new NatsPubOpts
-            {
-                Headers = msg.Headers,
-            },
+            queueGroup,
+            msg.Headers,
+            requestOpts,
             replyOpts,
             cancellationToken);
+    }
 
     /// <summary>
     /// Request and receive a single reply from a responder.
     /// </summary>
     /// <param name="nats">NATS connection</param>
     /// <param name="msg">Message to be sent as request</param>
+    /// <param name="queueGroup">If specified, the reply handler (subscriber) will join this queue group.</param>
+    /// <param name="requestOpts">Request publish options</param>
     /// <param name="replyOpts">Reply handler subscription options</param>
     /// <param name="cancellationToken">Cancel this request</param>
     /// <returns>Returns the <see cref="NatsMsg"/> received from the responder as reply.</returns>
@@ -52,15 +61,32 @@ public static class NatsRequestExtensions
     public static ValueTask<NatsMsg?> RequestAsync(
         this INatsConnection nats,
         in NatsMsg msg,
+        string? queueGroup = default,
+        in NatsPubOpts? requestOpts = default,
         in NatsSubOpts? replyOpts = default,
-        CancellationToken cancellationToken = default) =>
-        nats.RequestAsync(
+        CancellationToken cancellationToken = default)
+    {
+        CheckMsgForRequestReply(msg);
+
+        return nats.RequestAsync(
             msg.Subject,
             payload: new ReadOnlySequence<byte>(msg.Data),
-            requestOpts: new NatsPubOpts
-            {
-                Headers = msg.Headers,
-            },
+            queueGroup,
+            msg.Headers,
+            requestOpts,
             replyOpts,
             cancellationToken);
+    }
+
+    internal static void CheckMsgForRequestReply(in NatsMsg msg) => CheckForRequestReply(msg.ReplyTo);
+
+    internal static void CheckMsgForRequestReply<T>(in NatsMsg<T> msg) => CheckForRequestReply(msg.ReplyTo);
+
+    private static void CheckForRequestReply(string? replyTo)
+    {
+        if (!string.IsNullOrWhiteSpace(replyTo))
+        {
+            throw new NatsException($"Can't set {nameof(NatsMsg.ReplyTo)} for a request");
+        }
+    }
 }

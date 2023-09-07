@@ -18,8 +18,8 @@ public sealed class NatsSub : NatsSubBase, INatsSub
 
     private readonly Channel<NatsMsg> _msgs;
 
-    internal NatsSub(NatsConnection connection, ISubscriptionManager manager, string subject, NatsSubOpts? opts)
-        : base(connection, manager, subject, opts) =>
+    internal NatsSub(NatsConnection connection, ISubscriptionManager manager, string subject, string? queueGroup, NatsSubOpts? opts)
+        : base(connection, manager, subject, queueGroup, opts) =>
         _msgs = Channel.CreateBounded<NatsMsg>(
             GetChannelOpts(opts?.ChannelOpts));
 
@@ -28,9 +28,8 @@ public sealed class NatsSub : NatsSubBase, INatsSub
     internal static BoundedChannelOptions GetChannelOpts(
         NatsSubChannelOpts? subChannelOpts)
     {
-        if (subChannelOpts != null)
+        if (subChannelOpts is { } overrideOpts)
         {
-            var overrideOpts = subChannelOpts.Value;
             return new BoundedChannelOptions(overrideOpts.Capacity ??
                                              DefaultChannelOpts.Capacity)
             {
@@ -74,9 +73,10 @@ public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
         NatsConnection connection,
         ISubscriptionManager manager,
         string subject,
+        string? queueGroup,
         NatsSubOpts? opts,
         INatsSerializer serializer)
-        : base(connection, manager, subject, opts)
+        : base(connection, manager, subject, queueGroup, opts)
     {
         _msgs = Channel.CreateBounded<NatsMsg<T?>>(
             NatsSub.GetChannelOpts(opts?.ChannelOpts));

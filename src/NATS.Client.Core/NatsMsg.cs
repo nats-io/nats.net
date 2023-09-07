@@ -40,10 +40,10 @@ public readonly record struct NatsMsg(
         return new NatsMsg(subject, replyTo, (int)size, headers, payloadBuffer.ToArray(), connection);
     }
 
-    public ValueTask ReplyAsync(ReadOnlySequence<byte> payload = default, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
+    public ValueTask ReplyAsync(ReadOnlySequence<byte> payload = default, string? replyTo = default, NatsHeaders? headers = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         CheckReplyPreconditions();
-        return Connection.PublishAsync(ReplyTo!, payload, opts, cancellationToken);
+        return Connection.PublishAsync(ReplyTo!, payload, replyTo, headers, opts, cancellationToken);
     }
 
     public ValueTask ReplyAsync(NatsMsg msg, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
@@ -112,10 +112,10 @@ public readonly record struct NatsMsg<T>(
         return new NatsMsg<T>(subject, replyTo, (int)size, headers, data, connection);
     }
 
-    public ValueTask ReplyAsync<TReply>(TReply data, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
+    public ValueTask ReplyAsync<TReply>(TReply data, string? replyTo = default, NatsHeaders? headers = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         CheckReplyPreconditions();
-        return Connection.PublishAsync(ReplyTo!, data, opts, cancellationToken);
+        return Connection.PublishAsync(ReplyTo!, data, replyTo, headers, opts, cancellationToken);
     }
 
     public ValueTask ReplyAsync<TReply>(NatsMsg<TReply> msg)
@@ -124,10 +124,10 @@ public readonly record struct NatsMsg<T>(
         return Connection.PublishAsync(msg with { Subject = ReplyTo! });
     }
 
-    public ValueTask ReplyAsync(ReadOnlySequence<byte> payload = default, in NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
+    public ValueTask ReplyAsync(ReadOnlySequence<byte> payload = default, string? replyTo = default, NatsHeaders? headers = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         CheckReplyPreconditions();
-        return Connection.PublishAsync(ReplyTo!, payload: payload, opts, cancellationToken);
+        return Connection.PublishAsync(ReplyTo!, payload: payload, replyTo, headers, opts, cancellationToken);
     }
 
     public ValueTask ReplyAsync(NatsMsg msg)

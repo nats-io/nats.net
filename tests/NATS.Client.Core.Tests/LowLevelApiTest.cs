@@ -18,7 +18,7 @@ public class LowLevelApiTest
         var subject = "foo.*";
         var builder = new NatsSubCustomTestBuilder(_output);
         var sub = builder.Build(subject, default, nats, nats.SubscriptionManager);
-        await nats.SubAsync(subject, opts: default, sub);
+        await nats.SubAsync(subject, queueGroup: default, opts: default, sub: sub);
 
         await Retry.Until(
             "subscription is ready",
@@ -45,7 +45,7 @@ public class LowLevelApiTest
         private readonly ITestOutputHelper _output;
 
         public NatsSubTest(string subject, NatsConnection connection, NatsSubCustomTestBuilder builder, ITestOutputHelper output, ISubscriptionManager manager)
-        : base(connection, manager, subject, default)
+        : base(connection, manager, subject, default, default)
         {
             _builder = builder;
             _output = output;

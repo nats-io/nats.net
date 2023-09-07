@@ -21,8 +21,7 @@ var replyTasks = new List<Task>();
 for (int i = 0; i < 3; i++)
 {
     // Create three subscriptions all on the same queue group
-    var opts = new NatsSubOpts { QueueGroup = "maths-service" };
-    var sub = await nats.SubscribeAsync<int>("math.double", opts);
+    var sub = await nats.SubscribeAsync<int>("math.double", queueGroup: "maths-service");
 
     subs.Add(sub);
 

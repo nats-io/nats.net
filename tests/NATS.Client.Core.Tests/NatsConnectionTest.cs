@@ -129,7 +129,7 @@ public abstract partial class NatsConnectionTest
         await Retry.Until(
             "reply handle is ready",
             () => Volatile.Read(ref sync) == 1,
-            async () => await pubConnection.PublishAsync(subject, 1, new NatsPubOpts { ReplyTo = "ignore" }),
+            async () => await pubConnection.PublishAsync(subject, 1, replyTo: "ignore"),
             retryDelay: TimeSpan.FromSeconds(1));
 
         var v = await pubConnection.RequestAsync<int, string>(subject, 9999);

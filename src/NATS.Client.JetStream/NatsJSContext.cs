@@ -31,12 +31,15 @@ public partial class NatsJSContext
     public async ValueTask<PubAckResponse> PublishAsync<T>(
         string subject,
         T? data,
-        NatsPubOpts opts = default,
+        NatsHeaders? headers = default,
+        NatsPubOpts? opts = default,
         CancellationToken cancellationToken = default)
     {
         await using var sub = await Connection.RequestSubAsync<T, PubAckResponse>(
                 subject: subject,
                 data: data,
+                queueGroup: default,
+                headers: headers,
                 requestOpts: opts,
                 replyOpts: default,
                 cancellationToken)
@@ -87,6 +90,8 @@ public partial class NatsJSContext
         await using var sub = await Connection.RequestSubAsync<TRequest, TResponse>(
                 subject: subject,
                 data: request,
+                queueGroup: default,
+                headers: default,
                 requestOpts: default,
                 replyOpts: new NatsSubOpts { Serializer = NatsJSErrorAwareJsonSerializer.Default },
                 cancellationToken)

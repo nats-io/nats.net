@@ -44,8 +44,9 @@ public class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
         string stream,
         string consumer,
         string subject,
+        string? queueGroup,
         NatsSubOpts? opts)
-        : base(context.Connection, context.Connection.SubscriptionManager, subject, opts)
+        : base(context.Connection, context.Connection.SubscriptionManager, subject, queueGroup, opts)
     {
         _logger = Connection.Opts.LoggerFactory.CreateLogger<NatsJSConsume<TMsg>>();
         _debug = _logger.IsEnabled(LogLevel.Debug);

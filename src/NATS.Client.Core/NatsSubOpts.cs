@@ -2,18 +2,8 @@ using System.Threading.Channels;
 
 namespace NATS.Client.Core;
 
-public readonly record struct NatsSubOpts
+public record NatsSubOpts
 {
-    /// <summary>
-    /// If specified, the subscriber will join this queue group.
-    /// </summary>
-    /// <remarks>
-    /// Subscribers with the same queue group name, become a queue group,
-    /// and only one randomly chosen subscriber of the queue group will
-    /// consume a message each time a message is received by the queue group.
-    /// </remarks>
-    public string? QueueGroup { get; init; }
-
     /// <summary>
     /// Serializer to use to deserialize the message if a model is being used.
     /// </summary>

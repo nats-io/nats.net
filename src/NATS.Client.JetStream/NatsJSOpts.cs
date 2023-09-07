@@ -33,6 +33,27 @@ public record NatsJSOpts
     /// These options are used as the defaults when acknowledging messages received from a stream using a consumer.
     /// </remarks>
     public AckOpts AckOpts { get; init; }
+
+    /// <summary>
+    /// Default consume options to be used in consume calls in this context.
+    /// </summary>
+    /// <remarks>
+    /// Defaults to MaxMsgs = 1,000.
+    /// </remarks>
+    public NatsJSConsumeOpts DefaultConsumeOpts { get; init; } = new() { MaxMsgs = 1_000 };
+
+    /// <summary>
+    /// Default fetch options to be used in fetch calls in this context.
+    /// </summary>
+    /// <remarks>
+    /// Defaults to MaxMsgs = 1,000.
+    /// </remarks>
+    public NatsJSFetchOpts DefaultFetchOpts { get; init; } = new() { MaxMsgs = 1_000 };
+
+    /// <summary>
+    /// Default next options to be used in next calls in this context.
+    /// </summary>
+    public NatsJSNextOpts DefaultNextOpts { get; init; } = new();
 }
 
 public record NatsJSConsumeOpts

@@ -62,8 +62,8 @@ public class JetStreamTest
             ack = await js.PublishAsync(
                 "events.foo",
                 new TestData { Test = 2 },
-                new NatsPubOpts { Headers = new NatsHeaders { { "Nats-Msg-Id", "test2" } }, },
-                cts1.Token);
+                headers: new NatsHeaders { { "Nats-Msg-Id", "test2" } },
+                cancellationToken: cts1.Token);
             Assert.Null(ack.Error);
             Assert.Equal("events", ack.Stream);
             Assert.Equal(2, ack.Seq);
@@ -73,8 +73,8 @@ public class JetStreamTest
             ack = await js.PublishAsync(
                 "events.foo",
                 new TestData { Test = 2 },
-                new NatsPubOpts { Headers = new NatsHeaders { { "Nats-Msg-Id", "test2" } }, },
-                cts1.Token);
+                headers: new NatsHeaders { { "Nats-Msg-Id", "test2" } },
+                cancellationToken: cts1.Token);
             Assert.Null(ack.Error);
             Assert.Equal("events", ack.Stream);
             Assert.Equal(2, ack.Seq);
