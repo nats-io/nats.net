@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using Cysharp.Diagnostics;
+using Microsoft.Extensions.Logging;
 
 namespace NATS.Client.Core.Tests;
 
@@ -31,6 +32,7 @@ public class NatsServer : IAsyncDisposable
     private readonly Task<string[]> _processOut;
     private readonly Task<string[]> _processErr;
     private readonly TransportType _transportType;
+    private readonly OutputHelperLoggerFactory _loggerFactory;
     private int _disposed;
 
     static NatsServer()
@@ -108,6 +110,7 @@ public class NatsServer : IAsyncDisposable
         }
 
         outputHelper.WriteLine("OK to Process Start, Port:" + Opts.ServerPort);
+        _loggerFactory = new OutputHelperLoggerFactory(_outputHelper, this);
     }
 
     public NatsServerOpts Opts { get; }
@@ -134,6 +137,8 @@ public class NatsServer : IAsyncDisposable
             }
         }
     }
+
+    public Action<LogMessage> OnLog { get; set; } = _ => { };
 
     public static NatsServer StartJS() => StartJS(new NullOutputHelper(), TransportType.Tcp);
 
@@ -239,7 +244,7 @@ public class NatsServer : IAsyncDisposable
 
         var client = new NatsConnection((options ?? NatsOpts.Default) with
         {
-            LoggerFactory = new OutputHelperLoggerFactory(_outputHelper),
+            LoggerFactory = _loggerFactory,
             Url = $"nats://localhost:{proxy.Port}",
             ConnectTimeout = TimeSpan.FromSeconds(10),
         });
@@ -292,7 +297,7 @@ public class NatsServer : IAsyncDisposable
     {
         return opts with
         {
-            LoggerFactory = new OutputHelperLoggerFactory(_outputHelper),
+            LoggerFactory = _loggerFactory,
 
             // ConnectTimeout = TimeSpan.FromSeconds(1),
             // ReconnectWait = TimeSpan.Zero,
@@ -307,6 +312,32 @@ public class NatsServer : IAsyncDisposable
                 : NatsTlsOpts.Default,
             Url = ClientUrl,
         };
+    }
+
+    public void LogMessage<TState>(string categoryName, LogLevel logLevel, EventId eventId, Exception? exception, string text, TState state)
+    {
+        foreach (var @delegate in OnLog.GetInvocationList())
+        {
+            var action = (Action<LogMessage>)@delegate;
+            try
+            {
+                if (state is IReadOnlyList<KeyValuePair<string, object?>> kvs)
+                {
+                    action(new LogMessage(categoryName, logLevel, eventId, exception, text, kvs));
+                }
+                else
+                {
+                    action(new LogMessage(categoryName, logLevel, eventId, exception, text, new[]
+                    {
+                        new KeyValuePair<string, object?>("text", text),
+                    }));
+                }
+            }
+            catch
+            {
+                // ignore
+            }
+        }
     }
 
     private async Task<string[]> EnumerateWithLogsAsync(ProcessAsyncEnumerable enumerable, CancellationToken cancellationToken)
@@ -326,6 +357,14 @@ public class NatsServer : IAsyncDisposable
         return l.ToArray();
     }
 }
+
+public record LogMessage(
+    string Category,
+    LogLevel LogLevel,
+    EventId EventId,
+    Exception? Exception,
+    string Text,
+    IReadOnlyList<KeyValuePair<string, object?>> State);
 
 public class NatsCluster : IAsyncDisposable
 {

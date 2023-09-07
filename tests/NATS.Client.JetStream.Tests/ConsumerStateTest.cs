@@ -7,8 +7,8 @@ public class ConsumerStateTest
     [Fact]
     public void Default_options()
     {
-        var m = NatsJSOpsDefaults.SetMax();
-        var t = NatsJSOpsDefaults.SetTimeouts();
+        var m = NatsJSOptsDefaults.SetMax(1_000);
+        var t = NatsJSOptsDefaults.SetTimeouts();
         Assert.Equal(1_000, m.MaxMsgs);
         Assert.Equal(0, m.MaxBytes);
         Assert.Equal(TimeSpan.FromSeconds(30), t.Expires);
@@ -19,12 +19,12 @@ public class ConsumerStateTest
 
     [Fact]
     public void Allow_only_max_msgs_or_bytes_options() =>
-        Assert.Throws<NatsJSException>(() => _ = NatsJSOpsDefaults.SetMax(new NatsJSOpts(NatsOpts.Default), 1, 1));
+        Assert.Throws<NatsJSException>(() => _ = NatsJSOptsDefaults.SetMax(1, 1));
 
     [Fact]
     public void Set_bytes_option()
     {
-        var opts = NatsJSOpsDefaults.SetMax(new NatsJSOpts(NatsOpts.Default), maxBytes: 1024);
+        var opts = NatsJSOptsDefaults.SetMax(maxBytes: 1024);
         Assert.Equal(1_000_000, opts.MaxMsgs);
         Assert.Equal(1024, opts.MaxBytes);
         Assert.Equal(500_000, opts.ThresholdMsgs);
@@ -34,7 +34,7 @@ public class ConsumerStateTest
     [Fact]
     public void Set_msgs_option()
     {
-        var opts = NatsJSOpsDefaults.SetMax(maxMsgs: 10_000);
+        var opts = NatsJSOptsDefaults.SetMax(maxMsgs: 10_000);
         Assert.Equal(10_000, opts.MaxMsgs);
         Assert.Equal(0, opts.MaxBytes);
         Assert.Equal(5_000, opts.ThresholdMsgs);
@@ -46,15 +46,11 @@ public class ConsumerStateTest
     {
         Assert.Equal(
             TimeSpan.FromSeconds(10),
-            NatsJSOpsDefaults.SetTimeouts(idleHeartbeat: TimeSpan.FromSeconds(10)).IdleHeartbeat);
+            NatsJSOptsDefaults.SetTimeouts(idleHeartbeat: TimeSpan.FromSeconds(10)).IdleHeartbeat);
 
-        Assert.Equal(
-            TimeSpan.FromSeconds(.5),
-            NatsJSOpsDefaults.SetTimeouts(idleHeartbeat: TimeSpan.FromSeconds(.1)).IdleHeartbeat);
+        Assert.Throws<NatsJSException>(() => NatsJSOptsDefaults.SetTimeouts(idleHeartbeat: TimeSpan.FromSeconds(.1)));
 
-        Assert.Equal(
-            TimeSpan.FromSeconds(30),
-            NatsJSOpsDefaults.SetTimeouts(idleHeartbeat: TimeSpan.FromSeconds(60)).IdleHeartbeat);
+        Assert.Throws<NatsJSException>(() => NatsJSOptsDefaults.SetTimeouts(idleHeartbeat: TimeSpan.FromSeconds(60)));
     }
 
     [Fact]
@@ -62,33 +58,39 @@ public class ConsumerStateTest
     {
         Assert.Equal(
             TimeSpan.FromSeconds(10),
-            NatsJSOpsDefaults.SetTimeouts(expires: TimeSpan.FromSeconds(10)).Expires);
+            NatsJSOptsDefaults.SetTimeouts(expires: TimeSpan.FromSeconds(10)).Expires);
 
-        Assert.Equal(
-            TimeSpan.FromSeconds(1),
-            NatsJSOpsDefaults.SetTimeouts(expires: TimeSpan.FromSeconds(.1)).Expires);
+        Assert.Throws<NatsJSException>(() => NatsJSOptsDefaults.SetTimeouts(expires: TimeSpan.FromSeconds(.1)));
 
-        Assert.Equal(
-            TimeSpan.FromSeconds(300),
-            NatsJSOpsDefaults.SetTimeouts(expires: TimeSpan.FromSeconds(300)).Expires);
+        Assert.Throws<NatsJSException>(() => NatsJSOptsDefaults.SetTimeouts(expires: TimeSpan.FromSeconds(300)));
     }
 
     [Theory]
-    [InlineData(10, 1, 1)]
-    [InlineData(10, null, 5)]
-    [InlineData(10, 100, 10)]
-    public void Set_threshold_option(int max, int? threshold, int expected)
+    [InlineData(10, 1, 1, false)]
+    [InlineData(10, null, 5, false)]
+    [InlineData(10, 100, 10, true)]
+    public void Set_threshold_option(int max, int? threshold, int expected, bool invalid)
     {
         // Msgs
+        if (!invalid)
         {
-            var opts = NatsJSOpsDefaults.SetMax(maxMsgs: max, thresholdMsgs: threshold);
+            var opts = NatsJSOptsDefaults.SetMax(maxMsgs: max, thresholdMsgs: threshold);
             Assert.Equal(expected, opts.ThresholdMsgs);
+        }
+        else
+        {
+            Assert.Throws<NatsJSException>(() => NatsJSOptsDefaults.SetMax(maxMsgs: max, thresholdMsgs: threshold));
         }
 
         // Bytes
+        if (!invalid)
         {
-            var opts = NatsJSOpsDefaults.SetMax(maxBytes: max, thresholdBytes: threshold);
+            var opts = NatsJSOptsDefaults.SetMax(maxBytes: max, thresholdBytes: threshold);
             Assert.Equal(expected, opts.ThresholdBytes);
+        }
+        else
+        {
+            Assert.Throws<NatsJSException>(() => NatsJSOptsDefaults.SetMax(maxBytes: max, thresholdBytes: threshold));
         }
     }
 }

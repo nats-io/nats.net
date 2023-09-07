@@ -4,13 +4,17 @@ namespace NATS.Client.JetStream;
 
 public record NatsJSOpts
 {
-    public NatsJSOpts(NatsOpts opts, string? apiPrefix = default, int? maxMsgs = default, AckOpts? ackOpts = default, string? inboxPrefix = default)
+    public NatsJSOpts(NatsOpts opts, string? apiPrefix = default, string? domain = default, AckOpts? ackOpts = default)
     {
         ApiPrefix = apiPrefix ?? "$JS.API";
-        MaxMsgs = maxMsgs ?? 1000;
         AckOpts = ackOpts ?? new AckOpts(opts.WaitUntilSent);
-        InboxPrefix = inboxPrefix ?? opts.InboxPrefix;
+        Domain = domain;
     }
+
+    /// <summary>
+    /// Complete prefix to prepend to JetStream API subjects as it's dynamically built from ApiPrefix and Domain properties.
+    /// </summary>
+    public string Prefix => string.IsNullOrEmpty(Domain) ? ApiPrefix : $"{Prefix}.{Domain}";
 
     /// <summary>
     /// Prefix to prepend to JetStream API subjects. (default: $JS.API)
@@ -18,28 +22,21 @@ public record NatsJSOpts
     public string ApiPrefix { get; init; }
 
     /// <summary>
-    /// Prefix to use in inbox subscription subjects to receive messages from JetStream. (default: _INBOX)
-    /// <para>
-    /// Default is taken from NatsOpts (on the parent NatsConnection) which is '_INBOX' if not set.
-    /// </para>
+    /// JetStream domain to use in JetStream API subjects. (default: null)
     /// </summary>
-    public string InboxPrefix { get; init; }
+    public string? Domain { get; init; }
 
     /// <summary>
-    /// Maximum number of messages to receive in a batch. (default: 1000)
+    /// Message ACK options <see cref="AckOpts"/>.
     /// </summary>
-    public int MaxMsgs { get; init; } = 1000;
-
+    /// <remarks>
+    /// These options are used as the defaults when acknowledging messages received from a stream using a consumer.
+    /// </remarks>
     public AckOpts AckOpts { get; init; }
 }
 
 public record NatsJSConsumeOpts
 {
-    /// <summary>
-    /// Errors and notifications handler
-    /// </summary>
-    public Action<NatsJSNotification>? ErrorHandler { get; init; }
-
     /// <summary>
     /// Maximum number of messages stored in the buffer
     /// </summary>
@@ -83,11 +80,6 @@ public record NatsJSConsumeOpts
 public record NatsJSNextOpts
 {
     /// <summary>
-    /// Errors and notifications handler
-    /// </summary>
-    public Action<NatsJSNotification>? ErrorHandler { get; init; }
-
-    /// <summary>
     /// Amount of time to wait for the request to expire (in nanoseconds)
     /// </summary>
     public TimeSpan? Expires { get; init; }
@@ -109,11 +101,6 @@ public record NatsJSNextOpts
 
 public record NatsJSFetchOpts
 {
-    /// <summary>
-    /// Errors and notifications handler
-    /// </summary>
-    public Action<NatsJSNotification>? ErrorHandler { get; init; }
-
     /// <summary>
     /// Maximum number of messages to return
     /// </summary>

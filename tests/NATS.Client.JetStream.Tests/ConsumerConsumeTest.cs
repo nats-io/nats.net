@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Tests;
 
 namespace NATS.Client.JetStream.Tests;
@@ -78,12 +79,7 @@ public class ConsumerConsumeTest
     public async Task Consume_idle_heartbeat_test()
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        await using var server = NatsServer.Start(
-            outputHelper: new NullOutputHelper(),
-            opts: new NatsServerOptsBuilder()
-                .UseTransport(TransportType.Tcp)
-                .UseJetStream()
-                .Build());
+        await using var server = NatsServer.StartJS();
 
         var (nats, proxy) = server.CreateProxiedClientConnection();
 
@@ -98,14 +94,18 @@ public class ConsumerConsumeTest
         ack.EnsureSuccess();
 
         var signal = new WaitSignal(TimeSpan.FromSeconds(30));
+        server.OnLog += log =>
+        {
+            if (log is { Category: "NATS.Client.JetStream.NatsJSConsume", LogLevel: LogLevel.Debug })
+            {
+                if (log.EventId == NatsJSLogEvents.IdleTimeout)
+                    signal.Pulse();
+            }
+        };
         var consumerOpts = new NatsJSConsumeOpts
         {
             MaxMsgs = 10,
             IdleHeartbeat = TimeSpan.FromSeconds(5),
-            ErrorHandler = _ =>
-            {
-                signal.Pulse();
-            },
         };
         var consumer = await js.GetConsumerAsync("s1", "c1", cts.Token);
         var count = 0;
@@ -153,10 +153,6 @@ public class ConsumerConsumeTest
         var consumerOpts = new NatsJSConsumeOpts
         {
             MaxMsgs = 10,
-            ErrorHandler = e =>
-            {
-                _output.WriteLine($"Consume error: {e.Code} {e.Description}");
-            },
         };
 
         var consumer = await js.GetConsumerAsync("s1", "c1", cts.Token);

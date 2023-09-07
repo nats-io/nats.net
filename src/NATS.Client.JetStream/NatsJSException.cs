@@ -14,3 +14,16 @@ public class NatsJSException : NatsException
     {
     }
 }
+
+public class NatsJSProtocolException : NatsJSException
+{
+    public NatsJSProtocolException(string message)
+        : base(message)
+    {
+    }
+
+    public NatsJSProtocolException(string message, Exception exception)
+        : base(message, exception)
+    {
+    }
+}

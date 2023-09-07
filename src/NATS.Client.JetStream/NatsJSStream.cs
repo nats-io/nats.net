@@ -18,7 +18,7 @@ public class NatsJSStream
 
     public StreamInfo Info { get; private set; }
 
-    public async ValueTask<bool> DeleteAsync(string stream, CancellationToken cancellationToken = default)
+    public async ValueTask<bool> DeleteAsync(CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
         return _deleted = await _context.DeleteStreamAsync(_name, cancellationToken);
@@ -33,11 +33,10 @@ public class NatsJSStream
         Info = response.Info;
     }
 
-    public async IAsyncEnumerable<NatsJSConsumer> ListConsumersAsync(string stream, ConsumerListRequest request, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public IAsyncEnumerable<NatsJSConsumer> ListConsumersAsync(CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
-        await foreach (var consumer in _context.ListConsumersAsync(_name, request, cancellationToken))
-            yield return consumer;
+        return _context.ListConsumersAsync(_name, cancellationToken);
     }
 
     public ValueTask<NatsJSConsumer> CreateConsumerAsync(ConsumerCreateRequest request, CancellationToken cancellationToken = default)

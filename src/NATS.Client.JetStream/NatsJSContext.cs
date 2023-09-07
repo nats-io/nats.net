@@ -24,7 +24,7 @@ public partial class NatsJSContext
 
     public ValueTask<AccountInfoResponse> GetAccountInfoAsync(CancellationToken cancellationToken = default) =>
         JSRequestResponseAsync<object, AccountInfoResponse>(
-            subject: $"{Opts.ApiPrefix}.INFO",
+            subject: $"{Opts.Prefix}.INFO",
             request: null,
             cancellationToken);
 
@@ -58,7 +58,7 @@ public partial class NatsJSContext
         throw new NatsJSException("No response received");
     }
 
-    internal string NewInbox() => $"{Opts.InboxPrefix}.{Guid.NewGuid():n}";
+    internal string NewInbox() => $"{Connection.Opts.InboxPrefix}.{Guid.NewGuid():n}";
 
     internal async ValueTask<TResponse> JSRequestResponseAsync<TRequest, TResponse>(
         string subject,
