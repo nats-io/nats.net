@@ -6,6 +6,11 @@ namespace NATS.Client.Core;
 public interface INatsConnection
 {
     /// <summary>
+    /// Gets the current state of the NATS connection.
+    /// </summary>
+    NatsConnectionState ConnectionState { get; }
+
+    /// <summary>
     /// Send PING command and await PONG. Return value is similar as Round Trip Time (RTT).
     /// </summary>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
