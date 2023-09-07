@@ -58,7 +58,7 @@ public partial class NatsJSContext
         throw new NatsJSException("No response received");
     }
 
-    internal string NewInbox() => $"{Opts.InboxPrefix}.{Guid.NewGuid():n}";
+    internal string NewInbox() => $"{Connection.Opts.InboxPrefix}.{Guid.NewGuid():n}";
 
     internal async ValueTask<TResponse> JSRequestResponseAsync<TRequest, TResponse>(
         string subject,

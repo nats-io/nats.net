@@ -46,8 +46,8 @@ public class NatsJSConsumer
 
         var inbox = _context.NewInbox();
 
-        var max = NatsJSOpsDefaults.SetMax(opts.MaxMsgs, opts.MaxBytes, opts.ThresholdMsgs, opts.ThresholdBytes);
-        var timeouts = NatsJSOpsDefaults.SetTimeouts(opts.Expires, opts.IdleHeartbeat);
+        var max = NatsJSOptsDefaults.SetMax(opts.MaxMsgs, opts.MaxBytes, opts.ThresholdMsgs, opts.ThresholdBytes);
+        var timeouts = NatsJSOptsDefaults.SetTimeouts(opts.Expires, opts.IdleHeartbeat);
 
         var requestOpts = new NatsSubOpts
         {
@@ -136,8 +136,8 @@ public class NatsJSConsumer
 
         var inbox = _context.NewInbox();
 
-        var max = NatsJSOpsDefaults.SetMax(opts.MaxMsgs, opts.MaxBytes);
-        var timeouts = NatsJSOpsDefaults.SetTimeouts(opts.Expires, opts.IdleHeartbeat);
+        var max = NatsJSOptsDefaults.SetMax(opts.MaxMsgs, opts.MaxBytes);
+        var timeouts = NatsJSOptsDefaults.SetTimeouts(opts.Expires, opts.IdleHeartbeat);
 
         var requestOpts = new NatsSubOpts
         {

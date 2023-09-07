@@ -4,11 +4,10 @@ namespace NATS.Client.JetStream;
 
 public record NatsJSOpts
 {
-    public NatsJSOpts(NatsOpts opts, string? apiPrefix = default, string? domain = default, AckOpts? ackOpts = default, string? inboxPrefix = default)
+    public NatsJSOpts(NatsOpts opts, string? apiPrefix = default, string? domain = default, AckOpts? ackOpts = default)
     {
         ApiPrefix = apiPrefix ?? "$JS.API";
         AckOpts = ackOpts ?? new AckOpts(opts.WaitUntilSent);
-        InboxPrefix = inboxPrefix ?? opts.InboxPrefix;
         Domain = domain;
     }
 
@@ -26,14 +25,6 @@ public record NatsJSOpts
     /// JetStream domain to use in JetStream API subjects. (default: null)
     /// </summary>
     public string? Domain { get; init; }
-
-    /// <summary>
-    /// Prefix to use in inbox subscription subjects to receive messages from JetStream. (default: _INBOX)
-    /// <para>
-    /// Default is taken from NatsOpts (on the parent NatsConnection) which is '_INBOX' if not set.
-    /// </para>
-    /// </summary>
-    public string InboxPrefix { get; init; }
 
     /// <summary>
     /// Message ACK options <see cref="AckOpts"/>.

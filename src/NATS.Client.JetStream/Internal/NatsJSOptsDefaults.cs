@@ -2,7 +2,7 @@ using NATS.Client.Core;
 
 namespace NATS.Client.JetStream.Internal;
 
-internal static class NatsJSOpsDefaults
+internal static class NatsJSOptsDefaults
 {
     private static readonly TimeSpan ExpiresDefault = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan ExpiresMin = TimeSpan.FromSeconds(1);
@@ -38,7 +38,7 @@ internal static class NatsJSOpsDefaults
         }
         else
         {
-            throw new NatsJSException($"Invalid state: {nameof(NatsJSOpsDefaults)}: {nameof(SetMax)}");
+            throw new NatsJSException($"Invalid state: {nameof(NatsJSOptsDefaults)}: {nameof(SetMax)}");
         }
 
         var thresholdMsgsOut = thresholdMsgs ?? maxMsgsOut / 2;
