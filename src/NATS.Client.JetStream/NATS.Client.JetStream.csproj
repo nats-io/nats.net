@@ -9,9 +9,6 @@
     <PackageTags>pubsub;messaging</PackageTags>
     <Description>JetStream support for NATS.Client.</Description>
 
-    <!-- TODO: Let JetStream packages to be created when code is ready for preview -->
-    <IsPackable>false</IsPackable>
-
   </PropertyGroup>
 
   <ItemGroup>
