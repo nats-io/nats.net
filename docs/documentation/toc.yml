@@ -1,14 +1,25 @@
 - name: Introduction
   href: intro.md
 
-- name: Publish-Subscribe
-  href: pub-sub.md
+- name: Core
+  href: core/intro.md
+  items:
+  - name: Publish-Subscribe
+    href: core/pub-sub.md
+  - name: Request-Reply
+    href: core/req-rep.md
+  - name: Queue Groups
+    href: core/queue.md
 
-- name: Request-Reply
-  href: req-rep.md
-
-- name: Queue Groups
-  href: queue.md
+- name: JetStream
+  href: jetstream/intro.md
+  items:
+  - name: Managing
+    href: jetstream/manage.md
+  - name: Publishing
+    href: jetstream/publish.md
+  - name: Consuming
+    href: jetstream/consume.md
 
 - name: Updating Documentation
   href: update-docs.md
