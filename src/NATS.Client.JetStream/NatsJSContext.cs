@@ -172,18 +172,3 @@ public partial class NatsJSContext
         throw new NatsJSException("No response received");
     }
 }
-
-/// <summary>
-/// The exception that is thrown when JetStream publish acknowledgment indicates a duplicate sequence error.
-/// </summary>
-public class NatsJSDuplicateMessageException : NatsJSException
-{
-    public NatsJSDuplicateMessageException(long sequence)
-        : base($"Duplicate of {sequence}") =>
-        Sequence = sequence;
-
-    /// <summary>
-    /// The duplicate sequence number.
-    /// </summary>
-    public long Sequence { get; }
-}
