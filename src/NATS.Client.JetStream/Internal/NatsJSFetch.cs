@@ -4,12 +4,11 @@ using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.Core.Commands;
-using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
 
-namespace NATS.Client.JetStream;
+namespace NATS.Client.JetStream.Internal;
 
-public class NatsJSFetch<TMsg> : NatsSubBase, INatsJSFetch<TMsg>
+internal class NatsJSFetch<TMsg> : NatsSubBase, INatsJSFetch<TMsg>
 {
     private readonly ILogger _logger;
     private readonly bool _debug;
