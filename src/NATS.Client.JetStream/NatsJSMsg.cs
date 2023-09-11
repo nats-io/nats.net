@@ -81,7 +81,7 @@ public readonly struct NatsJSMsg<T>
     /// defined as how long to allow messages to remain un-acknowledged before attempting redelivery.
     /// </para>
     /// <para>
-    /// This message must be sent before the <c>ack_wait</c> period times-out. The period should be extended
+    /// This message must be sent before the <c>ack_wait</c> period elapses. The period should be extended
     /// by another amount of time equal to <c>ack_wait</c> by the NATS JetStream server.
     /// </para>
     /// </remarks>
