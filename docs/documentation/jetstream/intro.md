@@ -26,7 +26,7 @@ in the defined storage system.
 A consumer is a stateful view of a stream. It acts as interface for clients to consume a subset of messages stored in a
 stream and will keep track of which messages were delivered and acknowledged by clients.
 
-## Quick Start
+## JetStream Quick Start
 
 [Download the latest](https://nats.io/download/) `nats-server` for your platform and run it with JetStream enabled:
 
@@ -34,45 +34,102 @@ stream and will keep track of which messages were delivered and acknowledged by 
 $ nats-server -js
 ```
 
-NATS server will listen on its default TCP port 4222.
+Install `NATS.Client.JetStream` preview from Nuget.
 
-Then create a .NET 6 (or above) console project, add `NATS.Client.JetStream` preview NuGet package and paste the below
-code snippet into `Program.cs`:
+Before we can so anything, we need a JetStream context:
 
 ```csharp
-using System;
-using Microsoft.Extensions.Logging;
-using NATS.Client.Core;
-using NATS.Client.JetStream;
-
-var opts = NatsOpts.Default with { LoggerFactory = new MinimumConsoleLoggerFactory(LogLevel.Error) };
-
-await using var nc = new NatsConnection(opts);
+await using var nc = new NatsConnection();
 var js = new NatsJSContext(nc);
+```
 
-await js.CreateStreamAsync("orders", subjects: new []{"orders.>"});
+Let's create our stream first. In JetStream, a stream is simply a storage for messages:
 
+```csharp
+await js.CreateStreamAsync(stream: "shop_orders", subjects: new []{"orders.>"});
+```
+
+We can save messages in a stream by publishing them to the subjects the stream is interested in, which is `orders.>` in
+our case, meaning any subject prefixed with `orders.` e.g. `orders.new.123`. Have a look at NATS documentation about
+[wildcards in Subject-Based Messaging](https://docs.nats.io/nats-concepts/subjects#wildcards) for more information.
+
+Given that we have a record `Order`, we can publish and consume stream of `Order` objects:
+
+```csharp
+public record Order(int OrderId);
+```
+
+We can publish to the `shop_orders` stream and receive a confirmation that our message is persisted:
+
+```csharp
 for (var i = 0; i < 10; i++)
 {
+    // Notice we're using JetStream context to publish and receive ACKs
     var ack = await js.PublishAsync($"orders.new.{i}", new Order(i));
     ack.EnsureSuccess();
 }
+```
 
-var consumer = await js.CreateConsumerAsync("orders", "order_processor");
+Now that we have a few messages in our stream, let's see its status using the [NATS command
+line client](https://github.com/nats-io/natscli):
 
-Console.WriteLine($"Consume...");
+```shell
+$ nats stream ls
+╭───────────────────────────────────────────────────────────────────────────────────╮
+│                                      Streams                                      │
+├─────────────┬─────────────┬─────────────────────┬──────────┬───────┬──────────────┤
+│ Name        │ Description │ Created             │ Messages │ Size  │ Last Message │
+├─────────────┼─────────────┼─────────────────────┼──────────┼───────┼──────────────┤
+│ shop_orders │             │ 2023-09-12 10:25:52 │ 10       │ 600 B │ 10.41s       │
+╰─────────────┴─────────────┴─────────────────────┴──────────┴───────┴──────────────╯
+```
+
+We need one more JetStream construct before we can start consuming our messages: a *consumer*:
+
+```csharp
+var consumer = await js.CreateConsumerAsync(stream: "shop_orders", consumer: "order_processor");
+```
+
+In JetStream, consumers are stored on the server. Clients don't need to worry about maintaining state separately.
+You can think of JetStream consumers as pointers to messages in streams stored on the NATS JetStream server. Let's
+see what our consumer's state is:
+
+```shell
+$ nats consumer report shop_orders
+╭────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                Consumer report for shop_orders with 1 consumers                                │
+├─────────────────┬──────┬────────────┬──────────┬─────────────┬─────────────┬─────────────┬───────────┬─────────┤
+│ Consumer        │ Mode │ Ack Policy │ Ack Wait │ Ack Pending │ Redelivered │ Unprocessed │ Ack Floor │ Cluster │
+├─────────────────┼──────┼────────────┼──────────┼─────────────┼─────────────┼─────────────┼───────────┼─────────┤
+│ order_processor │ Pull │ Explicit   │ 30.00s   │ 0           │ 0           │ 10 / 100%   │ 0         │         │
+╰─────────────────┴──────┴────────────┴──────────┴─────────────┴─────────────┴─────────────┴───────────┴─────────╯
+```
+
+Check out [JetStream documentation](https://docs.nats.io/nats-concepts/jetstream) for more information on streams and consumers.
+
+Finally, we're ready to consume the messages we persisted in `shop_orders` stream:
+
+```csharp
 await foreach (var msg in consumer.ConsumeAllAsync<Order>())
 {
     var order = msg.Data;
     Console.WriteLine($"Processing {msg.Subject} {order}...");
     await msg.AckAsync();
-    if (order.OrderId == 5)
-        break;
+    // this loop never ends unless there is an error
 }
-Console.WriteLine($"Done consuming.");
-
-public record Order(int OrderId);
 ```
+
+## Logging
+
+You should also hook your logger to `NatsConnection` to make sure all is working as expected or
+to get help diagnosing any issues you might have:
+
+```csharp
+var opts = NatsOpts.Default with { LoggerFactory = new MinimumConsoleLoggerFactory(LogLevel.Error) };
+await using var nats = new NatsConnection(otps);
+```
+
+## What's Next
 
 [Managing JetStream](manage.md) covers how to create, update, get, list and delete streams and consumers.
 
