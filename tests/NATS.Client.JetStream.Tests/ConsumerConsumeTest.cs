@@ -96,7 +96,7 @@ public class ConsumerConsumeTest
         var signal = new WaitSignal(TimeSpan.FromSeconds(30));
         server.OnLog += log =>
         {
-            if (log is { Category: "NATS.Client.JetStream.NatsJSConsume", LogLevel: LogLevel.Debug })
+            if (log is { Category: "NATS.Client.JetStream.Internal.NatsJSConsume", LogLevel: LogLevel.Debug })
             {
                 if (log.EventId == NatsJSLogEvents.IdleTimeout)
                     signal.Pulse();
