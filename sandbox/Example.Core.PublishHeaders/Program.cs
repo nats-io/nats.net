@@ -15,7 +15,7 @@ for (var i = 0; i < 10; i++)
     await connection.PublishAsync<Bar>(
         subject,
         new Bar { Id = i, Name = "Baz" },
-        new NatsPubOpts { Headers = new NatsHeaders { ["XFoo"] = $"bar{i}" } });
+        headers: new NatsHeaders { ["XFoo"] = $"bar{i}" });
 }
 
 void Print(string message)

@@ -47,7 +47,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
 
     internal InboxSubBuilder InboxSubBuilder { get; }
 
-    public async ValueTask SubscribeAsync(string subject, NatsSubOpts? opts, NatsSubBase sub, CancellationToken cancellationToken)
+    public async ValueTask SubscribeAsync(string subject, string? queueGroup, NatsSubOpts? opts, NatsSubBase sub, CancellationToken cancellationToken)
     {
         if (IsInboxSubject(subject))
         {
@@ -55,7 +55,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
         }
         else
         {
-            await SubscribeInternalAsync(subject, opts, sub, cancellationToken).ConfigureAwait(false);
+            await SubscribeInternalAsync(subject, queueGroup, opts, sub, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -179,6 +179,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
                     _inboxSub = InboxSubBuilder.Build(subject, opts, _connection, manager: this);
                     await SubscribeInternalAsync(
                         inboxSubject,
+                        queueGroup: default,
                         opts: default,
                         _inboxSub,
                         cancellationToken).ConfigureAwait(false);
@@ -193,7 +194,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
         await InboxSubBuilder.RegisterAsync(sub).ConfigureAwait(false);
     }
 
-    private async ValueTask SubscribeInternalAsync(string subject, NatsSubOpts? opts, NatsSubBase sub, CancellationToken cancellationToken)
+    private async ValueTask SubscribeInternalAsync(string subject, string? queueGroup, NatsSubOpts? opts, NatsSubBase sub, CancellationToken cancellationToken)
     {
         var sid = GetNextSid();
         lock (_gate)
@@ -204,7 +205,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
 
         try
         {
-            await _connection.SubscribeCoreAsync(sid, subject, opts?.QueueGroup, opts?.MaxMsgs, cancellationToken)
+            await _connection.SubscribeCoreAsync(sid, subject, queueGroup, opts?.MaxMsgs, cancellationToken)
                 .ConfigureAwait(false);
             await sub.ReadyAsync().ConfigureAwait(false);
         }

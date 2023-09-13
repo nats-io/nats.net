@@ -5,7 +5,7 @@ namespace NATS.Client.Core;
 /// <summary>
 /// Options For setting the FullMode and Capacity for a the <see cref="Channel"/> created for Subscriptions
 /// </summary>
-public readonly record struct NatsSubChannelOpts
+public record NatsSubChannelOpts
 {
     /// <summary>
     /// The Behavior of the Subscription's Channel when the Capacity has been reached.

@@ -43,12 +43,13 @@ public abstract class NatsSubBase
         NatsConnection connection,
         ISubscriptionManager manager,
         string subject,
+        string? queueGroup,
         NatsSubOpts? opts)
     {
         _logger = connection.Opts.LoggerFactory.CreateLogger<NatsSubBase>();
         _debug = _logger.IsEnabled(LogLevel.Debug);
         _manager = manager;
-        _pendingMsgs = opts is { MaxMsgs: > 0 } ? opts.Value.MaxMsgs ?? -1 : -1;
+        _pendingMsgs = opts is { MaxMsgs: > 0 } ? opts.MaxMsgs ?? -1 : -1;
         _countPendingMsgs = _pendingMsgs > 0;
         _idleTimeout = opts?.IdleTimeout ?? default;
         _startUpTimeout = opts?.StartUpTimeout ?? default;
@@ -56,7 +57,7 @@ public abstract class NatsSubBase
 
         Connection = connection;
         Subject = subject;
-        QueueGroup = opts?.QueueGroup;
+        QueueGroup = queueGroup;
 
         // Only allocate timers if necessary to reduce GC pressure
         if (_idleTimeout != default)

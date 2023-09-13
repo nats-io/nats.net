@@ -40,7 +40,7 @@ public abstract partial class NatsConnectionTest
         Assert.False(headers.IsReadOnly);
 
         // Send with headers
-        await nats.PublishAsync("foo", 100, new NatsPubOpts { Headers = headers });
+        await nats.PublishAsync("foo", 100, headers: headers);
 
         Assert.True(headers.IsReadOnly);
         Assert.Throws<InvalidOperationException>(() =>
@@ -63,7 +63,7 @@ public abstract partial class NatsConnectionTest
         Assert.Equal("multi-value-1", msg1.Headers["Multi"][1]);
 
         // Send empty headers
-        await nats.PublishAsync("foo", 200, new NatsPubOpts { Headers = new NatsHeaders() });
+        await nats.PublishAsync("foo", 200, headers: new NatsHeaders());
 
         var msg2 = await signal2;
         Assert.Equal(200, msg2.Data);

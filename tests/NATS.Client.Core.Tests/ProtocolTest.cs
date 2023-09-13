@@ -148,7 +148,7 @@ public class ProtocolTest
         Assert.Matches(@"^MSG foo.signal1 \w+ 0␍␊$", msgFrame1.Message);
 
         Log("HPUB notifications");
-        await nats.PublishAsync("foo.signal2", opts: new NatsPubOpts { Headers = new NatsHeaders() });
+        await nats.PublishAsync("foo.signal2", headers: new NatsHeaders());
         var msg2 = await signal2;
         Assert.Equal(0, msg2.Data.Length);
         Assert.NotNull(msg2.Headers);
@@ -182,7 +182,7 @@ public class ProtocolTest
         Log("### Auto-unsubscribe after consuming max-msgs");
         {
             var opts = new NatsSubOpts { MaxMsgs = maxMsgs };
-            await using var sub = await nats.SubscribeAsync<int>("foo", opts);
+            await using var sub = await nats.SubscribeAsync<int>("foo", opts: opts);
             sid++;
 
             await Retry.Until("all frames arrived", () => proxy.Frames.Count >= 2);
@@ -246,7 +246,7 @@ public class ProtocolTest
             proxy.Reset();
 
             var opts = new NatsSubOpts { MaxMsgs = maxMsgs };
-            var sub = await nats.SubscribeAsync<int>("foo3", opts);
+            var sub = await nats.SubscribeAsync<int>("foo3", opts: opts);
             sid++;
             var count = 0;
             var reg = sub.Register(_ => Interlocked.Increment(ref count));
@@ -303,7 +303,7 @@ public class ProtocolTest
 
         var sync = 0;
         await using var sub = new NatsSubReconnectTest(nats, subject, i => Interlocked.Exchange(ref sync, i));
-        await nats.SubAsync(sub.Subject, opts: default, sub);
+        await nats.SubAsync(sub.Subject, queueGroup: default, opts: default, sub: sub);
 
         await Retry.Until(
             "subscribed",
@@ -341,7 +341,7 @@ public class ProtocolTest
         private readonly Action<int> _callback;
 
         internal NatsSubReconnectTest(NatsConnection connection, string subject, Action<int> callback)
-            : base(connection, connection.SubscriptionManager, subject, default) =>
+            : base(connection, connection.SubscriptionManager, subject, queueGroup: default, opts: default) =>
             _callback = callback;
 
         internal override IEnumerable<ICommand> GetReconnectCommands(int sid)

@@ -30,9 +30,10 @@ public class NatsJSConsumer
     }
 
     public async IAsyncEnumerable<NatsJSMsg<T?>> ConsumeAllAsync<T>(
-        NatsJSConsumeOpts opts,
+        NatsJSConsumeOpts? opts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        opts ??= _context.Opts.DefaultConsumeOpts;
         await using var cc = await ConsumeAsync<T>(opts, cancellationToken);
         await foreach (var jsMsg in cc.Msgs.ReadAllAsync(cancellationToken))
         {
@@ -40,9 +41,10 @@ public class NatsJSConsumer
         }
     }
 
-    public async ValueTask<INatsJSConsume<T>> ConsumeAsync<T>(NatsJSConsumeOpts opts, CancellationToken cancellationToken = default)
+    public async ValueTask<INatsJSConsume<T>> ConsumeAsync<T>(NatsJSConsumeOpts? opts = default, CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
+        opts ??= _context.Opts.DefaultConsumeOpts;
 
         var inbox = _context.NewInbox();
 
@@ -67,6 +69,7 @@ public class NatsJSConsumer
             consumer: _consumer,
             context: _context,
             subject: inbox,
+            queueGroup: default,
             opts: requestOpts,
             maxMsgs: max.MaxMsgs,
             maxBytes: max.MaxBytes,
@@ -77,6 +80,7 @@ public class NatsJSConsumer
 
         await _context.Connection.SubAsync(
             subject: inbox,
+            queueGroup: default,
             opts: requestOpts,
             sub: sub,
             cancellationToken);
@@ -97,8 +101,11 @@ public class NatsJSConsumer
         return sub;
     }
 
-    public async ValueTask<NatsJSMsg<T?>?> NextAsync<T>(NatsJSNextOpts opts, CancellationToken cancellationToken = default)
+    public async ValueTask<NatsJSMsg<T?>?> NextAsync<T>(NatsJSNextOpts? opts = default, CancellationToken cancellationToken = default)
     {
+        ThrowIfDeleted();
+        opts ??= _context.Opts.DefaultNextOpts;
+
         await using var f = await FetchAsync<T>(
             new NatsJSFetchOpts
             {
@@ -118,9 +125,12 @@ public class NatsJSConsumer
     }
 
     public async IAsyncEnumerable<NatsJSMsg<T?>> FetchAllAsync<T>(
-        NatsJSFetchOpts opts,
+        NatsJSFetchOpts? opts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        ThrowIfDeleted();
+        opts ??= _context.Opts.DefaultFetchOpts;
+
         await using var fc = await FetchAsync<T>(opts, cancellationToken);
         await foreach (var jsMsg in fc.Msgs.ReadAllAsync(cancellationToken))
         {
@@ -129,10 +139,11 @@ public class NatsJSConsumer
     }
 
     public async ValueTask<INatsJSFetch<T>> FetchAsync<T>(
-        NatsJSFetchOpts opts,
+        NatsJSFetchOpts? opts = default,
         CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
+        opts ??= _context.Opts.DefaultFetchOpts;
 
         var inbox = _context.NewInbox();
 
@@ -157,6 +168,7 @@ public class NatsJSConsumer
             consumer: _consumer,
             context: _context,
             subject: inbox,
+            queueGroup: default,
             opts: requestOpts,
             maxMsgs: max.MaxMsgs,
             maxBytes: max.MaxBytes,
@@ -165,6 +177,7 @@ public class NatsJSConsumer
 
         await _context.Connection.SubAsync(
             subject: inbox,
+            queueGroup: default,
             opts: requestOpts,
             sub: sub,
             cancellationToken);
