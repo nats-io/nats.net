@@ -7,15 +7,14 @@ public partial class NatsConnection
     internal async ValueTask<INatsSub> RequestSubAsync(
         string subject,
         ReadOnlySequence<byte> payload = default,
-        string? queueGroup = default,
         NatsHeaders? headers = default,
         NatsPubOpts? requestOpts = default,
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default)
     {
         var replyTo = $"{InboxPrefix}{Guid.NewGuid():n}";
-        var sub = new NatsSub(this, SubscriptionManager.InboxSubBuilder, replyTo, queueGroup, replyOpts);
-        await SubAsync(replyTo, queueGroup, replyOpts, sub, cancellationToken).ConfigureAwait(false);
+        var sub = new NatsSub(this, SubscriptionManager.InboxSubBuilder, replyTo, queueGroup: default, replyOpts);
+        await SubAsync(replyTo, queueGroup: default, replyOpts, sub, cancellationToken).ConfigureAwait(false);
         if (requestOpts?.WaitUntilSent == true)
         {
             await PubAsync(subject, replyTo, payload, headers, cancellationToken).ConfigureAwait(false);
@@ -31,7 +30,6 @@ public partial class NatsConnection
     internal async ValueTask<INatsSub<TReply>> RequestSubAsync<TRequest, TReply>(
         string subject,
         TRequest? data,
-        string? queueGroup = default,
         NatsHeaders? headers = default,
         NatsPubOpts? requestOpts = default,
         NatsSubOpts? replyOpts = default,
@@ -40,8 +38,8 @@ public partial class NatsConnection
         var replyTo = $"{InboxPrefix}{Guid.NewGuid():n}";
 
         var replySerializer = replyOpts?.Serializer ?? Opts.Serializer;
-        var sub = new NatsSub<TReply>(this, SubscriptionManager.InboxSubBuilder, replyTo, queueGroup, replyOpts, replySerializer);
-        await SubAsync(replyTo, queueGroup, replyOpts, sub, cancellationToken).ConfigureAwait(false);
+        var sub = new NatsSub<TReply>(this, SubscriptionManager.InboxSubBuilder, replyTo, queueGroup: default, replyOpts, replySerializer);
+        await SubAsync(replyTo, queueGroup: default, replyOpts, sub, cancellationToken).ConfigureAwait(false);
 
         var serializer = requestOpts?.Serializer ?? Opts.Serializer;
 

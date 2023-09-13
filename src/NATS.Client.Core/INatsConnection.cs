@@ -1,5 +1,4 @@
 using System.Buffers;
-using System.Runtime.CompilerServices;
 
 namespace NATS.Client.Core;
 
@@ -98,7 +97,6 @@ public interface INatsConnection
     /// </summary>
     /// <param name="subject">Subject of the responder</param>
     /// <param name="data">Data to send to responder</param>
-    /// <param name="queueGroup">If specified, the reply handler (subscriber) will join this queue group.</param>
     /// <param name="headers">Optional message headers</param>
     /// <param name="requestOpts">Request publish options</param>
     /// <param name="replyOpts">Reply handler subscription options</param>
@@ -115,7 +113,6 @@ public interface INatsConnection
     ValueTask<NatsMsg<TReply?>?> RequestAsync<TRequest, TReply>(
         string subject,
         TRequest? data,
-        string? queueGroup = default,
         NatsHeaders? headers = default,
         NatsPubOpts? requestOpts = default,
         NatsSubOpts? replyOpts = default,
@@ -126,7 +123,6 @@ public interface INatsConnection
     /// </summary>
     /// <param name="subject">Subject of the responder</param>
     /// <param name="payload">Payload to send to responder</param>
-    /// <param name="queueGroup">If specified, the reply handler (subscriber) will join this queue group.</param>
     /// <param name="headers">Optional message headers</param>
     /// <param name="requestOpts">Request publish options</param>
     /// <param name="replyOpts">Reply handler subscription options</param>
@@ -141,7 +137,6 @@ public interface INatsConnection
     ValueTask<NatsMsg?> RequestAsync(
         string subject,
         ReadOnlySequence<byte> payload = default,
-        string? queueGroup = default,
         NatsHeaders? headers = default,
         NatsPubOpts? requestOpts = default,
         NatsSubOpts? replyOpts = default,
@@ -152,7 +147,6 @@ public interface INatsConnection
     /// </summary>
     /// <param name="subject">Subject of the responder</param>
     /// <param name="data">Data to send to responder</param>
-    /// <param name="queueGroup">If specified, the reply handler (subscriber) will join this queue group.</param>
     /// <param name="headers">Optional message headers</param>
     /// <param name="requestOpts">Request publish options</param>
     /// <param name="replyOpts">Reply handler subscription options</param>
@@ -167,7 +161,6 @@ public interface INatsConnection
     IAsyncEnumerable<NatsMsg<TReply?>> RequestManyAsync<TRequest, TReply>(
         string subject,
         TRequest? data,
-        string? queueGroup = default,
         NatsHeaders? headers = default,
         NatsPubOpts? requestOpts = default,
         NatsSubOpts? replyOpts = default,
@@ -178,7 +171,6 @@ public interface INatsConnection
     /// </summary>
     /// <param name="subject">Subject of the responder</param>
     /// <param name="payload">Payload to send to responder</param>
-    /// <param name="queueGroup">If specified, the reply handler (subscriber) will join this queue group.</param>
     /// <param name="headers">Optional message headers</param>
     /// <param name="requestOpts">Request publish options</param>
     /// <param name="replyOpts">Reply handler subscription options</param>
@@ -191,7 +183,6 @@ public interface INatsConnection
     IAsyncEnumerable<NatsMsg> RequestManyAsync(
         string subject,
         ReadOnlySequence<byte> payload = default,
-        string? queueGroup = default,
         NatsHeaders? headers = default,
         NatsPubOpts? requestOpts = default,
         NatsSubOpts? replyOpts = default,

@@ -9,7 +9,6 @@ public static class NatsRequestExtensions
     /// </summary>
     /// <param name="nats">NATS connection</param>
     /// <param name="msg">Message to be sent as request</param>
-    /// <param name="queueGroup">If specified, the reply handler (subscriber) will join this queue group.</param>
     /// <param name="requestOpts">Request publish options</param>
     /// <param name="replyOpts">Reply handler subscription options</param>
     /// <param name="cancellationToken">Cancel this request</param>
@@ -25,7 +24,6 @@ public static class NatsRequestExtensions
     public static ValueTask<NatsMsg<TReply?>?> RequestAsync<TRequest, TReply>(
         this INatsConnection nats,
         in NatsMsg<TRequest> msg,
-        string? queueGroup = default,
         NatsPubOpts? requestOpts = default,
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default)
@@ -35,7 +33,6 @@ public static class NatsRequestExtensions
         return nats.RequestAsync<TRequest, TReply>(
             msg.Subject,
             msg.Data,
-            queueGroup,
             msg.Headers,
             requestOpts,
             replyOpts,
@@ -47,7 +44,6 @@ public static class NatsRequestExtensions
     /// </summary>
     /// <param name="nats">NATS connection</param>
     /// <param name="msg">Message to be sent as request</param>
-    /// <param name="queueGroup">If specified, the reply handler (subscriber) will join this queue group.</param>
     /// <param name="requestOpts">Request publish options</param>
     /// <param name="replyOpts">Reply handler subscription options</param>
     /// <param name="cancellationToken">Cancel this request</param>
@@ -61,7 +57,6 @@ public static class NatsRequestExtensions
     public static ValueTask<NatsMsg?> RequestAsync(
         this INatsConnection nats,
         in NatsMsg msg,
-        string? queueGroup = default,
         in NatsPubOpts? requestOpts = default,
         in NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default)
@@ -71,7 +66,6 @@ public static class NatsRequestExtensions
         return nats.RequestAsync(
             msg.Subject,
             payload: new ReadOnlySequence<byte>(msg.Data),
-            queueGroup,
             msg.Headers,
             requestOpts,
             replyOpts,

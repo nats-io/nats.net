@@ -38,7 +38,6 @@ public partial class NatsJSContext
         await using var sub = await Connection.RequestSubAsync<T, PubAckResponse>(
                 subject: subject,
                 data: data,
-                queueGroup: default,
                 headers: headers,
                 requestOpts: opts,
                 replyOpts: default,
@@ -90,7 +89,6 @@ public partial class NatsJSContext
         await using var sub = await Connection.RequestSubAsync<TRequest, TResponse>(
                 subject: subject,
                 data: request,
-                queueGroup: default,
                 headers: default,
                 requestOpts: default,
                 replyOpts: new NatsSubOpts { Serializer = NatsJSErrorAwareJsonSerializer.Default },
