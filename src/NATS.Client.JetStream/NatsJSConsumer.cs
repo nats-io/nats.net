@@ -37,6 +37,8 @@ public class NatsJSConsumer
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     /// <remarks>After deletion this object can't be used anymore.</remarks>
+    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <exception cref="NatsJSException">There is an error sending the message or this consumer object isn't valid anymore because it was deleted earlier.</exception>
     public async ValueTask<bool> DeleteAsync(CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
@@ -71,6 +73,7 @@ public class NatsJSConsumer
     /// <typeparam name="T">Message type to deserialize.</typeparam>
     /// <returns>A consume object to manage the operation and retrieve messages.</returns>
     /// <exception cref="NatsJSProtocolException">Consumer is deleted, it's push based or request sent to server is invalid.</exception>
+    /// <exception cref="NatsJSException">There is an error sending the message or this consumer object isn't valid anymore because it was deleted earlier.</exception>
     public async ValueTask<INatsJSConsume<T>> ConsumeAsync<T>(NatsJSConsumeOpts? opts = default, CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
@@ -138,6 +141,7 @@ public class NatsJSConsumer
     /// <typeparam name="T">Message type to deserialize.</typeparam>
     /// <returns>Message retrieved from the stream or <c>NULL</c></returns>
     /// <exception cref="NatsJSProtocolException">Consumer is deleted, it's push based or request sent to server is invalid.</exception>
+    /// <exception cref="NatsJSException">There is an error sending the message or this consumer object isn't valid anymore because it was deleted earlier.</exception>
     /// <remarks>
     /// <para>
     /// If the request to server expires (in 30 seconds by default) this call returns <c>NULL</c>.
@@ -190,6 +194,7 @@ public class NatsJSConsumer
     /// <typeparam name="T">Message type to deserialize.</typeparam>
     /// <returns>Async enumerable of messages which can be used in a <c>await foreach</c> loop.</returns>
     /// <exception cref="NatsJSProtocolException">Consumer is deleted, it's push based or request sent to server is invalid.</exception>
+    /// <exception cref="NatsJSException">There is an error sending the message or this consumer object isn't valid anymore because it was deleted earlier.</exception>
     public async IAsyncEnumerable<NatsJSMsg<T?>> FetchAllAsync<T>(
         NatsJSFetchOpts? opts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -212,6 +217,7 @@ public class NatsJSConsumer
     /// <typeparam name="T">Message type to deserialize.</typeparam>
     /// <returns>A fetch object to manage the operation and retrieve messages.</returns>
     /// <exception cref="NatsJSProtocolException">Consumer is deleted, it's push based or request sent to server is invalid.</exception>
+    /// <exception cref="NatsJSException">There is an error sending the message or this consumer object isn't valid anymore because it was deleted earlier.</exception>
     public async ValueTask<INatsJSFetch<T>> FetchAsync<T>(
         NatsJSFetchOpts? opts = default,
         CancellationToken cancellationToken = default)

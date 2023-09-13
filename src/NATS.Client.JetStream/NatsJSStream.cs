@@ -28,7 +28,7 @@ public class NatsJSStream
     /// </summary>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>Whether delete was successful or not.</returns>
-    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
+    /// <exception cref="NatsJSException">There is an error retrieving the response or this consumer object isn't valid anymore because it was deleted earlier.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     /// <remarks>After deletion this object can't be used anymore.</remarks>
     public async ValueTask<bool> DeleteAsync(CancellationToken cancellationToken = default)
@@ -42,7 +42,7 @@ public class NatsJSStream
     /// </summary>
     /// <param name="request">Stream update request to be sent to the server.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
+    /// <exception cref="NatsJSException">There is an error retrieving the response or this consumer object isn't valid anymore because it was deleted earlier.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     public async ValueTask UpdateAsync(
         StreamUpdateRequest request,
@@ -60,7 +60,7 @@ public class NatsJSStream
     /// <param name="ackPolicy">Ack policy to use. Must not be set to <c>none</c>. Default is <c>explicit</c>.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>The NATS JetStream consumer object which can be used retrieving data from the stream.</returns>
-    /// <exception cref="NatsJSException">Ack policy is set to <c>none</c> or there was an issue retrieving the response.</exception>
+    /// <exception cref="NatsJSException">Ack policy is set to <c>none</c> or there is an error retrieving the response or this consumer object isn't valid anymore because it was deleted earlier.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     public ValueTask<NatsJSConsumer> CreateConsumerAsync(string consumer, ConsumerConfigurationAckPolicy ackPolicy = ConsumerConfigurationAckPolicy.@explicit, CancellationToken cancellationToken = default)
     {
@@ -74,7 +74,7 @@ public class NatsJSStream
     /// <param name="request">Consumer creation request to be sent to NATS JetStream server.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>The NATS JetStream consumer object which can be used retrieving data from the stream.</returns>
-    /// <exception cref="NatsJSException">Ack policy is set to <c>none</c> or there was an issue retrieving the response.</exception>
+    /// <exception cref="NatsJSException">Ack policy is set to <c>none</c> or there is an error retrieving the response or this consumer object isn't valid anymore because it was deleted earlier.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     public ValueTask<NatsJSConsumer> CreateConsumerAsync(ConsumerCreateRequest request, CancellationToken cancellationToken = default)
     {
@@ -88,7 +88,7 @@ public class NatsJSStream
     /// <param name="consumer">Consumer name.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>The NATS JetStream consumer object which can be used retrieving data from the stream.</returns>
-    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
+    /// <exception cref="NatsJSException">There is an error retrieving the response or this consumer object isn't valid anymore because it was deleted earlier.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     public ValueTask<NatsJSConsumer> GetConsumerAsync(string consumer, CancellationToken cancellationToken = default)
     {
@@ -101,7 +101,7 @@ public class NatsJSStream
     /// </summary>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>Async enumerable of consumer objects. Can be used in a <c>await foreach</c> loop.</returns>
-    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
+    /// <exception cref="NatsJSException">There is an error retrieving the response or this consumer object isn't valid anymore because it was deleted earlier.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     /// <remarks>
     /// Note that paging isn't implemented. You might receive only a partial list of consumers if there are a lot of them.
@@ -118,7 +118,7 @@ public class NatsJSStream
     /// <param name="consumer">Consumer name to be deleted.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>Whether the deletion was successful.</returns>
-    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
+    /// <exception cref="NatsJSException">There is an error retrieving the response or this consumer object isn't valid anymore because it was deleted earlier.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     public ValueTask<bool> DeleteConsumerAsync(string consumer, CancellationToken cancellationToken = default)
     {
