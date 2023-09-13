@@ -9,5 +9,5 @@ public static class NatsJSExtensionsInternal
     public static bool HasTerminalJSError(this NatsHeaders headers) => headers
         is { Code: 400 }
         or { Code: 409, Message: NatsHeaders.Messages.ConsumerDeleted }
-        or { Code: 409, Message: NatsHeaders.Messages.ConsumerDeleted };
+        or { Code: 409, Message: NatsHeaders.Messages.ConsumerIsPushBased };
 }

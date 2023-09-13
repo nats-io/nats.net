@@ -2,6 +2,9 @@ using NATS.Client.Core;
 
 namespace NATS.Client.JetStream;
 
+/// <summary>
+/// JetStream options to be used within a JetStream context.
+/// </summary>
 public record NatsJSOpts
 {
     public NatsJSOpts(NatsOpts opts, string? apiPrefix = default, string? domain = default, AckOpts? ackOpts = default)
@@ -56,6 +59,9 @@ public record NatsJSOpts
     public NatsJSNextOpts DefaultNextOpts { get; init; } = new();
 }
 
+/// <summary>
+/// Consumer consume method options.
+/// </summary>
 public record NatsJSConsumeOpts
 {
     /// <summary>
@@ -98,6 +104,9 @@ public record NatsJSConsumeOpts
     public INatsSerializer? Serializer { get; init; }
 }
 
+/// <summary>
+/// Consumer next method options.
+/// </summary>
 public record NatsJSNextOpts
 {
     /// <summary>
@@ -120,6 +129,9 @@ public record NatsJSNextOpts
     public INatsSerializer? Serializer { get; init; }
 }
 
+/// <summary>
+/// Consumer fetch method options.
+/// </summary>
 public record NatsJSFetchOpts
 {
     /// <summary>

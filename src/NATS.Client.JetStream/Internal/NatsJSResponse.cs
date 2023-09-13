@@ -1,12 +1,12 @@
 using NATS.Client.JetStream.Models;
 
-namespace NATS.Client.JetStream;
+namespace NATS.Client.JetStream.Internal;
 
 /// <summary>
 /// JetStream response including an optional error property encapsulating both successful and failed calls.
 /// </summary>
 /// <typeparam name="T">JetStream response type</typeparam>
-public readonly struct NatsJSResponse<T>
+internal readonly struct NatsJSResponse<T>
 {
     internal NatsJSResponse(T? response, ApiError? error)
     {
@@ -27,13 +27,4 @@ public readonly struct NatsJSResponse<T>
             throw new NatsJSApiException(Error ?? new ApiError { Description = "Unknown state" });
         }
     }
-}
-
-public class NatsJSApiException : NatsJSException
-{
-    public NatsJSApiException(ApiError error)
-        : base(error.Description) =>
-        Error = error;
-
-    public ApiError Error { get; }
 }

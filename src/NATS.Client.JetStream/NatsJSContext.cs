@@ -5,13 +5,20 @@ using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
 
+/// <summary>Provides management and access to NATS JetStream streams and consumers.</summary>
 public partial class NatsJSContext
 {
+    /// <inheritdoc cref="NatsJSContext(NATS.Client.Core.NatsConnection,NATS.Client.JetStream.NatsJSOpts)"/>>
     public NatsJSContext(NatsConnection connection)
         : this(connection, new NatsJSOpts(connection.Opts))
     {
     }
 
+    /// <summary>
+    /// Creates a NATS JetStream context used to manage and access streams and consumers.
+    /// </summary>
+    /// <param name="connection">A NATS server connection <see cref="NatsConnection"/> to access the JetStream APIs, publishers and consumers.</param>
+    /// <param name="opts">Context wide <see cref="NatsJSOpts"/> JetStream options.</param>
     public NatsJSContext(NatsConnection connection, NatsJSOpts opts)
     {
         Connection = connection;
@@ -22,19 +29,58 @@ public partial class NatsJSContext
 
     internal NatsJSOpts Opts { get; }
 
+    /// <summary>
+    /// Calls JetStream Account Info API.
+    /// </summary>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>The account information based on the NATS connection credentials.</returns>
     public ValueTask<AccountInfoResponse> GetAccountInfoAsync(CancellationToken cancellationToken = default) =>
         JSRequestResponseAsync<object, AccountInfoResponse>(
             subject: $"{Opts.Prefix}.INFO",
             request: null,
             cancellationToken);
 
+    /// <summary>
+    /// Sends data to a stream associated with the subject.
+    /// </summary>
+    /// <param name="subject">Subject to publish the data to.</param>
+    /// <param name="data">Data to publish.</param>
+    /// <param name="msgId">Sets <c>Nats-Msg-Id</c> header for idempotent message writes.</param>
+    /// <param name="headers">Optional message headers.</param>
+    /// <param name="opts">Options to be used by publishing command.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the publishing call or the wait for response.</param>
+    /// <typeparam name="T">Type of the data being sent.</typeparam>
+    /// <returns>
+    /// The ACK response to indicate if stream accepted the message as well as additional
+    /// information like the sequence number of the message stored by the stream.
+    /// </returns>
+    /// <exception cref="NatsJSException">There was a problem receiving the response.</exception>
+    /// <remarks>
+    /// <para>
+    /// Note that if the subject isn't backed by a stream or the connected NATS server
+    /// isn't running with JetStream enabled, this call will hang waiting for an ACK
+    /// until the request times out.
+    /// </para>
+    /// <para>
+    /// By setting <c>msgId</c> you can ensure messages written to a stream only once. JetStream support idempotent
+    /// message writes by ignoring duplicate messages as indicated by the Nats-Msg-Id header. If both <c>msgId</c>
+    /// and the <c>Nats-Msg-Id</c> header value was set, <c>msgId</c> parameter value will be used.
+    /// </para>
+    /// </remarks>
     public async ValueTask<PubAckResponse> PublishAsync<T>(
         string subject,
         T? data,
+        string? msgId = default,
         NatsHeaders? headers = default,
         NatsPubOpts? opts = default,
         CancellationToken cancellationToken = default)
     {
+        if (msgId != null)
+        {
+            headers ??= new NatsHeaders();
+            headers["Nats-Msg-Id"] = msgId;
+        }
+
         await using var sub = await Connection.RequestSubAsync<T, PubAckResponse>(
                 subject: subject,
                 data: data,
@@ -123,13 +169,4 @@ public partial class NatsJSContext
 
         throw new NatsJSException("No response received");
     }
-}
-
-public class NatsJSDuplicateMessageException : NatsJSException
-{
-    public NatsJSDuplicateMessageException(long sequence)
-        : base($"Duplicate of {sequence}") =>
-        Sequence = sequence;
-
-    public long Sequence { get; }
 }
