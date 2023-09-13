@@ -74,7 +74,6 @@ public class NatsJSConsumer
     public async ValueTask<INatsJSConsume<T>> ConsumeAsync<T>(NatsJSConsumeOpts? opts = default, CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
-        opts ??= _context.Opts.DefaultConsumeOpts;
 
         var inbox = _context.NewInbox();
 

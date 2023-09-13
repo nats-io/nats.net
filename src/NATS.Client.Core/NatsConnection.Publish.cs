@@ -5,7 +5,7 @@ namespace NATS.Client.Core;
 public partial class NatsConnection
 {
     /// <inheritdoc />
-    public ValueTask PublishAsync(string subject, ReadOnlySequence<byte> payload = default, string? replyTo = default, NatsHeaders? headers = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
+    public ValueTask PublishAsync(string subject, ReadOnlySequence<byte> payload = default, NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         if (opts?.WaitUntilSent ?? false)
         {
@@ -20,11 +20,11 @@ public partial class NatsConnection
     /// <inheritdoc />
     public ValueTask PublishAsync(in NatsMsg msg, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
-        return PublishAsync(msg.Subject, msg.Data, msg.ReplyTo, msg.Headers, opts, cancellationToken);
+        return PublishAsync(msg.Subject, msg.Data, msg.Headers, msg.ReplyTo, opts, cancellationToken);
     }
 
     /// <inheritdoc />
-    public ValueTask PublishAsync<T>(string subject, T? data, string? replyTo = default, NatsHeaders? headers = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
+    public ValueTask PublishAsync<T>(string subject, T? data, NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         var serializer = opts?.Serializer ?? Opts.Serializer;
         if (opts?.WaitUntilSent ?? false)
@@ -40,6 +40,6 @@ public partial class NatsConnection
     /// <inheritdoc />
     public ValueTask PublishAsync<T>(in NatsMsg<T> msg, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
-        return PublishAsync<T>(msg.Subject, msg.Data, msg.ReplyTo, msg.Headers, opts, cancellationToken);
+        return PublishAsync<T>(msg.Subject, msg.Data, msg.Headers, msg.ReplyTo, opts, cancellationToken);
     }
 }

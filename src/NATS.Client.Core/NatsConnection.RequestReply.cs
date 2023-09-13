@@ -14,7 +14,6 @@ public partial class NatsConnection
     public async ValueTask<NatsMsg<TReply?>?> RequestAsync<TRequest, TReply>(
         string subject,
         TRequest? data,
-        string? queueGroup = default,
         NatsHeaders? headers = default,
         NatsPubOpts? requestOpts = default,
         NatsSubOpts? replyOpts = default,
@@ -22,7 +21,7 @@ public partial class NatsConnection
     {
         var opts = SetReplyOptsDefaults(replyOpts);
 
-        await using var sub = await RequestSubAsync<TRequest, TReply>(subject, data, queueGroup, headers, requestOpts, opts, cancellationToken)
+        await using var sub = await RequestSubAsync<TRequest, TReply>(subject, data, headers, requestOpts, opts, cancellationToken)
             .ConfigureAwait(false);
 
         if (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
@@ -40,7 +39,6 @@ public partial class NatsConnection
     public async ValueTask<NatsMsg?> RequestAsync(
         string subject,
         ReadOnlySequence<byte> payload = default,
-        string? queueGroup = default,
         NatsHeaders? headers = default,
         NatsPubOpts? requestOpts = default,
         NatsSubOpts? replyOpts = default,
@@ -48,7 +46,7 @@ public partial class NatsConnection
     {
         var opts = SetReplyOptsDefaults(replyOpts);
 
-        await using var sub = await RequestSubAsync(subject, payload, queueGroup, headers, requestOpts, opts, cancellationToken).ConfigureAwait(false);
+        await using var sub = await RequestSubAsync(subject, payload, headers, requestOpts, opts, cancellationToken).ConfigureAwait(false);
 
         if (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
@@ -65,13 +63,12 @@ public partial class NatsConnection
     public async IAsyncEnumerable<NatsMsg<TReply?>> RequestManyAsync<TRequest, TReply>(
         string subject,
         TRequest? data,
-        string? queueGroup = default,
         NatsHeaders? headers = default,
         NatsPubOpts? requestOpts = default,
         NatsSubOpts? replyOpts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        await using var sub = await RequestSubAsync<TRequest, TReply>(subject, data, queueGroup, headers, requestOpts, replyOpts, cancellationToken)
+        await using var sub = await RequestSubAsync<TRequest, TReply>(subject, data, headers, requestOpts, replyOpts, cancellationToken)
             .ConfigureAwait(false);
 
         while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
@@ -93,13 +90,12 @@ public partial class NatsConnection
     public async IAsyncEnumerable<NatsMsg> RequestManyAsync(
         string subject,
         ReadOnlySequence<byte> payload = default,
-        string? queueGroup = default,
         NatsHeaders? headers = default,
         NatsPubOpts? requestOpts = default,
         NatsSubOpts? replyOpts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        await using var sub = await RequestSubAsync(subject, payload, queueGroup, headers, requestOpts, replyOpts, cancellationToken).ConfigureAwait(false);
+        await using var sub = await RequestSubAsync(subject, payload, headers, requestOpts, replyOpts, cancellationToken).ConfigureAwait(false);
 
         while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {

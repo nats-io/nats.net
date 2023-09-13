@@ -9,7 +9,6 @@ public static class NatsRequestManyExtensions
     /// </summary>
     /// <param name="nats">NATS connection</param>
     /// <param name="msg">Message to be sent as request</param>
-    /// <param name="queueGroup">If specified, the reply handler (subscriber) will join this queue group.</param>
     /// <param name="requestOpts">Request publish options</param>
     /// <param name="replyOpts">Reply handler subscription options</param>
     /// <param name="cancellationToken">Cancel this request</param>
@@ -21,7 +20,6 @@ public static class NatsRequestManyExtensions
     public static IAsyncEnumerable<NatsMsg> RequestManyAsync(
         this INatsConnection nats,
         NatsMsg msg,
-        string? queueGroup = default,
         NatsPubOpts? requestOpts = default,
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default)
@@ -31,7 +29,6 @@ public static class NatsRequestManyExtensions
         return nats.RequestManyAsync(
             msg.Subject,
             payload: new ReadOnlySequence<byte>(msg.Data),
-            queueGroup,
             msg.Headers,
             requestOpts,
             replyOpts,
@@ -43,7 +40,6 @@ public static class NatsRequestManyExtensions
     /// </summary>
     /// <param name="nats">NATS connection</param>
     /// <param name="msg">Message to be sent as request</param>
-    /// <param name="queueGroup">If specified, the reply handler (subscriber) will join this queue group.</param>
     /// <param name="requestOpts">Request publish options</param>
     /// <param name="replyOpts">Reply handler subscription options</param>
     /// <param name="cancellationToken">Cancel this request</param>
@@ -57,7 +53,6 @@ public static class NatsRequestManyExtensions
     public static IAsyncEnumerable<NatsMsg<TReply?>> RequestManyAsync<TRequest, TReply>(
         this INatsConnection nats,
         NatsMsg<TRequest> msg,
-        string? queueGroup = default,
         NatsPubOpts? requestOpts = default,
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default)
@@ -67,7 +62,6 @@ public static class NatsRequestManyExtensions
         return nats.RequestManyAsync<TRequest, TReply>(
             msg.Subject,
             msg.Data,
-            queueGroup,
             msg.Headers,
             requestOpts,
             replyOpts,
