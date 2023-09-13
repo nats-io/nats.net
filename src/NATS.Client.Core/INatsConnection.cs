@@ -16,12 +16,12 @@ public interface INatsConnection
     /// </summary>
     /// <param name="subject">The destination subject to publish to.</param>
     /// <param name="payload">The message payload data.</param>
-    /// <param name="replyTo">Optional reply-to subject.</param>
     /// <param name="headers">Optional message headers.</param>
+    /// <param name="replyTo">Optional reply-to subject.</param>
     /// <param name="opts">A <see cref="NatsPubOpts"/> for publishing options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous send operation.</returns>
-    ValueTask PublishAsync(string subject, ReadOnlySequence<byte> payload = default, string? replyTo = default, NatsHeaders? headers = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
+    ValueTask PublishAsync(string subject, ReadOnlySequence<byte> payload = default, NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Publishes the message payload to the given subject name, optionally supplying a reply subject.
@@ -36,14 +36,14 @@ public interface INatsConnection
     /// Publishes a serializable message payload to the given subject name, optionally supplying a reply subject.
     /// </summary>
     /// <param name="subject">The destination subject to publish to.</param>
-    /// <param name="data">Serializable data object</param>
-    /// <param name="replyTo">Optional reply-to subject.</param>
+    /// <param name="data">Serializable data object.</param>
     /// <param name="headers">Optional message headers.</param>
+    /// <param name="replyTo">Optional reply-to subject.</param>
     /// <param name="opts">A <see cref="NatsPubOpts"/> for publishing options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
-    /// <typeparam name="T">Specifies the type of data that may be send to the NATS Server.</typeparam>
+    /// <typeparam name="T">Specifies the type of data that may be sent to the NATS Server.</typeparam>
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous send operation.</returns>
-    ValueTask PublishAsync<T>(string subject, T data, string? replyTo = default, NatsHeaders? headers = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
+    ValueTask PublishAsync<T>(string subject, T data, NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Publishes a serializable message payload to the given subject name, optionally supplying a reply subject.
@@ -51,7 +51,7 @@ public interface INatsConnection
     /// <param name="msg">A <see cref="NatsMsg{T}"/> representing message details.</param>
     /// <param name="opts">A <see cref="NatsPubOpts"/> for publishing options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
-    /// <typeparam name="T">Specifies the type of data that may be send to the NATS Server.</typeparam>
+    /// <typeparam name="T">Specifies the type of data that may be sent to the NATS Server.</typeparam>
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous send operation.</returns>
     ValueTask PublishAsync<T>(in NatsMsg<T> msg, NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
 
