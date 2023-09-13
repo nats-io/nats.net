@@ -36,11 +36,11 @@ $ nats-server -js
 
 Install `NATS.Client.JetStream` preview from Nuget.
 
-Before we can so anything, we need a JetStream context:
+Before we can do anything, we need a JetStream context:
 
 ```csharp
-await using var nc = new NatsConnection();
-var js = new NatsJSContext(nc);
+await using var nats = new NatsConnection();
+var js = new NatsJSContext(nats);
 ```
 
 Let's create our stream first. In JetStream, a stream is simply a storage for messages:

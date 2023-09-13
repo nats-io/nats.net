@@ -1,7 +1,7 @@
 # Consuming Messages from Streams
 
-Consuming messages from a stream can be done using one of three different methods depending on you application needs.
-You can access these methods from the consumer object you can create using JetStream context:
+Consuming messages from a stream can be done using one of three different methods depending on your application needs.
+You can access these methods from the consumer object created using JetStream context:
 
 ```csharp
 await using var nats = new NatsConnection();
@@ -12,7 +12,7 @@ var consumer = await js.CreateConsumerAsync(stream: "orders", consumer: "order_p
 
 ## Next Method
 
-Next method is the simplest was of retrieving messages from a stream. Every time you call the next method you get
+Next method is the simplest way of retrieving messages from a stream. Every time you call the next method, you get
 a single message or nothing based on the expiry time to wait for a message. Once a message is received you can
 process it and call next again for another.
 
@@ -30,13 +30,13 @@ while (!cancellationToken.IsCancellationRequested)
 ```
 
 Next is the simplest and most conservative way of consuming messages since you request a single message from JetStream
-server then acknowledge it before requesting more messages. However, next method is also the least performant since
-there is not message batching.
+server then acknowledge it before requesting more. However, next method is also the least performant since
+there is no message batching.
 
 ## Fetch Method
 
-Fetch method requests messages in batches to improve the performance while giving the application the control over how
-fast it can process the messages without overwhelming the application process.
+Fetch method requests messages in batches to improve the performance while giving the application control over how
+fast it can process messages without overwhelming the application process.
 
 ```csharp
 while (!cancellationToken.IsCancellationRequested)
@@ -46,15 +46,17 @@ while (!cancellationToken.IsCancellationRequested)
     {
         // Process message
         await msg.AckAsync();
+
+        // Loop ends when pull request expires or when requested number of messages (MaxMsgs) received
     }
 }
 ```
 
 ## Consume Method
 
-Consume method is the most performant method of consuming messages. Request for messages (a.k.a. pull requests) are
-interleaved so that there is a constant flow of messages from the JetStream server. Flow is controlled by `MaxMsgs`
-or `MaxBytes` and respective thresholds not to overwhelm the application and not to waste server resources.
+Consume method is the most performant method of consuming messages. Requests for messages (a.k.a. pull requests) are
+overlapped so that there is a constant flow of messages from the JetStream server. Flow is controlled by `MaxMsgs`
+or `MaxBytes` and respective thresholds to not overwhelm the application and to not waste server resources.
 
 ```csharp
 await foreach (var msg in consumer.ConsumeAllAsync<Order>())
@@ -62,18 +64,18 @@ await foreach (var msg in consumer.ConsumeAllAsync<Order>())
     // Process message
     await msg.AckAsync();
 
-    // loop never exits unless there is an error or a break
+    // loop never ends unless there is an error or a break
 }
 ```
 
 ## Handling Exceptions
 
-While consuming messages (using next, fetch or consume methods) there are several scenarios where exception might be
+While consuming messages (using next, fetch or consume methods) there are several scenarios where exceptions might be
 thrown by the client library, for example:
 
 * Consumer is deleted by another application or operator
 * Connection to NATS server is interrupted (mainly for next and fetch methods, consume method can recover)
-* Client request for the next batch is invalid
+* Client pull request is invalid
 * Account permissions have changed
 * Cluster leader changed
 

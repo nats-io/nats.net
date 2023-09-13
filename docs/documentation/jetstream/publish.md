@@ -38,8 +38,8 @@ public record Order(int OrderId);
 
 JetStream support
 [idempotent message writes](https://docs.nats.io/using-nats/developer/develop_jetstream/model_deep_dive#message-deduplication)
-by ignoring duplicate messages as indicated by the message ID. Message ID is not pert of the message but rather passed
-as meta data, part of the message headers.
+by ignoring duplicate messages as indicated by the message ID. Message ID is not part of the message but rather passed
+as metadata, part of the message headers.
 
 ```csharp
 var ack = await js.PublishAsync("orders.new.1", order, msgId: "1");
