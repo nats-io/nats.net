@@ -51,11 +51,6 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
     {
         if (IsInboxSubject(subject))
         {
-            if (queueGroup != null)
-            {
-                throw new NatsException("Inbox subscriptions don't support queue groups");
-            }
-
             await SubscribeInboxAsync(subject, opts, sub, cancellationToken).ConfigureAwait(false);
         }
         else
