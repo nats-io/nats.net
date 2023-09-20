@@ -23,6 +23,16 @@ public interface INatsConnection
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous send operation.</returns>
     ValueTask PublishAsync(string subject, ReadOnlySequence<byte> payload = default, NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
 
+
+    /// <inheritdoc cref="PublishAsync(string,System.Buffers.ReadOnlySequence{byte},NATS.Client.Core.NatsHeaders?,string?,NATS.Client.Core.NatsPubOpts?,System.Threading.CancellationToken)"/>
+    ValueTask PublishAsync(string subject, byte[] payload, NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
+
+    /// <inheritdoc cref="PublishAsync(string,System.Buffers.ReadOnlySequence{byte},NATS.Client.Core.NatsHeaders?,string?,NATS.Client.Core.NatsPubOpts?,System.Threading.CancellationToken)"/>
+    ValueTask PublishAsync(string subject, Memory<byte> payload, NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
+
+    /// <inheritdoc cref="PublishAsync(string,System.Buffers.ReadOnlySequence{byte},NATS.Client.Core.NatsHeaders?,string?,NATS.Client.Core.NatsPubOpts?,System.Threading.CancellationToken)"/>
+    ValueTask PublishAsync(string subject, ReadOnlyMemory<byte> payload, NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Publishes the message payload to the given subject name, optionally supplying a reply subject.
     /// </summary>
@@ -85,6 +95,49 @@ public interface INatsConnection
     /// consume a message each time a message is received by the queue group.
     /// </remarks>
     ValueTask<INatsSub<T>> SubscribeAsync<T>(string subject, string? queueGroup = default, NatsSubOpts? opts = default, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Initiates a subscription to a subject, optionally joining a distributed queue group.
+    /// </summary>
+    /// <param name="subject">The subject name to subscribe to.</param>
+    /// <param name="queueGroup">If specified, the subscriber will join this queue group.</param>
+    /// <param name="opts">A <see cref="NatsSubOpts"/> for subscription options.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
+    /// <returns>The created async enumerable.</returns>
+    /// <remarks>
+    /// <para>
+    /// Subscribers with the same queue group name, become a queue group,
+    /// and only one randomly chosen subscriber of the queue group will
+    /// consume a message each time a message is received by the queue group.
+    /// </para>
+    /// <para>
+    /// Creates an <see cref="IAsyncEnumerable{T}"/> that enables reading all of the messages from the subscription,
+    /// which typically can be used in a <c>await foreach</c> loop.
+    /// </para>
+    /// </remarks>
+    IAsyncEnumerable<NatsMsg> SubscribeAllAsync(string subject, string? queueGroup = default, NatsSubOpts? opts = default, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Initiates a subscription to a subject, optionally joining a distributed queue group.
+    /// </summary>
+    /// <param name="subject">The subject name to subscribe to.</param>
+    /// <param name="queueGroup">If specified, the subscriber will join this queue group.</param>
+    /// <param name="opts">A <see cref="NatsSubOpts"/> for subscription options.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
+    /// <typeparam name="T">Specifies the type of data that may be received from the NATS Server.</typeparam>
+    /// <returns>The created async enumerable.</returns>
+    /// <remarks>
+    /// <para>
+    /// Subscribers with the same queue group name, become a queue group,
+    /// and only one randomly chosen subscriber of the queue group will
+    /// consume a message each time a message is received by the queue group.
+    /// </para>
+    /// <para>
+    /// Creates an <see cref="IAsyncEnumerable{T}"/> that enables reading all of the messages from the subscription,
+    /// which typically can be used in a <c>await foreach</c> loop.
+    /// </para>
+    /// </remarks>
+    IAsyncEnumerable<NatsMsg<T>> SubscribeAllAsync<T>(string subject, string? queueGroup = default, NatsSubOpts? opts = default, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Create a new inbox subject with the form {Inbox Prefix}.{Unique Connection ID}.{Unique Inbox ID}

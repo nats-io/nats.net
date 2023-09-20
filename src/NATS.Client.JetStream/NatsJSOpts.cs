@@ -64,6 +64,8 @@ public record NatsJSOpts
 /// </summary>
 public record NatsJSConsumeOpts
 {
+    internal static readonly NatsJSConsumeOpts Default = new();
+
     /// <summary>
     /// Maximum number of messages stored in the buffer
     /// </summary>

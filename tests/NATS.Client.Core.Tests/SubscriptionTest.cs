@@ -1,3 +1,6 @@
+using System.Text;
+using NATS.Client.TestUtilities;
+
 namespace NATS.Client.Core.Tests;
 
 public class SubscriptionTest
@@ -232,5 +235,87 @@ public class SubscriptionTest
 
         Assert.Equal(0, count);
         Assert.Equal(NatsSubEndReason.None, ((NatsSubBase)sub).EndReason);
+    }
+
+    [Fact]
+    public async Task Publish_raw_test()
+    {
+        const string subject = "foo";
+        const string payload = "test payload";
+
+        byte[] payloadBytes = Encoding.ASCII.GetBytes(payload);
+        Memory<byte> payloadMemory = payloadBytes;
+        ReadOnlyMemory<byte> payloadReadOnlyMemory = payloadMemory;
+
+        await using var server = NatsServer.Start();
+        await using var nats = server.CreateClientConnection();
+        await using var sub = await nats.SubscribeAsync(subject);
+
+        await nats.PublishAsync(subject, payloadBytes);
+        await nats.PublishAsync(subject, payloadMemory);
+        await nats.PublishAsync(subject, payloadReadOnlyMemory);
+
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+        var count = 0;
+        await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken))
+        {
+            var data = Encoding.ASCII.GetString(msg.Data.Span);
+            Assert.Equal(payload, data);
+            count++;
+            if (count == 3)
+                await sub.UnsubscribeAsync();
+        }
+
+        Assert.Equal(3, count);
+        Assert.Equal(NatsSubEndReason.None, ((NatsSubBase)sub).EndReason);
+    }
+
+    [Fact]
+    public async Task Subscribe_all_test()
+    {
+        const string payload = "test payload";
+
+        await using var server = NatsServer.Start();
+        await using var nats = server.CreateClientConnection();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        var sync1 = new SubscriberSync("foo1.sync", nats);
+        var task1 = Task.Run(async () =>
+        {
+            await foreach (var msg in nats.SubscribeAllAsync("foo1.*", cancellationToken: cancellationToken))
+            {
+                if (sync1.TrySet(msg.Subject))
+                    continue;
+
+                Assert.Equal(payload, Encoding.ASCII.GetString(msg.Data.Span));
+                break;
+            }
+        });
+
+        var sync2 = new SubscriberSync("foo2.sync", nats);
+        var task2 = Task.Run(async () =>
+        {
+            await foreach (var msg in nats.SubscribeAllAsync<string>("foo2.*", cancellationToken: cancellationToken))
+            {
+                if (sync2.TrySet(msg.Subject))
+                    continue;
+
+                Assert.Equal(payload, msg.Data);
+                break;
+            }
+        });
+
+        await sync1;
+        await sync2;
+
+        await nats.PublishAsync("foo1.data", Encoding.ASCII.GetBytes(payload));
+        await nats.PublishAsync<string>("foo2.data", payload);
+
+        await task1;
+        await task2;
     }
 }

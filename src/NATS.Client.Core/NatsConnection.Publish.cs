@@ -18,6 +18,27 @@ public partial class NatsConnection
     }
 
     /// <inheritdoc />
+    public ValueTask PublishAsync(string subject, byte[] payload, NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
+    {
+        var sequence = new ReadOnlySequence<byte>(payload);
+        return PublishAsync(subject, sequence, headers, replyTo, opts, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public ValueTask PublishAsync(string subject, Memory<byte> payload, NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
+    {
+        var sequence = new ReadOnlySequence<byte>(payload);
+        return PublishAsync(subject, sequence, headers, replyTo, opts, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public ValueTask PublishAsync(string subject, ReadOnlyMemory<byte> payload, NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
+    {
+        var sequence = new ReadOnlySequence<byte>(payload);
+        return PublishAsync(subject, sequence, headers, replyTo, opts, cancellationToken);
+    }
+
+    /// <inheritdoc />
     public ValueTask PublishAsync(in NatsMsg msg, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         return PublishAsync(msg.Subject, msg.Data, msg.Headers, msg.ReplyTo, opts, cancellationToken);
