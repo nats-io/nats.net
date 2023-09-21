@@ -1,3 +1,4 @@
+using NATS.Client.Core;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
@@ -137,6 +138,17 @@ public class NatsJSStream
             subject: $"{_context.Opts.Prefix}.STREAM.INFO.{_name}",
             request: null,
             cancellationToken).ConfigureAwait(false);
+
+    public async ValueTask<T?> GetAsync<T>(string subject, CancellationToken cancellationToken = default)
+    {
+        var msg = await _context.Connection.RequestAsync<object, T>(
+            subject: $"{_context.Opts.Prefix}.DIRECT.GET.{_name}.{subject}",
+            data: default,
+            cancellationToken: cancellationToken);
+        if (msg == default)
+            return default;
+        return msg.Value.Data;
+    }
 
     private void ThrowIfDeleted()
     {
