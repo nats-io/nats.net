@@ -614,6 +614,7 @@ namespace NATS.Client
             {
                 private readonly Connection connection;
                 private Task channelTask = null;
+                private CancellationTokenSource cts;
 
                 internal SubChannelProcessor(Connection c)
                 {
@@ -623,12 +624,12 @@ namespace NATS.Client
                     {
                         Name = "SubChannelProcessor " + this.GetHashCode(),
                     };
-
+                    cts = new CancellationTokenSource();
                     // Use the default task scheduler and do not let child tasks launched
                     // when delivering messages to attach to this task (Issue #273)
                     channelTask = Task.Factory.StartNew(
                         DeliverMessages, 
-                        CancellationToken.None,
+                        cts.Token,
                         TaskCreationOptions.LongRunning | TaskCreationOptions.DenyChildAttach,
                         TaskScheduler.Default);
                 }
@@ -645,6 +646,8 @@ namespace NATS.Client
                     Channel.close();
                     channelTask.Wait(500);
 #if NET46
+                    cts.Cancel();
+                    channelTask.Wait();
                     channelTask.Dispose();
 #endif
                     channelTask = null;
