@@ -276,7 +276,8 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
                     _serializer),
                 _context);
 
-            _pendingMsgs--;
+            if (_pendingMsgs > 0)
+                _pendingMsgs--;
 
             if (_maxBytes > 0)
             {

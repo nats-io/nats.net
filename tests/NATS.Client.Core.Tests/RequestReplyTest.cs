@@ -12,7 +12,13 @@ public class RequestReplyTest
     [Fact]
     public async Task Simple_request_reply_test()
     {
-        await using var server = NatsServer.Start();
+        await using var server = NatsServer.Start(
+            _output,
+            new NatsServerOptsBuilder()
+                .UseTransport(TransportType.Tcp)
+                .Trace()
+                .Build());
+
         await using var nats = server.CreateClientConnection();
 
         var sub = await nats.SubscribeAsync<int>("foo");
