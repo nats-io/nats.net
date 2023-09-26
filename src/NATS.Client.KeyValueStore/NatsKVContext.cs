@@ -1,10 +1,22 @@
-﻿using NATS.Client.JetStream;
+﻿using System.Text.RegularExpressions;
+using NATS.Client.Core;
+using NATS.Client.JetStream;
+using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.KeyValueStore;
 
+public enum NatsKVStorageType
+{
+    File = 0,
+    Memory = 1,
+}
+
 public class NatsKVContext
 {
+    private static readonly Regex ValidBucketRegex = new(pattern: @"\A[a-zA-Z0-9_-]+\z", RegexOptions.Compiled);
+    private static readonly Regex ValidKeyRegex = new(pattern: @"\A[-/_=\.a-zA-Z0-9]+\z", RegexOptions.Compiled);
+
     private readonly NatsJSContext _context;
     private readonly NatsKVOpts _opts;
 
@@ -14,133 +26,111 @@ public class NatsKVContext
         _opts = opts ?? new NatsKVOpts();
     }
 
-    public async ValueTask<NatsKVStore> CreateStoreAsync(string bucket, CancellationToken cancellationToken = default)
+    public ValueTask<NatsKVStore> CreateStoreAsync(string bucket, CancellationToken cancellationToken = default)
+        => CreateStoreAsync(new NatsKVConfig(bucket), cancellationToken);
+
+    public async ValueTask<NatsKVStore> CreateStoreAsync(NatsKVConfig config, CancellationToken cancellationToken = default)
     {
-        var stream = await _context.CreateStreamAsync(
-            new StreamConfiguration
+        ValidateBucketName(config.Bucket);
+
+        // TODO: KV Mirrors
+        var subjects = new[] { $"$KV.{config.Bucket}.>" };
+
+        long history;
+        if (config.History > 0)
+        {
+            if (config.History > NatsKVDefaults.MaxHistory)
             {
-                Name = $"KV_{bucket}",
-                Subjects = new[] { $"$KV.{bucket}.>" },
-                MaxMsgsPerSubject = 5,
-                Retention = StreamConfigurationRetention.limits,
-                Discard = StreamConfigurationDiscard.@new,
-                DuplicateWindow = 120000000000,
-                AllowRollupHdrs = true,
-                DenyDelete = true,
-                AllowDirect = true,
-            },
-            cancellationToken);
-        return new NatsKVStore(bucket, _context, stream);
+                throw new NatsKVException($"Too long history (max:{NatsKVDefaults.MaxHistory})");
+            }
+            else
+            {
+                history = config.History;
+            }
+        }
+        else
+        {
+            history = 1;
+        }
+
+        var storage = config.Storage == NatsKVStorageType.File
+            ? StreamConfigurationStorage.file
+            : StreamConfigurationStorage.memory;
+
+        var republish = config.Republish != null
+            ? new Republish
+            {
+                Dest = config.Republish.Dest!,
+                Src = config.Republish.Src!,
+                HeadersOnly = config.Republish.HeadersOnly,
+            }
+            : null;
+
+        var replicas = config.NumberOfReplicas > 0 ? config.NumberOfReplicas : 1;
+
+        var streamConfig = new StreamConfiguration
+        {
+            Name = BucketToStream(config.Bucket),
+            Description = config.Description!,
+            Subjects = subjects,
+            MaxMsgsPerSubject = history,
+            MaxBytes = config.MaxBytes,
+            MaxAge = config.MaxAge.ToNanos(),
+            MaxMsgSize = config.MaxValueSize,
+            Storage = storage,
+            Republish = republish!,
+            AllowRollupHdrs = true,
+            DenyDelete = true,
+            DenyPurge = false,
+            AllowDirect = true,
+            NumReplicas = replicas,
+            Discard = StreamConfigurationDiscard.@new,
+
+            // TODO: KV mirrors
+            // MirrorDirect =
+            // Mirror =
+            Retention = StreamConfigurationRetention.limits, // from ADR-8
+            DuplicateWindow = 120000000000, // from ADR-8
+        };
+
+        var stream = await _context.CreateStreamAsync(streamConfig, cancellationToken);
+
+        return new NatsKVStore(config.Bucket, _opts, _context, stream);
     }
-}
 
-public class NatsKVStore
-{
-    private readonly string _bucket;
-    private readonly NatsJSContext _context;
-    private readonly NatsJSStream _stream;
-
-    internal NatsKVStore(string bucket, NatsJSContext context, NatsJSStream stream)
+    public async ValueTask<NatsKVStore> GetStoreAsync(string bucket, CancellationToken cancellationToken = default)
     {
-        _bucket = bucket;
-        _context = context;
-        _stream = stream;
+        ValidateBucketName(bucket);
+
+        var stream = await _context.GetStreamAsync(BucketToStream(bucket), cancellationToken);
+
+        if (stream.Info.Config.MaxMsgsPerSubject < 1)
+        {
+            throw new NatsKVException("Invalid KV store name");
+        }
+
+        // TODO: KV mirror
+        return new NatsKVStore(bucket, _opts, _context, stream);
     }
 
-    public async ValueTask PutAsync<T>(string key, T value, CancellationToken cancellationToken = default)
+    public ValueTask<bool> DeleteStoreAsync(string bucket, CancellationToken cancellationToken = default)
     {
-        // PUB $KV.profiles.sue.color
-        var ack = await _context.PublishAsync($"$KV.{_bucket}.{key}", value, cancellationToken: cancellationToken);
-        ack.EnsureSuccess();
+        ValidateBucketName(bucket);
+        return _context.DeleteStreamAsync(BucketToStream(bucket), cancellationToken);
     }
 
-    public ValueTask<T?> GetAsync<T>(string key, CancellationToken cancellationToken = default)
+    private static string BucketToStream(string bucket) => $"KV_{bucket}";
+
+    private static void ValidateBucketName(string bucket)
     {
-        // API--------------+ stream----+ subject--------------+
-        // $JS.API.DIRECT.GET.KV_profiles.$KV.profiles.sue.color
-        return _stream.GetAsync<T>($"$KV.{_bucket}.{key}", cancellationToken);
+        if (!ValidBucketRegex.IsMatch(bucket))
+        {
+            throw new NatsKVException("Invalid bucket name");
+        }
     }
 }
 
 public record NatsKVOpts
 {
-}
-
-public enum NatsKVStorageType
-{
-    File = 0,
-    Memory = 1,
-}
-
-public record NatsKVRepublish
-{
-    /// <summary>
-    /// Subject that should be republished.
-    /// </summary>
-    public string src { get; init; }
-
-    /// <summary>
-    /// Subject where messages will be republished.
-    /// </summary>
-    public string dest { get; init; }
-
-    /// <summary>
-    /// If true, only headers should be republished.
-    /// </summary>
-    public bool headers_only { get; init; }
-}
-
-public record NatsKVConfig
-{
-    /// <summary>
-    /// Name of the bucket
-    /// </summary>
-    public string Bucket { get; init; }
-
-    /// <summary>
-    /// Human readable description.
-    /// </summary>
-    public string Description { get; init; }
-
-    /// <summary>
-    /// Maximum size of a single value.
-    /// </summary>
-    public int MaxValueSize { get; init; }
-
-    /// <summary>
-    /// Maximum historical entries.
-    /// </summary>
-    public long History { get; init; }
-
-    /// <summary>
-    /// Maximum age of any entry in the bucket, expressed in nanoseconds
-    /// </summary>
-    public TimeSpan MaxAge { get; init; }
-
-    /// <summary>
-    /// How large the bucket may become in total bytes before the configured discard policy kicks in
-    /// </summary>
-    public long MaxBytes { get; init; }
-
-    /// <summary>
-    /// The type of storage backend, `File` (default) and `Memory`
-    /// </summary>
-    public NatsKVStorageType Storage { get; init; }
-
-    /// <summary>
-    /// How many replicas to keep for each entry in a cluster.
-    /// </summary>
-    public int NumberOfReplicas { get; init; }
-
-    /// <summary>
-    /// Republish is for republishing messages once persistent in the Key Value Bucket.
-    /// </summary>
-    public NatsKVRepublish? Republish { get; init; }
-
-    // Bucket mirror configuration.
-    // pub mirror: Option<Source>,
-    // Bucket sources configuration.
-    // pub sources: Option<Vec<Source>>,
-    // Allow mirrors using direct API.
-    // pub mirror_direct: bool,
+    public INatsSerializer? Serializer { get; init; }
 }

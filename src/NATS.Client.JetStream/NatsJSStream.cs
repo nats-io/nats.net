@@ -139,16 +139,34 @@ public class NatsJSStream
             request: null,
             cancellationToken).ConfigureAwait(false);
 
-    public async ValueTask<T?> GetAsync<T>(string subject, CancellationToken cancellationToken = default)
+    public ValueTask<NatsMsg<T?>?> GetDirectAsync<T>(string subject, INatsSerializer? serializer = default, CancellationToken cancellationToken = default)
     {
-        var msg = await _context.Connection.RequestAsync<object, T>(
+        NatsSubOpts? subOpts;
+        NatsPubOpts? pubOpts;
+        if (serializer != null)
+        {
+            subOpts = new NatsSubOpts { Serializer = serializer };
+            pubOpts = new NatsPubOpts { Serializer = serializer };
+        }
+        else
+        {
+            subOpts = default;
+            pubOpts = default;
+        }
+
+        return _context.Connection.RequestAsync<object, T>(
             subject: $"{_context.Opts.Prefix}.DIRECT.GET.{_name}.{subject}",
             data: default,
+            requestOpts: pubOpts,
+            replyOpts: subOpts,
             cancellationToken: cancellationToken);
-        if (msg == default)
-            return default;
-        return msg.Value.Data;
     }
+
+    public ValueTask<StreamMsgGetResponse> GetAsync(StreamMsgGetRequest request, CancellationToken cancellationToken = default) =>
+        _context.JSRequestResponseAsync<StreamMsgGetRequest, StreamMsgGetResponse>(
+            subject: $"{_context.Opts.Prefix}.STREAM.MSG.GET.{_name}",
+            request: request,
+            cancellationToken);
 
     private void ThrowIfDeleted()
     {
