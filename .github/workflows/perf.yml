@@ -14,6 +14,7 @@ jobs:
       matrix:
         config:
           - branch: release/v2.9.23
+          - branch: latest
           - branch: main
     runs-on: ubuntu-latest
     env:
