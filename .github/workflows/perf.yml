@@ -14,7 +14,7 @@ jobs:
       matrix:
         config:
           - branch: dev
-          #- branch: main
+          - branch: main
     runs-on: ubuntu-latest
     env:
       DOTNET_CLI_TELEMETRY_OPTOUT: 1
