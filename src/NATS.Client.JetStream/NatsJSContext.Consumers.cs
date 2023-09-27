@@ -45,18 +45,7 @@ public partial class NatsJSContext
         ConsumerCreateRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (!string.IsNullOrEmpty(request.Config.DeliverSubject))
-        {
-            throw new NatsJSException("This API only support pull consumers. " +
-                                      "'deliver_subject' option applies to push consumers");
-        }
-
-        if (request.Config.AckPolicy == ConsumerConfigurationAckPolicy.none)
-        {
-            throw new NatsJSException("This API only support pull consumers. " +
-                                      "'ack_policy' must be set to 'explicit' or 'all' for pull consumers");
-        }
-
+        // TODO: Adjust API subject according to server version and filter subject
         var response = await JSRequestResponseAsync<ConsumerCreateRequest, ConsumerInfo>(
             subject: $"{Opts.Prefix}.CONSUMER.CREATE.{request.StreamName}.{request.Config.Name}",
             request,
