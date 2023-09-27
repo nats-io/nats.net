@@ -142,6 +142,14 @@ public class NatsServer : IAsyncDisposable
 
     public static NatsServer StartJS() => StartJS(new NullOutputHelper(), TransportType.Tcp);
 
+    public static NatsServer StartJSWithTrace(ITestOutputHelper outputHelper) => Start(
+        outputHelper: outputHelper,
+        opts: new NatsServerOptsBuilder()
+            .UseTransport(TransportType.Tcp)
+            .Trace()
+            .UseJetStream()
+            .Build());
+
     public static NatsServer StartJS(ITestOutputHelper outputHelper, TransportType transportType) => Start(
         outputHelper: outputHelper,
         opts: new NatsServerOptsBuilder()

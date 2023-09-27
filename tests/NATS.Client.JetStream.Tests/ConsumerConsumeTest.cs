@@ -79,7 +79,7 @@ public class ConsumerConsumeTest
     public async Task Consume_idle_heartbeat_test()
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        await using var server = NatsServer.StartJS();
+        await using var server = NatsServer.StartJSWithTrace(_output);
 
         var (nats, proxy) = server.CreateProxiedClientConnection();
 
@@ -141,7 +141,8 @@ public class ConsumerConsumeTest
             }
         }
 
-        Assert.True(msgNextRequests.Count is 2 or 3);
+        // Still fail and check traces if it happens again
+        Assert.True(msgNextRequests.Count is 2);
 
         // Pull requests
         foreach (var frame in msgNextRequests)
