@@ -13,7 +13,8 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - branch: dev
+          - branch: release/v2.9.23
+          - branch: latest
           - branch: main
     runs-on: ubuntu-latest
     env:
@@ -23,7 +24,9 @@ jobs:
     steps:
       - name: Install nats
         run: |
-          rel=$(curl -s https://api.github.com/repos/nats-io/natscli/releases/latest | jq -r .tag_name | sed s/v//)
+          # latest 0.1.1 doesn't have binaries
+          # rel=$(curl -s https://api.github.com/repos/nats-io/natscli/releases/latest | jq -r .tag_name | sed s/v//)
+          rel=0.1.0
           wget https://github.com/nats-io/natscli/releases/download/v$rel/nats-$rel-linux-amd64.zip
           unzip nats-$rel-linux-amd64.zip
           sudo mv nats-$rel-linux-amd64/nats /usr/local/bin

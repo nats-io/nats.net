@@ -39,11 +39,11 @@ public record StreamSource
     public string FilterSubject { get; set; } = default!;
 
     /// <summary>
-    /// Map matching subjects according to this transform destination
+    /// Subject transforms to apply to matching messages
     /// </summary>
-    [System.Text.Json.Serialization.JsonPropertyName("subject_transform_dest")]
+    [System.Text.Json.Serialization.JsonPropertyName("subject_transforms")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public string SubjectTransformDest { get; set; } = default!;
+    public System.Collections.Generic.ICollection<SubjectTransform> SubjectTransforms { get; set; } = default!;
 
     [System.Text.Json.Serialization.JsonPropertyName("external")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
