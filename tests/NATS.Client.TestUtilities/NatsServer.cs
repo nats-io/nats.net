@@ -151,7 +151,13 @@ public class NatsServer : IAsyncDisposable
 
     public static NatsServer Start() => Start(new NullOutputHelper(), TransportType.Tcp);
 
-    public static NatsServer Start(ITestOutputHelper outputHelper) => Start(outputHelper, TransportType.Tcp);
+    public static NatsServer StartWithTrace(ITestOutputHelper outputHelper)
+        => Start(
+            outputHelper,
+            new NatsServerOptsBuilder()
+                .Trace()
+                .UseTransport(TransportType.Tcp)
+                .Build());
 
     public static NatsServer Start(ITestOutputHelper outputHelper, TransportType transportType) =>
         Start(outputHelper, new NatsServerOptsBuilder().UseTransport(transportType).Build());
