@@ -12,12 +12,8 @@ public class RequestReplyTest
     [Fact]
     public async Task Simple_request_reply_test()
     {
-        await using var server = NatsServer.Start(
-            _output,
-            new NatsServerOptsBuilder()
-                .UseTransport(TransportType.Tcp)
-                .Trace()
-                .Build());
+        // Trace to hunt flapper!
+        await using var server = NatsServer.StartWithTrace(_output);
 
         await using var nats = server.CreateClientConnection();
 

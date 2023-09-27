@@ -79,7 +79,7 @@ public class ConsumerConsumeTest
     public async Task Consume_idle_heartbeat_test()
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        await using var server = NatsServer.StartJS();
+        await using var server = NatsServer.StartJSWithTrace(_output);
 
         var (nats, proxy) = server.CreateProxiedClientConnection();
 
@@ -120,14 +120,29 @@ public class ConsumerConsumeTest
 
         await Retry.Until(
             "all pull requests are received",
-            () => proxy.ClientFrames.Count(f => f.Message.StartsWith("PUB $JS.API.CONSUMER.MSG.NEXT.s1.c1")) == 2);
+            () => proxy.ClientFrames.Count(f => f.Message.StartsWith("PUB $JS.API.CONSUMER.MSG.NEXT.s1.c1")) >= 2);
 
         var msgNextRequests = proxy
             .ClientFrames
             .Where(f => f.Message.StartsWith("PUB $JS.API.CONSUMER.MSG.NEXT.s1.c1"))
             .ToList();
 
-        Assert.Equal(2, msgNextRequests.Count);
+        // In some cases we are receiving more than two requests which
+        // is possible if the tests are running in a slow container and taking
+        // more than the timeout? Looking at the test and the code I can't make
+        // sense of it, really, but I'm going to assume it's fine to receive 3 pull
+        // requests as well as 2 since test failure reported 3 and failed once.
+        if (msgNextRequests.Count > 2)
+        {
+            _output.WriteLine($"Pull request count more than expected: {msgNextRequests.Count}");
+            foreach (var frame in msgNextRequests)
+            {
+                _output.WriteLine($"PULL REQUEST: {frame}");
+            }
+        }
+
+        // Still fail and check traces if it happens again
+        Assert.True(msgNextRequests.Count is 2);
 
         // Pull requests
         foreach (var frame in msgNextRequests)
