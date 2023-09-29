@@ -46,19 +46,19 @@ public readonly struct NatsJSMsg<T>
     public T? Data => _msg.Data;
 
     /// <summary>
-    /// The sequence number of the message
-    /// </summary>
-    public long? Seq => _msg.Seq;
-
-    /// <summary>
-    /// The time of the message
-    /// </summary>
-    public DateTimeOffset? DateTime => _msg.DateTime;
-
-    /// <summary>
     /// The connection messages was delivered on.
     /// </summary>
     public INatsConnection? Connection => _msg.Connection;
+
+    /// <summary>
+    /// The sequence number of the message.
+    /// </summary>
+    public long? Sequence => _msg.Seq;
+
+    /// <summary>
+    /// The time of the message.
+    /// </summary>
+    public DateTimeOffset? DateTime => _msg.DateTime;
 
     /// <summary>
     /// Acknowledges the message was completely handled.
@@ -66,8 +66,7 @@ public readonly struct NatsJSMsg<T>
     /// <param name="opts">Ack options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the call.</param>
     /// <returns>A <see cref="ValueTask"/> representing the async call.</returns>
-    public ValueTask AckAsync(AckOpts opts = default, CancellationToken cancellationToken = default) =>
-        SendAckAsync(NatsJSConstants.Ack, opts, cancellationToken);
+    public ValueTask AckAsync(AckOpts opts = default, CancellationToken cancellationToken = default) => SendAckAsync(NatsJSConstants.Ack, opts, cancellationToken);
 
     /// <summary>
     /// Signals that the message will not be processed now and processing can move onto the next message.
@@ -78,8 +77,7 @@ public readonly struct NatsJSMsg<T>
     /// <remarks>
     /// Messages rejected using <c>NACK</c> will be resent by the NATS JetStream server after the configured timeout.
     /// </remarks>
-    public ValueTask NackAsync(AckOpts opts = default, CancellationToken cancellationToken = default) =>
-        SendAckAsync(NatsJSConstants.Nack, opts, cancellationToken);
+    public ValueTask NackAsync(AckOpts opts = default, CancellationToken cancellationToken = default) => SendAckAsync(NatsJSConstants.Nack, opts, cancellationToken);
 
     /// <summary>
     /// Indicates that work is ongoing and the wait period should be extended.
@@ -97,8 +95,7 @@ public readonly struct NatsJSMsg<T>
     /// by another amount of time equal to <c>ack_wait</c> by the NATS JetStream server.
     /// </para>
     /// </remarks>
-    public ValueTask AckProgressAsync(AckOpts opts = default, CancellationToken cancellationToken = default) =>
-        SendAckAsync(NatsJSConstants.AckProgress, opts, cancellationToken);
+    public ValueTask AckProgressAsync(AckOpts opts = default, CancellationToken cancellationToken = default) => SendAckAsync(NatsJSConstants.AckProgress, opts, cancellationToken);
 
     /// <summary>
     /// Instructs the server to stop redelivery of the message without acknowledging it as successfully processed.
@@ -106,18 +103,19 @@ public readonly struct NatsJSMsg<T>
     /// <param name="opts">Ack options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the call.</param>
     /// <returns>A <see cref="ValueTask"/> representing the async call.</returns>
-    public ValueTask AckTerminateAsync(AckOpts opts = default, CancellationToken cancellationToken = default) =>
-        SendAckAsync(NatsJSConstants.AckTerminate, opts, cancellationToken);
+    public ValueTask AckTerminateAsync(AckOpts opts = default, CancellationToken cancellationToken = default) => SendAckAsync(NatsJSConstants.AckTerminate, opts, cancellationToken);
 
-    private ValueTask SendAckAsync(ReadOnlySequence<byte> payload, AckOpts opts = default,
-        CancellationToken cancellationToken = default)
+    private ValueTask SendAckAsync(ReadOnlySequence<byte> payload, AckOpts opts = default, CancellationToken cancellationToken = default)
     {
         if (_msg == default)
             throw new NatsJSException("No user message, can't acknowledge");
 
         return _msg.ReplyAsync(
             payload: payload,
-            opts: new NatsPubOpts {WaitUntilSent = opts.WaitUntilSent ?? _context.Opts.AckOpts.WaitUntilSent,},
+            opts: new NatsPubOpts
+            {
+                WaitUntilSent = opts.WaitUntilSent ?? _context.Opts.AckOpts.WaitUntilSent,
+            },
             cancellationToken: cancellationToken);
     }
 }
