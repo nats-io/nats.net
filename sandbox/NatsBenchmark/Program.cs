@@ -77,7 +77,7 @@ namespace NatsBenchmark
             pubConn.ConnectAsync().AsTask().Wait();
             subConn.ConnectAsync().AsTask().Wait();
 
-            var d = subConn.SubscribeAsync(_subject).AsTask().Result.Register(_ =>
+            var d = subConn.SubscribeAsync<byte[]>(_subject).AsTask().Result.Register(_ =>
             {
                 Interlocked.Increment(ref subCount);
 
@@ -152,7 +152,7 @@ namespace NatsBenchmark
             pubConn.ConnectAsync().AsTask().Wait();
             subConn.ConnectAsync().AsTask().Wait();
 
-            var d = subConn.SubscribeAsync(_subject).AsTask().Result.Register(_ =>
+            var d = subConn.SubscribeAsync<byte[]>(_subject).AsTask().Result.Register(_ =>
             {
                 Interlocked.Increment(ref subCount);
 
@@ -236,7 +236,7 @@ namespace NatsBenchmark
             pubConn.ConnectAsync().AsTask().Wait();
             subConn.ConnectAsync().AsTask().Wait();
 
-            var d = subConn.SubscribeAsync(_subject).AsTask().Result.Register(_ =>
+            var d = subConn.SubscribeAsync<byte[]>(_subject).AsTask().Result.Register(_ =>
             {
                 Interlocked.Increment(ref subCount);
 
@@ -316,7 +316,7 @@ namespace NatsBenchmark
             pubConn.ConnectAsync().AsTask().Wait();
             subConn.ConnectAsync().AsTask().Wait();
 
-            var d = subConn.SubscribeAsync(_subject).AsTask().Result.Register(_ =>
+            var d = subConn.SubscribeAsync<byte[]>(_subject).AsTask().Result.Register(_ =>
             {
                 Interlocked.Increment(ref subCount);
 
@@ -421,7 +421,7 @@ namespace NatsBenchmark
             pubConn2.ConnectAsync().AsTask().Wait();
             subConn2.ConnectAsync().AsTask().Wait();
 
-            var d = subConn.SubscribeAsync(_subject).AsTask().Result.Register(_ =>
+            var d = subConn.SubscribeAsync<byte[]>(_subject).AsTask().Result.Register(_ =>
             {
                 Interlocked.Increment(ref subCount);
 
@@ -435,7 +435,7 @@ namespace NatsBenchmark
                     }
                 }
             });
-            var d2 = subConn2.SubscribeAsync(_subject).AsTask().Result.Register(_ =>
+            var d2 = subConn2.SubscribeAsync<byte[]>(_subject).AsTask().Result.Register(_ =>
             {
                 Interlocked.Increment(ref subCount2);
 
@@ -812,20 +812,6 @@ public struct Vector3
 internal static class NatsMsgTestUtils
 {
     internal static INatsSub<T>? Register<T>(this INatsSub<T>? sub, Action<NatsMsg<T?>> action)
-    {
-        if (sub == null)
-            return null;
-        Task.Run(async () =>
-        {
-            await foreach (var natsMsg in sub.Msgs.ReadAllAsync())
-            {
-                action(natsMsg);
-            }
-        });
-        return sub;
-    }
-
-    internal static INatsSub? Register(this INatsSub? sub, Action<NatsMsg> action)
     {
         if (sub == null)
             return null;

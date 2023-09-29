@@ -84,7 +84,7 @@ public class Runner : ConsoleAppBase
     [RootCommand]
     public async Task Run()
     {
-        var subscription = await _connection.SubscribeAsync("foo");
+        var subscription = await _connection.SubscribeAsync<string>("foo");
 
         _ = Task.Run(async () =>
         {

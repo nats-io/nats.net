@@ -84,3 +84,18 @@ public sealed class NatsJsonSerializer : INatsSerializer
         public Span<byte> GetSpan(int sizeHint = 0) => Array.Empty<byte>();
     }
 }
+
+public abstract class NatsBaseSerializer : INatsSerializer
+{
+    protected NatsBaseSerializer(NatsBaseSerializer next) => Next = next;
+
+    public NatsBaseSerializer Next { get; }
+
+    public abstract int Serialize<T>(ICountableBufferWriter bufferWriter, T? value);
+
+    public abstract T? Deserialize<T>(in ReadOnlySequence<byte> buffer);
+
+    public abstract object? Deserialize(in ReadOnlySequence<byte> buffer, Type type);
+}
+
+public class

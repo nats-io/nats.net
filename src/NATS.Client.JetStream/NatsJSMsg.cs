@@ -108,8 +108,11 @@ public readonly struct NatsJSMsg<T>
             throw new NatsJSException("No user message, can't acknowledge");
 
         return _msg.ReplyAsync(
-            payload: payload,
-            opts: new NatsPubOpts { WaitUntilSent = opts.WaitUntilSent ?? _context.Opts.AckOpts.WaitUntilSent },
+            data: payload,
+            opts: new NatsPubOpts
+            {
+                WaitUntilSent = opts.WaitUntilSent ?? _context.Opts.AckOpts.WaitUntilSent,
+            },
             cancellationToken: cancellationToken);
     }
 }

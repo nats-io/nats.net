@@ -11,11 +11,11 @@ await using var connection = new NatsConnection(options);
 
 Print($"[SUB] Subscribing to subject '{subject}'...\n");
 
-var sub = await connection.SubscribeAsync(subject);
+var sub = await connection.SubscribeAsync<byte[]>(subject);
 
 await foreach (var msg in sub.Msgs.ReadAllAsync())
 {
-    var data = Encoding.UTF8.GetString(msg.Data.ToArray());
+    var data = Encoding.UTF8.GetString(msg.Data!);
     Print($"[RCV] {msg.Subject}: {data}\n");
 }
 
