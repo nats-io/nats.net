@@ -1,4 +1,7 @@
+using System.Buffers;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Channels;
 using Xunit.Sdk;
@@ -323,6 +326,207 @@ public abstract partial class NatsConnectionTest
 
         list.ShouldEqual(100, 200, 300, 400, 500);
     }
+
+    public static IEnumerable<object[]> TestConfig()
+    {
+        Type[] types = { typeof(byte[]), typeof(ReadOnlyMemory<byte>), typeof(Memory<byte>) };
+        byte[] payload = "hello world"u8.ToArray();
+        bool[] waitUntilSend = { true, false };
+        INatsSerializer[] natsSerializer = { NatsOpts.Default.Serializer, new ByteSerializer() };
+
+        foreach (var pubType in types)
+        {
+            foreach (var subType in types)
+            {
+                foreach (var wait in waitUntilSend)
+                {
+                    foreach (var serializer in natsSerializer)
+                    {
+                        yield return new object[] { pubType, subType, wait, serializer, payload };
+                    }
+                }
+            }
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(TestConfig))]
+    public async Task TestBinaryPayload(Type pubType, Type subType, bool waitUntilSend, INatsSerializer serializer, byte[] payload)
+    {
+        byte[]? received = Array.Empty<byte>();
+
+        if (pubType == typeof(byte[]))
+        {
+            if (subType == typeof(byte[]))
+            {
+                received = await TestBinaryPayloadCore<byte[], byte[]>(payload, waitUntilSend, serializer);
+            }
+            else if (subType == typeof(ReadOnlyMemory<byte>))
+            {
+                var rec = await TestBinaryPayloadCore<byte[], ReadOnlyMemory<byte>>(payload, waitUntilSend, serializer);
+                received = rec.ToArray();
+            }
+            else if (subType == typeof(Memory<byte>))
+            {
+                var rec = await TestBinaryPayloadCore<byte[], Memory<byte>>(payload, waitUntilSend, serializer);
+                received = rec.ToArray();
+            }
+        }
+        else if (pubType == typeof(Memory<byte>))
+        {
+            if (subType == typeof(byte[]))
+            {
+                received = await TestBinaryPayloadCore<Memory<byte>, byte[]>(payload, waitUntilSend, serializer);
+            }
+            else if (subType == typeof(ReadOnlyMemory<byte>))
+            {
+                var rec = await TestBinaryPayloadCore<Memory<byte>, ReadOnlyMemory<byte>>(payload, waitUntilSend, serializer);
+                received = rec.ToArray();
+            }
+            else if (subType == typeof(Memory<byte>))
+            {
+                var rec = await TestBinaryPayloadCore<Memory<byte>, Memory<byte>>(payload, waitUntilSend, serializer);
+                received = rec.ToArray();
+            }
+        }
+        else if (pubType == typeof(ReadOnlyMemory<byte>))
+        {
+            if (subType == typeof(byte[]))
+            {
+                received = await TestBinaryPayloadCore<ReadOnlyMemory<byte>, byte[]>(payload, waitUntilSend, serializer);
+            }
+            else if (subType == typeof(ReadOnlyMemory<byte>))
+            {
+                var rec = await TestBinaryPayloadCore<ReadOnlyMemory<byte>, ReadOnlyMemory<byte>>(payload, waitUntilSend, serializer);
+                received = rec.ToArray();
+            }
+            else if (subType == typeof(Memory<byte>))
+            {
+                var rec = await TestBinaryPayloadCore<ReadOnlyMemory<byte>, Memory<byte>>(payload, waitUntilSend, serializer);
+                received = rec.ToArray();
+            }
+        }
+
+        Assert.True(payload.SequenceEqual(received ?? throw new NullReferenceException()));
+    }
+
+    public async Task<TSub?> TestBinaryPayloadCore<TPub, TSub>(TPub payload, bool waitUntilSend, INatsSerializer serializer)
+    {
+        await using var server = NatsServer.Start(_output, _transportType);
+
+        await using var subConnection = server.CreateClientConnection();
+        await using var pubConnection = server.CreateClientConnection();
+
+        using var timeout = new CancellationTokenSource(5_000);
+        var subject = Guid.NewGuid().ToString("N");
+
+        var receivedData = new List<TSub?>();
+        var pubOpts = new NatsPubOpts {WaitUntilSent = waitUntilSend, Serializer = serializer };
+        var subOpts = new NatsSubOpts { Serializer = serializer };
+        await using var sub = await subConnection.SubscribeAsync<TSub>(subject, opts: subOpts, cancellationToken: timeout.Token);
+
+        var receivedTask = Task.Run(
+            async () =>
+            {
+                await sub.Msgs.WaitToReadAsync(timeout.Token);
+                sub.Msgs.TryRead(out var msg);
+                receivedData.Add(msg.Data);
+            },
+            timeout.Token);
+
+
+        await pubConnection.PublishAsync(subject, payload, opts: pubOpts, cancellationToken: timeout.Token);
+
+        await receivedTask;
+
+        var receivedPayload = Assert.Single(receivedData);
+        return receivedPayload;
+    }
+
+    private sealed class ByteSerializer : INatsSerializer
+    {
+        public int Serialize<T>(ICountableBufferWriter bufferWriter, T? value)
+        {
+            if (value == null)
+            {
+                return 0;
+            }
+
+            if (typeof(T) == typeof(ReadOnlyMemory<byte>))
+            {
+                var rom = (ReadOnlyMemory<byte>)(object)value;
+                var buffer = bufferWriter.GetMemory(rom.Length);
+                rom.CopyTo(buffer);
+                bufferWriter.Advance(rom.Length);
+                return rom.Length;
+            }
+
+            if (typeof(T) == typeof(Memory<byte>))
+            {
+                var mem = (Memory<byte>)(object)value;
+                var buffer = bufferWriter.GetMemory(mem.Length);
+                mem.CopyTo(buffer);
+                bufferWriter.Advance(mem.Length);
+                return mem.Length;
+            }
+
+            if (typeof(T) == typeof(byte[]))
+            {
+                var arr = (byte[])(object)value;
+                var buffer = bufferWriter.GetMemory(arr.Length);
+                arr.CopyTo(buffer);
+                bufferWriter.Advance(arr.Length);
+                return arr.Length;
+            }
+
+            throw new NotSupportedException();
+        }
+
+        public T? Deserialize<T>(in ReadOnlySequence<byte> buffer)
+        {
+            var arr = new byte[buffer.Length];
+            buffer.CopyTo(arr.AsSpan());
+
+            if (typeof(T) == typeof(ReadOnlyMemory<byte>))
+            {
+                return (T)(object)new ReadOnlyMemory<byte>(arr);
+            }
+
+            if (typeof(T) == typeof(Memory<byte>))
+            {
+                return (T)(object)new Memory<byte>(arr);
+            }
+
+            if (typeof(T) == typeof(byte[]))
+            {
+                return (T)(object)arr;
+            }
+
+            throw new NotSupportedException();
+        }
+
+        public object? Deserialize(in ReadOnlySequence<byte> buffer, Type type)
+        {
+            if (type == typeof(ReadOnlyMemory<byte>))
+            {
+                return Deserialize<ReadOnlyMemory<byte>>(buffer);
+            }
+            if (type == typeof(Memory<byte>))
+            {
+                return Deserialize<Memory<byte>>(buffer);
+            }
+
+            if (type == typeof(byte[]))
+            {
+                return Deserialize<byte[]>(buffer);
+            }
+
+            throw new NotSupportedException();
+        }
+    }
+
+
+
 }
 
 public class SampleClass : IEquatable<SampleClass>
