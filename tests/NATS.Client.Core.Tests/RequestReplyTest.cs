@@ -12,20 +12,30 @@ public class RequestReplyTest
     [Fact]
     public async Task Simple_request_reply_test()
     {
-        // Trace to hunt flapper!
-        await using var server = NatsServer.StartWithTrace(_output);
-
+        await using var server = NatsServer.Start();
         await using var nats = server.CreateClientConnection();
 
-        var sub = await nats.SubscribeAsync<int>("foo");
+        const string subject = "foo";
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cancellationToken = cts.Token;
+
+        var sub = await nats.SubscribeAsync<int>(subject, cancellationToken: cancellationToken);
         var reg = sub.Register(async msg =>
         {
-            await msg.ReplyAsync(msg.Data * 2);
+            await msg.ReplyAsync(msg.Data * 2, cancellationToken: cancellationToken);
         });
+
+        var natsSubOpts = new NatsSubOpts { Timeout = TimeSpan.FromSeconds(10) };
 
         for (var i = 0; i < 10; i++)
         {
-            var rep = await nats.RequestAsync<int, int>("foo", i);
+            var rep = await nats.RequestAsync<int, int>(subject, i, replyOpts: natsSubOpts, cancellationToken: cancellationToken);
+
+            if (rep == null)
+            {
+                throw new TimeoutException("Request timeout");
+            }
+
             Assert.Equal(i * 2, rep?.Data);
         }
 
