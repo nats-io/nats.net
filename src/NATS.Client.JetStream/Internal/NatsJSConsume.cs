@@ -309,7 +309,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
             Pull(_maxMsgs, _maxBytes - _pendingBytes);
             ResetPending();
         }
-        else if (_maxBytes == 0 && _pendingMsgs <= _thresholdMsgs)
+        else if (_maxBytes == 0 && _pendingMsgs <= _thresholdMsgs && _pendingMsgs < _maxMsgs)
         {
             if (_debug)
                 _logger.LogDebug(NatsJSLogEvents.PendingCount, "Check pending messages {Pending}", _pendingMsgs);
