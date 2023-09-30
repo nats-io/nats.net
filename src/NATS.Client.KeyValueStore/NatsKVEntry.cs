@@ -1,4 +1,4 @@
-﻿namespace NATS.Client.KeyValueStore;
+namespace NATS.Client.KeyValueStore;
 
 public record NatsKVEntry<T>(string Bucket, string Key)
 {

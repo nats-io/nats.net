@@ -1,4 +1,4 @@
-﻿namespace NATS.Client.KeyValueStore;
+namespace NATS.Client.KeyValueStore;
 
 public static class NatsKVDefaults
 {
