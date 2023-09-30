@@ -12,11 +12,13 @@ public readonly struct NatsJSMsg<T>
 {
     private readonly NatsJSContext _context;
     private readonly NatsMsg<T> _msg;
+    private readonly Lazy<(DateTimeOffset? DateTime, long? Sequence)> _replyToDateTimeAndSeq;
 
     internal NatsJSMsg(NatsMsg<T> msg, NatsJSContext context)
     {
         _msg = msg;
         _context = context;
+        _replyToDateTimeAndSeq = new Lazy<(DateTimeOffset? DateTime, long? Sequnce)>(() => ReplyToDateTimeAndSeq.Parse(msg.ReplyTo));
     }
 
     /// <summary>
@@ -53,12 +55,12 @@ public readonly struct NatsJSMsg<T>
     /// <summary>
     /// The sequence number of the message.
     /// </summary>
-    public long? Sequence => _msg.Seq;
+    public long? Sequence => _replyToDateTimeAndSeq.Value.Sequence;
 
     /// <summary>
     /// The time of the message.
     /// </summary>
-    public DateTimeOffset? DateTime => _msg.DateTime;
+    public DateTimeOffset? DateTime => _replyToDateTimeAndSeq.Value.DateTime;
 
     /// <summary>
     /// Acknowledges the message was completely handled.
@@ -112,10 +114,7 @@ public readonly struct NatsJSMsg<T>
 
         return _msg.ReplyAsync(
             payload: payload,
-            opts: new NatsPubOpts
-            {
-                WaitUntilSent = opts.WaitUntilSent ?? _context.Opts.AckOpts.WaitUntilSent,
-            },
+            opts: new NatsPubOpts {WaitUntilSent = opts.WaitUntilSent ?? _context.Opts.AckOpts.WaitUntilSent,},
             cancellationToken: cancellationToken);
     }
 }

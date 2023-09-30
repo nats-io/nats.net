@@ -1,6 +1,5 @@
 using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
-using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
 
@@ -25,8 +24,6 @@ namespace NATS.Client.Core;
 public readonly record struct NatsMsg(
     string Subject,
     string? ReplyTo,
-    long? Seq,
-    DateTimeOffset? DateTime,
     int Size,
     NatsHeaders? Headers,
     ReadOnlyMemory<byte> Data,
@@ -53,22 +50,12 @@ public readonly record struct NatsMsg(
             headers.SetReadOnly();
         }
 
-        long? seq = null;
-        DateTimeOffset? dateTime = null;
-
-        if (replyTo != null)
-        {
-            var dateTimeAndSeq = ReplyToDateTimeAndSeq.Parse(replyTo);
-            seq = dateTimeAndSeq.Seq;
-            dateTime = dateTimeAndSeq.DateTime;
-        }
-
         var size = subject.Length
                    + (replyTo?.Length ?? 0)
                    + (headersBuffer?.Length ?? 0)
                    + payloadBuffer.Length;
 
-        return new NatsMsg(subject, replyTo, seq, dateTime, (int) size, headers, payloadBuffer.ToArray(), connection);
+        return new NatsMsg(subject, replyTo, (int)size, headers, payloadBuffer.ToArray(), connection);
     }
 
     /// <summary>
@@ -142,8 +129,6 @@ public readonly record struct NatsMsg(
 public readonly record struct NatsMsg<T>(
     string Subject,
     string? ReplyTo,
-    long? Seq,
-    DateTimeOffset? DateTime,
     int Size,
     NatsHeaders? Headers,
     T? Data,
@@ -178,22 +163,12 @@ public readonly record struct NatsMsg<T>(
             headers.SetReadOnly();
         }
 
-        long? seq = null;
-        DateTimeOffset? dateTime = null;
-
-        if (replyTo != null)
-        {
-            var dateTimeAndSeq = ReplyToDateTimeAndSeq.Parse(replyTo);
-            seq = dateTimeAndSeq.Seq;
-            dateTime = dateTimeAndSeq.DateTime;
-        }
-
         var size = subject.Length
             + (replyTo?.Length ?? 0)
             + (headersBuffer?.Length ?? 0)
             + payloadBuffer.Length;
 
-        return new NatsMsg<T>(subject, replyTo, seq, dateTime, (int) size, headers, data, connection);
+        return new NatsMsg<T>(subject, replyTo, (int)size, headers, data, connection);
     }
 
     /// <summary>
