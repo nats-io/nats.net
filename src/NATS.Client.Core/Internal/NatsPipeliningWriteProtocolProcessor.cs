@@ -129,14 +129,23 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
                             continue;
                         }
 
-                        if (command is IBatchCommand batch)
+                        try
                         {
-                            count += batch.Write(protocolWriter);
+                            if (command is IBatchCommand batch)
+                            {
+                                count += batch.Write(protocolWriter);
+                            }
+                            else
+                            {
+                                command.Write(protocolWriter);
+                                count++;
+                            }
                         }
-                        else
+                        catch (Exception e)
                         {
-                            command.Write(protocolWriter);
-                            count++;
+                            // flag potential serialization exceptions
+                            ((IPromise)command).SetException(e);
+                            continue;
                         }
 
                         if (command is IPromise p)

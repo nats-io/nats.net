@@ -5,6 +5,9 @@ namespace NATS.Client.Core.Commands;
 
 internal sealed class PublishCommand<T> : CommandBase<PublishCommand<T>>
 {
+    // This buffer will be pooled with this command object
+    private readonly FixedArrayBufferWriter _buffer = new();
+
     private string? _subject;
     private string? _replyTo;
     private NatsHeaders? _headers;
@@ -32,12 +35,17 @@ internal sealed class PublishCommand<T> : CommandBase<PublishCommand<T>>
         result._serializer = serializer;
         result._cancellationToken = cancellationToken;
 
+        // Serialize data as soon as possible to propagate any exceptions
+        // to the caller so that publish method will throw the exception
+        result._buffer.Reset();
+        serializer.Serialize(result._buffer, value);
+
         return result;
     }
 
     public override void Write(ProtocolWriter writer)
     {
-        writer.WritePublish(_subject!, _replyTo, _headers, _value, _serializer!);
+        writer.WritePublish(_subject!, _replyTo, _headers, new ReadOnlySequence<byte>(_buffer.WrittenMemory));
     }
 
     protected override void Reset()
