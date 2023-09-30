@@ -48,7 +48,8 @@ jobs:
         run: dotnet test -c Debug --no-build tests/NATS.Client.Core.Tests/NATS.Client.Core.Tests.csproj
 
       - name: Test JetStream
-        run: dotnet test -c Debug --no-build tests/NATS.Client.JetStream.Tests/NATS.Client.JetStream.Tests.csproj
+        # This test is hanging sometimes. Find out where!
+        run: dotnet test -c Debug --no-build --logger:"console;verbosity=normal" tests/NATS.Client.JetStream.Tests/NATS.Client.JetStream.Tests.csproj
 
       - name: Test Key/Value Store
         run: dotnet test -c Debug --no-build tests/NATS.Client.KeyValueStore.Tests/NATS.Client.KeyValueStore.Tests.csproj
