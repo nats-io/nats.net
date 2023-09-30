@@ -29,6 +29,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
     private readonly long _maxBytes;
     private readonly long _thresholdBytes;
 
+    private readonly object _pendingGate = new();
     private long _pendingMsgs;
     private long _pendingBytes;
 
@@ -119,8 +120,11 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
 
     public void ResetPending()
     {
-        _pendingMsgs = _maxMsgs;
-        _pendingBytes = _maxBytes;
+        lock (_pendingGate)
+        {
+            _pendingMsgs = _maxMsgs;
+            _pendingBytes = _maxBytes;
+        }
     }
 
     public void ResetHeartbeatTimer() => _timer.Change(_hbTimeout, Timeout.Infinite);
@@ -176,25 +180,29 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
                     {
                         if (long.TryParse(natsPendingMsgs, out var pendingMsgs))
                         {
-                            if (_debug)
+                            lock (_pendingGate)
                             {
-                                _logger.LogDebug(
-                                    NatsJSLogEvents.PendingCount,
-                                    "Header pending messages current {Pending}",
-                                    _pendingMsgs);
-                            }
+                                if (_debug)
+                                {
+                                    _logger.LogDebug(
+                                        NatsJSLogEvents.PendingCount,
+                                        "Header pending messages current {Pending}",
+                                        _pendingMsgs);
+                                }
 
-                            _pendingMsgs -= pendingMsgs;
-                            if (_pendingMsgs < 0)
-                                _pendingMsgs = 0;
+                                _pendingMsgs -= pendingMsgs;
+                                if (_pendingMsgs < 0)
+                                    _pendingMsgs = 0;
 
-                            if (_debug)
-                            {
-                                _logger.LogDebug(
-                                    NatsJSLogEvents.PendingCount,
-                                    "Header pending messages {Header} {Pending}",
-                                    natsPendingMsgs,
-                                    _pendingMsgs);
+
+                                if (_debug)
+                                {
+                                    _logger.LogDebug(
+                                        NatsJSLogEvents.PendingCount,
+                                        "Header pending messages {Header} {Pending}",
+                                        natsPendingMsgs,
+                                        _pendingMsgs);
+                                }
                             }
                         }
                         else
@@ -207,18 +215,21 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
                     {
                         if (long.TryParse(natsPendingBytes, out var pendingBytes))
                         {
-                            if (_debug)
+                            lock (_pendingGate)
                             {
-                                _logger.LogDebug(NatsJSLogEvents.PendingCount, "Header pending bytes current {Pending}", _pendingBytes);
-                            }
+                                if (_debug)
+                                {
+                                    _logger.LogDebug(NatsJSLogEvents.PendingCount, "Header pending bytes current {Pending}", _pendingBytes);
+                                }
 
-                            _pendingBytes -= pendingBytes;
-                            if (_pendingBytes < 0)
-                                _pendingBytes = 0;
+                                _pendingBytes -= pendingBytes;
+                                if (_pendingBytes < 0)
+                                    _pendingBytes = 0;
 
-                            if (_debug)
-                            {
-                                _logger.LogDebug(NatsJSLogEvents.PendingCount, "Header pending bytes {Header} {Pending}", natsPendingBytes, _pendingBytes);
+                                if (_debug)
+                                {
+                                    _logger.LogDebug(NatsJSLogEvents.PendingCount, "Header pending bytes {Header} {Pending}", natsPendingBytes, _pendingBytes);
+                                }
                             }
                         }
                         else
@@ -276,15 +287,21 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
                     _serializer),
                 _context);
 
-            if (_pendingMsgs > 0)
-                _pendingMsgs--;
+            lock (_pendingGate)
+            {
+                if (_pendingMsgs > 0)
+                    _pendingMsgs--;
+            }
 
             if (_maxBytes > 0)
             {
                 if (_debug)
                     _logger.LogDebug(NatsJSLogEvents.MessageProperty, "Message size {Size}", msg.Size);
 
-                _pendingBytes -= msg.Size;
+                lock (_pendingGate)
+                {
+                    _pendingBytes -= msg.Size;
+                }
             }
 
             await _userMsgs.Writer.WriteAsync(msg).ConfigureAwait(false);
@@ -301,21 +318,24 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
 
     private void CheckPending()
     {
-        if (_maxBytes > 0 && _pendingBytes <= _thresholdBytes)
+        lock (_pendingGate)
         {
-            if (_debug)
-                _logger.LogDebug(NatsJSLogEvents.PendingCount, "Check pending bytes {Pending}", _pendingBytes);
+            if (_maxBytes > 0 && _pendingBytes <= _thresholdBytes)
+            {
+                if (_debug)
+                    _logger.LogDebug(NatsJSLogEvents.PendingCount, "Check pending bytes {Pending}, {MaxBytes}", _pendingBytes, _maxBytes);
 
-            Pull(_maxMsgs, _maxBytes - _pendingBytes);
-            ResetPending();
-        }
-        else if (_maxBytes == 0 && _pendingMsgs <= _thresholdMsgs && _pendingMsgs < _maxMsgs)
-        {
-            if (_debug)
-                _logger.LogDebug(NatsJSLogEvents.PendingCount, "Check pending messages {Pending}", _pendingMsgs);
+                Pull(_maxMsgs, _maxBytes - _pendingBytes);
+                ResetPending();
+            }
+            else if (_maxBytes == 0 && _pendingMsgs <= _thresholdMsgs && _pendingMsgs < _maxMsgs)
+            {
+                if (_debug)
+                    _logger.LogDebug(NatsJSLogEvents.PendingCount, "Check pending messages {Pending}, {MaxMsgs}", _pendingMsgs, _maxMsgs);
 
-            Pull(_maxMsgs - _pendingMsgs, 0);
-            ResetPending();
+                Pull(_maxMsgs - _pendingMsgs, 0);
+                ResetPending();
+            }
         }
     }
 
