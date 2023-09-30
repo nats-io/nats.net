@@ -12,11 +12,13 @@ public readonly struct NatsJSMsg<T>
 {
     private readonly NatsJSContext _context;
     private readonly NatsMsg<T> _msg;
+    private readonly Lazy<NatsJSMsgMetadata?> _replyToDateTimeAndSeq;
 
     internal NatsJSMsg(NatsMsg<T> msg, NatsJSContext context)
     {
         _msg = msg;
         _context = context;
+        _replyToDateTimeAndSeq = new Lazy<NatsJSMsgMetadata?>(() => ReplyToDateTimeAndSeq.Parse(msg.ReplyTo));
     }
 
     /// <summary>
@@ -49,6 +51,11 @@ public readonly struct NatsJSMsg<T>
     /// The connection messages was delivered on.
     /// </summary>
     public INatsConnection? Connection => _msg.Connection;
+
+    /// <summary>
+    /// Additional metadata about the message.
+    /// </summary>
+    public NatsJSMsgMetadata? Metadata => _replyToDateTimeAndSeq.Value;
 
     /// <summary>
     /// Acknowledges the message was completely handled.
@@ -102,10 +109,7 @@ public readonly struct NatsJSMsg<T>
 
         return _msg.ReplyAsync(
             payload: payload,
-            opts: new NatsPubOpts
-            {
-                WaitUntilSent = opts.WaitUntilSent ?? _context.Opts.AckOpts.WaitUntilSent,
-            },
+            opts: new NatsPubOpts {WaitUntilSent = opts.WaitUntilSent ?? _context.Opts.AckOpts.WaitUntilSent,},
             cancellationToken: cancellationToken);
     }
 }
