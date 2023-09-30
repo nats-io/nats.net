@@ -12,13 +12,13 @@ public readonly struct NatsJSMsg<T>
 {
     private readonly NatsJSContext _context;
     private readonly NatsMsg<T> _msg;
-    private readonly Lazy<(DateTimeOffset? DateTime, long? Sequence)> _replyToDateTimeAndSeq;
+    private readonly Lazy<NatsJSMsgMetadata?> _replyToDateTimeAndSeq;
 
     internal NatsJSMsg(NatsMsg<T> msg, NatsJSContext context)
     {
         _msg = msg;
         _context = context;
-        _replyToDateTimeAndSeq = new Lazy<(DateTimeOffset? DateTime, long? Sequnce)>(() => ReplyToDateTimeAndSeq.Parse(msg.ReplyTo));
+        _replyToDateTimeAndSeq = new Lazy<NatsJSMsgMetadata?>(() => ReplyToDateTimeAndSeq.Parse(msg.ReplyTo));
     }
 
     /// <summary>
@@ -53,14 +53,9 @@ public readonly struct NatsJSMsg<T>
     public INatsConnection? Connection => _msg.Connection;
 
     /// <summary>
-    /// The sequence number of the message.
+    /// Additional metadata about the message.
     /// </summary>
-    public long? Sequence => _replyToDateTimeAndSeq.Value.Sequence;
-
-    /// <summary>
-    /// The time of the message.
-    /// </summary>
-    public DateTimeOffset? DateTime => _replyToDateTimeAndSeq.Value.DateTime;
+    public NatsJSMsgMetadata? Metadata => _replyToDateTimeAndSeq.Value;
 
     /// <summary>
     /// Acknowledges the message was completely handled.
