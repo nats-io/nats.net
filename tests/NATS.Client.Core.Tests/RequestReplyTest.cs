@@ -29,14 +29,9 @@ public class RequestReplyTest
 
         for (var i = 0; i < 10; i++)
         {
-            var rep = await nats.RequestAsync<int, int>(subject, i, replyOpts: natsSubOpts, cancellationToken: cancellationToken);
+            var rep = await nats.RequestAsync<int, int>(subject, i, replyOpts: natsSubOpts, cancellationToken: cancellationToken) ?? throw new TimeoutException("Request timeout");
 
-            if (rep == null)
-            {
-                throw new TimeoutException("Request timeout");
-            }
-
-            Assert.Equal(i * 2, rep?.Data);
+            Assert.Equal(i * 2, rep.Data);
         }
 
         await sub.DisposeAsync();

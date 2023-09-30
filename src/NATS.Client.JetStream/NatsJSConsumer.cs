@@ -78,6 +78,8 @@ public class NatsJSConsumer
     {
         ThrowIfDeleted();
 
+        opts ??= new NatsJSConsumeOpts();
+
         var inbox = _context.NewInbox();
 
         var max = NatsJSOptsDefaults.SetMax(opts.MaxMsgs, opts.MaxBytes, opts.ThresholdMsgs, opts.ThresholdBytes);
