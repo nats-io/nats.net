@@ -110,6 +110,8 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
 
         _pullRequests = Channel.CreateBounded<PullRequest>(NatsSub.GetChannelOpts(opts?.ChannelOpts));
         _pullTask = Task.Run(PullLoop);
+
+        ResetPending();
     }
 
     public ChannelReader<NatsJSMsg<TMsg?>> Msgs { get; }
@@ -130,15 +132,6 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
             replyTo: Subject,
             headers: default,
             cancellationToken);
-    }
-
-    public void ResetPending()
-    {
-        lock (_pendingGate)
-        {
-            _pendingMsgs = _maxMsgs;
-            _pendingBytes = _maxBytes;
-        }
     }
 
     public void ResetHeartbeatTimer() => _timer.Change(_hbTimeout, Timeout.Infinite);
@@ -327,6 +320,15 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
     {
         _pullRequests.Writer.TryComplete();
         _userMsgs.Writer.TryComplete();
+    }
+
+    private void ResetPending()
+    {
+        lock (_pendingGate)
+        {
+            _pendingMsgs = _maxMsgs;
+            _pendingBytes = _maxBytes;
+        }
     }
 
     private void CheckPending()
