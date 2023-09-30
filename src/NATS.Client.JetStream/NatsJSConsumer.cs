@@ -118,6 +118,7 @@ public class NatsJSConsumer
             cancellationToken);
 
         await sub.CallMsgNextAsync(
+            "init",
             new ConsumerGetnextRequest
             {
                 Batch = max.MaxMsgs,
