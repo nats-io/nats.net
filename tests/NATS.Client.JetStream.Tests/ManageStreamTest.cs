@@ -12,45 +12,46 @@ public class ManageStreamTest
     [Fact]
     public async Task Account_info_create_get_update_stream()
     {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
         await using var server = NatsServer.StartJS();
         var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats);
 
         // Account Info
         {
-            var accountInfo = await js.GetAccountInfoAsync();
+            var accountInfo = await js.GetAccountInfoAsync(cancellationToken);
             Assert.Equal(0, accountInfo.Streams);
         }
 
         // Create
         {
-            var stream = await js.CreateStreamAsync(request: new StreamConfiguration
-            {
-                Name = "events",
-                Subjects = new[] { "events.*" },
-            });
+            var stream = await js.CreateStreamAsync(
+                request: new StreamConfiguration { Name = "events", Subjects = new[] { "events.*" } },
+                cancellationToken: cancellationToken);
             Assert.Equal("events", stream.Info.Config.Name);
 
-            var accountInfo = await js.GetAccountInfoAsync();
+            var accountInfo = await js.GetAccountInfoAsync(cancellationToken);
             Assert.Equal(1, accountInfo.Streams);
         }
 
         // Get
         {
-            var stream = await js.GetStreamAsync("events");
+            var stream = await js.GetStreamAsync("events", cancellationToken);
             Assert.Equal("events", stream.Info.Config.Name);
             Assert.Equal(new[] { "events.*" }, stream.Info.Config.Subjects);
         }
 
         // Update
         {
-            var stream1 = await js.GetStreamAsync("events");
+            var stream1 = await js.GetStreamAsync("events", cancellationToken);
             Assert.Equal(-1, stream1.Info.Config.MaxMsgs);
 
-            var stream2 = await js.UpdateStreamAsync(new StreamUpdateRequest { Name = "events", MaxMsgs = 10 });
+            var stream2 = await js.UpdateStreamAsync(new StreamUpdateRequest { Name = "events", MaxMsgs = 10 }, cancellationToken);
             Assert.Equal(10, stream2.Info.Config.MaxMsgs);
 
-            var stream3 = await js.GetStreamAsync("events");
+            var stream3 = await js.GetStreamAsync("events", cancellationToken);
             Assert.Equal(10, stream3.Info.Config.MaxMsgs);
         }
     }
