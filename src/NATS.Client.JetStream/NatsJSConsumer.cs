@@ -78,6 +78,8 @@ public class NatsJSConsumer
     {
         ThrowIfDeleted();
 
+        opts ??= new NatsJSConsumeOpts();
+
         var inbox = _context.NewInbox();
 
         var max = NatsJSOptsDefaults.SetMax(opts.MaxMsgs, opts.MaxBytes, opts.ThresholdMsgs, opts.ThresholdBytes);
@@ -117,7 +119,9 @@ public class NatsJSConsumer
             sub: sub,
             cancellationToken);
 
+        // Start consuming with the first Pull Request
         await sub.CallMsgNextAsync(
+            "init",
             new ConsumerGetnextRequest
             {
                 Batch = max.MaxMsgs,
@@ -127,7 +131,6 @@ public class NatsJSConsumer
             },
             cancellationToken);
 
-        sub.ResetPending();
         sub.ResetHeartbeatTimer();
 
         return sub;

@@ -109,7 +109,7 @@ public readonly struct NatsJSMsg<T>
 
         return _msg.ReplyAsync(
             payload: payload,
-            opts: new NatsPubOpts {WaitUntilSent = opts.WaitUntilSent ?? _context.Opts.AckOpts.WaitUntilSent,},
+            opts: new NatsPubOpts { WaitUntilSent = opts.WaitUntilSent ?? _context.Opts.AckOpts.WaitUntilSent },
             cancellationToken: cancellationToken);
     }
 }
