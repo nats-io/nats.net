@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 
 namespace NATS.Client.Core.Tests;
 
@@ -19,7 +19,7 @@ public class SerializerTest
             await nats.PublishAsync(
                 "foo",
                 0,
-                opts: new NatsPubOpts { Serializer = new TestSerializer(), WaitUntilSent = false, });
+                opts: new NatsPubOpts { Serializer = new TestSerializer(), WaitUntilSent = false, SerializeEarly = true });
         });
 
         await Assert.ThrowsAsync<TestSerializerException>(async () =>
@@ -27,7 +27,7 @@ public class SerializerTest
             await nats.PublishAsync(
                 "foo",
                 0,
-                opts: new NatsPubOpts { Serializer = new TestSerializer(), WaitUntilSent = true, });
+                opts: new NatsPubOpts { Serializer = new TestSerializer(), WaitUntilSent = true });
         });
     }
 }
