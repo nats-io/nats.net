@@ -165,6 +165,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
             headers: default,
             value: request,
             serializer: NatsJsonSerializer.Default,
+            serializeEarly: true,
             cancellationToken: default);
     }
 

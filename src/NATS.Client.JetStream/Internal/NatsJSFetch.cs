@@ -151,6 +151,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase, INatsJSFetch<TMsg>
             headers: default,
             value: request,
             serializer: NatsJsonSerializer.Default,
+            serializeEarly: true,
             cancellationToken: default);
     }
 

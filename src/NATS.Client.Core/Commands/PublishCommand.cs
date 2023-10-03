@@ -3,29 +3,38 @@ using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core.Commands;
 
+internal class BufferObjectPoolNode : IObjectPoolNode<BufferObjectPoolNode>
+{
+    private BufferObjectPoolNode? _next;
+
+    public BufferObjectPoolNode(FixedArrayBufferWriter writer) => Writer = writer;
+
+    public ref BufferObjectPoolNode? NextNode => ref _next;
+
+    public FixedArrayBufferWriter Writer { get; }
+}
+
 internal sealed class PublishCommand<T> : CommandBase<PublishCommand<T>>
 {
-    // This buffer will be pooled with this command object
-    private readonly FixedArrayBufferWriter _buffer = new();
-
+    private readonly ObjectPool _pool;
+    private BufferObjectPoolNode? _buffer;
     private string? _subject;
     private string? _replyTo;
     private NatsHeaders? _headers;
     private T? _value;
     private INatsSerializer? _serializer;
+    private bool _serializeEarly;
     private CancellationToken _cancellationToken;
 
-    private PublishCommand()
-    {
-    }
+    private PublishCommand(ObjectPool pool) => _pool = pool;
 
     public override bool IsCanceled => _cancellationToken.IsCancellationRequested;
 
-    public static PublishCommand<T> Create(ObjectPool pool, string subject, string? replyTo, NatsHeaders? headers, T? value, INatsSerializer serializer, CancellationToken cancellationToken)
+    public static PublishCommand<T> Create(ObjectPool pool, string subject, string? replyTo, NatsHeaders? headers, T? value, INatsSerializer serializer, bool serializeEarly, CancellationToken cancellationToken)
     {
         if (!TryRent(pool, out var result))
         {
-            result = new PublishCommand<T>();
+            result = new PublishCommand<T>(pool);
         }
 
         result._subject = subject;
@@ -33,19 +42,42 @@ internal sealed class PublishCommand<T> : CommandBase<PublishCommand<T>>
         result._headers = headers;
         result._value = value;
         result._serializer = serializer;
+        result._serializeEarly = serializeEarly;
         result._cancellationToken = cancellationToken;
 
-        // Serialize data as soon as possible to propagate any exceptions
-        // to the caller so that publish method will throw the exception
-        result._buffer.Reset();
-        serializer.Serialize(result._buffer, value);
+        if (serializeEarly)
+        {
+            // Serialize data as soon as possible to propagate any exceptions
+            // to the caller so that publish method will throw the exception
+            if (!result._pool.TryRent(out result._buffer))
+            {
+                result._buffer = new BufferObjectPoolNode(new FixedArrayBufferWriter());
+            }
+
+            result._buffer.Writer.Reset();
+            serializer.Serialize(result._buffer.Writer, value);
+        }
 
         return result;
     }
 
     public override void Write(ProtocolWriter writer)
     {
-        writer.WritePublish(_subject!, _replyTo, _headers, new ReadOnlySequence<byte>(_buffer.WrittenMemory));
+        if (_serializeEarly)
+        {
+            try
+            {
+                writer.WritePublish(_subject!, _replyTo, _headers, default, _buffer!.Writer.WrittenSpan);
+            }
+            finally
+            {
+                _pool.Return(_buffer!);
+            }
+        }
+        else
+        {
+            writer.WritePublish(_subject!, _replyTo, _headers, _value, _serializer!);
+        }
     }
 
     protected override void Reset()
@@ -55,6 +87,8 @@ internal sealed class PublishCommand<T> : CommandBase<PublishCommand<T>>
         _value = default;
         _serializer = null;
         _cancellationToken = default;
+        _buffer = default;
+        _serializeEarly = default;
     }
 }
 

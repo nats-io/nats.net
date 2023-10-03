@@ -28,20 +28,20 @@ public partial class NatsConnection
         }
     }
 
-    internal ValueTask PubModelPostAsync<T>(string subject, T? data, INatsSerializer serializer, string? replyTo = default, NatsHeaders? headers = default, CancellationToken cancellationToken = default)
+    internal ValueTask PubModelPostAsync<T>(string subject, T? data, INatsSerializer serializer, string? replyTo = default, NatsHeaders? headers = default, bool serializeEarly = default, CancellationToken cancellationToken = default)
     {
         headers?.SetReadOnly();
 
         if (ConnectionState == NatsConnectionState.Open)
         {
-            var command = PublishCommand<T>.Create(_pool, subject, replyTo, headers, data, serializer, cancellationToken);
+            var command = PublishCommand<T>.Create(_pool, subject, replyTo, headers, data, serializer, serializeEarly, cancellationToken);
             return EnqueueCommandAsync(command);
         }
         else
         {
-            return WithConnectAsync(subject, replyTo, headers, data, serializer, cancellationToken, static (self, s, r, h, d, ser, c) =>
+            return WithConnectAsync(subject, replyTo, headers, data, serializer, serializeEarly, cancellationToken, static (self, s, r, h, d, ser, se, c) =>
             {
-                var command = PublishCommand<T>.Create(self._pool, s, r, h, d, ser, c);
+                var command = PublishCommand<T>.Create(self._pool, s, r, h, d, ser, se, c);
                 return self.EnqueueCommandAsync(command);
             });
         }

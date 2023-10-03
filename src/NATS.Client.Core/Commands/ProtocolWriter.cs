@@ -48,8 +48,10 @@ internal sealed class ProtocolWriter
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#pub
     // PUB <subject> [reply-to] <#bytes>\r\n[payload]\r\n
-    public void WritePublish(string subject, string? replyTo, NatsHeaders? headers, ReadOnlySequence<byte> payload)
+    public void WritePublish(string subject, string? replyTo, NatsHeaders? headers, ReadOnlySequence<byte> payload, ReadOnlySpan<byte> payloadAsSpan = default)
     {
+        var payloadLength = payloadAsSpan == default ? payload.Length : payloadAsSpan.Length;
+
         // We use a separate buffer to write the headers so that we can calculate the
         // size before we write to the output buffer '_writer'.
         if (headers != null)
@@ -70,14 +72,14 @@ internal sealed class ProtocolWriter
 
         if (headers == null)
         {
-            _writer.WriteNumber(payload.Length);
+            _writer.WriteNumber(payloadLength);
         }
         else
         {
             var headersLength = _bufferHeaders.WrittenSpan.Length;
             _writer.WriteNumber(CommandConstants.NatsHeaders10NewLine.Length + headersLength);
             _writer.WriteSpace();
-            var total = CommandConstants.NatsHeaders10NewLine.Length + headersLength + payload.Length;
+            var total = CommandConstants.NatsHeaders10NewLine.Length + headersLength + payloadLength;
             _writer.WriteNumber(total);
         }
 
@@ -90,9 +92,16 @@ internal sealed class ProtocolWriter
             _writer.WriteSpan(_bufferHeaders.WrittenSpan);
         }
 
-        if (payload.Length != 0)
+        if (payloadLength != 0)
         {
-            _writer.WriteSequence(payload);
+            if (payloadAsSpan == default)
+            {
+                _writer.WriteSequence(payload);
+            }
+            else
+            {
+                _writer.WriteSpan(payloadAsSpan);
+            }
         }
 
         _writer.WriteNewLine();

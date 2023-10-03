@@ -9,4 +9,6 @@ public record NatsPubOpts
     /// Default value is false, and calls to PublishAsync will complete after the publish command has been written to the Command Channel
     /// </summary>
     public bool? WaitUntilSent { get; init; }
+
+    public bool? SerializeEarly { get; init; }
 }
