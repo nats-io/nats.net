@@ -5,6 +5,8 @@ namespace Example.JetStream.PullConsumer;
 
 public class RawDataSerializer : INatsSerializer
 {
+    public INatsSerializer? Next => default;
+
     public int Serialize<T>(ICountableBufferWriter bufferWriter, T? value)
     {
         if (value is RawData data)
@@ -16,13 +18,11 @@ public class RawDataSerializer : INatsSerializer
         throw new Exception($"Can only work with '{typeof(RawData)}'");
     }
 
-    public T? Deserialize<T>(in ReadOnlySequence<byte> buffer) => (T?)Deserialize(buffer, typeof(T));
-
-    public object? Deserialize(in ReadOnlySequence<byte> buffer, Type type)
+    public T? Deserialize<T>(in ReadOnlySequence<byte> buffer)
     {
-        if (type != typeof(RawData))
+        if (typeof(T) != typeof(RawData))
             throw new Exception($"Can only work with '{typeof(RawData)}'");
 
-        return new RawData(buffer.ToArray());
+        return (T)(object)new RawData(buffer.ToArray());
     }
 }

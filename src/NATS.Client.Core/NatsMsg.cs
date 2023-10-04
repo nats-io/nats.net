@@ -89,7 +89,7 @@ public readonly record struct NatsMsg<T>(
     /// <summary>
     /// Reply to this message.
     /// </summary>
-    /// <param name="msg">A <see cref="NatsMsg"/> representing message details.</param>
+    /// <param name="msg">A <see cref="NatsMsg{T}"/> representing message details.</param>
     /// <param name="opts">A <see cref="NatsPubOpts"/> for publishing options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
     /// <typeparam name="TReply">Specifies the type of data that may be sent to the NATS Server.</typeparam>

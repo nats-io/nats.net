@@ -72,7 +72,7 @@ public interface INatsConnection
     /// <returns>Returns the <see cref="NatsMsg{T}"/> received from the responder as reply.</returns>
     /// <exception cref="OperationCanceledException">Raised when cancellation token is used</exception>
     /// <remarks>
-    /// Response can be (null) or one <see cref="NatsMsg"/>.
+    /// Response can be (null) or one <see cref="NatsMsg{T}"/>.
     /// Reply option's max messages will be set to 1.
     /// if reply option's timeout is not defined then it will be set to NatsOpts.RequestTimeout.
     /// </remarks>
@@ -95,7 +95,7 @@ public interface INatsConnection
     /// <param name="cancellationToken">Cancel this request</param>
     /// <typeparam name="TRequest">Request type</typeparam>
     /// <typeparam name="TReply">Reply type</typeparam>
-    /// <returns>An asynchronous enumerable of <see cref="NatsMsg"/> objects</returns>
+    /// <returns>An asynchronous enumerable of <see cref="NatsMsg{T}"/> objects</returns>
     /// <exception cref="OperationCanceledException">Raised when cancellation token is used</exception>
     /// <remarks>
     /// if reply option's timeout is not defined then it will be set to NatsOpts.RequestTimeout.
