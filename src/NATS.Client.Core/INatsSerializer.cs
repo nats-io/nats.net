@@ -21,11 +21,7 @@ public interface ICountableBufferWriter : IBufferWriter<byte>
 
 public static class NatsDefaultSerializer
 {
-    public static readonly INatsSerializer Default =
-        new NatsRawSerializer(
-            new NatsStringSerializer(
-                Encoding.UTF8,
-                NatsJsonSerializer.Default));
+    public static readonly INatsSerializer Default = new NatsRawSerializer(NatsJsonSerializer.Default);
 }
 
 public class NatsRawSerializer : INatsSerializer
@@ -106,47 +102,6 @@ public class NatsRawSerializer : INatsSerializer
         if (typeof(T) == typeof(ReadOnlySequence<byte>))
         {
             return (T)(object)new ReadOnlySequence<byte>(buffer.ToArray());
-        }
-
-        if (Next != null)
-            return Next.Deserialize<T>(buffer);
-
-        throw new NatsException($"Can't deserialize {typeof(T)}");
-    }
-}
-
-public class NatsStringSerializer : INatsSerializer
-{
-    private readonly Encoding _encoding;
-
-    public NatsStringSerializer(Encoding encoding, INatsSerializer? next)
-    {
-        _encoding = encoding;
-        Next = next;
-    }
-
-    public INatsSerializer? Next { get; }
-
-    public int Serialize<T>(ICountableBufferWriter bufferWriter, T? value)
-    {
-        if (value is string str)
-        {
-            var bytes = _encoding.GetBytes(str);
-            bufferWriter.Write(bytes);
-            return bytes.Length;
-        }
-
-        if (Next != null)
-            return Next.Serialize(bufferWriter, value);
-
-        throw new NatsException($"Can't serialize {typeof(T)}");
-    }
-
-    public T? Deserialize<T>(in ReadOnlySequence<byte> buffer)
-    {
-        if (typeof(T) == typeof(string))
-        {
-            return (T)(object)_encoding.GetString(buffer.ToArray());
         }
 
         if (Next != null)
