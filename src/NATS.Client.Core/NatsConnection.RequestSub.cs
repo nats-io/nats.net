@@ -49,7 +49,7 @@ public partial class NatsConnection
         }
         else
         {
-            await PubModelPostAsync(subject, data, serializer, replyTo, headers, cancellationToken).ConfigureAwait(false);
+            await PubModelPostAsync(subject, data, serializer, replyTo, headers, requestOpts?.ErrorHandler, cancellationToken).ConfigureAwait(false);
         }
 
         return sub;
