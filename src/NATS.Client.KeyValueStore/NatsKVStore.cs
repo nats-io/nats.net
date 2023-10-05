@@ -1,6 +1,7 @@
 using System.Buffers;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
+using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.KeyValueStore;
@@ -131,6 +132,45 @@ public class NatsKVStore
                 Value = data,
                 UsedDirectGet = false,
             };
+        }
+    }
+
+    public async IAsyncEnumerable<NatsKVEntry<T?>> WatchAll<T>(string key, CancellationToken cancellationToken = default)
+    {
+        NatsKVContext.ValidateKeyName(key);
+
+        var inbox = _context.NewInbox();
+        await using var sub = await _context.Connection.SubscribeAsync<T>(inbox, cancellationToken: cancellationToken);
+
+        await _context.CreateConsumerAsync(
+            new ConsumerCreateRequest
+            {
+                StreamName = $"KV_{_bucket}",
+                Config = new ConsumerConfiguration
+                {
+                    AckPolicy = ConsumerConfigurationAckPolicy.none,
+                    DeliverPolicy = ConsumerConfigurationDeliverPolicy.@new,
+                    DeliverSubject = inbox,
+                    Description = "KV watch consumer",
+                    FilterSubject = $"$KV.{_bucket}.{key}",
+                    FlowControl = true,
+                    IdleHeartbeat = TimeSpan.FromSeconds(5).ToNanos(),
+                    InactiveThreshold = TimeSpan.FromSeconds(30).ToNanos(),
+                    MaxDeliver = 1,
+                    MemStorage = true,
+                    NumReplicas = 1,
+                    ReplayPolicy = ConsumerConfigurationReplayPolicy.instant,
+                },
+            },
+            cancellationToken: cancellationToken);
+
+        while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            while (sub.Msgs.TryRead(out NatsMsg<T?> item))
+            {
+                var msg = new NatsJSMsg<T?>(item, _context);
+                yield return new NatsKVEntry<T?>(_bucket, );
+            }
         }
     }
 }

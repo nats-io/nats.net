@@ -119,15 +119,23 @@ public class NatsKVContext
         return _context.DeleteStreamAsync(BucketToStream(bucket), cancellationToken);
     }
 
-    private static string BucketToStream(string bucket) => $"KV_{bucket}";
-
-    private static void ValidateBucketName(string bucket)
+    internal static void ValidateBucketName(string bucket)
     {
         if (!ValidBucketRegex.IsMatch(bucket))
         {
             throw new NatsKVException("Invalid bucket name");
         }
     }
+
+    internal static void ValidateKeyName(string key)
+    {
+        if (!ValidKeyRegex.IsMatch(key))
+        {
+            throw new NatsKVException("Invalid key name");
+        }
+    }
+
+    private static string BucketToStream(string bucket) => $"KV_{bucket}";
 }
 
 public record NatsKVOpts

@@ -46,10 +46,18 @@ public partial class NatsJSContext
         CancellationToken cancellationToken = default)
     {
         // TODO: Adjust API subject according to server version and filter subject
+        var subject = $"{Opts.Prefix}.CONSUMER.CREATE.{request.StreamName}";
+
+        if (!string.IsNullOrWhiteSpace(request.Config.Name))
+        {
+            subject += $".{request.Config.Name}";
+        }
+
         var response = await JSRequestResponseAsync<ConsumerCreateRequest, ConsumerInfo>(
-            subject: $"{Opts.Prefix}.CONSUMER.CREATE.{request.StreamName}.{request.Config.Name}",
+            subject: subject,
             request,
             cancellationToken);
+
         return new NatsJSConsumer(this, response);
     }
 
