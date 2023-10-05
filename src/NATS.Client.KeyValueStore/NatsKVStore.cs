@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Runtime.CompilerServices;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Internal;
@@ -135,9 +136,9 @@ public class NatsKVStore
         }
     }
 
-    public async IAsyncEnumerable<NatsKVEntry<T?>> WatchAll<T>(string key, CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<NatsKVEntry<T?>> WatchAll<T>(string key, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        NatsKVContext.ValidateKeyName(key);
+        var keyBase = $"$KV.{_bucket}.";
 
         var inbox = _context.NewInbox();
         await using var sub = await _context.Connection.SubscribeAsync<T>(inbox, cancellationToken: cancellationToken);
@@ -149,10 +150,10 @@ public class NatsKVStore
                 Config = new ConsumerConfiguration
                 {
                     AckPolicy = ConsumerConfigurationAckPolicy.none,
-                    DeliverPolicy = ConsumerConfigurationDeliverPolicy.@new,
+                    DeliverPolicy = ConsumerConfigurationDeliverPolicy.last_per_subject,
                     DeliverSubject = inbox,
                     Description = "KV watch consumer",
-                    FilterSubject = $"$KV.{_bucket}.{key}",
+                    FilterSubject = $"{keyBase}{key}",
                     FlowControl = true,
                     IdleHeartbeat = TimeSpan.FromSeconds(5).ToNanos(),
                     InactiveThreshold = TimeSpan.FromSeconds(30).ToNanos(),
@@ -166,10 +167,23 @@ public class NatsKVStore
 
         while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            while (sub.Msgs.TryRead(out NatsMsg<T?> item))
+            while (sub.Msgs.TryRead(out var natsMsg))
             {
-                var msg = new NatsJSMsg<T?>(item, _context);
-                yield return new NatsKVEntry<T?>(_bucket, );
+                if (natsMsg.Subject != inbox)
+                {
+                    var msg = new NatsJSMsg<T?>(natsMsg, _context);
+                    var metadata = msg.Metadata!.Value;
+                    var keyReceived = msg.Subject.Substring(keyBase.Length);
+                    yield return new NatsKVEntry<T?>(_bucket, keyReceived)
+                    {
+                        Value = msg.Data,
+                        Revision = (long)metadata.Sequence.Stream,
+                    };
+                }
+                else
+                {
+                    // TODO: handle control messages
+                }
             }
         }
     }

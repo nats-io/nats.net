@@ -84,39 +84,24 @@ public class KeyValueStoreTest
         var store = await kv.CreateStoreAsync(bucket, cancellationToken: cancellationToken);
 
         await store.PutAsync("k1", "v1", cancellationToken: cancellationToken);
-        var entry = await store.GetEntryAsync<string>("k1", cancellationToken: cancellationToken);
 
-        _output.WriteLine($"Get: {entry.Value}");
-
-        var inbox = js.NewInbox();
-        await using var sub = await nats.SubscribeAsync<string>(inbox, cancellationToken: cancellationToken);
-
-        var consumer = await js.CreateConsumerAsync(
-            new ConsumerCreateRequest
+        var signal = new WaitSignal();
+        var watchTask = Task.Run(async () =>
+        {
+            await foreach (var entry in store.WatchAll<string>("*", cancellationToken))
             {
-                StreamName = $"KV_{bucket}",
-                Config = new ConsumerConfiguration
-                {
-                    AckPolicy = ConsumerConfigurationAckPolicy.none,
-                    DeliverPolicy = ConsumerConfigurationDeliverPolicy.@new,
-                    DeliverSubject = inbox,
-                    Description = "KV watch consumer",
-                    FilterSubject = $"$KV.{bucket}.*",
-                    FlowControl = true,
-                    IdleHeartbeat = TimeSpan.FromSeconds(5).ToNanos(),
-                    InactiveThreshold = TimeSpan.FromSeconds(30).ToNanos(),
-                    MaxDeliver = 1,
-                    MemStorage = true,
-                    NumReplicas = 1,
-                    ReplayPolicy = ConsumerConfigurationReplayPolicy.instant,
-                },
-            },
-            cancellationToken: cancellationToken);
+                signal.Pulse();
+                _output.WriteLine($"WATCH: {entry.Key} ({entry.Revision}): {entry.Value}");
+                if (entry.Value == "v3")
+                    break;
+            }
+        });
+
+        await signal;
 
         await store.PutAsync("k1", "v2", cancellationToken: cancellationToken);
+        await store.PutAsync("k1", "v3", cancellationToken: cancellationToken);
 
-        var msg = await sub.Msgs.ReadAsync(cancellationToken);
-        _output.WriteLine($"WATCH: {msg.Subject}: {msg.Data}");
-
+        await watchTask;
     }
 }
