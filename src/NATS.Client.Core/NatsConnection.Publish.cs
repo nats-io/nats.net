@@ -33,7 +33,7 @@ public partial class NatsConnection
         }
         else
         {
-            return PubModelPostAsync<T>(subject, data, serializer, replyTo, headers, cancellationToken);
+            return PubModelPostAsync<T>(subject, data, serializer, replyTo, headers, opts?.ErrorHandler, cancellationToken);
         }
     }
 
