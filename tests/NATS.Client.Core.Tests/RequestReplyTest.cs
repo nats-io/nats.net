@@ -15,16 +15,23 @@ public class RequestReplyTest
         await using var server = NatsServer.Start();
         await using var nats = server.CreateClientConnection();
 
-        var sub = await nats.SubscribeAsync<int>("foo");
+        const string subject = "foo";
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cancellationToken = cts.Token;
+
+        var sub = await nats.SubscribeAsync<int>(subject, cancellationToken: cancellationToken);
         var reg = sub.Register(async msg =>
         {
-            await msg.ReplyAsync(msg.Data * 2);
+            await msg.ReplyAsync(msg.Data * 2, cancellationToken: cancellationToken);
         });
+
+        var natsSubOpts = new NatsSubOpts { Timeout = TimeSpan.FromSeconds(10) };
 
         for (var i = 0; i < 10; i++)
         {
-            var rep = await nats.RequestAsync<int, int>("foo", i);
-            Assert.Equal(i * 2, rep?.Data);
+            var rep = await nats.RequestAsync<int, int>(subject, i, replyOpts: natsSubOpts, cancellationToken: cancellationToken) ?? throw new TimeoutException("Request timeout");
+
+            Assert.Equal(i * 2, rep.Data);
         }
 
         await sub.DisposeAsync();

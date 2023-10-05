@@ -119,7 +119,9 @@ public class NatsJSConsumer
             sub: sub,
             cancellationToken);
 
+        // Start consuming with the first Pull Request
         await sub.CallMsgNextAsync(
+            "init",
             new ConsumerGetnextRequest
             {
                 Batch = max.MaxMsgs,
@@ -129,7 +131,6 @@ public class NatsJSConsumer
             },
             cancellationToken);
 
-        sub.ResetPending();
         sub.ResetHeartbeatTimer();
 
         return sub;
