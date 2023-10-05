@@ -24,7 +24,20 @@ public interface INatsConnection
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous send operation.</returns>
     ValueTask PublishAsync<T>(string subject, T data, NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
 
-    ValueTask PublishAsync(string subject, NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Publishes an empty message payload to the given subject name, optionally supplying a reply subject.
+    /// </summary>
+    /// <param name="subject">The destination subject to publish to.</param>
+    /// <param name="headers">Optional message headers.</param>
+    /// <param name="replyTo">Optional reply-to subject.</param>
+    /// <param name="opts">A <see cref="NatsPubOpts"/> for publishing options.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
+    /// <returns>A <see cref="ValueTask"/> that represents the asynchronous send operation.</returns>
+    /// <remarks>
+    /// Publishing a sentinel usually means a signal to the given subject which could be used to trigger an action
+    /// or indicate an event for example and of messages.
+    /// </remarks>
+    ValueTask PublishSentinelAsync(string subject, NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Publishes a serializable message payload to the given subject name, optionally supplying a reply subject.

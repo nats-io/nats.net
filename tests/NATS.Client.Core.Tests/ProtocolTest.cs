@@ -134,11 +134,11 @@ public class ProtocolTest
         await Retry.Until(
             "subscription is active",
             () => Volatile.Read(ref sync) == 1,
-            async () => await nats.PublishAsync("foo.sync"),
+            async () => await nats.PublishSentinelAsync("foo.sync"),
             retryDelay: TimeSpan.FromSeconds(1));
 
         Log("PUB notifications");
-        await nats.PublishAsync("foo.signal1");
+        await nats.PublishSentinelAsync("foo.signal1");
         var msg1 = await signal1;
         Assert.Equal(0, msg1.Data);
         Assert.Null(msg1.Headers);
@@ -148,7 +148,7 @@ public class ProtocolTest
         Assert.Matches(@"^MSG foo.signal1 \w+ 0␍␊$", msgFrame1.Message);
 
         Log("HPUB notifications");
-        await nats.PublishAsync("foo.signal2", headers: new NatsHeaders());
+        await nats.PublishSentinelAsync("foo.signal2", headers: new NatsHeaders());
         var msg2 = await signal2;
         Assert.Equal(0, msg2.Data);
         Assert.NotNull(msg2.Headers);
