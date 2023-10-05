@@ -10,6 +10,7 @@ internal sealed class PublishCommand<T> : CommandBase<PublishCommand<T>>
     private NatsHeaders? _headers;
     private T? _value;
     private INatsSerializer? _serializer;
+    private Action<Exception>? _errorHandler;
     private CancellationToken _cancellationToken;
 
     private PublishCommand()
@@ -18,7 +19,7 @@ internal sealed class PublishCommand<T> : CommandBase<PublishCommand<T>>
 
     public override bool IsCanceled => _cancellationToken.IsCancellationRequested;
 
-    public static PublishCommand<T> Create(ObjectPool pool, string subject, string? replyTo, NatsHeaders? headers, T? value, INatsSerializer serializer, CancellationToken cancellationToken)
+    public static PublishCommand<T> Create(ObjectPool pool, string subject, string? replyTo, NatsHeaders? headers, T? value, INatsSerializer serializer, Action<Exception>? errorHandler, CancellationToken cancellationToken)
     {
         if (!TryRent(pool, out var result))
         {
@@ -30,6 +31,7 @@ internal sealed class PublishCommand<T> : CommandBase<PublishCommand<T>>
         result._headers = headers;
         result._value = value;
         result._serializer = serializer;
+        result._errorHandler = errorHandler;
         result._cancellationToken = cancellationToken;
 
         return result;
@@ -37,7 +39,32 @@ internal sealed class PublishCommand<T> : CommandBase<PublishCommand<T>>
 
     public override void Write(ProtocolWriter writer)
     {
-        writer.WritePublish(_subject!, _replyTo, _headers, _value, _serializer!);
+        try
+        {
+            writer.WritePublish(_subject!, _replyTo, _headers, _value, _serializer!);
+        }
+        catch (Exception e)
+        {
+            if (_errorHandler is { } errorHandler)
+            {
+                ThreadPool.UnsafeQueueUserWorkItem(
+                    state =>
+                    {
+                        try
+                        {
+                            state.handler(state.exception);
+                        }
+                        catch
+                        {
+                            // ignore
+                        }
+                    },
+                    (handler: errorHandler, exception: e),
+                    preferLocal: false);
+            }
+
+            throw;
+        }
     }
 
     protected override void Reset()
@@ -46,6 +73,7 @@ internal sealed class PublishCommand<T> : CommandBase<PublishCommand<T>>
         _headers = default;
         _value = default;
         _serializer = null;
+        _errorHandler = default;
         _cancellationToken = default;
     }
 }
