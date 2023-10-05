@@ -243,7 +243,7 @@ public class SubscriptionTest
         const string subject = "foo";
         const string payload = "test payload";
 
-        byte[] payloadBytes = Encoding.ASCII.GetBytes(payload);
+        var payloadBytes = Encoding.ASCII.GetBytes(payload);
         Memory<byte> payloadMemory = payloadBytes;
         ReadOnlyMemory<byte> payloadReadOnlyMemory = payloadMemory;
 
@@ -254,7 +254,6 @@ public class SubscriptionTest
         await nats.PublishAsync(subject, payloadBytes);
         await nats.PublishAsync(subject, payloadMemory);
         await nats.PublishAsync(subject, payloadReadOnlyMemory);
-
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;

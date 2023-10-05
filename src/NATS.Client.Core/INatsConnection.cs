@@ -23,7 +23,6 @@ public interface INatsConnection
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous send operation.</returns>
     ValueTask PublishAsync(string subject, ReadOnlySequence<byte> payload = default, NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
 
-
     /// <inheritdoc cref="PublishAsync(string,System.Buffers.ReadOnlySequence{byte},NATS.Client.Core.NatsHeaders?,string?,NATS.Client.Core.NatsPubOpts?,System.Threading.CancellationToken)"/>
     ValueTask PublishAsync(string subject, byte[] payload, NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
 
@@ -137,7 +136,7 @@ public interface INatsConnection
     /// which typically can be used in a <c>await foreach</c> loop.
     /// </para>
     /// </remarks>
-    IAsyncEnumerable<NatsMsg<T>> SubscribeAllAsync<T>(string subject, string? queueGroup = default, NatsSubOpts? opts = default, CancellationToken cancellationToken = default);
+    IAsyncEnumerable<NatsMsg<T?>> SubscribeAllAsync<T>(string subject, string? queueGroup = default, NatsSubOpts? opts = default, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Create a new inbox subject with the form {Inbox Prefix}.{Unique Connection ID}.{Unique Inbox ID}

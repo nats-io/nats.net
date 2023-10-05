@@ -36,7 +36,7 @@ public partial class NatsConnection
     }
 
     /// <inheritdoc />
-    public async IAsyncEnumerable<NatsMsg<T>> SubscribeAllAsync<T>(string subject, string? queueGroup = default, NatsSubOpts? opts = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<NatsMsg<T?>> SubscribeAllAsync<T>(string subject, string? queueGroup = default, NatsSubOpts? opts = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         await using var sub = await SubscribeAsync<T>(subject, queueGroup, opts, cancellationToken).ConfigureAwait(false);
         var reader = sub.Msgs;
