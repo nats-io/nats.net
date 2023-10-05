@@ -73,9 +73,8 @@ public class KeyValueStoreTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10_0000));
         var cancellationToken = cts.Token;
 
-        // await using var server = NatsServer.StartJS();
-        // await using var nats = server.CreateClientConnection();
-        await using var nats = new NatsConnection();
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
