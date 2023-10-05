@@ -151,7 +151,7 @@ public class NatsProxy : IDisposable
     {
         var subject = $"_SIGNAL_SYNC_{Interlocked.Increment(ref _syncCount)}";
 
-        await nats.PublishSentinelAsync(subject);
+        await nats.PublishAsync(subject);
 
         await Retry.Until(
             "flush sync frame",

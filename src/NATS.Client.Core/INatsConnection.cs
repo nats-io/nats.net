@@ -37,7 +37,7 @@ public interface INatsConnection
     /// Publishing a sentinel usually means a signal to the given subject which could be used to trigger an action
     /// or indicate an event for example and of messages.
     /// </remarks>
-    ValueTask PublishSentinelAsync(string subject, NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
+    ValueTask PublishAsync(string subject, NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Publishes a serializable message payload to the given subject name, optionally supplying a reply subject.

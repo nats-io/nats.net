@@ -95,7 +95,7 @@ public class Runner : ConsoleAppBase
         });
 
         await _connection.PingAsync();
-        await _connection.PublishSentinelAsync("foo");
+        await _connection.PublishAsync("foo");
     }
 }
 
