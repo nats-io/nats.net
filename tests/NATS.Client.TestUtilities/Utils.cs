@@ -72,32 +72,6 @@ public static class NatsMsgTestUtils
             }
         });
     }
-
-    public static Task Register(this INatsSub? sub, Action<NatsMsg> action)
-    {
-        if (sub == null)
-            return Task.CompletedTask;
-        return Task.Run(async () =>
-        {
-            await foreach (var natsMsg in sub.Msgs.ReadAllAsync())
-            {
-                action(natsMsg);
-            }
-        });
-    }
-
-    public static Task Register(this INatsSub? sub, Func<NatsMsg, Task> action)
-    {
-        if (sub == null)
-            return Task.CompletedTask;
-        return Task.Run(async () =>
-        {
-            await foreach (var natsMsg in sub.Msgs.ReadAllAsync())
-            {
-                await action(natsMsg);
-            }
-        });
-    }
 }
 
 public static class BinaryUtils

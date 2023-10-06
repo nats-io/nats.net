@@ -16,7 +16,7 @@ public class NatsSubTests
             async Task Isolator()
             {
                 // Subscription is not being disposed here
-                var natsSub = await nats.SubscribeAsync("foo");
+                var natsSub = await nats.SubscribeAsync<string>("foo");
                 Assert.That(natsSub.Subject, Is.EqualTo("foo"));
             }
 
@@ -26,7 +26,7 @@ public class NatsSubTests
 
             dotMemory.Check(memory =>
             {
-                var count = memory.GetObjects(where => where.Type.Is<NatsSub>()).ObjectsCount;
+                var count = memory.GetObjects(where => where.Type.Is<NatsSubUtils>()).ObjectsCount;
                 Assert.That(count, Is.EqualTo(0));
             });
         }

@@ -60,11 +60,11 @@ public class SerializerTest
 
 public class TestSerializer : INatsSerializer
 {
+    public INatsSerializer? Next => default;
+
     public int Serialize<T>(ICountableBufferWriter bufferWriter, T? value) => throw new TestSerializerException();
 
     public T? Deserialize<T>(in ReadOnlySequence<byte> buffer) => throw new TestSerializerException();
-
-    public object? Deserialize(in ReadOnlySequence<byte> buffer, Type type) => throw new TestSerializerException();
 }
 
 public class TestSerializerException : Exception
