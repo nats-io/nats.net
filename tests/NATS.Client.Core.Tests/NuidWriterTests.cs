@@ -333,7 +333,7 @@ public class NuidWriterTests
 
         Assert.True(didWrite, "didWrite");
 
-        var fInstance = typeof(NuidWriter).GetField("t_writer", BindingFlags.Static | BindingFlags.NonPublic);
+        var fInstance = typeof(NuidWriter).GetField("_writer", BindingFlags.Static | BindingFlags.NonPublic);
         var instance = fInstance!.GetValue(null);
 
         var fSequential = typeof(NuidWriter).GetField("_sequential", BindingFlags.Instance | BindingFlags.NonPublic);
