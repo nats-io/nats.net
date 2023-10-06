@@ -1,15 +1,13 @@
 ﻿using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.Reflection;
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.RegularExpressions;
 
 namespace NATS.Client.Core.Tests;
 
 public class NuidWriterTests
 {
-    private static readonly Regex _nuidRegex = new Regex("[A-z0-9]{22}");
+    private static readonly Regex NuidRegex = new("[A-z0-9]{22}");
 
     private readonly ITestOutputHelper _outputHelper;
 
@@ -25,7 +23,7 @@ public class NuidWriterTests
     [InlineData("long-inbox-prefix-above-stackalloc-limit-of-64")]
     public void NewInbox_NuidAppended(string? prefix)
     {
-        var natsOpts = NatsOpts.Default with { InboxPrefix = prefix };
+        var natsOpts = NatsOpts.Default with { InboxPrefix = prefix! };
         var sut = new NatsConnection(natsOpts);
 
         var inbox = sut.InboxPrefix;
@@ -62,7 +60,7 @@ public class NuidWriterTests
     public void GetNextNuid_BufferToShort_False_Char()
     {
         // Arrange
-        Span<char> nuid = stackalloc char[(int)NuidWriter.NUIDLENGTH - 1];
+        Span<char> nuid = stackalloc char[(int)NuidWriter.NuidLength - 1];
 
         // Act
         var result = NuidWriter.TryWriteNuid(nuid);
@@ -171,7 +169,7 @@ public class NuidWriterTests
             var buffer = new char[22];
             var didWrite = NuidWriter.TryWriteNuid(buffer);
 
-            var isMatch = _nuidRegex.IsMatch(new string(buffer));
+            var isMatch = NuidRegex.IsMatch(new string(buffer));
             Volatile.Write(ref completedSuccessfully, didWrite && isMatch);
         });
         t.Start();
@@ -184,6 +182,7 @@ public class NuidWriterTests
     public void DifferentThreads_DifferentPrefixes()
     {
         // Arrange
+        const int prefixLength = 12;
         ConcurrentQueue<(char[] nuid, int threadId)> nuids = new();
 
         // Act
@@ -203,9 +202,9 @@ public class NuidWriterTests
         var uniquePrefixes = new HashSet<string>();
         var uniqueThreadIds = new HashSet<int>();
 
-        foreach ((var nuid, var threadId) in nuids.ToList())
+        foreach (var (nuid, threadId) in nuids.ToList())
         {
-            var prefix = new string(nuid.AsSpan(0, NuidWriter.PrefixLength));
+            var prefix = new string(nuid.AsSpan(0, prefixLength));
             Assert.True(uniquePrefixes.Add(prefix), $"Unique prefix {prefix}");
             Assert.True(uniqueThreadIds.Add(threadId), $"Unique thread id {threadId}");
         }
@@ -265,7 +264,6 @@ public class NuidWriterTests
                             return;
                         }
 
-                        // _outputHelper.WriteLine(buffer.ToString());
                         var nuid = new string(buffer);
 
                         if (!nuids.Add(nuid))
@@ -309,7 +307,6 @@ public class NuidWriterTests
                     return;
                 }
 
-                // _outputHelper.WriteLine(buffer.ToString());
                 var nuid = new string(buffer);
 
                 if (!nuids.Add(nuid))
@@ -337,18 +334,17 @@ public class NuidWriterTests
         Assert.True(didWrite, "didWrite");
 
         var fInstance = typeof(NuidWriter).GetField("t_writer", BindingFlags.Static | BindingFlags.NonPublic);
-        var instance = fInstance.GetValue(null);
+        var instance = fInstance!.GetValue(null);
 
         var fSequential = typeof(NuidWriter).GetField("_sequential", BindingFlags.Instance | BindingFlags.NonPublic);
-        fSequential.SetValue(instance, sequential);
+        fSequential!.SetValue(instance, sequential);
 
         var fIncrement = typeof(NuidWriter).GetField("_increment", BindingFlags.Instance | BindingFlags.NonPublic);
-        fIncrement.SetValue(instance, increment);
+        fIncrement!.SetValue(instance, increment);
     }
 
     private sealed class DeterministicRng : RandomNumberGenerator
     {
-        public int GetBytesInvocations;
         private readonly Queue<byte[]> _bytes;
 
         public DeterministicRng(Queue<byte[]> bytes)
@@ -363,7 +359,6 @@ public class NuidWriterTests
                 throw new InvalidOperationException($"Lenght of {nameof(buffer)} is {buffer.Length}, length of {nameof(nextBytes)} is {nextBytes.Length}");
 
             Array.Copy(nextBytes, buffer, buffer.Length);
-            GetBytesInvocations++;
         }
     }
 }
