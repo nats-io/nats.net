@@ -31,8 +31,8 @@ public class NuidWriterTests
         var inbox = sut.InboxPrefix;
         var newInbox = sut.NewInbox();
 
-        Assert.Matches($"{prefix ?? ""}{(prefix?.Length > 0 ? "." : "")}[A-z0-9]{{22}}", inbox);
-        Assert.Matches($"{prefix ?? ""}{(prefix?.Length > 0 ? "." : "")}[A-z0-9]{{22}}.[A-z0-9]{{22}}", newInbox);
+        Assert.Matches($"{prefix ?? string.Empty}{(prefix?.Length > 0 ? "." : string.Empty)}[A-z0-9]{{22}}", inbox);
+        Assert.Matches($"{prefix ?? string.Empty}{(prefix?.Length > 0 ? "." : string.Empty)}[A-z0-9]{{22}}.[A-z0-9]{{22}}", newInbox);
         _outputHelper.WriteLine($"Prefix:   '{prefix}'");
         _outputHelper.WriteLine($"Inbox:    '{inbox}'");
         _outputHelper.WriteLine($"NewInbox: '{newInbox}'");
@@ -45,7 +45,7 @@ public class NuidWriterTests
         Span<char> buffer = stackalloc char[44];
 
         // Act
-        bool result = NuidWriter.TryWriteNuid(buffer);
+        var result = NuidWriter.TryWriteNuid(buffer);
 
         // Assert
         ReadOnlySpan<char> lower = buffer.Slice(0, 22);
@@ -62,10 +62,10 @@ public class NuidWriterTests
     public void GetNextNuid_BufferToShort_False_Char()
     {
         // Arrange
-        Span<char> nuid = stackalloc char[(int)NuidWriter.NUID_LENGTH - 1];
+        Span<char> nuid = stackalloc char[(int)NuidWriter.NUIDLENGTH - 1];
 
         // Act
-        bool result = NuidWriter.TryWriteNuid(nuid);
+        var result = NuidWriter.TryWriteNuid(nuid);
 
         // Assert
         Assert.False(result);
@@ -80,7 +80,7 @@ public class NuidWriterTests
         Span<char> secondNuid = stackalloc char[22];
 
         // Act
-        bool result = NuidWriter.TryWriteNuid(firstNuid);
+        var result = NuidWriter.TryWriteNuid(firstNuid);
         result &= NuidWriter.TryWriteNuid(secondNuid);
 
         // Assert
@@ -96,7 +96,7 @@ public class NuidWriterTests
         Span<char> secondNuid = stackalloc char[22];
 
         // Act
-        bool result = NuidWriter.TryWriteNuid(firstNuid);
+        var result = NuidWriter.TryWriteNuid(firstNuid);
         result &= NuidWriter.TryWriteNuid(secondNuid);
 
         // Assert
@@ -111,7 +111,7 @@ public class NuidWriterTests
         Span<char> nuid = stackalloc char[22];
 
         // Act
-        bool result = NuidWriter.TryWriteNuid(nuid);
+        var result = NuidWriter.TryWriteNuid(nuid);
 
         // Assert
         Assert.True(result);
@@ -122,14 +122,14 @@ public class NuidWriterTests
     [Fact]
     public void GetNextNuid_PrefixRenewed_Char()
     {
-        bool result = false;
-        char[] firstNuid = new char[22];
-        char[] secondNuid = new char[22];
+        var result = false;
+        var firstNuid = new char[22];
+        var secondNuid = new char[22];
 
-        Thread executionThread = new Thread(() =>
+        var executionThread = new Thread(() =>
         {
-            uint increment = 100U;
-            ulong maxSequential = 839299365868340224ul - increment - 1;
+            var increment = 100U;
+            var maxSequential = 839299365868340224ul - increment - 1;
             SetSequentialAndIncrement(maxSequential, increment);
 
             result = NuidWriter.TryWriteNuid(firstNuid);
@@ -138,7 +138,6 @@ public class NuidWriterTests
 
         executionThread.Start();
         executionThread.Join(1_000);
-
 
         // Assert
         Assert.True(result);
@@ -149,14 +148,14 @@ public class NuidWriterTests
     public void GetPrefix_PrefixAsExpected()
     {
         // Arrange
-        byte[] rngBytes = new byte[12] { 0, 1, 2, 3, 4, 5, 6, 7, 11, 253, 254, 255 };
+        var rngBytes = new byte[12] { 0, 1, 2, 3, 4, 5, 6, 7, 11, 253, 254, 255 };
         DeterministicRng rng = new(new Queue<byte[]>(new[] { rngBytes, rngBytes }));
 
-        MethodInfo mi = typeof(NuidWriter).GetMethod("GetPrefix", BindingFlags.Static | BindingFlags.NonPublic);
-        Func<RandomNumberGenerator, char[]> mGetPrefix = mi!.CreateDelegate<Func<RandomNumberGenerator, char[]>>();
+        var mi = typeof(NuidWriter).GetMethod("GetPrefix", BindingFlags.Static | BindingFlags.NonPublic);
+        var mGetPrefix = mi!.CreateDelegate<Func<RandomNumberGenerator, char[]>>();
 
         // Act
-        char[] prefix = mGetPrefix(rng);
+        var prefix = mGetPrefix(rng);
 
         // Assert
         Assert.Equal(12, prefix.Length);
@@ -166,13 +165,13 @@ public class NuidWriterTests
     [Fact]
     public void InitAndWrite_Char()
     {
-        bool completedSuccessfully = false;
+        var completedSuccessfully = false;
         Thread t = new(() =>
         {
-            char[] buffer = new char[22];
-            bool didWrite = NuidWriter.TryWriteNuid(buffer);
+            var buffer = new char[22];
+            var didWrite = NuidWriter.TryWriteNuid(buffer);
 
-            bool isMatch = _nuidRegex.IsMatch(new string(buffer));
+            var isMatch = _nuidRegex.IsMatch(new string(buffer));
             Volatile.Write(ref completedSuccessfully, didWrite && isMatch);
         });
         t.Start();
@@ -188,26 +187,25 @@ public class NuidWriterTests
         ConcurrentQueue<(char[] nuid, int threadId)> nuids = new();
 
         // Act
-        for (int i = 0; i < 10; i++)
+        for (var i = 0; i < 10; i++)
         {
             Thread t = new(() =>
             {
-                char[] buffer = new char[22];
+                var buffer = new char[22];
                 NuidWriter.TryWriteNuid(buffer);
                 nuids.Enqueue((buffer, Environment.CurrentManagedThreadId));
             });
             t.Start();
             t.Join(1_000);
-
         }
 
         // Assert
-        HashSet<string> uniquePrefixes = new HashSet<string>();
-        HashSet<int> uniqueThreadIds = new HashSet<int>();
+        var uniquePrefixes = new HashSet<string>();
+        var uniqueThreadIds = new HashSet<int>();
 
-        foreach ((char[] nuid, int threadId) in nuids.ToList())
+        foreach ((var nuid, var threadId) in nuids.ToList())
         {
-            string prefix = new string(nuid.AsSpan(0, NuidWriter.PrefixLength));
+            var prefix = new string(nuid.AsSpan(0, NuidWriter.PrefixLength));
             Assert.True(uniquePrefixes.Add(prefix), $"Unique prefix {prefix}");
             Assert.True(uniqueThreadIds.Add(threadId), $"Unique thread id {threadId}");
         }
@@ -221,13 +219,13 @@ public class NuidWriterTests
     public void AllNuidsAreUnique()
     {
         const int count = 1_000 * 1_000 * 10;
-        HashSet<string> nuids = new HashSet<string>(count);
+        var nuids = new HashSet<string>(count);
 
-        char[] buffer = new char[22];
+        var buffer = new char[22];
 
-        for (int i = 0; i < count; i++)
+        for (var i = 0; i < count; i++)
         {
-            bool didWrite = NuidWriter.TryWriteNuid(buffer);
+            var didWrite = NuidWriter.TryWriteNuid(buffer);
 
             if (!didWrite)
             {
@@ -247,9 +245,9 @@ public class NuidWriterTests
     [Trait("Category", "long-running")]
     public void AllNuidsAreUnique_SmallSequentials()
     {
-        bool writeFailed = false;
-        string duplicateFailure = "";
-        Thread executionThread = new Thread(() =>
+        var writeFailed = false;
+        var duplicateFailure = string.Empty;
+        var executionThread = new Thread(() =>
         {
             Span<char> buffer = new char[22];
             for (uint seq = 0; seq < 128; seq++)
@@ -259,7 +257,7 @@ public class NuidWriterTests
                     HashSet<string> nuids = new(2048);
                     SetSequentialAndIncrement(seq, incr);
 
-                    for (int i = 0; i < 2048; i++)
+                    for (var i = 0; i < 2048; i++)
                     {
                         if (!NuidWriter.TryWriteNuid(buffer))
                         {
@@ -267,9 +265,8 @@ public class NuidWriterTests
                             return;
                         }
 
-                        //_outputHelper.WriteLine(buffer.ToString());
-
-                        string nuid = new string(buffer);
+                        // _outputHelper.WriteLine(buffer.ToString());
+                        var nuid = new string(buffer);
 
                         if (!nuids.Add(nuid))
                         {
@@ -286,16 +283,16 @@ public class NuidWriterTests
         Interlocked.MemoryBarrier();
 
         Assert.False(writeFailed);
-        Assert.Equal("", duplicateFailure);
+        Assert.Equal(string.Empty, duplicateFailure);
     }
 
     [Fact]
     [Trait("Category", "long-running")]
     public void AllNuidsAreUnique_ZeroSequential()
     {
-        bool writeFailed = false;
-        string duplicateFailure = "";
-        Thread executionThread = new Thread(() =>
+        var writeFailed = false;
+        var duplicateFailure = string.Empty;
+        var executionThread = new Thread(() =>
         {
             uint seq = 0;
             uint incr = 33;
@@ -304,7 +301,7 @@ public class NuidWriterTests
             SetSequentialAndIncrement(seq, incr);
 
             Span<char> buffer = new char[22];
-            for (int i = 0; i < 100_000_000; i++)
+            for (var i = 0; i < 100_000_000; i++)
             {
                 if (!NuidWriter.TryWriteNuid(buffer))
                 {
@@ -312,9 +309,8 @@ public class NuidWriterTests
                     return;
                 }
 
-                //_outputHelper.WriteLine(buffer.ToString());
-
-                string nuid = new string(buffer);
+                // _outputHelper.WriteLine(buffer.ToString());
+                var nuid = new string(buffer);
 
                 if (!nuids.Add(nuid))
                 {
@@ -329,24 +325,24 @@ public class NuidWriterTests
         Interlocked.MemoryBarrier();
 
         Assert.False(writeFailed);
-        Assert.Equal("", duplicateFailure);
+        Assert.Equal(string.Empty, duplicateFailure);
     }
 
     // This messes with NuidWriter's internal state and must be used
     // on separate threads (distinct NuidWriter instances) only.
     private static void SetSequentialAndIncrement(ulong sequential, ulong increment)
     {
-        bool didWrite = NuidWriter.TryWriteNuid(new char[128]);
+        var didWrite = NuidWriter.TryWriteNuid(new char[128]);
 
         Assert.True(didWrite, "didWrite");
 
-        FieldInfo fInstance = typeof(NuidWriter).GetField("t_writer", BindingFlags.Static | BindingFlags.NonPublic);
-        object instance = fInstance.GetValue(null);
+        var fInstance = typeof(NuidWriter).GetField("t_writer", BindingFlags.Static | BindingFlags.NonPublic);
+        var instance = fInstance.GetValue(null);
 
-        FieldInfo fSequential = typeof(NuidWriter).GetField("_sequential", BindingFlags.Instance | BindingFlags.NonPublic);
+        var fSequential = typeof(NuidWriter).GetField("_sequential", BindingFlags.Instance | BindingFlags.NonPublic);
         fSequential.SetValue(instance, sequential);
 
-        FieldInfo fIncrement = typeof(NuidWriter).GetField("_increment", BindingFlags.Instance | BindingFlags.NonPublic);
+        var fIncrement = typeof(NuidWriter).GetField("_increment", BindingFlags.Instance | BindingFlags.NonPublic);
         fIncrement.SetValue(instance, increment);
     }
 
@@ -362,8 +358,8 @@ public class NuidWriterTests
 
         public override void GetBytes(byte[] buffer)
         {
-            byte[] nextBytes = _bytes.Dequeue();
-            if(nextBytes.Length < buffer.Length)
+            var nextBytes = _bytes.Dequeue();
+            if (nextBytes.Length < buffer.Length)
                 throw new InvalidOperationException($"Lenght of {nameof(buffer)} is {buffer.Length}, length of {nameof(nextBytes)} is {nextBytes.Length}");
 
             Array.Copy(nextBytes, buffer, buffer.Length);

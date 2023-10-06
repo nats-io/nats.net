@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -20,16 +20,16 @@ namespace MicroBenchmark;
 [SimpleJob(RuntimeMoniker.Net70, baseline: true)]
 public class NewInboxBenchmarks
 {
-    private char[] buf = new char[32];
+    private char[] _buf = new char[32];
 
-    private static readonly NatsOpts s_longPrefixOpt = NatsOpts.Default
+    private static readonly NatsOpts LongPrefixOpt = NatsOpts.Default
         with
-        {
-            InboxPrefix = "this-is-a-rather-long-prefix-that-we-use-here"
-        };
+    {
+        InboxPrefix = "this-is-a-rather-long-prefix-that-we-use-here",
+    };
 
     private static readonly NatsConnection _connectionDefaultPrefix = new();
-    private static readonly NatsConnection _connectionLongPrefix = new(s_longPrefixOpt);
+    private static readonly NatsConnection _connectionLongPrefix = new(LongPrefixOpt);
 
     [GlobalSetup]
     public void Setup()
@@ -41,7 +41,7 @@ public class NewInboxBenchmarks
     [SkipLocalsInit]
     public bool TryWriteNuid()
     {
-        return NuidWriter.TryWriteNuid(buf);
+        return NuidWriter.TryWriteNuid(_buf);
     }
 
     [Benchmark]

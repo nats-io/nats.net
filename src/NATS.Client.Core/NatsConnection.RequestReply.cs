@@ -17,24 +17,24 @@ public partial class NatsConnection
     private static string NewInbox(ReadOnlySpan<char> prefix)
     {
         Span<char> buffer = stackalloc char[64];
-        uint separatorLength = prefix.Length > 0 ? 1u : 0u;
-        uint totalLength = (uint)prefix.Length + (uint)NuidWriter.NUID_LENGTH + separatorLength;
+        var separatorLength = prefix.Length > 0 ? 1u : 0u;
+        var totalLength = (uint)prefix.Length + (uint)NuidWriter.NUIDLENGTH + separatorLength;
         if (totalLength <= buffer.Length)
         {
-             buffer = buffer.Slice(0, (int)totalLength);
+            buffer = buffer.Slice(0, (int)totalLength);
         }
         else
         {
             buffer = new char[totalLength];
         }
 
-        uint totalPrefixLength = (uint)prefix.Length + separatorLength;
+        var totalPrefixLength = (uint)prefix.Length + separatorLength;
         if ((uint)buffer.Length > totalPrefixLength && (uint)buffer.Length > (uint)prefix.Length)
         {
             prefix.CopyTo(buffer);
             buffer[prefix.Length] = '.';
-            Span<char> remaining = buffer.Slice((int)totalPrefixLength);
-            bool didWrite = NuidWriter.TryWriteNuid(remaining);
+            var remaining = buffer.Slice((int)totalPrefixLength);
+            var didWrite = NuidWriter.TryWriteNuid(remaining);
             Debug.Assert(didWrite, "didWrite");
             return new string(buffer);
         }
