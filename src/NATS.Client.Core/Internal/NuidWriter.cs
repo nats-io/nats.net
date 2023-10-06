@@ -42,7 +42,7 @@ internal sealed class NuidWriter
 
     private static bool TryWriteNuidCore(Span<char> buffer, Span<char> prefix, ulong sequential)
     {
-        if ((uint)buffer.Length < NuidLength || prefix.Length != PrefixLength || (uint)prefix.Length > (uint)buffer.Length)
+        if ((uint)buffer.Length < NuidLength || prefix.Length != PrefixLength)
         {
             return false;
         }
