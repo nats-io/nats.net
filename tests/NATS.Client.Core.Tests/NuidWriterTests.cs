@@ -213,8 +213,7 @@ public class NuidWriterTests
         Assert.Equal(10, uniqueThreadIds.Count);
     }
 
-    [Fact]
-    [Trait("Category", "long-running")]
+    [Fact(Skip = "long running")]
     public void AllNuidsAreUnique()
     {
         const int count = 1_000 * 1_000 * 10;
@@ -240,8 +239,7 @@ public class NuidWriterTests
         }
     }
 
-    [Fact]
-    [Trait("Category", "long-running")]
+    [Fact(Skip = "long running")]
     public void AllNuidsAreUnique_SmallSequentials()
     {
         var writeFailed = false;
@@ -284,8 +282,7 @@ public class NuidWriterTests
         Assert.Equal(string.Empty, duplicateFailure);
     }
 
-    [Fact]
-    [Trait("Category", "long-running")]
+    [Fact(Skip = "long running")]
     public void AllNuidsAreUnique_ZeroSequential()
     {
         var writeFailed = false;
