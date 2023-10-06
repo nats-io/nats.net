@@ -112,9 +112,9 @@ public class ProtocolTest
         var (nats, proxy) = server.CreateProxiedClientConnection();
 
         var sync = 0;
-        var signal1 = new WaitSignal<NatsMsg>();
-        var signal2 = new WaitSignal<NatsMsg>();
-        var sub = await nats.SubscribeAsync("foo.*");
+        var signal1 = new WaitSignal<NatsMsg<int>>();
+        var signal2 = new WaitSignal<NatsMsg<int>>();
+        var sub = await nats.SubscribeAsync<int>("foo.*");
         var reg = sub.Register(m =>
         {
             switch (m.Subject)
@@ -140,7 +140,7 @@ public class ProtocolTest
         Log("PUB notifications");
         await nats.PublishAsync("foo.signal1");
         var msg1 = await signal1;
-        Assert.Equal(0, msg1.Data.Length);
+        Assert.Equal(0, msg1.Data);
         Assert.Null(msg1.Headers);
         var pubFrame1 = proxy.Frames.First(f => f.Message.StartsWith("PUB foo.signal1"));
         Assert.Equal("PUB foo.signal1 0␍␊", pubFrame1.Message);
@@ -150,7 +150,7 @@ public class ProtocolTest
         Log("HPUB notifications");
         await nats.PublishAsync("foo.signal2", headers: new NatsHeaders());
         var msg2 = await signal2;
-        Assert.Equal(0, msg2.Data.Length);
+        Assert.Equal(0, msg2.Data);
         Assert.NotNull(msg2.Headers);
         Assert.Empty(msg2.Headers!);
         var pubFrame2 = proxy.Frames.First(f => f.Message.StartsWith("HPUB foo.signal2"));

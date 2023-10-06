@@ -105,10 +105,10 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
             Timeout.Infinite,
             Timeout.Infinite);
 
-        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg?>>(NatsSub.GetChannelOpts(opts?.ChannelOpts));
+        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg?>>(NatsSubUtils.GetChannelOpts(opts?.ChannelOpts));
         Msgs = _userMsgs.Reader;
 
-        _pullRequests = Channel.CreateBounded<PullRequest>(NatsSub.GetChannelOpts(opts?.ChannelOpts));
+        _pullRequests = Channel.CreateBounded<PullRequest>(NatsSubUtils.GetChannelOpts(opts?.ChannelOpts));
         _pullTask = Task.Run(PullLoop);
 
         ResetPending();
