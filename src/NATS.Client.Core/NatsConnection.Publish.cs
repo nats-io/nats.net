@@ -1,26 +1,18 @@
-using System.Buffers;
-
 namespace NATS.Client.Core;
 
 public partial class NatsConnection
 {
     /// <inheritdoc />
-    public ValueTask PublishAsync(string subject, ReadOnlySequence<byte> payload = default, NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
+    public ValueTask PublishAsync(string subject, NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         if (opts?.WaitUntilSent ?? false)
         {
-            return PubAsync(subject, replyTo, payload, headers, cancellationToken);
+            return PubAsync(subject, replyTo, payload: default, headers, cancellationToken);
         }
         else
         {
-            return PubPostAsync(subject, replyTo, payload, headers, cancellationToken);
+            return PubPostAsync(subject, replyTo, payload: default, headers, cancellationToken);
         }
-    }
-
-    /// <inheritdoc />
-    public ValueTask PublishAsync(in NatsMsg msg, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
-    {
-        return PublishAsync(msg.Subject, msg.Data, msg.Headers, msg.ReplyTo, opts, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -33,7 +25,7 @@ public partial class NatsConnection
         }
         else
         {
-            return PubModelPostAsync<T>(subject, data, serializer, replyTo, headers, cancellationToken);
+            return PubModelPostAsync<T>(subject, data, serializer, replyTo, headers, opts?.ErrorHandler, cancellationToken);
         }
     }
 

@@ -1,4 +1,3 @@
-using System.Text;
 using NATS.Client.Core;
 using NATS.Client.Hosting;
 
@@ -11,13 +10,13 @@ var app = builder.Build();
 
 app.MapGet("/subscribe", async (INatsConnection command) =>
 {
-    var subscription = await command.SubscribeAsync("foo");
+    var subscription = await command.SubscribeAsync<int>("foo");
 
     _ = Task.Run(async () =>
     {
         await foreach (var msg in subscription.Msgs.ReadAllAsync())
         {
-            Console.WriteLine($"Received {Encoding.UTF8.GetString(msg.Data.ToArray())}");
+            Console.WriteLine($"Received {msg.Data}");
         }
     });
 });

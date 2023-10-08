@@ -12,21 +12,26 @@ public class RequestReplyTest
     [Fact]
     public async Task Simple_request_reply_test()
     {
-        // Trace to hunt flapper!
-        await using var server = NatsServer.StartWithTrace(_output);
-
+        await using var server = NatsServer.Start();
         await using var nats = server.CreateClientConnection();
 
-        var sub = await nats.SubscribeAsync<int>("foo");
+        const string subject = "foo";
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cancellationToken = cts.Token;
+
+        var sub = await nats.SubscribeAsync<int>(subject, cancellationToken: cancellationToken);
         var reg = sub.Register(async msg =>
         {
-            await msg.ReplyAsync(msg.Data * 2);
+            await msg.ReplyAsync(msg.Data * 2, cancellationToken: cancellationToken);
         });
+
+        var natsSubOpts = new NatsSubOpts { Timeout = TimeSpan.FromSeconds(10) };
 
         for (var i = 0; i < 10; i++)
         {
-            var rep = await nats.RequestAsync<int, int>("foo", i);
-            Assert.Equal(i * 2, rep?.Data);
+            var rep = await nats.RequestAsync<int, int>(subject, i, replyOpts: natsSubOpts, cancellationToken: cancellationToken) ?? throw new TimeoutException("Request timeout");
+
+            Assert.Equal(i * 2, rep.Data);
         }
 
         await sub.DisposeAsync();
@@ -255,11 +260,6 @@ public class RequestReplyTest
     [Fact]
     public async Task Request_reply_binary_test()
     {
-        static ReadOnlySequence<byte> ToSeq(string input)
-        {
-            return new ReadOnlySequence<byte>(Encoding.ASCII.GetBytes(input));
-        }
-
         static string ToStr(ReadOnlyMemory<byte> input)
         {
             return Encoding.ASCII.GetString(input.Span);
@@ -269,22 +269,22 @@ public class RequestReplyTest
 
         await using var server = NatsServer.Start();
         await using var nats = server.CreateClientConnection();
-        await using var sub = await nats.SubscribeAsync("foo", cancellationToken: cts.Token);
+        await using var sub = await nats.SubscribeAsync<string>("foo", cancellationToken: cts.Token);
         var reg = sub.Register(async m =>
         {
-            if (ToStr(m.Data) == "1")
+            if (m.Data == "1")
             {
-                await m.ReplyAsync(payload: ToSeq("qw"), cancellationToken: cts.Token);
-                await m.ReplyAsync(payload: ToSeq("er"), cancellationToken: cts.Token);
-                await m.ReplyAsync(payload: ToSeq("ty"), cancellationToken: cts.Token);
-                await m.ReplyAsync(payload: default, cancellationToken: cts.Token); // sentinel
+                await m.ReplyAsync("qw", cancellationToken: cts.Token);
+                await m.ReplyAsync("er", cancellationToken: cts.Token);
+                await m.ReplyAsync("ty", cancellationToken: cts.Token);
+                await m.ReplyAsync(default(string), cancellationToken: cts.Token); // sentinel
             }
         });
 
         var writer = new ArrayBufferWriter<byte>();
-        await foreach (var msg in nats.RequestManyAsync("foo", ToSeq("1"), cancellationToken: cts.Token))
+        await foreach (var msg in nats.RequestManyAsync<string, string>("foo", "1", cancellationToken: cts.Token))
         {
-            writer.Write(msg.Data.Span);
+            writer.Write(Encoding.UTF8.GetBytes(msg.Data!));
         }
 
         var buffer = ToStr(writer.WrittenMemory);

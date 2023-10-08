@@ -1,32 +1,7 @@
-using System.Buffers;
-
 namespace NATS.Client.Core;
 
 public partial class NatsConnection
 {
-    internal async ValueTask<INatsSub> RequestSubAsync(
-        string subject,
-        ReadOnlySequence<byte> payload = default,
-        NatsHeaders? headers = default,
-        NatsPubOpts? requestOpts = default,
-        NatsSubOpts? replyOpts = default,
-        CancellationToken cancellationToken = default)
-    {
-        var replyTo = $"{InboxPrefix}{Guid.NewGuid():n}";
-        var sub = new NatsSub(this, SubscriptionManager.InboxSubBuilder, replyTo, queueGroup: default, replyOpts);
-        await SubAsync(replyTo, queueGroup: default, replyOpts, sub, cancellationToken).ConfigureAwait(false);
-        if (requestOpts?.WaitUntilSent == true)
-        {
-            await PubAsync(subject, replyTo, payload, headers, cancellationToken).ConfigureAwait(false);
-        }
-        else
-        {
-            await PubPostAsync(subject, replyTo, payload, headers, cancellationToken).ConfigureAwait(false);
-        }
-
-        return sub;
-    }
-
     internal async ValueTask<INatsSub<TReply>> RequestSubAsync<TRequest, TReply>(
         string subject,
         TRequest? data,
@@ -49,7 +24,7 @@ public partial class NatsConnection
         }
         else
         {
-            await PubModelPostAsync(subject, data, serializer, replyTo, headers, cancellationToken).ConfigureAwait(false);
+            await PubModelPostAsync(subject, data, serializer, replyTo, headers, requestOpts?.ErrorHandler, cancellationToken).ConfigureAwait(false);
         }
 
         return sub;

@@ -9,6 +9,8 @@ internal sealed class NatsJSErrorAwareJsonSerializer : INatsSerializer
 {
     public static readonly NatsJSErrorAwareJsonSerializer Default = new();
 
+    public INatsSerializer? Next => default;
+
     public int Serialize<T>(ICountableBufferWriter bufferWriter, T? value) =>
         throw new NotSupportedException();
 
@@ -27,9 +29,6 @@ internal sealed class NatsJSErrorAwareJsonSerializer : INatsSerializer
 
         return jsonDocument.Deserialize<T>();
     }
-
-    public object? Deserialize(in ReadOnlySequence<byte> buffer, Type type) =>
-        throw new NotSupportedException();
 }
 
 internal class NatsJSApiErrorException : Exception

@@ -57,7 +57,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase, INatsJSFetch<TMsg>
         _pendingMsgs = _maxMsgs;
         _pendingBytes = _maxBytes;
 
-        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg?>>(NatsSub.GetChannelOpts(opts?.ChannelOpts));
+        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg?>>(NatsSubUtils.GetChannelOpts(opts?.ChannelOpts));
         Msgs = _userMsgs.Reader;
 
         if (_debug)
@@ -151,6 +151,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase, INatsJSFetch<TMsg>
             headers: default,
             value: request,
             serializer: NatsJsonSerializer.Default,
+            errorHandler: default,
             cancellationToken: default);
     }
 
