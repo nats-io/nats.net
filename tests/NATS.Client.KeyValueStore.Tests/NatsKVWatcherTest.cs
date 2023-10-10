@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Buffers.Text;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Tests;
@@ -82,7 +82,7 @@ public class NatsKVWatcherTest
                     }
                     else
                     {
-                       Assert.Fail("Not a number (2)");
+                        Assert.Fail("Not a number (2)");
                     }
                 }
             }
@@ -234,7 +234,7 @@ public class NatsKVWatcherTest
                     }
                     else
                     {
-                       Assert.Fail("Not a number (2)");
+                        Assert.Fail("Not a number (2)");
                     }
                 }
             }

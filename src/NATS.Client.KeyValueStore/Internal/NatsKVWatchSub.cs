@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Threading.Channels;
 using NATS.Client.Core;
 using NATS.Client.JetStream;

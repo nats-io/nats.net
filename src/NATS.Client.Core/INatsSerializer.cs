@@ -88,8 +88,8 @@ public class NatsRawSerializer : INatsSerializer
         {
             if (buffer.Length == 0)
             {
-
             }
+
             return (T)(object)buffer.ToArray();
         }
 

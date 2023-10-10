@@ -1,4 +1,4 @@
-﻿using System.Threading.Channels;
+using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.Core.Internal;
@@ -39,7 +39,7 @@ internal class NatsKVWatcher<T> : INatsKVWatcher<T>
     private readonly NatsConnection _nats;
     private readonly Channel<NatsKVWatchCommandMsg<T>> _commandChannel;
     private readonly Channel<NatsKVEntry<T?>> _entryChannel;
-    private readonly Channel<(string origin, string consumer)> _consumerCreateChannel;
+    private readonly Channel<string> _consumerCreateChannel;
     private readonly Timer _timer;
     private readonly int _hbTimeout;
     private readonly long _idleHbNanos;
@@ -105,7 +105,7 @@ internal class NatsKVWatcher<T> : INatsKVWatcher<T>
         // A single request to create the consumer is enough because we don't want to create a new consumer
         // back to back in case the consumer is being recreated due to a timeout and a mismatch in consumer
         // sequence for example; creating the consumer once would solve both the issues.
-        _consumerCreateChannel = Channel.CreateBounded<(string origin, string consumer)>(new BoundedChannelOptions(1)
+        _consumerCreateChannel = Channel.CreateBounded<string>(new BoundedChannelOptions(1)
         {
             AllowSynchronousContinuations = false,
             FullMode = BoundedChannelFullMode.DropOldest,
@@ -133,7 +133,11 @@ internal class NatsKVWatcher<T> : INatsKVWatcher<T>
         await _commandTask;
     }
 
-    internal void Init() => CreateSub("init");
+    internal ValueTask InitAsync()
+    {
+        Consumer = NewNuid();
+        return CreatePushConsumer("init");
+    }
 
     private void OnDisconnected(object? sender, string e) => StopHeartbeatTimer();
 
@@ -279,79 +283,7 @@ internal class NatsKVWatcher<T> : INatsKVWatcher<T>
                 {
                     try
                     {
-                        if (_debug)
-                        {
-                            _logger.LogDebug(NatsKVLogEvents.NewConsumer, "Creating new consumer {Consumer} from {Origin}", Consumer, origin);
-                        }
-
-                        if (_sub != null)
-                        {
-                            if (_debug)
-                            {
-                                _logger.LogDebug(NatsKVLogEvents.DeleteOldDeliverySubject, "Deleting old delivery subject {Subject}", _sub.Subject);
-                            }
-
-                            await _sub.UnsubscribeAsync();
-                            await _sub.DisposeAsync();
-                        }
-
-                        _sub = new NatsKVWatchSub<T>(_context, _commandChannel, _subOpts, _cancellationToken);
-                        await _context.Connection.SubAsync(_sub, _cancellationToken).ConfigureAwait(false);
-
-                        if (_debug)
-                        {
-                            _logger.LogDebug(NatsKVLogEvents.NewDeliverySubject, "New delivery subject {Subject}", _sub.Subject);
-                        }
-
-                        Interlocked.Exchange(ref _sequenceConsumer, 0);
-
-                        var sequence = Volatile.Read(ref _sequenceStream);
-
-                        var config = new ConsumerConfiguration
-                        {
-                            Name = Consumer,
-                            DeliverPolicy = ConsumerConfigurationDeliverPolicy.all,
-                            AckPolicy = ConsumerConfigurationAckPolicy.none,
-                            DeliverSubject = _sub.Subject,
-                            FilterSubject = _filter,
-                            FlowControl = true,
-                            IdleHeartbeat = _idleHbNanos,
-                            AckWait = _ackWaitNanos,
-                            MaxDeliver = 1,
-                            MemStorage = true,
-                            NumReplicas = 1,
-                            ReplayPolicy = ConsumerConfigurationReplayPolicy.instant,
-                        };
-
-                        if (!_opts.IncludeHistory)
-                        {
-                            config.DeliverPolicy = ConsumerConfigurationDeliverPolicy.last_per_subject;
-                        }
-
-                        if (_opts.UpdatesOnly)
-                        {
-                            config.DeliverPolicy = ConsumerConfigurationDeliverPolicy.@new;
-                        }
-
-                        if (_opts.MetaOnly)
-                        {
-                            config.HeadersOnly = true;
-                        }
-
-                        if (sequence > 0)
-                        {
-                            config.DeliverPolicy = ConsumerConfigurationDeliverPolicy.by_start_sequence;
-                            config.OptStartSeq = sequence + 1;
-                        }
-
-                        await _context.CreateConsumerAsync(
-                            new ConsumerCreateRequest { StreamName = _stream, Config = config, },
-                            cancellationToken: _cancellationToken);
-
-                        if (_debug)
-                        {
-                            _logger.LogDebug(NatsKVLogEvents.NewConsumerCreated, "Created new consumer {Consumer} from {Origin}", Consumer, origin);
-                        }
+                        await CreatePushConsumer(origin);
                     }
                     catch (Exception e)
                     {
@@ -366,6 +298,83 @@ internal class NatsKVWatcher<T> : INatsKVWatcher<T>
         catch (Exception e)
         {
             _logger.LogError(e, "Unexpected consumer create loop error");
+        }
+    }
+
+    private async ValueTask CreatePushConsumer(string origin)
+    {
+        if (_debug)
+        {
+            _logger.LogDebug(NatsKVLogEvents.NewConsumer, "Creating new consumer {Consumer} from {Origin}", Consumer, origin);
+        }
+
+        if (_sub != null)
+        {
+            if (_debug)
+            {
+                _logger.LogDebug(NatsKVLogEvents.DeleteOldDeliverySubject, "Deleting old delivery subject {Subject}", _sub.Subject);
+            }
+
+            await _sub.UnsubscribeAsync();
+            await _sub.DisposeAsync();
+        }
+
+        _sub = new NatsKVWatchSub<T>(_context, _commandChannel, _subOpts, _cancellationToken);
+        await _context.Connection.SubAsync(_sub, _cancellationToken).ConfigureAwait(false);
+
+        if (_debug)
+        {
+            _logger.LogDebug(NatsKVLogEvents.NewDeliverySubject, "New delivery subject {Subject}", _sub.Subject);
+        }
+
+        Interlocked.Exchange(ref _sequenceConsumer, 0);
+
+        var sequence = Volatile.Read(ref _sequenceStream);
+
+        var config = new ConsumerConfiguration
+        {
+            Name = Consumer,
+            DeliverPolicy = ConsumerConfigurationDeliverPolicy.all,
+            AckPolicy = ConsumerConfigurationAckPolicy.none,
+            DeliverSubject = _sub.Subject,
+            FilterSubject = _filter,
+            FlowControl = true,
+            IdleHeartbeat = _idleHbNanos,
+            AckWait = _ackWaitNanos,
+            MaxDeliver = 1,
+            MemStorage = true,
+            NumReplicas = 1,
+            ReplayPolicy = ConsumerConfigurationReplayPolicy.instant,
+        };
+
+        if (!_opts.IncludeHistory)
+        {
+            config.DeliverPolicy = ConsumerConfigurationDeliverPolicy.last_per_subject;
+        }
+
+        if (_opts.UpdatesOnly)
+        {
+            config.DeliverPolicy = ConsumerConfigurationDeliverPolicy.@new;
+        }
+
+        if (_opts.MetaOnly)
+        {
+            config.HeadersOnly = true;
+        }
+
+        if (sequence > 0)
+        {
+            config.DeliverPolicy = ConsumerConfigurationDeliverPolicy.by_start_sequence;
+            config.OptStartSeq = sequence + 1;
+        }
+
+        await _context.CreateConsumerAsync(
+            new ConsumerCreateRequest { StreamName = _stream, Config = config, },
+            cancellationToken: _cancellationToken);
+
+        if (_debug)
+        {
+            _logger.LogDebug(NatsKVLogEvents.NewConsumerCreated, "Created new consumer {Consumer} from {Origin}", Consumer, origin);
         }
     }
 
@@ -387,6 +396,6 @@ internal class NatsKVWatcher<T> : INatsKVWatcher<T>
     private void CreateSub(string origin)
     {
         Consumer = NewNuid();
-        _consumerCreateChannel.Writer.TryWrite((origin, Consumer));
+        _consumerCreateChannel.Writer.TryWrite(origin);
     }
 }

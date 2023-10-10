@@ -148,7 +148,7 @@ public class NatsKVStore
             subOpts: default,
             cancellationToken);
 
-        watcher.Init();
+        await watcher.InitAsync();
 
         return watcher;
     }
