@@ -13,8 +13,6 @@ public record NatsKVWatchOpts
 
     public TimeSpan IdleHeartbeat { get; init; } = TimeSpan.FromSeconds(5);
 
-    public TimeSpan InactiveThreshold { get; init; } = TimeSpan.FromSeconds(30);
-
     public bool IgnoreDeletes { get; init; } = false;
 
     public bool IncludeHistory { get; init; } = false;

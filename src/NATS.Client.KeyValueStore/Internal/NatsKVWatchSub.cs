@@ -15,7 +15,6 @@ internal class NatsKVWatchSub<T> : NatsSubBase
     private readonly ChannelWriter<NatsKVWatchCommandMsg<T>> _commands;
 
     public NatsKVWatchSub(
-        string subject,
         NatsJSContext context,
         Channel<NatsKVWatchCommandMsg<T>> commandChannel,
         NatsSubOpts? opts,
@@ -23,7 +22,7 @@ internal class NatsKVWatchSub<T> : NatsSubBase
         : base(
             connection: context.Connection,
             manager: context.Connection.SubscriptionManager,
-            subject: subject,
+            subject: context.NewInbox(),
             queueGroup: default,
             opts)
     {
