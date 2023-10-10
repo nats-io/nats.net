@@ -24,7 +24,7 @@ public class NatsProxy : IDisposable
         _tcpListener.Start();
         _watch.Restart();
 
-        new Thread(() =>
+        Task.Run(() =>
         {
             var client = 0;
             while (true)
@@ -48,7 +48,7 @@ public class NatsProxy : IDisposable
                 var n = client++;
 
 #pragma warning disable CS4014
-                new Thread(() =>
+                Task.Run(() =>
                 {
                     var stream1 = tcpClient1.GetStream();
                     var sr1 = new StreamReader(stream1, Encoding.ASCII);
@@ -58,19 +58,19 @@ public class NatsProxy : IDisposable
                     var sr2 = new StreamReader(stream2, Encoding.ASCII);
                     var sw2 = new StreamWriter(stream2, Encoding.ASCII);
 
-                    new Thread(() =>
+                    Task.Run(() =>
                     {
                         while (NatsProtoDump(n, "C", sr1, sw2, ClientInterceptor))
                         {
                         }
-                    }) { IsBackground = true, Name = $"nats-proxy-writer-{n}" }.Start();
+                    });
 
                     while (NatsProtoDump(n, $"S", sr2, sw1, ServerInterceptor))
                     {
                     }
-                }) { IsBackground = true, Name = $"nats-proxy-reader-{n}" }.Start();
+                });
             }
-        }) { IsBackground = true, Name = "nats-proxy-srv" }.Start();
+        });
 
         var stopwatch = Stopwatch.StartNew();
         while (stopwatch.Elapsed < TimeSpan.FromSeconds(10))
