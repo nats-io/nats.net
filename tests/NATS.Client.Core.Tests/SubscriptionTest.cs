@@ -254,8 +254,6 @@ public class SubscriptionTest
 
             Assert.Empty(proxy.ClientFrames);
 
-            await nats.PingAsync();
-
             var subMsg2 = await Check("re-subscribed", proxy);
 
             Assert.Equal(subMsg1, subMsg2);
@@ -267,7 +265,11 @@ public class SubscriptionTest
 
         async Task<string> Check(string reason, NatsProxy natsProxy)
         {
-            await Retry.Until(reason, () => natsProxy.ClientFrames.Any(f => f.Message.StartsWith("SUB")));
+            await Retry.Until(
+                reason,
+                condition: () => natsProxy.ClientFrames.Any(f => f.Message.StartsWith("SUB")),
+                retryDelay: TimeSpan.FromSeconds(5),
+                timeout: TimeSpan.FromSeconds(90)); // reconnect might take a while
 
             var inboxSubMessage = natsProxy.ClientFrames.First(f => f.Message.StartsWith("SUB")).Message;
 
