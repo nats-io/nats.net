@@ -243,8 +243,11 @@ public class SubscriptionTest
         var (nats, proxy) = server.CreateProxiedClientConnection();
         try
         {
-            var subject = nats.NewInbox();
-            await using var sub = await nats.SubscribeAsync<int>(subject);
+            var subject1 = nats.NewInbox();
+            await using var sub1 = await nats.SubscribeAsync<int>(subject1);
+
+            var subject2 = nats.NewInbox();
+            await using var sub2 = await nats.SubscribeAsync<int>(subject2);
 
             await nats.PingAsync();
 
@@ -257,6 +260,17 @@ public class SubscriptionTest
             var subMsg2 = await Check("re-subscribed", proxy);
 
             Assert.Equal(subMsg1, subMsg2);
+
+            // Ensure mux inbox is working as expected
+            await nats.PublishAsync(subject1, 42);
+            var msg1 = await sub1.Msgs.ReadAsync();
+            Assert.Equal(42, msg1.Data);
+            Assert.False(sub1.Msgs.TryPeek(out _));
+
+            await nats.PublishAsync(subject2, 43);
+            var msg2 = await sub2.Msgs.ReadAsync();
+            Assert.Equal(43, msg2.Data);
+            Assert.False(sub2.Msgs.TryPeek(out _));
         }
         finally
         {
@@ -271,7 +285,8 @@ public class SubscriptionTest
                 retryDelay: TimeSpan.FromSeconds(5),
                 timeout: TimeSpan.FromSeconds(90)); // reconnect might take a while
 
-            var inboxSubMessage = natsProxy.ClientFrames.First(f => f.Message.StartsWith("SUB")).Message;
+            // check that we have only one SUB message for the mux inbox only (no other subscriptions)
+            var inboxSubMessage = natsProxy.ClientFrames.Single(f => f.Message.StartsWith("SUB")).Message;
 
             Assert.Matches(@"\ASUB _INBOX\.[A-Za-z0-9]{22}\.\* \S+\z", inboxSubMessage);
 
