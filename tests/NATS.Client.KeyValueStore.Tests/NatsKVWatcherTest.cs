@@ -141,7 +141,7 @@ public class NatsKVWatcherTest
     public async Task Watcher_timeout_reconnect()
     {
         const string bucket = "b1";
-        var timeout = TimeSpan.FromSeconds(30000);
+        var timeout = TimeSpan.FromSeconds(30);
 
         var cts = new CancellationTokenSource(timeout);
         var cancellationToken = cts.Token;

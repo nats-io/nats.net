@@ -51,6 +51,12 @@ public partial class NatsJSContext
         if (!string.IsNullOrWhiteSpace(request.Config.Name))
         {
             subject += $".{request.Config.Name}";
+            request.Config.Name = default!;
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Config.FilterSubject))
+        {
+            subject += $".{request.Config.FilterSubject}";
         }
 
         var response = await JSRequestResponseAsync<ConsumerCreateRequest, ConsumerInfo>(

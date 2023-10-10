@@ -2,6 +2,7 @@
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
+using NATS.Client.Core.Internal;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
@@ -189,15 +190,6 @@ internal class NatsKVWatcher<T> : INatsKVWatcher<T>
                         {
                             if (msg.Metadata is { } metadata)
                             {
-
-                                // Very first message: Consumer creation response might not arrive
-                                // before the first message so we rely on the message metadata for
-                                // the consumer name.
-                                if (Consumer == null)
-                                {
-                                    Consumer = metadata.Consumer;
-                                }
-
                                 if (!metadata.Consumer.Equals(Consumer))
                                 {
                                     // Ignore messages from other consumers
@@ -208,7 +200,7 @@ internal class NatsKVWatcher<T> : INatsKVWatcher<T>
 
                                 var sequence = Interlocked.Increment(ref _sequenceConsumer);
 
-                                if (sequence != (long) metadata.Sequence.Consumer)
+                                if (sequence != (long)metadata.Sequence.Consumer)
                                 {
                                     CreateSub("sequence-mismatch");
                                     _logger.LogWarning("Missed messages, recreating consumer");
@@ -224,7 +216,7 @@ internal class NatsKVWatcher<T> : INatsKVWatcher<T>
 
                                 await _entryChannel.Writer.WriteAsync(entry, _cancellationToken);
 
-                                Interlocked.Exchange(ref _sequenceStream, (long) metadata.Sequence.Stream);
+                                Interlocked.Exchange(ref _sequenceStream, (long)metadata.Sequence.Stream);
                             }
                             else
                             {
@@ -260,10 +252,14 @@ internal class NatsKVWatcher<T> : INatsKVWatcher<T>
             {
                 while (_consumerCreateChannel.Reader.TryRead(out var origin))
                 {
+                    Console.WriteLine($"CREATE {origin}");
                     if (_debug)
                     {
                         _logger.LogDebug(NatsKVLogEvents.NewConsumer, "Creating new consumer from {Origin}", origin);
                     }
+
+                    Consumer = NewNuid();
+                    var subject = $"{_context.Connection.Opts.InboxPrefix}.{NewNuid()}";
 
                     if (_sub != null)
                     {
@@ -272,17 +268,17 @@ internal class NatsKVWatcher<T> : INatsKVWatcher<T>
                         await _sub.DisposeAsync();
                     }
 
-                    _sub = new NatsKVWatchSub<T>(_context, _commandChannel, opts: default, _cancellationToken);
+                    _sub = new NatsKVWatchSub<T>(subject, _context, _commandChannel, opts: default, _cancellationToken);
                     await _context.Connection.SubAsync(_sub, _cancellationToken).ConfigureAwait(false);
                     Console.WriteLine($"SUB {_sub.Subject}");
 
-                    Consumer = null;
                     Interlocked.Exchange(ref _sequenceConsumer, 0);
 
                     var sequence = Volatile.Read(ref _sequenceStream);
 
                     var config = new ConsumerConfiguration
                     {
+                        Name = Consumer,
                         DeliverPolicy = ConsumerConfigurationDeliverPolicy.last_per_subject,
                         AckPolicy = ConsumerConfigurationAckPolicy.none,
                         DeliverSubject = _sub.Subject,
@@ -299,7 +295,7 @@ internal class NatsKVWatcher<T> : INatsKVWatcher<T>
                     if (sequence > 0)
                     {
                         config.DeliverPolicy = ConsumerConfigurationDeliverPolicy.by_start_sequence;
-                        config.OptStartSeq = sequence;
+                        config.OptStartSeq = sequence + 1;
                     }
 
                     Console.WriteLine("xxx new consumer...");
@@ -317,6 +313,17 @@ internal class NatsKVWatcher<T> : INatsKVWatcher<T>
             Console.WriteLine($"Consumer create loop error: {e}");
             _logger.LogError(e, "Consumer create loop error");
         }
+    }
+
+    private string NewNuid()
+    {
+        Span<char> buffer = stackalloc char[22];
+        if (NuidWriter.TryWriteNuid(buffer))
+        {
+            return new string(buffer);
+        }
+
+        throw new InvalidOperationException("Internal error: can't generate nuid");
     }
 
     private void ResetHeartbeatTimer()

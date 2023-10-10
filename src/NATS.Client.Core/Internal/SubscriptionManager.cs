@@ -181,7 +181,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
                 if (Interlocked.CompareExchange(ref _inboxSub, _inboxSubSentinel, _inboxSubSentinel) == _inboxSubSentinel)
                 {
                     var inboxSubject = $"{_inboxPrefix}.*";
-                    _inboxSub = InboxSubBuilder.Build(subject, opts, _connection, manager: this);
+                    _inboxSub = InboxSubBuilder.Build(inboxSubject, opts, _connection, manager: this);
                     await SubscribeInternalAsync(
                         inboxSubject,
                         queueGroup: default,
@@ -269,5 +269,8 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
         }
     }
 
-    private bool IsInboxSubject(string subject) => subject.StartsWith(_inboxPrefix, StringComparison.Ordinal);
+    private bool IsInboxSubject(string subject)
+    {
+        return subject.StartsWith(_inboxPrefix, StringComparison.Ordinal);
+    }
 }

@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace NATS.Client.Core.Tests;
 
 public class SubscriptionTest
@@ -232,5 +234,46 @@ public class SubscriptionTest
 
         Assert.Equal(0, count);
         Assert.Equal(NatsSubEndReason.None, ((NatsSubBase)sub).EndReason);
+    }
+
+    [Fact]
+    public async Task Mux_inbox_reconnect_test()
+    {
+        await using var server = NatsServer.Start();
+        var (nats, proxy) = server.CreateProxiedClientConnection();
+        try
+        {
+            var subject = nats.NewInbox();
+            await using var sub = await nats.SubscribeAsync<int>(subject);
+
+            await nats.PingAsync();
+
+            var subMsg1 = await Check("subscribed", proxy);
+
+            proxy.Reset();
+
+            Assert.Empty(proxy.ClientFrames);
+
+            await nats.PingAsync();
+
+            var subMsg2 = await Check("re-subscribed", proxy);
+
+            Assert.Equal(subMsg1, subMsg2);
+        }
+        finally
+        {
+            await nats.DisposeAsync();
+        }
+
+        async Task<string> Check(string reason, NatsProxy natsProxy)
+        {
+            await Retry.Until(reason, () => natsProxy.ClientFrames.Any(f => f.Message.StartsWith("SUB")));
+
+            var inboxSubMessage = natsProxy.ClientFrames.First(f => f.Message.StartsWith("SUB")).Message;
+
+            Assert.Matches(@"\ASUB _INBOX\.[A-Za-z0-9]{22}\.\* \S+\z", inboxSubMessage);
+
+            return inboxSubMessage;
+        }
     }
 }

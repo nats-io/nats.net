@@ -106,7 +106,7 @@ public partial class NatsJSContext
         throw new NatsJSException("No response received");
     }
 
-    internal string NewInbox() => Connection.NewInbox();
+    internal string NewInbox() => NatsConnection.NewInbox(Connection.Opts.InboxPrefix);
 
     internal async ValueTask<TResponse> JSRequestResponseAsync<TRequest, TResponse>(
         string subject,
