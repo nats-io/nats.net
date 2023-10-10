@@ -180,7 +180,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
             {
                 if (Interlocked.CompareExchange(ref _inboxSub, _inboxSubSentinel, _inboxSubSentinel) == _inboxSubSentinel)
                 {
-                    var inboxSubject = $"{_inboxPrefix}*";
+                    var inboxSubject = $"{_inboxPrefix}.*";
                     _inboxSub = InboxSubBuilder.Build(subject, opts, _connection, manager: this);
                     await SubscribeInternalAsync(
                         inboxSubject,

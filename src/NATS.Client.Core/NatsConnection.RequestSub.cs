@@ -10,7 +10,7 @@ public partial class NatsConnection
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default)
     {
-        var replyTo = $"{InboxPrefix}{Guid.NewGuid():n}";
+        var replyTo = NewInbox();
 
         var replySerializer = replyOpts?.Serializer ?? Opts.Serializer;
         var sub = new NatsSub<TReply>(this, SubscriptionManager.InboxSubBuilder, replyTo, queueGroup: default, replyOpts, replySerializer);
