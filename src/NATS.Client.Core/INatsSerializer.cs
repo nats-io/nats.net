@@ -1,5 +1,4 @@
 using System.Buffers;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -86,10 +85,6 @@ public class NatsRawSerializer : INatsSerializer
     {
         if (typeof(T) == typeof(byte[]))
         {
-            if (buffer.Length == 0)
-            {
-            }
-
             return (T)(object)buffer.ToArray();
         }
 
