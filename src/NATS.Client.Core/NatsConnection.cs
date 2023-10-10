@@ -68,7 +68,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         Counter = new ConnectionStatsCounter();
         _writerState = new WriterState(opts);
         _commandWriter = _writerState.CommandBuffer.Writer;
-        InboxPrefix = $"{opts.InboxPrefix}.{Guid.NewGuid():n}.";
+        InboxPrefix = NewInbox(opts.InboxPrefix);
         SubscriptionManager = new SubscriptionManager(this, InboxPrefix);
         _logger = opts.LoggerFactory.CreateLogger<NatsConnection>();
         _clientOpts = ClientOpts.Create(Opts);
