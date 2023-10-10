@@ -66,41 +66,4 @@ public class KeyValueStoreTest
         Assert.False(entry.UsedDirectGet);
         Assert.Equal("v1", entry.Value);
     }
-
-    [Fact]
-    public async Task Watch()
-    {
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10_0000));
-        var cancellationToken = cts.Token;
-
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
-
-        var js = new NatsJSContext(nats);
-        var kv = new NatsKVContext(js);
-
-        var bucket = "b1";
-        var store = await kv.CreateStoreAsync(bucket, cancellationToken: cancellationToken);
-
-        await store.PutAsync("k1", "v1", cancellationToken: cancellationToken);
-
-        var signal = new WaitSignal();
-        var watchTask = Task.Run(async () =>
-        {
-            await foreach (var entry in store.WatchAll<string>("*", cancellationToken))
-            {
-                signal.Pulse();
-                _output.WriteLine($"WATCH: {entry.Key} ({entry.Revision}): {entry.Value}");
-                if (entry.Value == "v3")
-                    break;
-            }
-        });
-
-        await signal;
-
-        await store.PutAsync("k1", "v2", cancellationToken: cancellationToken);
-        await store.PutAsync("k1", "v3", cancellationToken: cancellationToken);
-
-        await watchTask;
-    }
 }

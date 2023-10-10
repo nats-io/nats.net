@@ -47,20 +47,20 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
 
     internal InboxSubBuilder InboxSubBuilder { get; }
 
-    public async ValueTask SubscribeAsync(string subject, string? queueGroup, NatsSubOpts? opts, NatsSubBase sub, CancellationToken cancellationToken)
+    public async ValueTask SubscribeAsync(NatsSubBase sub, CancellationToken cancellationToken)
     {
-        if (IsInboxSubject(subject))
+        if (IsInboxSubject(sub.Subject))
         {
-            if (queueGroup != null)
+            if (sub.QueueGroup != null)
             {
                 throw new NatsException("Inbox subscriptions don't support queue groups");
             }
 
-            await SubscribeInboxAsync(subject, opts, sub, cancellationToken).ConfigureAwait(false);
+            await SubscribeInboxAsync(sub.Subject, sub.Opts, sub, cancellationToken).ConfigureAwait(false);
         }
         else
         {
-            await SubscribeInternalAsync(subject, queueGroup, opts, sub, cancellationToken).ConfigureAwait(false);
+            await SubscribeInternalAsync(sub.Subject, sub.QueueGroup, sub.Opts, sub, cancellationToken).ConfigureAwait(false);
         }
     }
 

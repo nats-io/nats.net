@@ -2,8 +2,8 @@ using System.Buffers;
 using System.Runtime.CompilerServices;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
-using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
+using NATS.Client.KeyValueStore.Internal;
 
 namespace NATS.Client.KeyValueStore;
 
@@ -136,55 +136,39 @@ public class NatsKVStore
         }
     }
 
-    public async IAsyncEnumerable<NatsKVEntry<T?>> WatchAll<T>(string key, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async ValueTask<INatsKVWatcher<T>> WatchAsync<T>(string key, NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default)
     {
-        var keyBase = $"$KV.{_bucket}.";
+        opts ??= NatsKVWatchOpts.Default;
 
-        var inbox = _context.NewInbox();
-        await using var sub = await _context.Connection.SubscribeAsync<T>(inbox, cancellationToken: cancellationToken);
+        var watcher = new NatsKVWatcher<T>(
+            context: _context,
+            bucket: _bucket,
+            key: key,
+            opts: opts,
+            subOpts: default,
+            cancellationToken);
 
-        await _context.CreateConsumerAsync(
-            new ConsumerCreateRequest
-            {
-                StreamName = $"KV_{_bucket}",
-                Config = new ConsumerConfiguration
-                {
-                    AckPolicy = ConsumerConfigurationAckPolicy.none,
-                    DeliverPolicy = ConsumerConfigurationDeliverPolicy.last_per_subject,
-                    DeliverSubject = inbox,
-                    Description = "KV watch consumer",
-                    FilterSubject = $"{keyBase}{key}",
-                    FlowControl = true,
-                    IdleHeartbeat = TimeSpan.FromSeconds(5).ToNanos(),
-                    InactiveThreshold = TimeSpan.FromSeconds(30).ToNanos(),
-                    MaxDeliver = 1,
-                    MemStorage = true,
-                    NumReplicas = 1,
-                    ReplayPolicy = ConsumerConfigurationReplayPolicy.instant,
-                },
-            },
-            cancellationToken: cancellationToken);
+        watcher.Init();
 
-        while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+        return watcher;
+    }
+
+    public ValueTask<INatsKVWatcher<T>> WatchAsync<T>(NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default) =>
+        WatchAsync<T>(">", opts, cancellationToken);
+
+    public async IAsyncEnumerable<NatsKVEntry<T?>> WatchAllAsync<T>(string key, NatsKVWatchOpts? opts = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        await using var watcher = await WatchAsync<T>(key, opts, cancellationToken);
+
+        while (await watcher.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            while (sub.Msgs.TryRead(out var natsMsg))
+            while (watcher.Msgs.TryRead(out var entry))
             {
-                if (natsMsg.Subject != inbox)
-                {
-                    var msg = new NatsJSMsg<T?>(natsMsg, _context);
-                    var metadata = msg.Metadata!.Value;
-                    var keyReceived = msg.Subject.Substring(keyBase.Length);
-                    yield return new NatsKVEntry<T?>(_bucket, keyReceived)
-                    {
-                        Value = msg.Data,
-                        Revision = (long)metadata.Sequence.Stream,
-                    };
-                }
-                else
-                {
-                    // TODO: handle control messages
-                }
+                yield return entry;
             }
         }
     }
+
+    public IAsyncEnumerable<NatsKVEntry<T?>> WatchAllAsync<T>(NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default) =>
+        WatchAllAsync<T>(">", opts, cancellationToken);
 }

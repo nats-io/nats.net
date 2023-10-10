@@ -58,6 +58,7 @@ public abstract class NatsSubBase
         Connection = connection;
         Subject = subject;
         QueueGroup = queueGroup;
+        Opts = opts;
 
         // Only allocate timers if necessary to reduce GC pressure
         if (_idleTimeout != default)
@@ -104,6 +105,8 @@ public abstract class NatsSubBase
     public int? PendingMsgs => _pendingMsgs == -1 ? null : Volatile.Read(ref _pendingMsgs);
 
     public NatsSubEndReason EndReason => (NatsSubEndReason)Volatile.Read(ref _endReasonRaw);
+
+    internal NatsSubOpts? Opts { get; private set; }
 
     protected NatsConnection Connection { get; }
 

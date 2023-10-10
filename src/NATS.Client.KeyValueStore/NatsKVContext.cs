@@ -1,5 +1,4 @@
 using System.Text.RegularExpressions;
-using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
@@ -136,9 +135,4 @@ public class NatsKVContext
     }
 
     private static string BucketToStream(string bucket) => $"KV_{bucket}";
-}
-
-public record NatsKVOpts
-{
-    public INatsSerializer? Serializer { get; init; }
 }
