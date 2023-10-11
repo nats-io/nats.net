@@ -13,9 +13,10 @@ public class NatsKVWatcherTest
     public NatsKVWatcherTest(ITestOutputHelper output) => _output = output;
 
     [Fact]
-    public async Task Watcher_reconnect()
+    public async Task Watcher_reconnect_with_history()
     {
         const string bucket = "b1";
+        var config = new NatsKVConfig(bucket) { History = 10 };
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
@@ -24,12 +25,12 @@ public class NatsKVWatcherTest
         await using var nats1 = server.CreateClientConnection();
         var js1 = new NatsJSContext(nats1);
         var kv1 = new NatsKVContext(js1);
-        var store1 = await kv1.CreateStoreAsync(bucket, cancellationToken: cancellationToken);
+        var store1 = await kv1.CreateStoreAsync(config, cancellationToken: cancellationToken);
 
         var (nats2, proxy) = server.CreateProxiedClientConnection();
         var js2 = new NatsJSContext(nats2);
         var kv2 = new NatsKVContext(js2);
-        var store2 = await kv2.CreateStoreAsync(bucket, cancellationToken: cancellationToken);
+        var store2 = await kv2.CreateStoreAsync(config, cancellationToken: cancellationToken);
         var watcher = await store2.WatchAsync<IMemoryOwner<byte>>("k1.*", cancellationToken: cancellationToken);
 
         await store1.PutAsync("k1.p1", 1, cancellationToken);
@@ -62,11 +63,17 @@ public class NatsKVWatcherTest
             }
         }
 
+        var signal = new WaitSignal();
+        nats2.ConnectionDisconnected += (_, _) => signal.Pulse();
+
+        proxy.Reset();
+
+        await signal;
+
+        // Check that default history config is deep enough
         await store1.PutAsync("k1.p1", 4, cancellationToken);
         await store1.PutAsync("k1.p1", 5, cancellationToken);
         await store1.PutAsync("k1.p1", 6, cancellationToken);
-
-        proxy.Reset();
 
         await foreach (var entry in watcher.Msgs.ReadAllAsync(cancellationToken))
         {
