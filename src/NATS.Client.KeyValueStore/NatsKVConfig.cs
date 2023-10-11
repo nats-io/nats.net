@@ -1,7 +1,14 @@
 namespace NATS.Client.KeyValueStore;
 
+/// <summary>
+/// Key Value Store configuration
+/// </summary>
 public record NatsKVConfig
 {
+    /// <summary>
+    /// Create a new configuration
+    /// </summary>
+    /// <param name="bucket">Name of the bucket</param>
     public NatsKVConfig(string bucket) => Bucket = bucket;
 
     /// <summary>
@@ -49,7 +56,7 @@ public record NatsKVConfig
     /// </summary>
     public NatsKVRepublish? Republish { get; init; }
 
-    // Bucket mirror configuration.
+    // TODO: Bucket mirror configuration.
     // pub mirror: Option<Source>,
     // Bucket sources configuration.
     // pub sources: Option<Vec<Source>>,
@@ -57,6 +64,9 @@ public record NatsKVConfig
     // pub mirror_direct: bool,
 }
 
+/// <summary>
+/// Key Value Store republish configuration
+/// </summary>
 public record NatsKVRepublish
 {
     /// <summary>

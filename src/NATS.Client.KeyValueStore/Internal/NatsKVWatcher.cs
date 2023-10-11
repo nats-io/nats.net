@@ -115,7 +115,7 @@ internal class NatsKVWatcher<T> : INatsKVWatcher<T>
         _commandTask = Task.Run(CommandLoop);
     }
 
-    public ChannelReader<NatsKVEntry<T?>> Msgs => _entryChannel.Reader;
+    public ChannelReader<NatsKVEntry<T?>> Entries => _entryChannel.Reader;
 
     internal string Consumer
     {

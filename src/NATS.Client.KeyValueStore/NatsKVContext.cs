@@ -5,12 +5,18 @@ using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.KeyValueStore;
 
+/// <summary>
+/// Key Value Store storage type
+/// </summary>
 public enum NatsKVStorageType
 {
     File = 0,
     Memory = 1,
 }
 
+/// <summary>
+/// Key Value Store context
+/// </summary>
 public class NatsKVContext
 {
     private static readonly Regex ValidBucketRegex = new(pattern: @"\A[a-zA-Z0-9_-]+\z", RegexOptions.Compiled);
@@ -19,15 +25,33 @@ public class NatsKVContext
     private readonly NatsJSContext _context;
     private readonly NatsKVOpts _opts;
 
+    /// <summary>
+    /// Create a new Key Value Store context
+    /// </summary>
+    /// <param name="context">JetStream context</param>
+    /// <param name="opts">Key Value Store context options</param>
     public NatsKVContext(NatsJSContext context, NatsKVOpts? opts = default)
     {
         _context = context;
         _opts = opts ?? new NatsKVOpts();
     }
 
+    /// <summary>
+    /// Create a new Key Value Store or get an existing one
+    /// </summary>
+    /// <param name="bucket">Name of the bucket</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>Key Value Store</returns>
     public ValueTask<NatsKVStore> CreateStoreAsync(string bucket, CancellationToken cancellationToken = default)
         => CreateStoreAsync(new NatsKVConfig(bucket), cancellationToken);
 
+    /// <summary>
+    /// Create a new Key Value Store or get an existing one
+    /// </summary>
+    /// <param name="config">Key Value Store configuration</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>Key Value Store</returns>
+    /// <exception cref="NatsKVException">There was an issue with configuration</exception>
     public async ValueTask<NatsKVStore> CreateStoreAsync(NatsKVConfig config, CancellationToken cancellationToken = default)
     {
         ValidateBucketName(config.Bucket);
@@ -97,6 +121,13 @@ public class NatsKVContext
         return new NatsKVStore(config.Bucket, _opts, _context, stream);
     }
 
+    /// <summary>
+    /// Get a Key Value Store
+    /// </summary>
+    /// <param name="bucket">Name of the bucjet</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>Key Value Store</returns>
+    /// <exception cref="NatsKVException">There was an issue with configuration</exception>
     public async ValueTask<NatsKVStore> GetStoreAsync(string bucket, CancellationToken cancellationToken = default)
     {
         ValidateBucketName(bucket);
@@ -112,6 +143,12 @@ public class NatsKVContext
         return new NatsKVStore(bucket, _opts, _context, stream);
     }
 
+    /// <summary>
+    /// Delete a Key Value Store
+    /// </summary>
+    /// <param name="bucket">Name of the bucket</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>True for success</returns>
     public ValueTask<bool> DeleteStoreAsync(string bucket, CancellationToken cancellationToken = default)
     {
         ValidateBucketName(bucket);

@@ -7,6 +7,9 @@ using NATS.Client.KeyValueStore.Internal;
 
 namespace NATS.Client.KeyValueStore;
 
+/// <summary>
+/// Key Value Store entry operation
+/// </summary>
 public enum NatsKVOperation
 {
     /// <summary>
@@ -25,6 +28,9 @@ public enum NatsKVOperation
     Purge,
 }
 
+/// <summary>
+/// Key Value Store
+/// </summary>
 public class NatsKVStore
 {
     private readonly string _bucket;
@@ -42,12 +48,28 @@ public class NatsKVStore
         _serializer = _opts.Serializer ?? _context.Connection.Opts.Serializer;
     }
 
+    /// <summary>
+    /// Put a value into the bucket using the key
+    /// </summary>
+    /// <param name="key">Key of the entry</param>
+    /// <param name="value">Value of the entry</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <typeparam name="T">Serialized value type</typeparam>
     public async ValueTask PutAsync<T>(string key, T value, CancellationToken cancellationToken = default)
     {
         var ack = await _context.PublishAsync($"$KV.{_bucket}.{key}", value, cancellationToken: cancellationToken);
         ack.EnsureSuccess();
     }
 
+    /// <summary>
+    /// Get an entry from the bucket using the key
+    /// </summary>
+    /// <param name="key">Key of the entry</param>
+    /// <param name="serializer">Optional serialized to override the default</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <typeparam name="T">Serialized value type</typeparam>
+    /// <returns>The entry</returns>
+    /// <exception cref="NatsKVException">There was an error with metadata</exception>
     public async ValueTask<NatsKVEntry<T?>> GetEntryAsync<T>(string key, INatsSerializer? serializer = default, CancellationToken cancellationToken = default)
     {
         if (_stream.Info.Config.AllowDirect)
@@ -136,6 +158,14 @@ public class NatsKVStore
         }
     }
 
+    /// <summary>
+    /// Start a watcher for specific keys
+    /// </summary>
+    /// <param name="key">Key to watch (subject-based wildcards may be used)</param>
+    /// <param name="opts">Watch options</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <typeparam name="T">Serialized value type</typeparam>
+    /// <returns>A watcher object</returns>
     public async ValueTask<INatsKVWatcher<T>> WatchAsync<T>(string key, NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default)
     {
         opts ??= NatsKVWatchOpts.Default;
@@ -153,22 +183,45 @@ public class NatsKVStore
         return watcher;
     }
 
+    /// <summary>
+    /// Start a watcher for all the keys in the bucket
+    /// </summary>
+    /// <param name="opts">Watch options</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <typeparam name="T">Serialized value type</typeparam>
+    /// <returns>A watcher object</returns>
     public ValueTask<INatsKVWatcher<T>> WatchAsync<T>(NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default) =>
         WatchAsync<T>(">", opts, cancellationToken);
 
+    /// <summary>
+    /// Start a watcher for specific keys
+    /// </summary>
+    /// <param name="key">Key to watch (subject-based wildcards may be used)</param>
+    /// <param name="opts">Watch options</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <typeparam name="T">Serialized value type</typeparam>
+    /// <returns>An asynchronous enumerable which can be used in <c>await foreach</c> loops</returns>
     public async IAsyncEnumerable<NatsKVEntry<T?>> WatchAllAsync<T>(string key, NatsKVWatchOpts? opts = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         await using var watcher = await WatchAsync<T>(key, opts, cancellationToken);
 
-        while (await watcher.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+        while (await watcher.Entries.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            while (watcher.Msgs.TryRead(out var entry))
+            while (watcher.Entries.TryRead(out var entry))
             {
                 yield return entry;
             }
         }
     }
 
+    /// <summary>
+    /// Start a watcher for all the keys in the bucket
+    /// </summary>
+    /// <param name="key">Key to watch (subject-based wildcards may be used)</param>
+    /// <param name="opts">Watch options</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <typeparam name="T">Serialized value type</typeparam>
+    /// <returns>An asynchronous enumerable which can be used in <c>await foreach</c> loops</returns>
     public IAsyncEnumerable<NatsKVEntry<T?>> WatchAllAsync<T>(NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default) =>
         WatchAllAsync<T>(">", opts, cancellationToken);
 }

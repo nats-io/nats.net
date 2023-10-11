@@ -39,7 +39,7 @@ public class NatsKVWatcherTest
 
         var count = 0;
 
-        await foreach (var entry in watcher.Msgs.ReadAllAsync(cancellationToken))
+        await foreach (var entry in watcher.Entries.ReadAllAsync(cancellationToken))
         {
             if (entry.Value is { } memoryOwner)
             {
@@ -75,7 +75,7 @@ public class NatsKVWatcherTest
         await store1.PutAsync("k1.p1", 5, cancellationToken);
         await store1.PutAsync("k1.p1", 6, cancellationToken);
 
-        await foreach (var entry in watcher.Msgs.ReadAllAsync(cancellationToken))
+        await foreach (var entry in watcher.Entries.ReadAllAsync(cancellationToken))
         {
             if (entry.Value is { } memoryOwner)
             {
@@ -170,7 +170,7 @@ public class NatsKVWatcherTest
 
         await store1.PutAsync("k1.p1", 1, cancellationToken);
 
-        var e1 = await watcher.Msgs.ReadAsync(cancellationToken);
+        var e1 = await watcher.Entries.ReadAsync(cancellationToken);
         Assert.Equal(1, e1.Revision);
         var count = 1;
 
@@ -179,7 +179,7 @@ public class NatsKVWatcherTest
 
         var consumer1 = ((NatsKVWatcher<IMemoryOwner<byte>>)watcher).Consumer;
 
-        await foreach (var entry in watcher.Msgs.ReadAllAsync(cancellationToken))
+        await foreach (var entry in watcher.Entries.ReadAllAsync(cancellationToken))
         {
             if (entry.Value is { } memoryOwner)
             {
@@ -227,7 +227,7 @@ public class NatsKVWatcherTest
             retryDelay: TimeSpan.FromSeconds(1),
             timeout: timeout);
 
-        await foreach (var entry in watcher.Msgs.ReadAllAsync(cancellationToken))
+        await foreach (var entry in watcher.Entries.ReadAllAsync(cancellationToken))
         {
             if (entry.Value is { } memoryOwner)
             {

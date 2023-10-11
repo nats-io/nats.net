@@ -1,5 +1,11 @@
 namespace NATS.Client.KeyValueStore;
 
+/// <summary>
+/// Key Value Store entry
+/// </summary>
+/// <param name="Bucket">Name of the bucket</param>
+/// <param name="Key">Name of the key</param>
+/// <typeparam name="T">Serialized value type</typeparam>
 public readonly record struct NatsKVEntry<T>(string Bucket, string Key)
 {
     /// <summary>
