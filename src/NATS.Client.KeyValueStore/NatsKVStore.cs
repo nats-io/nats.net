@@ -217,7 +217,6 @@ public class NatsKVStore
     /// <summary>
     /// Start a watcher for all the keys in the bucket
     /// </summary>
-    /// <param name="key">Key to watch (subject-based wildcards may be used)</param>
     /// <param name="opts">Watch options</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <typeparam name="T">Serialized value type</typeparam>
