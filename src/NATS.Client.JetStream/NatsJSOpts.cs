@@ -155,6 +155,11 @@ public record NatsJSFetchOpts
     public TimeSpan? IdleHeartbeat { get; init; }
 
     /// <summary>
+    /// Does not wait for messages to be available
+    /// </summary>
+    public bool NoWait { get; init; }
+
+    /// <summary>
     /// Serializer to use to deserialize the message if a model is being used.
     /// </summary>
     /// <remarks>

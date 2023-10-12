@@ -266,13 +266,18 @@ public class NatsJSConsumer
             cancellationToken);
 
         await sub.CallMsgNextAsync(
-            new ConsumerGetnextRequest
-            {
-                Batch = max.MaxMsgs,
-                MaxBytes = max.MaxBytes,
-                IdleHeartbeat = timeouts.IdleHeartbeat.ToNanos(),
-                Expires = timeouts.Expires.ToNanos(),
-            },
+            opts.NoWait
+
+                // When no wait is set we don't need to send the idle heartbeat and expiration, because if no message is available nats doesn't send 404 instantly
+                ? new ConsumerGetnextRequest { Batch = max.MaxMsgs, MaxBytes = max.MaxBytes, NoWait = opts.NoWait }
+                : new ConsumerGetnextRequest
+                {
+                    Batch = max.MaxMsgs,
+                    MaxBytes = max.MaxBytes,
+                    IdleHeartbeat = timeouts.IdleHeartbeat.ToNanos(),
+                    Expires = timeouts.Expires.ToNanos(),
+                    NoWait = opts.NoWait,
+                },
             cancellationToken);
 
         sub.ResetHeartbeatTimer();

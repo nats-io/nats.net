@@ -1,4 +1,5 @@
 using System.Threading.Channels;
+using NATS.Client.Core;
 
 namespace NATS.Client.JetStream;
 
@@ -7,6 +8,11 @@ namespace NATS.Client.JetStream;
 /// </summary>
 public interface INatsJSFetch : IAsyncDisposable
 {
+    /// <summary>
+    /// The reason why the fetch has ended
+    /// </summary>
+    NatsSubEndReason EndReason { get; }
+
     void Stop();
 }
 
