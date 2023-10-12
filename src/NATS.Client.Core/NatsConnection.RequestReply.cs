@@ -65,7 +65,7 @@ public partial class NatsConnection
     }
 
     [SkipLocalsInit]
-    private static string NewInbox(ReadOnlySpan<char> prefix)
+    internal static string NewInbox(ReadOnlySpan<char> prefix)
     {
         Span<char> buffer = stackalloc char[64];
         var separatorLength = prefix.Length > 0 ? 1u : 0u;

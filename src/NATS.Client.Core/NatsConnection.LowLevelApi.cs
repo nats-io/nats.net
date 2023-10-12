@@ -99,17 +99,17 @@ public partial class NatsConnection
         }
     }
 
-    internal ValueTask SubAsync(string subject, string? queueGroup, NatsSubOpts? opts, NatsSubBase sub, CancellationToken cancellationToken = default)
+    internal ValueTask SubAsync(NatsSubBase sub, CancellationToken cancellationToken = default)
     {
         if (ConnectionState == NatsConnectionState.Open)
         {
-            return SubscriptionManager.SubscribeAsync(subject, queueGroup, opts, sub, cancellationToken);
+            return SubscriptionManager.SubscribeAsync(sub, cancellationToken);
         }
         else
         {
-            return WithConnectAsync(subject, queueGroup, opts, sub, cancellationToken, static (self, s, q, o, b, token) =>
+            return WithConnectAsync(sub, cancellationToken, static (self, s, token) =>
             {
-                return self.SubscriptionManager.SubscribeAsync(s, q, o, b, token);
+                return self.SubscriptionManager.SubscribeAsync(s, token);
             });
         }
     }

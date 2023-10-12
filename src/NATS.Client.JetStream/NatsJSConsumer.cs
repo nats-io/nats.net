@@ -112,12 +112,7 @@ public class NatsJSConsumer
             expires: timeouts.Expires,
             idle: timeouts.IdleHeartbeat);
 
-        await _context.Connection.SubAsync(
-            subject: inbox,
-            queueGroup: default,
-            opts: requestOpts,
-            sub: sub,
-            cancellationToken);
+        await _context.Connection.SubAsync(sub: sub, cancellationToken);
 
         // Start consuming with the first Pull Request
         await sub.CallMsgNextAsync(
@@ -258,12 +253,7 @@ public class NatsJSConsumer
             expires: timeouts.Expires,
             idle: timeouts.IdleHeartbeat);
 
-        await _context.Connection.SubAsync(
-            subject: inbox,
-            queueGroup: default,
-            opts: requestOpts,
-            sub: sub,
-            cancellationToken);
+        await _context.Connection.SubAsync(sub: sub, cancellationToken);
 
         await sub.CallMsgNextAsync(
             new ConsumerGetnextRequest

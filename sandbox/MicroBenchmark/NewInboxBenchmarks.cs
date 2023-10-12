@@ -15,9 +15,9 @@ public class NewInboxBenchmarks
 {
     private static readonly NatsOpts LongPrefixOpt = NatsOpts.Default
         with
-        {
-            InboxPrefix = "this-is-a-rather-long-prefix-that-we-use-here",
-        };
+    {
+        InboxPrefix = "this-is-a-rather-long-prefix-that-we-use-here",
+    };
 
     private static readonly NatsConnection ConnectionDefaultPrefix = new();
     private static readonly NatsConnection ConnectionLongPrefix = new(LongPrefixOpt);

@@ -29,17 +29,20 @@ await using var nats2 = server.CreateClientConnection();
 await nats1.PingAsync();
 await nats2.PingAsync();
 
-await using var sub = await nats1.SubscribeAsync<byte[]>(t.Subject);
+await using var sub = await nats1.SubscribeAsync<IMemoryOwner<byte>>(t.Subject);
 
 var stopwatch = Stopwatch.StartNew();
 
 var subReader = Task.Run(async () =>
 {
     var count = 0;
-    await foreach (var unused in sub.Msgs.ReadAllAsync())
+    await foreach (var msg in sub.Msgs.ReadAllAsync())
     {
-        if (++count == t.Msgs)
-            break;
+        using (msg.Data)
+        {
+            if (++count == t.Msgs)
+                break;
+        }
     }
 });
 

@@ -1,3 +1,4 @@
+using NATS.Client.Core;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
@@ -137,6 +138,32 @@ public class NatsJSStream
             subject: $"{_context.Opts.Prefix}.STREAM.INFO.{_name}",
             request: null,
             cancellationToken).ConfigureAwait(false);
+
+    public ValueTask<NatsMsg<T?>?> GetDirectAsync<T>(string subject, INatsSerializer? serializer = default, CancellationToken cancellationToken = default)
+    {
+        NatsSubOpts? subOpts;
+        if (serializer != null)
+        {
+            subOpts = new NatsSubOpts { Serializer = serializer };
+        }
+        else
+        {
+            subOpts = default;
+        }
+
+        return _context.Connection.RequestAsync<object, T>(
+            subject: $"{_context.Opts.Prefix}.DIRECT.GET.{_name}.{subject}",
+            data: default,
+            requestOpts: default,
+            replyOpts: subOpts,
+            cancellationToken: cancellationToken);
+    }
+
+    public ValueTask<StreamMsgGetResponse> GetAsync(StreamMsgGetRequest request, CancellationToken cancellationToken = default) =>
+        _context.JSRequestResponseAsync<StreamMsgGetRequest, StreamMsgGetResponse>(
+            subject: $"{_context.Opts.Prefix}.STREAM.MSG.GET.{_name}",
+            request: request,
+            cancellationToken);
 
     private void ThrowIfDeleted()
     {

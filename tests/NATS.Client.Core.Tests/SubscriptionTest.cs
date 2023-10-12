@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace NATS.Client.Core.Tests;
 
 public class SubscriptionTest
@@ -232,5 +234,63 @@ public class SubscriptionTest
 
         Assert.Equal(0, count);
         Assert.Equal(NatsSubEndReason.None, ((NatsSubBase)sub).EndReason);
+    }
+
+    [Fact]
+    public async Task Mux_inbox_reconnect_test()
+    {
+        await using var server = NatsServer.Start();
+        var (nats, proxy) = server.CreateProxiedClientConnection();
+        try
+        {
+            var subject1 = nats.NewInbox();
+            await using var sub1 = await nats.SubscribeAsync<int>(subject1);
+
+            var subject2 = nats.NewInbox();
+            await using var sub2 = await nats.SubscribeAsync<int>(subject2);
+
+            await nats.PingAsync();
+
+            var subMsg1 = await Check("subscribed", proxy);
+
+            proxy.Reset();
+
+            Assert.Empty(proxy.ClientFrames);
+
+            var subMsg2 = await Check("re-subscribed", proxy);
+
+            Assert.Equal(subMsg1, subMsg2);
+
+            // Ensure mux inbox is working as expected
+            await nats.PublishAsync(subject1, 42);
+            var msg1 = await sub1.Msgs.ReadAsync();
+            Assert.Equal(42, msg1.Data);
+            Assert.False(sub1.Msgs.TryPeek(out _));
+
+            await nats.PublishAsync(subject2, 43);
+            var msg2 = await sub2.Msgs.ReadAsync();
+            Assert.Equal(43, msg2.Data);
+            Assert.False(sub2.Msgs.TryPeek(out _));
+        }
+        finally
+        {
+            await nats.DisposeAsync();
+        }
+
+        async Task<string> Check(string reason, NatsProxy natsProxy)
+        {
+            await Retry.Until(
+                reason,
+                condition: () => natsProxy.ClientFrames.Any(f => f.Message.StartsWith("SUB")),
+                retryDelay: TimeSpan.FromSeconds(5),
+                timeout: TimeSpan.FromSeconds(90)); // reconnect might take a while
+
+            // check that we have only one SUB message for the mux inbox only (no other subscriptions)
+            var inboxSubMessage = natsProxy.ClientFrames.Single(f => f.Message.StartsWith("SUB")).Message;
+
+            Assert.Matches(@"\ASUB _INBOX\.[A-Za-z0-9]{22}\.\* \S+\z", inboxSubMessage);
+
+            return inboxSubMessage;
+        }
     }
 }

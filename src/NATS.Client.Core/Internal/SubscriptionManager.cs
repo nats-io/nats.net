@@ -47,20 +47,20 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
 
     internal InboxSubBuilder InboxSubBuilder { get; }
 
-    public async ValueTask SubscribeAsync(string subject, string? queueGroup, NatsSubOpts? opts, NatsSubBase sub, CancellationToken cancellationToken)
+    public async ValueTask SubscribeAsync(NatsSubBase sub, CancellationToken cancellationToken)
     {
-        if (IsInboxSubject(subject))
+        if (IsInboxSubject(sub.Subject))
         {
-            if (queueGroup != null)
+            if (sub.QueueGroup != null)
             {
                 throw new NatsException("Inbox subscriptions don't support queue groups");
             }
 
-            await SubscribeInboxAsync(subject, opts, sub, cancellationToken).ConfigureAwait(false);
+            await SubscribeInboxAsync(sub.Subject, sub.Opts, sub, cancellationToken).ConfigureAwait(false);
         }
         else
         {
-            await SubscribeInternalAsync(subject, queueGroup, opts, sub, cancellationToken).ConfigureAwait(false);
+            await SubscribeInternalAsync(sub.Subject, sub.QueueGroup, sub.Opts, sub, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -181,7 +181,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
                 if (Interlocked.CompareExchange(ref _inboxSub, _inboxSubSentinel, _inboxSubSentinel) == _inboxSubSentinel)
                 {
                     var inboxSubject = $"{_inboxPrefix}.*";
-                    _inboxSub = InboxSubBuilder.Build(subject, opts, _connection, manager: this);
+                    _inboxSub = InboxSubBuilder.Build(inboxSubject, opts, _connection, manager: this);
                     await SubscribeInternalAsync(
                         inboxSubject,
                         queueGroup: default,
@@ -269,5 +269,8 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
         }
     }
 
-    private bool IsInboxSubject(string subject) => subject.StartsWith(_inboxPrefix, StringComparison.Ordinal);
+    private bool IsInboxSubject(string subject)
+    {
+        return subject.StartsWith(_inboxPrefix, StringComparison.Ordinal);
+    }
 }

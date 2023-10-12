@@ -1,5 +1,4 @@
 using System.Buffers;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -102,6 +101,13 @@ public class NatsRawSerializer : INatsSerializer
         if (typeof(T) == typeof(ReadOnlySequence<byte>))
         {
             return (T)(object)new ReadOnlySequence<byte>(buffer.ToArray());
+        }
+
+        if (typeof(T) == typeof(IMemoryOwner<byte>))
+        {
+            var memoryOwner = MemoryPool<byte>.Shared.Rent((int)buffer.Length);
+            buffer.CopyTo(memoryOwner.Memory.Span);
+            return (T)memoryOwner;
         }
 
         if (Next != null)
