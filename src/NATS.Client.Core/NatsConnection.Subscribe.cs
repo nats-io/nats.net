@@ -7,7 +7,7 @@ public partial class NatsConnection
     {
         var serializer = opts?.Serializer ?? Opts.Serializer;
         var sub = new NatsSub<T>(this, SubscriptionManager.GetManagerFor(subject), subject, queueGroup, opts, serializer);
-        await SubAsync(subject, queueGroup, opts, sub, cancellationToken).ConfigureAwait(false);
+        await SubAsync(sub, cancellationToken).ConfigureAwait(false);
         return sub;
     }
 }

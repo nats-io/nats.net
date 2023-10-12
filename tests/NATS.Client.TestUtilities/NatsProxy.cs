@@ -140,6 +140,8 @@ public class NatsProxy : IDisposable
                 }
             }
 
+            _clients.Clear();
+
             lock (_frames)
                 _frames.Clear();
 
