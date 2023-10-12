@@ -12,6 +12,7 @@ permissions:
 
 jobs:
   nuget:
+    environment: github-pages
     name: dotnet
     runs-on: ubuntu-latest
     steps:
