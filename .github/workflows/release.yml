@@ -12,7 +12,9 @@ permissions:
 
 jobs:
   nuget:
-    environment: github-pages
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     name: dotnet
     runs-on: ubuntu-latest
     steps:
