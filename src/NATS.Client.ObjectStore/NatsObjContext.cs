@@ -49,6 +49,7 @@ public class NatsObjContext
             AllowDirect = true,
             Metadata = config.Metadata!,
             Retention = StreamConfigurationRetention.limits,
+            Compression = StreamConfigurationCompression.none,
         };
 
         var stream = await _context.CreateStreamAsync(streamConfiguration, cancellationToken);
