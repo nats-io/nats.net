@@ -18,6 +18,21 @@ public interface ICountableBufferWriter : IBufferWriter<byte>
     int WrittenCount { get; }
 }
 
+public readonly struct FixedSizeMemoryOwner : IMemoryOwner<byte>
+{
+    private readonly IMemoryOwner<byte> _owner;
+
+    public FixedSizeMemoryOwner(IMemoryOwner<byte> owner, int size)
+    {
+        _owner = owner;
+        Memory = _owner.Memory.Slice(0, size);
+    }
+
+    public Memory<byte> Memory { get; }
+
+    public void Dispose() => _owner.Dispose();
+}
+
 public static class NatsDefaultSerializer
 {
     public static readonly INatsSerializer Default = new NatsRawSerializer(NatsJsonSerializer.Default);
@@ -105,9 +120,9 @@ public class NatsRawSerializer : INatsSerializer
 
         if (typeof(T) == typeof(IMemoryOwner<byte>))
         {
-            var memoryOwner = MemoryPool<byte>.Shared.Rent((int)buffer.Length);
+            var memoryOwner = new FixedSizeMemoryOwner(MemoryPool<byte>.Shared.Rent((int)buffer.Length), (int)buffer.Length);
             buffer.CopyTo(memoryOwner.Memory.Span);
-            return (T)memoryOwner;
+            return (T)(object)memoryOwner;
         }
 
         if (Next != null)
