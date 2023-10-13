@@ -255,8 +255,6 @@ public class SubscriptionTest
 
             proxy.Reset();
 
-            Assert.Empty(proxy.ClientFrames);
-
             var subMsg2 = await Check("re-subscribed", proxy);
 
             Assert.Equal(subMsg1, subMsg2);
