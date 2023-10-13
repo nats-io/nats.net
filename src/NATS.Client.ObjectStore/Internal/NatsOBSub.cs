@@ -31,7 +31,10 @@ internal class NatsOBSub<T> : NatsSubBase
     private readonly INatsSerializer _serializer;
     private readonly ChannelWriter<NatsOBSubMsg<T?>> _commands;
 
+    private int _done;
+
     public NatsOBSub(
+        string subject,
         NatsJSContext context,
         Channel<NatsOBSubMsg<T?>> commandChannel,
         NatsSubOpts? opts,
@@ -39,7 +42,7 @@ internal class NatsOBSub<T> : NatsSubBase
         : base(
             connection: context.Connection,
             manager: context.Connection.SubscriptionManager,
-            subject: context.NewInbox(),
+            subject: subject,
             queueGroup: default,
             opts)
     {
@@ -51,6 +54,8 @@ internal class NatsOBSub<T> : NatsSubBase
         _commands = commandChannel.Writer;
         _nats.ConnectionOpened += OnConnectionOpened;
     }
+
+    public void Done() => Interlocked.Increment(ref _done);
 
     public override async ValueTask ReadyAsync()
     {
@@ -70,7 +75,11 @@ internal class NatsOBSub<T> : NatsSubBase
         ReadOnlySequence<byte>? headersBuffer,
         ReadOnlySequence<byte> payloadBuffer)
     {
+        if (Volatile.Read(ref _done) > 0)
+            return;
+
         var msg = new NatsJSMsg<T?>(NatsMsg<T?>.Build(subject, replyTo, headersBuffer, payloadBuffer, _nats, _headerParser, _serializer), _context);
+
         await _commands.WriteAsync(new NatsOBSubMsg<T?> { Command = NatsOBSubCommand.Msg, Msg = msg }, _cancellationToken).ConfigureAwait(false);
     }
 

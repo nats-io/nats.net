@@ -1,4 +1,4 @@
-﻿using NATS.Client.JetStream;
+using NATS.Client.JetStream;
 
 namespace NATS.Client.ObjectStore;
 

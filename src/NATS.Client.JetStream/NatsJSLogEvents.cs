@@ -13,4 +13,8 @@ public static class NatsJSLogEvents
     public static readonly EventId PendingCount = new(2007, nameof(PendingCount));
     public static readonly EventId MessageProperty = new(2008, nameof(MessageProperty));
     public static readonly EventId PullRequest = new(2009, nameof(PullRequest));
+    public static readonly EventId NewConsumer = new(2010, nameof(NewConsumer));
+    public static readonly EventId DeleteOldDeliverySubject = new(2011, nameof(DeleteOldDeliverySubject));
+    public static readonly EventId NewDeliverySubject = new(2012, nameof(NewDeliverySubject));
+    public static readonly EventId NewConsumerCreated = new(2013, nameof(NewConsumerCreated));
 }

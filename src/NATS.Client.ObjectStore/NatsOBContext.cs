@@ -1,4 +1,4 @@
-﻿using System.Text.RegularExpressions;
+using System.Text.RegularExpressions;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;

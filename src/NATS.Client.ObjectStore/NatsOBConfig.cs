@@ -1,4 +1,4 @@
-﻿namespace NATS.Client.ObjectStore;
+namespace NATS.Client.ObjectStore;
 
 /// <summary>
 /// Object Store storage type

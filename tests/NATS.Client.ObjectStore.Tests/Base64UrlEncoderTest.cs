@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using NATS.Client.ObjectStore.Internal;
 
 namespace NATS.Client.ObjectStore.Tests;
@@ -57,9 +57,14 @@ public class Base64UrlEncoderTest
             .Replace('_', '/')
             .Replace('-', '+');
 
-        switch (input.Length % 4) {
-            case 2: incoming += "=="; break;
-            case 3: incoming += "="; break;
+        switch (input.Length % 4)
+        {
+        case 2:
+            incoming += "==";
+            break;
+        case 3:
+            incoming += "=";
+            break;
         }
 
         var bytes = Convert.FromBase64String(incoming);

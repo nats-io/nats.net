@@ -1,5 +1,4 @@
-﻿using System.Buffers;
-using System.Drawing;
+using System.Buffers;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using NATS.Client.Core;
@@ -36,12 +35,46 @@ public class NatsOBStore
         _stream = stream;
     }
 
-    // public async ValueTask<ObjectMetadata> GetAsync(string name, Stream stream, CancellationToken cancellationToken = default)
-    // {
-    //     ValidateObjectName(name);
-    //     var info = await GetInfoAsync(name, cancellationToken);
-    //
-    // }
+    public async ValueTask<ObjectMetadata> GetAsync(string name, Stream stream, CancellationToken cancellationToken = default)
+    {
+        ValidateObjectName(name);
+
+        var info = await GetInfoAsync(name, cancellationToken);
+
+        await using var pushConsumer = new NatsJSOrderedPushConsumer<IMemoryOwner<byte>>(
+            _context,
+            $"OBJ_{_bucket}",
+            $"$O.{_bucket}.C.{info.Nuid}",
+            new NatsJSOrderedPushConsumerOpts { DeliverPolicy = ConsumerConfigurationDeliverPolicy.all },
+            new NatsSubOpts(),
+            cancellationToken);
+
+        pushConsumer.Init();
+
+        await foreach (var msg in pushConsumer.Msgs.ReadAllAsync(cancellationToken))
+        {
+            if (pushConsumer.IsDone)
+                continue;
+
+            if (msg.Data != null)
+            {
+                using (msg.Data)
+                {
+                    await stream.WriteAsync(msg.Data.Memory, cancellationToken);
+                }
+            }
+
+            var p = msg.Metadata?.NumPending;
+            if (p is 0)
+            {
+                pushConsumer.Done();
+            }
+        }
+
+        await stream.FlushAsync(cancellationToken);
+
+        return info;
+    }
 
     public async ValueTask<ObjectMetadata> PutAsync(ObjectMetadata meta, Stream stream, CancellationToken cancellationToken = default)
     {
@@ -86,7 +119,7 @@ public class NatsOBStore
             {
                 while (true)
                 {
-                    var memoryOwner = MemoryPool<byte>.Shared.Rent(chunkSize);
+                    var memoryOwner = new FixedSizeMemoryOwner(MemoryPool<byte>.Shared.Rent(chunkSize), chunkSize);
 
                     var memory = memoryOwner.Memory;
                     var currentChunkSize = 0;
@@ -171,10 +204,7 @@ public class NatsOBStore
 
         var response = await _stream.GetAsync(request, cancellationToken);
 
-        var data = NatsJsonSerializer.Default.Deserialize<ObjectMetadata>(new ReadOnlySequence<byte>(Convert.FromBase64String(response.Message.Data)));
-
-        if (data == null)
-            throw new NatsOBException("Can't deserialize object metadata");
+        var data = NatsJsonSerializer.Default.Deserialize<ObjectMetadata>(new ReadOnlySequence<byte>(Convert.FromBase64String(response.Message.Data))) ?? throw new NatsOBException("Can't deserialize object metadata");
 
         return data;
     }
