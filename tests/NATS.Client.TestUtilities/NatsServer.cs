@@ -457,17 +457,44 @@ public class NatsCluster : IAsyncDisposable
         var opts1 = new NatsServerOptsBuilder()
             .UseTransport(transportType)
             .EnableClustering()
+            .Trace() // for debugging
             .Build();
+
 
         var opts2 = new NatsServerOptsBuilder()
             .UseTransport(transportType)
             .EnableClustering()
+            .Trace() // for debugging
             .Build();
+
 
         var opts3 = new NatsServerOptsBuilder()
             .UseTransport(transportType)
             .EnableClustering()
+            .Trace() // for debugging
             .Build();
+
+        // By querying the ports we set the values lazily on all the opts.
+        outputHelper.WriteLine($"opts1.ServerPort={opts1.ServerPort}");
+        outputHelper.WriteLine($"opts1.ClusteringPort={opts1.ClusteringPort}");
+        if (opts1.EnableWebSocket)
+        {
+            outputHelper.WriteLine($"opts1.WebSocketPort={opts1.WebSocketPort}");
+        }
+
+        outputHelper.WriteLine($"opts2.ServerPort={opts2.ServerPort}");
+        outputHelper.WriteLine($"opts2.ClusteringPort={opts2.ClusteringPort}");
+        if (opts2.EnableWebSocket)
+        {
+            outputHelper.WriteLine($"opts2.WebSocketPort={opts2.WebSocketPort}");
+        }
+
+        outputHelper.WriteLine($"opts3.ServerPort={opts3.ServerPort}");
+        outputHelper.WriteLine($"opts3.ClusteringPort={opts3.ClusteringPort}");
+        if (opts3.EnableWebSocket)
+        {
+            outputHelper.WriteLine($"opts3.WebSocketPort={opts3.WebSocketPort}");
+        }
 
         var routes = new[] { opts1, opts2, opts3 };
 
