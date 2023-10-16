@@ -8,8 +8,10 @@ public class ConsumerFetchTest
 
     public ConsumerFetchTest(ITestOutputHelper output) => _output = output;
 
-    [Fact]
-    public async Task Fetch_test()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Fetch_test(bool noWait)
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         await using var server = NatsServer.StartJS();
@@ -27,7 +29,7 @@ public class ConsumerFetchTest
         var consumer = await js.GetConsumerAsync("s1", "c1", cts.Token);
         var count = 0;
         await using var fc =
-            await consumer.FetchAsync<TestData>(new NatsJSFetchOpts { MaxMsgs = 10 }, cancellationToken: cts.Token);
+            await consumer.FetchAsync<TestData>(new NatsJSFetchOpts { MaxMsgs = 10, NoWait = noWait }, cancellationToken: cts.Token);
         await foreach (var msg in fc.Msgs.ReadAllAsync(cts.Token))
         {
             await msg.AckAsync(new AckOpts(WaitUntilSent: true), cts.Token);
