@@ -6,7 +6,8 @@ namespace NATS.Client.Core;
 public enum TlsMode
 {
     /// <summary>
-    /// Auto mode will attempt to upgrade the connection to TLS if the server supports it. (same as <c>Prefer</c>)
+    /// For connections that use the "nats://" scheme and don't supply Client or CA Certificates - same as <c>Prefer</c>
+    /// For connections that use the "tls://" scheme or supply Client or CA Certificates - same as <c>Require</c>
     /// </summary>
     Auto,
 
