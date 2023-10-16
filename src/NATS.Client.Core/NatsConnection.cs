@@ -255,6 +255,14 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
                     var conn = new TcpConnection();
                     await conn.ConnectAsync(target.Host, target.Port, Opts.ConnectTimeout).ConfigureAwait(false);
                     _socket = conn;
+
+                    if (Opts.TlsOpts.TlsFirst)
+                    {
+                        // upgrade TcpConnection to SslConnection
+                        var sslConnection = conn.UpgradeToSslStreamConnection(Opts.TlsOpts, _tlsCerts);
+                        await sslConnection.AuthenticateAsClientAsync(target.Host).ConfigureAwait(false);
+                        _socket = sslConnection;
+                    }
                 }
 
                 _currentConnectUri = uri;
@@ -471,6 +479,14 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
                         var conn = new TcpConnection();
                         await conn.ConnectAsync(target.Host, target.Port, Opts.ConnectTimeout).ConfigureAwait(false);
                         _socket = conn;
+
+                        if (Opts.TlsOpts.TlsFirst)
+                        {
+                            // upgrade TcpConnection to SslConnection
+                            var sslConnection = conn.UpgradeToSslStreamConnection(Opts.TlsOpts, _tlsCerts);
+                            await sslConnection.AuthenticateAsClientAsync(target.Host).ConfigureAwait(false);
+                            _socket = sslConnection;
+                        }
                     }
 
                     _currentConnectUri = url;

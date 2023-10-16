@@ -23,5 +23,8 @@ public sealed record NatsTlsOpts
     /// <summary>When true, skip remote certificate verification and accept any server certificate</summary>
     public bool InsecureSkipVerify { get; init; }
 
+    /// <summary>When true, client initiates TLS connection immediately when connecting</summary>
+    public bool TlsFirst { get; init; }
+
     internal bool Required => CertFile != default || KeyFile != default || CaFile != default;
 }
