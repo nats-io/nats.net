@@ -234,7 +234,7 @@ public abstract partial class NatsConnectionTest
     [Fact(Timeout = 30000)]
     public async Task ReconnectClusterTest()
     {
-        await using var cluster = new NatsCluster(new NullOutputHelper(), _transportType);
+        await using var cluster = new NatsCluster(_output, _transportType);
         await Task.Delay(TimeSpan.FromSeconds(5)); // wait for cluster completely connected.
 
         var subject = Guid.NewGuid().ToString();

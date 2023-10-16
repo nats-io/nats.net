@@ -181,7 +181,7 @@ public class NatsServer : IAsyncDisposable
             {
                 if (e.Data != null)
                 {
-                    if (Regex.IsMatch(e.Data, @"\[INF\] Server is ready"))
+                    if (Regex.IsMatch(e.Data, @"(?:\[INF\] Server is ready|error parsing)"))
                     {
                         mre.Set();
                     }
