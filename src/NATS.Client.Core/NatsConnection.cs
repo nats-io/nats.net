@@ -42,8 +42,8 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
     // when reconnect, make new instance.
     private ISocketConnection? _socket;
     private CancellationTokenSource? _pingTimerCancellationTokenSource;
-    private NatsUri? _currentConnectUri;
-    private NatsUri? _lastSeedConnectUri;
+    private volatile NatsUri? _currentConnectUri;
+    private volatile NatsUri? _lastSeedConnectUri;
     private NatsReadProtocolProcessor? _socketReader;
     private NatsPipeliningWriteProtocolProcessor? _socketWriter;
     private TaskCompletionSource _waitForOpenConnection;
@@ -222,10 +222,13 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         Debug.Assert(ConnectionState == NatsConnectionState.Connecting, "Connection state");
 
         var uris = Opts.GetSeedUris();
-        if (Opts.TlsOpts.EffectiveMode == TlsMode.Require && uris.Any(u => !u.IsTls))
-            throw new NatsException($"URI {uris.First(u => !u.IsTls)} doesn't support TLS but TlsMode is set to Explicit");
-        if (Opts.TlsOpts.EffectiveMode == TlsMode.Disabled && uris.Any(u => u.IsTls))
-            throw new NatsException($"URI {uris.First(u => u.IsTls)} requires TLS but TlsMode is set to Disabled");
+
+        foreach (var uri in uris)
+        {
+            if (Opts.TlsOpts.EffectiveMode(uri) == TlsMode.Disable && uri.IsTls)
+                throw new NatsException($"URI {uri} requires TLS but TlsMode is set to Disable");
+        }
+
         if (Opts.TlsOpts.HasTlsFile)
             _tlsCerts = new TlsCerts(Opts.TlsOpts);
 
@@ -258,11 +261,11 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
                     await conn.ConnectAsync(target.Host, target.Port, Opts.ConnectTimeout).ConfigureAwait(false);
                     _socket = conn;
 
-                    if (Opts.TlsOpts.EffectiveMode == TlsMode.Implicit)
+                    if (Opts.TlsOpts.EffectiveMode(uri) == TlsMode.Implicit)
                     {
                         // upgrade TcpConnection to SslConnection
                         var sslConnection = conn.UpgradeToSslStreamConnection(Opts.TlsOpts, _tlsCerts);
-                        await sslConnection.AuthenticateAsClientAsync(target.Host).ConfigureAwait(false);
+                        await sslConnection.AuthenticateAsClientAsync(uri).ConfigureAwait(false);
                         _socket = sslConnection;
                     }
                 }
@@ -341,19 +344,19 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
             // check to see if we should upgrade to TLS
             if (_socket is TcpConnection tcpConnection)
             {
-                if (Opts.TlsOpts.EffectiveMode == TlsMode.Disabled && WritableServerInfo!.TlsRequired)
+                if (Opts.TlsOpts.EffectiveMode(_currentConnectUri) == TlsMode.Disable && WritableServerInfo!.TlsRequired)
                 {
                     throw new NatsException(
-                        $"Server {_currentConnectUri} requires TLS but TlsMode is set to Disabled");
+                        $"Server {_currentConnectUri} requires TLS but TlsMode is set to Disable");
                 }
 
-                if (Opts.TlsOpts.EffectiveMode == TlsMode.Require && !WritableServerInfo!.TlsRequired && !WritableServerInfo.TlsAvailable)
+                if (Opts.TlsOpts.EffectiveMode(_currentConnectUri) == TlsMode.Require && !WritableServerInfo!.TlsRequired && !WritableServerInfo.TlsAvailable)
                 {
                     throw new NatsException(
                         $"Server {_currentConnectUri} does not support TLS but TlsMode is set to Require");
                 }
 
-                if (Opts.TlsOpts.EffectiveMode == TlsMode.Prefer && (WritableServerInfo!.TlsRequired || WritableServerInfo.TlsAvailable))
+                if (Opts.TlsOpts.TryTls(_currentConnectUri) && (WritableServerInfo!.TlsRequired || WritableServerInfo.TlsAvailable))
                 {
                     // do TLS upgrade
                     // if the current URI is not a seed URI and is not a DNS hostname, check the server cert against the
@@ -375,7 +378,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
                     // upgrade TcpConnection to SslConnection
                     var sslConnection = tcpConnection.UpgradeToSslStreamConnection(Opts.TlsOpts, _tlsCerts);
-                    await sslConnection.AuthenticateAsClientAsync(targetHost).ConfigureAwait(false);
+                    await sslConnection.AuthenticateAsClientAsync(_currentConnectUri).ConfigureAwait(false);
                     _socket = sslConnection;
 
                     // create new socket reader
@@ -482,11 +485,11 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
                         await conn.ConnectAsync(target.Host, target.Port, Opts.ConnectTimeout).ConfigureAwait(false);
                         _socket = conn;
 
-                        if (Opts.TlsOpts.EffectiveMode == TlsMode.Implicit)
+                        if (Opts.TlsOpts.EffectiveMode(url) == TlsMode.Implicit)
                         {
                             // upgrade TcpConnection to SslConnection
                             var sslConnection = conn.UpgradeToSslStreamConnection(Opts.TlsOpts, _tlsCerts);
-                            await sslConnection.AuthenticateAsClientAsync(target.Host).ConfigureAwait(false);
+                            await sslConnection.AuthenticateAsClientAsync(url).ConfigureAwait(false);
                             _socket = sslConnection;
                         }
                     }

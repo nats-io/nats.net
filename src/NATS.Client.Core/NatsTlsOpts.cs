@@ -1,3 +1,5 @@
+using NATS.Client.Core.Internal;
+
 namespace NATS.Client.Core;
 
 /// <summary>
@@ -29,7 +31,7 @@ public enum TlsMode
     /// <summary>
     /// Disabled mode will not attempt to upgrade the connection to TLS.
     /// </summary>
-    Disabled,
+    Disable,
 }
 
 /// <summary>
@@ -57,9 +59,15 @@ public sealed record NatsTlsOpts
 
     internal bool HasTlsFile => CertFile != default || KeyFile != default || CaFile != default;
 
-    internal TlsMode EffectiveMode => Mode switch
+    internal TlsMode EffectiveMode(NatsUri uri) => Mode switch
     {
-        TlsMode.Auto => TlsMode.Prefer,
+        TlsMode.Auto => HasTlsFile || uri.Uri.Scheme.ToLower() == "tls" ? TlsMode.Require : TlsMode.Prefer,
         _ => Mode,
     };
+
+    internal bool TryTls(NatsUri uri)
+    {
+        var effectiveMode = EffectiveMode(uri);
+        return effectiveMode is TlsMode.Require or TlsMode.Prefer;
+    }
 }
