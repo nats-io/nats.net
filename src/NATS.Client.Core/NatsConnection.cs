@@ -465,11 +465,22 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
                 if (urlEnumerator.MoveNext())
                 {
                     url = urlEnumerator.Current;
-                    var target = (url.Host, url.Port);
+
                     if (OnConnectingAsync != null)
                     {
+                        var target = (url.Host, url.Port);
                         _logger.LogInformation("Try to invoke OnConnectingAsync before connect to NATS.");
-                        target = await OnConnectingAsync(target).ConfigureAwait(false);
+                        var newTarget = await OnConnectingAsync(target).ConfigureAwait(false);
+
+                        if (newTarget.Host != target.Host || newTarget.Port != target.Port)
+                        {
+                            var newUri = new UriBuilder(url.Uri)
+                            {
+                                Host = newTarget.Host,
+                                Port = newTarget.Port,
+                            }.Uri.ToString();
+                            url = new NatsUri(newUri, url.IsSeed);
+                        }
                     }
 
                     _logger.LogInformation("Try to connect NATS {0}", url);
@@ -482,7 +493,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
                     else
                     {
                         var conn = new TcpConnection();
-                        await conn.ConnectAsync(target.Host, target.Port, Opts.ConnectTimeout).ConfigureAwait(false);
+                        await conn.ConnectAsync(url.Host, url.Port, Opts.ConnectTimeout).ConfigureAwait(false);
                         _socket = conn;
 
                         if (Opts.TlsOpts.EffectiveMode(url) == TlsMode.Implicit)
