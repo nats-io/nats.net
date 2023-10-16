@@ -361,15 +361,15 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
                     // do TLS upgrade
                     // if the current URI is not a seed URI and is not a DNS hostname, check the server cert against the
                     // last seed hostname if it was a DNS hostname
-                    var targetHost = _currentConnectUri.Host;
+                    var targetUri = _currentConnectUri;
                     if (!_currentConnectUri.IsSeed
-                        && Uri.CheckHostName(targetHost) != UriHostNameType.Dns
+                        && Uri.CheckHostName(targetUri.Host) != UriHostNameType.Dns
                         && Uri.CheckHostName(_lastSeedConnectUri!.Host) == UriHostNameType.Dns)
                     {
-                        targetHost = _lastSeedConnectUri.Host;
+                        targetUri = targetUri.CloneWith(_lastSeedConnectUri.Host);
                     }
 
-                    _logger.LogDebug("Perform TLS Upgrade to " + targetHost);
+                    _logger.LogDebug("Perform TLS Upgrade to " + targetUri);
 
                     // cancel INFO parsed signal and dispose current socket reader
                     infoParsedSignal.SetCanceled();
@@ -378,7 +378,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
                     // upgrade TcpConnection to SslConnection
                     var sslConnection = tcpConnection.UpgradeToSslStreamConnection(Opts.TlsOpts, _tlsCerts);
-                    await sslConnection.AuthenticateAsClientAsync(_currentConnectUri).ConfigureAwait(false);
+                    await sslConnection.AuthenticateAsClientAsync(targetUri).ConfigureAwait(false);
                     _socket = sslConnection;
 
                     // create new socket reader
@@ -474,12 +474,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
                         if (newTarget.Host != target.Host || newTarget.Port != target.Port)
                         {
-                            var newUri = new UriBuilder(url.Uri)
-                            {
-                                Host = newTarget.Host,
-                                Port = newTarget.Port,
-                            }.Uri.ToString();
-                            url = new NatsUri(newUri, url.IsSeed);
+                            url = url.CloneWith(newTarget.Host, newTarget.Port);
                         }
                     }
 

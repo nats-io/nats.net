@@ -40,6 +40,17 @@ internal sealed class NatsUri : IEquatable<NatsUri>
         Uri = uriBuilder.Uri;
     }
 
+    public NatsUri CloneWith(string host, int? port = default)
+    {
+        var newUri = new UriBuilder(Uri)
+        {
+            Host = host,
+            Port = port ?? Port,
+        }.Uri.ToString();
+
+        return new NatsUri(newUri, IsSeed);
+    }
+
     public Uri Uri { get; }
 
     public bool IsSeed { get; }

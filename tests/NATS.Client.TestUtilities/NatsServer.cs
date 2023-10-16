@@ -457,21 +457,16 @@ public class NatsCluster : IAsyncDisposable
         var opts1 = new NatsServerOptsBuilder()
             .UseTransport(transportType)
             .EnableClustering()
-            .Trace() // for debugging
             .Build();
-
 
         var opts2 = new NatsServerOptsBuilder()
             .UseTransport(transportType)
             .EnableClustering()
-            .Trace() // for debugging
             .Build();
-
 
         var opts3 = new NatsServerOptsBuilder()
             .UseTransport(transportType)
             .EnableClustering()
-            .Trace() // for debugging
             .Build();
 
         // By querying the ports we set the values lazily on all the opts.
