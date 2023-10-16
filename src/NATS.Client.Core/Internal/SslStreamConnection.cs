@@ -125,9 +125,9 @@ internal sealed class SslStreamConnection : ISocketConnection
 
     private SslClientAuthenticationOptions SslClientAuthenticationOptions(string targetHost)
     {
-        if (_tlsOpts.Disabled)
+        if (_tlsOpts.EffectiveMode == TlsMode.Disabled)
         {
-            throw new InvalidOperationException("TLS is not permitted when TlsOptions.Disabled is set");
+            throw new InvalidOperationException("TLS is not permitted when TlsMode is set to Disabled");
         }
 
         LocalCertificateSelectionCallback? lcsCb = default;

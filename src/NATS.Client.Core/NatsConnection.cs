@@ -222,9 +222,11 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         Debug.Assert(ConnectionState == NatsConnectionState.Connecting, "Connection state");
 
         var uris = Opts.GetSeedUris();
-        if (Opts.TlsOpts.Disabled && uris.Any(u => u.IsTls))
-            throw new NatsException($"URI {uris.First(u => u.IsTls)} requires TLS but NatsTlsOpts.Disabled is set to true");
-        if (Opts.TlsOpts.Required)
+        if (Opts.TlsOpts.EffectiveMode == TlsMode.Require && uris.Any(u => !u.IsTls))
+            throw new NatsException($"URI {uris.First(u => !u.IsTls)} doesn't support TLS but TlsMode is set to Explicit");
+        if (Opts.TlsOpts.EffectiveMode == TlsMode.Disabled && uris.Any(u => u.IsTls))
+            throw new NatsException($"URI {uris.First(u => u.IsTls)} requires TLS but TlsMode is set to Disabled");
+        if (Opts.TlsOpts.HasTlsFile)
             _tlsCerts = new TlsCerts(Opts.TlsOpts);
 
         if (!Opts.AuthOpts.IsAnonymous)
@@ -256,7 +258,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
                     await conn.ConnectAsync(target.Host, target.Port, Opts.ConnectTimeout).ConfigureAwait(false);
                     _socket = conn;
 
-                    if (Opts.TlsOpts.TlsFirst)
+                    if (Opts.TlsOpts.EffectiveMode == TlsMode.Implicit)
                     {
                         // upgrade TcpConnection to SslConnection
                         var sslConnection = conn.UpgradeToSslStreamConnection(Opts.TlsOpts, _tlsCerts);
@@ -339,19 +341,19 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
             // check to see if we should upgrade to TLS
             if (_socket is TcpConnection tcpConnection)
             {
-                if (Opts.TlsOpts.Disabled && WritableServerInfo!.TlsRequired)
+                if (Opts.TlsOpts.EffectiveMode == TlsMode.Disabled && WritableServerInfo!.TlsRequired)
                 {
                     throw new NatsException(
-                        $"Server {_currentConnectUri} requires TLS but NatsTlsOpts.Disabled is set to true");
+                        $"Server {_currentConnectUri} requires TLS but TlsMode is set to Disabled");
                 }
 
-                if (Opts.TlsOpts.Required && !WritableServerInfo!.TlsRequired && !WritableServerInfo.TlsAvailable)
+                if (Opts.TlsOpts.EffectiveMode == TlsMode.Require && !WritableServerInfo!.TlsRequired && !WritableServerInfo.TlsAvailable)
                 {
                     throw new NatsException(
-                        $"Server {_currentConnectUri} does not support TLS but NatsTlsOpts.Disabled is set to true");
+                        $"Server {_currentConnectUri} does not support TLS but TlsMode is set to Require");
                 }
 
-                if (Opts.TlsOpts.Required || WritableServerInfo!.TlsRequired || WritableServerInfo.TlsAvailable)
+                if (Opts.TlsOpts.EffectiveMode == TlsMode.Prefer && (WritableServerInfo!.TlsRequired || WritableServerInfo.TlsAvailable))
                 {
                     // do TLS upgrade
                     // if the current URI is not a seed URI and is not a DNS hostname, check the server cert against the
@@ -480,7 +482,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
                         await conn.ConnectAsync(target.Host, target.Port, Opts.ConnectTimeout).ConfigureAwait(false);
                         _socket = conn;
 
-                        if (Opts.TlsOpts.TlsFirst)
+                        if (Opts.TlsOpts.EffectiveMode == TlsMode.Implicit)
                         {
                             // upgrade TcpConnection to SslConnection
                             var sslConnection = conn.UpgradeToSslStreamConnection(Opts.TlsOpts, _tlsCerts);
