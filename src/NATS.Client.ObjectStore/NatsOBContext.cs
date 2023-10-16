@@ -5,17 +5,27 @@ using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.ObjectStore;
 
+/// <summary>
+/// Object Store context.
+/// </summary>
 public class NatsOBContext
 {
     private static readonly Regex ValidBucketRegex = new(pattern: @"\A[a-zA-Z0-9_-]+\z", RegexOptions.Compiled);
 
     private readonly NatsJSContext _context;
 
-    public NatsOBContext(NatsJSContext context)
-    {
-        _context = context;
-    }
+    /// <summary>
+    /// Create a new object store context.
+    /// </summary>
+    /// <param name="context">JetStream context.</param>
+    public NatsOBContext(NatsJSContext context) => _context = context;
 
+    /// <summary>
+    /// Create a new object store.
+    /// </summary>
+    /// <param name="config">Object store configuration.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>Object store object.</returns>
     public async ValueTask<NatsOBStore> CreateObjectStore(NatsOBConfig config, CancellationToken cancellationToken = default)
     {
         ValidateBucketName(config.Bucket);
@@ -43,6 +53,18 @@ public class NatsOBContext
 
         var stream = await _context.CreateStreamAsync(streamConfiguration, cancellationToken);
         return new NatsOBStore(config, _context, stream);
+    }
+
+    /// <summary>
+    /// Delete an object store.
+    /// </summary>
+    /// <param name="bucket">Name of the bucket.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>Whether delete was successful or not.</returns>
+    public ValueTask<bool> DeleteObjectStore(string bucket, CancellationToken cancellationToken)
+    {
+        ValidateBucketName(bucket);
+        return _context.DeleteStreamAsync($"OBJ_{bucket}", cancellationToken);
     }
 
     private void ValidateBucketName(string bucket)

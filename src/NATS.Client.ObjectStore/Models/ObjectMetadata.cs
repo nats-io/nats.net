@@ -57,6 +57,13 @@ public record ObjectMetadata
     public Dictionary<string, string> Meta { get; set; } = default!;
 
     /// <summary>
+    /// Object deleted
+    /// </summary>
+    [JsonPropertyName("deleted")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Deleted { get; set; } = default!;
+
+    /// <summary>
     /// Object options
     /// </summary>
     [JsonPropertyName("options")]

@@ -11,6 +11,9 @@ using NATS.Client.ObjectStore.Models;
 
 namespace NATS.Client.ObjectStore;
 
+/// <summary>
+/// NATS Object Store.
+/// </summary>
 public class NatsOBStore
 {
     private const int DefaultChunkSize = 128 * 1024;
@@ -21,60 +24,105 @@ public class NatsOBStore
     private static readonly Regex ValidObjectRegex = new(pattern: @"\A[-/_=\.a-zA-Z0-9]+\z", RegexOptions.Compiled);
 
     private readonly string _bucket;
-    private readonly NatsOBConfig _config;
     private readonly NatsJSContext _context;
     private readonly NatsJSStream _stream;
-    private readonly NatsConnection _nats;
 
     internal NatsOBStore(NatsOBConfig config, NatsJSContext context, NatsJSStream stream)
     {
         _bucket = config.Bucket;
-        _config = config;
         _context = context;
-        _nats = context.Connection;
         _stream = stream;
     }
 
-    public async ValueTask<ObjectMetadata> GetAsync(string name, Stream stream, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Get object by key.
+    /// </summary>
+    /// <param name="key">Object key.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>Object value as a byte array.</returns>
+    public async ValueTask<byte[]> GetBytesAsync(string key, CancellationToken cancellationToken = default)
     {
-        ValidateObjectName(name);
+        var memoryStream = new MemoryStream();
+        await GetAsync(key, memoryStream, cancellationToken).ConfigureAwait(false);
+        return memoryStream.ToArray();
+    }
 
-        var info = await GetInfoAsync(name, cancellationToken);
+    /// <summary>
+    /// Get object by key.
+    /// </summary>
+    /// <param name="key">Object key.</param>
+    /// <param name="stream">Stream to write the object value to.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>Object metadata.</returns>
+    /// <exception cref="NatsOBException">Metadata didn't match the value retrieved e.g. the SHA digest.</exception>
+    public async ValueTask<ObjectMetadata> GetAsync(string key, Stream stream, CancellationToken cancellationToken = default)
+    {
+        ValidateObjectName(key);
+
+        var info = await GetInfoAsync(key, cancellationToken: cancellationToken);
 
         await using var pushConsumer = new NatsJSOrderedPushConsumer<IMemoryOwner<byte>>(
             _context,
             $"OBJ_{_bucket}",
-            $"$O.{_bucket}.C.{info.Nuid}",
+            GetChunkSubject(info.Nuid),
             new NatsJSOrderedPushConsumerOpts { DeliverPolicy = ConsumerConfigurationDeliverPolicy.all },
             new NatsSubOpts(),
             cancellationToken);
 
         pushConsumer.Init();
 
-        await foreach (var msg in pushConsumer.Msgs.ReadAllAsync(cancellationToken))
+        string digest;
+        var chunks = 0;
+        var size = 0;
+        using (var sha256 = SHA256.Create())
         {
-            // We have to make sure to carry on consuming the channel to avoid any blocking:
-            // e.g. if the channel is full, we would be blocking the reads off the socket (this was intentionally
-            // done ot avoid bloating the memory with a large backlog of messages or dropping messages at this level
-            // and signal the server that we are a slow consumer); then when we make an request-reply API call to
-            // delete the consumer, the socket would be blocked trying to send the response back to us; so we need to
-            // keep consuming the channel to avoid this.
-            if (pushConsumer.IsDone)
-                continue;
-
-            if (msg.Data != null)
+            await using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Write))
             {
-                using (msg.Data)
+                await foreach (var msg in pushConsumer.Msgs.ReadAllAsync(cancellationToken))
                 {
-                    await stream.WriteAsync(msg.Data.Memory, cancellationToken);
+                    // We have to make sure to carry on consuming the channel to avoid any blocking:
+                    // e.g. if the channel is full, we would be blocking the reads off the socket (this was intentionally
+                    // done ot avoid bloating the memory with a large backlog of messages or dropping messages at this level
+                    // and signal the server that we are a slow consumer); then when we make an request-reply API call to
+                    // delete the consumer, the socket would be blocked trying to send the response back to us; so we need to
+                    // keep consuming the channel to avoid this.
+                    if (pushConsumer.IsDone)
+                        continue;
+
+                    if (msg.Data != null)
+                    {
+                        using (msg.Data)
+                        {
+                            chunks++;
+                            size += msg.Data.Memory.Length;
+                            await hashedStream.WriteAsync(msg.Data.Memory, cancellationToken);
+                        }
+                    }
+
+                    var p = msg.Metadata?.NumPending;
+                    if (p is 0)
+                    {
+                        pushConsumer.Done();
+                    }
                 }
             }
 
-            var p = msg.Metadata?.NumPending;
-            if (p is 0)
-            {
-                pushConsumer.Done();
-            }
+            digest = Base64UrlEncoder.Encode(sha256.Hash);
+        }
+
+        if ($"SHA-256={digest}" != info.Digest)
+        {
+            throw new NatsOBException("SHA-256 digest mismatch");
+        }
+
+        if (chunks != info.Chunks)
+        {
+            throw new NatsOBException("Chunks mismatch");
+        }
+
+        if (size != info.Size)
+        {
+            throw new NatsOBException("Size mismatch");
         }
 
         await stream.FlushAsync(cancellationToken);
@@ -82,6 +130,37 @@ public class NatsOBStore
         return info;
     }
 
+    /// <summary>
+    /// Put an object by key.
+    /// </summary>
+    /// <param name="key">Object key.</param>
+    /// <param name="value">Object value as a byte array.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>Object metadata.</returns>
+    public ValueTask<ObjectMetadata> PutAsync(string key, byte[] value, CancellationToken cancellationToken = default) =>
+        PutAsync(new ObjectMetadata { Name = key }, new MemoryStream(value), cancellationToken);
+
+    /// <summary>
+    /// Put an object by key.
+    /// </summary>
+    /// <param name="key">Object key.</param>
+    /// <param name="stream">Stream to read the value from.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>Object metadata.</returns>
+    /// <exception cref="NatsOBException">There was an error calculating SHA digest.</exception>
+    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    public ValueTask<ObjectMetadata> PutAsync(string key, Stream stream, CancellationToken cancellationToken = default) =>
+        PutAsync(new ObjectMetadata { Name = key }, stream, cancellationToken);
+
+    /// <summary>
+    /// Put an object by key.
+    /// </summary>
+    /// <param name="meta">Object metadata.</param>
+    /// <param name="stream">Stream to read the value from.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>Object metadata.</returns>
+    /// <exception cref="NatsOBException">There was an error calculating SHA digest.</exception>
+    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     public async ValueTask<ObjectMetadata> PutAsync(ObjectMetadata meta, Stream stream, CancellationToken cancellationToken = default)
     {
         ValidateObjectName(meta.Name);
@@ -89,7 +168,7 @@ public class NatsOBStore
         ObjectMetadata? info = null;
         try
         {
-            info = await GetInfoAsync(meta.Name, cancellationToken);
+            info = await GetInfoAsync(meta.Name, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
         catch (NatsJSApiException e)
         {
@@ -98,8 +177,6 @@ public class NatsOBStore
         }
 
         var nuid = NewNuid();
-        var encodedName = Base64UrlEncoder.Encode(meta.Name);
-
         meta.Bucket = _bucket;
         meta.Nuid = nuid;
         meta.MTime = DateTimeOffset.UtcNow;
@@ -162,8 +239,8 @@ public class NatsOBStore
                     var buffer = new FixedSizeMemoryOwner(memoryOwner, currentChunkSize);
 
                     // Chunks
-                    var ack1 = await _context.PublishAsync($"$O.{_bucket}.C.{nuid}", buffer, cancellationToken: cancellationToken);
-                    ack1.EnsureSuccess();
+                    var ack = await _context.PublishAsync(GetChunkSubject(nuid), buffer, cancellationToken: cancellationToken);
+                    ack.EnsureSuccess();
 
                     if (eof)
                         break;
@@ -181,8 +258,7 @@ public class NatsOBStore
         meta.Digest = $"SHA-256={digest}";
 
         // Metadata
-        var ack2 = await _context.PublishAsync($"$O.{_bucket}.M.{encodedName}", meta, headers: NatsRollupHeaders, cancellationToken: cancellationToken);
-        ack2.EnsureSuccess();
+        await PublishMeta(meta, cancellationToken);
 
         // Delete the old object
         if (info != null && info.Nuid != nuid)
@@ -191,7 +267,7 @@ public class NatsOBStore
             {
                 await _context.JSRequestResponseAsync<StreamPurgeRequest, StreamPurgeResponse>(
                     subject: $"{_context.Opts.Prefix}.STREAM.PURGE.OBJ_{_bucket}",
-                    request: new StreamPurgeRequest { Filter = $"$O.{_bucket}.C.{info.Nuid}" },
+                    request: new StreamPurgeRequest { Filter = GetChunkSubject(info.Nuid) },
                     cancellationToken);
             }
             catch (NatsJSApiException e)
@@ -204,16 +280,73 @@ public class NatsOBStore
         return meta;
     }
 
-    public async ValueTask<ObjectMetadata> GetInfoAsync(string key, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Get object metadata by key.
+    /// </summary>
+    /// <param name="key">Object key.</param>
+    /// <param name="showDeleted">Also retrieve deleted objects.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>Object metadata.</returns>
+    /// <exception cref="NatsOBException">Object was not found.</exception>
+    public async ValueTask<ObjectMetadata> GetInfoAsync(string key, bool showDeleted = false, CancellationToken cancellationToken = default)
     {
-        var request = new StreamMsgGetRequest { LastBySubj = $"$O.{_bucket}.M.{Base64UrlEncoder.Encode(key)}", };
+        ValidateObjectName(key);
+
+        var request = new StreamMsgGetRequest { LastBySubj = GetMetaSubject(key) };
 
         var response = await _stream.GetAsync(request, cancellationToken);
 
         var data = NatsJsonSerializer.Default.Deserialize<ObjectMetadata>(new ReadOnlySequence<byte>(Convert.FromBase64String(response.Message.Data))) ?? throw new NatsOBException("Can't deserialize object metadata");
 
+        if (!showDeleted && data.Deleted)
+        {
+            throw new NatsOBException("Object not found");
+        }
+
         return data;
     }
+
+    /// <summary>
+    /// Delete an object by key.
+    /// </summary>
+    /// <param name="key">Object key.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <exception cref="NatsOBException">Object metadata was invalid or chunks can't be purged.</exception>
+    public async ValueTask DeleteAsync(string key, CancellationToken cancellationToken = default)
+    {
+        ValidateObjectName(key);
+
+        var meta = await GetInfoAsync(key, showDeleted: true, cancellationToken).ConfigureAwait(false);
+
+        if (string.IsNullOrEmpty(meta.Nuid))
+        {
+            throw new NatsOBException("Object-store meta information invalid");
+        }
+
+        meta.Size = 0;
+        meta.Chunks = 0;
+        meta.Digest = string.Empty;
+        meta.Deleted = true;
+        meta.MTime = DateTimeOffset.UtcNow;
+
+        await PublishMeta(meta, cancellationToken);
+
+        var response = await _stream.PurgeAsync(new StreamPurgeRequest { Filter = GetChunkSubject(meta.Nuid) }, cancellationToken);
+        if (!response.Success)
+        {
+            throw new NatsOBException("Can't purge object chunks");
+        }
+    }
+
+    private async ValueTask PublishMeta(ObjectMetadata meta, CancellationToken cancellationToken)
+    {
+        var ack = await _context.PublishAsync(GetMetaSubject(meta.Name), meta, headers: NatsRollupHeaders, cancellationToken: cancellationToken);
+        ack.EnsureSuccess();
+    }
+
+    private string GetMetaSubject(string key) => $"$O.{_bucket}.M.{Base64UrlEncoder.Encode(key)}";
+
+    private string GetChunkSubject(string nuid) => $"$O.{_bucket}.C.{nuid}";
 
     private string NewNuid()
     {
