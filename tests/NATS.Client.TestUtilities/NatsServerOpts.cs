@@ -16,27 +16,42 @@ public sealed class NatsServerOptsBuilder
     private readonly List<string> _extraConfigs = new();
     private bool _enableWebSocket;
     private bool _enableTls;
+    private bool _tlsFirst;
     private bool _enableJetStream;
     private string? _tlsServerCertFile;
     private string? _tlsServerKeyFile;
     private string? _tlsCaFile;
     private TransportType? _transportType;
+    private bool _serverDisposeReturnsPorts;
+    private bool _enableClustering;
     private bool _trace;
 
-    public NatsServerOpts Build()
+    public NatsServerOpts Build() => new()
     {
-        return new NatsServerOpts
-        {
-            EnableWebSocket = _enableWebSocket,
-            EnableTls = _enableTls,
-            EnableJetStream = _enableJetStream,
-            TlsServerCertFile = _tlsServerCertFile,
-            TlsServerKeyFile = _tlsServerKeyFile,
-            TlsCaFile = _tlsCaFile,
-            ExtraConfigs = _extraConfigs,
-            TransportType = _transportType ?? TransportType.Tcp,
-            Trace = _trace,
-        };
+        EnableWebSocket = _enableWebSocket,
+        EnableTls = _enableTls,
+        TlsFirst = _tlsFirst,
+        EnableJetStream = _enableJetStream,
+        TlsServerCertFile = _tlsServerCertFile,
+        TlsServerKeyFile = _tlsServerKeyFile,
+        TlsCaFile = _tlsCaFile,
+        ExtraConfigs = _extraConfigs,
+        TransportType = _transportType ?? TransportType.Tcp,
+        ServerDisposeReturnsPorts = _serverDisposeReturnsPorts,
+        EnableClustering = _enableClustering,
+        Trace = _trace,
+    };
+
+    public NatsServerOptsBuilder EnableClustering()
+    {
+        _enableClustering = true;
+        return this;
+    }
+
+    public NatsServerOptsBuilder WithServerDisposeReturnsPorts()
+    {
+        _serverDisposeReturnsPorts = true;
+        return this;
     }
 
     public NatsServerOptsBuilder Trace()
@@ -45,9 +60,14 @@ public sealed class NatsServerOptsBuilder
         return this;
     }
 
-    public NatsServerOptsBuilder UseTransport(TransportType transportType)
+    public NatsServerOptsBuilder UseTransport(TransportType transportType, bool tlsFirst = false)
     {
         _transportType = transportType;
+
+        if (transportType != TransportType.Tls && tlsFirst)
+        {
+            throw new Exception("tlsFirst is only valid for TLS transport");
+        }
 
         if (transportType == TransportType.Tls)
         {
@@ -55,6 +75,7 @@ public sealed class NatsServerOptsBuilder
             _tlsServerCertFile = "resources/certs/server-cert.pem";
             _tlsServerKeyFile = "resources/certs/server-key.pem";
             _tlsCaFile = "resources/certs/ca-cert.pem";
+            _tlsFirst = tlsFirst;
         }
         else if (transportType == TransportType.WebSocket)
         {
@@ -130,6 +151,8 @@ public sealed class NatsServerOpts : IDisposable
 
     public string? TlsCaFile { get; init; }
 
+    public bool TlsFirst { get; init; } = false;
+
     public TransportType TransportType { get; init; }
 
     public bool Trace { get; init; }
@@ -152,6 +175,7 @@ public sealed class NatsServerOpts : IDisposable
             if (Trace)
             {
                 sb.AppendLine($"trace: true");
+                sb.AppendLine($"debug: true");
             }
 
             if (EnableWebSocket)
@@ -184,6 +208,11 @@ public sealed class NatsServerOpts : IDisposable
                 if (TlsCaFile != default)
                 {
                     sb.AppendLine($"  ca_file: {TlsCaFile}");
+                }
+
+                if (TlsFirst)
+                {
+                    sb.AppendLine($"  handshake_first: true");
                 }
 
                 sb.AppendLine("}");

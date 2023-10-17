@@ -67,10 +67,7 @@ public class NatsServer : IAsyncDisposable
             opts.JetStreamStoreDir = _jetStreamStoreDir;
         }
 
-        _configFileName = Path.GetTempFileName();
-        var config = opts.ConfigFileContents;
-        File.WriteAllText(_configFileName, config);
-        var cmd = $"{NatsServerPath} -c {_configFileName}";
+        (_configFileName, var config, var cmd) = GetCmd(opts);
 
         outputHelper.WriteLine("ProcessStart: " + cmd + Environment.NewLine + config);
         var (p, stdout, stderr) = ProcessX.GetDualAsyncEnumerable(cmd);
@@ -158,6 +155,62 @@ public class NatsServer : IAsyncDisposable
             .Build());
 
     public static NatsServer Start() => Start(new NullOutputHelper(), TransportType.Tcp);
+
+    public static bool SupportsTlsFirst()
+    {
+        var (configFileName, _, _) = GetCmd(new NatsServerOptsBuilder().UseTransport(TransportType.Tls, tlsFirst: true).Build());
+
+        Process? process = null;
+        try
+        {
+            process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = NatsServerPath,
+                    Arguments = $"-c \"{configFileName}\"",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                },
+            };
+
+            var mre = new ManualResetEventSlim();
+            var matched = 0;
+            DataReceivedEventHandler? handler = (_, e) =>
+            {
+                if (e.Data != null)
+                {
+                    if (Regex.IsMatch(e.Data, @"(?:\[INF\] Server is ready|error parsing)"))
+                    {
+                        mre.Set();
+                    }
+
+                    if (Regex.IsMatch(e.Data, @"Clients that are not using ""TLS Handshake First"" option will fail to connect"))
+                    {
+                        Interlocked.Increment(ref matched);
+                    }
+                }
+            };
+            process.OutputDataReceived += handler;
+            process.ErrorDataReceived += handler;
+
+            process.Start();
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+
+            if (!mre.Wait(10_000))
+            {
+                throw new Exception("Can't start nats-server");
+            }
+
+            return Volatile.Read(ref matched) > 0;
+        }
+        finally
+        {
+            process?.Kill();
+        }
+    }
 
     public static NatsServer StartWithTrace(ITestOutputHelper outputHelper)
         => Start(
@@ -309,6 +362,18 @@ public class NatsServer : IAsyncDisposable
 
     public NatsOpts ClientOpts(NatsOpts opts)
     {
+        var tls = opts.TlsOpts ?? NatsTlsOpts.Default;
+
+        var natsTlsOpts = Opts.EnableTls
+            ? tls with
+            {
+                CertFile = Opts.TlsClientCertFile,
+                KeyFile = Opts.TlsClientKeyFile,
+                CaFile = Opts.TlsCaFile,
+                Mode = Opts.TlsFirst ? TlsMode.Implicit : TlsMode.Auto,
+            }
+            : NatsTlsOpts.Default;
+
         return opts with
         {
             LoggerFactory = _loggerFactory,
@@ -316,14 +381,7 @@ public class NatsServer : IAsyncDisposable
             // ConnectTimeout = TimeSpan.FromSeconds(1),
             // ReconnectWait = TimeSpan.Zero,
             // ReconnectJitter = TimeSpan.Zero,
-            TlsOpts = Opts.EnableTls
-                ? NatsTlsOpts.Default with
-                {
-                    CertFile = Opts.TlsClientCertFile,
-                    KeyFile = Opts.TlsClientKeyFile,
-                    CaFile = Opts.TlsCaFile,
-                }
-                : NatsTlsOpts.Default,
+            TlsOpts = natsTlsOpts,
             Url = ClientUrl,
         };
     }
@@ -352,6 +410,18 @@ public class NatsServer : IAsyncDisposable
                 // ignore
             }
         }
+    }
+
+    private static (string configFileName, string config, string cmd) GetCmd(NatsServerOpts opts)
+    {
+        var configFileName = Path.GetTempFileName();
+
+        var config = opts.ConfigFileContents;
+        File.WriteAllText(configFileName, config);
+
+        var cmd = $"{NatsServerPath} -c {configFileName}";
+
+        return (configFileName, config, cmd);
     }
 
     private async Task<string[]> EnumerateWithLogsAsync(ProcessAsyncEnumerable enumerable, CancellationToken cancellationToken)
@@ -384,25 +454,45 @@ public class NatsCluster : IAsyncDisposable
 {
     public NatsCluster(ITestOutputHelper outputHelper, TransportType transportType)
     {
-        var opts1 = new NatsServerOpts
+        var opts1 = new NatsServerOptsBuilder()
+            .UseTransport(transportType)
+            .EnableClustering()
+            .Build();
+
+        var opts2 = new NatsServerOptsBuilder()
+            .UseTransport(transportType)
+            .EnableClustering()
+            .Build();
+
+        var opts3 = new NatsServerOptsBuilder()
+            .UseTransport(transportType)
+            .EnableClustering()
+            .Build();
+
+        // By querying the ports we set the values lazily on all the opts.
+        outputHelper.WriteLine($"opts1.ServerPort={opts1.ServerPort}");
+        outputHelper.WriteLine($"opts1.ClusteringPort={opts1.ClusteringPort}");
+        if (opts1.EnableWebSocket)
         {
-            TransportType = transportType,
-            EnableWebSocket = transportType == TransportType.WebSocket,
-            EnableClustering = true,
-        };
-        var opts2 = new NatsServerOpts
+            outputHelper.WriteLine($"opts1.WebSocketPort={opts1.WebSocketPort}");
+        }
+
+        outputHelper.WriteLine($"opts2.ServerPort={opts2.ServerPort}");
+        outputHelper.WriteLine($"opts2.ClusteringPort={opts2.ClusteringPort}");
+        if (opts2.EnableWebSocket)
         {
-            TransportType = transportType,
-            EnableWebSocket = transportType == TransportType.WebSocket,
-            EnableClustering = true,
-        };
-        var opts3 = new NatsServerOpts
+            outputHelper.WriteLine($"opts2.WebSocketPort={opts2.WebSocketPort}");
+        }
+
+        outputHelper.WriteLine($"opts3.ServerPort={opts3.ServerPort}");
+        outputHelper.WriteLine($"opts3.ClusteringPort={opts3.ClusteringPort}");
+        if (opts3.EnableWebSocket)
         {
-            TransportType = transportType,
-            EnableWebSocket = transportType == TransportType.WebSocket,
-            EnableClustering = true,
-        };
+            outputHelper.WriteLine($"opts3.WebSocketPort={opts3.WebSocketPort}");
+        }
+
         var routes = new[] { opts1, opts2, opts3 };
+
         foreach (var opt in routes)
         {
             opt.SetRoutes(routes);

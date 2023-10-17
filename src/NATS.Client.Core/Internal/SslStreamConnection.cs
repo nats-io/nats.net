@@ -69,10 +69,17 @@ internal sealed class SslStreamConnection : ISocketConnection
         _waitForClosedSource.TrySetResult(exception);
     }
 
-    public async Task AuthenticateAsClientAsync(string target)
+    public async Task AuthenticateAsClientAsync(NatsUri uri)
     {
-        var options = SslClientAuthenticationOptions(target);
-        await _sslStream.AuthenticateAsClientAsync(options).ConfigureAwait(false);
+        var options = SslClientAuthenticationOptions(uri);
+        try
+        {
+            await _sslStream.AuthenticateAsClientAsync(options).ConfigureAwait(false);
+        }
+        catch (AuthenticationException ex)
+        {
+            throw new NatsException($"TLS authentication failed", ex);
+        }
     }
 
     private static X509Certificate LcsCbClientCerts(
@@ -123,11 +130,11 @@ internal sealed class SslStreamConnection : ISocketConnection
         return sslPolicyErrors == SslPolicyErrors.None;
     }
 
-    private SslClientAuthenticationOptions SslClientAuthenticationOptions(string targetHost)
+    private SslClientAuthenticationOptions SslClientAuthenticationOptions(NatsUri uri)
     {
-        if (_tlsOpts.Disabled)
+        if (_tlsOpts.EffectiveMode(uri) == TlsMode.Disable)
         {
-            throw new InvalidOperationException("TLS is not permitted when TlsOptions.Disabled is set");
+            throw new InvalidOperationException("TLS is not permitted when TlsMode is set to Disable");
         }
 
         LocalCertificateSelectionCallback? lcsCb = default;
@@ -148,7 +155,7 @@ internal sealed class SslStreamConnection : ISocketConnection
 
         var options = new SslClientAuthenticationOptions
         {
-            TargetHost = targetHost,
+            TargetHost = uri.Host,
             EnabledSslProtocols = SslProtocols.Tls12,
             ClientCertificates = _tlsCerts?.ClientCerts,
             LocalCertificateSelectionCallback = lcsCb,
