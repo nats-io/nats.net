@@ -7,7 +7,7 @@ public static class WaitSignalExtensions
 {
     public static Task ConnectionDisconnectedAsAwaitable(this NatsConnection connection)
     {
-        var signal = new WaitSignal(TimeSpan.FromSeconds(900));
+        var signal = new WaitSignal();
         connection.ConnectionDisconnected += (sender, e) =>
         {
             signal.Pulse();
