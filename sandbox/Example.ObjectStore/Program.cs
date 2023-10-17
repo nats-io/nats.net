@@ -6,9 +6,9 @@ using NATS.Client.ObjectStore.Models;
 
 var nats = new NatsConnection();
 var js = new NatsJSContext(nats);
-var ob = new NatsOBContext(js);
+var ob = new NatsObjContext(js);
 
-var store = await ob.CreateObjectStore(new NatsOBConfig("o1"));
+var store = await ob.CreateObjectStore(new NatsObjConfig("o1"));
 
 var meta = new ObjectMetadata { Name = "k1", Options = new Options { MaxChunkSize = 10 }, };
 

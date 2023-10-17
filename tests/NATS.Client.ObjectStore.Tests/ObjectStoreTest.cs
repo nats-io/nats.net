@@ -21,9 +21,9 @@ public class ObjectStoreTest
         await using var server = NatsServer.StartJS();
         await using var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats);
-        var ob = new NatsOBContext(js);
+        var ob = new NatsObjContext(js);
 
-        await ob.CreateObjectStore(new NatsOBConfig("b1"), cancellationToken);
+        await ob.CreateObjectStore(new NatsObjConfig("b1"), cancellationToken);
 
         await foreach (var stream in js.ListStreamsAsync(cancellationToken: cancellationToken))
         {
@@ -48,9 +48,9 @@ public class ObjectStoreTest
         await using var server = NatsServer.StartJS();
         await using var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats);
-        var ob = new NatsOBContext(js);
+        var ob = new NatsObjContext(js);
 
-        var store = await ob.CreateObjectStore(new NatsOBConfig("b1"), cancellationToken);
+        var store = await ob.CreateObjectStore(new NatsObjConfig("b1"), cancellationToken);
 
         var stringBuilder = new StringBuilder();
         for (var i = 0; i < 9; i++)
@@ -110,9 +110,9 @@ public class ObjectStoreTest
         await using var server = NatsServer.StartJS();
         await using var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats);
-        var ob = new NatsOBContext(js);
+        var ob = new NatsObjContext(js);
 
-        var store = await ob.CreateObjectStore(new NatsOBConfig("b1"), cancellationToken);
+        var store = await ob.CreateObjectStore(new NatsObjConfig("b1"), cancellationToken);
 
         var stringBuilder = new StringBuilder();
         for (var i = 0; i < 9; i++)
@@ -164,9 +164,9 @@ public class ObjectStoreTest
         await using var server = NatsServer.StartJS();
         await using var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats);
-        var ob = new NatsOBContext(js);
+        var ob = new NatsObjContext(js);
 
-        var store = await ob.CreateObjectStore(new NatsOBConfig("b1"), cancellationToken);
+        var store = await ob.CreateObjectStore(new NatsObjConfig("b1"), cancellationToken);
         await store.PutAsync("k1", new byte[] { 65, 66, 67 }, cancellationToken);
 
         var info = await store.GetInfoAsync("k1", cancellationToken: cancellationToken);
@@ -177,7 +177,7 @@ public class ObjectStoreTest
 
         await store.DeleteAsync("k1", cancellationToken);
 
-        var exception = await Assert.ThrowsAsync<NatsOBException>(async () => await store.GetInfoAsync("k1", cancellationToken: cancellationToken));
+        var exception = await Assert.ThrowsAsync<NatsObjException>(async () => await store.GetInfoAsync("k1", cancellationToken: cancellationToken));
         Assert.Equal("Object not found", exception.Message);
 
         var info2 = await store.GetInfoAsync("k1", showDeleted: true, cancellationToken: cancellationToken);

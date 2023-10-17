@@ -3,7 +3,7 @@ namespace NATS.Client.ObjectStore;
 /// <summary>
 /// Object Store storage type
 /// </summary>
-public enum NatsOBStorageType
+public enum NatsObjStorageType
 {
     File = 0,
     Memory = 1,
@@ -13,7 +13,7 @@ public enum NatsOBStorageType
 /// Object store configuration.
 /// </summary>
 /// <param name="Bucket">Name of the bucket.</param>
-public record NatsOBConfig(string Bucket)
+public record NatsObjConfig(string Bucket)
 {
     /// <summary>
     /// Bucket description.
@@ -33,7 +33,7 @@ public record NatsOBConfig(string Bucket)
     /// <summary>
     /// Type of backing storage to use.
     /// </summary>
-    public NatsOBStorageType? Storage { get; init; }
+    public NatsObjStorageType? Storage { get; init; }
 
     /// <summary>
     /// How many replicas to keep for each key.

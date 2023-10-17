@@ -8,7 +8,7 @@ namespace NATS.Client.ObjectStore;
 /// <summary>
 /// Object Store context.
 /// </summary>
-public class NatsOBContext
+public class NatsObjContext
 {
     private static readonly Regex ValidBucketRegex = new(pattern: @"\A[a-zA-Z0-9_-]+\z", RegexOptions.Compiled);
 
@@ -18,7 +18,7 @@ public class NatsOBContext
     /// Create a new object store context.
     /// </summary>
     /// <param name="context">JetStream context.</param>
-    public NatsOBContext(NatsJSContext context) => _context = context;
+    public NatsObjContext(NatsJSContext context) => _context = context;
 
     /// <summary>
     /// Create a new object store.
@@ -26,11 +26,11 @@ public class NatsOBContext
     /// <param name="config">Object store configuration.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>Object store object.</returns>
-    public async ValueTask<NatsOBStore> CreateObjectStore(NatsOBConfig config, CancellationToken cancellationToken = default)
+    public async ValueTask<NatsObjStore> CreateObjectStore(NatsObjConfig config, CancellationToken cancellationToken = default)
     {
         ValidateBucketName(config.Bucket);
 
-        var storage = config.Storage == NatsOBStorageType.File
+        var storage = config.Storage == NatsObjStorageType.File
             ? StreamConfigurationStorage.file
             : StreamConfigurationStorage.memory;
 
@@ -52,7 +52,7 @@ public class NatsOBContext
         };
 
         var stream = await _context.CreateStreamAsync(streamConfiguration, cancellationToken);
-        return new NatsOBStore(config, _context, stream);
+        return new NatsObjStore(config, _context, stream);
     }
 
     /// <summary>
@@ -71,22 +71,22 @@ public class NatsOBContext
     {
         if (string.IsNullOrWhiteSpace(bucket))
         {
-            throw new NatsOBException("Bucket name can't be empty");
+            throw new NatsObjException("Bucket name can't be empty");
         }
 
         if (bucket.StartsWith("."))
         {
-            throw new NatsOBException("Bucket name can't start with a period");
+            throw new NatsObjException("Bucket name can't start with a period");
         }
 
         if (bucket.EndsWith("."))
         {
-            throw new NatsOBException("Bucket name can't end with a period");
+            throw new NatsObjException("Bucket name can't end with a period");
         }
 
         if (!ValidBucketRegex.IsMatch(bucket))
         {
-            throw new NatsOBException("Bucket name can only contain alphanumeric characters, dashes, and underscores");
+            throw new NatsObjException("Bucket name can only contain alphanumeric characters, dashes, and underscores");
         }
     }
 }

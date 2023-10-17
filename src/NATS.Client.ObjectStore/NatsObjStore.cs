@@ -14,7 +14,7 @@ namespace NATS.Client.ObjectStore;
 /// <summary>
 /// NATS Object Store.
 /// </summary>
-public class NatsOBStore
+public class NatsObjStore
 {
     private const int DefaultChunkSize = 128 * 1024;
     private const string NatsRollup = "Nats-Rollup";
@@ -27,7 +27,7 @@ public class NatsOBStore
     private readonly NatsJSContext _context;
     private readonly NatsJSStream _stream;
 
-    internal NatsOBStore(NatsOBConfig config, NatsJSContext context, NatsJSStream stream)
+    internal NatsObjStore(NatsObjConfig config, NatsJSContext context, NatsJSStream stream)
     {
         _bucket = config.Bucket;
         _context = context;
@@ -55,7 +55,7 @@ public class NatsOBStore
     /// <param name="leaveOpen"><c>true</c> to not close the underlying stream when async method returns; otherwise, <c>false</c></param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>Object metadata.</returns>
-    /// <exception cref="NatsOBException">Metadata didn't match the value retrieved e.g. the SHA digest.</exception>
+    /// <exception cref="NatsObjException">Metadata didn't match the value retrieved e.g. the SHA digest.</exception>
     public async ValueTask<ObjectMetadata> GetAsync(string key, Stream stream, bool leaveOpen = false, CancellationToken cancellationToken = default)
     {
         ValidateObjectName(key);
@@ -113,17 +113,17 @@ public class NatsOBStore
 
         if ($"SHA-256={digest}" != info.Digest)
         {
-            throw new NatsOBException("SHA-256 digest mismatch");
+            throw new NatsObjException("SHA-256 digest mismatch");
         }
 
         if (chunks != info.Chunks)
         {
-            throw new NatsOBException("Chunks mismatch");
+            throw new NatsObjException("Chunks mismatch");
         }
 
         if (size != info.Size)
         {
-            throw new NatsOBException("Size mismatch");
+            throw new NatsObjException("Size mismatch");
         }
 
         await stream.FlushAsync(cancellationToken);
@@ -149,7 +149,7 @@ public class NatsOBStore
     /// <param name="leaveOpen"><c>true</c> to not close the underlying stream when async method returns; otherwise, <c>false</c></param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>Object metadata.</returns>
-    /// <exception cref="NatsOBException">There was an error calculating SHA digest.</exception>
+    /// <exception cref="NatsObjException">There was an error calculating SHA digest.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     public ValueTask<ObjectMetadata> PutAsync(string key, Stream stream, bool leaveOpen = false, CancellationToken cancellationToken = default) =>
         PutAsync(new ObjectMetadata { Name = key }, stream, leaveOpen, cancellationToken);
@@ -162,7 +162,7 @@ public class NatsOBStore
     /// <param name="leaveOpen"><c>true</c> to not close the underlying stream when async method returns; otherwise, <c>false</c></param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>Object metadata.</returns>
-    /// <exception cref="NatsOBException">There was an error calculating SHA digest.</exception>
+    /// <exception cref="NatsObjException">There was an error calculating SHA digest.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     public async ValueTask<ObjectMetadata> PutAsync(ObjectMetadata meta, Stream stream, bool leaveOpen = false, CancellationToken cancellationToken = default)
     {
@@ -251,7 +251,7 @@ public class NatsOBStore
             }
 
             if (sha256.Hash == null)
-                throw new NatsOBException("Can't compute SHA256 hash");
+                throw new NatsObjException("Can't compute SHA256 hash");
 
             digest = Base64UrlEncoder.Encode(sha256.Hash);
         }
@@ -290,7 +290,7 @@ public class NatsOBStore
     /// <param name="showDeleted">Also retrieve deleted objects.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>Object metadata.</returns>
-    /// <exception cref="NatsOBException">Object was not found.</exception>
+    /// <exception cref="NatsObjException">Object was not found.</exception>
     public async ValueTask<ObjectMetadata> GetInfoAsync(string key, bool showDeleted = false, CancellationToken cancellationToken = default)
     {
         ValidateObjectName(key);
@@ -299,11 +299,11 @@ public class NatsOBStore
 
         var response = await _stream.GetAsync(request, cancellationToken);
 
-        var data = NatsJsonSerializer.Default.Deserialize<ObjectMetadata>(new ReadOnlySequence<byte>(Convert.FromBase64String(response.Message.Data))) ?? throw new NatsOBException("Can't deserialize object metadata");
+        var data = NatsJsonSerializer.Default.Deserialize<ObjectMetadata>(new ReadOnlySequence<byte>(Convert.FromBase64String(response.Message.Data))) ?? throw new NatsObjException("Can't deserialize object metadata");
 
         if (!showDeleted && data.Deleted)
         {
-            throw new NatsOBException("Object not found");
+            throw new NatsObjException("Object not found");
         }
 
         return data;
@@ -314,7 +314,7 @@ public class NatsOBStore
     /// </summary>
     /// <param name="key">Object key.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <exception cref="NatsOBException">Object metadata was invalid or chunks can't be purged.</exception>
+    /// <exception cref="NatsObjException">Object metadata was invalid or chunks can't be purged.</exception>
     public async ValueTask DeleteAsync(string key, CancellationToken cancellationToken = default)
     {
         ValidateObjectName(key);
@@ -323,7 +323,7 @@ public class NatsOBStore
 
         if (string.IsNullOrEmpty(meta.Nuid))
         {
-            throw new NatsOBException("Object-store meta information invalid");
+            throw new NatsObjException("Object-store meta information invalid");
         }
 
         meta.Size = 0;
@@ -337,7 +337,7 @@ public class NatsOBStore
         var response = await _stream.PurgeAsync(new StreamPurgeRequest { Filter = GetChunkSubject(meta.Nuid) }, cancellationToken);
         if (!response.Success)
         {
-            throw new NatsOBException("Can't purge object chunks");
+            throw new NatsObjException("Can't purge object chunks");
         }
     }
 
@@ -366,12 +366,12 @@ public class NatsOBStore
     {
         if (string.IsNullOrWhiteSpace(name))
         {
-            throw new NatsOBException("Object name can't be empty");
+            throw new NatsObjException("Object name can't be empty");
         }
 
         if (!ValidObjectRegex.IsMatch(name))
         {
-            throw new NatsOBException("Object name can only contain alphanumeric characters, dashes, underscores, forward slash, equals sign, and periods");
+            throw new NatsObjException("Object name can only contain alphanumeric characters, dashes, underscores, forward slash, equals sign, and periods");
         }
     }
 }

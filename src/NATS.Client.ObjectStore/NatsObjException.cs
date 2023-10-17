@@ -5,13 +5,13 @@ namespace NATS.Client.ObjectStore;
 /// <summary>
 /// NATS Object Store exception.
 /// </summary>
-public class NatsOBException : NatsJSException
+public class NatsObjException : NatsJSException
 {
     /// <summary>
     /// Create a new NATS Object Store exception.
     /// </summary>
     /// <param name="message">Exception message.</param>
-    public NatsOBException(string message)
+    public NatsObjException(string message)
         : base(message)
     {
     }
@@ -21,7 +21,7 @@ public class NatsOBException : NatsJSException
     /// </summary>
     /// <param name="message">Exception message.</param>
     /// <param name="exception">Inner exception</param>
-    public NatsOBException(string message, Exception exception)
+    public NatsObjException(string message, Exception exception)
         : base(message, exception)
     {
     }
