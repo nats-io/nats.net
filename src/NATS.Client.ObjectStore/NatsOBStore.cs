@@ -146,12 +146,13 @@ public class NatsOBStore
     /// </summary>
     /// <param name="key">Object key.</param>
     /// <param name="stream">Stream to read the value from.</param>
+    /// <param name="leaveOpen"><c>true</c> to not close the underlying stream when async method returns; otherwise, <c>false</c></param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>Object metadata.</returns>
     /// <exception cref="NatsOBException">There was an error calculating SHA digest.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
-    public ValueTask<ObjectMetadata> PutAsync(string key, Stream stream, CancellationToken cancellationToken = default) =>
-        PutAsync(new ObjectMetadata { Name = key }, stream, cancellationToken: cancellationToken);
+    public ValueTask<ObjectMetadata> PutAsync(string key, Stream stream, bool leaveOpen = false, CancellationToken cancellationToken = default) =>
+        PutAsync(new ObjectMetadata { Name = key }, stream, leaveOpen, cancellationToken);
 
     /// <summary>
     /// Put an object by key.
