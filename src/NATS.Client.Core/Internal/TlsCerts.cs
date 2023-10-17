@@ -6,7 +6,7 @@ internal class TlsCerts
 {
     public TlsCerts(NatsTlsOpts tlsOpts)
     {
-        if (tlsOpts.Disabled)
+        if (tlsOpts.Mode == TlsMode.Disable)
         {
             return;
         }
