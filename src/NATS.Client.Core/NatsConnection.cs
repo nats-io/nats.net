@@ -536,7 +536,8 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
     private NatsUri FixTlsHost(NatsUri uri)
     {
-        var lastSeedHost = _lastSeedConnectUri?.Host;
+        var lastSeedConnectUri = _lastSeedConnectUri;
+        var lastSeedHost = lastSeedConnectUri?.Host;
 
         if (string.IsNullOrEmpty(lastSeedHost))
             return uri;
