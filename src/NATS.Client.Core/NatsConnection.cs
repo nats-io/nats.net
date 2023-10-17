@@ -265,7 +265,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
                     {
                         // upgrade TcpConnection to SslConnection
                         var sslConnection = conn.UpgradeToSslStreamConnection(Opts.TlsOpts, _tlsCerts);
-                        await sslConnection.AuthenticateAsClientAsync(FixTlsHost(uri)).ConfigureAwait(false);
+                        await sslConnection.AuthenticateAsClientAsync(uri).ConfigureAwait(false);
                         _socket = sslConnection;
                     }
                 }
@@ -536,13 +536,18 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
     private NatsUri FixTlsHost(NatsUri uri)
     {
+        var lastSeedHost = _lastSeedConnectUri?.Host;
+
+        if (string.IsNullOrEmpty(lastSeedHost))
+            return uri;
+
         // if the current URI is not a seed URI and is not a DNS hostname, check the server cert against the
         // last seed hostname if it was a DNS hostname
         if (!uri.IsSeed
             && Uri.CheckHostName(uri.Host) != UriHostNameType.Dns
-            && Uri.CheckHostName(_lastSeedConnectUri!.Host) == UriHostNameType.Dns)
+            && Uri.CheckHostName(lastSeedHost) == UriHostNameType.Dns)
         {
-            return uri.CloneWith(_lastSeedConnectUri.Host);
+            return uri.CloneWith(lastSeedHost);
         }
 
         return uri;
