@@ -529,3 +529,18 @@ public class NullOutputHelper : ITestOutputHelper
     {
     }
 }
+
+public sealed class SkipIfNatsServer : FactAttribute
+{
+    private static readonly bool SupportsTlsFirst;
+
+    static SkipIfNatsServer() => SupportsTlsFirst = NatsServer.SupportsTlsFirst();
+
+    public SkipIfNatsServer(bool doesNotSupportTlsFirst = false)
+    {
+        if (doesNotSupportTlsFirst && !SupportsTlsFirst)
+        {
+            Skip = "NATS server doesn't support TLS first";
+        }
+    }
+}

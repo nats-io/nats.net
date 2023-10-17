@@ -6,17 +6,9 @@ public class TlsFirstTest
 
     public TlsFirstTest(ITestOutputHelper output) => _output = output;
 
-    [Fact]
-    public async Task Tls_first_connection()
+    [SkipIfNatsServer(doesNotSupportTlsFirst: true)]
+    public async Task Implicit_TLS_connection()
     {
-        if (!NatsServer.SupportsTlsFirst())
-        {
-            _output.WriteLine($"TLS first is NOT supported by the server");
-            return;
-        }
-
-        _output.WriteLine($"TLS first is supported by the server");
-
         await using var server = NatsServer.Start(
             new NullOutputHelper(),
             new NatsServerOptsBuilder()
@@ -45,6 +37,42 @@ public class TlsFirstTest
             Assert.Matches(@"can not start to connect nats server: tls://", exception.Message);
 
             _output.WriteLine($"Auto TLS connection rejected");
+        }
+    }
+
+    [Fact]
+    public async Task Implicit_TLS_fails_when_disabled()
+    {
+        await using var server = NatsServer.Start(
+            new NullOutputHelper(),
+            new NatsServerOptsBuilder()
+                .UseTransport(TransportType.Tls, tlsFirst: false)
+                .Build());
+
+        var clientOpts = server.ClientOpts(NatsOpts.Default);
+
+        Assert.True(clientOpts.TlsOpts.Mode == TlsMode.Auto);
+
+        // TLS first connection should fail
+        {
+            await using var nats = new NatsConnection(clientOpts with { TlsOpts = clientOpts.TlsOpts with { Mode = TlsMode.Implicit } });
+
+            var exception = await Assert.ThrowsAsync<NatsException>(async () => await nats.ConnectAsync());
+
+            Assert.Matches(@"can not start to connect nats server", exception.Message);
+
+            _output.WriteLine($"Implicit TLS connection rejected");
+
+        }
+
+        // Normal TLS connection should work
+        {
+            await using var nats = new NatsConnection(clientOpts);
+            await nats.ConnectAsync();
+            var rtt = await nats.PingAsync();
+            Assert.True(rtt > TimeSpan.Zero);
+            Assert.True(nats.ServerInfo!.TlsRequired);
+            _output.WriteLine($"Explicit TLS connection (RTT: {rtt})");
         }
     }
 }
