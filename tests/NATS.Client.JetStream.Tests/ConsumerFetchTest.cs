@@ -40,6 +40,38 @@ public class ConsumerFetchTest
         Assert.Equal(10, count);
     }
 
+    [Theory]
+    [InlineData(0, NatsSubEndReason.NoMsgs)]
+    [InlineData(5, NatsSubEndReason.Timeout)]
+    public async Task EndReason_test(int sendCount, NatsSubEndReason endReason)
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+        var js = new NatsJSContext(nats);
+        await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
+        await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+
+        for (var i = 0; i < sendCount; i++)
+        {
+            var ack = await js.PublishAsync("s1.foo", new TestData { Test = i }, cancellationToken: cts.Token);
+            ack.EnsureSuccess();
+        }
+
+        var consumer = await js.GetConsumerAsync("s1", "c1", cts.Token);
+        var count = 0;
+        await using var fc =
+            await consumer.FetchAsync<TestData>(new NatsJSFetchOpts { MaxMsgs = 10, NoWait = true }, cancellationToken: cts.Token);
+        await foreach (var msg in fc.Msgs.ReadAllAsync(cts.Token))
+        {
+            await msg.AckAsync(new AckOpts(WaitUntilSent: true), cts.Token);
+            count++;
+        }
+
+        Assert.Equal(sendCount, count);
+        Assert.Equal(endReason, fc.EndReason);
+    }
+
     private record TestData
     {
         public int Test { get; init; }
