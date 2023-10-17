@@ -258,7 +258,9 @@ public class NatsJSConsumer
         await sub.CallMsgNextAsync(
             opts.NoWait
 
-                // When no wait is set we don't need to send the idle heartbeat and expiration, because if no message is available nats doesn't send 404 instantly
+                // When no wait is set we don't need to send the idle heartbeat and expiration
+                // If no message is available the server will respond with a 404 immediately
+                // If messages are available the server will send a 408 direct after the last message
                 ? new ConsumerGetnextRequest { Batch = max.MaxMsgs, MaxBytes = max.MaxBytes, NoWait = opts.NoWait }
                 : new ConsumerGetnextRequest
                 {
