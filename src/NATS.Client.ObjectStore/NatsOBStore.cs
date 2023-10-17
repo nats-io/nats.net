@@ -43,7 +43,7 @@ public class NatsOBStore
     public async ValueTask<byte[]> GetBytesAsync(string key, CancellationToken cancellationToken = default)
     {
         var memoryStream = new MemoryStream();
-        await GetAsync(key, memoryStream, cancellationToken).ConfigureAwait(false);
+        await GetAsync(key, memoryStream, cancellationToken: cancellationToken).ConfigureAwait(false);
         return memoryStream.ToArray();
     }
 
@@ -52,10 +52,11 @@ public class NatsOBStore
     /// </summary>
     /// <param name="key">Object key.</param>
     /// <param name="stream">Stream to write the object value to.</param>
+    /// <param name="leaveOpen"><c>true</c> to not close the underlying stream when async method returns; otherwise, <c>false</c></param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>Object metadata.</returns>
     /// <exception cref="NatsOBException">Metadata didn't match the value retrieved e.g. the SHA digest.</exception>
-    public async ValueTask<ObjectMetadata> GetAsync(string key, Stream stream, CancellationToken cancellationToken = default)
+    public async ValueTask<ObjectMetadata> GetAsync(string key, Stream stream, bool leaveOpen = false, CancellationToken cancellationToken = default)
     {
         ValidateObjectName(key);
 
@@ -76,7 +77,7 @@ public class NatsOBStore
         var size = 0;
         using (var sha256 = SHA256.Create())
         {
-            await using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Write))
+            await using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Write, leaveOpen))
             {
                 await foreach (var msg in pushConsumer.Msgs.ReadAllAsync(cancellationToken))
                 {
@@ -138,7 +139,7 @@ public class NatsOBStore
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>Object metadata.</returns>
     public ValueTask<ObjectMetadata> PutAsync(string key, byte[] value, CancellationToken cancellationToken = default) =>
-        PutAsync(new ObjectMetadata { Name = key }, new MemoryStream(value), cancellationToken);
+        PutAsync(new ObjectMetadata { Name = key }, new MemoryStream(value), cancellationToken: cancellationToken);
 
     /// <summary>
     /// Put an object by key.
@@ -150,18 +151,19 @@ public class NatsOBStore
     /// <exception cref="NatsOBException">There was an error calculating SHA digest.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     public ValueTask<ObjectMetadata> PutAsync(string key, Stream stream, CancellationToken cancellationToken = default) =>
-        PutAsync(new ObjectMetadata { Name = key }, stream, cancellationToken);
+        PutAsync(new ObjectMetadata { Name = key }, stream, cancellationToken: cancellationToken);
 
     /// <summary>
     /// Put an object by key.
     /// </summary>
     /// <param name="meta">Object metadata.</param>
     /// <param name="stream">Stream to read the value from.</param>
+    /// <param name="leaveOpen"><c>true</c> to not close the underlying stream when async method returns; otherwise, <c>false</c></param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>Object metadata.</returns>
     /// <exception cref="NatsOBException">There was an error calculating SHA digest.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
-    public async ValueTask<ObjectMetadata> PutAsync(ObjectMetadata meta, Stream stream, CancellationToken cancellationToken = default)
+    public async ValueTask<ObjectMetadata> PutAsync(ObjectMetadata meta, Stream stream, bool leaveOpen = false, CancellationToken cancellationToken = default)
     {
         ValidateObjectName(meta.Name);
 
@@ -198,7 +200,7 @@ public class NatsOBStore
         string digest;
         using (var sha256 = SHA256.Create())
         {
-            await using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Read))
+            await using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Read, leaveOpen))
             {
                 while (true)
                 {

@@ -12,7 +12,6 @@ public class ObjectStoreTest
 
     public ObjectStoreTest(ITestOutputHelper output) => _output = output;
 
-
     [Fact]
     public async Task Create_delete_object_store()
     {
@@ -68,7 +67,7 @@ public class ObjectStoreTest
             var buffer = Encoding.ASCII.GetBytes(buffer90);
             var stream = new MemoryStream(buffer);
 
-            await store.PutAsync(meta, stream, cancellationToken);
+            await store.PutAsync(meta, stream, cancellationToken: cancellationToken);
 
             var data = await store.GetInfoAsync("k1", cancellationToken: cancellationToken);
 
@@ -88,7 +87,7 @@ public class ObjectStoreTest
             var buffer = Encoding.ASCII.GetBytes(buffer90 + "09-45");
             var stream = new MemoryStream(buffer);
 
-            await store.PutAsync(meta, stream, cancellationToken);
+            await store.PutAsync(meta, stream, cancellationToken: cancellationToken);
 
             var data = await store.GetInfoAsync("k2", cancellationToken: cancellationToken);
 
@@ -128,12 +127,12 @@ public class ObjectStoreTest
             var meta = new ObjectMetadata { Name = "k1", Options = new Options { MaxChunkSize = 10 }, };
             var buffer = Encoding.ASCII.GetBytes(buffer90);
             var stream = new MemoryStream(buffer);
-            await store.PutAsync(meta, stream, cancellationToken);
+            await store.PutAsync(meta, stream, cancellationToken: cancellationToken);
         }
 
         {
             var memoryStream = new MemoryStream();
-            await store.GetAsync("k1", memoryStream, cancellationToken);
+            await store.GetAsync("k1", memoryStream, cancellationToken: cancellationToken);
             await memoryStream.FlushAsync(cancellationToken);
             var buffer = memoryStream.ToArray();
             Assert.Equal(buffer90, Encoding.ASCII.GetString(buffer));
@@ -144,12 +143,12 @@ public class ObjectStoreTest
             var meta = new ObjectMetadata { Name = "k2", Options = new Options { MaxChunkSize = 10 }, };
             var buffer = Encoding.ASCII.GetBytes(buffer90 + "09-45");
             var stream = new MemoryStream(buffer);
-            await store.PutAsync(meta, stream, cancellationToken);
+            await store.PutAsync(meta, stream, cancellationToken: cancellationToken);
         }
 
         {
             var memoryStream = new MemoryStream();
-            await store.GetAsync("k2", memoryStream, cancellationToken);
+            await store.GetAsync("k2", memoryStream, cancellationToken: cancellationToken);
             await memoryStream.FlushAsync(cancellationToken);
             var buffer = memoryStream.ToArray();
             Assert.Equal(buffer90 + "09-45", Encoding.ASCII.GetString(buffer));
