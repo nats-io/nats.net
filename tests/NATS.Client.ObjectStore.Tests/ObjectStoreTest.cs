@@ -186,4 +186,35 @@ public class ObjectStoreTest
         Assert.Equal(0, info2.Chunks);
         Assert.Equal(string.Empty, info2.Digest);
     }
+
+    [Fact]
+    public async Task Put_and_get_large_file()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+        var js = new NatsJSContext(nats);
+        var obj = new NatsObjContext(js);
+
+        var store = await obj.CreateObjectStore(new NatsObjConfig("b1"), cancellationToken);
+
+        var data = new byte[1024 * 1024 * 10];
+        Random.Shared.NextBytes(data);
+
+        const string filename = $"_tmp_test_file_{nameof(Put_and_get_large_file)}.bin";
+        var filename1 = $"{filename}.1";
+
+        await File.WriteAllBytesAsync(filename, data, cancellationToken);
+
+        await store.PutAsync("my/random/data.bin", File.OpenRead(filename), cancellationToken: cancellationToken);
+
+        await store.GetAsync("my/random/data.bin", File.OpenWrite(filename1), cancellationToken: cancellationToken);
+
+        var hash = Convert.ToBase64String(SHA256.HashData(await File.ReadAllBytesAsync(filename, cancellationToken)));
+        var hash1 = Convert.ToBase64String(SHA256.HashData(await File.ReadAllBytesAsync(filename1, cancellationToken)));
+
+        Assert.Equal(hash, hash1);
+    }
 }

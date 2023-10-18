@@ -26,3 +26,18 @@ public class NatsObjException : NatsJSException
     {
     }
 }
+
+/// <summary>
+/// NATS Object Store object not found exception.
+/// </summary>
+public class NatsObjNotFoundException : NatsObjException
+{
+    /// <summary>
+    /// Create a new NATS Object Store object not found exception.
+    /// </summary>
+    /// <param name="message">Exception message.</param>
+    public NatsObjNotFoundException(string message)
+        : base(message)
+    {
+    }
+}

@@ -85,8 +85,14 @@ public class NatsRawSerializer : INatsSerializer
         {
             using (memoryOwner)
             {
-                bufferWriter.Write(memoryOwner.Memory.Span);
-                return memoryOwner.Memory.Length;
+                var length = memoryOwner.Memory.Length;
+
+                var buffer = bufferWriter.GetMemory(length);
+                memoryOwner.Memory.CopyTo(buffer);
+
+                bufferWriter.Advance(length);
+
+                return length;
             }
         }
 

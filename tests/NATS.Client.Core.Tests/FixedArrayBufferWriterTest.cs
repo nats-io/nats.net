@@ -37,4 +37,30 @@ public class FixedArrayBufferWriterTest
 
         newSpan.Length.Should().Be((ushort.MaxValue * 2) - 20000);
     }
+
+    [Theory]
+    [InlineData(129, 0, "double capacity")]
+    [InlineData(257, 0, "adjust capacity to size")]
+    [InlineData(129, 1, "double capacity when already advanced")]
+    [InlineData(257, 1, "adjust capacity to size when already advanced")]
+    public void Resize(int size, int advance, string reason)
+    {
+        // GetSpan()
+        {
+            var writer = new FixedArrayBufferWriter(128);
+            if (advance > 0)
+                writer.Advance(advance);
+            var span = writer.GetSpan(size);
+            span.Length.Should().BeGreaterOrEqualTo(size, reason);
+        }
+
+        // GetMemory()
+        {
+            var writer = new FixedArrayBufferWriter(128);
+            if (advance > 0)
+                writer.Advance(advance);
+            var memory = writer.GetMemory(size);
+            memory.Length.Should().BeGreaterOrEqualTo(size, reason);
+        }
+    }
 }
