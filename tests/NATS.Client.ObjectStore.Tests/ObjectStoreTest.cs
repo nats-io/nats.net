@@ -177,14 +177,20 @@ public class ObjectStoreTest
 
         await store.DeleteAsync("k1", cancellationToken);
 
-        var exception = await Assert.ThrowsAsync<NatsObjException>(async () => await store.GetInfoAsync("k1", cancellationToken: cancellationToken));
-        Assert.Equal("Object not found", exception.Message);
+        var exception = await Assert.ThrowsAsync<NatsObjNotFoundException>(async () => await store.GetInfoAsync("k1", cancellationToken: cancellationToken));
+        Assert.Matches("Object not found", exception.Message);
 
         var info2 = await store.GetInfoAsync("k1", showDeleted: true, cancellationToken: cancellationToken);
         Assert.True(info2.Deleted);
         Assert.Equal(0, info2.Size);
         Assert.Equal(0, info2.Chunks);
         Assert.Equal(string.Empty, info2.Digest);
+
+        // Put again
+        await store.PutAsync("k1", new byte[] { 65, 66, 67 }, cancellationToken);
+
+        var info3 = await store.GetInfoAsync("k1", showDeleted: true, cancellationToken: cancellationToken);
+        Assert.False(info3.Deleted);
     }
 
     [Fact]
