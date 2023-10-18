@@ -157,7 +157,7 @@ public record NatsJSFetchOpts
     /// <summary>
     /// Does not wait for messages to be available
     /// </summary>
-    public bool NoWait { get; init; }
+    internal bool NoWait { get; init; }
 
     /// <summary>
     /// Serializer to use to deserialize the message if a model is being used.

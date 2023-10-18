@@ -207,6 +207,20 @@ public class NatsJSConsumer
         }
     }
 
+    public async IAsyncEnumerable<NatsJSMsg<T?>> FetchNoWait<T>(
+        NatsJSFetchOpts? opts = default,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        ThrowIfDeleted();
+        opts ??= _context.Opts.DefaultFetchOpts;
+
+        await using var fc = await FetchAsync<T>(opts with { NoWait = true }, cancellationToken);
+        await foreach (var jsMsg in fc.Msgs.ReadAllAsync(cancellationToken))
+        {
+            yield return jsMsg;
+        }
+    }
+
     /// <summary>
     /// Consume a set number of messages from the stream using this consumer.
     /// </summary>
@@ -261,7 +275,7 @@ public class NatsJSConsumer
                 // When no wait is set we don't need to send the idle heartbeat and expiration
                 // If no message is available the server will respond with a 404 immediately
                 // If messages are available the server will send a 408 direct after the last message
-                ? new ConsumerGetnextRequest { Batch = max.MaxMsgs, MaxBytes = max.MaxBytes, NoWait = opts.NoWait }
+                ? new ConsumerGetnextRequest {Batch = max.MaxMsgs, MaxBytes = max.MaxBytes, NoWait = opts.NoWait}
                 : new ConsumerGetnextRequest
                 {
                     Batch = max.MaxMsgs,
