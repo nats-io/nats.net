@@ -205,7 +205,7 @@ public class NatsObjStore
             {
                 while (true)
                 {
-                    var memoryOwner = new FixedSizeMemoryOwner(MemoryPool<byte>.Shared.Rent(chunkSize), chunkSize);
+                    var memoryOwner = NatsMemoryOwner<byte>.Allocate(chunkSize);
 
                     var memory = memoryOwner.Memory;
                     var currentChunkSize = 0;
@@ -239,7 +239,7 @@ public class NatsObjStore
                         chunks++;
                     }
 
-                    var buffer = new FixedSizeMemoryOwner(memoryOwner, currentChunkSize);
+                    var buffer = memoryOwner.Slice(0, currentChunkSize);
 
                     // Chunks
                     var ack = await _context.PublishAsync(GetChunkSubject(nuid), buffer, cancellationToken: cancellationToken);
