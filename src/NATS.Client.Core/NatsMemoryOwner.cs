@@ -3,6 +3,8 @@
 
 namespace NATS.Client.Core;
 
+#pragma warning disable SX1101
+
 using System;
 using System.Buffers;
 using System.Runtime.CompilerServices;
@@ -61,8 +63,8 @@ public struct NatsMemoryOwner<T> : IMemoryOwner<T>
     private NatsMemoryOwner(int length, ArrayPool<T> pool, NatsMemoryOwnerAllocationMode mode)
     {
         _start = 0;
-        this._length = length;
-        this._pool = pool;
+        _length = length;
+        _pool = pool;
         _array = pool.Rent(length);
 
         if (mode == NatsMemoryOwnerAllocationMode.Clear)
@@ -80,10 +82,10 @@ public struct NatsMemoryOwner<T> : IMemoryOwner<T>
     /// <param name="array">The input <typeparamref name="T"/> array to use.</param>
     private NatsMemoryOwner(int start, int length, ArrayPool<T> pool, T[] array)
     {
-        this._start = start;
-        this._length = length;
-        this._pool = pool;
-        this._array = array;
+        _start = start;
+        _length = length;
+        _pool = pool;
+        _array = array;
     }
 
     /// <summary>
@@ -149,12 +151,14 @@ public struct NatsMemoryOwner<T> : IMemoryOwner<T>
     public static NatsMemoryOwner<T> Allocate(int size, ArrayPool<T> pool, NatsMemoryOwnerAllocationMode mode) => new(size, pool, mode);
 
     /// <inheritdoc/>
+#pragma warning disable SA1201
     public Memory<T> Memory
+#pragma warning restore SA1201
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get
         {
-            var array = this._array;
+            var array = _array;
 
             if (array is null)
             {
@@ -173,7 +177,7 @@ public struct NatsMemoryOwner<T> : IMemoryOwner<T>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get
         {
-            var array = this._array;
+            var array = _array;
 
             if (array is null)
             {
@@ -208,7 +212,7 @@ public struct NatsMemoryOwner<T> : IMemoryOwner<T>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ref T DangerousGetReference()
     {
-        var array = this._array;
+        var array = _array;
 
         if (array is null)
         {
@@ -232,7 +236,7 @@ public struct NatsMemoryOwner<T> : IMemoryOwner<T>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ArraySegment<T> DangerousGetArray()
     {
-        var array = this._array;
+        var array = _array;
 
         if (array is null)
         {
@@ -258,21 +262,21 @@ public struct NatsMemoryOwner<T> : IMemoryOwner<T>
     /// </remarks>
     public NatsMemoryOwner<T> Slice(int start, int length)
     {
-        var array = this._array;
+        var array = _array;
 
         if (array is null)
         {
             ThrowObjectDisposedException();
         }
 
-        this._array = null;
+        _array = null;
 
-        if ((uint)start > this._length)
+        if ((uint)start > _length)
         {
             ThrowInvalidOffsetException();
         }
 
-        if ((uint)length > (this._length - start))
+        if ((uint)length > (_length - start))
         {
             ThrowInvalidLengthException();
         }
@@ -288,14 +292,14 @@ public struct NatsMemoryOwner<T> : IMemoryOwner<T>
     /// <inheritdoc/>
     public void Dispose()
     {
-        var array = this._array;
+        var array = _array;
 
         if (array is null)
         {
             return;
         }
 
-        this._array = null;
+        _array = null;
 
         _pool.Return(array);
     }
@@ -370,7 +374,8 @@ internal static class NatsMemoryOwnerArrayExtensions
     {
         ref var r0 = ref MemoryMarshal.GetArrayDataReference(array);
         ref var ri = ref Unsafe.Add(ref r0, (nint)(uint)i);
-
+#pragma warning disable CS8619
         return ref ri;
+#pragma warning restore CS8619
     }
 }
