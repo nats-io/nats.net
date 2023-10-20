@@ -172,7 +172,11 @@ internal class NatsJSFetch<TMsg> : NatsSubBase, INatsJSFetch<TMsg>
                 var headers = new NatsHeaders();
                 if (Connection.HeaderParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), headers))
                 {
-                    if (headers is { Code: 408, Message: NatsHeaders.Messages.RequestTimeout })
+                    if (headers is { Code: 404 })
+                    {
+                        EndSubscription(NatsSubEndReason.NoMsgs);
+                    }
+                    else if (headers is { Code: 408, Message: NatsHeaders.Messages.RequestTimeout })
                     {
                         EndSubscription(NatsSubEndReason.Timeout);
                     }

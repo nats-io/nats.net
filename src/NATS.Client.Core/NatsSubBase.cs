@@ -10,6 +10,7 @@ namespace NATS.Client.Core;
 public enum NatsSubEndReason
 {
     None,
+    NoMsgs,
     MaxMsgs,
     MaxBytes,
     Timeout,
