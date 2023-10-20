@@ -186,6 +186,9 @@ public class NuidWriterTests
         ConcurrentQueue<(char[] nuid, int threadId)> nuids = new();
 
         // Act
+        var count = 0;
+        var threads = new List<Thread>();
+
         for (var i = 0; i < 10; i++)
         {
             Thread t = new(() =>
@@ -193,10 +196,17 @@ public class NuidWriterTests
                 var buffer = new char[22];
                 NuidWriter.TryWriteNuid(buffer);
                 nuids.Enqueue((buffer, Environment.CurrentManagedThreadId));
+
+                Interlocked.Increment(ref count);
+
+                // Avoid exiting the thread so the ids won't clash.
+                SpinWait.SpinUntil(() => Volatile.Read(ref count) == 10);
             });
             t.Start();
-            t.Join(1_000);
+            threads.Add(t);
         }
+
+        threads.ForEach(t => t.Join(1_000));
 
         // Assert
         var uniquePrefixes = new HashSet<string>();

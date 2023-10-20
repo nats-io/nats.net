@@ -31,7 +31,7 @@ public class NatsKVWatcherTest
         var js2 = new NatsJSContext(nats2);
         var kv2 = new NatsKVContext(js2);
         var store2 = await kv2.CreateStoreAsync(config, cancellationToken: cancellationToken);
-        var watcher = await store2.WatchAsync<IMemoryOwner<byte>>("k1.*", cancellationToken: cancellationToken);
+        var watcher = await store2.WatchAsync<NatsMemoryOwner<byte>>("k1.*", cancellationToken: cancellationToken);
 
         await store1.PutAsync("k1.p1", 1, cancellationToken);
         await store1.PutAsync("k1.p1", 2, cancellationToken);
@@ -41,25 +41,18 @@ public class NatsKVWatcherTest
 
         await foreach (var entry in watcher.Entries.ReadAllAsync(cancellationToken))
         {
-            if (entry.Value is { } memoryOwner)
+            using (entry.Value)
             {
-                using (memoryOwner)
+                if (Utf8Parser.TryParse(entry.Value.Memory.Span, out int value, out _))
                 {
-                    if (Utf8Parser.TryParse(memoryOwner.Memory.Span, out int value, out _))
-                    {
-                        Assert.Equal(++count, value);
-                        if (value == 3)
-                            break;
-                    }
-                    else
-                    {
-                        Assert.Fail("Not a number (1)");
-                    }
+                    Assert.Equal(++count, value);
+                    if (value == 3)
+                        break;
                 }
-            }
-            else
-            {
-                throw new Exception("Null value (1)");
+                else
+                {
+                    Assert.Fail("Not a number (1)");
+                }
             }
         }
 
@@ -163,7 +156,7 @@ public class NatsKVWatcherTest
         var js2 = new NatsJSContext(nats2);
         var kv2 = new NatsKVContext(js2);
         var store2 = await kv2.CreateStoreAsync(bucket, cancellationToken: cancellationToken);
-        var watcher = await store2.WatchAsync<IMemoryOwner<byte>>("k1.*", cancellationToken: cancellationToken);
+        var watcher = await store2.WatchAsync<NatsMemoryOwner<byte>>("k1.*", cancellationToken: cancellationToken);
 
         // Swallow heartbeats
         proxy.ServerInterceptors.Add(m => m?.Contains("Idle Heartbeat") ?? false ? null : m);
@@ -177,29 +170,22 @@ public class NatsKVWatcherTest
         await store1.PutAsync("k1.p1", 2, cancellationToken);
         await store1.PutAsync("k1.p1", 3, cancellationToken);
 
-        var consumer1 = ((NatsKVWatcher<IMemoryOwner<byte>>)watcher).Consumer;
+        var consumer1 = ((NatsKVWatcher<NatsMemoryOwner<byte>>)watcher).Consumer;
 
         await foreach (var entry in watcher.Entries.ReadAllAsync(cancellationToken))
         {
-            if (entry.Value is { } memoryOwner)
+            using (entry.Value)
             {
-                using (memoryOwner)
+                if (Utf8Parser.TryParse(entry.Value.Memory.Span, out int value, out _))
                 {
-                    if (Utf8Parser.TryParse(memoryOwner.Memory.Span, out int value, out _))
-                    {
-                        Assert.Equal(++count, value);
-                        if (value == 3)
-                            break;
-                    }
-                    else
-                    {
-                        Assert.Fail("Not a number (1)");
-                    }
+                    Assert.Equal(++count, value);
+                    if (value == 3)
+                        break;
                 }
-            }
-            else
-            {
-                throw new Exception("Null value (1)");
+                else
+                {
+                    Assert.Fail("Not a number (1)");
+                }
             }
         }
 
@@ -223,7 +209,7 @@ public class NatsKVWatcherTest
 
         await Retry.Until(
             reason: "consumer changed",
-            condition: () => consumer1 != ((NatsKVWatcher<IMemoryOwner<byte>>)watcher).Consumer,
+            condition: () => consumer1 != ((NatsKVWatcher<NatsMemoryOwner<byte>>)watcher).Consumer,
             retryDelay: TimeSpan.FromSeconds(1),
             timeout: timeout);
 

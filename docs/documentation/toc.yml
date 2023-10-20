@@ -21,5 +21,11 @@
   - name: Consuming
     href: jetstream/consume.md
 
+- name: Key/Value Store
+  href: key-value-store/intro.md
+
+- name: Object Store
+  href: object-store/intro.md
+
 - name: Updating Documentation
   href: update-docs.md

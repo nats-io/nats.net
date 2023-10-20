@@ -28,6 +28,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase, INatsJSFetch<TMsg>
 
     private long _pendingMsgs;
     private long _pendingBytes;
+    private int _disposed;
 
     public NatsJSFetch(
         long maxMsgs,
@@ -57,7 +58,10 @@ internal class NatsJSFetch<TMsg> : NatsSubBase, INatsJSFetch<TMsg>
         _pendingMsgs = _maxMsgs;
         _pendingBytes = _maxBytes;
 
-        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg?>>(NatsSubUtils.GetChannelOpts(opts?.ChannelOpts));
+        // Keep user channel small to avoid blocking the user code when disposed,
+        // otherwise channel reader will continue delivering messages even after
+        // this 'fetch' object being disposed.
+        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg?>>(1);
         Msgs = _userMsgs.Reader;
 
         if (_debug)
@@ -112,8 +116,6 @@ internal class NatsJSFetch<TMsg> : NatsSubBase, INatsJSFetch<TMsg>
 
     public ChannelReader<NatsJSMsg<TMsg?>> Msgs { get; }
 
-    public void Stop() => EndSubscription(NatsSubEndReason.None);
-
     public ValueTask CallMsgNextAsync(ConsumerGetnextRequest request, CancellationToken cancellationToken = default) =>
         Connection.PubModelAsync(
             subject: $"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
@@ -127,6 +129,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase, INatsJSFetch<TMsg>
 
     public override async ValueTask DisposeAsync()
     {
+        Interlocked.Exchange(ref _disposed, 1);
         await base.DisposeAsync().ConfigureAwait(false);
         await _hbTimer.DisposeAsync().ConfigureAwait(false);
         await _expiresTimer.DisposeAsync().ConfigureAwait(false);
@@ -231,7 +234,12 @@ internal class NatsJSFetch<TMsg> : NatsSubBase, INatsJSFetch<TMsg>
             _pendingMsgs--;
             _pendingBytes -= msg.Size;
 
-            await _userMsgs.Writer.WriteAsync(msg).ConfigureAwait(false);
+            // Stop feeding the user if we are disposed.
+            // We need to exit as soon as possible.
+            if (Volatile.Read(ref _disposed) == 0)
+            {
+                await _userMsgs.Writer.WriteAsync(msg).ConfigureAwait(false);
+            }
         }
 
         if (_maxBytes > 0 && _pendingBytes <= 0)

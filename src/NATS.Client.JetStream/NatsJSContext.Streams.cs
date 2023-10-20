@@ -56,6 +56,27 @@ public partial class NatsJSContext
     }
 
     /// <summary>
+    /// Purges all of the (or filtered) data in a stream, leaves the stream.
+    /// </summary>
+    /// <param name="stream">Stream name to be purged.</param>
+    /// <param name="request">Purge request.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>Purge response</returns>
+    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
+    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    public async ValueTask<StreamPurgeResponse> PurgeStreamAsync(
+        string stream,
+        StreamPurgeRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await JSRequestResponseAsync<StreamPurgeRequest, StreamPurgeResponse>(
+            subject: $"{Opts.Prefix}.STREAM.PURGE.{stream}",
+            request: request,
+            cancellationToken);
+        return response;
+    }
+
+    /// <summary>
     /// Get stream information from the server and creates a NATS JetStream stream object <see cref="NatsJSStream"/>.
     /// </summary>
     /// <param name="stream">Name of the stream to retrieve.</param>

@@ -52,6 +52,17 @@ internal sealed class NatsUri : IEquatable<NatsUri>
 
     public int Port => Uri.Port;
 
+    public NatsUri CloneWith(string host, int? port = default)
+    {
+        var newUri = new UriBuilder(Uri)
+        {
+            Host = host,
+            Port = port ?? Port,
+        }.Uri.ToString();
+
+        return new NatsUri(newUri, IsSeed);
+    }
+
     public override string ToString()
     {
         return IsWebSocket && Uri.AbsolutePath != "/" ? Uri.ToString() : Uri.ToString().Trim('/');

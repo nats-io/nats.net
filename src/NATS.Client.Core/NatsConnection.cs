@@ -42,8 +42,8 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
     // when reconnect, make new instance.
     private ISocketConnection? _socket;
     private CancellationTokenSource? _pingTimerCancellationTokenSource;
-    private NatsUri? _currentConnectUri;
-    private NatsUri? _lastSeedConnectUri;
+    private volatile NatsUri? _currentConnectUri;
+    private volatile NatsUri? _lastSeedConnectUri;
     private NatsReadProtocolProcessor? _socketReader;
     private NatsPipeliningWriteProtocolProcessor? _socketWriter;
     private TaskCompletionSource _waitForOpenConnection;
@@ -222,9 +222,14 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         Debug.Assert(ConnectionState == NatsConnectionState.Connecting, "Connection state");
 
         var uris = Opts.GetSeedUris();
-        if (Opts.TlsOpts.Disabled && uris.Any(u => u.IsTls))
-            throw new NatsException($"URI {uris.First(u => u.IsTls)} requires TLS but NatsTlsOpts.Disabled is set to true");
-        if (Opts.TlsOpts.Required)
+
+        foreach (var uri in uris)
+        {
+            if (Opts.TlsOpts.EffectiveMode(uri) == TlsMode.Disable && uri.IsTls)
+                throw new NatsException($"URI {uri} requires TLS but TlsMode is set to Disable");
+        }
+
+        if (Opts.TlsOpts.HasTlsFile)
             _tlsCerts = new TlsCerts(Opts.TlsOpts);
 
         if (!Opts.AuthOpts.IsAnonymous)
@@ -255,6 +260,14 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
                     var conn = new TcpConnection();
                     await conn.ConnectAsync(target.Host, target.Port, Opts.ConnectTimeout).ConfigureAwait(false);
                     _socket = conn;
+
+                    if (Opts.TlsOpts.EffectiveMode(uri) == TlsMode.Implicit)
+                    {
+                        // upgrade TcpConnection to SslConnection
+                        var sslConnection = conn.UpgradeToSslStreamConnection(Opts.TlsOpts, _tlsCerts);
+                        await sslConnection.AuthenticateAsClientAsync(uri).ConfigureAwait(false);
+                        _socket = sslConnection;
+                    }
                 }
 
                 _currentConnectUri = uri;
@@ -331,32 +344,24 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
             // check to see if we should upgrade to TLS
             if (_socket is TcpConnection tcpConnection)
             {
-                if (Opts.TlsOpts.Disabled && WritableServerInfo!.TlsRequired)
+                if (Opts.TlsOpts.EffectiveMode(_currentConnectUri) == TlsMode.Disable && WritableServerInfo!.TlsRequired)
                 {
                     throw new NatsException(
-                        $"Server {_currentConnectUri} requires TLS but NatsTlsOpts.Disabled is set to true");
+                        $"Server {_currentConnectUri} requires TLS but TlsMode is set to Disable");
                 }
 
-                if (Opts.TlsOpts.Required && !WritableServerInfo!.TlsRequired && !WritableServerInfo.TlsAvailable)
+                if (Opts.TlsOpts.EffectiveMode(_currentConnectUri) == TlsMode.Require && !WritableServerInfo!.TlsRequired && !WritableServerInfo.TlsAvailable)
                 {
                     throw new NatsException(
-                        $"Server {_currentConnectUri} does not support TLS but NatsTlsOpts.Disabled is set to true");
+                        $"Server {_currentConnectUri} does not support TLS but TlsMode is set to Require");
                 }
 
-                if (Opts.TlsOpts.Required || WritableServerInfo!.TlsRequired || WritableServerInfo.TlsAvailable)
+                if (Opts.TlsOpts.TryTls(_currentConnectUri) && (WritableServerInfo!.TlsRequired || WritableServerInfo.TlsAvailable))
                 {
                     // do TLS upgrade
-                    // if the current URI is not a seed URI and is not a DNS hostname, check the server cert against the
-                    // last seed hostname if it was a DNS hostname
-                    var targetHost = _currentConnectUri.Host;
-                    if (!_currentConnectUri.IsSeed
-                        && Uri.CheckHostName(targetHost) != UriHostNameType.Dns
-                        && Uri.CheckHostName(_lastSeedConnectUri!.Host) == UriHostNameType.Dns)
-                    {
-                        targetHost = _lastSeedConnectUri.Host;
-                    }
+                    var targetUri = FixTlsHost(_currentConnectUri);
 
-                    _logger.LogDebug("Perform TLS Upgrade to " + targetHost);
+                    _logger.LogDebug("Perform TLS Upgrade to " + targetUri);
 
                     // cancel INFO parsed signal and dispose current socket reader
                     infoParsedSignal.SetCanceled();
@@ -365,7 +370,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
                     // upgrade TcpConnection to SslConnection
                     var sslConnection = tcpConnection.UpgradeToSslStreamConnection(Opts.TlsOpts, _tlsCerts);
-                    await sslConnection.AuthenticateAsClientAsync(targetHost).ConfigureAwait(false);
+                    await sslConnection.AuthenticateAsClientAsync(targetUri).ConfigureAwait(false);
                     _socket = sslConnection;
 
                     // create new socket reader
@@ -452,11 +457,17 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
                 if (urlEnumerator.MoveNext())
                 {
                     url = urlEnumerator.Current;
-                    var target = (url.Host, url.Port);
+
                     if (OnConnectingAsync != null)
                     {
+                        var target = (url.Host, url.Port);
                         _logger.LogInformation("Try to invoke OnConnectingAsync before connect to NATS.");
-                        target = await OnConnectingAsync(target).ConfigureAwait(false);
+                        var newTarget = await OnConnectingAsync(target).ConfigureAwait(false);
+
+                        if (newTarget.Host != target.Host || newTarget.Port != target.Port)
+                        {
+                            url = url.CloneWith(newTarget.Host, newTarget.Port);
+                        }
                     }
 
                     _logger.LogInformation("Try to connect NATS {0}", url);
@@ -469,8 +480,16 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
                     else
                     {
                         var conn = new TcpConnection();
-                        await conn.ConnectAsync(target.Host, target.Port, Opts.ConnectTimeout).ConfigureAwait(false);
+                        await conn.ConnectAsync(url.Host, url.Port, Opts.ConnectTimeout).ConfigureAwait(false);
                         _socket = conn;
+
+                        if (Opts.TlsOpts.EffectiveMode(url) == TlsMode.Implicit)
+                        {
+                            // upgrade TcpConnection to SslConnection
+                            var sslConnection = conn.UpgradeToSslStreamConnection(Opts.TlsOpts, _tlsCerts);
+                            await sslConnection.AuthenticateAsClientAsync(FixTlsHost(url)).ConfigureAwait(false);
+                            _socket = sslConnection;
+                        }
                     }
 
                     _currentConnectUri = url;
@@ -513,6 +532,26 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
                 return;
             _logger.LogError(ex, "Unknown error, loop stopped and connection is invalid state.");
         }
+    }
+
+    private NatsUri FixTlsHost(NatsUri uri)
+    {
+        var lastSeedConnectUri = _lastSeedConnectUri;
+        var lastSeedHost = lastSeedConnectUri?.Host;
+
+        if (string.IsNullOrEmpty(lastSeedHost))
+            return uri;
+
+        // if the current URI is not a seed URI and is not a DNS hostname, check the server cert against the
+        // last seed hostname if it was a DNS hostname
+        if (!uri.IsSeed
+            && Uri.CheckHostName(uri.Host) != UriHostNameType.Dns
+            && Uri.CheckHostName(lastSeedHost) == UriHostNameType.Dns)
+        {
+            return uri.CloneWith(lastSeedHost);
+        }
+
+        return uri;
     }
 
     private async Task WaitWithJitterAsync()

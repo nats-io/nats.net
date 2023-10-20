@@ -85,18 +85,7 @@ public class NatsJSConsumer
         var max = NatsJSOptsDefaults.SetMax(opts.MaxMsgs, opts.MaxBytes, opts.ThresholdMsgs, opts.ThresholdBytes);
         var timeouts = NatsJSOptsDefaults.SetTimeouts(opts.Expires, opts.IdleHeartbeat);
 
-        var requestOpts = new NatsSubOpts
-        {
-            Serializer = opts.Serializer,
-            ChannelOpts = new NatsSubChannelOpts
-            {
-                // Keep capacity at 1 to make sure message acknowledgements are sent
-                // right after the message is processed and messages aren't queued up
-                // which might cause timeouts for acknowledgments.
-                Capacity = 1,
-                FullMode = BoundedChannelFullMode.Wait,
-            },
-        };
+        var requestOpts = BuildRequestOpts(opts.Serializer, opts.MaxMsgs);
 
         var sub = new NatsJSConsume<T>(
             stream: _stream,
@@ -110,7 +99,8 @@ public class NatsJSConsumer
             thresholdMsgs: max.ThresholdMsgs,
             thresholdBytes: max.ThresholdBytes,
             expires: timeouts.Expires,
-            idle: timeouts.IdleHeartbeat);
+            idle: timeouts.IdleHeartbeat,
+            cancellationToken: cancellationToken);
 
         await _context.Connection.SubAsync(sub: sub, cancellationToken);
 
@@ -242,18 +232,7 @@ public class NatsJSConsumer
         var max = NatsJSOptsDefaults.SetMax(opts.MaxMsgs, opts.MaxBytes);
         var timeouts = NatsJSOptsDefaults.SetTimeouts(opts.Expires, opts.IdleHeartbeat);
 
-        var requestOpts = new NatsSubOpts
-        {
-            Serializer = opts.Serializer,
-            ChannelOpts = new NatsSubChannelOpts
-            {
-                // Keep capacity at 1 to make sure message acknowledgements are sent
-                // right after the message is processed and messages aren't queued up
-                // which might cause timeouts for acknowledgments.
-                Capacity = 1,
-                FullMode = BoundedChannelFullMode.Wait,
-            },
-        };
+        var requestOpts = BuildRequestOpts(opts.Serializer, opts.MaxMsgs);
 
         var sub = new NatsJSFetch<T>(
             stream: _stream,
@@ -302,6 +281,21 @@ public class NatsJSConsumer
             subject: $"{_context.Opts.Prefix}.CONSUMER.INFO.{_stream}.{_consumer}",
             request: null,
             cancellationToken).ConfigureAwait(false);
+
+    private static NatsSubOpts BuildRequestOpts(INatsSerializer? serializer, int? maxMsgs) =>
+        new()
+        {
+            Serializer = serializer,
+            ChannelOpts = new NatsSubChannelOpts
+            {
+                // Keep capacity large enough not to block the socket reads.
+                // This might delay message acknowledgements on slow consumers
+                // but it's crucial to keep the reads flowing on the main
+                // NATS TCP connection.
+                Capacity = maxMsgs > 0 ? maxMsgs * 2 : 1_000,
+                FullMode = BoundedChannelFullMode.Wait,
+            },
+        };
 
     private void ThrowIfDeleted()
     {

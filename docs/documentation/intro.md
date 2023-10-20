@@ -13,3 +13,7 @@ these docs. You can also create a Pull Request using the Edit on GitHub link on 
 [Core NATS](core/intro.md) is the base set of functionalities and qualities of service offered by a NATS service infrastructure.
 
 [JetStream](jetstream/intro.md) is the built-in distributed persistence system built-in to the same NATS server binary.
+
+[Key/Value Store](key-value-store/intro.md) is the built-in distributed persistent associative arrays built on top of JetStream.
+
+[Object Store](object-store/intro.md) is the built-in distributed persistent objects of arbitrary size built on top of JetStream.

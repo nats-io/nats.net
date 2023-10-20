@@ -39,6 +39,21 @@ public class NatsJSStream
     }
 
     /// <summary>
+    /// Purge data from this stream. Leaves the stream.
+    /// </summary>
+    /// <param name="request">Purge request.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>Whether delete was successful or not.</returns>
+    /// <exception cref="NatsJSException">There is an error retrieving the response or this consumer object isn't valid anymore because it was deleted earlier.</exception>
+    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <remarks>After deletion this object can't be used anymore.</remarks>
+    public async ValueTask<StreamPurgeResponse> PurgeAsync(StreamPurgeRequest request, CancellationToken cancellationToken = default)
+    {
+        ThrowIfDeleted();
+        return await _context.PurgeStreamAsync(_name, request, cancellationToken);
+    }
+
+    /// <summary>
     /// Update stream properties on the server.
     /// </summary>
     /// <param name="request">Stream update request to be sent to the server.</param>

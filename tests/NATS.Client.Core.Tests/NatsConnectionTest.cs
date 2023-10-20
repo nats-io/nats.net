@@ -150,12 +150,11 @@ public abstract partial class NatsConnectionTest
     [Fact]
     public async Task ReconnectSingleTest()
     {
-        using var options = new NatsServerOpts
-        {
-            TransportType = _transportType,
-            EnableWebSocket = _transportType == TransportType.WebSocket,
-            ServerDisposeReturnsPorts = false,
-        };
+        var options = new NatsServerOptsBuilder()
+            .UseTransport(_transportType)
+            .WithServerDisposeReturnsPorts()
+            .Build();
+
         await using var server = NatsServer.Start(_output, options);
         var subject = Guid.NewGuid().ToString();
 
@@ -249,7 +248,7 @@ public abstract partial class NatsConnectionTest
         await connection3.ConnectAsync();
 
         _output.WriteLine("Server1 ClientConnectUrls:" +
-                         string.Join(", ", connection1.ServerInfo?.ClientConnectUrls ?? Array.Empty<string>()));
+                          string.Join(", ", connection1.ServerInfo?.ClientConnectUrls ?? Array.Empty<string>()));
         _output.WriteLine("Server2 ClientConnectUrls:" +
                          string.Join(", ", connection2.ServerInfo?.ClientConnectUrls ?? Array.Empty<string>()));
         _output.WriteLine("Server3 ClientConnectUrls:" +
