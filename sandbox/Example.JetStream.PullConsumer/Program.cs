@@ -74,16 +74,13 @@ try
             {
                 Console.WriteLine($"___\nFETCH {maxMsgs}");
                 await consumer.RefreshAsync(cts.Token);
-                await using var sub = await consumer.FetchAsync<IMemoryOwner<byte>>(fetchOpts, cts.Token);
+                await using var sub = await consumer.FetchAsync<NatsMemoryOwner<byte>>(fetchOpts, cts.Token);
                 await foreach (var msg in sub.Msgs.ReadAllAsync(cts.Token))
                 {
-                    if (msg.Data is { } memoryOwner)
+                    using (msg.Data)
                     {
-                        using (memoryOwner)
-                        {
-                            var message = Encoding.ASCII.GetString(memoryOwner.Memory.Span);
-                            Console.WriteLine($"Received: {message}");
-                        }
+                        var message = Encoding.ASCII.GetString(msg.Data.Span);
+                        Console.WriteLine($"Received: {message}");
                     }
 
                     await msg.AckAsync(cancellationToken: cts.Token);
@@ -109,15 +106,12 @@ try
             {
                 Console.WriteLine($"___\nFETCH {maxMsgs}");
                 await consumer.RefreshAsync(cts.Token);
-                await foreach (var msg in consumer.FetchAllAsync<IMemoryOwner<byte>>(fetchOpts, cts.Token))
+                await foreach (var msg in consumer.FetchAllAsync<NatsMemoryOwner<byte>>(fetchOpts, cts.Token))
                 {
-                    if (msg.Data is { } memoryOwner)
+                    using (msg.Data)
                     {
-                        using (memoryOwner)
-                        {
-                            var message = Encoding.ASCII.GetString(memoryOwner.Memory.Span);
-                            Console.WriteLine($"Received: {message}");
-                        }
+                        var message = Encoding.ASCII.GetString(msg.Data.Span);
+                        Console.WriteLine($"Received: {message}");
                     }
 
                     await msg.AckAsync(cancellationToken: cts.Token);
@@ -142,16 +136,13 @@ try
             try
             {
                 Console.WriteLine("___\nNEXT");
-                var next = await consumer.NextAsync<IMemoryOwner<byte>>(nextOpts, cts.Token);
+                var next = await consumer.NextAsync<NatsMemoryOwner<byte>>(nextOpts, cts.Token);
                 if (next is { } msg)
                 {
-                    if (msg.Data is { } memoryOwner)
+                    using (msg.Data)
                     {
-                        using (memoryOwner)
-                        {
-                            var message = Encoding.ASCII.GetString(memoryOwner.Memory.Span);
-                            Console.WriteLine($"Received: {message}");
-                        }
+                        var message = Encoding.ASCII.GetString(msg.Data.Span);
+                        Console.WriteLine($"Received: {message}");
                     }
 
                     await msg.AckAsync(cancellationToken: cts.Token);
@@ -176,7 +167,7 @@ try
             try
             {
                 Console.WriteLine("___\nCONSUME");
-                await using var sub = await consumer.ConsumeAsync<IMemoryOwner<byte>>(consumeOpts);
+                await using var sub = await consumer.ConsumeAsync<NatsMemoryOwner<byte>>(consumeOpts);
 
                 cts.Token.Register(() =>
                 {
@@ -186,19 +177,15 @@ try
                 var stopped = false;
                 await foreach (var msg in sub.Msgs.ReadAllAsync())
                 {
-                    Console.WriteLine($"CANCEL:{cts.Token.IsCancellationRequested}");
-                    if (msg.Data is { } memoryOwner)
+                    using (msg.Data)
                     {
-                        using (memoryOwner)
+                        var message = Encoding.ASCII.GetString(msg.Data.Span);
+                        Console.WriteLine($"Received: {message}");
+                        if (message == "stop")
                         {
-                            var message = Encoding.ASCII.GetString(memoryOwner.Memory.Span);
-                            Console.WriteLine($"Received: {message}");
-                            if (message == "stop")
-                            {
-                                Console.WriteLine("Stopping consumer...");
-                                sub.Stop();
-                                stopped = true;
-                            }
+                            Console.WriteLine("Stopping consumer...");
+                            sub.Stop();
+                            stopped = true;
                         }
                     }
 
@@ -235,15 +222,12 @@ try
             try
             {
                 Console.WriteLine("___\nCONSUME-ALL");
-                await foreach (var msg in consumer.ConsumeAllAsync<IMemoryOwner<byte>>(consumeOpts, cts.Token))
+                await foreach (var msg in consumer.ConsumeAllAsync<NatsMemoryOwner<byte>>(consumeOpts, cts.Token))
                 {
-                    if (msg.Data is { } memoryOwner)
+                    using (msg.Data)
                     {
-                        using (memoryOwner)
-                        {
-                            var message = Encoding.ASCII.GetString(memoryOwner.Memory.Span);
-                            Console.WriteLine($"Received: {message}");
-                        }
+                        var message = Encoding.ASCII.GetString(msg.Data.Span);
+                        Console.WriteLine($"Received: {message}");
                     }
 
                     await msg.AckAsync(cancellationToken: cts.Token);
