@@ -62,7 +62,6 @@ public class TlsFirstTest
             Assert.Matches(@"can not start to connect nats server", exception.Message);
 
             _output.WriteLine($"Implicit TLS connection rejected");
-
         }
 
         // Normal TLS connection should work
