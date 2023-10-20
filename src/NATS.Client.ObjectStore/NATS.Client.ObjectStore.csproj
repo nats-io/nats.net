@@ -9,7 +9,7 @@
     <!-- NuGet Packaging -->
     <PackageTags>pubsub;messaging</PackageTags>
     <Description>JetStream Object Store support for NATS.Client.</Description>
-    <IsPackable>false</IsPackable>
+    <IsPackable>true</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>
