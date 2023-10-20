@@ -52,7 +52,7 @@ internal sealed class FixedArrayBufferWriter : ICountableBufferWriter
     {
         if (_buffer.Length - _written < sizeHint)
         {
-            Resize(sizeHint);
+            Resize(sizeHint + _written);
         }
 
         return _buffer.AsMemory(_written);
@@ -63,7 +63,7 @@ internal sealed class FixedArrayBufferWriter : ICountableBufferWriter
     {
         if (_buffer.Length - _written < sizeHint)
         {
-            Resize(sizeHint);
+            Resize(sizeHint + _written);
         }
 
         return _buffer.AsSpan(_written);

@@ -190,7 +190,19 @@ internal class NatsJSOrderedPushConsumer<T>
 
                             if (string.Equals(msg.Subject, subSubject))
                             {
-                                // Control message: e.g. heartbeat
+                                // Control messages: e.g. heartbeat
+                                if (msg.Headers is { } headers)
+                                {
+                                    if (headers.TryGetValue("Nats-Consumer-Stalled", out var flowControlReplyTo))
+                                    {
+                                        await _nats.PublishAsync(flowControlReplyTo, cancellationToken: _cancellationToken);
+                                    }
+
+                                    if (headers is { Code: 100, MessageText: "FlowControl Request" })
+                                    {
+                                        await msg.ReplyAsync(cancellationToken: _cancellationToken);
+                                    }
+                                }
                             }
                             else
                             {

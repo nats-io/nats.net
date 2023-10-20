@@ -58,6 +58,17 @@ public readonly struct NatsJSMsg<T>
     public NatsJSMsgMetadata? Metadata => _replyToDateTimeAndSeq.Value;
 
     /// <summary>
+    /// Reply with an empty message.
+    /// </summary>
+    /// <param name="headers">Optional message headers.</param>
+    /// <param name="replyTo">Optional reply-to subject.</param>
+    /// <param name="opts">A <see cref="NatsPubOpts"/> for publishing options.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
+    /// <returns>A <see cref="ValueTask"/> that represents the asynchronous send operation.</returns>
+    public ValueTask ReplyAsync(NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default) =>
+        _msg.ReplyAsync(headers, replyTo, opts, cancellationToken);
+
+    /// <summary>
     /// Acknowledges the message was completely handled.
     /// </summary>
     /// <param name="opts">Ack options.</param>

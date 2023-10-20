@@ -126,8 +126,6 @@ public class NatsObjStore
             throw new NatsObjException("Size mismatch");
         }
 
-        await stream.FlushAsync(cancellationToken);
-
         return info;
     }
 
@@ -173,10 +171,8 @@ public class NatsObjStore
         {
             info = await GetInfoAsync(meta.Name, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
-        catch (NatsJSApiException e)
+        catch (NatsObjNotFoundException)
         {
-            if (e.Error.Code != 404)
-                throw;
         }
 
         var nuid = NewNuid();
@@ -296,17 +292,28 @@ public class NatsObjStore
         ValidateObjectName(key);
 
         var request = new StreamMsgGetRequest { LastBySubj = GetMetaSubject(key) };
-
-        var response = await _stream.GetAsync(request, cancellationToken);
-
-        var data = NatsJsonSerializer.Default.Deserialize<ObjectMetadata>(new ReadOnlySequence<byte>(Convert.FromBase64String(response.Message.Data))) ?? throw new NatsObjException("Can't deserialize object metadata");
-
-        if (!showDeleted && data.Deleted)
+        try
         {
-            throw new NatsObjException("Object not found");
-        }
+            var response = await _stream.GetAsync(request, cancellationToken);
 
-        return data;
+            var data = NatsJsonSerializer.Default.Deserialize<ObjectMetadata>(new ReadOnlySequence<byte>(Convert.FromBase64String(response.Message.Data))) ?? throw new NatsObjException("Can't deserialize object metadata");
+
+            if (!showDeleted && data.Deleted)
+            {
+                throw new NatsObjNotFoundException($"Object not found: {key}");
+            }
+
+            return data;
+        }
+        catch (NatsJSApiException e)
+        {
+            if (e.Error.Code == 404)
+            {
+                throw new NatsObjNotFoundException($"Object not found: {key}");
+            }
+
+            throw;
+        }
     }
 
     /// <summary>
