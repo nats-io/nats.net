@@ -29,7 +29,7 @@ await using var nats2 = server.CreateClientConnection();
 await nats1.PingAsync();
 await nats2.PingAsync();
 
-await using var sub = await nats1.SubscribeAsync<IMemoryOwner<byte>>(t.Subject);
+await using var sub = await nats1.SubscribeAsync<NatsMemoryOwner<byte>>(t.Subject);
 
 var stopwatch = Stopwatch.StartNew();
 
