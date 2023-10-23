@@ -5,11 +5,13 @@ namespace NATS.Client.Services;
 public readonly struct NatsSvcMsg<T>
 {
     private readonly NatsMsg<T> _msg;
+    private readonly NatsSvcEndPointBase? _endPoint;
 
-    public NatsSvcMsg(NatsMsg<T> msg, Exception? exception)
+    public NatsSvcMsg(NatsMsg<T> msg, NatsSvcEndPointBase? endPoint, Exception? exception)
     {
         Exception = exception;
         _msg = msg;
+        _endPoint = endPoint;
     }
 
     public bool HasError => Exception is not null;
@@ -34,6 +36,9 @@ public readonly struct NatsSvcMsg<T>
         headers.Add("Nats-Service-Error-Code", $"{code}");
         headers.Add("Nats-Service-Error", $"{message}");
 
+        _endPoint?.IncrementErrors();
+        _endPoint?.SetLastError($"{message} ({code})");
+
         return ReplyAsync(data, headers, replyTo, opts, cancellationToken);
     }
 
@@ -42,6 +47,9 @@ public readonly struct NatsSvcMsg<T>
         headers ??= new NatsHeaders();
         headers.Add("Nats-Service-Error-Code", $"{code}");
         headers.Add("Nats-Service-Error", $"{message}");
+
+        _endPoint?.IncrementErrors();
+        _endPoint?.SetLastError($"{message} ({code})");
 
         return ReplyAsync(headers: headers, replyTo: replyTo, opts: opts, cancellationToken: cancellationToken);
     }

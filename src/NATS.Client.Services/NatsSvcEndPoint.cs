@@ -4,6 +4,7 @@ using System.Text;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
+using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Services;
 
@@ -34,7 +35,31 @@ public interface INatsSvcEndPoint : IAsyncDisposable
     string? QueueGroup { get; }
 }
 
-public class NatsSvcEndPoint<T> : NatsSubBase, INatsSvcEndPoint
+public abstract class NatsSvcEndPointBase : NatsSubBase, INatsSvcEndPoint
+{
+    protected NatsSvcEndPointBase(NatsConnection connection, ISubscriptionManager manager, string subject, string? queueGroup, NatsSubOpts? opts)
+        : base(connection, manager, subject, queueGroup, opts)
+    {
+    }
+
+    public abstract long Requests { get; }
+
+    public abstract long ProcessingTime { get; }
+
+    public abstract long Errors { get; }
+
+    public abstract string? LastError { get; }
+
+    public abstract long AverageProcessingTime { get; }
+
+    public abstract IDictionary<string, string>? Metadata { get; }
+
+    internal abstract void IncrementErrors();
+
+    internal abstract void SetLastError(string error);
+}
+
+public class NatsSvcEndPoint<T> : NatsSvcEndPointBase
 {
     private readonly ILogger _logger;
     private readonly Func<NatsSvcMsg<T>, ValueTask> _handler;
@@ -64,23 +89,27 @@ public class NatsSvcEndPoint<T> : NatsSubBase, INatsSvcEndPoint
         _handlerTask = Task.Run(HandlerLoop);
     }
 
-    public long Requests => Volatile.Read(ref _requests);
+    public override long Requests => Volatile.Read(ref _requests);
 
-    public long ProcessingTime => Volatile.Read(ref _processingTime);
+    public override long ProcessingTime => Volatile.Read(ref _processingTime);
 
-    public long Errors => Volatile.Read(ref _errors);
+    public override long Errors => Volatile.Read(ref _errors);
 
-    public string? LastError => Volatile.Read(ref _lastError);
+    public override string? LastError => Volatile.Read(ref _lastError);
 
-    public long AverageProcessingTime => Requests == 0 ? 0 : ProcessingTime / Requests;
+    public override long AverageProcessingTime => Requests == 0 ? 0 : ProcessingTime / Requests;
 
-    public IDictionary<string, string>? Metadata { get; }
+    public override IDictionary<string, string>? Metadata { get; }
 
     public override async ValueTask DisposeAsync()
     {
-        await _handlerTask;
         await base.DisposeAsync();
+        await _handlerTask;
     }
+
+    internal override void IncrementErrors() => Interlocked.Increment(ref _errors);
+
+    internal override void SetLastError(string error) => Interlocked.Exchange(ref _lastError, error);
 
     internal ValueTask StartAsync(CancellationToken cancellationToken) =>
         _nats.SubAsync(this, cancellationToken);
@@ -109,7 +138,7 @@ public class NatsSvcEndPoint<T> : NatsSubBase, INatsSvcEndPoint
             msg = new NatsMsg<T>(subject, replyTo, subject.Length + (replyTo?.Length ?? 0), default, default, _nats);
         }
 
-        return _channel.Writer.WriteAsync(new NatsSvcMsg<T>(msg, exception), _cancellationToken);
+        return _channel.Writer.WriteAsync(new NatsSvcMsg<T>(msg, this, exception), _cancellationToken);
     }
 
     protected override void TryComplete() => _channel.Writer.TryComplete();
@@ -147,9 +176,6 @@ public class NatsSvcEndPoint<T> : NatsSubBase, INatsSvcEndPoint
                     // Only log unknown exceptions
                     _logger.LogError(e, "Endpoint {Name} error processing message", _name);
                 }
-
-                Interlocked.Increment(ref _errors);
-                Interlocked.Exchange(ref _lastError, message);
 
                 try
                 {

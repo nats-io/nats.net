@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace NATS.Client.Services.Models;
 
-public class StatsResponse
+public record StatsResponse
 {
     [JsonPropertyName("type")]
     public string Type { get; set; } = "io.nats.micro.v1.stats_response";
@@ -23,13 +23,13 @@ public class StatsResponse
 
     [JsonPropertyName("endpoints")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    public ICollection<EndpointStats> Endpoints { get; set; } = default!;
+    public ICollection<EndpointStats> EndPoints { get; set; } = default!;
 
     [JsonPropertyName("started")]
     public string Started { get; set; } = default!;
 }
 
-public class EndpointStats
+public record EndpointStats
 {
     [JsonPropertyName("name")]
     public string Name { get; set; } = default!;

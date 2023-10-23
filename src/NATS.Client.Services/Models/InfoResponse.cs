@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace NATS.Client.Services.Models;
 
-public class InfoResponse
+public record InfoResponse
 {
     [JsonPropertyName("type")]
     public string Type { get; set; } = "io.nats.micro.v1.info_response";
@@ -25,10 +25,10 @@ public class InfoResponse
 
     [JsonPropertyName("endpoints")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    public ICollection<EndpointInfo> Endpoints { get; set; } = default!;
+    public ICollection<EndpointInfo> EndPoints { get; set; } = default!;
 }
 
-public class EndpointInfo
+public record EndpointInfo
 {
     [JsonPropertyName("name")]
     public string Name { get; set; } = default!;

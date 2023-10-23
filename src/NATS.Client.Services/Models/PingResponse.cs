@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace NATS.Client.Services.Models;
 
-public class PingResponse
+public record PingResponse
 {
     [JsonPropertyName("type")]
     public string Type { get; set; } = "io.nats.micro.v1.ping_response";

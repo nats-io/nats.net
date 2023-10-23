@@ -21,6 +21,7 @@ public class NatsSvcService : IAsyncDisposable
     private readonly List<SvcListener> _svcListeners = new();
     private readonly ConcurrentDictionary<string, INatsSvcEndPoint> _endPoints = new();
     private readonly string _started;
+    private readonly CancellationTokenSource _cts;
 
     public NatsSvcService(NatsConnection nats, NatsSvcConfig config, CancellationToken cancellationToken)
     {
@@ -28,7 +29,8 @@ public class NatsSvcService : IAsyncDisposable
         _id = NuidWriter.NewNuid();
         _nats = nats;
         _config = config;
-        _cancellationToken = cancellationToken;
+        _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _cancellationToken = _cts.Token;
         _channel = Channel.CreateBounded<SvcMsg>(32);
         _taskMsgLoop = Task.Run(MsgLoop);
         _started = DateTimeOffset.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffffffZ");
@@ -51,22 +53,23 @@ public class NatsSvcService : IAsyncDisposable
 
         _channel.Writer.TryComplete();
 
+        _cts.Cancel();
+
         await _taskMsgLoop;
     }
 
     public ValueTask AddEndPointAsync<T>(Func<NatsSvcMsg<T>, ValueTask> handler, string? name = default, string? subject = default, IDictionary<string, string>? metadata = default, CancellationToken cancellationToken = default) =>
         AddEndPointInternalAsync<T>(handler, name, subject, _config.QueueGroup, metadata, cancellationToken);
 
-    public ValueTask<NatsSvcGroup> AddGroupAsync(string name, string? queueGroup = default, CancellationToken cancellationToken = default)
+    public ValueTask<Group> AddGroupAsync(string name, string? queueGroup = default, CancellationToken cancellationToken = default)
     {
-        var group = new NatsSvcGroup(this, name, queueGroup, cancellationToken);
+        var group = new Group(this, name, queueGroup, cancellationToken);
         return ValueTask.FromResult(group);
     }
 
     public async ValueTask DisposeAsync()
     {
         await StopAsync(_cancellationToken);
-
         GC.SuppressFinalize(this);
     }
 
@@ -147,7 +150,7 @@ public class NatsSvcService : IAsyncDisposable
                             Version = _config.Version,
                             Description = _config.Description!,
                             Metadata = _config.Metadata!,
-                            Endpoints = endPoints,
+                            EndPoints = endPoints,
                         },
                         cancellationToken: _cancellationToken);
                 }
@@ -191,7 +194,7 @@ public class NatsSvcService : IAsyncDisposable
                         Id = _id,
                         Version = _config.Version,
                         Metadata = _config.Metadata!,
-                        Endpoints = endPoints,
+                        EndPoints = endPoints,
                         Started = _started,
                     };
 
@@ -207,13 +210,13 @@ public class NatsSvcService : IAsyncDisposable
         }
     }
 
-    public class NatsSvcGroup
+    public class Group
     {
         private readonly NatsSvcService _service;
         private readonly CancellationToken _cancellationToken;
         private readonly string _dot;
 
-        public NatsSvcGroup(NatsSvcService service, string groupName, string? queueGroup = default, CancellationToken cancellationToken = default)
+        public Group(NatsSvcService service, string groupName, string? queueGroup = default, CancellationToken cancellationToken = default)
         {
             ValidateGroupName(groupName);
             _service = service;
@@ -235,7 +238,7 @@ public class NatsSvcService : IAsyncDisposable
             return _service.AddEndPointInternalAsync(handler, epName, epSubject, queueGroup, metadata, cancellationToken);
         }
 
-        public ValueTask<NatsSvcGroup> AddGroupAsync(string name, string? queueGroup, CancellationToken cancellationToken = default)
+        public ValueTask<Group> AddGroupAsync(string name, string? queueGroup, CancellationToken cancellationToken = default)
         {
             var groupName = $"{GroupName}{_dot}{name}";
             return _service.AddGroupAsync(groupName, queueGroup, cancellationToken);
