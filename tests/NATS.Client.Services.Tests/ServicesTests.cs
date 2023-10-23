@@ -1,4 +1,4 @@
-﻿namespace NATS.Client.Services.Tests;
+namespace NATS.Client.Services.Tests;
 
 public class ServicesTests
 {

@@ -1,4 +1,4 @@
-﻿using System.Text.Json.Nodes;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 
 namespace NATS.Client.Services;
@@ -34,5 +34,5 @@ public record NatsSvcConfig
 
     public string QueueGroup { get; init; } = "q";
 
-    public Func<JsonNode> StatsHandler { get; init; }
+    public Func<JsonNode>? StatsHandler { get; init; }
 }

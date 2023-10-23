@@ -1,23 +1,74 @@
-﻿using System.Text;
+using System.Text;
+using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.Services;
 
-var nats = new NatsConnection();
+var opts = NatsOpts.Default with { LoggerFactory = new MinimumConsoleLoggerFactory(LogLevel.Error) };
+
+var nats = new NatsConnection(opts);
 var svc = new NatsSvcContext(nats);
 
 var qg = args.Length > 0 ? args[0] : "q";
 
 await using var testService = await svc.AddServiceAsync("test", "1.0.0", qg);
 
-await testService.AddEndPointAsync("bla", async m =>
+await testService.AddEndPointAsync<int>(name: "bla", handler: async m =>
 {
-    string message;
-    using (m.Data)
+    if (m.Exception is { } e)
     {
-        message = Encoding.ASCII.GetString(m.Data.Span);
+        Console.WriteLine($"[MSG] Error: {e.GetBaseException().Message}");
+        await m.ReplyErrorAsync(999, e.GetBaseException().Message, Encoding.UTF8.GetBytes(e.ToString()));
     }
 
-    Console.WriteLine($"[MSG] {m.Subject}: {message}");
+    Console.WriteLine($"[MSG] {m.Subject}: {m.Data}");
+
+    if (m.Data == 0)
+    {
+        throw new Exception("Data can't be 0");
+    }
+
+    if (m.Data == 1)
+    {
+        throw new NatsSvcEndPointException(1, "Data can't be 1", "More info ...");
+    }
+
+    if (m.Data == 2)
+    {
+        await m.ReplyErrorAsync(2, "Data can't be 2");
+        return;
+    }
+
+    await Task.Delay(Random.Shared.Next(10, 100));
+    await m.ReplyAsync(42);
+});
+
+var grp1 = await testService.AddGroupAsync("grp1");
+
+await grp1.AddEndPointAsync<int>(name: "bla", handler: async m =>
+{
+    if (m.Exception is { } e)
+    {
+        Console.WriteLine($"[MSG] Error: {e.GetBaseException().Message}");
+        await m.ReplyErrorAsync(999, e.GetBaseException().Message, Encoding.UTF8.GetBytes(e.ToString()));
+    }
+
+    Console.WriteLine($"[MSG] {m.Subject}: {m.Data}");
+
+    if (m.Data == 0)
+    {
+        throw new Exception("Data can't be 0");
+    }
+
+    if (m.Data == 1)
+    {
+        throw new NatsSvcEndPointException(1, "Data can't be 1", "More info ...");
+    }
+
+    if (m.Data == 2)
+    {
+        await m.ReplyErrorAsync(2, "Data can't be 2");
+        return;
+    }
 
     await Task.Delay(Random.Shared.Next(10, 100));
     await m.ReplyAsync(42);

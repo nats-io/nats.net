@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Text.Json.Nodes;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
@@ -19,7 +19,7 @@ public class NatsSvcService : IAsyncDisposable
     private readonly Channel<SvcMsg> _channel;
     private readonly Task _taskMsgLoop;
     private readonly List<SvcListener> _svcListeners = new();
-    private readonly ConcurrentDictionary<string, NatsSvcEndPoint> _endPoints = new();
+    private readonly ConcurrentDictionary<string, INatsSvcEndPoint> _endPoints = new();
     private readonly string _started;
 
     public NatsSvcService(NatsConnection nats, NatsSvcConfig config, CancellationToken cancellationToken)
@@ -48,26 +48,24 @@ public class NatsSvcService : IAsyncDisposable
         {
             await ep.DisposeAsync();
         }
+
+        _channel.Writer.TryComplete();
+
+        await _taskMsgLoop;
     }
 
-    public async ValueTask AddEndPointAsync(string name, Func<NatsSvcMsg, ValueTask> handler, string? subject = default, IDictionary<string, string>? metadata = default, CancellationToken cancellationToken = default)
+    public ValueTask AddEndPointAsync<T>(Func<NatsSvcMsg<T>, ValueTask> handler, string? name = default, string? subject = default, IDictionary<string, string>? metadata = default, CancellationToken cancellationToken = default) =>
+        AddEndPointInternalAsync<T>(handler, name, subject, _config.QueueGroup, metadata, cancellationToken);
+
+    public ValueTask<NatsSvcGroup> AddGroupAsync(string name, string? queueGroup = default, CancellationToken cancellationToken = default)
     {
-        var ep = new NatsSvcEndPoint(_nats, _config, name, handler, subject, metadata, opts: default, cancellationToken);
-
-        if (!_endPoints.TryAdd(name, ep))
-            throw new NatsSvcException($"Endpoint '{name}' already exists");
-
-        await ep.StartAsync(cancellationToken).ConfigureAwait(false);
+        var group = new NatsSvcGroup(this, name, queueGroup, cancellationToken);
+        return ValueTask.FromResult(group);
     }
 
     public async ValueTask DisposeAsync()
     {
-        foreach (var listener in _svcListeners)
-        {
-            await listener.DisposeAsync();
-        }
-
-        _channel.Writer.TryComplete();
+        await StopAsync(_cancellationToken);
 
         GC.SuppressFinalize(this);
     }
@@ -86,6 +84,24 @@ public class NatsSvcService : IAsyncDisposable
                 _svcListeners.Add(svcListener);
             }
         }
+    }
+
+    private async ValueTask AddEndPointInternalAsync<T>(Func<NatsSvcMsg<T>, ValueTask> handler, string? name, string? subject, string? queueGroup, IDictionary<string, string>? metadata, CancellationToken cancellationToken)
+    {
+        var epSubject = subject ?? name ?? throw new NatsSvcException("Either name or subject must be specified");
+        var epName = name ?? epSubject;
+
+        var ep = new NatsSvcEndPoint<T>(_nats, queueGroup, epName, handler, epSubject, metadata, opts: default, cancellationToken);
+
+        if (!_endPoints.TryAdd(epName, ep))
+        {
+            await using (ep)
+            {
+                throw new NatsSvcException($"Endpoint '{name}' already exists");
+            }
+        }
+
+        await ep.StartAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private async Task MsgLoop()
@@ -125,14 +141,14 @@ public class NatsSvcService : IAsyncDisposable
 
                     await svcMsg.Msg.ReplyAsync(
                         new InfoResponse
-                            {
-                                Name = _config.Name,
-                                Id = _id,
-                                Version = _config.Version,
-                                Description = _config.Description!,
-                                Metadata = _config.Metadata!,
-                                Endpoints = endPoints,
-                            },
+                        {
+                            Name = _config.Name,
+                            Id = _id,
+                            Version = _config.Version,
+                            Description = _config.Description!,
+                            Metadata = _config.Metadata!,
+                            Endpoints = endPoints,
+                        },
                         cancellationToken: _cancellationToken);
                 }
                 else if (type == SvcMsgType.Stats)
@@ -147,12 +163,11 @@ public class NatsSvcService : IAsyncDisposable
                         JsonNode? statsData;
                         try
                         {
-                            statsData = _config.StatsHandler();
+                            statsData = _config.StatsHandler?.Invoke();
                         }
                         catch (Exception ex)
                         {
                             _logger.LogError(ex, "Error calling stats handler for {Endpoint}", ep.Key);
-                            Console.WriteLine($"[STATS] error calling stats handler for {ep.Key}: {ex.Message}");
                             statsData = null;
                         }
 
@@ -188,6 +203,55 @@ public class NatsSvcService : IAsyncDisposable
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Message loop error");
+            }
+        }
+    }
+
+    public class NatsSvcGroup
+    {
+        private readonly NatsSvcService _service;
+        private readonly CancellationToken _cancellationToken;
+        private readonly string _dot;
+
+        public NatsSvcGroup(NatsSvcService service, string groupName, string? queueGroup = default, CancellationToken cancellationToken = default)
+        {
+            ValidateGroupName(groupName);
+            _service = service;
+            GroupName = groupName;
+            QueueGroup = queueGroup;
+            _cancellationToken = cancellationToken;
+            _dot = GroupName.Length == 0 ? string.Empty : ".";
+        }
+
+        public string GroupName { get; }
+
+        public string? QueueGroup { get; }
+
+        public ValueTask AddEndPointAsync<T>(Func<NatsSvcMsg<T>, ValueTask> handler, string? name = default, string? subject = default, IDictionary<string, string>? metadata = default, CancellationToken cancellationToken = default)
+        {
+            var epName = name != null ? $"{GroupName}{_dot}{name}" : null;
+            var epSubject = subject != null ? $"{GroupName}{_dot}{subject}" : null;
+            var queueGroup = QueueGroup ?? _service._config.QueueGroup;
+            return _service.AddEndPointInternalAsync(handler, epName, epSubject, queueGroup, metadata, cancellationToken);
+        }
+
+        public ValueTask<NatsSvcGroup> AddGroupAsync(string name, string? queueGroup, CancellationToken cancellationToken = default)
+        {
+            var groupName = $"{GroupName}{_dot}{name}";
+            return _service.AddGroupAsync(groupName, queueGroup, cancellationToken);
+        }
+
+        private void ValidateGroupName(string groupName)
+        {
+            foreach (var c in groupName)
+            {
+                switch (c)
+                {
+                case '>':
+                    throw new NatsSvcException("Invalid group name (can't have '>' wildcard in group name)");
+                case '\r' or '\n' or ' ':
+                    throw new NatsSvcException("Invalid group name (must be a valid NATS subject)");
+                }
             }
         }
     }
