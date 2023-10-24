@@ -293,4 +293,66 @@ public class RequestReplyTest
         await sub.DisposeAsync();
         await reg;
     }
+
+    [Fact]
+    public async Task Request_reply_many_multiple_with_timeout_test()
+    {
+        await using var server = NatsServer.Start();
+        await using var nats = server.CreateClientConnection();
+
+        const string subject = "foo";
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cancellationToken = cts.Token;
+
+        var sub = await nats.SubscribeAsync<int>(subject, cancellationToken: cancellationToken);
+        var reg = sub.Register(async msg =>
+        {
+            await msg.ReplyAsync(msg.Data * 2, cancellationToken: cancellationToken);
+        });
+
+        var opts = new NatsSubOpts { Timeout = TimeSpan.FromSeconds(2) };
+
+        List<Task<(int index, int data)>> tasks = new();
+
+        for (var i = 0; i < 10; i++)
+        {
+            var index = i;
+
+            tasks.Add(Task.Run(
+                async () =>
+                {
+                    var data = -1;
+
+                    await foreach (var msg in nats.RequestManyAsync<int, int>(subject, index, replyOpts: opts, cancellationToken: cancellationToken))
+                    {
+                        data = msg.Data;
+                    }
+
+                    return (index, data);
+                },
+                cancellationToken));
+        }
+
+        foreach (var task in tasks)
+        {
+            var (index, data) = await task;
+            Assert.Equal(index * 2, data);
+        }
+
+        // Make sure timeout isn't affecting the real inbox subscription
+        // by waiting double the timeout period which should be enough
+        for (var i = 1; i <= 2; i++)
+        {
+            var data = -1;
+            await foreach (var msg in nats.RequestManyAsync<int, int>(subject, i * 100, replyOpts: opts, cancellationToken: cancellationToken))
+            {
+                data = msg.Data;
+            }
+
+            Assert.Equal(i * 200, data);
+        }
+
+        await sub.DisposeAsync();
+        await reg;
+    }
 }
