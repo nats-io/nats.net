@@ -38,20 +38,20 @@ public class ManageStreamTest
 
         // Get
         {
-            var stream = await js.GetStreamAsync("events", cancellationToken);
+            var stream = await js.GetStreamAsync("events", cancellationToken: cancellationToken);
             Assert.Equal("events", stream.Info.Config.Name);
             Assert.Equal(new[] { "events.*" }, stream.Info.Config.Subjects);
         }
 
         // Update
         {
-            var stream1 = await js.GetStreamAsync("events", cancellationToken);
+            var stream1 = await js.GetStreamAsync("events", cancellationToken: cancellationToken);
             Assert.Equal(-1, stream1.Info.Config.MaxMsgs);
 
             var stream2 = await js.UpdateStreamAsync(new StreamUpdateRequest { Name = "events", MaxMsgs = 10 }, cancellationToken);
             Assert.Equal(10, stream2.Info.Config.MaxMsgs);
 
-            var stream3 = await js.GetStreamAsync("events", cancellationToken);
+            var stream3 = await js.GetStreamAsync("events", cancellationToken: cancellationToken);
             Assert.Equal(10, stream3.Info.Config.MaxMsgs);
         }
     }

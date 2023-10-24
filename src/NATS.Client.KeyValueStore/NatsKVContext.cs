@@ -132,7 +132,7 @@ public class NatsKVContext
     {
         ValidateBucketName(bucket);
 
-        var stream = await _context.GetStreamAsync(BucketToStream(bucket), cancellationToken);
+        var stream = await _context.GetStreamAsync(BucketToStream(bucket), cancellationToken: cancellationToken);
 
         if (stream.Info.Config.MaxMsgsPerSubject < 1)
         {
