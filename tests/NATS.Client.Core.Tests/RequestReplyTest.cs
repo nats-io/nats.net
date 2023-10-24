@@ -312,6 +312,21 @@ public class RequestReplyTest
 
         var opts = new NatsSubOpts { Timeout = TimeSpan.FromSeconds(2) };
 
+        // Make sure timeout isn't affecting the real inbox subscription
+        // by waiting double the timeout period (by calling RequestMany twice)
+        // which should be enough
+        for (var i = 1; i <= 2; i++)
+        {
+            var data = -1;
+            await foreach (var msg in nats.RequestManyAsync<int, int>(subject, i * 100, replyOpts: opts, cancellationToken: cancellationToken))
+            {
+                data = msg.Data;
+            }
+
+            Assert.Equal(i * 200, data);
+        }
+
+        // Run a bunch more RequestMany calls with timeout for good measure
         List<Task<(int index, int data)>> tasks = new();
 
         for (var i = 0; i < 10; i++)
@@ -337,19 +352,6 @@ public class RequestReplyTest
         {
             var (index, data) = await task;
             Assert.Equal(index * 2, data);
-        }
-
-        // Make sure timeout isn't affecting the real inbox subscription
-        // by waiting double the timeout period which should be enough
-        for (var i = 1; i <= 2; i++)
-        {
-            var data = -1;
-            await foreach (var msg in nats.RequestManyAsync<int, int>(subject, i * 100, replyOpts: opts, cancellationToken: cancellationToken))
-            {
-                data = msg.Data;
-            }
-
-            Assert.Equal(i * 200, data);
         }
 
         await sub.DisposeAsync();
