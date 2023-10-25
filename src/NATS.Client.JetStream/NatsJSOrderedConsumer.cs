@@ -21,7 +21,7 @@ public class NatsJSOrderedConsumer
         _cancellationToken = cancellationToken;
     }
 
-    public async IAsyncEnumerable<NatsJSMsg<T?>> ConsumeAllAsync<T>(
+    public async IAsyncEnumerable<NatsJSMsg<T?>> ConsumeAsync<T>(
         NatsJSConsumeOpts? opts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -34,7 +34,7 @@ public class NatsJSOrderedConsumer
             var consumer = await RecreateConsumer(consumerName, seq, cancellationToken);
             consumerName = consumer.Info.Name;
 
-            await using var cc = await consumer.ConsumeAsync<T>(opts, cancellationToken);
+            await using var cc = await consumer.ConsumeInternalAsync<T>(opts, cancellationToken);
 
             NatsJSProtocolException? protocolException = default;
             while (true)
@@ -103,7 +103,7 @@ public class NatsJSOrderedConsumer
         }
     }
 
-    public async IAsyncEnumerable<NatsJSMsg<T?>> FetchAllAsync<T>(
+    public async IAsyncEnumerable<NatsJSMsg<T?>> FetchAsync<T>(
         NatsJSFetchOpts? opts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -112,7 +112,7 @@ public class NatsJSOrderedConsumer
         var consumer = await RecreateConsumer(_fetchConsumerName, _fetchSeq, cancellationToken);
         _fetchConsumerName = consumer.Info.Name;
 
-        await foreach (var msg in consumer.FetchAllAsync<T>(opts, cancellationToken))
+        await foreach (var msg in consumer.FetchAsync<T>(opts, cancellationToken))
         {
             if (msg.Metadata is not { } metadata)
                 continue;
@@ -136,7 +136,7 @@ public class NatsJSOrderedConsumer
             MaxMsgs = 1, IdleHeartbeat = opts.IdleHeartbeat, Expires = opts.Expires, Serializer = opts.Serializer,
         };
 
-        await foreach (var msg in FetchAllAsync<T>(fetchOpts, cancellationToken))
+        await foreach (var msg in FetchAsync<T>(fetchOpts, cancellationToken))
         {
             return msg;
         }

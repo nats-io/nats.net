@@ -42,7 +42,7 @@ fast it can process messages without overwhelming the application process.
 while (!cancellationToken.IsCancellationRequested)
 {
     // Consume a batch of messages (1000 by default)
-    await foreach (var msg in consumer.FetchAllAsync<Order>())
+    await foreach (var msg in consumer.FetchAsync<Order>())
     {
         // Process message
         await msg.AckAsync();
@@ -59,7 +59,7 @@ overlapped so that there is a constant flow of messages from the JetStream serve
 or `MaxBytes` and respective thresholds to not overwhelm the application and to not waste server resources.
 
 ```csharp
-await foreach (var msg in consumer.ConsumeAllAsync<Order>())
+await foreach (var msg in consumer.ConsumeAsync<Order>())
 {
     // Process message
     await msg.AckAsync();
@@ -88,7 +88,7 @@ while (!cancellationToken.IsCancellationRequested)
     try
     {
         await consumer.RefreshAsync(); // or try to recreate consumer
-        await foreach (var msg in consumer.ConsumeAllAsync<Order>())
+        await foreach (var msg in consumer.ConsumeAsync<Order>())
         {
             // Process message
             await msg.AckAsync();

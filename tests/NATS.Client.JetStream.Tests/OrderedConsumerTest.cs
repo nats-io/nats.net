@@ -32,7 +32,7 @@ public class OrderedConsumerTest
             MaxMsgs = 3,
             Expires = TimeSpan.FromSeconds(3),
         };
-        await foreach (var msg in consumer.ConsumeAllAsync<int>(consumeOpts, cancellationToken: cts.Token))
+        await foreach (var msg in consumer.ConsumeAsync<int>(consumeOpts, cancellationToken: cts.Token))
         {
             _output.WriteLine($"[RCV] {msg.Data}");
             Assert.Equal(count, msg.Data);
@@ -66,7 +66,7 @@ public class OrderedConsumerTest
                 MaxMsgs = 3,
                 Expires = TimeSpan.FromSeconds(3),
             };
-            await foreach (var msg in consumer.FetchAllAsync<int>(fetchOpts, cancellationToken: cts.Token))
+            await foreach (var msg in consumer.FetchAsync<int>(fetchOpts, cancellationToken: cts.Token))
             {
                 _output.WriteLine($"[RCV] {msg.Data}");
                 Assert.Equal(i, msg.Data);
