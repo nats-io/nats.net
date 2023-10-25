@@ -42,7 +42,7 @@ public class NatsJSConsumer
     public async ValueTask<bool> DeleteAsync(CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
-        return _deleted = await _context.DeleteConsumerAsync(_stream, _consumer, cancellationToken);
+        return _deleted = await _context.DeleteConsumerAsync(_stream, _consumer, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -58,8 +58,8 @@ public class NatsJSConsumer
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         opts ??= _context.Opts.DefaultConsumeOpts;
-        await using var cc = await ConsumeAsync<T>(opts, cancellationToken);
-        await foreach (var jsMsg in cc.Msgs.ReadAllAsync(cancellationToken))
+        await using var cc = await ConsumeAsync<T>(opts, cancellationToken).ConfigureAwait(false);
+        await foreach (var jsMsg in cc.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
             yield return jsMsg;
         }
@@ -102,7 +102,7 @@ public class NatsJSConsumer
             idle: timeouts.IdleHeartbeat,
             cancellationToken: cancellationToken);
 
-        await _context.Connection.SubAsync(sub: sub, cancellationToken);
+        await _context.Connection.SubAsync(sub: sub, cancellationToken).ConfigureAwait(false);
 
         // Start consuming with the first Pull Request
         await sub.CallMsgNextAsync(
@@ -114,7 +114,7 @@ public class NatsJSConsumer
                 IdleHeartbeat = timeouts.IdleHeartbeat.ToNanos(),
                 Expires = timeouts.Expires.ToNanos(),
             },
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
 
         sub.ResetHeartbeatTimer();
 
@@ -164,9 +164,9 @@ public class NatsJSConsumer
                 Expires = opts.Expires,
                 Serializer = opts.Serializer,
             },
-            cancellationToken: cancellationToken);
+            cancellationToken: cancellationToken).ConfigureAwait(false);
 
-        await foreach (var natsJSMsg in f.Msgs.ReadAllAsync(cancellationToken))
+        await foreach (var natsJSMsg in f.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
             return natsJSMsg;
         }
@@ -190,8 +190,8 @@ public class NatsJSConsumer
         ThrowIfDeleted();
         opts ??= _context.Opts.DefaultFetchOpts;
 
-        await using var fc = await FetchAsync<T>(opts, cancellationToken);
-        await foreach (var jsMsg in fc.Msgs.ReadAllAsync(cancellationToken))
+        await using var fc = await FetchAsync<T>(opts, cancellationToken).ConfigureAwait(false);
+        await foreach (var jsMsg in fc.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
             yield return jsMsg;
         }
@@ -248,8 +248,8 @@ public class NatsJSConsumer
         ThrowIfDeleted();
         opts ??= _context.Opts.DefaultFetchOpts;
 
-        await using var fc = await FetchAsync<T>(opts with { NoWait = true }, cancellationToken);
-        await foreach (var jsMsg in fc.Msgs.ReadAllAsync(cancellationToken))
+        await using var fc = await FetchAsync<T>(opts with { NoWait = true }, cancellationToken).ConfigureAwait(false);
+        await foreach (var jsMsg in fc.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
             yield return jsMsg;
         }
@@ -290,7 +290,7 @@ public class NatsJSConsumer
             expires: timeouts.Expires,
             idle: timeouts.IdleHeartbeat);
 
-        await _context.Connection.SubAsync(sub: sub, cancellationToken);
+        await _context.Connection.SubAsync(sub: sub, cancellationToken).ConfigureAwait(false);
 
         await sub.CallMsgNextAsync(
             opts.NoWait
@@ -307,7 +307,7 @@ public class NatsJSConsumer
                     Expires = timeouts.Expires.ToNanos(),
                     NoWait = opts.NoWait,
                 },
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
 
         sub.ResetHeartbeatTimer();
 

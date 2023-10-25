@@ -285,7 +285,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
                     }
                     else if (headers.HasTerminalJSError())
                     {
-                        _userMsgs.Writer.TryComplete(new NatsJSProtocolException($"JetStream server error: {headers.Code} {headers.MessageText}"));
+                        _userMsgs.Writer.TryComplete(new NatsJSProtocolException(headers.Code, headers.Message, headers.MessageText));
                         EndSubscription(NatsSubEndReason.JetStreamError);
                     }
                     else
