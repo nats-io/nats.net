@@ -80,17 +80,19 @@ public partial class NatsJSContext
     /// Get stream information from the server and creates a NATS JetStream stream object <see cref="NatsJSStream"/>.
     /// </summary>
     /// <param name="stream">Name of the stream to retrieve.</param>
+    /// <param name="request">Stream info request options</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>The NATS JetStream stream object which can be used to manage the stream.</returns>
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     public async ValueTask<NatsJSStream> GetStreamAsync(
         string stream,
+        StreamInfoRequest? request = null,
         CancellationToken cancellationToken = default)
     {
-        var response = await JSRequestResponseAsync<object, StreamInfoResponse>(
+        var response = await JSRequestResponseAsync<StreamInfoRequest, StreamInfoResponse>(
             subject: $"{Opts.Prefix}.STREAM.INFO.{stream}",
-            request: null,
+            request: request,
             cancellationToken);
         return new NatsJSStream(this, response);
     }
