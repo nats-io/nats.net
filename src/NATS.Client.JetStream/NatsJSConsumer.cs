@@ -197,7 +197,51 @@ public class NatsJSConsumer
         }
     }
 
-    public async IAsyncEnumerable<NatsJSMsg<T?>> FetchNoWait<T>(
+    /// <summary>
+    /// Consume a set number of messages from the stream using this consumer.
+    /// Returns immediately if no messages are available.
+    /// </summary>
+    /// <param name="opts">Fetch options. (default: <c>MaxMsgs</c> 1,000 and timeout is ignored)</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the call.</param>
+    /// <typeparam name="T">Message type to deserialize.</typeparam>
+    /// <returns>Async enumerable of messages which can be used in a <c>await foreach</c> loop.</returns>
+    /// <exception cref="NatsJSProtocolException">Consumer is deleted, it's push based or request sent to server is invalid.</exception>
+    /// <exception cref="NatsJSException">There is an error sending the message or this consumer object isn't valid anymore because it was deleted earlier.</exception>
+    /// <remarks>
+    /// <para>
+    /// This method will return immediately if no messages are available.
+    /// </para>
+    /// <para>
+    /// Using this method is discouraged because it might create an unnecessary load on your cluster.
+    /// Use <c>Consume</c> or <c>Fetch</c> instead.
+    /// </para>
+    /// </remarks>
+    /// <example>
+    /// <para>
+    /// However, there are scenarios where this method is useful. For example if your application is
+    /// processing messages in batches infrequently (for example every 5 minutes) you might want to
+    /// consider <c>FetchNoWait</c>. You must make sure to count your messages and stop fetching
+    /// if you received all of them in one call, meaning when <c>count &lt; MaxMsgs</c>.
+    /// </para>
+    /// <code>
+    /// const int max = 10;
+    /// var count = 0;
+    ///
+    /// await foreach (var msg in consumer.FetchAllNoWaitAsync&lt;int&gt;(new NatsJSFetchOpts { MaxMsgs = max }))
+    /// {
+    ///     count++;
+    ///     Process(msg);
+    ///     await msg.AckAsync();
+    /// }
+    ///
+    /// if (count &lt; max)
+    /// {
+    ///     // No more messages. Pause for more.
+    ///     await Task.Delay(TimeSpan.FromMinutes(5));
+    /// }
+    /// </code>
+    /// </example>
+    public async IAsyncEnumerable<NatsJSMsg<T?>> FetchAllNoWaitAsync<T>(
         NatsJSFetchOpts? opts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -254,7 +298,7 @@ public class NatsJSConsumer
                 // When no wait is set we don't need to send the idle heartbeat and expiration
                 // If no message is available the server will respond with a 404 immediately
                 // If messages are available the server will send a 408 direct after the last message
-                ? new ConsumerGetnextRequest {Batch = max.MaxMsgs, MaxBytes = max.MaxBytes, NoWait = opts.NoWait}
+                ? new ConsumerGetnextRequest { Batch = max.MaxMsgs, MaxBytes = max.MaxBytes, NoWait = opts.NoWait }
                 : new ConsumerGetnextRequest
                 {
                     Batch = max.MaxMsgs,
