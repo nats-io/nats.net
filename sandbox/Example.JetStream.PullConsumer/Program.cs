@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Diagnostics;
 using System.Text;
 using Microsoft.Extensions.Logging;
@@ -85,6 +84,49 @@ try
 
                     await msg.AckAsync(cancellationToken: cts.Token);
                     Report(++count, stopwatch, $"data: {msg.Data}");
+                }
+            }
+            catch (NatsJSProtocolException e)
+            {
+                Console.WriteLine(e.Message);
+            }
+            catch (NatsJSException e)
+            {
+                Console.WriteLine(e.Message);
+                await Task.Delay(1000);
+            }
+        }
+    }
+    else if (cmd == "fetch-all-no-wait")
+    {
+        while (!cts.Token.IsCancellationRequested)
+        {
+            try
+            {
+                const int max = 10;
+                Console.WriteLine($"___\nFETCH-NO-WAIT {max}");
+                await consumer.RefreshAsync(cts.Token);
+
+                var fetchNoWaitOpts = new NatsJSFetchOpts { MaxMsgs = max };
+                var fetchMsgCount = 0;
+
+                await foreach (var msg in consumer.FetchAllNoWaitAsync<NatsMemoryOwner<byte>>(fetchNoWaitOpts, cts.Token))
+                {
+                    fetchMsgCount++;
+                    using (msg.Data)
+                    {
+                        var message = Encoding.ASCII.GetString(msg.Data.Span);
+                        Console.WriteLine($"Received: {message}");
+                    }
+
+                    await msg.AckAsync(cancellationToken: cts.Token);
+                    Report(++count, stopwatch, $"data: {msg.Data}");
+                }
+
+                if (fetchMsgCount < fetchNoWaitOpts.MaxMsgs)
+                {
+                    Console.WriteLine("No more messages. Pause for more...");
+                    await Task.Delay(TimeSpan.FromSeconds(5));
                 }
             }
             catch (NatsJSProtocolException e)
