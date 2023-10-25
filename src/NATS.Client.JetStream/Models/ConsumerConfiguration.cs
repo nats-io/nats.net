@@ -11,7 +11,7 @@ public record ConsumerConfiguration
     [System.Text.Json.Serialization.JsonPropertyName("opt_start_seq")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     [System.ComponentModel.DataAnnotations.Range(0D, 18446744073709552000D)]
-    public long OptStartSeq { get; set; } = default!;
+    public ulong OptStartSeq { get; set; } = default!;
 
     [System.Text.Json.Serialization.JsonPropertyName("opt_start_time")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]

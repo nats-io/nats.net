@@ -275,7 +275,7 @@ public class ConsumerConsumeTest
         var infos = new List<ConsumerInfo>();
         await foreach (var natsJSConsumer in stream.ListConsumersAsync(cts.Token))
         {
-            infos.Add(natsJSConsumer.Info);
+            infos.Add(natsJSConsumer);
         }
 
         Assert.Single(infos);
@@ -328,7 +328,7 @@ public class ConsumerConsumeTest
         var infos = new List<ConsumerInfo>();
         await foreach (var natsJSConsumer in stream.ListConsumersAsync(cts.Token))
         {
-            infos.Add(natsJSConsumer.Info);
+            infos.Add(natsJSConsumer);
         }
 
         Assert.Single(infos);

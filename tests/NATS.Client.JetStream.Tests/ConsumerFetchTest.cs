@@ -115,7 +115,7 @@ public class ConsumerFetchTest
         var infos = new List<ConsumerInfo>();
         await foreach (var natsJSConsumer in stream.ListConsumersAsync(cts.Token))
         {
-            infos.Add(natsJSConsumer.Info);
+            infos.Add(natsJSConsumer);
         }
 
         Assert.Single(infos);

@@ -40,6 +40,17 @@ internal sealed class NuidWriter
         return InitAndWrite(nuidBuffer);
     }
 
+    public static string NewNuid()
+    {
+        Span<char> buffer = stackalloc char[22];
+        if (TryWriteNuid(buffer))
+        {
+            return new string(buffer);
+        }
+
+        throw new InvalidOperationException("Internal error: can't generate nuid");
+    }
+
     private static bool TryWriteNuidCore(Span<char> buffer, Span<char> prefix, ulong sequential)
     {
         if ((uint)buffer.Length < NuidLength || prefix.Length != PrefixLength)

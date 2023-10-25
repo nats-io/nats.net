@@ -1,4 +1,5 @@
 using NATS.Client.Core;
+using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
 
@@ -57,6 +58,30 @@ public record NatsJSOpts
     /// Default next options to be used in next calls in this context.
     /// </summary>
     public NatsJSNextOpts DefaultNextOpts { get; init; } = new();
+}
+
+public record NatsJSOrderedConsumerOpts
+{
+    public static readonly NatsJSOrderedConsumerOpts Default = new();
+
+    public string[] FilterSubjects { get; init; } = Array.Empty<string>();
+
+    public ConsumerConfigurationDeliverPolicy DeliverPolicy { get; init; } = ConsumerConfigurationDeliverPolicy.all;
+
+    public ulong OptStartSeq { get; init; } = 0;
+
+    public DateTimeOffset OptStartTime { get; init; } = default;
+
+    public ConsumerConfigurationReplayPolicy ReplayPolicy { get; init; } = ConsumerConfigurationReplayPolicy.instant;
+
+    public TimeSpan InactiveThreshold { get; init; } = TimeSpan.FromMinutes(5);
+
+    public bool HeadersOnly { get; init; } = false;
+
+    /// <summary>
+    /// Maximum number of attempts for the consumer to be recreated (Defaults to unlimited).
+    /// </summary>
+    public int MaxResetAttempts { get; init; } = -1;
 }
 
 /// <summary>

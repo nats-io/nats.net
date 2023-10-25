@@ -84,6 +84,12 @@ public class NatsJSStream
         return _context.CreateConsumerAsync(_name, consumer, ackPolicy, cancellationToken);
     }
 
+    public ValueTask<NatsJSOrderedConsumer> CreateOrderedConsumerAsync(NatsJSOrderedConsumerOpts? opts = default, CancellationToken cancellationToken = default)
+    {
+        ThrowIfDeleted();
+        return _context.CreateOrderedConsumerAsync(_name, opts, cancellationToken);
+    }
+
     /// <summary>
     /// Creates new consumer for this stream if it doesn't exists or returns an existing one with the same name.
     /// </summary>
@@ -122,7 +128,7 @@ public class NatsJSStream
     /// <remarks>
     /// Note that paging isn't implemented. You might receive only a partial list of consumers if there are a lot of them.
     /// </remarks>
-    public IAsyncEnumerable<NatsJSConsumer> ListConsumersAsync(CancellationToken cancellationToken = default)
+    public IAsyncEnumerable<ConsumerInfo> ListConsumersAsync(CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
         return _context.ListConsumersAsync(_name, cancellationToken);

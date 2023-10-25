@@ -1,10 +1,28 @@
 using System.Runtime.CompilerServices;
+using NATS.Client.Core.Internal;
+using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
 
 public partial class NatsJSContext
 {
+    /// <summary>
+    /// Creates new ordered consumer.
+    /// </summary>
+    /// <param name="stream">Stream name to create the consumer under.</param>
+    /// <param name="opts">Ordered consumer options.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>The NATS JetStream consumer object which can be used retrieving ordered data from the stream.</returns>
+    public ValueTask<NatsJSOrderedConsumer> CreateOrderedConsumerAsync(
+        string stream,
+        NatsJSOrderedConsumerOpts? opts = default,
+        CancellationToken cancellationToken = default)
+    {
+        opts ??= NatsJSOrderedConsumerOpts.Default;
+        return new ValueTask<NatsJSOrderedConsumer>(new NatsJSOrderedConsumer(stream, this, opts, cancellationToken));
+    }
+
     /// <summary>
     /// Creates new consumer if it doesn't exists or returns an existing one with the same name.
     /// </summary>
@@ -90,13 +108,13 @@ public partial class NatsJSContext
     /// </summary>
     /// <param name="stream">Stream name the consumers belong to.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <returns>Async enumerable of consumer objects. Can be used in a <c>await foreach</c> loop.</returns>
+    /// <returns>Async enumerable of consumer info objects. Can be used in a <c>await foreach</c> loop.</returns>
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     /// <remarks>
     /// Note that paging isn't implemented. You might receive only a partial list of consumers if there are a lot of them.
     /// </remarks>
-    public async IAsyncEnumerable<NatsJSConsumer> ListConsumersAsync(
+    public async IAsyncEnumerable<ConsumerInfo> ListConsumersAsync(
         string stream,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -105,7 +123,7 @@ public partial class NatsJSContext
             new ConsumerListRequest { Offset = 0 },
             cancellationToken);
         foreach (var consumer in response.Consumers)
-            yield return new NatsJSConsumer(this, consumer);
+            yield return consumer;
     }
 
     /// <summary>
@@ -124,5 +142,64 @@ public partial class NatsJSContext
             request: null,
             cancellationToken);
         return response.Success;
+    }
+
+    internal ValueTask<ConsumerInfo> CreateOrderedConsumerInternalAsync(
+        string stream,
+        NatsJSOrderedConsumerOpts opts,
+        CancellationToken cancellationToken)
+    {
+        var request = new ConsumerCreateRequest
+        {
+            StreamName = stream,
+            Config = new ConsumerConfiguration
+            {
+                Name = NuidWriter.NewNuid(),
+                DeliverPolicy = opts.DeliverPolicy,
+                AckPolicy = ConsumerConfigurationAckPolicy.none,
+                ReplayPolicy = opts.ReplayPolicy,
+                InactiveThreshold = opts.InactiveThreshold.ToNanos(),
+                NumReplicas = 1,
+                MemStorage = true,
+            },
+        };
+
+        if (opts.OptStartSeq > 0)
+        {
+            request.Config.OptStartSeq = opts.OptStartSeq;
+        }
+
+        if (opts.OptStartTime != default)
+        {
+            request.Config.OptStartTime = opts.OptStartTime;
+        }
+
+        if (opts.HeadersOnly)
+        {
+            request.Config.HeadersOnly = true;
+        }
+
+        if (opts.FilterSubjects.Length > 0)
+        {
+            request.Config.FilterSubjects = opts.FilterSubjects;
+        }
+
+        var subject = $"{Opts.Prefix}.CONSUMER.CREATE.{request.StreamName}";
+
+        if (!string.IsNullOrWhiteSpace(request.Config.Name))
+        {
+            subject += $".{request.Config.Name}";
+            request.Config.Name = default!;
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Config.FilterSubject))
+        {
+            subject += $".{request.Config.FilterSubject}";
+        }
+
+        return JSRequestResponseAsync<ConsumerCreateRequest, ConsumerInfo>(
+            subject: subject,
+            request,
+            cancellationToken);
     }
 }
