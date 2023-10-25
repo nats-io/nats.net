@@ -79,7 +79,7 @@ public class NatsJSOrderedConsumer
                 }
             }
 
-            CONSUME_LOOP:
+        CONSUME_LOOP:
             if (protocolException != null)
             {
                 if (protocolException
@@ -133,7 +133,10 @@ public class NatsJSOrderedConsumer
 
         var fetchOpts = new NatsJSFetchOpts
         {
-            MaxMsgs = 1, IdleHeartbeat = opts.IdleHeartbeat, Expires = opts.Expires, Serializer = opts.Serializer,
+            MaxMsgs = 1,
+            IdleHeartbeat = opts.IdleHeartbeat,
+            Expires = opts.Expires,
+            Serializer = opts.Serializer,
         };
 
         await foreach (var msg in FetchAsync<T>(fetchOpts, cancellationToken))
@@ -152,7 +155,8 @@ public class NatsJSOrderedConsumer
         {
             consumerOpts = _opts with
             {
-                OptStartSeq = _fetchSeq + 1, DeliverPolicy = ConsumerConfigurationDeliverPolicy.by_start_sequence,
+                OptStartSeq = _fetchSeq + 1,
+                DeliverPolicy = ConsumerConfigurationDeliverPolicy.by_start_sequence,
             };
 
             if (consumer != string.Empty)
