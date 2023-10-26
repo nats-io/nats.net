@@ -8,18 +8,40 @@ using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Services;
 
+/// <summary>
+/// NATS service endpoint.
+/// </summary>
 public interface INatsSvcEndPoint : IAsyncDisposable
 {
+    /// <summary>
+    /// Number of requests received.
+    /// </summary>
     long Requests { get; }
 
+
+    /// <summary>
+    /// Total processing time in nanoseconds.
+    /// </summary>
     long ProcessingTime { get; }
 
+    /// <summary>
+    /// Number of errors.
+    /// </summary>
     long Errors { get; }
 
+    /// <summary>
+    /// Last error message.
+    /// </summary>
     string? LastError { get; }
 
+    /// <summary>
+    /// Average processing time in nanoseconds.
+    /// </summary>
     long AverageProcessingTime { get; }
 
+    /// <summary>
+    /// Endpoint metadata.
+    /// </summary>
     IDictionary<string, string>? Metadata { get; }
 
     /// <summary>
@@ -28,13 +50,19 @@ public interface INatsSvcEndPoint : IAsyncDisposable
     string Subject { get; }
 
     /// <summary>
+    /// Endpoint queue group.
+    /// </summary>
+    /// <remarks>
     /// If specified, the subscriber will join this queue group. Subscribers with the same queue group name,
     /// become a queue group, and only one randomly chosen subscriber of the queue group will
     /// consume a message each time a message is received by the queue group.
-    /// </summary>
+    /// </remarks>
     string? QueueGroup { get; }
 }
 
+/// <summary>
+/// Endpoint base class exposing general stats.
+/// </summary>
 public abstract class NatsSvcEndPointBase : NatsSubBase, INatsSvcEndPoint
 {
     protected NatsSvcEndPointBase(NatsConnection connection, ISubscriptionManager manager, string subject, string? queueGroup, NatsSubOpts? opts)
@@ -42,16 +70,22 @@ public abstract class NatsSvcEndPointBase : NatsSubBase, INatsSvcEndPoint
     {
     }
 
+    /// <inheritdoc/>
     public abstract long Requests { get; }
 
+    /// <inheritdoc/>
     public abstract long ProcessingTime { get; }
 
+    /// <inheritdoc/>
     public abstract long Errors { get; }
 
+    /// <inheritdoc/>
     public abstract string? LastError { get; }
 
+    /// <inheritdoc/>
     public abstract long AverageProcessingTime { get; }
 
+    /// <inheritdoc/>
     public abstract IDictionary<string, string>? Metadata { get; }
 
     internal abstract void IncrementErrors();
@@ -59,6 +93,10 @@ public abstract class NatsSvcEndPointBase : NatsSubBase, INatsSvcEndPoint
     internal abstract void SetLastError(string error);
 }
 
+/// <summary>
+/// NATS service endpoint.
+/// </summary>
+/// <typeparam name="T">Serialized type to use when receiving data.</typeparam>
 public class NatsSvcEndPoint<T> : NatsSvcEndPointBase
 {
     private readonly ILogger _logger;
@@ -75,6 +113,17 @@ public class NatsSvcEndPoint<T> : NatsSvcEndPointBase
     private long _processingTime;
     private string? _lastError;
 
+    /// <summary>
+    /// Creates a new instance of <see cref="NatsSvcEndPoint{T}"/>.
+    /// </summary>
+    /// <param name="nats">NATS connection.</param>
+    /// <param name="queueGroup">Queue group.</param>
+    /// <param name="name">Optional endpoint name.</param>
+    /// <param name="handler">Callback function to handle messages received.</param>
+    /// <param name="subject">Optional subject name.</param>
+    /// <param name="metadata">Endpoint metadata.</param>
+    /// <param name="opts">Subscription options.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     public NatsSvcEndPoint(NatsConnection nats, string? queueGroup, string name, Func<NatsSvcMsg<T>, ValueTask> handler, string subject, IDictionary<string, string>? metadata, NatsSubOpts? opts, CancellationToken cancellationToken)
         : base(nats, nats.SubscriptionManager, subject, queueGroup, opts)
     {
@@ -89,18 +138,25 @@ public class NatsSvcEndPoint<T> : NatsSvcEndPointBase
         _handlerTask = Task.Run(HandlerLoop);
     }
 
+    /// <inheritdoc/>
     public override long Requests => Volatile.Read(ref _requests);
 
+    /// <inheritdoc/>
     public override long ProcessingTime => Volatile.Read(ref _processingTime);
 
+    /// <inheritdoc/>
     public override long Errors => Volatile.Read(ref _errors);
 
+    /// <inheritdoc/>
     public override string? LastError => Volatile.Read(ref _lastError);
 
+    /// <inheritdoc/>
     public override long AverageProcessingTime => Requests == 0 ? 0 : ProcessingTime / Requests;
 
+    /// <inheritdoc/>
     public override IDictionary<string, string>? Metadata { get; }
 
+    /// <inheritdoc/>
     public override async ValueTask DisposeAsync()
     {
         await base.DisposeAsync();

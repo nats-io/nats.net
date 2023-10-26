@@ -9,6 +9,9 @@ using NATS.Client.Services.Models;
 
 namespace NATS.Client.Services;
 
+/// <summary>
+/// NATS service.
+/// </summary>
 public class NatsSvcService : IAsyncDisposable
 {
     private readonly ILogger _logger;
@@ -23,6 +26,12 @@ public class NatsSvcService : IAsyncDisposable
     private readonly string _started;
     private readonly CancellationTokenSource _cts;
 
+    /// <summary>
+    /// Creates a new instance of <see cref="NatsSvcService"/>.
+    /// </summary>
+    /// <param name="nats">NATS connection.</param>
+    /// <param name="config">Service configuration.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the service creation requests.</param>
     public NatsSvcService(NatsConnection nats, NatsSvcConfig config, CancellationToken cancellationToken)
     {
         _logger = nats.Opts.LoggerFactory.CreateLogger<NatsSvcService>();
@@ -36,6 +45,11 @@ public class NatsSvcService : IAsyncDisposable
         _started = DateTimeOffset.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffffffZ");
     }
 
+    /// <summary>
+    /// Stop the service.
+    /// </summary>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the stop operation.</param>
+    /// <returns>A <seealso cref="ValueTask"/> representing the asynchronous operation.</returns>
     public async ValueTask StopAsync(CancellationToken cancellationToken = default)
     {
         foreach (var listener in _svcListeners)
@@ -58,15 +72,39 @@ public class NatsSvcService : IAsyncDisposable
         await _taskMsgLoop;
     }
 
+    /// <summary>
+    /// Adds a new endpoint.
+    /// </summary>
+    /// <param name="handler">Callback for handling incoming messages.</param>
+    /// <param name="name">Optional endpoint name.</param>
+    /// <param name="subject">Optional endpoint subject.</param>
+    /// <param name="metadata">Optional endpoint metadata.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to stop the endpoint.</param>
+    /// <typeparam name="T">Serialization type for messages received.</typeparam>
+    /// <returns>A <seealso cref="ValueTask"/> representing the asynchronous operation.</returns>
+    /// <remarks>
+    /// One of name or subject must be specified.
+    /// </remarks>
     public ValueTask AddEndPointAsync<T>(Func<NatsSvcMsg<T>, ValueTask> handler, string? name = default, string? subject = default, IDictionary<string, string>? metadata = default, CancellationToken cancellationToken = default) =>
         AddEndPointInternalAsync<T>(handler, name, subject, _config.QueueGroup, metadata, cancellationToken);
 
+    /// <summary>
+    /// Adds a new service group with optional queue group.
+    /// </summary>
+    /// <param name="name">Name of the group.</param>
+    /// <param name="queueGroup">Queue group name.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> may be used to cancel th call in the future.</param>
+    /// <returns>A <seealso cref="ValueTask"/> representing the asynchronous operation.</returns>
     public ValueTask<Group> AddGroupAsync(string name, string? queueGroup = default, CancellationToken cancellationToken = default)
     {
         var group = new Group(this, name, queueGroup, cancellationToken);
         return ValueTask.FromResult(group);
     }
 
+
+    /// <summary>
+    /// Stop the service.
+    /// </summary>
     public async ValueTask DisposeAsync()
     {
         await StopAsync(_cancellationToken);
@@ -210,12 +248,22 @@ public class NatsSvcService : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// NATS service group.
+    /// </summary>
     public class Group
     {
         private readonly NatsSvcService _service;
         private readonly CancellationToken _cancellationToken;
         private readonly string _dot;
 
+        /// <summary>
+        /// Creates a new instance of <see cref="Group"/>.
+        /// </summary>
+        /// <param name="service">Service instance.</param>
+        /// <param name="groupName">Group name.</param>
+        /// <param name="queueGroup">Optional queue group.</param>
+        /// <param name="cancellationToken">A <see cref="CancellationToken"/> may be used to cancel th call in the future.</param>
         public Group(NatsSvcService service, string groupName, string? queueGroup = default, CancellationToken cancellationToken = default)
         {
             ValidateGroupName(groupName);
@@ -230,6 +278,19 @@ public class NatsSvcService : IAsyncDisposable
 
         public string? QueueGroup { get; }
 
+        /// <summary>
+        /// Adds a new endpoint.
+        /// </summary>
+        /// <param name="handler">Callback for handling incoming messages.</param>
+        /// <param name="name">Optional endpoint name.</param>
+        /// <param name="subject">Optional endpoint subject.</param>
+        /// <param name="metadata">Optional endpoint metadata.</param>
+        /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to stop the endpoint.</param>
+        /// <typeparam name="T">Serialization type for messages received.</typeparam>
+        /// <returns>A <seealso cref="ValueTask"/> representing the asynchronous operation.</returns>
+        /// <remarks>
+        /// One of name or subject must be specified.
+        /// </remarks>
         public ValueTask AddEndPointAsync<T>(Func<NatsSvcMsg<T>, ValueTask> handler, string? name = default, string? subject = default, IDictionary<string, string>? metadata = default, CancellationToken cancellationToken = default)
         {
             var epName = name != null ? $"{GroupName}{_dot}{name}" : null;
@@ -238,7 +299,14 @@ public class NatsSvcService : IAsyncDisposable
             return _service.AddEndPointInternalAsync(handler, epName, epSubject, queueGroup, metadata, cancellationToken);
         }
 
-        public ValueTask<Group> AddGroupAsync(string name, string? queueGroup, CancellationToken cancellationToken = default)
+        /// <summary>
+        /// Adds a new service group with optional queue group.
+        /// </summary>
+        /// <param name="name">Name of the group.</param>
+        /// <param name="queueGroup">Optional queue group name.</param>
+        /// <param name="cancellationToken">A <see cref="CancellationToken"/> may be used to cancel th call in the future.</param>
+        /// <returns>A <seealso cref="ValueTask"/> representing the asynchronous operation.</returns>
+        public ValueTask<Group> AddGroupAsync(string name, string? queueGroup = default, CancellationToken cancellationToken = default)
         {
             var groupName = $"{GroupName}{_dot}{name}";
             return _service.AddGroupAsync(groupName, queueGroup, cancellationToken);

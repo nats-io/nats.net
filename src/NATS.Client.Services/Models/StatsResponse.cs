@@ -50,9 +50,6 @@ public record EndpointStats
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public string LastError { get; set; } = default!;
 
-    /**
-    * A field that can be customized with any data as returned by stats handler see {@link ServiceConfig}
-    */
     [JsonPropertyName("data")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public JsonNode Data { get; set; } = default!;
@@ -60,9 +57,6 @@ public record EndpointStats
     [JsonPropertyName("processing_time")]
     public long ProcessingTime { get; set; }
 
-    /**
-    * Average processing_time is the total processing_time divided by the num_requests
-    */
     [JsonPropertyName("average_processing_time")]
     public long AverageProcessingTime { get; set; }
 }
