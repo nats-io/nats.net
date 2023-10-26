@@ -56,6 +56,9 @@ jobs:
       - name: Test Object Store
         run: dotnet test -c Debug --no-build --logger:"console;verbosity=normal" tests/NATS.Client.ObjectStore.Tests/NATS.Client.ObjectStore.Tests.csproj
 
+      - name: Test Services
+        run: dotnet test -c Debug --no-build --logger:"console;verbosity=normal" tests/NATS.Client.Services.Tests/NATS.Client.Services.Tests.csproj
+
   memory_test:
     name: memory test
     strategy:
