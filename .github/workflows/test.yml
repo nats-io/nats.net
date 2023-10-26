@@ -39,7 +39,8 @@ jobs:
       - name: Setup dotnet
         uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: '6.x'
+          dotnet-version: '8.x'
+          dotnet-quality: 'preview'
 
       - name: Build
         run: dotnet build -c Debug
@@ -79,7 +80,8 @@ jobs:
       - name: Setup dotnet
         uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: '6.x'
+          dotnet-version: '8.x'
+          dotnet-quality: 'preview'
 
       - name: Get nats-server
         shell: bash
