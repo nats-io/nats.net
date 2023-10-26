@@ -11,7 +11,7 @@ internal sealed class NatsJSErrorAwareJsonSerializer : INatsSerializer
 
     public INatsSerializer? Next => default;
 
-    public int Serialize<T>(ICountableBufferWriter bufferWriter, T? value) =>
+    public int Serialize<T>(IBufferWriter<byte> bufferWriter, T? value) =>
         throw new NotSupportedException();
 
     public T? Deserialize<T>(in ReadOnlySequence<byte> buffer)

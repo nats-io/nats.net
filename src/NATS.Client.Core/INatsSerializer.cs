@@ -8,14 +8,9 @@ public interface INatsSerializer
 {
     public INatsSerializer? Next { get; }
 
-    int Serialize<T>(ICountableBufferWriter bufferWriter, T? value);
+    int Serialize<T>(IBufferWriter<byte> bufferWriter, T? value);
 
     T? Deserialize<T>(in ReadOnlySequence<byte> buffer);
-}
-
-public interface ICountableBufferWriter : IBufferWriter<byte>
-{
-    int WrittenCount { get; }
 }
 
 public static class NatsDefaultSerializer
@@ -29,7 +24,7 @@ public class NatsRawSerializer : INatsSerializer
 
     public INatsSerializer? Next { get; }
 
-    public int Serialize<T>(ICountableBufferWriter bufferWriter, T? value)
+    public int Serialize<T>(IBufferWriter<byte> bufferWriter, T? value)
     {
         if (value is byte[] bytes)
         {
@@ -139,7 +134,7 @@ public sealed class NatsJsonSerializer : INatsSerializer
 
     public INatsSerializer? Next => default;
 
-    public int Serialize<T>(ICountableBufferWriter bufferWriter, T? value)
+    public int Serialize<T>(IBufferWriter<byte> bufferWriter, T? value)
     {
         Utf8JsonWriter writer;
         if (_jsonWriter == null)
