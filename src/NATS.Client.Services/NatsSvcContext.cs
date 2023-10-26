@@ -23,7 +23,7 @@ public class NatsSvcContext
     /// <param name="queueGroup">Optional queue group (default: "q")</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>NATS Service instance.</returns>
-    public ValueTask<NatsSvcService> AddServiceAsync(string name, string version, string queueGroup = "q", CancellationToken cancellationToken = default) =>
+    public ValueTask<NatsSvcServer> AddServiceAsync(string name, string version, string queueGroup = "q", CancellationToken cancellationToken = default) =>
         AddServiceAsync(new NatsSvcConfig(name, version) { QueueGroup = queueGroup }, cancellationToken);
 
     /// <summary>
@@ -32,9 +32,9 @@ public class NatsSvcContext
     /// <param name="config">Service configuration.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>NATS Service instance.</returns>
-    public async ValueTask<NatsSvcService> AddServiceAsync(NatsSvcConfig config, CancellationToken cancellationToken = default)
+    public async ValueTask<NatsSvcServer> AddServiceAsync(NatsSvcConfig config, CancellationToken cancellationToken = default)
     {
-        var service = new NatsSvcService(_nats, config, cancellationToken);
+        var service = new NatsSvcServer(_nats, config, cancellationToken);
         await service.StartAsync().ConfigureAwait(false);
         return service;
     }

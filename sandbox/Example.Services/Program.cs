@@ -12,7 +12,7 @@ var qg = args.Length > 0 ? args[0] : "q";
 
 await using var testService = await svc.AddServiceAsync("test", "1.0.0", qg);
 
-await testService.AddEndPointAsync<int>(name: "bla", handler: async m =>
+await testService.AddEndpointAsync<int>(name: "bla", handler: async m =>
 {
     if (m.Exception is { } e)
     {
@@ -29,7 +29,7 @@ await testService.AddEndPointAsync<int>(name: "bla", handler: async m =>
 
     if (m.Data == 1)
     {
-        throw new NatsSvcEndPointException(1, "Data can't be 1", "More info ...");
+        throw new NatsSvcEndpointException(1, "Data can't be 1", "More info ...");
     }
 
     if (m.Data == 2)
@@ -44,7 +44,7 @@ await testService.AddEndPointAsync<int>(name: "bla", handler: async m =>
 
 var grp1 = await testService.AddGroupAsync("grp1");
 
-await grp1.AddEndPointAsync<int>(name: "bla", handler: async m =>
+await grp1.AddEndpointAsync<int>(name: "bla", handler: async m =>
 {
     if (m.Exception is { } e)
     {
@@ -61,7 +61,7 @@ await grp1.AddEndPointAsync<int>(name: "bla", handler: async m =>
 
     if (m.Data == 1)
     {
-        throw new NatsSvcEndPointException(1, "Data can't be 1", "More info ...");
+        throw new NatsSvcEndpointException(1, "Data can't be 1", "More info ...");
     }
 
     if (m.Data == 2)

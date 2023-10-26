@@ -20,15 +20,15 @@ public class NatsSvcException : NatsException
 /// <summary>
 /// NATS service endpoint exception.
 /// </summary>
-public class NatsSvcEndPointException : NatsException
+public class NatsSvcEndpointException : NatsException
 {
     /// <summary>
-    /// Creates a new instance of <see cref="NatsSvcEndPointException"/>.
+    /// Creates a new instance of <see cref="NatsSvcEndpointException"/>.
     /// </summary>
     /// <param name="code">Error code.</param>
     /// <param name="message">Error message</param>
     /// <param name="body">Optional error body.</param>
-    public NatsSvcEndPointException(int code, string message, string? body = default)
+    public NatsSvcEndpointException(int code, string message, string? body = default)
         : base(message)
     {
         Code = code;

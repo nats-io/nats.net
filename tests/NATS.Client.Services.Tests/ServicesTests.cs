@@ -57,7 +57,7 @@ public class ServicesTests
 
         await using var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
 
-        await s1.AddEndPointAsync<int>(
+        await s1.AddEndpointAsync<int>(
             name: "e1",
             handler: async m =>
             {
@@ -69,7 +69,7 @@ public class ServicesTests
 
                 if (m.Data == 8)
                 {
-                    throw new NatsSvcEndPointException(m.Data, $"Error{m.Data}");
+                    throw new NatsSvcEndpointException(m.Data, $"Error{m.Data}");
                 }
 
                 if (m.Data == 9)
@@ -82,8 +82,8 @@ public class ServicesTests
             cancellationToken: cancellationToken);
 
         var info = (await FindServices<InfoResponse>(server, "$SRV.INFO", 1, cancellationToken)).First();
-        Assert.Single(info.EndPoints);
-        var endpointInfo = info.EndPoints.First();
+        Assert.Single(info.Endpoints);
+        var endpointInfo = info.Endpoints.First();
         Assert.Equal("e1", endpointInfo.Name);
 
         for (int i = 0; i < 10; i++)
@@ -107,8 +107,8 @@ public class ServicesTests
         }
 
         var stat = (await FindServices<StatsResponse>(server, "$SRV.STATS", 1, cancellationToken)).First();
-        Assert.Single(stat.EndPoints);
-        var endpointStats = stat.EndPoints.First();
+        Assert.Single(stat.Endpoints);
+        var endpointStats = stat.Endpoints.First();
         Assert.Equal("e1", endpointStats.Name);
         Assert.Equal(10, endpointStats.NumRequests);
         Assert.Equal(3, endpointStats.NumErrors);
@@ -129,25 +129,25 @@ public class ServicesTests
 
         await using var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
 
-        await s1.AddEndPointAsync<int>(
+        await s1.AddEndpointAsync<int>(
             name: "baz",
             subject: "foo.baz",
             handler: m => ValueTask.CompletedTask,
             cancellationToken: cancellationToken);
 
-        await s1.AddEndPointAsync<int>(
+        await s1.AddEndpointAsync<int>(
             subject: "foo.bar1",
             handler: m => ValueTask.CompletedTask,
             cancellationToken: cancellationToken);
 
         var grp1 = await s1.AddGroupAsync("grp1", cancellationToken: cancellationToken);
 
-        await grp1.AddEndPointAsync<int>(
+        await grp1.AddEndpointAsync<int>(
             name: "e1",
             handler: m => ValueTask.CompletedTask,
             cancellationToken: cancellationToken);
 
-        await grp1.AddEndPointAsync<int>(
+        await grp1.AddEndpointAsync<int>(
             name: "e2",
             subject: "foo.bar2",
             handler: m => ValueTask.CompletedTask,
@@ -155,7 +155,7 @@ public class ServicesTests
 
         var grp2 = await s1.AddGroupAsync(string.Empty, queueGroup: "q_empty", cancellationToken: cancellationToken);
 
-        await grp2.AddEndPointAsync<int>(
+        await grp2.AddEndpointAsync<int>(
             name: "empty1",
             subject: "foo.empty1",
             handler: m => ValueTask.CompletedTask,
@@ -164,23 +164,23 @@ public class ServicesTests
         // Check that the endpoints are registered correctly
         {
             var info = (await FindServices<InfoResponse>(server, "$SRV.INFO.s1", 1, cancellationToken)).First();
-            Assert.Equal(5, info.EndPoints.Count);
-            var endpoints = info.EndPoints.ToList();
+            Assert.Equal(5, info.Endpoints.Count);
+            var endpoints = info.Endpoints.ToList();
 
-            Assert.Equal("foo.baz", info.EndPoints.First(e => e.Name == "baz").Subject);
-            Assert.Equal("q", info.EndPoints.First(e => e.Name == "baz").QueueGroup);
+            Assert.Equal("foo.baz", info.Endpoints.First(e => e.Name == "baz").Subject);
+            Assert.Equal("q", info.Endpoints.First(e => e.Name == "baz").QueueGroup);
 
-            Assert.Equal("foo.bar1", info.EndPoints.First(e => e.Name == "foo.bar1").Subject);
-            Assert.Equal("q", info.EndPoints.First(e => e.Name == "foo.bar1").QueueGroup);
+            Assert.Equal("foo.bar1", info.Endpoints.First(e => e.Name == "foo.bar1").Subject);
+            Assert.Equal("q", info.Endpoints.First(e => e.Name == "foo.bar1").QueueGroup);
 
-            Assert.Equal("grp1.e1", info.EndPoints.First(e => e.Name == "grp1.e1").Subject);
-            Assert.Equal("q", info.EndPoints.First(e => e.Name == "grp1.e1").QueueGroup);
+            Assert.Equal("grp1.e1", info.Endpoints.First(e => e.Name == "grp1.e1").Subject);
+            Assert.Equal("q", info.Endpoints.First(e => e.Name == "grp1.e1").QueueGroup);
 
-            Assert.Equal("grp1.foo.bar2", info.EndPoints.First(e => e.Name == "grp1.e2").Subject);
-            Assert.Equal("q", info.EndPoints.First(e => e.Name == "grp1.e2").QueueGroup);
+            Assert.Equal("grp1.foo.bar2", info.Endpoints.First(e => e.Name == "grp1.e2").Subject);
+            Assert.Equal("q", info.Endpoints.First(e => e.Name == "grp1.e2").QueueGroup);
 
-            Assert.Equal("foo.empty1", info.EndPoints.First(e => e.Name == "empty1").Subject);
-            Assert.Equal("q_empty", info.EndPoints.First(e => e.Name == "empty1").QueueGroup);
+            Assert.Equal("foo.empty1", info.Endpoints.First(e => e.Name == "empty1").Subject);
+            Assert.Equal("q_empty", info.Endpoints.First(e => e.Name == "empty1").QueueGroup);
         }
 
         await using var s2 = await svc.AddServiceAsync(
@@ -193,7 +193,7 @@ public class ServicesTests
             },
             cancellationToken: cancellationToken);
 
-        await s2.AddEndPointAsync<int>(
+        await s2.AddEndpointAsync<int>(
             name: "s2baz",
             subject: "s2foo.baz",
             handler: m => ValueTask.CompletedTask,
@@ -203,8 +203,8 @@ public class ServicesTests
         // Check default queue group and stats handler
         {
             var info = (await FindServices<InfoResponse>(server, "$SRV.INFO.s2", 1, cancellationToken)).First();
-            Assert.Single(info.EndPoints);
-            var epi = info.EndPoints.First();
+            Assert.Single(info.Endpoints);
+            var epi = info.Endpoints.First();
 
             Assert.Equal("s2baz", epi.Name);
             Assert.Equal("s2foo.baz", epi.Subject);
@@ -214,8 +214,8 @@ public class ServicesTests
             var stat = (await FindServices<StatsResponse>(server, "$SRV.STATS.s2", 1, cancellationToken)).First();
             Assert.Equal("v1", stat.Metadata["k1"]);
             Assert.Equal("v2", stat.Metadata["k2"]);
-            Assert.Single(stat.EndPoints);
-            var eps = stat.EndPoints.First();
+            Assert.Single(stat.Endpoints);
+            var eps = stat.Endpoints.First();
             Assert.Equal("stat-v1", eps.Data["stat-k1"]?.GetValue<string>());
             Assert.Equal("stat-v2", eps.Data["stat-k2"]?.GetValue<string>());
         }

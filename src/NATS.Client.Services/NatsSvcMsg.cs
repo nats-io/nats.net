@@ -9,7 +9,7 @@ namespace NATS.Client.Services;
 public readonly struct NatsSvcMsg<T>
 {
     private readonly NatsMsg<T> _msg;
-    private readonly NatsSvcEndPointBase? _endPoint;
+    private readonly NatsSvcEndpointBase? _endPoint;
 
     /// <summary>
     /// Creates a new instance of <see cref="NatsSvcMsg{T}"/>.
@@ -17,7 +17,7 @@ public readonly struct NatsSvcMsg<T>
     /// <param name="msg">NATS message.</param>
     /// <param name="endPoint">Service endpoint.</param>
     /// <param name="exception">Optional exception if there were any errors.</param>
-    public NatsSvcMsg(NatsMsg<T> msg, NatsSvcEndPointBase? endPoint, Exception? exception)
+    public NatsSvcMsg(NatsMsg<T> msg, NatsSvcEndpointBase? endPoint, Exception? exception)
     {
         Exception = exception;
         _msg = msg;

@@ -10,9 +10,9 @@ using NATS.Client.Services.Models;
 namespace NATS.Client.Services;
 
 /// <summary>
-/// NATS service.
+/// NATS service server.
 /// </summary>
-public class NatsSvcService : IAsyncDisposable
+public class NatsSvcServer : IAsyncDisposable
 {
     private readonly ILogger _logger;
     private readonly string _id;
@@ -22,19 +22,19 @@ public class NatsSvcService : IAsyncDisposable
     private readonly Channel<SvcMsg> _channel;
     private readonly Task _taskMsgLoop;
     private readonly List<SvcListener> _svcListeners = new();
-    private readonly ConcurrentDictionary<string, INatsSvcEndPoint> _endPoints = new();
+    private readonly ConcurrentDictionary<string, INatsSvcEndpoint> _endPoints = new();
     private readonly string _started;
     private readonly CancellationTokenSource _cts;
 
     /// <summary>
-    /// Creates a new instance of <see cref="NatsSvcService"/>.
+    /// Creates a new instance of <see cref="NatsSvcServer"/>.
     /// </summary>
     /// <param name="nats">NATS connection.</param>
     /// <param name="config">Service configuration.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the service creation requests.</param>
-    public NatsSvcService(NatsConnection nats, NatsSvcConfig config, CancellationToken cancellationToken)
+    public NatsSvcServer(NatsConnection nats, NatsSvcConfig config, CancellationToken cancellationToken)
     {
-        _logger = nats.Opts.LoggerFactory.CreateLogger<NatsSvcService>();
+        _logger = nats.Opts.LoggerFactory.CreateLogger<NatsSvcServer>();
         _id = NuidWriter.NewNuid();
         _nats = nats;
         _config = config;
@@ -85,8 +85,8 @@ public class NatsSvcService : IAsyncDisposable
     /// <remarks>
     /// One of name or subject must be specified.
     /// </remarks>
-    public ValueTask AddEndPointAsync<T>(Func<NatsSvcMsg<T>, ValueTask> handler, string? name = default, string? subject = default, IDictionary<string, string>? metadata = default, CancellationToken cancellationToken = default) =>
-        AddEndPointInternalAsync<T>(handler, name, subject, _config.QueueGroup, metadata, cancellationToken);
+    public ValueTask AddEndpointAsync<T>(Func<NatsSvcMsg<T>, ValueTask> handler, string? name = default, string? subject = default, IDictionary<string, string>? metadata = default, CancellationToken cancellationToken = default) =>
+        AddEndpointInternalAsync<T>(handler, name, subject, _config.QueueGroup, metadata, cancellationToken);
 
     /// <summary>
     /// Adds a new service group with optional queue group.
@@ -127,12 +127,12 @@ public class NatsSvcService : IAsyncDisposable
         }
     }
 
-    private async ValueTask AddEndPointInternalAsync<T>(Func<NatsSvcMsg<T>, ValueTask> handler, string? name, string? subject, string? queueGroup, IDictionary<string, string>? metadata, CancellationToken cancellationToken)
+    private async ValueTask AddEndpointInternalAsync<T>(Func<NatsSvcMsg<T>, ValueTask> handler, string? name, string? subject, string? queueGroup, IDictionary<string, string>? metadata, CancellationToken cancellationToken)
     {
         var epSubject = subject ?? name ?? throw new NatsSvcException("Either name or subject must be specified");
         var epName = name ?? epSubject;
 
-        var ep = new NatsSvcEndPoint<T>(_nats, queueGroup, epName, handler, epSubject, metadata, opts: default, cancellationToken);
+        var ep = new NatsSvcEndpoint<T>(_nats, queueGroup, epName, handler, epSubject, metadata, opts: default, cancellationToken);
 
         if (!_endPoints.TryAdd(epName, ep))
         {
@@ -188,7 +188,7 @@ public class NatsSvcService : IAsyncDisposable
                             Version = _config.Version,
                             Description = _config.Description!,
                             Metadata = _config.Metadata!,
-                            EndPoints = endPoints,
+                            Endpoints = endPoints,
                         },
                         cancellationToken: _cancellationToken);
                 }
@@ -232,7 +232,7 @@ public class NatsSvcService : IAsyncDisposable
                         Id = _id,
                         Version = _config.Version,
                         Metadata = _config.Metadata!,
-                        EndPoints = endPoints,
+                        Endpoints = endPoints,
                         Started = _started,
                     };
 
@@ -253,21 +253,21 @@ public class NatsSvcService : IAsyncDisposable
     /// </summary>
     public class Group
     {
-        private readonly NatsSvcService _service;
+        private readonly NatsSvcServer _server;
         private readonly CancellationToken _cancellationToken;
         private readonly string _dot;
 
         /// <summary>
         /// Creates a new instance of <see cref="Group"/>.
         /// </summary>
-        /// <param name="service">Service instance.</param>
+        /// <param name="server">Service instance.</param>
         /// <param name="groupName">Group name.</param>
         /// <param name="queueGroup">Optional queue group.</param>
         /// <param name="cancellationToken">A <see cref="CancellationToken"/> may be used to cancel th call in the future.</param>
-        public Group(NatsSvcService service, string groupName, string? queueGroup = default, CancellationToken cancellationToken = default)
+        public Group(NatsSvcServer server, string groupName, string? queueGroup = default, CancellationToken cancellationToken = default)
         {
             ValidateGroupName(groupName);
-            _service = service;
+            _server = server;
             GroupName = groupName;
             QueueGroup = queueGroup;
             _cancellationToken = cancellationToken;
@@ -291,12 +291,12 @@ public class NatsSvcService : IAsyncDisposable
         /// <remarks>
         /// One of name or subject must be specified.
         /// </remarks>
-        public ValueTask AddEndPointAsync<T>(Func<NatsSvcMsg<T>, ValueTask> handler, string? name = default, string? subject = default, IDictionary<string, string>? metadata = default, CancellationToken cancellationToken = default)
+        public ValueTask AddEndpointAsync<T>(Func<NatsSvcMsg<T>, ValueTask> handler, string? name = default, string? subject = default, IDictionary<string, string>? metadata = default, CancellationToken cancellationToken = default)
         {
             var epName = name != null ? $"{GroupName}{_dot}{name}" : null;
             var epSubject = subject != null ? $"{GroupName}{_dot}{subject}" : null;
-            var queueGroup = QueueGroup ?? _service._config.QueueGroup;
-            return _service.AddEndPointInternalAsync(handler, epName, epSubject, queueGroup, metadata, cancellationToken);
+            var queueGroup = QueueGroup ?? _server._config.QueueGroup;
+            return _server.AddEndpointInternalAsync(handler, epName, epSubject, queueGroup, metadata, cancellationToken);
         }
 
         /// <summary>
@@ -309,7 +309,7 @@ public class NatsSvcService : IAsyncDisposable
         public ValueTask<Group> AddGroupAsync(string name, string? queueGroup = default, CancellationToken cancellationToken = default)
         {
             var groupName = $"{GroupName}{_dot}{name}";
-            return _service.AddGroupAsync(groupName, queueGroup, cancellationToken);
+            return _server.AddGroupAsync(groupName, queueGroup, cancellationToken);
         }
 
         private void ValidateGroupName(string groupName)

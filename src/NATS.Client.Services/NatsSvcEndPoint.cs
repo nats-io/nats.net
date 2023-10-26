@@ -11,7 +11,7 @@ namespace NATS.Client.Services;
 /// <summary>
 /// NATS service endpoint.
 /// </summary>
-public interface INatsSvcEndPoint : IAsyncDisposable
+public interface INatsSvcEndpoint : IAsyncDisposable
 {
     /// <summary>
     /// Number of requests received.
@@ -63,9 +63,9 @@ public interface INatsSvcEndPoint : IAsyncDisposable
 /// <summary>
 /// Endpoint base class exposing general stats.
 /// </summary>
-public abstract class NatsSvcEndPointBase : NatsSubBase, INatsSvcEndPoint
+public abstract class NatsSvcEndpointBase : NatsSubBase, INatsSvcEndpoint
 {
-    protected NatsSvcEndPointBase(NatsConnection connection, ISubscriptionManager manager, string subject, string? queueGroup, NatsSubOpts? opts)
+    protected NatsSvcEndpointBase(NatsConnection connection, ISubscriptionManager manager, string subject, string? queueGroup, NatsSubOpts? opts)
         : base(connection, manager, subject, queueGroup, opts)
     {
     }
@@ -97,7 +97,7 @@ public abstract class NatsSvcEndPointBase : NatsSubBase, INatsSvcEndPoint
 /// NATS service endpoint.
 /// </summary>
 /// <typeparam name="T">Serialized type to use when receiving data.</typeparam>
-public class NatsSvcEndPoint<T> : NatsSvcEndPointBase
+public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
 {
     private readonly ILogger _logger;
     private readonly Func<NatsSvcMsg<T>, ValueTask> _handler;
@@ -114,7 +114,7 @@ public class NatsSvcEndPoint<T> : NatsSvcEndPointBase
     private string? _lastError;
 
     /// <summary>
-    /// Creates a new instance of <see cref="NatsSvcEndPoint{T}"/>.
+    /// Creates a new instance of <see cref="NatsSvcEndpoint{T}"/>.
     /// </summary>
     /// <param name="nats">NATS connection.</param>
     /// <param name="queueGroup">Queue group.</param>
@@ -124,10 +124,10 @@ public class NatsSvcEndPoint<T> : NatsSvcEndPointBase
     /// <param name="metadata">Endpoint metadata.</param>
     /// <param name="opts">Subscription options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    public NatsSvcEndPoint(NatsConnection nats, string? queueGroup, string name, Func<NatsSvcMsg<T>, ValueTask> handler, string subject, IDictionary<string, string>? metadata, NatsSubOpts? opts, CancellationToken cancellationToken)
+    public NatsSvcEndpoint(NatsConnection nats, string? queueGroup, string name, Func<NatsSvcMsg<T>, ValueTask> handler, string subject, IDictionary<string, string>? metadata, NatsSubOpts? opts, CancellationToken cancellationToken)
         : base(nats, nats.SubscriptionManager, subject, queueGroup, opts)
     {
-        _logger = nats.Opts.LoggerFactory.CreateLogger<NatsSvcEndPoint<T>>();
+        _logger = nats.Opts.LoggerFactory.CreateLogger<NatsSvcEndpoint<T>>();
         _handler = handler;
         _nats = nats;
         _name = name;
@@ -215,7 +215,7 @@ public class NatsSvcEndPoint<T> : NatsSvcEndPointBase
                 int code;
                 string message;
                 string body;
-                if (e is NatsSvcEndPointException epe)
+                if (e is NatsSvcEndpointException epe)
                 {
                     code = epe.Code;
                     message = epe.Message;
@@ -224,7 +224,7 @@ public class NatsSvcEndPoint<T> : NatsSvcEndPointBase
                 else
                 {
                     // Do not expose exceptions unless explicitly
-                    // thrown as NatsSvcEndPointException
+                    // thrown as NatsSvcEndpointException
                     code = 999;
                     message = "Handler error";
                     body = string.Empty;

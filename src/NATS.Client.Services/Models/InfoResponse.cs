@@ -25,7 +25,7 @@ public record InfoResponse
 
     [JsonPropertyName("endpoints")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    public ICollection<EndpointInfo> EndPoints { get; set; } = default!;
+    public ICollection<EndpointInfo> Endpoints { get; set; } = default!;
 }
 
 public record EndpointInfo

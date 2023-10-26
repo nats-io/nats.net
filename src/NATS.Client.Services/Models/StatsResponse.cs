@@ -23,7 +23,7 @@ public record StatsResponse
 
     [JsonPropertyName("endpoints")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    public ICollection<EndpointStats> EndPoints { get; set; } = default!;
+    public ICollection<EndpointStats> Endpoints { get; set; } = default!;
 
     [JsonPropertyName("started")]
     public string Started { get; set; } = default!;
