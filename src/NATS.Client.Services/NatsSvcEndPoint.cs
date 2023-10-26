@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Diagnostics;
 using System.Text;
 using System.Threading.Channels;
@@ -17,7 +17,6 @@ public interface INatsSvcEndpoint : IAsyncDisposable
     /// Number of requests received.
     /// </summary>
     long Requests { get; }
-
 
     /// <summary>
     /// Total processing time in nanoseconds.

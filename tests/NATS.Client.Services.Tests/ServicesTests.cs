@@ -1,4 +1,4 @@
-﻿using System.Text.Json.Nodes;
+using System.Text.Json.Nodes;
 using NATS.Client.Core.Tests;
 using NATS.Client.Services.Models;
 
@@ -86,7 +86,7 @@ public class ServicesTests
         var endpointInfo = info.Endpoints.First();
         Assert.Equal("e1", endpointInfo.Name);
 
-        for (int i = 0; i < 10; i++)
+        for (var i = 0; i < 10; i++)
         {
             var response = await nats.RequestAsync<int, int>(endpointInfo.Subject, i, cancellationToken: cancellationToken);
             if (i is 7 or 8)

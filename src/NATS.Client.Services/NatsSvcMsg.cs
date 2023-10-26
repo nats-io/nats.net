@@ -104,7 +104,6 @@ public readonly struct NatsSvcMsg<T>
     /// <param name="replyTo">Optional reply-to subject.</param>
     /// <param name="opts">Optional publishing options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <typeparam name="TReply">A serializable type as data.</typeparam>
     /// <returns>A <seealso cref="ValueTask"/> representing the asynchronous operation.</returns>
     public ValueTask ReplyErrorAsync(int code, string message, NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {

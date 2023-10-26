@@ -101,7 +101,6 @@ public class NatsSvcServer : IAsyncDisposable
         return ValueTask.FromResult(group);
     }
 
-
     /// <summary>
     /// Stop the service.
     /// </summary>
