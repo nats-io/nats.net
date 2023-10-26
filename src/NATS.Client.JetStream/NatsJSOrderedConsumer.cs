@@ -4,6 +4,9 @@ using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
 
+/// <summary>
+/// NATS JetStream ordered consumer.
+/// </summary>
 public class NatsJSOrderedConsumer
 {
     private readonly string _stream;
@@ -13,6 +16,13 @@ public class NatsJSOrderedConsumer
     private ulong _fetchSeq;
     private string _fetchConsumerName = string.Empty;
 
+    /// <summary>
+    /// Creates a new NATS JetStream ordered consumer.
+    /// </summary>
+    /// <param name="stream">Name of the stream.</param>
+    /// <param name="context">NATS JetStream context.</param>
+    /// <param name="opts">Consumer options.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel consume and fetch operations.</param>
     public NatsJSOrderedConsumer(string stream, NatsJSContext context, NatsJSOrderedConsumerOpts opts, CancellationToken cancellationToken)
     {
         _stream = stream;
@@ -21,6 +31,14 @@ public class NatsJSOrderedConsumer
         _cancellationToken = cancellationToken;
     }
 
+    /// <summary>
+    /// Consume messages from the stream in order.
+    /// </summary>
+    /// <param name="opts">Consume options.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel consume operation.</param>
+    /// <typeparam name="T">Serialized message data type.</typeparam>
+    /// <returns>Asynchronous enumeration which can be used in a <c>await foreach</c> loop.</returns>
+    /// <exception cref="NatsJSProtocolException">There was a JetStream server error.</exception>
     public async IAsyncEnumerable<NatsJSMsg<T?>> ConsumeAsync<T>(
         NatsJSConsumeOpts? opts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -103,6 +121,13 @@ public class NatsJSOrderedConsumer
         }
     }
 
+    /// <summary>
+    /// Fetch messages from the stream in order.
+    /// </summary>
+    /// <param name="opts">Fetch options.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel fetch operation.</param>
+    /// <typeparam name="T">Serialized message data type.</typeparam>
+    /// <returns>Asynchronous enumeration which can be used in a <c>await foreach</c> loop.</returns>
     public async IAsyncEnumerable<NatsJSMsg<T?>> FetchAsync<T>(
         NatsJSFetchOpts? opts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -127,6 +152,13 @@ public class NatsJSOrderedConsumer
             _fetchConsumerName = string.Empty;
     }
 
+    /// <summary>
+    /// Get the next message from the stream in order.
+    /// </summary>
+    /// <param name="opts">Next options.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the underlying fetch operation.</param>
+    /// <typeparam name="T">Serialized message data type.</typeparam>
+    /// <returns>The next NATS JetStream message in order.</returns>
     public async ValueTask<NatsJSMsg<T?>?> NextAsync<T>(NatsJSNextOpts? opts = default, CancellationToken cancellationToken = default)
     {
         opts ??= _context.Opts.DefaultNextOpts;
