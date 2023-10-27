@@ -5,8 +5,9 @@ NATS.NET V2 is a [NATS](https://nats.io) client for the modern [.NET](https://do
 ## Preview
 
 The NATS.NET V2 client is in preview and not recommended for production use yet.
-Codebase is still under heavy development and we currently implemented [Core NATS](https://docs.nats.io/nats-concepts/core-nats)
-and basic [JetStream](https://docs.nats.io/nats-concepts/jetstream) features.
+Codebase is still under development and we implemented majority of the NATS APIs
+including [Core NATS](https://docs.nats.io/nats-concepts/core-nats), most of [JetStream](https://docs.nats.io/nats-concepts/jetstream) features, as well as main
+features of Object Store, Key/Value Store and Services.
 
 Please test and provide feedback:
 
@@ -30,6 +31,9 @@ Check out the [documentation](https://nats-io.github.io/nats.net.v2/) for guides
 - **NATS.Client.Core**: [Core NATS](https://docs.nats.io/nats-concepts/core-nats)
 - **NATS.Client.Hosting**: extension to configure DI container
 - **NATS.Client.JetStream**: [JetStream](https://docs.nats.io/nats-concepts/jetstream)
+- **NATS.Client.KeyValueStore**: [Key/Value Store](https://docs.nats.io/nats-concepts/jetstream/key-value-store)
+- **NATS.Client.ObjectStore**: [Object Store](https://docs.nats.io/nats-concepts/jetstream/obj_store)
+- **NATS.Client.Services**: [Services](https://docs.nats.io/using-nats/developer/services)
 
 ## Contributing
 
