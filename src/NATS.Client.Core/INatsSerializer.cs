@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 
 namespace NATS.Client.Core;
 
@@ -8,7 +9,7 @@ public interface INatsSerializer
 {
     public INatsSerializer? Next { get; }
 
-    int Serialize<T>(IBufferWriter<byte> bufferWriter, T? value);
+    int Serialize<T>(IBufferWriter<byte> bufferWriter, T value);
 
     T? Deserialize<T>(in ReadOnlySequence<byte> buffer);
 }
@@ -120,7 +121,7 @@ public class NatsRawSerializer : INatsSerializer
 
 public sealed class NatsJsonSerializer : INatsSerializer
 {
-    private static readonly JsonWriterOptions JsonWriterOpts = new JsonWriterOptions { Indented = false, SkipValidation = true, };
+    private static readonly JsonWriterOptions JsonWriterOpts = new() { Indented = false, SkipValidation = true };
 
     [ThreadStatic]
     private static Utf8JsonWriter? _jsonWriter;
@@ -159,17 +160,77 @@ public sealed class NatsJsonSerializer : INatsSerializer
         var reader = new Utf8JsonReader(buffer); // Utf8JsonReader is ref struct, no allocate.
         return JsonSerializer.Deserialize<T>(ref reader, _opts);
     }
+}
 
-    private sealed class NullBufferWriter : IBufferWriter<byte>
+public sealed class NatsJsonContextSerializer : INatsSerializer
+{
+    private static readonly JsonWriterOptions JsonWriterOpts = new() { Indented = false, SkipValidation = true };
+
+    [ThreadStatic]
+    private static Utf8JsonWriter? _jsonWriter;
+
+    private readonly JsonSerializerContext _context;
+
+    public NatsJsonContextSerializer(JsonSerializerContext context, INatsSerializer? next = default)
     {
-        internal static readonly IBufferWriter<byte> Instance = new NullBufferWriter();
+        Next = next;
+        _context = context;
+    }
 
-        public void Advance(int count)
+    public INatsSerializer? Next { get; }
+
+    public int Serialize<T>(IBufferWriter<byte> bufferWriter, T value)
+    {
+        if (_context.GetTypeInfo(typeof(T)) is JsonTypeInfo<T> jsonTypeInfo)
         {
+            Utf8JsonWriter writer;
+            if (_jsonWriter == null)
+            {
+                writer = _jsonWriter = new Utf8JsonWriter(bufferWriter, JsonWriterOpts);
+            }
+            else
+            {
+                writer = _jsonWriter;
+                writer.Reset(bufferWriter);
+            }
+
+            JsonSerializer.Serialize(writer, value, jsonTypeInfo);
+
+            var bytesCommitted = (int)writer.BytesCommitted;
+            writer.Reset(NullBufferWriter.Instance);
+            return bytesCommitted;
         }
 
-        public Memory<byte> GetMemory(int sizeHint = 0) => Array.Empty<byte>();
+        if (Next != null)
+            return Next.Serialize(bufferWriter, value);
 
-        public Span<byte> GetSpan(int sizeHint = 0) => Array.Empty<byte>();
+        throw new NatsException($"Can't serialize {typeof(T)}");
     }
+
+    public T? Deserialize<T>(in ReadOnlySequence<byte> buffer)
+    {
+        if (_context.GetTypeInfo(typeof(T)) is JsonTypeInfo<T> jsonTypeInfo)
+        {
+            var reader = new Utf8JsonReader(buffer); // Utf8JsonReader is ref struct, no allocate.
+            return JsonSerializer.Deserialize(ref reader, jsonTypeInfo);
+        }
+
+        if (Next != null)
+            return Next.Deserialize<T>(buffer);
+
+        throw new NatsException($"Can't deserialize {typeof(T)}");
+    }
+}
+
+internal sealed class NullBufferWriter : IBufferWriter<byte>
+{
+    internal static readonly IBufferWriter<byte> Instance = new NullBufferWriter();
+
+    public void Advance(int count)
+    {
+    }
+
+    public Memory<byte> GetMemory(int sizeHint = 0) => Array.Empty<byte>();
+
+    public Span<byte> GetSpan(int sizeHint = 0) => Array.Empty<byte>();
 }
