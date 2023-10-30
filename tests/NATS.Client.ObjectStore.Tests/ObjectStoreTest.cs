@@ -161,9 +161,8 @@ public class ObjectStoreTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10_000));
         var cancellationToken = cts.Token;
 
-        // await using var server = NatsServer.StartJS();
-        // await using var nats = server.CreateClientConnection();
-        var nats = new NatsConnection();
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats);
         var ob = new NatsObjContext(js);
 
