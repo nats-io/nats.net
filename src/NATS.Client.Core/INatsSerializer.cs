@@ -69,10 +69,7 @@ public class NatsUtf8PrimitivesSerializer : INatsSerializer
     {
         if (value is string str)
         {
-            var count = Encoding.UTF8.GetByteCount(str);
-            var buffer = bufferWriter.GetSpan(count);
-            var bytes = Encoding.UTF8.GetBytes(str, buffer);
-            bufferWriter.Advance(bytes);
+            Encoding.UTF8.GetBytes(str, bufferWriter);
             return;
         }
 
