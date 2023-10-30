@@ -53,7 +53,7 @@ public interface INatsBuffer<T> : IBufferWriter<T>
 /// Represents a heap-based, array-backed output sink into which <typeparamref name="T"/> data can be written.
 /// </summary>
 /// <typeparam name="T">The type of items to write to the current instance.</typeparam>
-public class NatsBufferWriter<T> : INatsBuffer<T>, IMemoryOwner<T>
+public sealed class NatsBufferWriter<T> : INatsBuffer<T>, IMemoryOwner<T>
 {
     /// <summary>
     /// The default buffer size to use to expand empty arrays.
