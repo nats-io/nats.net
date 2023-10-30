@@ -62,11 +62,11 @@ jobs:
 
       - name: Test Native AOT
         run: |
-          cd tests/NATS.Client.NativeAotTests
+          cd tests/NATS.Client.CheckNativeAot
           dotnet publish -r linux-x64 -c Release -o dist
           cd dist
           ls -lh
-          ./NATS.Client.NativeAotTests
+          ./NATS.Client.CheckNativeAot
 
   memory_test:
     name: memory test

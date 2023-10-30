@@ -89,7 +89,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.TlsFirst", "sandbox
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.NativeAot", "sandbox\Example.NativeAot\Example.NativeAot.csproj", "{51362D87-49C8-414C-AAB7-E51B946231E7}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nats.Client.NativeAotTests", "tests\Nats.Client.NativeAotTests\Nats.Client.NativeAotTests.csproj", "{CF44A42E-C075-4C5C-BE8B-3DF266FC617B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.CheckNativeAot", "tests\NATS.Client.CheckNativeAot\NATS.Client.CheckNativeAot.csproj", "{CF44A42E-C075-4C5C-BE8B-3DF266FC617B}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.ProtoBufMessages", "sandbox\Example.ProtoBufMessages\Example.ProtoBufMessages.csproj", "{9FCD9377-FE5F-4D94-BDCF-54427DB6487D}"
 EndProject
