@@ -1,4 +1,4 @@
-﻿using System.Text.Json.Serialization;
+using System.Text.Json.Serialization;
 using NATS.Client.Core;
 using NATS.Client.ObjectStore.Models;
 

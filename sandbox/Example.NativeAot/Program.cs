@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Text;
 using System.Text.Json.Serialization;
 using Google.Protobuf;
@@ -11,14 +11,14 @@ using NATS.Client.Core;
 
     await using var nats = new NatsConnection(natsOpts);
 
-    await using INatsSub<string> sub = await nats.SubscribeAsync<string>(subject: "foo");
+    await using var sub = await nats.SubscribeAsync<string>(subject: "foo");
 
     // Flush the the network buffers to make sure the subscription request has been processed.
     await nats.PingAsync();
 
     await nats.PublishAsync<string>(subject: "foo", data: "Hello World");
 
-    NatsMsg<string?> msg = await sub.Msgs.ReadAsync();
+    var msg = await sub.Msgs.ReadAsync();
 
     // Outputs 'Hello World'
     Console.WriteLine(msg.Data);
@@ -30,14 +30,14 @@ using NATS.Client.Core;
 
     await using var nats = new NatsConnection(natsOpts);
 
-    await using INatsSub<MyData> sub = await nats.SubscribeAsync<MyData>(subject: "foo");
+    await using var sub = await nats.SubscribeAsync<MyData>(subject: "foo");
 
     // Flush the the network buffers to make sure the subscription request has been processed.
     await nats.PingAsync();
 
     await nats.PublishAsync<MyData>(subject: "foo", data: new MyData { Id = 1, Name = "bar" });
 
-    NatsMsg<MyData?> msg = await sub.Msgs.ReadAsync();
+    var msg = await sub.Msgs.ReadAsync();
 
     // Outputs 'MyData { Id = 1, Name = bar }'
     Console.WriteLine(msg.Data);
@@ -48,7 +48,7 @@ using NATS.Client.Core;
     await using var nats = new NatsConnection();
 
     var natsSubOpts = new NatsSubOpts { Serializer = new NatsJsonContextSerializer(MyJsonContext.Default) };
-    await using INatsSub<MyData> sub = await nats.SubscribeAsync<MyData>(subject: "foo", opts: natsSubOpts);
+    await using var sub = await nats.SubscribeAsync<MyData>(subject: "foo", opts: natsSubOpts);
 
     // Flush the the network buffers to make sure the subscription request has been processed.
     await nats.PingAsync();
@@ -56,7 +56,7 @@ using NATS.Client.Core;
     var natsPubOpts = new NatsPubOpts { Serializer = new NatsJsonContextSerializer(MyJsonContext.Default) };
     await nats.PublishAsync<MyData>(subject: "foo", data: new MyData { Id = 1, Name = "bar" }, opts: natsPubOpts);
 
-    NatsMsg<MyData?> msg = await sub.Msgs.ReadAsync();
+    var msg = await sub.Msgs.ReadAsync();
 
     // Outputs 'MyData { Id = 1, Name = bar }'
     Console.WriteLine(msg.Data);
