@@ -6,41 +6,44 @@ on:
 jobs:
   dotnet:
     name: dotnet
-    strategy:
-      fail-fast: false
-      matrix:
-        config:
-          - branch: main
+#    strategy:
+#      fail-fast: false
+#      matrix:
+#        config:
+#          - branch: main
     runs-on: ubuntu-latest
-    env:
-      DOTNET_CLI_TELEMETRY_OPTOUT: 1
-      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
-      NUGET_XMLDOC_MODE: skip
+#    env:
+#      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+#      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+#      NUGET_XMLDOC_MODE: skip
     steps:
-      - name: Install nats-server
-        run: |
-          for i in 1 2 3
-          do
-            curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@${{ matrix.config.branch }} | PREFIX=. sh && break || sleep 30
-          done
-          sudo mv nats-server /usr/local/bin
-
-      - name: Check nats-server
-        run: nats-server -v
+#      - name: Install nats-server
+#        run: |
+#          for i in 1 2 3
+#          do
+#            curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@${{ matrix.config.branch }} | PREFIX=. sh && break || sleep 30
+#          done
+#          sudo mv nats-server /usr/local/bin
+#
+#      - name: Check nats-server
+#        run: nats-server -v
 
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Setup dotnet
-        uses: actions/setup-dotnet@v3
-        with:
-          dotnet-version: '8.x'
-          dotnet-quality: 'preview'
+#      - name: Setup dotnet
+#        uses: actions/setup-dotnet@v3
+#        with:
+#          dotnet-version: '8.x'
+#          dotnet-quality: 'preview'
 
-      - name: Test Native AOT
-        working-directory: tests/NATS.Client.NativeAotTests
-        run: |
-          dotnet publish -r linux-x64 -c Release -o dist
-          cd ./dist
-          ls -lh
-          ./NATS.Client.NativeAotTests
+      - run: |
+          ls -l /home/runner/work/nats.net.v2
+
+#      - name: Test Native AOT
+#        working-directory: tests/NATS.Client.NativeAotTests
+#        run: |
+#          dotnet publish -r linux-x64 -c Release -o dist
+#          cd ./dist
+#          ls -lh
+#          ./NATS.Client.NativeAotTests
