@@ -41,6 +41,8 @@ jobs:
           ls -l /home/runner/work/nats.net.v2/nats.net.v2
           pwd
           ls -l
+          cd tests
+          ls -l
 
 #      - name: Test Native AOT
 #        working-directory: tests/NATS.Client.NativeAotTests
