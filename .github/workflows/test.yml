@@ -44,7 +44,11 @@ jobs:
           echo "List files"
           ls -l
           echo "CD"
-          cd tests/NATS.Client.NativeAotTests
+          cd ./tests
+          echo "List files"
+          ls -l
+          echo "CD"
+          cd NATS.Client.NativeAotTests
           dotnet publish -r linux-x64 -c Release -o dist
           cd dist
           ls -lh
