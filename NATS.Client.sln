@@ -89,6 +89,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.TlsFirst", "sandbox
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.NativeAot", "sandbox\Example.NativeAot\Example.NativeAot.csproj", "{51362D87-49C8-414C-AAB7-E51B946231E7}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nats.Client.NativeAotTests", "tests\Nats.Client.NativeAotTests\Nats.Client.NativeAotTests.csproj", "{CF44A42E-C075-4C5C-BE8B-3DF266FC617B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -231,6 +233,10 @@ Global
 		{51362D87-49C8-414C-AAB7-E51B946231E7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{51362D87-49C8-414C-AAB7-E51B946231E7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{51362D87-49C8-414C-AAB7-E51B946231E7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CF44A42E-C075-4C5C-BE8B-3DF266FC617B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CF44A42E-C075-4C5C-BE8B-3DF266FC617B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CF44A42E-C075-4C5C-BE8B-3DF266FC617B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CF44A42E-C075-4C5C-BE8B-3DF266FC617B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -271,6 +277,7 @@ Global
 		{DD0AB72A-D6CD-4054-A9C9-0DCA3EDBA00F} = {95A69671-16CA-4133-981C-CC381B7AAA30}
 		{88625045-978F-417F-9F51-A4E3A9718945} = {95A69671-16CA-4133-981C-CC381B7AAA30}
 		{51362D87-49C8-414C-AAB7-E51B946231E7} = {95A69671-16CA-4133-981C-CC381B7AAA30}
+		{CF44A42E-C075-4C5C-BE8B-3DF266FC617B} = {C526E8AB-739A-48D7-8FC4-048978C9B650}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {8CBB7278-D093-448E-B3DE-B5991209A1AA}
