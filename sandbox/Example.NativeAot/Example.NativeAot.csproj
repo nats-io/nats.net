@@ -10,6 +10,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\..\src\NATS.Client.Core\NATS.Client.Core.csproj" />
+      <ProjectReference Include="..\Example.ProtoBufMessages\Example.ProtoBufMessages.csproj" />
     </ItemGroup>
 
 </Project>
