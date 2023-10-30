@@ -56,7 +56,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
                 throw new NatsException("Inbox subscriptions don't support queue groups");
             }
 
-            await SubscribeInboxAsync(sub.Subject, sub.Opts, sub, cancellationToken).ConfigureAwait(false);
+            await SubscribeInboxAsync(sub, cancellationToken).ConfigureAwait(false);
         }
         else
         {
@@ -171,7 +171,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
         return this;
     }
 
-    private async ValueTask SubscribeInboxAsync(string subject, NatsSubOpts? opts, NatsSubBase sub, CancellationToken cancellationToken)
+    private async ValueTask SubscribeInboxAsync(NatsSubBase sub, CancellationToken cancellationToken)
     {
         if (Interlocked.CompareExchange(ref _inboxSub, _inboxSubSentinel, _inboxSubSentinel) == _inboxSubSentinel)
         {
@@ -181,7 +181,12 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
                 if (Interlocked.CompareExchange(ref _inboxSub, _inboxSubSentinel, _inboxSubSentinel) == _inboxSubSentinel)
                 {
                     var inboxSubject = $"{_inboxPrefix}.*";
-                    _inboxSub = InboxSubBuilder.Build(inboxSubject, opts, _connection, manager: this);
+
+                    // We need to subscribe to the real inbox subject before we can register the internal subject.
+                    // We use 'default' options here since options provided by the user are for the internal subscription.
+                    // For example if the user provides a timeout, we don't want to timeout the real inbox subscription
+                    // since it must live duration of the connection.
+                    _inboxSub = InboxSubBuilder.Build(inboxSubject, opts: default, _connection, manager: this);
                     await SubscribeInternalAsync(
                         inboxSubject,
                         queueGroup: default,

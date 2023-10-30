@@ -85,18 +85,7 @@ public class NatsJSConsumer
         var max = NatsJSOptsDefaults.SetMax(opts.MaxMsgs, opts.MaxBytes, opts.ThresholdMsgs, opts.ThresholdBytes);
         var timeouts = NatsJSOptsDefaults.SetTimeouts(opts.Expires, opts.IdleHeartbeat);
 
-        var requestOpts = new NatsSubOpts
-        {
-            Serializer = opts.Serializer,
-            ChannelOpts = new NatsSubChannelOpts
-            {
-                // Keep capacity at 1 to make sure message acknowledgements are sent
-                // right after the message is processed and messages aren't queued up
-                // which might cause timeouts for acknowledgments.
-                Capacity = 1,
-                FullMode = BoundedChannelFullMode.Wait,
-            },
-        };
+        var requestOpts = BuildRequestOpts(opts.Serializer, opts.MaxMsgs);
 
         var sub = new NatsJSConsume<T>(
             stream: _stream,
@@ -110,7 +99,8 @@ public class NatsJSConsumer
             thresholdMsgs: max.ThresholdMsgs,
             thresholdBytes: max.ThresholdBytes,
             expires: timeouts.Expires,
-            idle: timeouts.IdleHeartbeat);
+            idle: timeouts.IdleHeartbeat,
+            cancellationToken: cancellationToken);
 
         await _context.Connection.SubAsync(sub: sub, cancellationToken);
 
@@ -209,6 +199,64 @@ public class NatsJSConsumer
 
     /// <summary>
     /// Consume a set number of messages from the stream using this consumer.
+    /// Returns immediately if no messages are available.
+    /// </summary>
+    /// <param name="opts">Fetch options. (default: <c>MaxMsgs</c> 1,000 and timeout is ignored)</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the call.</param>
+    /// <typeparam name="T">Message type to deserialize.</typeparam>
+    /// <returns>Async enumerable of messages which can be used in a <c>await foreach</c> loop.</returns>
+    /// <exception cref="NatsJSProtocolException">Consumer is deleted, it's push based or request sent to server is invalid.</exception>
+    /// <exception cref="NatsJSException">There is an error sending the message or this consumer object isn't valid anymore because it was deleted earlier.</exception>
+    /// <remarks>
+    /// <para>
+    /// This method will return immediately if no messages are available.
+    /// </para>
+    /// <para>
+    /// Using this method is discouraged because it might create an unnecessary load on your cluster.
+    /// Use <c>Consume</c> or <c>Fetch</c> instead.
+    /// </para>
+    /// </remarks>
+    /// <example>
+    /// <para>
+    /// However, there are scenarios where this method is useful. For example if your application is
+    /// processing messages in batches infrequently (for example every 5 minutes) you might want to
+    /// consider <c>FetchNoWait</c>. You must make sure to count your messages and stop fetching
+    /// if you received all of them in one call, meaning when <c>count &lt; MaxMsgs</c>.
+    /// </para>
+    /// <code>
+    /// const int max = 10;
+    /// var count = 0;
+    ///
+    /// await foreach (var msg in consumer.FetchAllNoWaitAsync&lt;int&gt;(new NatsJSFetchOpts { MaxMsgs = max }))
+    /// {
+    ///     count++;
+    ///     Process(msg);
+    ///     await msg.AckAsync();
+    /// }
+    ///
+    /// if (count &lt; max)
+    /// {
+    ///     // No more messages. Pause for more.
+    ///     await Task.Delay(TimeSpan.FromMinutes(5));
+    /// }
+    /// </code>
+    /// </example>
+    public async IAsyncEnumerable<NatsJSMsg<T?>> FetchAllNoWaitAsync<T>(
+        NatsJSFetchOpts? opts = default,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        ThrowIfDeleted();
+        opts ??= _context.Opts.DefaultFetchOpts;
+
+        await using var fc = await FetchAsync<T>(opts with { NoWait = true }, cancellationToken);
+        await foreach (var jsMsg in fc.Msgs.ReadAllAsync(cancellationToken))
+        {
+            yield return jsMsg;
+        }
+    }
+
+    /// <summary>
+    /// Consume a set number of messages from the stream using this consumer.
     /// </summary>
     /// <param name="opts">Fetch options. (default: <c>MaxMsgs</c> 1,000 and timeout in 30 seconds)</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the call.</param>
@@ -228,18 +276,7 @@ public class NatsJSConsumer
         var max = NatsJSOptsDefaults.SetMax(opts.MaxMsgs, opts.MaxBytes);
         var timeouts = NatsJSOptsDefaults.SetTimeouts(opts.Expires, opts.IdleHeartbeat);
 
-        var requestOpts = new NatsSubOpts
-        {
-            Serializer = opts.Serializer,
-            ChannelOpts = new NatsSubChannelOpts
-            {
-                // Keep capacity at 1 to make sure message acknowledgements are sent
-                // right after the message is processed and messages aren't queued up
-                // which might cause timeouts for acknowledgments.
-                Capacity = 1,
-                FullMode = BoundedChannelFullMode.Wait,
-            },
-        };
+        var requestOpts = BuildRequestOpts(opts.Serializer, opts.MaxMsgs);
 
         var sub = new NatsJSFetch<T>(
             stream: _stream,
@@ -256,13 +293,20 @@ public class NatsJSConsumer
         await _context.Connection.SubAsync(sub: sub, cancellationToken);
 
         await sub.CallMsgNextAsync(
-            new ConsumerGetnextRequest
-            {
-                Batch = max.MaxMsgs,
-                MaxBytes = max.MaxBytes,
-                IdleHeartbeat = timeouts.IdleHeartbeat.ToNanos(),
-                Expires = timeouts.Expires.ToNanos(),
-            },
+            opts.NoWait
+
+                // When no wait is set we don't need to send the idle heartbeat and expiration
+                // If no message is available the server will respond with a 404 immediately
+                // If messages are available the server will send a 408 direct after the last message
+                ? new ConsumerGetnextRequest { Batch = max.MaxMsgs, MaxBytes = max.MaxBytes, NoWait = opts.NoWait }
+                : new ConsumerGetnextRequest
+                {
+                    Batch = max.MaxMsgs,
+                    MaxBytes = max.MaxBytes,
+                    IdleHeartbeat = timeouts.IdleHeartbeat.ToNanos(),
+                    Expires = timeouts.Expires.ToNanos(),
+                    NoWait = opts.NoWait,
+                },
             cancellationToken);
 
         sub.ResetHeartbeatTimer();
@@ -281,6 +325,21 @@ public class NatsJSConsumer
             subject: $"{_context.Opts.Prefix}.CONSUMER.INFO.{_stream}.{_consumer}",
             request: null,
             cancellationToken).ConfigureAwait(false);
+
+    private static NatsSubOpts BuildRequestOpts(INatsSerializer? serializer, int? maxMsgs) =>
+        new()
+        {
+            Serializer = serializer,
+            ChannelOpts = new NatsSubChannelOpts
+            {
+                // Keep capacity large enough not to block the socket reads.
+                // This might delay message acknowledgements on slow consumers
+                // but it's crucial to keep the reads flowing on the main
+                // NATS TCP connection.
+                Capacity = maxMsgs > 0 ? maxMsgs * 2 : 1_000,
+                FullMode = BoundedChannelFullMode.Wait,
+            },
+        };
 
     private void ThrowIfDeleted()
     {

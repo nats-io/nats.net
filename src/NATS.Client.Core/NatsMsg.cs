@@ -68,6 +68,20 @@ public readonly record struct NatsMsg<T>(
     }
 
     /// <summary>
+    /// Reply with an empty message.
+    /// </summary>
+    /// <param name="headers">Optional message headers.</param>
+    /// <param name="replyTo">Optional reply-to subject.</param>
+    /// <param name="opts">A <see cref="NatsPubOpts"/> for publishing options.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
+    /// <returns>A <see cref="ValueTask"/> that represents the asynchronous send operation.</returns>
+    public ValueTask ReplyAsync(NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
+    {
+        CheckReplyPreconditions();
+        return Connection.PublishAsync<object?>(ReplyTo!, default, headers, replyTo, opts, cancellationToken);
+    }
+
+    /// <summary>
     /// Reply to this message.
     /// </summary>
     /// <param name="data">Serializable data object.</param>

@@ -23,6 +23,15 @@ public class NatsObjContext
     /// <summary>
     /// Create a new object store.
     /// </summary>
+    /// <param name="bucket">Bucket name.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>Object store object.</returns>
+    public ValueTask<NatsObjStore> CreateObjectStore(string bucket, CancellationToken cancellationToken = default) =>
+        CreateObjectStore(new NatsObjConfig(bucket), cancellationToken);
+
+    /// <summary>
+    /// Create a new object store.
+    /// </summary>
     /// <param name="config">Object store configuration.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>Object store object.</returns>

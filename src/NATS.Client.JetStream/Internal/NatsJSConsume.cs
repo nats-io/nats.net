@@ -19,11 +19,13 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
 {
     private readonly ILogger _logger;
     private readonly bool _debug;
+    private readonly CancellationTokenSource _cts;
     private readonly Channel<NatsJSMsg<TMsg?>> _userMsgs;
     private readonly Channel<PullRequest> _pullRequests;
     private readonly NatsJSContext _context;
     private readonly string _stream;
     private readonly string _consumer;
+    private readonly CancellationToken _cancellationToken;
     private readonly INatsSerializer _serializer;
     private readonly Timer _timer;
     private readonly Task _pullTask;
@@ -39,6 +41,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
     private readonly object _pendingGate = new();
     private long _pendingMsgs;
     private long _pendingBytes;
+    private int _disposed;
 
     public NatsJSConsume(
         long maxMsgs,
@@ -52,9 +55,12 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
         string consumer,
         string subject,
         string? queueGroup,
-        NatsSubOpts? opts)
+        NatsSubOpts? opts,
+        CancellationToken cancellationToken)
         : base(context.Connection, context.Connection.SubscriptionManager, subject, queueGroup, opts)
     {
+        _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _cancellationToken = _cts.Token;
         _logger = Connection.Opts.LoggerFactory.CreateLogger<NatsJSConsume<TMsg>>();
         _debug = _logger.IsEnabled(LogLevel.Debug);
         _context = context;
@@ -91,6 +97,15 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
             static state =>
             {
                 var self = (NatsJSConsume<TMsg>)state!;
+
+                if (self._cancellationToken.IsCancellationRequested)
+                {
+                    // We complete stop here since heartbeat timeout would kick in
+                    // when there are no pull requests or messages left in-flight.
+                    self.CompleteStop();
+                    return;
+                }
+
                 self.Pull("heartbeat-timeout", self._maxMsgs, self._maxBytes);
                 self.ResetPending();
                 if (self._debug)
@@ -105,10 +120,17 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
             Timeout.Infinite,
             Timeout.Infinite);
 
-        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg?>>(NatsSubUtils.GetChannelOpts(opts?.ChannelOpts));
+        // Keep user channel small to avoid blocking the user code
+        // when disposed otherwise channel reader will continue delivering messages
+        // if there are messages queued up already. This channel is used to pass messages
+        // to the user from the subscription channel (which should be set to a
+        // sufficiently large value to avoid blocking socket reads in the
+        // NATS connection).
+        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg?>>(1);
         Msgs = _userMsgs.Reader;
 
-        _pullRequests = Channel.CreateBounded<PullRequest>(NatsSubUtils.GetChannelOpts(opts?.ChannelOpts));
+        // Capacity as 1 is enough here since it's used for signaling only.
+        _pullRequests = Channel.CreateBounded<PullRequest>(1);
         _pullTask = Task.Run(PullLoop);
 
         ResetPending();
@@ -116,10 +138,13 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
 
     public ChannelReader<NatsJSMsg<TMsg?>> Msgs { get; }
 
-    public void Stop() => EndSubscription(NatsSubEndReason.None);
+    public void Stop() => _cts.Cancel();
 
     public ValueTask CallMsgNextAsync(string origin, ConsumerGetnextRequest request, CancellationToken cancellationToken = default)
     {
+        if (_cancellationToken.IsCancellationRequested)
+            return default;
+
         if (_debug)
         {
             _logger.LogDebug("Sending pull request for {Origin} {Msgs}, {Bytes}", origin, request.Batch, request.MaxBytes);
@@ -138,6 +163,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
 
     public override async ValueTask DisposeAsync()
     {
+        Interlocked.Exchange(ref _disposed, 1);
         await base.DisposeAsync().ConfigureAwait(false);
         await _pullTask.ConfigureAwait(false);
         await _timer.DisposeAsync().ConfigureAwait(false);
@@ -157,6 +183,9 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
             IdleHeartbeat = _idle,
             Expires = _expires,
         };
+
+        if (_cancellationToken.IsCancellationRequested)
+            yield break;
 
         yield return PublishCommand<ConsumerGetnextRequest>.Create(
             pool: Connection.ObjectPool,
@@ -311,7 +340,15 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
                 }
             }
 
-            await _userMsgs.Writer.WriteAsync(msg).ConfigureAwait(false);
+            // Stop feeding the user if we are disposed.
+            // We need to exit as soon as possible.
+            if (Volatile.Read(ref _disposed) == 0)
+            {
+                // We can't pass cancellation token here because we need to hand
+                // the message to the user to be processed. Writer will be completed
+                // when the user calls Stop() or when the subscription is closed.
+                await _userMsgs.Writer.WriteAsync(msg).ConfigureAwait(false);
+            }
         }
 
         CheckPending();
@@ -353,6 +390,24 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
                 ResetPending();
             }
         }
+    }
+
+    private void CompleteStop()
+    {
+        if (_debug)
+        {
+            _logger.LogDebug(NatsJSLogEvents.Stopping, "No more pull requests or messages in-flight, stopping");
+        }
+
+        // Schedule on the thread pool to avoid potential deadlocks.
+        ThreadPool.UnsafeQueueUserWorkItem(
+            state =>
+            {
+                var self = (NatsJSConsume<TMsg>)state!;
+                self._userMsgs.Writer.TryComplete();
+                self.EndSubscription(NatsSubEndReason.None);
+            },
+            this);
     }
 
     private void Pull(string origin, long batch, long maxBytes) => _pullRequests.Writer.TryWrite(new PullRequest
