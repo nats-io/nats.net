@@ -17,16 +17,16 @@ jobs:
 #      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
 #      NUGET_XMLDOC_MODE: skip
     steps:
-#      - name: Install nats-server
-#        run: |
-#          for i in 1 2 3
-#          do
-#            curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@${{ matrix.config.branch }} | PREFIX=. sh && break || sleep 30
-#          done
-#          sudo mv nats-server /usr/local/bin
-#
-#      - name: Check nats-server
-#        run: nats-server -v
+      - name: Install nats-server
+        run: |
+          for i in 1 2 3
+          do
+            curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@${{ matrix.config.branch }} | PREFIX=. sh && break || sleep 30
+          done
+          sudo mv nats-server /usr/local/bin
+
+      - name: Check nats-server
+        run: nats-server -v
 
       - name: Checkout
         uses: actions/checkout@v3
