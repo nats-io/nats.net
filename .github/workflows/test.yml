@@ -38,7 +38,9 @@ jobs:
 #          dotnet-quality: 'preview'
 
       - run: |
-          ls -l /home/runner/work/nats.net.v2
+          ls -l /home/runner/work/nats.net.v2/nats.net.v2
+          pwd
+          ls -l
 
 #      - name: Test Native AOT
 #        working-directory: tests/NATS.Client.NativeAotTests
