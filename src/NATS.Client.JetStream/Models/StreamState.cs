@@ -60,7 +60,7 @@ public record StreamState
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("subjects")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public System.Collections.Generic.IDictionary<string, long> Subjects { get; set; } = default!;
+    public System.Collections.Generic.IDictionary<string, long>? Subjects { get; set; } = null;
 
     /// <summary>
     /// The number of unique subjects held in the stream
