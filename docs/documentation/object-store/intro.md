@@ -33,7 +33,7 @@ Let's create our store first. In Object Store, a bucket is simply a storage for 
 var store = await obj.CreateObjectStore("test-bucket");
 ```
 
-Now that we have a KV bucket in our stream, let's see its status using the [NATS command
+Now that we have a bucket in our stream, let's see its status using the [NATS command
 line client](https://github.com/nats-io/natscli):
 
 ```shell

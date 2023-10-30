@@ -7,7 +7,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 
     <!-- NuGet Packaging -->
-    <PackageTags>pubsub;messaging</PackageTags>
+    <PackageTags>pubsub;messaging;persistance;storage</PackageTags>
     <Description>JetStream Object Store support for NATS.Client.</Description>
     <IsPackable>true</IsPackable>
   </PropertyGroup>

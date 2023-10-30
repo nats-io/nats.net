@@ -17,3 +17,5 @@ these docs. You can also create a Pull Request using the Edit on GitHub link on 
 [Key/Value Store](key-value-store/intro.md) is the built-in distributed persistent associative arrays built on top of JetStream.
 
 [Object Store](object-store/intro.md) is the built-in distributed persistent objects of arbitrary size built on top of JetStream.
+
+[Services](services/intro.md) is the services protocol built on top of core NATS enabling discovery and monitoring of services you develop.
