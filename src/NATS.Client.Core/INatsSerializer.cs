@@ -7,26 +7,64 @@ using System.Text.Json.Serialization.Metadata;
 
 namespace NATS.Client.Core;
 
+/// <summary>
+/// Serializer interface for NATS messages.
+/// </summary>
 public interface INatsSerializer
 {
+    /// <summary>
+    /// Next serializer in the chain.
+    /// </summary>
+    /// <remarks>
+    /// If the serializer can't handle the type, it may call the next serializer in the chain
+    /// or throw an exception if there are no more serializers to use when <c>Next</c> is set to <c>null</c>.
+    /// </remarks>
     public INatsSerializer? Next { get; }
 
+    /// <summary>
+    /// Serialize value to buffer.
+    /// </summary>
+    /// <param name="bufferWriter">Buffer to write the serialized data.</param>
+    /// <param name="value">Object to be serialized.</param>
+    /// <typeparam name="T">Serialized object type</typeparam>
     void Serialize<T>(IBufferWriter<byte> bufferWriter, T value);
 
+    /// <summary>
+    /// Deserialize value from buffer.
+    /// </summary>
+    /// <param name="buffer">Buffer with the serialized data.</param>
+    /// <typeparam name="T">Serialized object type.</typeparam>
+    /// <returns>Deserialized object</returns>
     T? Deserialize<T>(in ReadOnlySequence<byte> buffer);
 }
 
+/// <summary>
+/// Default serializer for NATS messages.
+/// </summary>
 public static class NatsDefaultSerializer
 {
+    /// <summary>
+    /// Combined serializer of <see cref="NatsRawSerializer"/> and <see cref="NatsUtf8PrimitivesSerializer"/> set
+    /// as the default serializer for NATS messages.
+    /// </summary>
     public static readonly INatsSerializer Default = new NatsRawSerializer(new NatsUtf8PrimitivesSerializer(default));
 }
 
+/// <summary>
+/// UTF8 serializer for strings and numbers (<c>int</c> and <c>double</c>).
+/// </summary>
 public class NatsUtf8PrimitivesSerializer : INatsSerializer
 {
+    /// <summary>
+    /// Creates a new instance of <see cref="NatsUtf8PrimitivesSerializer"/>.
+    /// </summary>
+    /// <param name="next">The next serializer in chain.</param>
     public NatsUtf8PrimitivesSerializer(INatsSerializer? next) => Next = next;
 
+    /// <inheritdoc />
     public INatsSerializer? Next { get; }
 
+    /// <inheritdoc />
     public void Serialize<T>(IBufferWriter<byte> bufferWriter, T value)
     {
         if (value is string str)
@@ -82,6 +120,7 @@ public class NatsUtf8PrimitivesSerializer : INatsSerializer
         Next.Serialize(bufferWriter, value);
     }
 
+    /// <inheritdoc />
     public T? Deserialize<T>(in ReadOnlySequence<byte> buffer)
     {
         if (typeof(T) == typeof(string))
@@ -152,12 +191,21 @@ public class NatsUtf8PrimitivesSerializer : INatsSerializer
     }
 }
 
+/// <summary>
+/// Serializer for binary data.
+/// </summary>
 public class NatsRawSerializer : INatsSerializer
 {
+    /// <summary>
+    /// Creates a new instance of <see cref="NatsRawSerializer"/>.
+    /// </summary>
+    /// <param name="next">Next serializer in chain.</param>
     public NatsRawSerializer(INatsSerializer? next) => Next = next;
 
+    /// <inheritdoc />
     public INatsSerializer? Next { get; }
 
+    /// <inheritdoc />
     public void Serialize<T>(IBufferWriter<byte> bufferWriter, T? value)
     {
         if (value is byte[] bytes)
@@ -218,6 +266,7 @@ public class NatsRawSerializer : INatsSerializer
         Next.Serialize(bufferWriter, value);
     }
 
+    /// <inheritdoc />
     public T? Deserialize<T>(in ReadOnlySequence<byte> buffer)
     {
         if (typeof(T) == typeof(byte[]))
@@ -256,6 +305,9 @@ public class NatsRawSerializer : INatsSerializer
     }
 }
 
+/// <summary>
+/// Serializer with support for <see cref="JsonSerializerContext"/>.
+/// </summary>
 public sealed class NatsJsonContextSerializer : INatsSerializer
 {
     private static readonly JsonWriterOptions JsonWriterOpts = new() { Indented = false, SkipValidation = true };
@@ -265,14 +317,21 @@ public sealed class NatsJsonContextSerializer : INatsSerializer
 
     private readonly JsonSerializerContext _context;
 
+    /// <summary>
+    /// Creates a new instance of <see cref="NatsJsonContextSerializer"/>.
+    /// </summary>
+    /// <param name="context">Context to use for serialization.</param>
+    /// <param name="next">Next serializer in chain.</param>
     public NatsJsonContextSerializer(JsonSerializerContext context, INatsSerializer? next = default)
     {
         Next = next;
         _context = context;
     }
 
+    /// <inheritdoc />
     public INatsSerializer? Next { get; }
 
+    /// <inheritdoc />
     public void Serialize<T>(IBufferWriter<byte> bufferWriter, T value)
     {
         if (_context.GetTypeInfo(typeof(T)) is JsonTypeInfo<T> jsonTypeInfo)
@@ -302,6 +361,7 @@ public sealed class NatsJsonContextSerializer : INatsSerializer
         Next.Serialize(bufferWriter, value);
     }
 
+    /// <inheritdoc />
     public T? Deserialize<T>(in ReadOnlySequence<byte> buffer)
     {
         if (_context.GetTypeInfo(typeof(T)) is JsonTypeInfo<T> jsonTypeInfo)
