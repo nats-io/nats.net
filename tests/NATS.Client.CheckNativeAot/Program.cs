@@ -376,6 +376,8 @@ async Task ServicesTests()
         Assert.Equal("stat-v1", eps.Data["stat-k1"]?.GetValue<string>());
         Assert.Equal("stat-v2", eps.Data["stat-k2"]?.GetValue<string>());
     }
+
+    Log("OK");
 }
 
 async Task ServicesTests2()
