@@ -31,11 +31,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-#      - name: Setup dotnet
-#        uses: actions/setup-dotnet@v3
-#        with:
-#          dotnet-version: '8.x'
-#          dotnet-quality: 'preview'
+      - name: Setup dotnet
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.x'
+          dotnet-quality: 'preview'
 
       - run: |
           ls -l /home/runner/work/nats.net.v2/nats.net.v2
@@ -45,6 +45,7 @@ jobs:
           ls -l
           cd Nats.Client.NativeAotTests
           ls -l
+          dotnet publish -r linux-x64 -c Release -o dist
 
 #      - name: Test Native AOT
 #        working-directory: tests/NATS.Client.NativeAotTests
