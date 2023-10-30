@@ -52,9 +52,8 @@ public class ServicesTests
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10_0000));
         var cancellationToken = cts.Token;
 
-        // await using var server = NatsServer.Start();
-        // await using var nats = server.CreateClientConnection();
-        var nats = new NatsConnection();
+        await using var server = NatsServer.Start();
+        await using var nats = server.CreateClientConnection();
         var svc = new NatsSvcContext(nats);
 
         await using var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
