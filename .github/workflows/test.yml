@@ -46,6 +46,9 @@ jobs:
           cd Nats.Client.NativeAotTests
           ls -l
           dotnet publish -r linux-x64 -c Release -o dist
+          cd ./dist
+          ls -lh
+          ./NATS.Client.NativeAotTests
 
 #      - name: Test Native AOT
 #        working-directory: tests/NATS.Client.NativeAotTests
