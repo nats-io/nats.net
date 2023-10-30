@@ -43,6 +43,8 @@ jobs:
           ls -l
           cd tests
           ls -l
+          cd Nats.Client.NativeAotTests
+          ls -l
 
 #      - name: Test Native AOT
 #        working-directory: tests/NATS.Client.NativeAotTests
