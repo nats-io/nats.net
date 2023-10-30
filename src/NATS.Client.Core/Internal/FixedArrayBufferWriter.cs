@@ -3,11 +3,6 @@ using System.Runtime.CompilerServices;
 
 namespace NATS.Client.Core.Internal;
 
-internal interface ICountableBufferWriter : IBufferWriter<byte>
-{
-    int WrittenCount { get; }
-}
-
 // similar as ArrayBufferWriter but adds more functional for ProtocolWriter
 internal sealed class FixedArrayBufferWriter : ICountableBufferWriter
 {
