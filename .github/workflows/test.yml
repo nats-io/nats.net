@@ -38,17 +38,8 @@ jobs:
           dotnet-quality: 'preview'
 
       - name: Test Native AOT
+        working-directory: ./tests/NATS.Client.NativeAotTests
         run: |
-          echo "Testing Native AOT"
-          pwd
-          echo "List files"
-          ls -l
-          echo "CD"
-          cd ./tests/
-          echo "List files"
-          ls -l
-          echo "CD"
-          cd './NATS.Client.NativeAotTests/'
           dotnet publish -r linux-x64 -c Release -o dist
           cd ./dist
           ls -lh
