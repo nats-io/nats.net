@@ -86,7 +86,7 @@ public partial class NatsJSContext
                 data: data,
                 headers: headers,
                 requestOpts: opts,
-                replyOpts: default,
+                replyOpts: new NatsSubOpts { Serializer = NatsJSJsonSerializer.Default },
                 cancellationToken)
             .ConfigureAwait(false);
 
@@ -129,7 +129,8 @@ public partial class NatsJSContext
     {
         if (request != null)
         {
-            Validator.ValidateObject(request, new ValidationContext(request));
+            // TODO: Can't validate using JSON serializer context at the moment.
+            // Validator.ValidateObject(request, new ValidationContext(request));
         }
 
         var cancellationTimer = Connection.GetCancellationTimer(cancellationToken);
@@ -139,7 +140,7 @@ public partial class NatsJSContext
                     subject: subject,
                     data: request,
                     headers: default,
-                    requestOpts: default,
+                    requestOpts: new NatsPubOpts { Serializer = NatsJSJsonSerializer.Default },
                     replyOpts: new NatsSubOpts { Serializer = NatsJSErrorAwareJsonSerializer.Default },
                     cancellationTimer.Token)
                 .ConfigureAwait(false);

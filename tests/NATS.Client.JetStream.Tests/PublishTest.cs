@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using NATS.Client.Core.Tests;
 
 namespace NATS.Client.JetStream.Tests;
@@ -21,7 +22,17 @@ public class PublishTest
 
         // Publish
         {
-            var ack = await js.PublishAsync("s1.foo", new TestData { Test = 1 }, cancellationToken: cts.Token);
+            var ack = await js.PublishAsync(
+                "s1.foo",
+                new TestData
+                {
+                    Test = 1,
+                },
+                opts: new NatsPubOpts
+                {
+                    Serializer = TestDataJsonSerializer.Default,
+                },
+                cancellationToken: cts.Token);
             Assert.Null(ack.Error);
             Assert.Equal(1, ack.Seq);
             Assert.Equal("s1", ack.Stream);
@@ -33,6 +44,7 @@ public class PublishTest
             var ack1 = await js.PublishAsync(
                 subject: "s1.foo",
                 data: new TestData { Test = 2 },
+                opts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default },
                 headers: new NatsHeaders { { "Nats-Msg-Id", "2" } },
                 cancellationToken: cts.Token);
             Assert.Null(ack1.Error);
@@ -42,15 +54,11 @@ public class PublishTest
             var ack2 = await js.PublishAsync(
                 subject: "s1.foo",
                 data: new TestData { Test = 2 },
+                opts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default },
                 headers: new NatsHeaders { { "Nats-Msg-Id", "2" } },
                 cancellationToken: cts.Token);
             Assert.Null(ack2.Error);
             Assert.True(ack2.Duplicate);
         }
-    }
-
-    private record TestData
-    {
-        public int Test { get; init; }
     }
 }

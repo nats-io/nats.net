@@ -1,4 +1,6 @@
 using System.Buffers;
+using System.Buffers.Text;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
@@ -9,14 +11,145 @@ public interface INatsSerializer
 {
     public INatsSerializer? Next { get; }
 
-    int Serialize<T>(IBufferWriter<byte> bufferWriter, T value);
+    void Serialize<T>(IBufferWriter<byte> bufferWriter, T value);
 
     T? Deserialize<T>(in ReadOnlySequence<byte> buffer);
 }
 
 public static class NatsDefaultSerializer
 {
-    public static readonly INatsSerializer Default = new NatsRawSerializer(NatsJsonSerializer.Default);
+    public static readonly INatsSerializer Default = new NatsRawSerializer(new NatsUtf8PrimitivesSerializer(default));
+}
+
+public class NatsUtf8PrimitivesSerializer : INatsSerializer
+{
+    public NatsUtf8PrimitivesSerializer(INatsSerializer? next) => Next = next;
+
+    public INatsSerializer? Next { get; }
+
+    public void Serialize<T>(IBufferWriter<byte> bufferWriter, T value)
+    {
+        if (value is string str)
+        {
+            var count = Encoding.UTF8.GetByteCount(str);
+            var buffer = bufferWriter.GetSpan(count);
+            var bytes = Encoding.UTF8.GetBytes(str, buffer);
+            bufferWriter.Advance(bytes);
+            return;
+        }
+
+        var span = bufferWriter.GetSpan(128);
+
+        // int
+        {
+            if (value is int input)
+            {
+                if (Utf8Formatter.TryFormat(input, span, out var written))
+                {
+                    bufferWriter.Advance(written);
+                }
+                else
+                {
+                    throw new NatsException($"Can't serialize {typeof(T)}, format error");
+                }
+
+                return;
+            }
+        }
+
+        // double
+        {
+            if (value is double input)
+            {
+                if (Utf8Formatter.TryFormat(input, span, out var written))
+                {
+                    bufferWriter.Advance(written);
+                }
+                else
+                {
+                    throw new NatsException($"Can't serialize {typeof(T)}, format error");
+                }
+
+                return;
+            }
+        }
+
+        if (Next == null)
+        {
+            throw new NatsException($"Can't serialize {typeof(T)}");
+        }
+
+        Next.Serialize(bufferWriter, value);
+    }
+
+    public T? Deserialize<T>(in ReadOnlySequence<byte> buffer)
+    {
+        if (typeof(T) == typeof(string))
+        {
+            return (T)(object)Encoding.UTF8.GetString(buffer);
+        }
+
+        if (typeof(T) == typeof(int) || typeof(T) == typeof(int?))
+        {
+            if (buffer.IsSingleSegment)
+            {
+                if (Utf8Parser.TryParse(buffer.FirstSpan, out int value, out _))
+                {
+                    return (T)(object)value;
+                }
+                else
+                {
+                    throw new NatsException($"Can't deserialize {typeof(T)}. Parsing error");
+                }
+            }
+            else
+            {
+                var bytes = buffer.ToArray();
+                if (Utf8Parser.TryParse(bytes, out int value, out _))
+                {
+                    return (T)(object)value;
+                }
+                else
+                {
+                    throw new NatsException($"Can't deserialize {typeof(T)}. Parsing error");
+                }
+            }
+        }
+
+        if (typeof(T) == typeof(double) || typeof(T) == typeof(double?))
+        {
+            if (buffer.IsSingleSegment)
+            {
+                if (Utf8Parser.TryParse(buffer.FirstSpan, out double value, out _))
+                {
+                    return (T)(object)value;
+                }
+                else
+                {
+                    throw new NatsException($"Can't deserialize {typeof(T)}. Parsing error");
+                }
+            }
+            else
+            {
+                var bytes = buffer.ToArray();
+                if (Utf8Parser.TryParse(bytes, out double value, out _))
+                {
+                    return (T)(object)value;
+                }
+                else
+                {
+                    throw new NatsException($"Can't deserialize {typeof(T)}. Parsing error");
+                }
+            }
+        }
+
+        if (Next == null)
+        {
+            throw new NatsException($"Can't deserialize {typeof(T)}");
+        }
+
+        return Next.Deserialize<T>(buffer);
+    }
 }
 
 public class NatsRawSerializer : INatsSerializer
@@ -25,24 +158,24 @@ public class NatsRawSerializer : INatsSerializer
 
     public INatsSerializer? Next { get; }
 
-    public int Serialize<T>(IBufferWriter<byte> bufferWriter, T? value)
+    public void Serialize<T>(IBufferWriter<byte> bufferWriter, T? value)
     {
         if (value is byte[] bytes)
         {
             bufferWriter.Write(bytes);
-            return bytes.Length;
+            return;
         }
 
         if (value is Memory<byte> memory)
         {
             bufferWriter.Write(memory.Span);
-            return memory.Length;
+            return;
         }
 
         if (value is ReadOnlyMemory<byte> readOnlyMemory)
         {
             bufferWriter.Write(readOnlyMemory.Span);
-            return readOnlyMemory.Length;
+            return;
         }
 
         if (value is ReadOnlySequence<byte> readOnlySequence)
@@ -59,7 +192,7 @@ public class NatsRawSerializer : INatsSerializer
                 }
             }
 
-            return (int)readOnlySequence.Length;
+            return;
         }
 
         if (value is IMemoryOwner<byte> memoryOwner)
@@ -73,14 +206,16 @@ public class NatsRawSerializer : INatsSerializer
 
                 bufferWriter.Advance(length);
 
-                return length;
+                return;
             }
         }
 
-        if (Next != null)
-            return Next.Serialize(bufferWriter, value);
+        if (Next == null)
+        {
+            throw new NatsException($"Can't serialize {typeof(T)}");
+        }
 
-        throw new NatsException($"Can't serialize {typeof(T)}");
+        Next.Serialize(bufferWriter, value);
     }
 
     public T? Deserialize<T>(in ReadOnlySequence<byte> buffer)
@@ -112,53 +247,12 @@ public class NatsRawSerializer : INatsSerializer
             return (T)(object)memoryOwner;
         }
 
-        if (Next != null)
-            return Next.Deserialize<T>(buffer);
-
-        throw new NatsException($"Can't deserialize {typeof(T)}");
-    }
-}
-
-public sealed class NatsJsonSerializer : INatsSerializer
-{
-    private static readonly JsonWriterOptions JsonWriterOpts = new() { Indented = false, SkipValidation = true };
-
-    [ThreadStatic]
-    private static Utf8JsonWriter? _jsonWriter;
-
-    private readonly JsonSerializerOptions _opts;
-
-    public NatsJsonSerializer(JsonSerializerOptions opts) => _opts = opts;
-
-    public static NatsJsonSerializer Default { get; } =
-        new(new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull, });
-
-    public INatsSerializer? Next => default;
-
-    public int Serialize<T>(IBufferWriter<byte> bufferWriter, T? value)
-    {
-        Utf8JsonWriter writer;
-        if (_jsonWriter == null)
+        if (Next == null)
         {
-            writer = _jsonWriter = new Utf8JsonWriter(bufferWriter, JsonWriterOpts);
-        }
-        else
-        {
-            writer = _jsonWriter;
-            writer.Reset(bufferWriter);
+            throw new NatsException($"Can't deserialize {typeof(T)}");
         }
 
-        JsonSerializer.Serialize(writer, value, _opts);
-
-        var bytesCommitted = (int)writer.BytesCommitted;
-        writer.Reset(NullBufferWriter.Instance);
-        return bytesCommitted;
-    }
-
-    public T? Deserialize<T>(in ReadOnlySequence<byte> buffer)
-    {
-        var reader = new Utf8JsonReader(buffer); // Utf8JsonReader is ref struct, no allocate.
-        return JsonSerializer.Deserialize<T>(ref reader, _opts);
+        return Next.Deserialize<T>(buffer);
     }
 }
 
@@ -179,7 +273,7 @@ public sealed class NatsJsonContextSerializer : INatsSerializer
 
     public INatsSerializer? Next { get; }
 
-    public int Serialize<T>(IBufferWriter<byte> bufferWriter, T value)
+    public void Serialize<T>(IBufferWriter<byte> bufferWriter, T value)
     {
         if (_context.GetTypeInfo(typeof(T)) is JsonTypeInfo<T> jsonTypeInfo)
         {
@@ -196,15 +290,16 @@ public sealed class NatsJsonContextSerializer : INatsSerializer
 
             JsonSerializer.Serialize(writer, value, jsonTypeInfo);
 
-            var bytesCommitted = (int)writer.BytesCommitted;
             writer.Reset(NullBufferWriter.Instance);
-            return bytesCommitted;
+            return;
         }
 
-        if (Next != null)
-            return Next.Serialize(bufferWriter, value);
+        if (Next == null)
+        {
+            throw new NatsException($"Can't serialize {typeof(T)}");
+        }
 
-        throw new NatsException($"Can't serialize {typeof(T)}");
+        Next.Serialize(bufferWriter, value);
     }
 
     public T? Deserialize<T>(in ReadOnlySequence<byte> buffer)
