@@ -182,7 +182,7 @@ public sealed class NatsBufferWriter<T> : IBufferWriter<T>, IMemoryOwner<T>
     /// Clears the data written to the underlying buffer.
     /// </summary>
     /// <remarks>
-    /// You must clear the <see cref="INatsBuffer{T}"/> instance before trying to re-use it.
+    /// You must clear the buffer instance before trying to re-use it.
     /// </remarks>
     public void Clear()
     {

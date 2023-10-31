@@ -59,15 +59,17 @@ APIs that can work with types that are not registered to generate serialization 
 
 Using this serializer is most useful for use cases where you want to send and receive JSON messages and you don't want to
 worry about registering types. It's also useful for prototyping and testing. To use the serializer you need to install
-the `NATS.Client.Core.Serializers.Json` Nuget package.
+the `NATS.Client.Serializers.Json` Nuget package.
 
 ```shell
-dotnet add package NATS.Client.Core.Serializers.Json --prerelease
+$ dotnet add package NATS.Client.Serializers.Json --prerelease
 ```
 
 Then set the serializer as the default for the connection:
 
 ```csharp
+using NATS.Client.Serializers.Json;
+
 var natsOpts = NatsOpts.Default with { Serializer = NatsJsonSerializer.Default };
 
 await using var nats = new NatsConnection(natsOpts);

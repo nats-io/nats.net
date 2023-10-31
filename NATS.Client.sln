@@ -93,7 +93,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.CheckNativeAot"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.ProtoBufMessages", "sandbox\Example.ProtoBufMessages\Example.ProtoBufMessages.csproj", "{9FCD9377-FE5F-4D94-BDCF-54427DB6487D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.Core.Serializers.Json", "src\NATS.Client.Core.Serializers.Json\NATS.Client.Core.Serializers.Json.csproj", "{5B4B30A5-941B-44F9-98C6-06F0BB2242AB}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.Serializers.Json", "src\NATS.Client.Serializers.Json\NATS.Client.Serializers.Json.csproj", "{5B4B30A5-941B-44F9-98C6-06F0BB2242AB}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -1,8 +1,9 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using NATS.Client.Core;
 
-namespace NATS.Client.Core.Serializers.Json;
+namespace NATS.Client.Serializers.Json;
 
 /// <summary>
 /// Reflection based JSON serializer for NATS.
