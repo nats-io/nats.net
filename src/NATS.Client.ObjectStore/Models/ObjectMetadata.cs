@@ -68,10 +68,10 @@ public record ObjectMetadata
     /// </summary>
     [JsonPropertyName("options")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    public Options Options { get; set; } = default!;
+    public MetaDataOptions Options { get; set; } = default!;
 }
 
-public record Options
+public record MetaDataOptions
 {
     /// <summary>
     /// Max chunk size

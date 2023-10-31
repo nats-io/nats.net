@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using NATS.Client.Core.Tests;
+using NATS.Client.Services.Internal;
 using NATS.Client.Services.Models;
 
 namespace NATS.Client.Services.Tests;
@@ -22,9 +23,9 @@ public class ServicesTests
 
         await using var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
 
-        var pingsTask = FindServices<PingResponse>(server, "$SRV.PING", 1, cancellationToken);
-        var infosTask = FindServices<InfoResponse>(server, "$SRV.INFO", 1, cancellationToken);
-        var statsTask = FindServices<StatsResponse>(server, "$SRV.STATS", 1, cancellationToken);
+        var pingsTask = FindServices<PingResponse>(nats, "$SRV.PING", 1, cancellationToken);
+        var infosTask = FindServices<InfoResponse>(nats, "$SRV.INFO", 1, cancellationToken);
+        var statsTask = FindServices<StatsResponse>(nats, "$SRV.STATS", 1, cancellationToken);
 
         var pings = await pingsTask;
         pings.ForEach(x => _output.WriteLine($"{x}"));
@@ -48,7 +49,7 @@ public class ServicesTests
     [Fact]
     public async Task Add_end_point()
     {
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10_0000));
         var cancellationToken = cts.Token;
 
         await using var server = NatsServer.Start();
@@ -81,7 +82,7 @@ public class ServicesTests
             },
             cancellationToken: cancellationToken);
 
-        var info = (await FindServices<InfoResponse>(server, "$SRV.INFO", 1, cancellationToken)).First();
+        var info = (await FindServices<InfoResponse>(nats, "$SRV.INFO", 1, cancellationToken)).First();
         Assert.Single(info.Endpoints);
         var endpointInfo = info.Endpoints.First();
         Assert.Equal("e1", endpointInfo.Name);
@@ -106,7 +107,7 @@ public class ServicesTests
             }
         }
 
-        var stat = (await FindServices<StatsResponse>(server, "$SRV.STATS", 1, cancellationToken)).First();
+        var stat = (await FindServices<StatsResponse>(nats, "$SRV.STATS", 1, cancellationToken)).First();
         Assert.Single(stat.Endpoints);
         var endpointStats = stat.Endpoints.First();
         Assert.Equal("e1", endpointStats.Name);
@@ -163,7 +164,7 @@ public class ServicesTests
 
         // Check that the endpoints are registered correctly
         {
-            var info = (await FindServices<InfoResponse>(server, "$SRV.INFO.s1", 1, cancellationToken)).First();
+            var info = (await FindServices<InfoResponse>(nats, "$SRV.INFO.s1", 1, cancellationToken)).First();
             Assert.Equal(5, info.Endpoints.Count);
             var endpoints = info.Endpoints.ToList();
 
@@ -202,7 +203,7 @@ public class ServicesTests
 
         // Check default queue group and stats handler
         {
-            var info = (await FindServices<InfoResponse>(server, "$SRV.INFO.s2", 1, cancellationToken)).First();
+            var info = (await FindServices<InfoResponse>(nats, "$SRV.INFO.s2", 1, cancellationToken)).First();
             Assert.Single(info.Endpoints);
             var epi = info.Endpoints.First();
 
@@ -211,7 +212,7 @@ public class ServicesTests
             Assert.Equal("q2", epi.QueueGroup);
             Assert.Equal("ep-v1", epi.Metadata["ep-k1"]);
 
-            var stat = (await FindServices<StatsResponse>(server, "$SRV.STATS.s2", 1, cancellationToken)).First();
+            var stat = (await FindServices<StatsResponse>(nats, "$SRV.STATS.s2", 1, cancellationToken)).First();
             Assert.Equal("v1", stat.Metadata["k1"]);
             Assert.Equal("v2", stat.Metadata["k2"]);
             Assert.Single(stat.Endpoints);
@@ -221,10 +222,13 @@ public class ServicesTests
         }
     }
 
-    private static async Task<List<T>> FindServices<T>(NatsServer server, string subject, int limit, CancellationToken ct)
+    private static async Task<List<T>> FindServices<T>(NatsConnection nats, string subject, int limit, CancellationToken ct)
     {
-        await using var nats = server.CreateClientConnection();
-        var replyOpts = new NatsSubOpts { Timeout = TimeSpan.FromSeconds(2) };
+        var replyOpts = new NatsSubOpts
+        {
+            Timeout = TimeSpan.FromSeconds(2),
+            Serializer = NatsSrvJsonSerializer.Default,
+        };
         var responses = new List<T>();
 
         var count = 0;

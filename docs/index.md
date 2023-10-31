@@ -13,8 +13,11 @@ The NATS.NET V2 client is in preview and not recommended for production use yet.
 - [x] KV initial support
 - [x] Object Store initial support
 - [x] Service API initial support
-- [ ] .NET 8.0 support (e.g. Native AOT)
+- [x] .NET 8.0 support (Native AOT)
+- [ ] Implementation of missing major features (e.g. JetStream ordered consumers)
 - [ ] Beta phase
+- [ ] Testing and bug fixing
+- [ ] General Availability
 
 ## What's Next
 

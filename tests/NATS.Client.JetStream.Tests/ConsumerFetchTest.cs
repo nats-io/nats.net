@@ -21,14 +21,14 @@ public class ConsumerFetchTest
 
         for (var i = 0; i < 10; i++)
         {
-            var ack = await js.PublishAsync("s1.foo", new TestData { Test = i }, cancellationToken: cts.Token);
+            var ack = await js.PublishAsync("s1.foo", new TestData { Test = i }, opts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts.Token);
             ack.EnsureSuccess();
         }
 
         var consumer = await js.GetConsumerAsync("s1", "c1", cts.Token);
         var count = 0;
         await using var fc =
-            await consumer.FetchInternalAsync<TestData>(new NatsJSFetchOpts { MaxMsgs = 10 }, cancellationToken: cts.Token);
+            await consumer.FetchInternalAsync<TestData>(new NatsJSFetchOpts { MaxMsgs = 10, Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts.Token);
         await foreach (var msg in fc.Msgs.ReadAllAsync(cts.Token))
         {
             await msg.AckAsync(new AckOpts(WaitUntilSent: true), cts.Token);
@@ -51,13 +51,13 @@ public class ConsumerFetchTest
 
         for (var i = 0; i < 10; i++)
         {
-            var ack = await js.PublishAsync("s1.foo", new TestData { Test = i }, cancellationToken: cts.Token);
+            var ack = await js.PublishAsync("s1.foo", new TestData { Test = i }, opts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts.Token);
             ack.EnsureSuccess();
         }
 
         var consumer = await js.GetConsumerAsync("s1", "c1", cts.Token);
         var count = 0;
-        await foreach (var msg in consumer.FetchNoWaitAsync<TestData>(new NatsJSFetchOpts { MaxMsgs = 10 }, cancellationToken: cts.Token))
+        await foreach (var msg in consumer.FetchNoWaitAsync<TestData>(new NatsJSFetchOpts { MaxMsgs = 10, Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts.Token))
         {
             await msg.AckAsync(new AckOpts(WaitUntilSent: true), cts.Token);
             Assert.Equal(count, msg.Data!.Test);
@@ -84,11 +84,12 @@ public class ConsumerFetchTest
             MaxMsgs = 10,
             IdleHeartbeat = TimeSpan.FromSeconds(5),
             Expires = TimeSpan.FromSeconds(10),
+            Serializer = TestDataJsonSerializer.Default,
         };
 
         for (var i = 0; i < 100; i++)
         {
-            var ack = await js.PublishAsync("s1.foo", new TestData { Test = i }, cancellationToken: cts.Token);
+            var ack = await js.PublishAsync("s1.foo", new TestData { Test = i }, opts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts.Token);
             ack.EnsureSuccess();
         }
 
@@ -121,10 +122,5 @@ public class ConsumerFetchTest
         Assert.Single(infos);
 
         Assert.True(infos[0].NumAckPending > 0);
-    }
-
-    private record TestData
-    {
-        public int Test { get; init; }
     }
 }

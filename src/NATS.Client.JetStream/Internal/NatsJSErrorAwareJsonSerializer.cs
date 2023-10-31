@@ -11,7 +11,7 @@ internal sealed class NatsJSErrorAwareJsonSerializer : INatsSerializer
 
     public INatsSerializer? Next => default;
 
-    public int Serialize<T>(ICountableBufferWriter bufferWriter, T? value) =>
+    public void Serialize<T>(IBufferWriter<byte> bufferWriter, T? value) =>
         throw new NotSupportedException();
 
     public T? Deserialize<T>(in ReadOnlySequence<byte> buffer)
@@ -23,11 +23,11 @@ internal sealed class NatsJSErrorAwareJsonSerializer : INatsSerializer
         var jsonDocument = JsonDocument.Parse(buffer);
         if (jsonDocument.RootElement.TryGetProperty("error", out var errorElement))
         {
-            var error = errorElement.Deserialize<ApiError>() ?? throw new NatsJSException("Can't parse JetStream error JSON payload");
+            var error = errorElement.Deserialize(NatsJSJsonSerializerContext.Default.ApiError) ?? throw new NatsJSException("Can't parse JetStream error JSON payload");
             throw new NatsJSApiErrorException(error);
         }
 
-        return jsonDocument.Deserialize<T>();
+        return NatsJSJsonSerializer.Default.Deserialize<T>(buffer);
     }
 }
 

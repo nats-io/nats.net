@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
@@ -149,7 +150,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         return Connection.PubModelAsync(
             subject: $"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
             data: request,
-            serializer: NatsJsonSerializer.Default,
+            serializer: NatsJSJsonSerializer.Default,
             replyTo: Subject,
             headers: default,
             cancellationToken);
@@ -189,7 +190,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
             replyTo: Subject,
             headers: default,
             value: request,
-            serializer: NatsJsonSerializer.Default,
+            serializer: NatsJSJsonSerializer.Default,
             errorHandler: default,
             cancellationToken: default);
     }

@@ -62,7 +62,7 @@ public class TestSerializer : INatsSerializer
 {
     public INatsSerializer? Next => default;
 
-    public int Serialize<T>(ICountableBufferWriter bufferWriter, T? value) => throw new TestSerializerException();
+    public void Serialize<T>(IBufferWriter<byte> bufferWriter, T? value) => throw new TestSerializerException();
 
     public T? Deserialize<T>(in ReadOnlySequence<byte> buffer) => throw new TestSerializerException();
 }

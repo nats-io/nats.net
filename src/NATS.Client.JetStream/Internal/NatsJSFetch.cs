@@ -120,7 +120,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         Connection.PubModelAsync(
             subject: $"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
             data: request,
-            serializer: NatsJsonSerializer.Default,
+            serializer: NatsJSJsonSerializer.Default,
             replyTo: Subject,
             headers: default,
             cancellationToken);
@@ -153,7 +153,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
             replyTo: Subject,
             headers: default,
             value: request,
-            serializer: NatsJsonSerializer.Default,
+            serializer: NatsJSJsonSerializer.Default,
             errorHandler: default,
             cancellationToken: default);
     }

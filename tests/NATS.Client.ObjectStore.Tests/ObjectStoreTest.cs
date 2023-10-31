@@ -62,7 +62,7 @@ public class ObjectStoreTest
 
         // square buffer: all chunks are the same size
         {
-            var meta = new ObjectMetadata { Name = "k1", Options = new Options { MaxChunkSize = 10 }, };
+            var meta = new ObjectMetadata { Name = "k1", Options = new MetaDataOptions { MaxChunkSize = 10 }, };
 
             var buffer = Encoding.ASCII.GetBytes(buffer90);
             var stream = new MemoryStream(buffer);
@@ -82,7 +82,7 @@ public class ObjectStoreTest
 
         // buffer with smaller last chunk
         {
-            var meta = new ObjectMetadata { Name = "k2", Options = new Options { MaxChunkSize = 10 }, };
+            var meta = new ObjectMetadata { Name = "k2", Options = new MetaDataOptions { MaxChunkSize = 10 }, };
 
             var buffer = Encoding.ASCII.GetBytes(buffer90 + "09-45");
             var stream = new MemoryStream(buffer);
@@ -124,7 +124,7 @@ public class ObjectStoreTest
 
         // square buffer: all chunks are the same size
         {
-            var meta = new ObjectMetadata { Name = "k1", Options = new Options { MaxChunkSize = 10 }, };
+            var meta = new ObjectMetadata { Name = "k1", Options = new MetaDataOptions { MaxChunkSize = 10 }, };
             var buffer = Encoding.ASCII.GetBytes(buffer90);
             var stream = new MemoryStream(buffer);
             await store.PutAsync(meta, stream, cancellationToken: cancellationToken);
@@ -140,7 +140,7 @@ public class ObjectStoreTest
 
         // buffer with smaller last chunk
         {
-            var meta = new ObjectMetadata { Name = "k2", Options = new Options { MaxChunkSize = 10 }, };
+            var meta = new ObjectMetadata { Name = "k2", Options = new MetaDataOptions { MaxChunkSize = 10 }, };
             var buffer = Encoding.ASCII.GetBytes(buffer90 + "09-45");
             var stream = new MemoryStream(buffer);
             await store.PutAsync(meta, stream, cancellationToken: cancellationToken);
@@ -158,7 +158,7 @@ public class ObjectStoreTest
     [Fact]
     public async Task Delete_object()
     {
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10_000));
         var cancellationToken = cts.Token;
 
         await using var server = NatsServer.StartJS();

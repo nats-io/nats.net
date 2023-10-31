@@ -27,5 +27,11 @@
 - name: Object Store
   href: object-store/intro.md
 
+- name: Services
+  href: services/intro.md
+
+- name: Serialization
+  href: serialization.md
+
 - name: Updating Documentation
   href: update-docs.md
