@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 namespace NATS.Client.Core.Internal;
 
 // similar as ArrayBufferWriter but adds more functional for ProtocolWriter
-internal sealed class FixedArrayBufferWriter : ICountableBufferWriter
+internal sealed class FixedArrayBufferWriter : IBufferWriter<byte>
 {
     private byte[] _buffer;
     private int _written;

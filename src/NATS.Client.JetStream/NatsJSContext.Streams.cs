@@ -130,7 +130,7 @@ public partial class NatsJSContext
         StreamUpdateRequest request,
         CancellationToken cancellationToken = default)
     {
-        var response = await JSRequestResponseAsync<object, StreamUpdateResponse>(
+        var response = await JSRequestResponseAsync<StreamUpdateRequest, StreamUpdateResponse>(
             subject: $"{Opts.Prefix}.STREAM.UPDATE.{request.Name}",
             request: request,
             cancellationToken);
