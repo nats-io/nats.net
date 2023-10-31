@@ -13,15 +13,6 @@ namespace NATS.Client.Core;
 public interface INatsSerializer
 {
     /// <summary>
-    /// Next serializer in the chain.
-    /// </summary>
-    /// <remarks>
-    /// If the serializer can't handle the type, it may call the next serializer in the chain
-    /// or throw an exception if there are no more serializers to use when <c>Next</c> is set to <c>null</c>.
-    /// </remarks>
-    public INatsSerializer? Next { get; }
-
-    /// <summary>
     /// Serialize value to buffer.
     /// </summary>
     /// <param name="bufferWriter">Buffer to write the serialized data.</param>
@@ -55,14 +46,13 @@ public static class NatsDefaultSerializer
 /// </summary>
 public class NatsUtf8PrimitivesSerializer : INatsSerializer
 {
+    private readonly INatsSerializer? _next;
+
     /// <summary>
     /// Creates a new instance of <see cref="NatsUtf8PrimitivesSerializer"/>.
     /// </summary>
     /// <param name="next">The next serializer in chain.</param>
-    public NatsUtf8PrimitivesSerializer(INatsSerializer? next) => Next = next;
-
-    /// <inheritdoc />
-    public INatsSerializer? Next { get; }
+    public NatsUtf8PrimitivesSerializer(INatsSerializer? next) => _next = next;
 
     /// <inheritdoc />
     public void Serialize<T>(IBufferWriter<byte> bufferWriter, T value)
@@ -109,12 +99,12 @@ public class NatsUtf8PrimitivesSerializer : INatsSerializer
             }
         }
 
-        if (Next == null)
+        if (_next == null)
         {
             throw new NatsException($"Can't serialize {typeof(T)}");
         }
 
-        Next.Serialize(bufferWriter, value);
+        _next.Serialize(bufferWriter, value);
     }
 
     /// <inheritdoc />
@@ -179,12 +169,12 @@ public class NatsUtf8PrimitivesSerializer : INatsSerializer
             }
         }
 
-        if (Next == null)
+        if (_next == null)
         {
             throw new NatsException($"Can't deserialize {typeof(T)}");
         }
 
-        return Next.Deserialize<T>(buffer);
+        return _next.Deserialize<T>(buffer);
     }
 }
 
@@ -193,14 +183,13 @@ public class NatsUtf8PrimitivesSerializer : INatsSerializer
 /// </summary>
 public class NatsRawSerializer : INatsSerializer
 {
+    private readonly INatsSerializer? _next;
+
     /// <summary>
     /// Creates a new instance of <see cref="NatsRawSerializer"/>.
     /// </summary>
     /// <param name="next">Next serializer in chain.</param>
-    public NatsRawSerializer(INatsSerializer? next) => Next = next;
-
-    /// <inheritdoc />
-    public INatsSerializer? Next { get; }
+    public NatsRawSerializer(INatsSerializer? next) => _next = next;
 
     /// <inheritdoc />
     public void Serialize<T>(IBufferWriter<byte> bufferWriter, T? value)
@@ -255,12 +244,12 @@ public class NatsRawSerializer : INatsSerializer
             }
         }
 
-        if (Next == null)
+        if (_next == null)
         {
             throw new NatsException($"Can't serialize {typeof(T)}");
         }
 
-        Next.Serialize(bufferWriter, value);
+        _next.Serialize(bufferWriter, value);
     }
 
     /// <inheritdoc />
@@ -293,12 +282,12 @@ public class NatsRawSerializer : INatsSerializer
             return (T)(object)memoryOwner;
         }
 
-        if (Next == null)
+        if (_next == null)
         {
             throw new NatsException($"Can't deserialize {typeof(T)}");
         }
 
-        return Next.Deserialize<T>(buffer);
+        return _next.Deserialize<T>(buffer);
     }
 }
 
@@ -313,6 +302,7 @@ public sealed class NatsJsonContextSerializer : INatsSerializer
     private static Utf8JsonWriter? _jsonWriter;
 
     private readonly JsonSerializerContext _context;
+    private readonly INatsSerializer? _next;
 
     /// <summary>
     /// Creates a new instance of <see cref="NatsJsonContextSerializer"/>.
@@ -321,12 +311,9 @@ public sealed class NatsJsonContextSerializer : INatsSerializer
     /// <param name="next">Next serializer in chain.</param>
     public NatsJsonContextSerializer(JsonSerializerContext context, INatsSerializer? next = default)
     {
-        Next = next;
         _context = context;
+        _next = next;
     }
-
-    /// <inheritdoc />
-    public INatsSerializer? Next { get; }
 
     /// <inheritdoc />
     public void Serialize<T>(IBufferWriter<byte> bufferWriter, T value)
@@ -350,12 +337,12 @@ public sealed class NatsJsonContextSerializer : INatsSerializer
             return;
         }
 
-        if (Next == null)
+        if (_next == null)
         {
             throw new NatsException($"Can't serialize {typeof(T)}");
         }
 
-        Next.Serialize(bufferWriter, value);
+        _next.Serialize(bufferWriter, value);
     }
 
     /// <inheritdoc />
@@ -367,8 +354,8 @@ public sealed class NatsJsonContextSerializer : INatsSerializer
             return JsonSerializer.Deserialize(ref reader, jsonTypeInfo);
         }
 
-        if (Next != null)
-            return Next.Deserialize<T>(buffer);
+        if (_next != null)
+            return _next.Deserialize<T>(buffer);
 
         throw new NatsException($"Can't deserialize {typeof(T)}");
     }

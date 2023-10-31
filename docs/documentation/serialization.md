@@ -5,9 +5,6 @@ NATS .NET Client supports serialization of messages using a simple interface [`I
 ```csharp
 public interface INatsSerializer
 {
-    // Next serializer in the chain or null if this is the last serializer.
-    public INatsSerializer? Next { get; }
-
     // Serialize the value to the buffer.
     void Serialize<T>(IBufferWriter<byte> bufferWriter, T value);
 
@@ -177,6 +174,9 @@ Console.WriteLine(msg.Data);
 You can also chain multiple serializers together to support multiple serialization formats. The first serializer in the
 chain that can handle the data will be used. This is useful if you need to support multiple serialization formats and
 reuse them.
+
+Note that chaining serializers is implemented by convention and not enforced by the [`INatsSerializer`](xref:NATS.Client.Core.INatsSerializer)
+interface since the next serializer would not be exposed to external users of the interface.
 
 Here is an example of a serializer that uses the Google ProtoBuf serializer and the [`NatsJsonContextSerializer`](xref:NATS.Client.Core.NatsJsonContextSerializer) to
 serialize and deserialize messages based on the type:
