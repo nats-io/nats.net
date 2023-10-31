@@ -28,7 +28,7 @@ public class ManageStreamTest
         // Create
         {
             var stream = await js.CreateStreamAsync(
-                request: new StreamConfiguration { Name = "events", Subjects = new[] { "events.*" } },
+                request: new StreamConfiguration {Name = "events", Subjects = new[] { "events.*" } },
                 cancellationToken: cancellationToken);
             Assert.Equal("events", stream.Info.Config.Name);
 
@@ -40,7 +40,7 @@ public class ManageStreamTest
         {
             var stream = await js.GetStreamAsync("events", cancellationToken: cancellationToken);
             Assert.Equal("events", stream.Info.Config.Name);
-            Assert.Equal(new[] { "events.*" }, stream.Info.Config.Subjects);
+            Assert.Equal(new[] {"events.*"}, stream.Info.Config.Subjects);
         }
 
         // Update
@@ -96,5 +96,35 @@ public class ManageStreamTest
 
             Assert.DoesNotContain(list, s => s.Config.Name == "s1");
         }
+    }
+
+    [Fact]
+    public async Task Delete_one_msg()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        await using var server = NatsServer.StartJS();
+        var nats = server.CreateClientConnection();
+        var js = new NatsJSContext(nats);
+
+        await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
+
+        var stream = await js.GetStreamAsync("s1", new StreamInfoRequest() { SubjectsFilter = "s1.Ü" }, cts.Token);
+        Assert.Null(stream.Info.State.Subjects);
+
+        await js.PublishAsync("s1.1", new byte[] { 1 }, cancellationToken: cts.Token);
+        await js.PublishAsync("s1.2", new byte[] { 2 }, cancellationToken: cts.Token);
+        await js.PublishAsync("s1.3", new byte[] { 3 }, cancellationToken: cts.Token);
+
+        stream = await js.GetStreamAsync("s1", new StreamInfoRequest() { SubjectsFilter = "s1.*" }, cts.Token);
+
+        Assert.Equal(3, stream.Info.State.Subjects.Count);
+
+        var deleteResponse = await js.DeleteMessageAsync("s1", new StreamMsgDeleteRequest { Seq = 1 }, cts.Token);
+        Assert.True(deleteResponse.Success);
+
+        stream = await js.GetStreamAsync("s1", new StreamInfoRequest() { SubjectsFilter = "s1.*" }, cts.Token);
+
+        Assert.Equal(2, stream.Info.State.Subjects.Count);
     }
 }
