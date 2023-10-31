@@ -15,7 +15,7 @@ public partial class NatsJSContext
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     public ValueTask<NatsJSStream> CreateStreamAsync(string stream, string[] subjects, CancellationToken cancellationToken = default) =>
-        CreateStreamAsync(new StreamCreateRequest {Name = stream, Subjects = subjects}, cancellationToken);
+        CreateStreamAsync(new StreamCreateRequest { Name = stream, Subjects = subjects }, cancellationToken);
 
     /// <summary>
     /// Creates a new stream if it doesn't exist or returns an existing stream with the same name.
@@ -154,7 +154,7 @@ public partial class NatsJSContext
     {
         var response = await JSRequestResponseAsync<StreamListRequest, StreamListResponse>(
             subject: $"{Opts.Prefix}.STREAM.LIST",
-            request: new StreamListRequest {Offset = 0, Subject = subject!},
+            request: new StreamListRequest { Offset = 0, Subject = subject! },
             cancellationToken);
         foreach (var stream in response.Streams)
             yield return new NatsJSStream(this, stream);
