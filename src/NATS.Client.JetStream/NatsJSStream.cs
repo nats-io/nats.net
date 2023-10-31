@@ -173,7 +173,7 @@ public class NatsJSStream
         NatsSubOpts? subOpts;
         if (serializer != null)
         {
-            subOpts = new NatsSubOpts {Serializer = serializer};
+            subOpts = new NatsSubOpts { Serializer = serializer };
         }
         else
         {
