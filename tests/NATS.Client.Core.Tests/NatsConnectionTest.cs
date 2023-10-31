@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading.Channels;
 using Xunit.Sdk;
 
@@ -57,7 +58,7 @@ public abstract partial class NatsConnectionTest
     {
         await using var server = NatsServer.Start(_output, _transportType);
 
-        var serializer1 = NatsOpts.Default.Serializer;
+        var serializer1 = new NatsJsonContextSerializer(SimpleClassJsonSerializerContext.Default);
 
         foreach (var serializer in new INatsSerializer[] { serializer1 })
         {
@@ -322,6 +323,11 @@ public abstract partial class NatsConnectionTest
 
         list.ShouldEqual(100, 200, 300, 400, 500);
     }
+}
+
+[JsonSerializable(typeof(SampleClass))]
+public partial class SimpleClassJsonSerializerContext : JsonSerializerContext
+{
 }
 
 public class SampleClass : IEquatable<SampleClass>

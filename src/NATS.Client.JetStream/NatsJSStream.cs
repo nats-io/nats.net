@@ -54,6 +54,20 @@ public class NatsJSStream
     }
 
     /// <summary>
+    /// Deletes a message from a stream.
+    /// </summary>
+    /// <param name="request">Delete message request.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>Delete message response</returns>
+    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
+    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    public async ValueTask<StreamMsgDeleteResponse> DeleteMessageAsync(StreamMsgDeleteRequest request, CancellationToken cancellationToken = default)
+    {
+        ThrowIfDeleted();
+        return await _context.DeleteMessageAsync(_name, request, cancellationToken);
+    }
+
+    /// <summary>
     /// Update stream properties on the server.
     /// </summary>
     /// <param name="request">Stream update request to be sent to the server.</param>

@@ -182,7 +182,7 @@ public class NatsObjStore
 
         if (meta.Options == null!)
         {
-            meta.Options = new Options { MaxChunkSize = DefaultChunkSize };
+            meta.Options = new MetaDataOptions { MaxChunkSize = DefaultChunkSize };
         }
 
         if (meta.Options.MaxChunkSize == 0)
@@ -296,7 +296,7 @@ public class NatsObjStore
         {
             var response = await _stream.GetAsync(request, cancellationToken);
 
-            var data = NatsJsonSerializer.Default.Deserialize<ObjectMetadata>(new ReadOnlySequence<byte>(Convert.FromBase64String(response.Message.Data))) ?? throw new NatsObjException("Can't deserialize object metadata");
+            var data = NatsObjJsonSerializer.Default.Deserialize<ObjectMetadata>(new ReadOnlySequence<byte>(Convert.FromBase64String(response.Message.Data))) ?? throw new NatsObjException("Can't deserialize object metadata");
 
             if (!showDeleted && data.Deleted)
             {
@@ -350,7 +350,7 @@ public class NatsObjStore
 
     private async ValueTask PublishMeta(ObjectMetadata meta, CancellationToken cancellationToken)
     {
-        var ack = await _context.PublishAsync(GetMetaSubject(meta.Name), meta, headers: NatsRollupHeaders, cancellationToken: cancellationToken);
+        var ack = await _context.PublishAsync(GetMetaSubject(meta.Name), meta, opts: new NatsPubOpts { Serializer = NatsObjJsonSerializer.Default }, headers: NatsRollupHeaders, cancellationToken: cancellationToken);
         ack.EnsureSuccess();
     }
 

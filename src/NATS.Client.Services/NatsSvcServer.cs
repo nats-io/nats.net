@@ -162,6 +162,7 @@ public class NatsSvcServer : IAsyncDisposable
 
                     await svcMsg.Msg.ReplyAsync(
                         new PingResponse { Name = _config.Name, Id = _id, Version = _config.Version, },
+                        opts: new NatsPubOpts { Serializer = NatsSrvJsonSerializer.Default },
                         cancellationToken: _cancellationToken);
                 }
                 else if (type == SvcMsgType.Info)
@@ -189,6 +190,7 @@ public class NatsSvcServer : IAsyncDisposable
                             Metadata = _config.Metadata!,
                             Endpoints = endPoints,
                         },
+                        opts: new NatsPubOpts { Serializer = NatsSrvJsonSerializer.Default },
                         cancellationToken: _cancellationToken);
                 }
                 else if (type == SvcMsgType.Stats)
@@ -237,6 +239,7 @@ public class NatsSvcServer : IAsyncDisposable
 
                     await svcMsg.Msg.ReplyAsync(
                         response,
+                        opts: new NatsPubOpts { Serializer = NatsSrvJsonSerializer.Default },
                         cancellationToken: _cancellationToken);
                 }
             }
