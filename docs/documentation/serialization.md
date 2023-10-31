@@ -25,7 +25,7 @@ strings and numbers. It uses the following rules to determine the type of the da
 
 - If the data is a byte array, [`Memory<byte>`](https://learn.microsoft.com/dotnet/api/system.memory-1), [`IMemoryOwner<byte>`](https://learn.microsoft.com/dotnet/api/system.buffers.imemoryowner-1) or similar it is treated as binary data.
 - If the data is a string or similar it is treated as UTF8 string.
-- If the data is an `int` or `double` it is treated as a number encoded as a UTF8 string.
+- If the data is a primitive (for example `DateTime`, `int` or `double`. See also [`NatsUtf8PrimitivesSerializer`](xref:NATS.Client.Core.NatsUtf8PrimitivesSerializer)) it is treated as the primitive encoded as a UTF8 string.
 - For any other type, the serializer will throw an exception.
 
 ```csharp

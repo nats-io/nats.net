@@ -42,8 +42,13 @@ public static class NatsDefaultSerializer
 }
 
 /// <summary>
-/// UTF8 serializer for strings and numbers (<c>int</c> and <c>double</c>).
+/// UTF8 serializer for strings and all the primitives.
 /// </summary>
+/// <remarks>
+/// Supported types are <c>string</c>, <c>DateTime</c>, <c>DateTimeOffset</c>, <c>Guid</c>,
+/// <c>TimeSpan</c>, <c>bool</c>, <c>byte</c>, <c>decimal</c>, <c>double</c>, <c>float</c>,
+/// <c>int</c>, <c>long</c>, <c>sbyte</c>, <c>short</c>, <c>uint</c> and <c>ulong</c>.
+/// </remarks>
 public class NatsUtf8PrimitivesSerializer : INatsSerializer
 {
     private readonly INatsSerializer? _next;
@@ -65,9 +70,111 @@ public class NatsUtf8PrimitivesSerializer : INatsSerializer
 
         var span = bufferWriter.GetSpan(128);
 
-        // int
+        // DateTime
         {
-            if (value is int input)
+            if (value is DateTime input)
+            {
+                if (Utf8Formatter.TryFormat(input, span, out var written))
+                {
+                    bufferWriter.Advance(written);
+                }
+                else
+                {
+                    throw new NatsException($"Can't serialize {typeof(T)}, format error");
+                }
+
+                return;
+            }
+        }
+
+        // DateTimeOffset
+        {
+            if (value is DateTimeOffset input)
+            {
+                if (Utf8Formatter.TryFormat(input, span, out var written))
+                {
+                    bufferWriter.Advance(written);
+                }
+                else
+                {
+                    throw new NatsException($"Can't serialize {typeof(T)}, format error");
+                }
+
+                return;
+            }
+        }
+
+        // Guid
+        {
+            if (value is Guid input)
+            {
+                if (Utf8Formatter.TryFormat(input, span, out var written))
+                {
+                    bufferWriter.Advance(written);
+                }
+                else
+                {
+                    throw new NatsException($"Can't serialize {typeof(T)}, format error");
+                }
+
+                return;
+            }
+        }
+
+        // TimeSpan
+        {
+            if (value is TimeSpan input)
+            {
+                if (Utf8Formatter.TryFormat(input, span, out var written))
+                {
+                    bufferWriter.Advance(written);
+                }
+                else
+                {
+                    throw new NatsException($"Can't serialize {typeof(T)}, format error");
+                }
+
+                return;
+            }
+        }
+
+        // bool
+        {
+            if (value is bool input)
+            {
+                if (Utf8Formatter.TryFormat(input, span, out var written))
+                {
+                    bufferWriter.Advance(written);
+                }
+                else
+                {
+                    throw new NatsException($"Can't serialize {typeof(T)}, format error");
+                }
+
+                return;
+            }
+        }
+
+        // byte
+        {
+            if (value is byte input)
+            {
+                if (Utf8Formatter.TryFormat(input, span, out var written))
+                {
+                    bufferWriter.Advance(written);
+                }
+                else
+                {
+                    throw new NatsException($"Can't serialize {typeof(T)}, format error");
+                }
+
+                return;
+            }
+        }
+
+        // decimal
+        {
+            if (value is decimal input)
             {
                 if (Utf8Formatter.TryFormat(input, span, out var written))
                 {
@@ -99,6 +206,125 @@ public class NatsUtf8PrimitivesSerializer : INatsSerializer
             }
         }
 
+        // float
+        {
+            if (value is float input)
+            {
+                if (Utf8Formatter.TryFormat(input, span, out var written))
+                {
+                    bufferWriter.Advance(written);
+                }
+                else
+                {
+                    throw new NatsException($"Can't serialize {typeof(T)}, format error");
+                }
+
+                return;
+            }
+        }
+
+        // int
+        {
+            if (value is int input)
+            {
+                if (Utf8Formatter.TryFormat(input, span, out var written))
+                {
+                    bufferWriter.Advance(written);
+                }
+                else
+                {
+                    throw new NatsException($"Can't serialize {typeof(T)}, format error");
+                }
+
+                return;
+            }
+        }
+
+        // long
+        {
+            if (value is long input)
+            {
+                if (Utf8Formatter.TryFormat(input, span, out var written))
+                {
+                    bufferWriter.Advance(written);
+                }
+                else
+                {
+                    throw new NatsException($"Can't serialize {typeof(T)}, format error");
+                }
+
+                return;
+            }
+        }
+
+        // sbyte
+        {
+            if (value is sbyte input)
+            {
+                if (Utf8Formatter.TryFormat(input, span, out var written))
+                {
+                    bufferWriter.Advance(written);
+                }
+                else
+                {
+                    throw new NatsException($"Can't serialize {typeof(T)}, format error");
+                }
+
+                return;
+            }
+        }
+
+        // short
+        {
+            if (value is short input)
+            {
+                if (Utf8Formatter.TryFormat(input, span, out var written))
+                {
+                    bufferWriter.Advance(written);
+                }
+                else
+                {
+                    throw new NatsException($"Can't serialize {typeof(T)}, format error");
+                }
+
+                return;
+            }
+        }
+
+        // uint
+        {
+            if (value is uint input)
+            {
+                if (Utf8Formatter.TryFormat(input, span, out var written))
+                {
+                    bufferWriter.Advance(written);
+                }
+                else
+                {
+                    throw new NatsException($"Can't serialize {typeof(T)}, format error");
+                }
+
+                return;
+            }
+        }
+
+        // ulong
+        {
+            if (value is ulong input)
+            {
+                if (Utf8Formatter.TryFormat(input, span, out var written))
+                {
+                    bufferWriter.Advance(written);
+                }
+                else
+                {
+                    throw new NatsException($"Can't serialize {typeof(T)}, format error");
+                }
+
+                return;
+            }
+        }
+
         if (_next == null)
         {
             throw new NatsException($"Can't serialize {typeof(T)}");
@@ -115,58 +341,156 @@ public class NatsUtf8PrimitivesSerializer : INatsSerializer
             return (T)(object)Encoding.UTF8.GetString(buffer);
         }
 
-        if (typeof(T) == typeof(int) || typeof(T) == typeof(int?))
+        var span = buffer.IsSingleSegment ? buffer.FirstSpan : buffer.ToArray();
+
+        if (typeof(T) == typeof(DateTime) || typeof(T) == typeof(DateTime?))
         {
-            if (buffer.IsSingleSegment)
+            if (Utf8Parser.TryParse(span, out DateTime value, out _))
             {
-                if (Utf8Parser.TryParse(buffer.FirstSpan, out int value, out _))
-                {
-                    return (T)(object)value;
-                }
-                else
-                {
-                    throw new NatsException($"Can't deserialize {typeof(T)}. Parsing error");
-                }
+                return (T)(object)value;
             }
-            else
+
+            throw new NatsException($"Can't deserialize {typeof(T)}. Parsing error");
+        }
+
+        if (typeof(T) == typeof(DateTimeOffset) || typeof(T) == typeof(DateTimeOffset?))
+        {
+            if (Utf8Parser.TryParse(span, out DateTimeOffset value, out _))
             {
-                var bytes = buffer.ToArray();
-                if (Utf8Parser.TryParse(bytes, out int value, out _))
-                {
-                    return (T)(object)value;
-                }
-                else
-                {
-                    throw new NatsException($"Can't deserialize {typeof(T)}. Parsing error");
-                }
+                return (T)(object)value;
             }
+
+            throw new NatsException($"Can't deserialize {typeof(T)}. Parsing error");
+        }
+
+        if (typeof(T) == typeof(Guid) || typeof(T) == typeof(Guid?))
+        {
+            if (Utf8Parser.TryParse(span, out Guid value, out _))
+            {
+                return (T)(object)value;
+            }
+
+            throw new NatsException($"Can't deserialize {typeof(T)}. Parsing error");
+        }
+
+        if (typeof(T) == typeof(TimeSpan) || typeof(T) == typeof(TimeSpan?))
+        {
+            if (Utf8Parser.TryParse(span, out TimeSpan value, out _))
+            {
+                return (T)(object)value;
+            }
+
+            throw new NatsException($"Can't deserialize {typeof(T)}. Parsing error");
+        }
+
+        if (typeof(T) == typeof(bool) || typeof(T) == typeof(bool?))
+        {
+            if (Utf8Parser.TryParse(span, out bool value, out _))
+            {
+                return (T)(object)value;
+            }
+
+            throw new NatsException($"Can't deserialize {typeof(T)}. Parsing error");
+        }
+
+        if (typeof(T) == typeof(byte) || typeof(T) == typeof(byte?))
+        {
+            if (Utf8Parser.TryParse(span, out byte value, out _))
+            {
+                return (T)(object)value;
+            }
+
+            throw new NatsException($"Can't deserialize {typeof(T)}. Parsing error");
+        }
+
+        if (typeof(T) == typeof(decimal) || typeof(T) == typeof(decimal?))
+        {
+            if (Utf8Parser.TryParse(span, out decimal value, out _))
+            {
+                return (T)(object)value;
+            }
+
+            throw new NatsException($"Can't deserialize {typeof(T)}. Parsing error");
         }
 
         if (typeof(T) == typeof(double) || typeof(T) == typeof(double?))
         {
-            if (buffer.IsSingleSegment)
+            if (Utf8Parser.TryParse(span, out double value, out _))
             {
-                if (Utf8Parser.TryParse(buffer.FirstSpan, out double value, out _))
-                {
-                    return (T)(object)value;
-                }
-                else
-                {
-                    throw new NatsException($"Can't deserialize {typeof(T)}. Parsing error");
-                }
+                return (T)(object)value;
             }
-            else
+
+            throw new NatsException($"Can't deserialize {typeof(T)}. Parsing error");
+        }
+
+        if (typeof(T) == typeof(float) || typeof(T) == typeof(float?))
+        {
+            if (Utf8Parser.TryParse(span, out float value, out _))
             {
-                var bytes = buffer.ToArray();
-                if (Utf8Parser.TryParse(bytes, out double value, out _))
-                {
-                    return (T)(object)value;
-                }
-                else
-                {
-                    throw new NatsException($"Can't deserialize {typeof(T)}. Parsing error");
-                }
+                return (T)(object)value;
             }
+
+            throw new NatsException($"Can't deserialize {typeof(T)}. Parsing error");
+        }
+
+        if (typeof(T) == typeof(int) || typeof(T) == typeof(int?))
+        {
+            if (Utf8Parser.TryParse(span, out int value, out _))
+            {
+                return (T)(object)value;
+            }
+
+            throw new NatsException($"Can't deserialize {typeof(T)}. Parsing error");
+        }
+
+        if (typeof(T) == typeof(long) || typeof(T) == typeof(long?))
+        {
+            if (Utf8Parser.TryParse(span, out long value, out _))
+            {
+                return (T)(object)value;
+            }
+
+            throw new NatsException($"Can't deserialize {typeof(T)}. Parsing error");
+        }
+
+        if (typeof(T) == typeof(sbyte) || typeof(T) == typeof(sbyte?))
+        {
+            if (Utf8Parser.TryParse(span, out sbyte value, out _))
+            {
+                return (T)(object)value;
+            }
+
+            throw new NatsException($"Can't deserialize {typeof(T)}. Parsing error");
+        }
+
+        if (typeof(T) == typeof(short) || typeof(T) == typeof(short?))
+        {
+            if (Utf8Parser.TryParse(span, out short value, out _))
+            {
+                return (T)(object)value;
+            }
+
+            throw new NatsException($"Can't deserialize {typeof(T)}. Parsing error");
+        }
+
+        if (typeof(T) == typeof(uint) || typeof(T) == typeof(uint?))
+        {
+            if (Utf8Parser.TryParse(span, out uint value, out _))
+            {
+                return (T)(object)value;
+            }
+
+            throw new NatsException($"Can't deserialize {typeof(T)}. Parsing error");
+        }
+
+        if (typeof(T) == typeof(ulong) || typeof(T) == typeof(ulong?))
+        {
+            if (Utf8Parser.TryParse(span, out ulong value, out _))
+            {
+                return (T)(object)value;
+            }
+
+            throw new NatsException($"Can't deserialize {typeof(T)}. Parsing error");
         }
 
         if (_next == null)
