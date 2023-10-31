@@ -118,13 +118,13 @@ public class ManageStreamTest
 
         stream = await js.GetStreamAsync("s1", new StreamInfoRequest() { SubjectsFilter = "s1.*" }, cts.Token);
 
-        Assert.Equal(3, stream.Info.State.Subjects.Count);
+        Assert.Equal(3, stream.Info.State.Subjects?.Count);
 
         var deleteResponse = await js.DeleteMessageAsync("s1", new StreamMsgDeleteRequest { Seq = 1 }, cts.Token);
         Assert.True(deleteResponse.Success);
 
         stream = await js.GetStreamAsync("s1", new StreamInfoRequest() { SubjectsFilter = "s1.*" }, cts.Token);
 
-        Assert.Equal(2, stream.Info.State.Subjects.Count);
+        Assert.Equal(2, stream.Info.State.Subjects?.Count);
     }
 }
