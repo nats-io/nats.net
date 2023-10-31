@@ -50,6 +50,29 @@ Console.WriteLine(msg.Data);
 The default serializer is designed to be used by developers who want to only work with binary data, and provide an out
 of the box experience for basic use cases like sending and receiving UTF8 strings.
 
+### Using JSON Serialization with Reflection
+
+If you're not using [Native AOT deployments](https://learn.microsoft.com/dotnet/core/deploying/native-aot) you can use
+the [`NatsJsonSerializer`](xref:NATS.Client.Core.Serializers.Json.NatsJsonSerializer) to serialize and deserialize
+messages. [`NatsJsonSerializer`](xref:NATS.Client.Core.Serializers.Json.NatsJsonSerializer) uses [`System.Text.Json`](https://learn.microsoft.com/dotnet/api/system.text.json)
+APIs that can work with types that are not registered to generate serialization code.
+
+Using this serializer is most useful for use cases where you want to send and receive JSON messages and you don't want to
+worry about registering types. It's also useful for prototyping and testing. To use the serializer you need to install
+the `NATS.Client.Core.Serializers.Json` Nuget package.
+
+```shell
+dotnet add package NATS.Client.Core.Serializers.Json --prerelease
+```
+
+Then set the serializer as the default for the connection:
+
+```csharp
+var natsOpts = NatsOpts.Default with { Serializer = NatsJsonSerializer.Default };
+
+await using var nats = new NatsConnection(natsOpts);
+```
+
 ## Using JSON Serializer Context
 
 The [`NatsJsonContextSerializer`](xref:NATS.Client.Core.NatsJsonContextSerializer) uses the [`System.Text.Json`](https://learn.microsoft.com/dotnet/api/system.text.json) serializer to serialize and deserialize messages. It relies
