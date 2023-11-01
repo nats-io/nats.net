@@ -165,12 +165,11 @@ public class KeyValueStoreTest
     [Fact]
     public async Task Delete()
     {
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10000));
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        // await using var server = NatsServer.StartJS();
-        // await using var nats = server.CreateClientConnection();
-        var nats = new NatsConnection();
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -220,7 +219,7 @@ public class KeyValueStoreTest
     [Fact]
     public async Task Update_with_revisions()
     {
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10000));
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
         await using var server = NatsServer.StartJS();
