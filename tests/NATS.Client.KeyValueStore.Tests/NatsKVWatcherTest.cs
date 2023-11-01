@@ -31,7 +31,7 @@ public class NatsKVWatcherTest
         var js2 = new NatsJSContext(nats2);
         var kv2 = new NatsKVContext(js2);
         var store2 = await kv2.CreateStoreAsync(config, cancellationToken: cancellationToken);
-        var watcher = await store2.WatchAsync<NatsMemoryOwner<byte>>("k1.*", cancellationToken: cancellationToken);
+        var watcher = await store2.WatchInternalAsync<NatsMemoryOwner<byte>>("k1.*", cancellationToken: cancellationToken);
 
         await store1.PutAsync("k1.p1", 1, cancellationToken);
         await store1.PutAsync("k1.p1", 2, cancellationToken);
@@ -115,7 +115,7 @@ public class NatsKVWatcherTest
         var watchTask = Task.Run(
             async () =>
             {
-                await foreach (var entry in store.WatchAllAsync<string>("*", cancellationToken: cancellationToken))
+                await foreach (var entry in store.WatchAsync<string>("*", cancellationToken: cancellationToken))
                 {
                     signal.Pulse();
                     _output.WriteLine($"WATCH: {entry.Key} ({entry.Revision}): {entry.Value}");
@@ -156,7 +156,7 @@ public class NatsKVWatcherTest
         var js2 = new NatsJSContext(nats2);
         var kv2 = new NatsKVContext(js2);
         var store2 = await kv2.CreateStoreAsync(bucket, cancellationToken: cancellationToken);
-        var watcher = await store2.WatchAsync<NatsMemoryOwner<byte>>("k1.*", cancellationToken: cancellationToken);
+        var watcher = await store2.WatchInternalAsync<NatsMemoryOwner<byte>>("k1.*", cancellationToken: cancellationToken);
 
         // Swallow heartbeats
         proxy.ServerInterceptors.Add(m => m?.Contains("Idle Heartbeat") ?? false ? null : m);

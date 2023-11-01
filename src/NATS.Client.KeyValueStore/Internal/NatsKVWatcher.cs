@@ -25,7 +25,7 @@ internal readonly struct NatsKVWatchCommandMsg<T>
     public NatsJSMsg<T?> Msg { get; init; } = default;
 }
 
-internal class NatsKVWatcher<T> : INatsKVWatcher<T>
+internal class NatsKVWatcher<T>
 {
     private readonly ILogger _logger;
     private readonly bool _debug;
@@ -96,11 +96,10 @@ internal class NatsKVWatcher<T> : INatsKVWatcher<T>
             Timeout.Infinite,
             Timeout.Infinite);
 
-        // Channel size 1 is enough because we want backpressure to go all the way to the subscription
-        // so that we get most accurate view of the stream. We can keep them as 1 until we find a case
-        // where it's not enough due to performance for example.
-        _commandChannel = Channel.CreateBounded<NatsKVWatchCommandMsg<T>>(1);
-        _entryChannel = Channel.CreateBounded<NatsKVEntry<T?>>(1);
+        // Keep the channel size large enough to avoid blocking the connection
+        // TCP receiver thread in case other operations are in-flight.
+        _commandChannel = Channel.CreateBounded<NatsKVWatchCommandMsg<T>>(1000);
+        _entryChannel = Channel.CreateBounded<NatsKVEntry<T?>>(1000);
 
         // A single request to create the consumer is enough because we don't want to create a new consumer
         // back to back in case the consumer is being recreated due to a timeout and a mismatch in consumer
