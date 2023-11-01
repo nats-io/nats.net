@@ -11,6 +11,12 @@ public record ObjectMetadata
     public string Name { get; set; } = default!;
 
     /// <summary>
+    /// Object description
+    /// </summary>
+    [JsonPropertyName("description")]
+    public string Description { get; set; } = default!;
+
+    /// <summary>
     /// Bucket name
     /// </summary>
     [JsonPropertyName("bucket")]
@@ -52,9 +58,16 @@ public record ObjectMetadata
     /// <summary>
     /// Object metadata
     /// </summary>
-    [JsonPropertyName("meta")]
+    [JsonPropertyName("metadata")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    public Dictionary<string, string> Meta { get; set; } = default!;
+    public Dictionary<string, string> Metadata { get; set; } = default!;
+
+    /// <summary>
+    /// Object metadata
+    /// </summary>
+    [JsonPropertyName("headers")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public Dictionary<string, string> Headers { get; set; } = default!;
 
     /// <summary>
     /// Object deleted

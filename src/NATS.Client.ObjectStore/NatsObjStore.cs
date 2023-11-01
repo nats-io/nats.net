@@ -279,6 +279,35 @@ public class NatsObjStore
         return meta;
     }
 
+    public async ValueTask<ObjectMetadata> UpdateMetaAsync(string key, ObjectMetadata meta, CancellationToken cancellationToken = default)
+    {
+        ValidateObjectName(meta.Name);
+
+        var info = await GetInfoAsync(key, cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        if (key != meta.Name)
+        {
+            // Make sure the new name is available
+            try
+            {
+                await GetInfoAsync(meta.Name, cancellationToken: cancellationToken).ConfigureAwait(false);
+                throw new NatsObjException($"Object already exists: {meta.Name}");
+            }
+            catch (NatsObjNotFoundException)
+            {
+            }
+        }
+
+        info.Name = meta.Name;
+        info.Description = meta.Description;
+        info.Metadata = meta.Metadata;
+        info.Headers = meta.Headers;
+
+        await PublishMeta(info, cancellationToken);
+
+        return info;
+    }
+
     /// <summary>
     /// Get object metadata by key.
     /// </summary>

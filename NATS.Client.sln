@@ -79,7 +79,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.ObjectStore.Tes
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.ObjectStore", "sandbox\Example.ObjectStore\Example.ObjectStore.csproj", "{51882883-A66E-4F95-A1AB-CFCBF71B4376}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nats.Client.Compat.ObjectStore", "tests\Nats.Client.Compat.ObjectStore\Nats.Client.Compat.ObjectStore.csproj", "{35578296-FF6C-4BA4-BEE5-C1A6E7DB7024}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nats.Client.Compat", "tests\Nats.Client.Compat\Nats.Client.Compat.csproj", "{35578296-FF6C-4BA4-BEE5-C1A6E7DB7024}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.Services", "src\NATS.Client.Services\NATS.Client.Services.csproj", "{050C63EE-8F1C-4535-9C6C-E12E62A1FF1D}"
 EndProject
