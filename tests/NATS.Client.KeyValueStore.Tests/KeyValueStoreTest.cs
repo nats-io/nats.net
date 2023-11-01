@@ -79,13 +79,13 @@ public class KeyValueStoreTest
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
 
-        var store = await kv.CreateStoreAsync("kv1", cancellationToken);
+        var store = await kv.CreateStoreAsync("kv1", cancellationToken: cancellationToken);
 
         const int total = 100;
 
         for (var i = 0; i < total; i++)
         {
-            await store.PutAsync($"k{i}", i);
+            await store.PutAsync($"k{i}", i, cancellationToken: cancellationToken);
         }
 
         for (var i = 0; i < total; i++)
@@ -102,5 +102,63 @@ public class KeyValueStoreTest
         }
 
         Assert.Equal(total, count);
+    }
+
+    [Fact]
+    public async Task Get_key_revisions()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10000));
+        var cancellationToken = cts.Token;
+
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var store = await kv.CreateStoreAsync(new NatsKVConfig("kv1") { History = 10 }, cancellationToken: cancellationToken);
+
+        var seq1 = await store.PutAsync($"k1", "v1-1", cancellationToken: cancellationToken);
+        var seq2 = await store.PutAsync($"k2", "v2-1", cancellationToken: cancellationToken);
+        var seq3 = await store.PutAsync($"k1", "v1-2", cancellationToken: cancellationToken);
+        var seq4 = await store.PutAsync($"k2", "v2-2", cancellationToken: cancellationToken);
+        var seq5 = await store.PutAsync($"k1", "v1-3", cancellationToken: cancellationToken);
+        var seq6 = await store.PutAsync($"k2", "v2-3", cancellationToken: cancellationToken);
+
+        // k1
+        {
+            var entry = await store.GetEntryAsync<string>($"k1", cancellationToken: cancellationToken);
+            var entry1 = await store.GetEntryAsync<string>($"k1", revision: seq1, cancellationToken: cancellationToken);
+            var entry2 = await store.GetEntryAsync<string>($"k1", revision: seq3, cancellationToken: cancellationToken);
+            var entry3 = await store.GetEntryAsync<string>($"k1", revision: seq5, cancellationToken: cancellationToken);
+
+            Assert.Equal("v1-3", entry.Value);
+            Assert.Equal(seq5, entry.Revision);
+
+            Assert.Equal("v1-1", entry1.Value);
+            Assert.Equal(seq1, entry1.Revision);
+            Assert.Equal("v1-2", entry2.Value);
+            Assert.Equal(seq3, entry2.Revision);
+            Assert.Equal("v1-3", entry3.Value);
+            Assert.Equal(seq5, entry3.Revision);
+        }
+
+        // k2
+        {
+            var entry = await store.GetEntryAsync<string>($"k2", cancellationToken: cancellationToken);
+            var entry1 = await store.GetEntryAsync<string>($"k2", revision: seq1, cancellationToken: cancellationToken);
+            var entry2 = await store.GetEntryAsync<string>($"k2", revision: seq3, cancellationToken: cancellationToken);
+            var entry3 = await store.GetEntryAsync<string>($"k2", revision: seq5, cancellationToken: cancellationToken);
+
+            Assert.Equal("v2-3", entry.Value);
+            Assert.Equal(seq6, entry.Revision);
+
+            Assert.Equal("v2-1", entry1.Value);
+            Assert.Equal(seq2, entry1.Revision);
+            Assert.Equal("v2-2", entry2.Value);
+            Assert.Equal(seq4, entry2.Revision);
+            Assert.Equal("v2-3", entry3.Value);
+            Assert.Equal(seq6, entry3.Revision);
+        }
     }
 }

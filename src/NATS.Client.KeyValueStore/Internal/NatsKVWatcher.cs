@@ -228,7 +228,7 @@ internal class NatsKVWatcher<T>
                                     var entry = new NatsKVEntry<T?>(_bucket, key)
                                     {
                                         Value = msg.Data,
-                                        Revision = (long)metadata.Sequence.Stream,
+                                        Revision = metadata.Sequence.Stream,
                                         Operation = operation,
                                         Created = metadata.Timestamp,
                                         Delta = delta,

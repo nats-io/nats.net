@@ -55,35 +55,64 @@ public class NatsKVStore
     /// <param name="value">Value of the entry</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <typeparam name="T">Serialized value type</typeparam>
-    public async ValueTask PutAsync<T>(string key, T value, CancellationToken cancellationToken = default)
+    public async ValueTask<ulong> PutAsync<T>(string key, T value, CancellationToken cancellationToken = default)
     {
         var ack = await _context.PublishAsync($"$KV.{_bucket}.{key}", value, cancellationToken: cancellationToken);
         ack.EnsureSuccess();
+        return ack.Seq;
     }
 
     /// <summary>
     /// Get an entry from the bucket using the key
     /// </summary>
     /// <param name="key">Key of the entry</param>
+    /// <param name="revision">Revision to retrieve</param>
     /// <param name="serializer">Optional serialized to override the default</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <typeparam name="T">Serialized value type</typeparam>
     /// <returns>The entry</returns>
     /// <exception cref="NatsKVException">There was an error with metadata</exception>
-    public async ValueTask<NatsKVEntry<T?>> GetEntryAsync<T>(string key, INatsSerializer? serializer = default, CancellationToken cancellationToken = default)
+    public async ValueTask<NatsKVEntry<T?>> GetEntryAsync<T>(string key, ulong revision = default, INatsSerializer? serializer = default, CancellationToken cancellationToken = default)
     {
+        var request = new StreamMsgGetRequest();
+        var keySubject = $"$KV.{_bucket}.{key}";
+
+        if (revision == default)
+        {
+            request.LastBySubj = keySubject;
+        }
+        else
+        {
+            request.Seq = revision;
+            request.NextBySubj = keySubject;
+        }
+
         if (_stream.Info.Config.AllowDirect)
         {
-            var direct = await _stream.GetDirectAsync<T>($"$KV.{_bucket}.{key}", serializer ?? _serializer, cancellationToken);
+            var direct = await _stream.GetDirectAsync<T>(request, serializer ?? _serializer, cancellationToken);
+
             if (direct is { Headers: { } headers } msg)
             {
+                if (!headers.TryGetValue("Nats-Subject", out var subjectValues))
+                    throw new NatsKVException("Missing sequence header");
+
+                var subject = subjectValues[^1];
+
+                if (revision != default)
+                {
+                    if (!string.Equals(subject, keySubject, StringComparison.Ordinal))
+                    {
+                        throw new NatsKVException("Unexpected subject");
+                    }
+                }
+
                 if (!headers.TryGetValue("Nats-Sequence", out var sequenceValues))
                     throw new NatsKVException("Missing sequence header");
 
                 if (sequenceValues.Count != 1)
                     throw new NatsKVException("Unexpected number of sequence headers");
 
-                if (!long.TryParse(sequenceValues[0], out var sequence))
+                if (!ulong.TryParse(sequenceValues[0], out var sequence))
                     throw new NatsKVException("Can't parse sequence header");
 
                 if (!headers.TryGetValue("Nats-Time-Stamp", out var timestampValues))
@@ -124,7 +153,15 @@ public class NatsKVStore
         }
         else
         {
-            var response = await _stream.GetAsync(new StreamMsgGetRequest { LastBySubj = $"$KV.{_bucket}.{key}" }, cancellationToken);
+            var response = await _stream.GetAsync(request, cancellationToken);
+
+            if (revision != default)
+            {
+                if (string.Equals(response.Message.Subject, keySubject, StringComparison.Ordinal))
+                {
+                    throw new NatsKVException("Unexpected subject");
+                }
+            }
 
             if (!DateTimeOffset.TryParse(response.Message.Time, out var created))
                 throw new NatsKVException("Can't parse timestamp message value");
@@ -200,7 +237,8 @@ public class NatsKVStore
             UpdatesOnly = false,
         };
 
-        await using var watcher = await WatchInternalAsync<Guid>(">", opts, cancellationToken);
+        // Type doesn't matter here, we're just using the watcher to get the keys
+        await using var watcher = await WatchInternalAsync<int>(">", opts, cancellationToken);
 
         while (await watcher.Entries.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {

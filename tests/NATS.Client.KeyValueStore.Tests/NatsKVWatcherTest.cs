@@ -164,7 +164,7 @@ public class NatsKVWatcherTest
         await store1.PutAsync("k1.p1", 1, cancellationToken);
 
         var e1 = await watcher.Entries.ReadAsync(cancellationToken);
-        Assert.Equal(1, e1.Revision);
+        Assert.Equal(1, (int)e1.Revision);
         var count = 1;
 
         await store1.PutAsync("k1.p1", 2, cancellationToken);

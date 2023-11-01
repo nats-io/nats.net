@@ -16,7 +16,7 @@ public record StoredMessage
     [System.Text.Json.Serialization.JsonPropertyName("seq")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Range(0D, 18446744073709552000D)]
-    public long Seq { get; set; } = default!;
+    public ulong Seq { get; set; } = default!;
 
     /// <summary>
     /// The base64 encoded payload of the message body
