@@ -81,15 +81,39 @@ public record ObjectMetadata
     /// </summary>
     [JsonPropertyName("options")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    public MetaDataOptions Options { get; set; } = default!;
+    public MetaDataOptions? Options { get; set; } = default!;
 }
 
 public record MetaDataOptions
 {
     /// <summary>
+    /// Link
+    /// </summary>
+    [JsonPropertyName("link")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public NatsObjLink? Link { get; set; } = default!;
+
+    /// <summary>
     /// Max chunk size
     /// </summary>
     [JsonPropertyName("max_chunk_size")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    public int MaxChunkSize { get; set; } = default!;
+    public int? MaxChunkSize { get; set; } = default!;
+}
+
+public record NatsObjLink
+{
+    /// <summary>
+    /// Link name
+    /// </summary>
+    [JsonPropertyName("name")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public string Name { get; set; } = default!;
+
+    /// <summary>
+    /// Bucket name
+    /// </summary>
+    [JsonPropertyName("bucket")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public string Bucket { get; set; } = default!;
 }

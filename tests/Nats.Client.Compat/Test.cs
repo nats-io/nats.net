@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using NATS.Client.Core;
 
 namespace Nats.Client.Compat;
@@ -38,10 +38,15 @@ public class Test
             }
             else if (action == "command")
             {
+                // We turn the suite name to a class name suffixed by 'Compat' and locate that class.
+                // For example suite 'object-store' becomes class name 'ObjectStoreCompat'
+                // which is our class containing those tests.
                 var typeName = typeof(Test).Namespace + "." + suite.Replace("-", string.Empty) + "compat";
                 var type = typeof(Test).Assembly.GetType(typeName, true, true);
                 var instance = Activator.CreateInstance(type!);
 
+                // Transform the test name to a method name prefixed by 'Test'
+                // so the test 'default-bucket' matches the method 'TestDefaultBucket'
                 var methodName = "test" + test.Replace("-", string.Empty);
                 var method = type!.GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
 

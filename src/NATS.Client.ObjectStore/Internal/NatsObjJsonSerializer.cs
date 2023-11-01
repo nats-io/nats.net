@@ -11,6 +11,7 @@ internal static class NatsObjJsonSerializer
 
 [JsonSerializable(typeof(ObjectMetadata))]
 [JsonSerializable(typeof(MetaDataOptions))]
+[JsonSerializable(typeof(NatsObjLink))]
 internal partial class NatsObjJsonSerializerContext : JsonSerializerContext
 {
 }

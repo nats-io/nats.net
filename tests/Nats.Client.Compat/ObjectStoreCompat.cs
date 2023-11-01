@@ -4,6 +4,9 @@ using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.ObjectStore;
 using NATS.Client.ObjectStore.Models;
+
+// ReSharper disable UnusedMember.Global
+// ReSharper disable UnusedType.Global
 #pragma warning disable CS8602 // Dereference of a possibly null reference.
 
 namespace Nats.Client.Compat;
@@ -115,31 +118,74 @@ public class ObjectStoreCompat
     {
         var ob = new NatsObjContext(new NatsJSContext(nats));
         var json = JsonNode.Parse(msg.Data.Span);
-        Test.Log($"JSON: {json}");
-        await msg.ReplyAsync();
+
+        // Test.Log($"JSON: {json}");
+        var bucket = json["bucket"].GetValue<string>();
+
+        var store = await ob.GetObjectStoreAsync(bucket);
+
+        await foreach (var info in store.WatchAsync(new NatsObjWatchOpts { UpdatesOnly = true }))
+        {
+            await msg.ReplyAsync(info.Digest);
+            break;
+        }
     }
 
     public async Task TestWatch(NatsConnection nats, NatsMsg<Memory<byte>> msg)
     {
         var ob = new NatsObjContext(new NatsJSContext(nats));
         var json = JsonNode.Parse(msg.Data.Span);
-        Test.Log($"JSON: {json}");
-        await msg.ReplyAsync();
+
+        // Test.Log($"JSON: {json}");
+        var bucket = json["bucket"].GetValue<string>();
+
+        var store = await ob.GetObjectStoreAsync(bucket);
+
+        var list = new List<string>();
+        await foreach (var info in store.WatchAsync())
+        {
+            list.Add(info.Digest);
+            if (list.Count == 2)
+                break;
+        }
+
+        await msg.ReplyAsync($"{list[0]},{list[1]}");
     }
 
     public async Task TestGetLink(NatsConnection nats, NatsMsg<Memory<byte>> msg)
     {
         var ob = new NatsObjContext(new NatsJSContext(nats));
         var json = JsonNode.Parse(msg.Data.Span);
-        Test.Log($"JSON: {json}");
-        await msg.ReplyAsync();
+
+        // Test.Log($"JSON: {json}");
+        var bucket = json["bucket"].GetValue<string>();
+        var objectName = json["object"].GetValue<string>();
+
+        var store = await ob.GetObjectStoreAsync(bucket);
+
+        var bytes = await store.GetBytesAsync(objectName);
+
+        var sha256 = SHA256.HashData(bytes);
+
+        await msg.ReplyAsync(sha256);
     }
 
     public async Task TestPutLink(NatsConnection nats, NatsMsg<Memory<byte>> msg)
     {
         var ob = new NatsObjContext(new NatsJSContext(nats));
         var json = JsonNode.Parse(msg.Data.Span);
-        Test.Log($"JSON: {json}");
+
+        // Test.Log($"JSON: {json}");
+        var bucket = json["bucket"].GetValue<string>();
+        var objectName = json["object"].GetValue<string>();
+        var linkName = json["link_name"].GetValue<string>();
+
+        var store = await ob.GetObjectStoreAsync(bucket);
+
+        var target = await store.GetInfoAsync(objectName);
+
+        await store.AddLinkAsync(linkName, target);
+
         await msg.ReplyAsync();
     }
 }
