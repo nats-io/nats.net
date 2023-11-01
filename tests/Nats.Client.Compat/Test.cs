@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Threading.Channels;
 using NATS.Client.Core;
 
 namespace Nats.Client.Compat;
@@ -18,8 +19,11 @@ public class Test
         Log($"Subscribed to {sub.Subject}");
         Log($"Ready to receive test messages...");
 
-        await foreach (var msg in sub.Msgs.ReadAllAsync())
+        while (true)
         {
+            var reader = sub.Msgs;
+            var msg = await reader.ReadAsync();
+
             if (msg.Subject == "tests.done")
             {
                 Log("Bye");
@@ -54,7 +58,7 @@ public class Test
 
                 if (method != null)
                 {
-                    await (Task)method.Invoke(instance, new object[] { nats, msg })!;
+                    await (Task)method.Invoke(instance, new object[] { nats, msg, reader })!;
                 }
                 else
                 {

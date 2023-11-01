@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.Json.Nodes;
+using System.Threading.Channels;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.ObjectStore;
@@ -13,7 +14,7 @@ namespace Nats.Client.Compat;
 
 public class ObjectStoreCompat
 {
-    public async Task TestDefaultBucket(NatsConnection nats, NatsMsg<Memory<byte>> msg)
+    public async Task TestDefaultBucket(NatsConnection nats, NatsMsg<Memory<byte>> msg, ChannelReader<NatsMsg<Memory<byte>>> reader)
     {
         var ob = new NatsObjContext(new NatsJSContext(nats));
 
@@ -26,7 +27,7 @@ public class ObjectStoreCompat
         await msg.ReplyAsync();
     }
 
-    public async Task TestCustomBucket(NatsConnection nats, NatsMsg<Memory<byte>> msg)
+    public async Task TestCustomBucket(NatsConnection nats, NatsMsg<Memory<byte>> msg, ChannelReader<NatsMsg<Memory<byte>>> reader)
     {
         var ob = new NatsObjContext(new NatsJSContext(nats));
 
@@ -52,7 +53,7 @@ public class ObjectStoreCompat
         await msg.ReplyAsync();
     }
 
-    public async Task TestPutObject(NatsConnection nats, NatsMsg<Memory<byte>> msg)
+    public async Task TestPutObject(NatsConnection nats, NatsMsg<Memory<byte>> msg, ChannelReader<NatsMsg<Memory<byte>>> reader)
     {
         var ob = new NatsObjContext(new NatsJSContext(nats));
         var json = JsonNode.Parse(msg.Data.Span);
@@ -74,7 +75,7 @@ public class ObjectStoreCompat
         await msg.ReplyAsync();
     }
 
-    public async Task TestGetObject(NatsConnection nats, NatsMsg<Memory<byte>> msg)
+    public async Task TestGetObject(NatsConnection nats, NatsMsg<Memory<byte>> msg, ChannelReader<NatsMsg<Memory<byte>>> reader)
     {
         var ob = new NatsObjContext(new NatsJSContext(nats));
         var json = JsonNode.Parse(msg.Data.Span);
@@ -92,7 +93,7 @@ public class ObjectStoreCompat
         await msg.ReplyAsync(sha256);
     }
 
-    public async Task TestUpdateMetadata(NatsConnection nats, NatsMsg<Memory<byte>> msg)
+    public async Task TestUpdateMetadata(NatsConnection nats, NatsMsg<Memory<byte>> msg, ChannelReader<NatsMsg<Memory<byte>>> reader)
     {
         var ob = new NatsObjContext(new NatsJSContext(nats));
         var json = JsonNode.Parse(msg.Data.Span);
@@ -114,7 +115,7 @@ public class ObjectStoreCompat
         await msg.ReplyAsync();
     }
 
-    public async Task TestWatchUpdates(NatsConnection nats, NatsMsg<Memory<byte>> msg)
+    public async Task TestWatchUpdates(NatsConnection nats, NatsMsg<Memory<byte>> msg, ChannelReader<NatsMsg<Memory<byte>>> reader)
     {
         var ob = new NatsObjContext(new NatsJSContext(nats));
         var json = JsonNode.Parse(msg.Data.Span);
@@ -131,7 +132,7 @@ public class ObjectStoreCompat
         }
     }
 
-    public async Task TestWatch(NatsConnection nats, NatsMsg<Memory<byte>> msg)
+    public async Task TestWatch(NatsConnection nats, NatsMsg<Memory<byte>> msg, ChannelReader<NatsMsg<Memory<byte>>> reader)
     {
         var ob = new NatsObjContext(new NatsJSContext(nats));
         var json = JsonNode.Parse(msg.Data.Span);
@@ -152,7 +153,7 @@ public class ObjectStoreCompat
         await msg.ReplyAsync($"{list[0]},{list[1]}");
     }
 
-    public async Task TestGetLink(NatsConnection nats, NatsMsg<Memory<byte>> msg)
+    public async Task TestGetLink(NatsConnection nats, NatsMsg<Memory<byte>> msg, ChannelReader<NatsMsg<Memory<byte>>> reader)
     {
         var ob = new NatsObjContext(new NatsJSContext(nats));
         var json = JsonNode.Parse(msg.Data.Span);
@@ -170,7 +171,7 @@ public class ObjectStoreCompat
         await msg.ReplyAsync(sha256);
     }
 
-    public async Task TestPutLink(NatsConnection nats, NatsMsg<Memory<byte>> msg)
+    public async Task TestPutLink(NatsConnection nats, NatsMsg<Memory<byte>> msg, ChannelReader<NatsMsg<Memory<byte>>> reader)
     {
         var ob = new NatsObjContext(new NatsJSContext(nats));
         var json = JsonNode.Parse(msg.Data.Span);
