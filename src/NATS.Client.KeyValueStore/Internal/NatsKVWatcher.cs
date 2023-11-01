@@ -173,7 +173,7 @@ internal class NatsKVWatcher<T>
 
                                     operation = operationValues[0] switch
                                     {
-                                        "DEL" => NatsKVOperation.Delete,
+                                        "DEL" => NatsKVOperation.Del,
                                         "PURGE" => NatsKVOperation.Purge,
                                         _ => operation,
                                     };
@@ -218,7 +218,7 @@ internal class NatsKVWatcher<T>
                                         continue;
                                     }
 
-                                    if (_opts.IgnoreDeletes && operation is NatsKVOperation.Delete or NatsKVOperation.Purge)
+                                    if (_opts.IgnoreDeletes && operation is NatsKVOperation.Del or NatsKVOperation.Purge)
                                     {
                                         continue;
                                     }

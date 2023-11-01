@@ -26,3 +26,11 @@ public class NatsKVException : NatsJSException
     {
     }
 }
+
+public class NatsKVKeyDeletedException : NatsKVException
+{
+    public NatsKVKeyDeletedException()
+        : base("Key was deleted")
+    {
+    }
+}

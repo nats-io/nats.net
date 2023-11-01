@@ -107,7 +107,7 @@ public class KeyValueStoreTest
     [Fact]
     public async Task Get_key_revisions()
     {
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10000));
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
         await using var server = NatsServer.StartJS();
@@ -159,6 +159,101 @@ public class KeyValueStoreTest
             Assert.Equal(seq4, entry2.Revision);
             Assert.Equal("v2-3", entry3.Value);
             Assert.Equal(seq6, entry3.Revision);
+        }
+    }
+
+    [Fact]
+    public async Task Delete()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10000));
+        var cancellationToken = cts.Token;
+
+        // await using var server = NatsServer.StartJS();
+        // await using var nats = server.CreateClientConnection();
+        var nats = new NatsConnection();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var store = await kv.CreateStoreAsync(new NatsKVConfig("kv1") { History = 10 }, cancellationToken: cancellationToken);
+
+        // delete non existing
+        {
+            await store.DeleteAsync($"k1", cancellationToken: cancellationToken);
+
+            var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () =>
+                await store.DeleteAsync($"k1", new NatsKVDeleteOpts { Revision = 1234 }, cancellationToken: cancellationToken));
+            Assert.Matches("wrong last sequence", exception.Message);
+
+            await Assert.ThrowsAsync<NatsKVKeyDeletedException>(async () =>
+                await store.GetEntryAsync<string>($"k1", cancellationToken: cancellationToken));
+        }
+
+        // delete existing with revision
+        {
+            await store.PutAsync($"k1", "v1-1", cancellationToken: cancellationToken);
+            await store.DeleteAsync($"k1", cancellationToken: cancellationToken);
+
+            await Assert.ThrowsAsync<NatsKVKeyDeletedException>(async () =>
+                await store.GetEntryAsync<string>($"k1", cancellationToken: cancellationToken));
+        }
+
+        // delete existing with revision
+        {
+            var seq1 = await store.PutAsync($"k1", "v1-1", cancellationToken: cancellationToken);
+            var seq2 = await store.PutAsync($"k1", "v1-1", cancellationToken: cancellationToken);
+
+            var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () =>
+                await store.DeleteAsync($"k1", new NatsKVDeleteOpts { Revision = seq1 }, cancellationToken: cancellationToken));
+            Assert.Matches("wrong last sequence", exception.Message);
+
+            await store.DeleteAsync($"k1", new NatsKVDeleteOpts { Revision = seq2 }, cancellationToken: cancellationToken);
+
+            await Assert.ThrowsAsync<NatsKVKeyDeletedException>(async () =>
+                await store.GetEntryAsync<string>($"k1", cancellationToken: cancellationToken));
+
+            var entry = await store.GetEntryAsync<string>($"k1", revision: seq1, cancellationToken: cancellationToken);
+            Assert.Equal("v1-1", entry.Value);
+        }
+    }
+
+    [Fact]
+    public async Task Update_with_revisions()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10000));
+        var cancellationToken = cts.Token;
+
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var store = await kv.CreateStoreAsync(new NatsKVConfig("kv1") { History = 10 }, cancellationToken: cancellationToken);
+
+        // update new
+        {
+            var seq = await store.UpdateAsync($"k1", "v1-new", 0, cancellationToken: cancellationToken);
+            var entry = await store.GetEntryAsync<string>($"k1", cancellationToken: cancellationToken);
+            Assert.Equal("v1-new", entry.Value);
+            Assert.Equal(seq, entry.Revision);
+
+            var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () =>
+                await store.UpdateAsync($"k1", "v1-new", 0, cancellationToken: cancellationToken));
+            Assert.Matches("wrong last sequence", exception.Message);
+        }
+
+        // update existing
+        {
+            var seq1 = await store.PutAsync($"k1", "v1-1", cancellationToken: cancellationToken);
+            var seq2 = await store.UpdateAsync($"k1", "v1-2", seq1, cancellationToken: cancellationToken);
+            var entry = await store.GetEntryAsync<string>($"k1", cancellationToken: cancellationToken);
+            Assert.Equal("v1-2", entry.Value);
+            Assert.Equal(seq2, entry.Revision);
+
+            var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () =>
+                await store.UpdateAsync($"k1", "v1-3", seq1, cancellationToken: cancellationToken));
+            Assert.Matches("wrong last sequence", exception.Message);
         }
     }
 }

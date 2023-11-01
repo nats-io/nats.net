@@ -20,7 +20,7 @@ public enum NatsKVOperation
     /// <summary>
     /// A value was deleted from a bucket
     /// </summary>
-    Delete,
+    Del,
 
     /// <summary>
     /// A value was purged from a bucket
@@ -60,6 +60,42 @@ public class NatsKVStore
         var ack = await _context.PublishAsync($"$KV.{_bucket}.{key}", value, cancellationToken: cancellationToken);
         ack.EnsureSuccess();
         return ack.Seq;
+    }
+
+    public async ValueTask<ulong> UpdateAsync<T>(string key, T value, ulong revision, CancellationToken cancellationToken = default)
+    {
+        var headers = new NatsHeaders();
+        headers.Add("Nats-Expected-Last-Subject-Sequence", revision.ToString());
+        var ack = await _context.PublishAsync($"$KV.{_bucket}.{key}", value, headers: headers, cancellationToken: cancellationToken);
+        ack.EnsureSuccess();
+        return ack.Seq;
+    }
+
+    public async ValueTask DeleteAsync(string key, NatsKVDeleteOpts? opts = default, CancellationToken cancellationToken = default)
+    {
+        opts ??= new NatsKVDeleteOpts();
+
+        var headers = new NatsHeaders();
+
+        if (opts.Purge)
+        {
+            headers.Add("KV-Operation", "PURGE");
+            headers.Add("Nats-Rollup", "sub");
+        }
+        else
+        {
+            headers.Add("KV-Operation", "DEL");
+        }
+
+        if (opts.Revision != default)
+        {
+            headers.Add("Nats-Expected-Last-Subject-Sequence", opts.Revision.ToString());
+        }
+
+        var subject = $"$KV.{_bucket}.{key}";
+
+        var ack = await _context.PublishAsync(subject, headers: headers, cancellationToken: cancellationToken);
+        ack.EnsureSuccess();
     }
 
     /// <summary>
@@ -132,6 +168,11 @@ public class NatsKVStore
 
                     if (!Enum.TryParse(operationValues[0], ignoreCase: true, out operation))
                         throw new NatsKVException("Can't parse operation header");
+                }
+
+                if (operation is NatsKVOperation.Del or NatsKVOperation.Purge)
+                {
+                    throw new NatsKVKeyDeletedException();
                 }
 
                 return new NatsKVEntry<T?>(_bucket, key)
@@ -267,4 +308,11 @@ public class NatsKVStore
 
         return watcher;
     }
+}
+
+public record NatsKVDeleteOpts
+{
+    public bool Purge { get; init; }
+
+    public ulong Revision { get; init; }
 }
