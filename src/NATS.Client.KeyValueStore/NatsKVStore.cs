@@ -62,13 +62,50 @@ public class NatsKVStore
         return ack.Seq;
     }
 
+    public async ValueTask<ulong> CreateAsync<T>(string key, T value, CancellationToken cancellationToken = default)
+    {
+        // First try to create a new entry
+        try
+        {
+            return await UpdateAsync(key, value, revision: 0, cancellationToken);
+        }
+        catch (NatsKVWrongLastRevisionException)
+        {
+        }
+
+        // If that fails, try to update an existing entry which may have been deleted
+        try
+        {
+            await GetEntryAsync<T>(key, cancellationToken: cancellationToken);
+        }
+        catch (NatsKVKeyDeletedException e)
+        {
+            return await UpdateAsync(key, value, e.Revision, cancellationToken);
+        }
+
+        throw new NatsKVCreateException();
+    }
+
     public async ValueTask<ulong> UpdateAsync<T>(string key, T value, ulong revision, CancellationToken cancellationToken = default)
     {
         var headers = new NatsHeaders();
         headers.Add("Nats-Expected-Last-Subject-Sequence", revision.ToString());
-        var ack = await _context.PublishAsync($"$KV.{_bucket}.{key}", value, headers: headers, cancellationToken: cancellationToken);
-        ack.EnsureSuccess();
-        return ack.Seq;
+        try
+        {
+            var ack = await _context.PublishAsync($"$KV.{_bucket}.{key}", value, headers: headers, cancellationToken: cancellationToken);
+            ack.EnsureSuccess();
+
+            return ack.Seq;
+        }
+        catch (NatsJSApiException e)
+        {
+            if (e.Error is { ErrCode: 10071, Code: 400, Description: not null } && e.Error.Description.StartsWith("wrong last sequence", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new NatsKVWrongLastRevisionException();
+            }
+
+            throw;
+        }
     }
 
     public async ValueTask DeleteAsync(string key, NatsKVDeleteOpts? opts = default, CancellationToken cancellationToken = default)
@@ -94,8 +131,20 @@ public class NatsKVStore
 
         var subject = $"$KV.{_bucket}.{key}";
 
-        var ack = await _context.PublishAsync(subject, headers: headers, cancellationToken: cancellationToken);
-        ack.EnsureSuccess();
+        try
+        {
+            var ack = await _context.PublishAsync(subject, headers: headers, cancellationToken: cancellationToken);
+            ack.EnsureSuccess();
+        }
+        catch (NatsJSApiException e)
+        {
+            if (e.Error is { ErrCode: 10071, Code: 400, Description: not null } && e.Error.Description.StartsWith("wrong last sequence", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new NatsKVWrongLastRevisionException();
+            }
+
+            throw;
+        }
     }
 
     /// <summary>
@@ -172,7 +221,7 @@ public class NatsKVStore
 
                 if (operation is NatsKVOperation.Del or NatsKVOperation.Purge)
                 {
-                    throw new NatsKVKeyDeletedException();
+                    throw new NatsKVKeyDeletedException(sequence);
                 }
 
                 return new NatsKVEntry<T?>(_bucket, key)

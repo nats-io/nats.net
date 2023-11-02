@@ -29,8 +29,25 @@ public class NatsKVException : NatsJSException
 
 public class NatsKVKeyDeletedException : NatsKVException
 {
-    public NatsKVKeyDeletedException()
-        : base("Key was deleted")
+    public NatsKVKeyDeletedException(ulong revision)
+        : base("Key was deleted") =>
+        Revision = revision;
+
+    public ulong Revision { get; }
+}
+
+public class NatsKVWrongLastRevisionException : NatsKVException
+{
+    public NatsKVWrongLastRevisionException()
+        : base("Wrong last revision")
+    {
+    }
+}
+
+public class NatsKVCreateException : NatsKVException
+{
+    public NatsKVCreateException()
+        : base("Can't create entry")
     {
     }
 }
