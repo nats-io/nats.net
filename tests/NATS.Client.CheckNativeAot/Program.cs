@@ -8,6 +8,7 @@ using NATS.Client.KeyValueStore;
 using NATS.Client.ObjectStore;
 using NATS.Client.ObjectStore.Models;
 using NATS.Client.Services;
+using NATS.Client.Services.Internal;
 using NATS.Client.Services.Models;
 
 Log("Starting...");
@@ -464,7 +465,7 @@ static async Task<List<T>> FindServices<T>(NatsConnection nats, string subject, 
     var responses = new List<T>();
 
     var count = 0;
-    await foreach (var msg in nats.RequestManyAsync<object?, T>(subject, null, replySerializer: TestDataJsonSerializer<T>.Default, replyOpts: replyOpts, cancellationToken: ct).ConfigureAwait(false))
+    await foreach (var msg in nats.RequestManyAsync<object?, T>(subject, null, replySerializer: NatsSrvJsonSerializer<T>.Default, replyOpts: replyOpts, cancellationToken: ct).ConfigureAwait(false))
     {
         responses.Add(msg.Data!);
         if (++count == limit)
