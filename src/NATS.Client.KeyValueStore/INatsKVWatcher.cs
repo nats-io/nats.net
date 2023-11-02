@@ -11,5 +11,5 @@ public interface INatsKVWatcher<T> : IAsyncDisposable
     /// <summary>
     /// Entries channel reader
     /// </summary>
-    ChannelReader<NatsKVEntry<T?>> Entries { get; }
+    ChannelReader<NatsKVEntry<T>> Entries { get; }
 }

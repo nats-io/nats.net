@@ -16,7 +16,7 @@ public class JsonSerializerTests
 
         var natsOpts = NatsOpts.Default with
         {
-            Serializer = NatsJsonSerializer.Default,
+            Serializers = NatsJsonSerializerRegistry.Default,
         };
 
         await using var server = NatsServer.Start();

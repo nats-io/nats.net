@@ -4,9 +4,9 @@ using NATS.Client.Services.Models;
 
 namespace NATS.Client.Services.Internal;
 
-internal class NatsSrvJsonSerializer
+internal static class NatsSrvJsonSerializer<T>
 {
-    public static readonly INatsSerializer Default = new NatsJsonContextSerializer(NatsSrvJsonSerializerContext.Default);
+    public static readonly INatsSerializer<T> Default = new NatsJsonContextSerializer<T>(NatsSrvJsonSerializerContext.Default);
 }
 
 [JsonSerializable(typeof(InfoResponse))]

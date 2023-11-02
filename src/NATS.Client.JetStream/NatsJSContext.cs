@@ -1,4 +1,3 @@
-using System.ComponentModel.DataAnnotations;
 using NATS.Client.Core;
 using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
@@ -47,6 +46,7 @@ public partial class NatsJSContext
     /// <param name="data">Data to publish.</param>
     /// <param name="msgId">Sets <c>Nats-Msg-Id</c> header for idempotent message writes.</param>
     /// <param name="headers">Optional message headers.</param>
+    /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="opts">Options to be used by publishing command.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the publishing call or the wait for response.</param>
     /// <typeparam name="T">Type of the data being sent.</typeparam>
@@ -72,6 +72,7 @@ public partial class NatsJSContext
         T? data,
         string? msgId = default,
         NatsHeaders? headers = default,
+        INatsSerializer<T>? serializer = default,
         NatsPubOpts? opts = default,
         CancellationToken cancellationToken = default)
     {
@@ -81,13 +82,16 @@ public partial class NatsJSContext
             headers["Nats-Msg-Id"] = msgId;
         }
 
+        serializer ??= Connection.Opts.Serializers.GetSerializer<T>();
+
         await using var sub = await Connection.RequestSubAsync<T, PubAckResponse>(
                 subject: subject,
                 data: data,
                 headers: headers,
+                requestSerializer: serializer,
+                replySerializer: NatsJSJsonSerializer<PubAckResponse>.Default,
                 requestOpts: opts,
-                replyOpts: new NatsSubOpts { Serializer = NatsJSJsonSerializer.Default },
-                cancellationToken)
+                cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
         if (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
@@ -140,9 +144,9 @@ public partial class NatsJSContext
                     subject: subject,
                     data: request,
                     headers: default,
-                    requestOpts: new NatsPubOpts { Serializer = NatsJSJsonSerializer.Default },
-                    replyOpts: new NatsSubOpts { Serializer = NatsJSErrorAwareJsonSerializer.Default },
-                    cancellationTimer.Token)
+                    requestSerializer: NatsJSJsonSerializer<TRequest>.Default,
+                    replySerializer: NatsJSErrorAwareJsonSerializer<TResponse>.Default,
+                    cancellationToken: cancellationTimer.Token)
                 .ConfigureAwait(false);
 
             if (await sub.Msgs.WaitToReadAsync(cancellationTimer.Token).ConfigureAwait(false))

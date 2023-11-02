@@ -28,10 +28,7 @@ public class PublishTest
                 {
                     Test = 1,
                 },
-                opts: new NatsPubOpts
-                {
-                    Serializer = TestDataJsonSerializer.Default,
-                },
+                serializer: TestDataJsonSerializer<TestData>.Default,
                 cancellationToken: cts.Token);
             Assert.Null(ack.Error);
             Assert.Equal(1, ack.Seq);
@@ -44,7 +41,7 @@ public class PublishTest
             var ack1 = await js.PublishAsync(
                 subject: "s1.foo",
                 data: new TestData { Test = 2 },
-                opts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default },
+                serializer: TestDataJsonSerializer<TestData>.Default,
                 headers: new NatsHeaders { { "Nats-Msg-Id", "2" } },
                 cancellationToken: cts.Token);
             Assert.Null(ack1.Error);
@@ -54,7 +51,7 @@ public class PublishTest
             var ack2 = await js.PublishAsync(
                 subject: "s1.foo",
                 data: new TestData { Test = 2 },
-                opts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default },
+                serializer: TestDataJsonSerializer<TestData>.Default,
                 headers: new NatsHeaders { { "Nats-Msg-Id", "2" } },
                 cancellationToken: cts.Token);
             Assert.Null(ack2.Error);

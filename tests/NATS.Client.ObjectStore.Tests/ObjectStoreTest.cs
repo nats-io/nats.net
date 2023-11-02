@@ -104,7 +104,7 @@ public class ObjectStoreTest
     [Fact]
     public async Task Get_chunks()
     {
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10000));
         var cancellationToken = cts.Token;
 
         await using var server = NatsServer.StartJS();

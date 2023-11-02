@@ -28,7 +28,7 @@ public partial class NatsConnection
         }
     }
 
-    internal ValueTask PubModelPostAsync<T>(string subject, T? data, INatsSerializer serializer, string? replyTo = default, NatsHeaders? headers = default, Action<Exception>? errorHandler = default, CancellationToken cancellationToken = default)
+    internal ValueTask PubModelPostAsync<T>(string subject, T? data, INatsSerializer<T> serializer, string? replyTo = default, NatsHeaders? headers = default, Action<Exception>? errorHandler = default, CancellationToken cancellationToken = default)
     {
         headers?.SetReadOnly();
 
@@ -73,7 +73,7 @@ public partial class NatsConnection
         }
     }
 
-    internal ValueTask PubModelAsync<T>(string subject, T? data, INatsSerializer serializer, string? replyTo = default, NatsHeaders? headers = default, CancellationToken cancellationToken = default)
+    internal ValueTask PubModelAsync<T>(string subject, T? data, INatsSerializer<T> serializer, string? replyTo = default, NatsHeaders? headers = default, CancellationToken cancellationToken = default)
     {
         headers?.SetReadOnly();
 

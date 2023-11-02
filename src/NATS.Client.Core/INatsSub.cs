@@ -7,7 +7,7 @@ public interface INatsSub<T> : IAsyncDisposable
     /// <summary>
     /// Access incoming messages for your subscription.
     /// </summary>
-    ChannelReader<NatsMsg<T?>> Msgs { get; }
+    ChannelReader<NatsMsg<T>> Msgs { get; }
 
     /// <summary>
     /// The subject name to subscribe to.

@@ -7,7 +7,7 @@ using NATS.Client.Core;
 // string
 {
     // Same as not specifying a serializer.
-    var natsOpts = NatsOpts.Default with { Serializer = NatsDefaultSerializer.Default };
+    var natsOpts = NatsOpts.Default with { Serializers = NatsDefaultSerializerRegistry.Default };
 
     await using var nats = new NatsConnection(natsOpts);
 
@@ -26,7 +26,7 @@ using NATS.Client.Core;
 
 // custom JSON
 {
-    var natsOpts = NatsOpts.Default with { Serializer = new NatsJsonContextSerializer(MyJsonContext.Default) };
+    var natsOpts = NatsOpts.Default with { Serializers = new NatsJsonContextSerializerRegistry(MyJsonContext.Default) };
 
     await using var nats = new NatsConnection(natsOpts);
 
@@ -47,14 +47,14 @@ using NATS.Client.Core;
 {
     await using var nats = new NatsConnection();
 
-    var natsSubOpts = new NatsSubOpts { Serializer = new NatsJsonContextSerializer(MyJsonContext.Default) };
-    await using var sub = await nats.SubscribeAsync<MyData>(subject: "foo", opts: natsSubOpts);
+    var serializer = new NatsJsonContextSerializer<MyData>(MyJsonContext.Default);
+
+    await using var sub = await nats.SubscribeAsync<MyData>(subject: "foo", serializer: serializer);
 
     // Flush the the network buffers to make sure the subscription request has been processed.
     await nats.PingAsync();
 
-    var natsPubOpts = new NatsPubOpts { Serializer = new NatsJsonContextSerializer(MyJsonContext.Default) };
-    await nats.PublishAsync<MyData>(subject: "foo", data: new MyData { Id = 1, Name = "bar" }, opts: natsPubOpts);
+    await nats.PublishAsync<MyData>(subject: "foo", data: new MyData { Id = 1, Name = "bar" }, serializer: serializer);
 
     var msg = await sub.Msgs.ReadAsync();
 
@@ -64,7 +64,7 @@ using NATS.Client.Core;
 
 // Protobuf
 {
-    var natsOpts = NatsOpts.Default with { Serializer = MyProtoBufSerializer.Default };
+    var natsOpts = NatsOpts.Default with { Serializers = new MyProtoBufSerializerRegistry() };
 
     await using var nats = new NatsConnection(natsOpts);
 
@@ -83,8 +83,8 @@ using NATS.Client.Core;
 
 // Protobuf/JSON
 {
-    var serializers = new NatsJsonContextSerializer(MyJsonContext.Default, next: MyProtoBufSerializer.Default);
-    var natsOpts = NatsOpts.Default with { Serializer = serializers };
+    var serializers = new MixedSerializerRegistry();
+    var natsOpts = NatsOpts.Default with { Serializers = serializers };
 
     await using var nats = new NatsConnection(natsOpts);
 
@@ -110,7 +110,7 @@ using NATS.Client.Core;
 // Binary
 {
     // Same as not specifying a serializer.
-    var natsOpts = NatsOpts.Default with { Serializer = NatsDefaultSerializer.Default };
+    var natsOpts = NatsOpts.Default with { Serializers = NatsDefaultSerializerRegistry.Default };
 
     await using var nats = new NatsConnection(natsOpts);
 
@@ -136,13 +136,21 @@ using NATS.Client.Core;
     }
 }
 
-public class MyProtoBufSerializer : INatsSerializer
+public class MixedSerializerRegistry : INatsSerializerRegistry
 {
-    public static readonly INatsSerializer Default = new MyProtoBufSerializer();
+    public INatsSerializer<T> GetSerializer<T>() => new NatsJsonContextSerializer<T>(MyJsonContext.Default, next: MyProtoBufSerializer<T>.Default);
+}
 
-    public INatsSerializer? Next => default;
+public class MyProtoBufSerializerRegistry : INatsSerializerRegistry
+{
+    public INatsSerializer<T> GetSerializer<T>() => MyProtoBufSerializer<T>.Default;
+}
 
-    public void Serialize<T>(IBufferWriter<byte> bufferWriter, T value)
+public class MyProtoBufSerializer<T> : INatsSerializer<T>
+{
+    public static readonly INatsSerializer<T> Default = new MyProtoBufSerializer<T>();
+
+    public void Serialize(IBufferWriter<byte> bufferWriter, T value)
     {
         if (value is IMessage message)
         {
@@ -154,7 +162,7 @@ public class MyProtoBufSerializer : INatsSerializer
         }
     }
 
-    public T? Deserialize<T>(in ReadOnlySequence<byte> buffer)
+    public T? Deserialize(in ReadOnlySequence<byte> buffer)
     {
         if (typeof(T) == typeof(Greeting))
         {

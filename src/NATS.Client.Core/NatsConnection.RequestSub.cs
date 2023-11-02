@@ -6,25 +6,27 @@ public partial class NatsConnection
         string subject,
         TRequest? data,
         NatsHeaders? headers = default,
+        INatsSerializer<TRequest>? requestSerializer = default,
+        INatsSerializer<TReply>? replySerializer = default,
         NatsPubOpts? requestOpts = default,
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default)
     {
         var replyTo = NewInbox();
 
-        var replySerializer = replyOpts?.Serializer ?? Opts.Serializer;
+        replySerializer ??= Opts.Serializers.GetSerializer<TReply>();
         var sub = new NatsSub<TReply>(this, SubscriptionManager.InboxSubBuilder, replyTo, queueGroup: default, replyOpts, replySerializer);
         await SubAsync(sub, cancellationToken).ConfigureAwait(false);
 
-        var serializer = requestOpts?.Serializer ?? Opts.Serializer;
+        requestSerializer ??= Opts.Serializers.GetSerializer<TRequest>();
 
         if (requestOpts?.WaitUntilSent == true)
         {
-            await PubModelAsync(subject, data, serializer, replyTo, headers, cancellationToken).ConfigureAwait(false);
+            await PubModelAsync(subject, data, requestSerializer, replyTo, headers, cancellationToken).ConfigureAwait(false);
         }
         else
         {
-            await PubModelPostAsync(subject, data, serializer, replyTo, headers, requestOpts?.ErrorHandler, cancellationToken).ConfigureAwait(false);
+            await PubModelPostAsync(subject, data, requestSerializer, replyTo, headers, requestOpts?.ErrorHandler, cancellationToken).ConfigureAwait(false);
         }
 
         return sub;

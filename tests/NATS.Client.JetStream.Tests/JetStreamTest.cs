@@ -52,7 +52,7 @@ public class JetStreamTest
             Assert.Equal("consumer1", consumer.Info.Config.Name);
 
             // Publish
-            var ack = await js.PublishAsync("events.foo", new TestData { Test = 1 }, opts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts1.Token);
+            var ack = await js.PublishAsync("events.foo", new TestData { Test = 1 }, serializer: TestDataJsonSerializer<TestData>.Default, cancellationToken: cts1.Token);
             Assert.Null(ack.Error);
             Assert.Equal("events", ack.Stream);
             Assert.Equal(1, ack.Seq);
@@ -62,7 +62,7 @@ public class JetStreamTest
             ack = await js.PublishAsync(
                 "events.foo",
                 new TestData { Test = 2 },
-                opts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default },
+                serializer: TestDataJsonSerializer<TestData>.Default,
                 headers: new NatsHeaders { { "Nats-Msg-Id", "test2" } },
                 cancellationToken: cts1.Token);
             Assert.Null(ack.Error);
@@ -74,7 +74,7 @@ public class JetStreamTest
             ack = await js.PublishAsync(
                 "events.foo",
                 new TestData { Test = 2 },
-                opts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default },
+                serializer: TestDataJsonSerializer<TestData>.Default,
                 headers: new NatsHeaders { { "Nats-Msg-Id", "test2" } },
                 cancellationToken: cts1.Token);
             Assert.Null(ack.Error);
@@ -84,9 +84,10 @@ public class JetStreamTest
 
             // Consume
             var cts2 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            var messages = new List<NatsJSMsg<TestData?>>();
+            var messages = new List<NatsJSMsg<TestData>>();
             var cc = await consumer.ConsumeAsync<TestData>(
-                new NatsJSConsumeOpts { MaxMsgs = 100, Serializer = TestDataJsonSerializer.Default },
+                serializer: TestDataJsonSerializer<TestData>.Default,
+                opts: new NatsJSConsumeOpts { MaxMsgs = 100 },
                 cancellationToken: cts2.Token);
             await foreach (var msg in cc.Msgs.ReadAllAsync(cts2.Token))
             {

@@ -79,14 +79,15 @@ public class NatsSvcServer : IAsyncDisposable
     /// <param name="name">Optional endpoint name.</param>
     /// <param name="subject">Optional endpoint subject.</param>
     /// <param name="metadata">Optional endpoint metadata.</param>
+    /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to stop the endpoint.</param>
     /// <typeparam name="T">Serialization type for messages received.</typeparam>
     /// <returns>A <seealso cref="ValueTask"/> representing the asynchronous operation.</returns>
     /// <remarks>
     /// One of name or subject must be specified.
     /// </remarks>
-    public ValueTask AddEndpointAsync<T>(Func<NatsSvcMsg<T>, ValueTask> handler, string? name = default, string? subject = default, IDictionary<string, string>? metadata = default, CancellationToken cancellationToken = default) =>
-        AddEndpointInternalAsync<T>(handler, name, subject, _config.QueueGroup, metadata, cancellationToken);
+    public ValueTask AddEndpointAsync<T>(Func<NatsSvcMsg<T>, ValueTask> handler, string? name = default, string? subject = default, IDictionary<string, string>? metadata = default, INatsSerializer<T>? serializer = default, CancellationToken cancellationToken = default) =>
+        AddEndpointInternalAsync<T>(handler, name, subject, _config.QueueGroup, metadata, serializer, cancellationToken);
 
     /// <summary>
     /// Adds a new service group with optional queue group.
@@ -126,12 +127,14 @@ public class NatsSvcServer : IAsyncDisposable
         }
     }
 
-    private async ValueTask AddEndpointInternalAsync<T>(Func<NatsSvcMsg<T>, ValueTask> handler, string? name, string? subject, string? queueGroup, IDictionary<string, string>? metadata, CancellationToken cancellationToken)
+    private async ValueTask AddEndpointInternalAsync<T>(Func<NatsSvcMsg<T>, ValueTask> handler, string? name, string? subject, string? queueGroup, IDictionary<string, string>? metadata, INatsSerializer<T>? serializer, CancellationToken cancellationToken)
     {
+        serializer ??= _nats.Opts.Serializers.GetSerializer<T>();
+
         var epSubject = subject ?? name ?? throw new NatsSvcException("Either name or subject must be specified");
         var epName = name ?? epSubject;
 
-        var ep = new NatsSvcEndpoint<T>(_nats, queueGroup, epName, handler, epSubject, metadata, opts: default, cancellationToken);
+        var ep = new NatsSvcEndpoint<T>(_nats, queueGroup, epName, handler, epSubject, metadata, serializer, opts: default, cancellationToken);
 
         if (!_endPoints.TryAdd(epName, ep))
         {
@@ -161,8 +164,8 @@ public class NatsSvcServer : IAsyncDisposable
                     }
 
                     await svcMsg.Msg.ReplyAsync(
-                        new PingResponse { Name = _config.Name, Id = _id, Version = _config.Version, },
-                        opts: new NatsPubOpts { Serializer = NatsSrvJsonSerializer.Default },
+                        data: new PingResponse { Name = _config.Name, Id = _id, Version = _config.Version, },
+                        serializer: NatsSrvJsonSerializer<PingResponse>.Default,
                         cancellationToken: _cancellationToken);
                 }
                 else if (type == SvcMsgType.Info)
@@ -190,7 +193,7 @@ public class NatsSvcServer : IAsyncDisposable
                             Metadata = _config.Metadata!,
                             Endpoints = endPoints,
                         },
-                        opts: new NatsPubOpts { Serializer = NatsSrvJsonSerializer.Default },
+                        serializer: NatsSrvJsonSerializer<InfoResponse>.Default,
                         cancellationToken: _cancellationToken);
                 }
                 else if (type == SvcMsgType.Stats)
@@ -239,7 +242,7 @@ public class NatsSvcServer : IAsyncDisposable
 
                     await svcMsg.Msg.ReplyAsync(
                         response,
-                        opts: new NatsPubOpts { Serializer = NatsSrvJsonSerializer.Default },
+                        serializer: NatsSrvJsonSerializer<StatsResponse>.Default,
                         cancellationToken: _cancellationToken);
                 }
             }
@@ -287,18 +290,21 @@ public class NatsSvcServer : IAsyncDisposable
         /// <param name="name">Optional endpoint name.</param>
         /// <param name="subject">Optional endpoint subject.</param>
         /// <param name="metadata">Optional endpoint metadata.</param>
+        /// <param name="serializer">Serializer to use for the message type.</param>
         /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to stop the endpoint.</param>
         /// <typeparam name="T">Serialization type for messages received.</typeparam>
         /// <returns>A <seealso cref="ValueTask"/> representing the asynchronous operation.</returns>
         /// <remarks>
         /// One of name or subject must be specified.
         /// </remarks>
-        public ValueTask AddEndpointAsync<T>(Func<NatsSvcMsg<T>, ValueTask> handler, string? name = default, string? subject = default, IDictionary<string, string>? metadata = default, CancellationToken cancellationToken = default)
+        public ValueTask AddEndpointAsync<T>(Func<NatsSvcMsg<T>, ValueTask> handler, string? name = default, string? subject = default, IDictionary<string, string>? metadata = default, INatsSerializer<T>? serializer = default, CancellationToken cancellationToken = default)
         {
+            serializer ??= _server._nats.Opts.Serializers.GetSerializer<T>();
+
             var epName = name != null ? $"{GroupName}{_dot}{name}" : null;
             var epSubject = subject != null ? $"{GroupName}{_dot}{subject}" : null;
             var queueGroup = QueueGroup ?? _server._config.QueueGroup;
-            return _server.AddEndpointInternalAsync(handler, epName, epSubject, queueGroup, metadata, cancellationToken);
+            return _server.AddEndpointInternalAsync(handler, epName, epSubject, queueGroup, metadata, serializer, cancellationToken);
         }
 
         /// <summary>

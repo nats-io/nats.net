@@ -62,13 +62,14 @@ public class NatsObjStore
 
         var info = await GetInfoAsync(key, cancellationToken: cancellationToken);
 
-        await using var pushConsumer = new NatsJSOrderedPushConsumer<IMemoryOwner<byte>>(
-            _context,
-            $"OBJ_{_bucket}",
-            GetChunkSubject(info.Nuid),
-            new NatsJSOrderedPushConsumerOpts { DeliverPolicy = ConsumerConfigurationDeliverPolicy.all },
-            new NatsSubOpts(),
-            cancellationToken);
+        await using var pushConsumer = new NatsJSOrderedPushConsumer<NatsMemoryOwner<byte>>(
+            context: _context,
+            stream: $"OBJ_{_bucket}",
+            filter: GetChunkSubject(info.Nuid),
+            serializer: NatsDefaultSerializer<NatsMemoryOwner<byte>>.Default,
+            opts: new NatsJSOrderedPushConsumerOpts { DeliverPolicy = ConsumerConfigurationDeliverPolicy.all },
+            subOpts: new NatsSubOpts(),
+            cancellationToken: cancellationToken);
 
         pushConsumer.Init();
 
@@ -90,14 +91,12 @@ public class NatsObjStore
                     if (pushConsumer.IsDone)
                         continue;
 
-                    if (msg.Data != null)
+                    if (msg.Data.Length > 0)
                     {
-                        using (msg.Data)
-                        {
-                            chunks++;
-                            size += msg.Data.Memory.Length;
-                            await hashedStream.WriteAsync(msg.Data.Memory, cancellationToken);
-                        }
+                        using var memoryOwner = msg.Data;
+                        chunks++;
+                        size += memoryOwner.Memory.Length;
+                        await hashedStream.WriteAsync(memoryOwner.Memory, cancellationToken);
                     }
 
                     var p = msg.Metadata?.NumPending;
@@ -296,7 +295,7 @@ public class NatsObjStore
         {
             var response = await _stream.GetAsync(request, cancellationToken);
 
-            var data = NatsObjJsonSerializer.Default.Deserialize<ObjectMetadata>(new ReadOnlySequence<byte>(Convert.FromBase64String(response.Message.Data))) ?? throw new NatsObjException("Can't deserialize object metadata");
+            var data = NatsObjJsonSerializer<ObjectMetadata>.Default.Deserialize(new ReadOnlySequence<byte>(Convert.FromBase64String(response.Message.Data))) ?? throw new NatsObjException("Can't deserialize object metadata");
 
             if (!showDeleted && data.Deleted)
             {
@@ -350,7 +349,7 @@ public class NatsObjStore
 
     private async ValueTask PublishMeta(ObjectMetadata meta, CancellationToken cancellationToken)
     {
-        var ack = await _context.PublishAsync(GetMetaSubject(meta.Name), meta, opts: new NatsPubOpts { Serializer = NatsObjJsonSerializer.Default }, headers: NatsRollupHeaders, cancellationToken: cancellationToken);
+        var ack = await _context.PublishAsync(GetMetaSubject(meta.Name), meta, serializer: NatsObjJsonSerializer<ObjectMetadata>.Default, headers: NatsRollupHeaders, cancellationToken: cancellationToken);
         ack.EnsureSuccess();
     }
 

@@ -22,7 +22,7 @@ internal readonly struct NatsKVWatchCommandMsg<T>
 
     public NatsKVWatchCommand Command { get; init; } = default;
 
-    public NatsJSMsg<T?> Msg { get; init; } = default;
+    public NatsJSMsg<T> Msg { get; init; } = default;
 }
 
 internal class NatsKVWatcher<T> : INatsKVWatcher<T>
@@ -31,6 +31,7 @@ internal class NatsKVWatcher<T> : INatsKVWatcher<T>
     private readonly bool _debug;
     private readonly NatsJSContext _context;
     private readonly string _bucket;
+    private readonly INatsSerializer<T> _serializer;
     private readonly NatsKVWatchOpts _opts;
     private readonly NatsSubOpts? _subOpts;
     private readonly CancellationToken _cancellationToken;
@@ -38,7 +39,7 @@ internal class NatsKVWatcher<T> : INatsKVWatcher<T>
     private readonly string _filter;
     private readonly NatsConnection _nats;
     private readonly Channel<NatsKVWatchCommandMsg<T>> _commandChannel;
-    private readonly Channel<NatsKVEntry<T?>> _entryChannel;
+    private readonly Channel<NatsKVEntry<T>> _entryChannel;
     private readonly Channel<string> _consumerCreateChannel;
     private readonly Timer _timer;
     private readonly int _hbTimeout;
@@ -57,6 +58,7 @@ internal class NatsKVWatcher<T> : INatsKVWatcher<T>
         NatsJSContext context,
         string bucket,
         string key,
+        INatsSerializer<T> serializer,
         NatsKVWatchOpts opts,
         NatsSubOpts? subOpts,
         CancellationToken cancellationToken)
@@ -65,6 +67,7 @@ internal class NatsKVWatcher<T> : INatsKVWatcher<T>
         _debug = _logger.IsEnabled(LogLevel.Debug);
         _context = context;
         _bucket = bucket;
+        _serializer = serializer;
         _opts = opts;
         _subOpts = subOpts;
         _keyBase = $"$KV.{_bucket}.";
@@ -100,7 +103,7 @@ internal class NatsKVWatcher<T> : INatsKVWatcher<T>
         // so that we get most accurate view of the stream. We can keep them as 1 until we find a case
         // where it's not enough due to performance for example.
         _commandChannel = Channel.CreateBounded<NatsKVWatchCommandMsg<T>>(1);
-        _entryChannel = Channel.CreateBounded<NatsKVEntry<T?>>(1);
+        _entryChannel = Channel.CreateBounded<NatsKVEntry<T>>(1);
 
         // A single request to create the consumer is enough because we don't want to create a new consumer
         // back to back in case the consumer is being recreated due to a timeout and a mismatch in consumer
@@ -115,7 +118,7 @@ internal class NatsKVWatcher<T> : INatsKVWatcher<T>
         _commandTask = Task.Run(CommandLoop);
     }
 
-    public ChannelReader<NatsKVEntry<T?>> Entries => _entryChannel.Reader;
+    public ChannelReader<NatsKVEntry<T>> Entries => _entryChannel.Reader;
 
     internal string Consumer
     {
@@ -226,7 +229,7 @@ internal class NatsKVWatcher<T> : INatsKVWatcher<T>
 
                                     var delta = (long)metadata.NumPending;
 
-                                    var entry = new NatsKVEntry<T?>(_bucket, key)
+                                    var entry = new NatsKVEntry<T>(_bucket, key)
                                     {
                                         Value = msg.Data,
                                         Revision = (long)metadata.Sequence.Stream,
@@ -319,7 +322,7 @@ internal class NatsKVWatcher<T> : INatsKVWatcher<T>
             await _sub.DisposeAsync();
         }
 
-        _sub = new NatsKVWatchSub<T>(_context, _commandChannel, _subOpts, _cancellationToken);
+        _sub = new NatsKVWatchSub<T>(_context, _commandChannel, _serializer, _subOpts, _cancellationToken);
         await _context.Connection.SubAsync(_sub, _cancellationToken).ConfigureAwait(false);
 
         if (_debug)

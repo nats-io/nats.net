@@ -58,11 +58,11 @@ public abstract partial class NatsConnectionTest
     {
         await using var server = NatsServer.Start(_output, _transportType);
 
-        var serializer1 = new NatsJsonContextSerializer(SimpleClassJsonSerializerContext.Default);
+        var serializer1 = new NatsJsonContextSerializerRegistry(SimpleClassJsonSerializerContext.Default);
 
-        foreach (var serializer in new INatsSerializer[] { serializer1 })
+        foreach (var serializer in new INatsSerializerRegistry[] { serializer1 })
         {
-            var options = NatsOpts.Default with { Serializer = serializer };
+            var options = NatsOpts.Default with { Serializers = serializer };
             await using var subConnection = server.CreateClientConnection(options);
             await using var pubConnection = server.CreateClientConnection(options);
 
@@ -134,15 +134,15 @@ public abstract partial class NatsConnectionTest
             retryDelay: TimeSpan.FromSeconds(1));
 
         var v = await pubConnection.RequestAsync<int, string>(subject, 9999);
-        v?.Data.Should().Be(text + 9999);
+        v.Data.Should().Be(text + 9999);
 
         // server exception handling: respond with the default value of the type.
         var response = await pubConnection.RequestAsync<int, string>(subject, 100);
-        Assert.Null(response?.Data);
+        Assert.Null(response.Data);
 
         // timeout check
-        var noReply = await pubConnection.RequestAsync<int, string>("foo", 10, replyOpts: new NatsSubOpts { Timeout = TimeSpan.FromSeconds(1) });
-        Assert.Null(noReply);
+        await Assert.ThrowsAsync<NatsNoReplyException>(async () =>
+            await pubConnection.RequestAsync<int, string>("foo", 10, replyOpts: new NatsSubOpts { Timeout = TimeSpan.FromSeconds(1) }));
 
         await sub.DisposeAsync();
         await reg;

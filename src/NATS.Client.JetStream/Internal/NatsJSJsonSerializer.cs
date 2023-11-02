@@ -4,9 +4,9 @@ using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Internal;
 
-internal static class NatsJSJsonSerializer
+internal static class NatsJSJsonSerializer<T>
 {
-    public static readonly INatsSerializer Default = new NatsJsonContextSerializer(NatsJSJsonSerializerContext.Default);
+    public static readonly INatsSerializer<T> Default = new NatsJsonContextSerializer<T>(NatsJSJsonSerializerContext.Default);
 }
 
 [JsonSerializable(typeof(AccountInfoResponse))]

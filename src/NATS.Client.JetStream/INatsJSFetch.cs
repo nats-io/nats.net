@@ -10,5 +10,5 @@ public interface INatsJSFetch<T> : IAsyncDisposable
     /// <summary>
     /// User messages received from the consumer.
     /// </summary>
-    ChannelReader<NatsJSMsg<T?>> Msgs { get; }
+    ChannelReader<NatsJSMsg<T>> Msgs { get; }
 }

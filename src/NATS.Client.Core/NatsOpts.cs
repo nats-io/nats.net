@@ -15,7 +15,7 @@ namespace NATS.Client.Core;
 /// <param name="Headers"></param>
 /// <param name="AuthOpts"></param>
 /// <param name="TlsOpts"></param>
-/// <param name="Serializer"></param>
+/// <param name="Serializers"></param>
 /// <param name="LoggerFactory"></param>
 /// <param name="WriterBufferSize"></param>
 /// <param name="ReaderBufferSize"></param>
@@ -43,7 +43,7 @@ public sealed record NatsOpts
     bool Headers,
     NatsAuthOpts AuthOpts,
     NatsTlsOpts TlsOpts,
-    INatsSerializer Serializer,
+    INatsSerializerRegistry Serializers,
     ILoggerFactory LoggerFactory,
     int WriterBufferSize,
     int ReaderBufferSize,
@@ -71,7 +71,7 @@ public sealed record NatsOpts
         Headers: true,
         AuthOpts: NatsAuthOpts.Default,
         TlsOpts: NatsTlsOpts.Default,
-        Serializer: NatsDefaultSerializer.Default,
+        Serializers: NatsDefaultSerializerRegistry.Default,
         LoggerFactory: NullLoggerFactory.Instance,
         WriterBufferSize: 65534, // 32767
         ReaderBufferSize: 1048576,

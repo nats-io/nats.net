@@ -10,7 +10,7 @@ public interface INatsJSConsume<T> : IAsyncDisposable
     /// <summary>
     /// Messages received from the consumer.
     /// </summary>
-    ChannelReader<NatsJSMsg<T?>> Msgs { get; }
+    ChannelReader<NatsJSMsg<T>> Msgs { get; }
 
     /// <summary>
     /// Stop the consumer gracefully.

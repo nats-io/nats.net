@@ -29,7 +29,7 @@ public class RequestReplyTest
 
         for (var i = 0; i < 10; i++)
         {
-            var rep = await nats.RequestAsync<int, int>(subject, i, replyOpts: natsSubOpts, cancellationToken: cancellationToken) ?? throw new TimeoutException("Request timeout");
+            var rep = await nats.RequestAsync<int, int>(subject, i, replyOpts: natsSubOpts, cancellationToken: cancellationToken);
 
             Assert.Equal(i * 2, rep.Data);
         }
@@ -50,8 +50,8 @@ public class RequestReplyTest
                 RequestTimeout = TimeSpan.FromSeconds(1),
             });
 
-            var reply = await nats.RequestAsync<int, int>("foo", 0);
-            Assert.Null(reply);
+            await Assert.ThrowsAsync<NatsNoReplyException>(async () =>
+                await nats.RequestAsync<int, int>("foo", 0));
         }
 
         // Cancellation token usage

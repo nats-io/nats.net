@@ -30,14 +30,14 @@ public class ConsumerConsumeTest
 
         for (var i = 0; i < 30; i++)
         {
-            var ack = await js.PublishAsync("s1.foo", new TestData { Test = i }, opts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts.Token);
+            var ack = await js.PublishAsync("s1.foo", new TestData { Test = i }, serializer: TestDataJsonSerializer<TestData>.Default, cancellationToken: cts.Token);
             ack.EnsureSuccess();
         }
 
-        var consumerOpts = new NatsJSConsumeOpts { MaxMsgs = 10, Serializer = TestDataJsonSerializer.Default };
+        var consumerOpts = new NatsJSConsumeOpts { MaxMsgs = 10 };
         var consumer = await js.GetConsumerAsync("s1", "c1", cts.Token);
         var count = 0;
-        await using var cc = await consumer.ConsumeAsync<TestData>(consumerOpts, cancellationToken: cts.Token);
+        await using var cc = await consumer.ConsumeAsync<TestData>(serializer: TestDataJsonSerializer<TestData>.Default, consumerOpts, cancellationToken: cts.Token);
         await foreach (var msg in cc.Msgs.ReadAllAsync(cts.Token))
         {
             await msg.AckAsync(new AckOpts(true), cts.Token);
@@ -91,7 +91,7 @@ public class ConsumerConsumeTest
         await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
         await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
 
-        var ack = await js.PublishAsync("s1.foo", new TestData { Test = 0 }, opts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts.Token);
+        var ack = await js.PublishAsync("s1.foo", new TestData { Test = 0 }, serializer: TestDataJsonSerializer<TestData>.Default, cancellationToken: cts.Token);
         ack.EnsureSuccess();
 
         var signal = new WaitSignal(TimeSpan.FromSeconds(30));
@@ -107,11 +107,10 @@ public class ConsumerConsumeTest
         {
             MaxMsgs = 10,
             IdleHeartbeat = TimeSpan.FromSeconds(5),
-            Serializer = TestDataJsonSerializer.Default,
         };
         var consumer = await js.GetConsumerAsync("s1", "c1", cts.Token);
         var count = 0;
-        var cc = await consumer.ConsumeAsync<TestData>(consumerOpts, cancellationToken: cts.Token);
+        var cc = await consumer.ConsumeAsync<TestData>(serializer: TestDataJsonSerializer<TestData>.Default, consumerOpts, cancellationToken: cts.Token);
         await foreach (var msg in cc.Msgs.ReadAllAsync(cts.Token))
         {
             await msg.AckAsync(new AckOpts(WaitUntilSent: true), cts.Token);
@@ -170,7 +169,6 @@ public class ConsumerConsumeTest
         var consumerOpts = new NatsJSConsumeOpts
         {
             MaxMsgs = 10,
-            Serializer = TestDataJsonSerializer.Default,
         };
 
         var consumer = await js.GetConsumerAsync("s1", "c1", cts.Token);
@@ -178,7 +176,7 @@ public class ConsumerConsumeTest
         // Not interested in management messages sent upto this point
         await proxy.FlushFramesAsync(nats);
 
-        var cc = await consumer.ConsumeAsync<TestData>(consumerOpts, cancellationToken: cts.Token);
+        var cc = await consumer.ConsumeAsync<TestData>(serializer: TestDataJsonSerializer<TestData>.Default, consumerOpts, cancellationToken: cts.Token);
 
         var readerTask = Task.Run(async () =>
         {
@@ -197,7 +195,7 @@ public class ConsumerConsumeTest
 
         // Send a message before reconnect
         {
-            var ack = await js2.PublishAsync("s1.foo", new TestData { Test = 0 }, opts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts.Token);
+            var ack = await js2.PublishAsync("s1.foo", new TestData { Test = 0 }, serializer: TestDataJsonSerializer<TestData>.Default, cancellationToken: cts.Token);
             ack.EnsureSuccess();
         }
 
@@ -217,7 +215,7 @@ public class ConsumerConsumeTest
 
         // Send a message to be received after reconnect
         {
-            var ack = await js2.PublishAsync("s1.foo", new TestData { Test = 1 }, opts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts.Token);
+            var ack = await js2.PublishAsync("s1.foo", new TestData { Test = 1 }, serializer: TestDataJsonSerializer<TestData>.Default, cancellationToken: cts.Token);
             ack.EnsureSuccess();
         }
 
@@ -246,16 +244,15 @@ public class ConsumerConsumeTest
             MaxMsgs = 10,
             IdleHeartbeat = TimeSpan.FromSeconds(5),
             Expires = TimeSpan.FromSeconds(10),
-            Serializer = TestDataJsonSerializer.Default,
         };
 
         for (var i = 0; i < 100; i++)
         {
-            var ack = await js.PublishAsync("s1.foo", new TestData { Test = i }, opts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts.Token);
+            var ack = await js.PublishAsync("s1.foo", new TestData { Test = i }, serializer: TestDataJsonSerializer<TestData>.Default, cancellationToken: cts.Token);
             ack.EnsureSuccess();
         }
 
-        var cc = await consumer.ConsumeAsync<TestData>(consumerOpts, cancellationToken: cts.Token);
+        var cc = await consumer.ConsumeAsync<TestData>(serializer: TestDataJsonSerializer<TestData>.Default, consumerOpts, cancellationToken: cts.Token);
 
         var signal = new WaitSignal();
         var reader = Task.Run(async () =>
@@ -303,16 +300,15 @@ public class ConsumerConsumeTest
             MaxMsgs = 10,
             IdleHeartbeat = TimeSpan.FromSeconds(2),
             Expires = TimeSpan.FromSeconds(4),
-            Serializer = TestDataJsonSerializer.Default,
         };
 
         for (var i = 0; i < 100; i++)
         {
-            var ack = await js.PublishAsync("s1.foo", new TestData { Test = i }, opts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts.Token);
+            var ack = await js.PublishAsync("s1.foo", new TestData { Test = i }, serializer: TestDataJsonSerializer<TestData>.Default, cancellationToken: cts.Token);
             ack.EnsureSuccess();
         }
 
-        var cc = await consumer.ConsumeAsync<TestData>(consumerOpts, cancellationToken: cts.Token);
+        var cc = await consumer.ConsumeAsync<TestData>(serializer: TestDataJsonSerializer<TestData>.Default, consumerOpts, cancellationToken: cts.Token);
 
         var signal = new WaitSignal();
         var reader = Task.Run(async () =>

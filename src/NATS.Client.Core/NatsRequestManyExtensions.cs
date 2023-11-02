@@ -7,6 +7,8 @@ public static class NatsRequestManyExtensions
     /// </summary>
     /// <param name="nats">NATS connection</param>
     /// <param name="msg">Message to be sent as request</param>
+    /// <param name="requestSerializer">Serializer to use for the request message type.</param>
+    /// <param name="replySerializer">Serializer to use for the reply message type.</param>
     /// <param name="requestOpts">Request publish options</param>
     /// <param name="replyOpts">Reply handler subscription options</param>
     /// <param name="cancellationToken">Cancel this request</param>
@@ -17,9 +19,11 @@ public static class NatsRequestManyExtensions
     /// <remarks>
     /// if reply option's timeout is not defined then it will be set to NatsOpts.RequestTimeout.
     /// </remarks>
-    public static IAsyncEnumerable<NatsMsg<TReply?>> RequestManyAsync<TRequest, TReply>(
+    public static IAsyncEnumerable<NatsMsg<TReply>> RequestManyAsync<TRequest, TReply>(
         this INatsConnection nats,
         NatsMsg<TRequest> msg,
+        INatsSerializer<TRequest>? requestSerializer = default,
+        INatsSerializer<TReply>? replySerializer = default,
         NatsPubOpts? requestOpts = default,
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default)
@@ -30,6 +34,8 @@ public static class NatsRequestManyExtensions
             msg.Subject,
             msg.Data,
             msg.Headers,
+            requestSerializer,
+            replySerializer,
             requestOpts,
             replyOpts,
             cancellationToken);

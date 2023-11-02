@@ -7,10 +7,6 @@ namespace NATS.Client.KeyValueStore;
 /// </summary>
 public record NatsKVOpts
 {
-    /// <summary>
-    /// Optional value serializer to override the default.
-    /// </summary>
-    public INatsSerializer? Serializer { get; init; }
 }
 
 /// <summary>

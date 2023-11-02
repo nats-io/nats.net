@@ -104,7 +104,7 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
     private readonly string _name;
     private readonly CancellationToken _cancellationToken;
     private readonly Channel<NatsSvcMsg<T>> _channel;
-    private readonly INatsSerializer _serializer;
+    private readonly INatsSerializer<T> _serializer;
     private readonly Task _handlerTask;
 
     private long _requests;
@@ -121,9 +121,10 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
     /// <param name="handler">Callback function to handle messages received.</param>
     /// <param name="subject">Optional subject name.</param>
     /// <param name="metadata">Endpoint metadata.</param>
+    /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="opts">Subscription options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    public NatsSvcEndpoint(NatsConnection nats, string? queueGroup, string name, Func<NatsSvcMsg<T>, ValueTask> handler, string subject, IDictionary<string, string>? metadata, NatsSubOpts? opts, CancellationToken cancellationToken)
+    public NatsSvcEndpoint(NatsConnection nats, string? queueGroup, string name, Func<NatsSvcMsg<T>, ValueTask> handler, string subject, IDictionary<string, string>? metadata, INatsSerializer<T> serializer, NatsSubOpts? opts, CancellationToken cancellationToken)
         : base(nats, nats.SubscriptionManager, subject, queueGroup, opts)
     {
         _logger = nats.Opts.LoggerFactory.CreateLogger<NatsSvcEndpoint<T>>();
@@ -132,7 +133,7 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
         _name = name;
         Metadata = metadata;
         _cancellationToken = cancellationToken;
-        _serializer = opts?.Serializer ?? _nats.Opts.Serializer;
+        _serializer = serializer;
         _channel = Channel.CreateBounded<NatsSvcMsg<T>>(128);
         _handlerTask = Task.Run(HandlerLoop);
     }

@@ -8,7 +8,6 @@ using NATS.Client.KeyValueStore;
 using NATS.Client.ObjectStore;
 using NATS.Client.ObjectStore.Models;
 using NATS.Client.Services;
-using NATS.Client.Services.Internal;
 using NATS.Client.Services.Models;
 
 Log("Starting...");
@@ -96,7 +95,7 @@ async Task JetStreamTests()
         Assert.Equal("consumer1", consumer.Info.Config.Name);
 
         // Publish
-        var ack = await js.PublishAsync("events.foo", new TestData { Test = 1 }, opts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts1.Token);
+        var ack = await js.PublishAsync("events.foo", new TestData { Test = 1 }, serializer: TestDataJsonSerializer<TestData>.Default, cancellationToken: cts1.Token);
         Assert.Null(ack.Error);
         Assert.Equal("events", ack.Stream);
         Assert.Equal(1, ack.Seq);
@@ -106,7 +105,7 @@ async Task JetStreamTests()
         ack = await js.PublishAsync(
             "events.foo",
             new TestData { Test = 2 },
-            opts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default },
+            serializer: TestDataJsonSerializer<TestData>.Default,
             headers: new NatsHeaders { { "Nats-Msg-Id", "test2" } },
             cancellationToken: cts1.Token);
         Assert.Null(ack.Error);
@@ -118,7 +117,7 @@ async Task JetStreamTests()
         ack = await js.PublishAsync(
             "events.foo",
             new TestData { Test = 2 },
-            opts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default },
+            serializer: TestDataJsonSerializer<TestData>.Default,
             headers: new NatsHeaders { { "Nats-Msg-Id", "test2" } },
             cancellationToken: cts1.Token);
         Assert.Null(ack.Error);
@@ -128,9 +127,10 @@ async Task JetStreamTests()
 
         // Consume
         var cts2 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var messages = new List<NatsJSMsg<TestData?>>();
+        var messages = new List<NatsJSMsg<TestData>>();
         var cc = await consumer.ConsumeAsync<TestData>(
-            new NatsJSConsumeOpts { MaxMsgs = 100, Serializer = TestDataJsonSerializer.Default },
+            serializer: TestDataJsonSerializer<TestData>.Default,
+            new NatsJSConsumeOpts { MaxMsgs = 100 },
             cancellationToken: cts2.Token);
         await foreach (var msg in cc.Msgs.ReadAllAsync(cts2.Token))
         {
@@ -427,18 +427,18 @@ async Task ServicesTests2()
         var response = await nats.RequestAsync<int, int>(endpointInfo.Subject, i, cancellationToken: cancellationToken);
         if (i is 7 or 8)
         {
-            Assert.Equal($"{i}", response?.Headers?["Nats-Service-Error-Code"]);
-            Assert.Equal($"Error{i}", response?.Headers?["Nats-Service-Error"]);
+            Assert.Equal($"{i}", response.Headers?["Nats-Service-Error-Code"]);
+            Assert.Equal($"Error{i}", response.Headers?["Nats-Service-Error"]);
         }
         else if (i is 9)
         {
-            Assert.Equal("999", response?.Headers?["Nats-Service-Error-Code"]);
-            Assert.Equal("Handler error", response?.Headers?["Nats-Service-Error"]);
+            Assert.Equal("999", response.Headers?["Nats-Service-Error-Code"]);
+            Assert.Equal("Handler error", response.Headers?["Nats-Service-Error"]);
         }
         else
         {
-            Assert.Equal(i * i, response?.Data);
-            Assert.Null(response?.Headers);
+            Assert.Equal(i * i, response.Data);
+            Assert.Null(response.Headers);
         }
     }
 
@@ -460,12 +460,11 @@ static async Task<List<T>> FindServices<T>(NatsConnection nats, string subject, 
     var replyOpts = new NatsSubOpts
     {
         Timeout = TimeSpan.FromSeconds(2),
-        Serializer = NatsSrvJsonSerializer.Default,
     };
     var responses = new List<T>();
 
     var count = 0;
-    await foreach (var msg in nats.RequestManyAsync<object?, T>(subject, null, replyOpts: replyOpts, cancellationToken: ct).ConfigureAwait(false))
+    await foreach (var msg in nats.RequestManyAsync<object?, T>(subject, null, replySerializer: TestDataJsonSerializer<T>.Default, replyOpts: replyOpts, cancellationToken: ct).ConfigureAwait(false))
     {
         responses.Add(msg.Data!);
         if (++count == limit)

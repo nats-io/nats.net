@@ -73,7 +73,7 @@ try
             {
                 Console.WriteLine($"___\nFETCH {maxMsgs}");
                 await consumer.RefreshAsync(cts.Token);
-                await using var sub = await consumer.FetchAsync<NatsMemoryOwner<byte>>(fetchOpts, cts.Token);
+                await using var sub = await consumer.FetchAsync<NatsMemoryOwner<byte>>(opts: fetchOpts, cancellationToken: cts.Token);
                 await foreach (var msg in sub.Msgs.ReadAllAsync(cts.Token))
                 {
                     using (msg.Data)
@@ -110,7 +110,7 @@ try
                 var fetchNoWaitOpts = new NatsJSFetchOpts { MaxMsgs = max };
                 var fetchMsgCount = 0;
 
-                await foreach (var msg in consumer.FetchAllNoWaitAsync<NatsMemoryOwner<byte>>(fetchNoWaitOpts, cts.Token))
+                await foreach (var msg in consumer.FetchAllNoWaitAsync<NatsMemoryOwner<byte>>(opts: fetchNoWaitOpts, cancellationToken: cts.Token))
                 {
                     fetchMsgCount++;
                     using (msg.Data)
@@ -148,7 +148,7 @@ try
             {
                 Console.WriteLine($"___\nFETCH {maxMsgs}");
                 await consumer.RefreshAsync(cts.Token);
-                await foreach (var msg in consumer.FetchAllAsync<NatsMemoryOwner<byte>>(fetchOpts, cts.Token))
+                await foreach (var msg in consumer.FetchAllAsync<NatsMemoryOwner<byte>>(opts: fetchOpts, cancellationToken: cts.Token))
                 {
                     using (msg.Data)
                     {
@@ -178,7 +178,7 @@ try
             try
             {
                 Console.WriteLine("___\nNEXT");
-                var next = await consumer.NextAsync<NatsMemoryOwner<byte>>(nextOpts, cts.Token);
+                var next = await consumer.NextAsync<NatsMemoryOwner<byte>>(opts: nextOpts, cancellationToken: cts.Token);
                 if (next is { } msg)
                 {
                     using (msg.Data)
@@ -209,7 +209,7 @@ try
             try
             {
                 Console.WriteLine("___\nCONSUME");
-                await using var sub = await consumer.ConsumeAsync<NatsMemoryOwner<byte>>(consumeOpts);
+                await using var sub = await consumer.ConsumeAsync<NatsMemoryOwner<byte>>(opts: consumeOpts);
 
                 cts.Token.Register(() =>
                 {
@@ -264,7 +264,7 @@ try
             try
             {
                 Console.WriteLine("___\nCONSUME-ALL");
-                await foreach (var msg in consumer.ConsumeAllAsync<NatsMemoryOwner<byte>>(consumeOpts, cts.Token))
+                await foreach (var msg in consumer.ConsumeAllAsync<NatsMemoryOwner<byte>>(opts: consumeOpts, cancellationToken: cts.Token))
                 {
                     using (msg.Data)
                     {
