@@ -288,6 +288,85 @@ public class KeyValueStoreTest
     }
 
     [Fact]
+    public async Task Purge_deletes()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var store = await kv.CreateStoreAsync(new NatsKVConfig("kv1") { History = 10 }, cancellationToken: cancellationToken);
+
+        await store.PutAsync("k1", "v1", cancellationToken: cancellationToken);
+        await store.PutAsync("k1", "v2", cancellationToken: cancellationToken);
+        await store.PutAsync("k1", "v3", cancellationToken: cancellationToken);
+        await store.DeleteAsync("k1", cancellationToken: cancellationToken);
+
+        await store.PutAsync("k2", "v1", cancellationToken: cancellationToken);
+        await store.PutAsync("k2", "v2", cancellationToken: cancellationToken);
+        await store.PutAsync("k2", "v3", cancellationToken: cancellationToken);
+        await store.DeleteAsync("k2", cancellationToken: cancellationToken);
+
+        var count = 0;
+        await foreach (var entry in store.HistoryAsync<string>("k1", cancellationToken: cancellationToken))
+        {
+            count++;
+            _output.WriteLine($"{entry}");
+        }
+
+        await foreach (var entry in store.HistoryAsync<string>("k2", cancellationToken: cancellationToken))
+        {
+            count++;
+            _output.WriteLine($"{entry}");
+        }
+
+        _output.WriteLine($"COUNT={count}");
+        Assert.Equal(8, count);
+
+        _output.WriteLine("PURGE DELETES");
+        await store.PurgeDeletesAsync(cancellationToken: cancellationToken);
+
+        count = 0;
+        await foreach (var entry in store.HistoryAsync<string>("k1", cancellationToken: cancellationToken))
+        {
+            count++;
+            _output.WriteLine($"{entry}");
+        }
+
+        await foreach (var entry in store.HistoryAsync<string>("k2", cancellationToken: cancellationToken))
+        {
+            count++;
+            _output.WriteLine($"{entry}");
+        }
+
+        _output.WriteLine($"COUNT={count}");
+        Assert.Equal(2, count);
+
+        _output.WriteLine("PURGE ALL DELETES");
+        await store.PurgeDeletesAsync(opts: new NatsKVPurgeOpts { DeleteMarkersThreshold = TimeSpan.Zero }, cancellationToken: cancellationToken);
+
+        count = 0;
+        await foreach (var entry in store.HistoryAsync<string>("k1", cancellationToken: cancellationToken))
+        {
+            count++;
+            _output.WriteLine($"{entry}");
+        }
+
+        await foreach (var entry in store.HistoryAsync<string>("k2", cancellationToken: cancellationToken))
+        {
+            count++;
+            _output.WriteLine($"{entry}");
+        }
+
+        _output.WriteLine($"COUNT={count}");
+        Assert.Equal(0, count);
+    }
+
+    [Fact]
     public async Task Update_with_revisions()
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -391,6 +470,14 @@ public class KeyValueStoreTest
 
         var store = await kv.CreateStoreAsync(new NatsKVConfig("kv1") { History = 10 }, cancellationToken: cancellationToken);
 
+        var nonExistentKeyCount = 0;
+        await foreach (var unused in store.HistoryAsync<string>("non-existing-key", cancellationToken: cancellationToken))
+        {
+            nonExistentKeyCount++;
+        }
+
+        Assert.Equal(0, nonExistentKeyCount);
+
         var seq = new ulong[5];
         seq[0] = await store.CreateAsync($"k1", "v0", cancellationToken: cancellationToken);
         seq[1] = await store.UpdateAsync($"k1", "v1", seq[0], cancellationToken: cancellationToken);
@@ -411,5 +498,28 @@ public class KeyValueStoreTest
             Assert.Equal(seq[i], list[i].Revision);
             Assert.Equal($"v{i}", list[i].Value);
         }
+    }
+
+    [Fact]
+    public async Task Status()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var store = await kv.CreateStoreAsync(new NatsKVConfig("kv1") { History = 10 }, cancellationToken: cancellationToken);
+
+        Assert.Equal("kv1", store.Bucket);
+
+        var status = await store.GetStatusAsync(cancellationToken);
+
+        Assert.Equal("kv1", status.Bucket);
+        Assert.Equal("KV_kv1", status.Info.Config.Name);
+        Assert.Equal(10, status.Info.Config.MaxMsgsPerSubject);
     }
 }

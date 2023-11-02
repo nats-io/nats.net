@@ -25,7 +25,7 @@ internal readonly struct NatsKVWatchCommandMsg<T>
     public NatsJSMsg<T?> Msg { get; init; } = default;
 }
 
-internal class NatsKVWatcher<T>
+internal class NatsKVWatcher<T> : IAsyncDisposable
 {
     private readonly ILogger _logger;
     private readonly bool _debug;
@@ -125,6 +125,12 @@ internal class NatsKVWatcher<T>
     public async ValueTask DisposeAsync()
     {
         _nats.ConnectionDisconnected -= OnDisconnected;
+
+        if (_sub != null)
+        {
+            await _sub.DisposeAsync();
+        }
+
         _consumerCreateChannel.Writer.TryComplete();
         _commandChannel.Writer.TryComplete();
         _entryChannel.Writer.TryComplete();

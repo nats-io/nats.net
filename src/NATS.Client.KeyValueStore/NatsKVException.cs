@@ -51,3 +51,11 @@ public class NatsKVCreateException : NatsKVException
     {
     }
 }
+
+public class NatsKVKeyNotFoundException : NatsKVException
+{
+    public NatsKVKeyNotFoundException()
+        : base("Key not found")
+    {
+    }
+}

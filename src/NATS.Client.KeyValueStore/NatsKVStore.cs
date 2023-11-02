@@ -33,20 +33,28 @@ public enum NatsKVOperation
 /// </summary>
 public class NatsKVStore
 {
-    private readonly string _bucket;
-    private readonly NatsKVOpts _opts;
+    private const string NatsExpectedLastSubjectSequence = "Nats-Expected-Last-Subject-Sequence";
+    private const string KVOperation = "KV-Operation";
+    private const string NatsRollup = "Nats-Rollup";
+    private const string OperationPurge = "PURGE";
+    private const string RollupSub = "sub";
+    private const string OperationDel = "DEL";
+    private const string NatsSubject = "Nats-Subject";
+    private const string NatsSequence = "Nats-Sequence";
+    private const string NatsTimeStamp = "Nats-Time-Stamp";
     private readonly NatsJSContext _context;
     private readonly NatsJSStream _stream;
     private readonly INatsSerializer _serializer;
 
     internal NatsKVStore(string bucket, NatsKVOpts opts, NatsJSContext context, NatsJSStream stream)
     {
-        _bucket = bucket;
-        _opts = opts;
+        Bucket = bucket;
         _context = context;
         _stream = stream;
-        _serializer = _opts.Serializer ?? _context.Connection.Opts.Serializer;
+        _serializer = opts.Serializer ?? _context.Connection.Opts.Serializer;
     }
+
+    public string Bucket { get; }
 
     /// <summary>
     /// Put a value into the bucket using the key
@@ -57,7 +65,7 @@ public class NatsKVStore
     /// <typeparam name="T">Serialized value type</typeparam>
     public async ValueTask<ulong> PutAsync<T>(string key, T value, CancellationToken cancellationToken = default)
     {
-        var ack = await _context.PublishAsync($"$KV.{_bucket}.{key}", value, cancellationToken: cancellationToken);
+        var ack = await _context.PublishAsync($"$KV.{Bucket}.{key}", value, cancellationToken: cancellationToken);
         ack.EnsureSuccess();
         return ack.Seq;
     }
@@ -88,11 +96,11 @@ public class NatsKVStore
 
     public async ValueTask<ulong> UpdateAsync<T>(string key, T value, ulong revision, CancellationToken cancellationToken = default)
     {
-        var headers = new NatsHeaders();
-        headers.Add("Nats-Expected-Last-Subject-Sequence", revision.ToString());
+        var headers = new NatsHeaders { { NatsExpectedLastSubjectSequence, revision.ToString() } };
+
         try
         {
-            var ack = await _context.PublishAsync($"$KV.{_bucket}.{key}", value, headers: headers, cancellationToken: cancellationToken);
+            var ack = await _context.PublishAsync($"$KV.{Bucket}.{key}", value, headers: headers, cancellationToken: cancellationToken);
             ack.EnsureSuccess();
 
             return ack.Seq;
@@ -116,20 +124,20 @@ public class NatsKVStore
 
         if (opts.Purge)
         {
-            headers.Add("KV-Operation", "PURGE");
-            headers.Add("Nats-Rollup", "sub");
+            headers.Add(KVOperation, OperationPurge);
+            headers.Add(NatsRollup, RollupSub);
         }
         else
         {
-            headers.Add("KV-Operation", "DEL");
+            headers.Add(KVOperation, OperationDel);
         }
 
         if (opts.Revision != default)
         {
-            headers.Add("Nats-Expected-Last-Subject-Sequence", opts.Revision.ToString());
+            headers.Add(NatsExpectedLastSubjectSequence, opts.Revision.ToString());
         }
 
-        var subject = $"$KV.{_bucket}.{key}";
+        var subject = $"$KV.{Bucket}.{key}";
 
         try
         {
@@ -160,10 +168,10 @@ public class NatsKVStore
     /// <typeparam name="T">Serialized value type</typeparam>
     /// <returns>The entry</returns>
     /// <exception cref="NatsKVException">There was an error with metadata</exception>
-    public async ValueTask<NatsKVEntry<T?>> GetEntryAsync<T>(string key, ulong revision = default, INatsSerializer? serializer = default, CancellationToken cancellationToken = default)
+    public async ValueTask<NatsKVEntry<T>> GetEntryAsync<T>(string key, ulong revision = default, INatsSerializer? serializer = default, CancellationToken cancellationToken = default)
     {
         var request = new StreamMsgGetRequest();
-        var keySubject = $"$KV.{_bucket}.{key}";
+        var keySubject = $"$KV.{Bucket}.{key}";
 
         if (revision == default)
         {
@@ -181,7 +189,10 @@ public class NatsKVStore
 
             if (direct is { Headers: { } headers } msg)
             {
-                if (!headers.TryGetValue("Nats-Subject", out var subjectValues))
+                if (headers.Code == 404)
+                    throw new NatsKVKeyNotFoundException();
+
+                if (!headers.TryGetValue(NatsSubject, out var subjectValues))
                     throw new NatsKVException("Missing sequence header");
 
                 var subject = subjectValues[^1];
@@ -194,7 +205,7 @@ public class NatsKVStore
                     }
                 }
 
-                if (!headers.TryGetValue("Nats-Sequence", out var sequenceValues))
+                if (!headers.TryGetValue(NatsSequence, out var sequenceValues))
                     throw new NatsKVException("Missing sequence header");
 
                 if (sequenceValues.Count != 1)
@@ -203,7 +214,7 @@ public class NatsKVStore
                 if (!ulong.TryParse(sequenceValues[0], out var sequence))
                     throw new NatsKVException("Can't parse sequence header");
 
-                if (!headers.TryGetValue("Nats-Time-Stamp", out var timestampValues))
+                if (!headers.TryGetValue(NatsTimeStamp, out var timestampValues))
                     throw new NatsKVException("Missing timestamp header");
 
                 if (timestampValues.Count != 1)
@@ -213,7 +224,7 @@ public class NatsKVStore
                     throw new NatsKVException("Can't parse timestamp header");
 
                 var operation = NatsKVOperation.Put;
-                if (headers.TryGetValue("KV-Operation", out var operationValues))
+                if (headers.TryGetValue(KVOperation, out var operationValues))
                 {
                     if (operationValues.Count != 1)
                         throw new NatsKVException("Unexpected number of operation headers");
@@ -227,9 +238,9 @@ public class NatsKVStore
                     throw new NatsKVKeyDeletedException(sequence);
                 }
 
-                return new NatsKVEntry<T?>(_bucket, key)
+                return new NatsKVEntry<T>(Bucket, key)
                 {
-                    Bucket = _bucket,
+                    Bucket = Bucket,
                     Key = key,
                     Created = timestamp,
                     Revision = sequence,
@@ -278,7 +289,7 @@ public class NatsKVStore
                 ArrayPool<byte>.Shared.Return(bytes);
             }
 
-            return new NatsKVEntry<T?>(_bucket, key)
+            return new NatsKVEntry<T>(Bucket, key)
             {
                 Created = created,
                 Revision = response.Message.Seq,
@@ -311,6 +322,18 @@ public class NatsKVStore
 
     public async IAsyncEnumerable<NatsKVEntry<T>> HistoryAsync<T>(string key, NatsKVWatchOpts? opts = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        try
+        {
+            await GetEntryAsync<T>(key, cancellationToken: cancellationToken);
+        }
+        catch (NatsKVKeyNotFoundException)
+        {
+            yield break;
+        }
+        catch (NatsKVKeyDeletedException)
+        {
+        }
+
         opts ??= NatsKVWatchOpts.Default;
         opts = opts with { IncludeHistory = true };
 
@@ -327,6 +350,12 @@ public class NatsKVStore
         }
     }
 
+    public async ValueTask<NatsKVStatus> GetStatusAsync(CancellationToken cancellationToken = default)
+    {
+        await _stream.RefreshAsync(cancellationToken);
+        return new NatsKVStatus(Bucket, _stream.Info);
+    }
+
     /// <summary>
     /// Start a watcher for all the keys in the bucket
     /// </summary>
@@ -336,6 +365,50 @@ public class NatsKVStore
     /// <returns>An asynchronous enumerable which can be used in <c>await foreach</c> loops</returns>
     public IAsyncEnumerable<NatsKVEntry<T>> WatchAsync<T>(NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default) =>
         WatchAsync<T>(">", opts, cancellationToken);
+
+    public async ValueTask PurgeDeletesAsync(NatsKVPurgeOpts? opts = default, CancellationToken cancellationToken = default)
+    {
+        opts ??= NatsKVPurgeOpts.Default;
+
+        var limit = DateTimeOffset.UtcNow - opts.DeleteMarkersThreshold;
+
+        var timeLimited = opts.DeleteMarkersThreshold > TimeSpan.Zero;
+
+        var deleted = new List<NatsKVEntry<int>>();
+
+        // Type doesn't matter here, we're just using the watcher to get the keys
+        await using (var watcher = await WatchInternalAsync<int>(">", opts: new NatsKVWatchOpts { MetaOnly = true }, cancellationToken: cancellationToken))
+        {
+            while (await watcher.Entries.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                while (watcher.Entries.TryRead(out var entry))
+                {
+                    if (entry.Operation is NatsKVOperation.Purge or NatsKVOperation.Del)
+                        deleted.Add(entry);
+                    if (entry.Delta == 0)
+                        goto PURGE_LOOP_DONE;
+                }
+            }
+        }
+
+    PURGE_LOOP_DONE:
+
+        foreach (var entry in deleted)
+        {
+            var request = new StreamPurgeRequest { Filter = $"$KV.{Bucket}.{entry.Key}" };
+
+            if (timeLimited && entry.Created > limit)
+            {
+                request.Keep = 1;
+            }
+
+            var response = await _stream.PurgeAsync(request, cancellationToken);
+            if (!response.Success)
+            {
+                throw new NatsKVException("Purge failed");
+            }
+        }
+    }
 
     public async IAsyncEnumerable<string> GetKeysAsync(NatsKVWatchOpts? opts = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -368,7 +441,7 @@ public class NatsKVStore
 
         var watcher = new NatsKVWatcher<T>(
             context: _context,
-            bucket: _bucket,
+            bucket: Bucket,
             key: key,
             opts: opts,
             subOpts: default,
@@ -380,9 +453,4 @@ public class NatsKVStore
     }
 }
 
-public record NatsKVDeleteOpts
-{
-    public bool Purge { get; init; }
-
-    public ulong Revision { get; init; }
-}
+public record NatsKVStatus(string Bucket, StreamInfo Info);
