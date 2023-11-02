@@ -1,6 +1,4 @@
-using System.Runtime.ExceptionServices;
 using NATS.Client.Core.Tests;
-using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.KeyValueStore.Tests;
@@ -164,7 +162,7 @@ public class KeyValueStoreTest
     }
 
     [Fact]
-    public async Task Delete()
+    public async Task Delete_and_purge()
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
@@ -190,28 +188,102 @@ public class KeyValueStoreTest
 
         // delete existing with revision
         {
-            await store.PutAsync($"k1", "v1-1", cancellationToken: cancellationToken);
-            await store.DeleteAsync($"k1", cancellationToken: cancellationToken);
+            await store.PutAsync($"k2", "v2-1", cancellationToken: cancellationToken);
+            await store.DeleteAsync($"k2", cancellationToken: cancellationToken);
 
             await Assert.ThrowsAsync<NatsKVKeyDeletedException>(async () =>
-                await store.GetEntryAsync<string>($"k1", cancellationToken: cancellationToken));
+                await store.GetEntryAsync<string>($"k2", cancellationToken: cancellationToken));
         }
 
         // delete existing with revision
         {
-            var seq1 = await store.PutAsync($"k1", "v1-1", cancellationToken: cancellationToken);
-            var seq2 = await store.PutAsync($"k1", "v1-1", cancellationToken: cancellationToken);
+            var seq1 = await store.PutAsync($"k3", "v3-1", cancellationToken: cancellationToken);
+            var seq2 = await store.PutAsync($"k3", "v3-1", cancellationToken: cancellationToken);
 
             await Assert.ThrowsAsync<NatsKVWrongLastRevisionException>(async () =>
-                await store.DeleteAsync($"k1", new NatsKVDeleteOpts { Revision = seq1 }, cancellationToken: cancellationToken));
+                await store.DeleteAsync($"k3", new NatsKVDeleteOpts { Revision = seq1 }, cancellationToken: cancellationToken));
 
-            await store.DeleteAsync($"k1", new NatsKVDeleteOpts { Revision = seq2 }, cancellationToken: cancellationToken);
+            await store.DeleteAsync($"k3", new NatsKVDeleteOpts { Revision = seq2 }, cancellationToken: cancellationToken);
 
             await Assert.ThrowsAsync<NatsKVKeyDeletedException>(async () =>
-                await store.GetEntryAsync<string>($"k1", cancellationToken: cancellationToken));
+                await store.GetEntryAsync<string>($"k3", cancellationToken: cancellationToken));
 
-            var entry = await store.GetEntryAsync<string>($"k1", revision: seq1, cancellationToken: cancellationToken);
-            Assert.Equal("v1-1", entry.Value);
+            var entry = await store.GetEntryAsync<string>($"k3", revision: seq1, cancellationToken: cancellationToken);
+            Assert.Equal("v3-1", entry.Value);
+        }
+
+        // purge
+        {
+            var seq0 = await store.PutAsync($"k4", "v4-0", cancellationToken: cancellationToken);
+            var seq1 = await store.PutAsync($"k4", "v4-1", cancellationToken: cancellationToken);
+            var seq2 = await store.PutAsync($"k4", "v4-2", cancellationToken: cancellationToken);
+
+            // initial state
+            {
+                var list = new List<NatsKVEntry<string>>();
+                await foreach (var entry in store.HistoryAsync<string>("k4", cancellationToken: cancellationToken))
+                {
+                    list.Add(entry);
+                }
+
+                Assert.Equal(3, list.Count);
+
+                Assert.Equal(seq0, list[0].Revision);
+                Assert.Equal("v4-0", list[0].Value);
+                Assert.Equal(NatsKVOperation.Put, list[0].Operation);
+
+                Assert.Equal(seq1, list[1].Revision);
+                Assert.Equal("v4-1", list[1].Value);
+                Assert.Equal(NatsKVOperation.Put, list[1].Operation);
+
+                Assert.Equal(seq2, list[2].Revision);
+                Assert.Equal("v4-2", list[2].Value);
+                Assert.Equal(NatsKVOperation.Put, list[2].Operation);
+            }
+
+            // deleted state
+            {
+                await store.DeleteAsync("k4", cancellationToken: cancellationToken);
+
+                var list = new List<NatsKVEntry<string>>();
+                await foreach (var entry in store.HistoryAsync<string>("k4", cancellationToken: cancellationToken))
+                {
+                    list.Add(entry);
+                }
+
+                Assert.Equal(4, list.Count);
+
+                Assert.Equal(seq0, list[0].Revision);
+                Assert.Equal("v4-0", list[0].Value);
+                Assert.Equal(NatsKVOperation.Put, list[0].Operation);
+
+                Assert.Equal(seq1, list[1].Revision);
+                Assert.Equal("v4-1", list[1].Value);
+                Assert.Equal(NatsKVOperation.Put, list[1].Operation);
+
+                Assert.Equal(seq2, list[2].Revision);
+                Assert.Equal("v4-2", list[2].Value);
+                Assert.Equal(NatsKVOperation.Put, list[2].Operation);
+
+                Assert.Null(list[3].Value);
+                Assert.Equal(NatsKVOperation.Del, list[3].Operation);
+            }
+
+            // purged state
+            {
+                await store.PurgeAsync("k4", cancellationToken: cancellationToken);
+
+                var list = new List<NatsKVEntry<string>>();
+                await foreach (var entry in store.HistoryAsync<string>("k4", cancellationToken: cancellationToken))
+                {
+                    list.Add(entry);
+                }
+
+                Assert.Single(list);
+
+                Assert.Null(list[0].Value);
+                Assert.Equal(NatsKVOperation.Purge, list[0].Operation);
+            }
         }
     }
 
@@ -302,6 +374,42 @@ public class KeyValueStoreTest
 
             await Assert.ThrowsAsync<NatsKVCreateException>(async () =>
                 await store.CreateAsync($"k3", "again", cancellationToken: cancellationToken));
+        }
+    }
+
+    [Fact]
+    public async Task History()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var store = await kv.CreateStoreAsync(new NatsKVConfig("kv1") { History = 10 }, cancellationToken: cancellationToken);
+
+        var seq = new ulong[5];
+        seq[0] = await store.CreateAsync($"k1", "v0", cancellationToken: cancellationToken);
+        seq[1] = await store.UpdateAsync($"k1", "v1", seq[0], cancellationToken: cancellationToken);
+        seq[2] = await store.UpdateAsync($"k1", "v2", seq[1], cancellationToken: cancellationToken);
+        seq[3] = await store.UpdateAsync($"k1", "v3", seq[2], cancellationToken: cancellationToken);
+        seq[4] = await store.UpdateAsync($"k1", "v4", seq[3], cancellationToken: cancellationToken);
+
+        var list = new List<NatsKVEntry<string>>();
+        await foreach (var entry in store.HistoryAsync<string>("k1", cancellationToken: cancellationToken))
+        {
+            list.Add(entry);
+        }
+
+        Assert.Equal(seq.Length, list.Count);
+
+        for (var i = 0; i < seq.Length; i++)
+        {
+            Assert.Equal(seq[i], list[i].Revision);
+            Assert.Equal($"v{i}", list[i].Value);
         }
     }
 }

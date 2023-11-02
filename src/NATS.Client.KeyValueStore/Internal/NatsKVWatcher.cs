@@ -38,7 +38,7 @@ internal class NatsKVWatcher<T>
     private readonly string _filter;
     private readonly NatsConnection _nats;
     private readonly Channel<NatsKVWatchCommandMsg<T>> _commandChannel;
-    private readonly Channel<NatsKVEntry<T?>> _entryChannel;
+    private readonly Channel<NatsKVEntry<T>> _entryChannel;
     private readonly Channel<string> _consumerCreateChannel;
     private readonly Timer _timer;
     private readonly int _hbTimeout;
@@ -99,7 +99,7 @@ internal class NatsKVWatcher<T>
         // Keep the channel size large enough to avoid blocking the connection
         // TCP receiver thread in case other operations are in-flight.
         _commandChannel = Channel.CreateBounded<NatsKVWatchCommandMsg<T>>(1000);
-        _entryChannel = Channel.CreateBounded<NatsKVEntry<T?>>(1000);
+        _entryChannel = Channel.CreateBounded<NatsKVEntry<T>>(1000);
 
         // A single request to create the consumer is enough because we don't want to create a new consumer
         // back to back in case the consumer is being recreated due to a timeout and a mismatch in consumer
@@ -114,7 +114,7 @@ internal class NatsKVWatcher<T>
         _commandTask = Task.Run(CommandLoop);
     }
 
-    public ChannelReader<NatsKVEntry<T?>> Entries => _entryChannel.Reader;
+    public ChannelReader<NatsKVEntry<T>> Entries => _entryChannel.Reader;
 
     internal string Consumer
     {
@@ -225,7 +225,7 @@ internal class NatsKVWatcher<T>
 
                                     var delta = (long)metadata.NumPending;
 
-                                    var entry = new NatsKVEntry<T?>(_bucket, key)
+                                    var entry = new NatsKVEntry<T>(_bucket, key)
                                     {
                                         Value = msg.Data,
                                         Revision = metadata.Sequence.Stream,

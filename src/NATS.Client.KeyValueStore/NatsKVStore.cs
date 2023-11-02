@@ -147,6 +147,9 @@ public class NatsKVStore
         }
     }
 
+    public ValueTask PurgeAsync(string key, NatsKVDeleteOpts? opts = default, CancellationToken cancellationToken = default) =>
+        DeleteAsync(key, (opts ?? new NatsKVDeleteOpts()) with { Purge = true }, cancellationToken);
+
     /// <summary>
     /// Get an entry from the bucket using the key
     /// </summary>
@@ -293,7 +296,7 @@ public class NatsKVStore
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <typeparam name="T">Serialized value type</typeparam>
     /// <returns>An asynchronous enumerable which can be used in <c>await foreach</c> loops</returns>
-    public async IAsyncEnumerable<NatsKVEntry<T?>> WatchAsync<T>(string key, NatsKVWatchOpts? opts = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<NatsKVEntry<T>> WatchAsync<T>(string key, NatsKVWatchOpts? opts = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         await using var watcher = await WatchInternalAsync<T>(key, opts, cancellationToken);
 
@@ -306,6 +309,24 @@ public class NatsKVStore
         }
     }
 
+    public async IAsyncEnumerable<NatsKVEntry<T>> HistoryAsync<T>(string key, NatsKVWatchOpts? opts = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        opts ??= NatsKVWatchOpts.Default;
+        opts = opts with { IncludeHistory = true };
+
+        await using var watcher = await WatchInternalAsync<T>(key, opts, cancellationToken);
+
+        while (await watcher.Entries.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            while (watcher.Entries.TryRead(out var entry))
+            {
+                yield return entry;
+                if (entry.Delta == 0)
+                    yield break;
+            }
+        }
+    }
+
     /// <summary>
     /// Start a watcher for all the keys in the bucket
     /// </summary>
@@ -313,7 +334,7 @@ public class NatsKVStore
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <typeparam name="T">Serialized value type</typeparam>
     /// <returns>An asynchronous enumerable which can be used in <c>await foreach</c> loops</returns>
-    public IAsyncEnumerable<NatsKVEntry<T?>> WatchAsync<T>(NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default) =>
+    public IAsyncEnumerable<NatsKVEntry<T>> WatchAsync<T>(NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default) =>
         WatchAsync<T>(">", opts, cancellationToken);
 
     public async IAsyncEnumerable<string> GetKeysAsync(NatsKVWatchOpts? opts = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
