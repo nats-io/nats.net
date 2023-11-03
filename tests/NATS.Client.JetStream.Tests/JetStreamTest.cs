@@ -55,7 +55,7 @@ public class JetStreamTest
             var ack = await js.PublishAsync("events.foo", new TestData { Test = 1 }, opts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts1.Token);
             Assert.Null(ack.Error);
             Assert.Equal("events", ack.Stream);
-            Assert.Equal(1, ack.Seq);
+            Assert.Equal(1, (int)ack.Seq);
             Assert.False(ack.Duplicate);
 
             // Message ID
@@ -67,7 +67,7 @@ public class JetStreamTest
                 cancellationToken: cts1.Token);
             Assert.Null(ack.Error);
             Assert.Equal("events", ack.Stream);
-            Assert.Equal(2, ack.Seq);
+            Assert.Equal(2, (int)ack.Seq);
             Assert.False(ack.Duplicate);
 
             // Duplicate
@@ -79,7 +79,7 @@ public class JetStreamTest
                 cancellationToken: cts1.Token);
             Assert.Null(ack.Error);
             Assert.Equal("events", ack.Stream);
-            Assert.Equal(2, ack.Seq);
+            Assert.Equal(2, (int)ack.Seq);
             Assert.True(ack.Duplicate);
 
             // Consume

@@ -106,6 +106,14 @@ public partial class NatsJSContext
         throw new NatsJSException("No response received");
     }
 
+    public ValueTask<PubAckResponse> PublishAsync(
+        string subject,
+        string? msgId = default,
+        NatsHeaders? headers = default,
+        NatsPubOpts? opts = default,
+        CancellationToken cancellationToken = default) =>
+        PublishAsync<object?>(subject, default, msgId, headers, opts, cancellationToken);
+
     internal string NewInbox() => NatsConnection.NewInbox(Connection.Opts.InboxPrefix);
 
     internal async ValueTask<TResponse> JSRequestResponseAsync<TRequest, TResponse>(

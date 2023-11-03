@@ -63,14 +63,14 @@ public class NatsJSDuplicateMessageException : NatsJSException
     /// Create JetStream duplicate message exception.
     /// </summary>
     /// <param name="sequence">The duplicate sequence number.</param>
-    public NatsJSDuplicateMessageException(long sequence)
+    public NatsJSDuplicateMessageException(ulong sequence)
         : base($"Duplicate of {sequence}") =>
         Sequence = sequence;
 
     /// <summary>
     /// The duplicate sequence number.
     /// </summary>
-    public long Sequence { get; }
+    public ulong Sequence { get; }
 }
 
 /// <summary>

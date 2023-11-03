@@ -58,10 +58,18 @@ public class NatsObjContext
             AllowDirect = true,
             Metadata = config.Metadata!,
             Retention = StreamConfigurationRetention.limits,
+            Compression = StreamConfigurationCompression.none,
         };
 
         var stream = await _context.CreateStreamAsync(streamConfiguration, cancellationToken);
-        return new NatsObjStore(config, _context, stream);
+        return new NatsObjStore(config, this, _context, stream);
+    }
+
+    public async ValueTask<NatsObjStore> GetObjectStoreAsync(string bucket, CancellationToken cancellationToken = default)
+    {
+        ValidateBucketName(bucket);
+        var stream = await _context.GetStreamAsync($"OBJ_{bucket}", cancellationToken: cancellationToken);
+        return new NatsObjStore(new NatsObjConfig(bucket), this, _context, stream);
     }
 
     /// <summary>

@@ -24,7 +24,7 @@ public record PubAckResponse
     [System.Text.Json.Serialization.JsonPropertyName("seq")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     [System.ComponentModel.DataAnnotations.Range(0D, 18446744073709552000D)]
-    public long Seq { get; set; } = default!;
+    public ulong Seq { get; set; } = default!;
 
     /// <summary>
     /// Indicates that the message was not stored due to the Nats-Msg-Id header and duplicate tracking

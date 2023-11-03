@@ -33,7 +33,7 @@ public record NatsObjConfig(string Bucket)
     /// <summary>
     /// Type of backing storage to use.
     /// </summary>
-    public NatsObjStorageType? Storage { get; init; }
+    public NatsObjStorageType Storage { get; init; }
 
     /// <summary>
     /// How many replicas to keep for each key.
