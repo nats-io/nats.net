@@ -28,6 +28,15 @@ strings and numbers. It uses the following rules to determine the type of the da
 - If the data is a primitive (for example `DateTime`, `int` or `double`. See also [`NatsUtf8PrimitivesSerializer<T>`](xref:NATS.Client.Core.NatsUtf8PrimitivesSerializer`1)) it is treated as the primitive encoded as a UTF8 string.
 - For any other type, the serializer will throw an exception.
 
+Serializer registry is a simple interface that can be used to provide a custom serializer instances for specific types:
+
+```csharp
+public interface INatsSerializerRegistry
+{
+    INatsSerializer<T> GetSerializer<T>();
+}
+```
+
 You can use the default serializer by not specifying a serializer in the connection options or by setting the serializer
 registry to the default serializer:
 
@@ -104,41 +113,34 @@ Then you can use the [`NatsJsonContextSerializer<T>`](xref:NATS.Client.Core.Nats
 by providing the registry ([`NatsJsonContextSerializerRegistry`](xref:NATS.Client.Core.NatsJsonContextSerializerRegistry)) with the connection options:
 
 ```csharp
-// Set the custom serializer as the default for the connection.
-var natsOpts = NatsOpts.Default with { Serializers = new NatsJsonContextSerializerRegistry(MyJsonContext.Default, OtherJsonContext.Default) };
+// Set the custom serializer registry as the default for the connection.
+var myRegistry = new NatsJsonContextSerializerRegistry(MyJsonContext.Default, OtherJsonContext.Default);
+
+var natsOpts = NatsOpts.Default with { Serializers = myRegistry };
 
 await using var nats = new NatsConnection(natsOpts);
 
 await using INatsSub<MyData> sub = await nats.SubscribeAsync<MyData>(subject: "foo");
 
-// Flush the the network buffers to make sure the subscription request has been processed.
-await nats.PingAsync();
+// ...
 
 await nats.PublishAsync<MyData>(subject: "foo", data: new MyData { Id = 1, Name = "bar" });
 
-NatsMsg<MyData?> msg = await sub.Msgs.ReadAsync();
-
-// Outputs 'MyData { Id = 1, Name = bar }'
-Console.WriteLine(msg.Data);
+// ...
 ```
 
 You can also set the serializer for a specific subscription or publish call:
+
 ```csharp
-await using var nats = new NatsConnection();
+var myJson = new NatsJsonContextSerializer(MyJsonContext.Default);
 
-var serializer = new NatsJsonContextSerializer(MyJsonContext.Default);
+await using INatsSub<MyData> sub = await nats.SubscribeAsync<MyData>(subject: "foo", serializer: myJson);
 
-await using INatsSub<MyData> sub = await nats.SubscribeAsync<MyData>(subject: "foo", serializer: serializer);
+// ...
 
-// Flush the the network buffers to make sure the subscription request has been processed.
-await nats.PingAsync();
+await nats.PublishAsync<MyData>(subject: "foo", data: new MyData { Id = 1, Name = "bar" }, serializer: myJson);
 
-await nats.PublishAsync<MyData>(subject: "foo", data: new MyData { Id = 1, Name = "bar" }, serializer: serializer);
-
-NatsMsg<MyData?> msg = await sub.Msgs.ReadAsync();
-
-// Outputs 'MyData { Id = 1, Name = bar }'
-Console.WriteLine(msg.Data);
+// ...
 ```
 
 ## Using Custom Serializer
@@ -152,8 +154,6 @@ Here is an example of a custom serializer that uses the Google ProtoBuf serializ
 public class MyProtoBufSerializer<T> : INatsSerializer<T>
 {
     public static readonly INatsSerializer Default = new MyProtoBufSerializer();
-
-    public INatsSerializer? Next => default;
 
     public void Serialize(IBufferWriter<byte> bufferWriter, T value)
     {
@@ -222,7 +222,7 @@ public class MixedSerializerRegistry : INatsSerializerRegistry
     public INatsSerializer<T> GetSerializer<T>() => new NatsJsonContextSerializer<T>(MyJsonContext.Default, next: MyProtoBufSerializer<T>.Default);
 }
 
-var natsOpts = NatsOpts.Default with { Serializer =  new MixedSerializerRegistry() };
+var natsOpts = NatsOpts.Default with { Serializers =  new MixedSerializerRegistry() };
 
 await using var nats = new NatsConnection(natsOpts);
 
