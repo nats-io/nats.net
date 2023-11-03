@@ -12,7 +12,7 @@ var kv = new NatsKVContext(js);
 
 var store = await kv.CreateStoreAsync("e1");
 
-await foreach (var entry in store.WatchAllAsync<int>())
+await foreach (var entry in store.WatchAsync<int>())
 {
     Console.WriteLine($"[RCV] {entry}");
 }

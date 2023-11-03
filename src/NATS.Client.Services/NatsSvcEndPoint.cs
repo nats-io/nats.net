@@ -44,6 +44,11 @@ public interface INatsSvcEndpoint : IAsyncDisposable
     IDictionary<string, string>? Metadata { get; }
 
     /// <summary>
+    /// The name of the endpoint.
+    /// </summary>
+    string Name { get; }
+
+    /// <summary>
     /// The subject name to subscribe to.
     /// </summary>
     string Subject { get; }
@@ -87,6 +92,9 @@ public abstract class NatsSvcEndpointBase : NatsSubBase, INatsSvcEndpoint
     /// <inheritdoc/>
     public abstract IDictionary<string, string>? Metadata { get; }
 
+    /// <inheritdoc/>
+    public abstract string Name { get; }
+
     internal abstract void IncrementErrors();
 
     internal abstract void SetLastError(string error);
@@ -101,7 +109,6 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
     private readonly ILogger _logger;
     private readonly Func<NatsSvcMsg<T>, ValueTask> _handler;
     private readonly NatsConnection _nats;
-    private readonly string _name;
     private readonly CancellationToken _cancellationToken;
     private readonly Channel<NatsSvcMsg<T>> _channel;
     private readonly INatsSerializer<T> _serializer;
@@ -130,13 +137,16 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
         _logger = nats.Opts.LoggerFactory.CreateLogger<NatsSvcEndpoint<T>>();
         _handler = handler;
         _nats = nats;
-        _name = name;
+        Name = name;
         Metadata = metadata;
         _cancellationToken = cancellationToken;
         _serializer = serializer;
         _channel = Channel.CreateBounded<NatsSvcMsg<T>>(128);
         _handlerTask = Task.Run(HandlerLoop);
     }
+
+    /// <inheritdoc/>
+    public override string Name { get; }
 
     /// <inheritdoc/>
     public override long Requests => Volatile.Read(ref _requests);
@@ -185,7 +195,7 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
         }
         catch (Exception e)
         {
-            _logger.LogError(e, "Endpoint {Name} error building message", _name);
+            _logger.LogError(e, "Endpoint {Name} error building message", Name);
             exception = e;
 
             // Most likely a serialization error.
@@ -230,7 +240,7 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
                     body = string.Empty;
 
                     // Only log unknown exceptions
-                    _logger.LogError(e, "Endpoint {Name} error processing message", _name);
+                    _logger.LogError(e, "Endpoint {Name} error processing message", Name);
                 }
 
                 try
@@ -246,7 +256,7 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
                 }
                 catch (Exception e1)
                 {
-                    _logger.LogError(e1, "Endpoint {Name} error responding", _name);
+                    _logger.LogError(e1, "Endpoint {Name} error responding", Name);
                 }
             }
             finally

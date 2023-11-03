@@ -31,7 +31,7 @@ public class PublishTest
                 serializer: TestDataJsonSerializer<TestData>.Default,
                 cancellationToken: cts.Token);
             Assert.Null(ack.Error);
-            Assert.Equal(1, ack.Seq);
+            Assert.Equal(1, (int)ack.Seq);
             Assert.Equal("s1", ack.Stream);
             Assert.False(ack.Duplicate);
         }
@@ -45,7 +45,7 @@ public class PublishTest
                 headers: new NatsHeaders { { "Nats-Msg-Id", "2" } },
                 cancellationToken: cts.Token);
             Assert.Null(ack1.Error);
-            Assert.Equal(2, ack1.Seq);
+            Assert.Equal(2, (int)ack1.Seq);
             Assert.False(ack1.Duplicate);
 
             var ack2 = await js.PublishAsync(

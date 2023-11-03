@@ -1,4 +1,5 @@
 using NATS.Client.Core;
+using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
@@ -168,11 +169,12 @@ public class NatsJSStream
             request: null,
             cancellationToken).ConfigureAwait(false);
 
-    public ValueTask<NatsMsg<T>> GetDirectAsync<T>(string subject, INatsSerializer<T>? serializer = default, CancellationToken cancellationToken = default)
+    public ValueTask<NatsMsg<T>> GetDirectAsync<T>(StreamMsgGetRequest request, INatsSerializer<T>? serializer = default, CancellationToken cancellationToken = default)
     {
-        return _context.Connection.RequestAsync<object, T>(
-            subject: $"{_context.Opts.Prefix}.DIRECT.GET.{_name}.{subject}",
-            data: default,
+        return _context.Connection.RequestAsync<StreamMsgGetRequest, T>(
+            subject: $"{_context.Opts.Prefix}.DIRECT.GET.{_name}",
+            data: request,
+            requestSerializer: NatsJSJsonSerializer<StreamMsgGetRequest>.Default,
             replySerializer: serializer,
             cancellationToken: cancellationToken);
     }

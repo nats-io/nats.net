@@ -113,7 +113,7 @@ public class ServicesTests
         Assert.Equal("e1", endpointStats.Name);
         Assert.Equal(10, endpointStats.NumRequests);
         Assert.Equal(3, endpointStats.NumErrors);
-        Assert.Equal("Handler error (999)", endpointStats.LastError);
+        Assert.Equal("999:Handler error", endpointStats.LastError);
         Assert.True(endpointStats.ProcessingTime > 0);
         Assert.True(endpointStats.AverageProcessingTime > 0);
     }
@@ -171,14 +171,14 @@ public class ServicesTests
             Assert.Equal("foo.baz", info.Endpoints.First(e => e.Name == "baz").Subject);
             Assert.Equal("q", info.Endpoints.First(e => e.Name == "baz").QueueGroup);
 
-            Assert.Equal("foo.bar1", info.Endpoints.First(e => e.Name == "foo.bar1").Subject);
-            Assert.Equal("q", info.Endpoints.First(e => e.Name == "foo.bar1").QueueGroup);
+            Assert.Equal("foo.bar1", info.Endpoints.First(e => e.Name == "foo-bar1").Subject);
+            Assert.Equal("q", info.Endpoints.First(e => e.Name == "foo-bar1").QueueGroup);
 
-            Assert.Equal("grp1.e1", info.Endpoints.First(e => e.Name == "grp1.e1").Subject);
-            Assert.Equal("q", info.Endpoints.First(e => e.Name == "grp1.e1").QueueGroup);
+            Assert.Equal("grp1.e1", info.Endpoints.First(e => e.Name == "e1").Subject);
+            Assert.Equal("q", info.Endpoints.First(e => e.Name == "e1").QueueGroup);
 
-            Assert.Equal("grp1.foo.bar2", info.Endpoints.First(e => e.Name == "grp1.e2").Subject);
-            Assert.Equal("q", info.Endpoints.First(e => e.Name == "grp1.e2").QueueGroup);
+            Assert.Equal("grp1.foo.bar2", info.Endpoints.First(e => e.Name == "e2").Subject);
+            Assert.Equal("q", info.Endpoints.First(e => e.Name == "e2").QueueGroup);
 
             Assert.Equal("foo.empty1", info.Endpoints.First(e => e.Name == "empty1").Subject);
             Assert.Equal("q_empty", info.Endpoints.First(e => e.Name == "empty1").QueueGroup);
@@ -190,7 +190,7 @@ public class ServicesTests
                 Description = "es-two",
                 QueueGroup = "q2",
                 Metadata = new Dictionary<string, string> { { "k1", "v1" }, { "k2", "v2" }, },
-                StatsHandler = () => JsonNode.Parse("{\"stat-k1\":\"stat-v1\",\"stat-k2\":\"stat-v2\"}")!,
+                StatsHandler = ep => JsonNode.Parse($"{{\"stat-k1\":\"stat-v1\",\"stat-k2\":\"stat-v2\",\"ep_name\": \"{ep.Name}\"}}")!,
             },
             cancellationToken: cancellationToken);
 
@@ -219,6 +219,7 @@ public class ServicesTests
             var eps = stat.Endpoints.First();
             Assert.Equal("stat-v1", eps.Data["stat-k1"]?.GetValue<string>());
             Assert.Equal("stat-v2", eps.Data["stat-k2"]?.GetValue<string>());
+            Assert.Equal("s2baz", eps.Data["ep_name"]?.GetValue<string>());
         }
     }
 

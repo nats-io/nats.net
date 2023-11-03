@@ -44,3 +44,17 @@ public record NatsKVWatchOpts
     /// </summary>
     public bool MetaOnly { get; init; } = false;
 }
+
+public record NatsKVDeleteOpts
+{
+    public bool Purge { get; init; }
+
+    public ulong Revision { get; init; }
+}
+
+public record NatsKVPurgeOpts
+{
+    public static readonly NatsKVPurgeOpts Default = new() { DeleteMarkersThreshold = TimeSpan.FromMinutes(30) };
+
+    public TimeSpan DeleteMarkersThreshold { get; init; }
+}
