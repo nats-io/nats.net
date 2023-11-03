@@ -62,5 +62,5 @@ public record NatsSvcConfig
     /// Stats handler. JSON object returned by this handler will be included in
     /// the service stats <c>data</c> property.
     /// </summary>
-    public Func<JsonNode>? StatsHandler { get; init; }
+    public Func<INatsSvcEndpoint, JsonNode>? StatsHandler { get; init; }
 }

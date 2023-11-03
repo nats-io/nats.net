@@ -1,5 +1,7 @@
 using System.Buffers;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using NATS.Client.Core;
 using NATS.Client.Core.Internal;
@@ -21,15 +23,18 @@ public class NatsObjStore
     private const string RollupSubject = "sub";
 
     private static readonly NatsHeaders NatsRollupHeaders = new() { { NatsRollup, RollupSubject } };
+
     private static readonly Regex ValidObjectRegex = new(pattern: @"\A[-/_=\.a-zA-Z0-9]+\z", RegexOptions.Compiled);
 
     private readonly string _bucket;
+    private readonly NatsObjContext _objContext;
     private readonly NatsJSContext _context;
     private readonly NatsJSStream _stream;
 
-    internal NatsObjStore(NatsObjConfig config, NatsJSContext context, NatsJSStream stream)
+    internal NatsObjStore(NatsObjConfig config, NatsObjContext objContext, NatsJSContext context, NatsJSStream stream)
     {
         _bucket = config.Bucket;
+        _objContext = objContext;
         _context = context;
         _stream = stream;
     }
@@ -62,11 +67,20 @@ public class NatsObjStore
 
         var info = await GetInfoAsync(key, cancellationToken: cancellationToken);
 
+        if (info.Options?.Link is { } link)
+        {
+            var store = await _objContext.GetObjectStoreAsync(link.Bucket, cancellationToken).ConfigureAwait(false);
+            return await store.GetAsync(link.Name, stream, leaveOpen, cancellationToken).ConfigureAwait(false);
+        }
+
         await using var pushConsumer = new NatsJSOrderedPushConsumer<IMemoryOwner<byte>>(
             _context,
             $"OBJ_{_bucket}",
             GetChunkSubject(info.Nuid),
-            new NatsJSOrderedPushConsumerOpts { DeliverPolicy = ConsumerConfigurationDeliverPolicy.all },
+            new NatsJSOrderedPushConsumerOpts
+            {
+                DeliverPolicy = ConsumerConfigurationDeliverPolicy.all,
+            },
             new NatsSubOpts(),
             cancellationToken);
 
@@ -180,19 +194,19 @@ public class NatsObjStore
         meta.Nuid = nuid;
         meta.MTime = DateTimeOffset.UtcNow;
 
-        if (meta.Options == null!)
+        meta.Options ??= new MetaDataOptions
         {
-            meta.Options = new MetaDataOptions { MaxChunkSize = DefaultChunkSize };
-        }
+            MaxChunkSize = DefaultChunkSize,
+        };
 
-        if (meta.Options.MaxChunkSize == 0)
+        if (meta.Options.MaxChunkSize is null or <= 0)
         {
             meta.Options.MaxChunkSize = DefaultChunkSize;
         }
 
         var size = 0;
         var chunks = 0;
-        var chunkSize = meta.Options.MaxChunkSize;
+        var chunkSize = meta.Options.MaxChunkSize!.Value;
 
         string digest;
         using (var sha256 = SHA256.Create())
@@ -266,7 +280,10 @@ public class NatsObjStore
             {
                 await _context.JSRequestResponseAsync<StreamPurgeRequest, StreamPurgeResponse>(
                     subject: $"{_context.Opts.Prefix}.STREAM.PURGE.OBJ_{_bucket}",
-                    request: new StreamPurgeRequest { Filter = GetChunkSubject(info.Nuid) },
+                    request: new StreamPurgeRequest
+                    {
+                        Filter = GetChunkSubject(info.Nuid),
+                    },
                     cancellationToken);
             }
             catch (NatsJSApiException e)
@@ -277,6 +294,82 @@ public class NatsObjStore
         }
 
         return meta;
+    }
+
+    public async ValueTask<ObjectMetadata> UpdateMetaAsync(string key, ObjectMetadata meta, CancellationToken cancellationToken = default)
+    {
+        ValidateObjectName(meta.Name);
+
+        var info = await GetInfoAsync(key, cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        if (key != meta.Name)
+        {
+            // Make sure the new name is available
+            try
+            {
+                await GetInfoAsync(meta.Name, cancellationToken: cancellationToken).ConfigureAwait(false);
+                throw new NatsObjException($"Object already exists: {meta.Name}");
+            }
+            catch (NatsObjNotFoundException)
+            {
+            }
+        }
+
+        info.Name = meta.Name;
+        info.Description = meta.Description;
+        info.Metadata = meta.Metadata;
+        info.Headers = meta.Headers;
+
+        await PublishMeta(info, cancellationToken);
+
+        return info;
+    }
+
+    public async ValueTask<ObjectMetadata> AddLinkAsync(string link, ObjectMetadata target, CancellationToken cancellationToken = default)
+    {
+        ValidateObjectName(link);
+        ValidateObjectName(target.Name);
+
+        if (target.Deleted)
+        {
+            throw new NatsObjException("Can't link to a deleted object");
+        }
+
+        if (target.Options?.Link is not null)
+        {
+            throw new NatsObjException("Can't link to a linked object");
+        }
+
+        try
+        {
+            var checkLink = await GetInfoAsync(link, showDeleted: true, cancellationToken: cancellationToken).ConfigureAwait(false);
+            if (checkLink.Options?.Link is null)
+            {
+                throw new NatsObjException("Object already exists");
+            }
+        }
+        catch (NatsObjNotFoundException)
+        {
+        }
+
+        var info = new ObjectMetadata
+        {
+            Name = link,
+            Bucket = _bucket,
+            Nuid = NewNuid(),
+            Options = new MetaDataOptions
+            {
+                Link = new NatsObjLink
+                {
+                    Name = target.Name,
+                    Bucket = target.Bucket,
+                },
+            },
+        };
+
+        await PublishMeta(info, cancellationToken);
+
+        return info;
     }
 
     /// <summary>
@@ -291,12 +384,16 @@ public class NatsObjStore
     {
         ValidateObjectName(key);
 
-        var request = new StreamMsgGetRequest { LastBySubj = GetMetaSubject(key) };
+        var request = new StreamMsgGetRequest
+        {
+            LastBySubj = GetMetaSubject(key),
+        };
         try
         {
             var response = await _stream.GetAsync(request, cancellationToken);
 
-            var data = NatsObjJsonSerializer.Default.Deserialize<ObjectMetadata>(new ReadOnlySequence<byte>(Convert.FromBase64String(response.Message.Data))) ?? throw new NatsObjException("Can't deserialize object metadata");
+            var base64String = Convert.FromBase64String(response.Message.Data);
+            var data = NatsObjJsonSerializer.Default.Deserialize<ObjectMetadata>(new ReadOnlySequence<byte>(base64String)) ?? throw new NatsObjException("Can't deserialize object metadata");
 
             if (!showDeleted && data.Deleted)
             {
@@ -313,6 +410,44 @@ public class NatsObjStore
             }
 
             throw;
+        }
+    }
+
+    public async IAsyncEnumerable<ObjectMetadata> WatchAsync(NatsObjWatchOpts? opts = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        opts ??= new NatsObjWatchOpts();
+
+        var deliverPolicy = ConsumerConfigurationDeliverPolicy.all;
+        if (opts.UpdatesOnly)
+        {
+            deliverPolicy = ConsumerConfigurationDeliverPolicy.@new;
+        }
+
+        await using var pushConsumer = new NatsJSOrderedPushConsumer<NatsMemoryOwner<byte>>(
+            _context,
+            $"OBJ_{_bucket}",
+            $"$O.{_bucket}.M.>",
+            new NatsJSOrderedPushConsumerOpts
+            {
+                DeliverPolicy = deliverPolicy,
+            },
+            new NatsSubOpts(),
+            cancellationToken);
+
+        pushConsumer.Init();
+
+        await foreach (var msg in pushConsumer.Msgs.ReadAllAsync(cancellationToken))
+        {
+            if (pushConsumer.IsDone)
+                continue;
+            using (msg.Data)
+            {
+                var info = JsonSerializer.Deserialize(msg.Data.Memory.Span, NatsObjJsonSerializerContext.Default.ObjectMetadata);
+                if (info != null)
+                {
+                    yield return info;
+                }
+            }
         }
     }
 
@@ -381,4 +516,9 @@ public class NatsObjStore
             throw new NatsObjException("Object name can only contain alphanumeric characters, dashes, underscores, forward slash, equals sign, and periods");
         }
     }
+}
+
+public record NatsObjWatchOpts
+{
+    public bool UpdatesOnly { get; init; }
 }
