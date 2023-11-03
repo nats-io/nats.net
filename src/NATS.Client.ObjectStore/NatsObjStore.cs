@@ -195,14 +195,14 @@ public class NatsObjStore
             meta.Options = new MetaDataOptions { MaxChunkSize = DefaultChunkSize };
         }
 
-        if (meta.Options.MaxChunkSize == 0)
+        if (meta.Options.MaxChunkSize is null or 0)
         {
             meta.Options.MaxChunkSize = DefaultChunkSize;
         }
 
         var size = 0;
         var chunks = 0;
-        var chunkSize = meta.Options.MaxChunkSize;
+        var chunkSize = meta.Options.MaxChunkSize.Value;
 
         string digest;
         using (var sha256 = SHA256.Create())

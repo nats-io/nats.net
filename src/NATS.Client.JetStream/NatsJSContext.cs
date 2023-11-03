@@ -116,7 +116,7 @@ public partial class NatsJSContext
         NatsHeaders? headers = default,
         NatsPubOpts? opts = default,
         CancellationToken cancellationToken = default) =>
-        PublishAsync<object?>(subject, default, msgId, headers, opts, cancellationToken);
+        PublishAsync<object?>(subject, default, msgId, headers, serializer: default, opts, cancellationToken);
 
     internal string NewInbox() => NatsConnection.NewInbox(Connection.Opts.InboxPrefix);
 
