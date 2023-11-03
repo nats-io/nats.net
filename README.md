@@ -21,6 +21,8 @@ supporting and developing NATS .NET V2 project.
 
 Check out the [documentation](https://nats-io.github.io/nats.net.v2/) for guides and examples.
 
+**Additionally Check out [NATS by example](https://natsbyexample.com) - An evolving collection of runnable, cross-client reference examples for NATS.**
+
 ## NATS.NET V2 Goals
 
 - Only support Async I/O (async/await)
