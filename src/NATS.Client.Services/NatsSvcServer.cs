@@ -314,12 +314,10 @@ public class NatsSvcServer : IAsyncDisposable
         /// </remarks>
         public ValueTask AddEndpointAsync<T>(Func<NatsSvcMsg<T>, ValueTask> handler, string? name = default, string? subject = default, string? queueGroup = default, IDictionary<string, string>? metadata = default, INatsSerializer<T>? serializer = default, CancellationToken cancellationToken = default)
         {
-            serializer ??= _server._nats.Opts.Serializers.GetSerializer<T>();
-
-            var epName = name != null ? $"{GroupName}{_dot}{name}" : null;
             subject ??= name;
             var epSubject = subject != null ? $"{GroupName}{_dot}{subject}" : null;
             queueGroup ??= QueueGroup ?? _server._config.QueueGroup;
+            serializer ??= _server._nats.Opts.Serializers.GetSerializer<T>();
             return _server.AddEndpointInternalAsync(handler, name, epSubject, queueGroup, metadata, serializer, cancellationToken);
         }
 
