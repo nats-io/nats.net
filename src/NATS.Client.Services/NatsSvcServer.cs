@@ -84,7 +84,7 @@ public class NatsSvcServer : IAsyncDisposable
     /// <param name="subject">Optional endpoint subject.</param>
     /// <param name="queueGroup">Queue group name (defaults to service group's).</param>
     /// <param name="metadata">Optional endpoint metadata.</param>
-    /// <param name="serializer">Serializer to use for when deserializing incoming messages (defaults to connection's serializer).</param>
+    /// <param name="serializer">Serializer to use when deserializing incoming messages (defaults to connection's serializer).</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to stop the endpoint.</param>
     /// <typeparam name="T">Serialization type for messages received.</typeparam>
     /// <returns>A <seealso cref="ValueTask"/> representing the asynchronous operation.</returns>
