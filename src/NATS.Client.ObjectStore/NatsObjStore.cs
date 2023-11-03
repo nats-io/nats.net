@@ -195,7 +195,7 @@ public class NatsObjStore
             meta.Options = new MetaDataOptions { MaxChunkSize = DefaultChunkSize };
         }
 
-        if (meta.Options.MaxChunkSize is null or 0)
+        if (meta.Options.MaxChunkSize is null or <= 0)
         {
             meta.Options.MaxChunkSize = DefaultChunkSize;
         }
