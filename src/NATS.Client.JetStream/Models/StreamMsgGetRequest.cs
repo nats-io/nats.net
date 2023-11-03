@@ -11,7 +11,7 @@ public record StreamMsgGetRequest
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("seq")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public int Seq { get; set; } = default!;
+    public ulong Seq { get; set; } = default!;
 
     /// <summary>
     /// Retrieves the last message for a given subject, cannot be combined with seq

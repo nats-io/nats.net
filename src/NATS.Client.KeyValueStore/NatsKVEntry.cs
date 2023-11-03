@@ -26,7 +26,7 @@ public readonly record struct NatsKVEntry<T>(string Bucket, string Key)
     /// <summary>
     /// A unique sequence for this value.
     /// </summary>
-    public long Revision { get; init; } = default;
+    public ulong Revision { get; init; } = default;
 
     /// <summary>
     /// Distance from the latest value.
