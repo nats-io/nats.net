@@ -89,6 +89,12 @@ public partial class NatsJSContext
                 replyOpts: new NatsSubOpts
                 {
                     Serializer = NatsJSJsonSerializer.Default,
+
+                    // It's important to set the timeout here so that the subscription can be
+                    // stopped if the server doesn't respond or more likely case is that if there
+                    // is a reconnect to the cluster between the request and waiting for a response,
+                    // without the timeout the publish call will hang forever since the server
+                    // which received the request won't be there to respond anymore.
                     Timeout = Connection.Opts.RequestTimeout,
                 },
                 cancellationToken)
@@ -107,6 +113,8 @@ public partial class NatsJSContext
             }
         }
 
+        // We throw a specific exception here for convenience so that the caller doesn't
+        // have to check for the exception message etc.
         throw new NatsJSPublishNoResponseException();
     }
 
