@@ -96,7 +96,7 @@ async Task JetStreamTests()
         Assert.Equal("consumer1", consumer.Info.Config.Name);
 
         // Publish
-        var ack = await js.PublishAsync("events.foo", new TestData { Test = 1 }, opts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts1.Token);
+        var ack = await js.PublishAsync("events.foo", new TestData { Test = 1 }, pubOpts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts1.Token);
         Assert.Null(ack.Error);
         Assert.Equal("events", ack.Stream);
         Assert.Equal(1, (int)ack.Seq);
@@ -106,8 +106,8 @@ async Task JetStreamTests()
         ack = await js.PublishAsync(
             "events.foo",
             new TestData { Test = 2 },
-            opts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default },
-            headers: new NatsHeaders { { "Nats-Msg-Id", "test2" } },
+            pubOpts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default },
+            opts: new NatsJSPubOpts { MsgId = "test2" },
             cancellationToken: cts1.Token);
         Assert.Null(ack.Error);
         Assert.Equal("events", ack.Stream);
@@ -118,8 +118,8 @@ async Task JetStreamTests()
         ack = await js.PublishAsync(
             "events.foo",
             new TestData { Test = 2 },
-            opts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default },
-            headers: new NatsHeaders { { "Nats-Msg-Id", "test2" } },
+            pubOpts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default },
+            opts: new NatsJSPubOpts { MsgId = "test2" },
             cancellationToken: cts1.Token);
         Assert.Null(ack.Error);
         Assert.Equal("events", ack.Stream);

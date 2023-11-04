@@ -30,7 +30,7 @@ public class ConsumerConsumeTest
 
         for (var i = 0; i < 30; i++)
         {
-            var ack = await js.PublishAsync("s1.foo", new TestData { Test = i }, opts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts.Token);
+            var ack = await js.PublishAsync("s1.foo", new TestData { Test = i }, pubOpts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts.Token);
             ack.EnsureSuccess();
         }
 
@@ -91,7 +91,7 @@ public class ConsumerConsumeTest
         await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
         await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
 
-        var ack = await js.PublishAsync("s1.foo", new TestData { Test = 0 }, opts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts.Token);
+        var ack = await js.PublishAsync("s1.foo", new TestData { Test = 0 }, pubOpts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts.Token);
         ack.EnsureSuccess();
 
         var signal = new WaitSignal(TimeSpan.FromSeconds(30));
@@ -197,7 +197,7 @@ public class ConsumerConsumeTest
 
         // Send a message before reconnect
         {
-            var ack = await js2.PublishAsync("s1.foo", new TestData { Test = 0 }, opts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts.Token);
+            var ack = await js2.PublishAsync("s1.foo", new TestData { Test = 0 }, pubOpts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts.Token);
             ack.EnsureSuccess();
         }
 
@@ -217,7 +217,7 @@ public class ConsumerConsumeTest
 
         // Send a message to be received after reconnect
         {
-            var ack = await js2.PublishAsync("s1.foo", new TestData { Test = 1 }, opts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts.Token);
+            var ack = await js2.PublishAsync("s1.foo", new TestData { Test = 1 }, pubOpts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts.Token);
             ack.EnsureSuccess();
         }
 
@@ -251,7 +251,7 @@ public class ConsumerConsumeTest
 
         for (var i = 0; i < 100; i++)
         {
-            var ack = await js.PublishAsync("s1.foo", new TestData { Test = i }, opts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts.Token);
+            var ack = await js.PublishAsync("s1.foo", new TestData { Test = i }, pubOpts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts.Token);
             ack.EnsureSuccess();
         }
 
@@ -308,7 +308,7 @@ public class ConsumerConsumeTest
 
         for (var i = 0; i < 100; i++)
         {
-            var ack = await js.PublishAsync("s1.foo", new TestData { Test = i }, opts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts.Token);
+            var ack = await js.PublishAsync("s1.foo", new TestData { Test = i }, pubOpts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts.Token);
             ack.EnsureSuccess();
         }
 

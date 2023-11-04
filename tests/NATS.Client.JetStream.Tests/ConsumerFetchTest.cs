@@ -21,7 +21,7 @@ public class ConsumerFetchTest
 
         for (var i = 0; i < 10; i++)
         {
-            var ack = await js.PublishAsync("s1.foo", new TestData { Test = i }, opts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts.Token);
+            var ack = await js.PublishAsync("s1.foo", new TestData { Test = i }, pubOpts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts.Token);
             ack.EnsureSuccess();
         }
 
@@ -51,7 +51,7 @@ public class ConsumerFetchTest
 
         for (var i = 0; i < 10; i++)
         {
-            var ack = await js.PublishAsync("s1.foo", new TestData { Test = i }, opts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts.Token);
+            var ack = await js.PublishAsync("s1.foo", new TestData { Test = i }, pubOpts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts.Token);
             ack.EnsureSuccess();
         }
 
@@ -89,7 +89,7 @@ public class ConsumerFetchTest
 
         for (var i = 0; i < 100; i++)
         {
-            var ack = await js.PublishAsync("s1.foo", new TestData { Test = i }, opts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts.Token);
+            var ack = await js.PublishAsync("s1.foo", new TestData { Test = i }, pubOpts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts.Token);
             ack.EnsureSuccess();
         }
 

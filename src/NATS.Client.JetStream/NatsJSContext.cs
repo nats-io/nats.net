@@ -1,4 +1,3 @@
-using System.ComponentModel.DataAnnotations;
 using NATS.Client.Core;
 using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
@@ -45,9 +44,9 @@ public partial class NatsJSContext
     /// </summary>
     /// <param name="subject">Subject to publish the data to.</param>
     /// <param name="data">Data to publish.</param>
-    /// <param name="msgId">Sets <c>Nats-Msg-Id</c> header for idempotent message writes.</param>
+    /// <param name="opts">JetStream publish options.</param>
     /// <param name="headers">Optional message headers.</param>
-    /// <param name="opts">Options to be used by publishing command.</param>
+    /// <param name="pubOpts">Options to be used by publishing command.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the publishing call or the wait for response.</param>
     /// <typeparam name="T">Type of the data being sent.</typeparam>
     /// <returns>
@@ -70,47 +69,83 @@ public partial class NatsJSContext
     public async ValueTask<PubAckResponse> PublishAsync<T>(
         string subject,
         T? data,
-        string? msgId = default,
+        NatsJSPubOpts? opts = default,
         NatsHeaders? headers = default,
-        NatsPubOpts? opts = default,
+        NatsPubOpts? pubOpts = default,
         CancellationToken cancellationToken = default)
     {
-        if (msgId != null)
+        if (opts != null)
         {
-            headers ??= new NatsHeaders();
-            headers["Nats-Msg-Id"] = msgId;
+            if (opts.MsgId != null)
+            {
+                headers ??= new NatsHeaders();
+                headers["Nats-Msg-Id"] = opts.MsgId;
+            }
+
+            if (opts.ExpectedLastMsgId != null)
+            {
+                headers ??= new NatsHeaders();
+                headers["Nats-Expected-Last-Msg-Id"] = opts.ExpectedLastMsgId;
+            }
+
+            if (opts.ExpectedStream != null)
+            {
+                headers ??= new NatsHeaders();
+                headers["Nats-Expected-Stream"] = opts.ExpectedStream;
+            }
+
+            if (opts.ExpectedLastSequence != null)
+            {
+                headers ??= new NatsHeaders();
+                headers["Nats-Expected-Last-Sequence"] = opts.ExpectedLastSequence.ToString();
+            }
+
+            if (opts.ExpectedLastSubjectSequence != null)
+            {
+                headers ??= new NatsHeaders();
+                headers["Nats-Expected-Last-Subject-Sequence"] = opts.ExpectedLastSubjectSequence.ToString();
+            }
         }
 
-        await using var sub = await Connection.RequestSubAsync<T, PubAckResponse>(
-                subject: subject,
-                data: data,
-                headers: headers,
-                requestOpts: opts,
-                replyOpts: new NatsSubOpts
-                {
-                    Serializer = NatsJSJsonSerializer.Default,
+        opts ??= NatsJSPubOpts.Default;
+        var retryMax = opts.RetryAttempts;
+        var retryWait = opts.RetryWaitBetweenAttempts;
 
-                    // It's important to set the timeout here so that the subscription can be
-                    // stopped if the server doesn't respond or more likely case is that if there
-                    // is a reconnect to the cluster between the request and waiting for a response,
-                    // without the timeout the publish call will hang forever since the server
-                    // which received the request won't be there to respond anymore.
-                    Timeout = Connection.Opts.RequestTimeout,
-                },
-                cancellationToken)
-            .ConfigureAwait(false);
-
-        while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+        for (var i = 0; i < retryMax; i++)
         {
-            while (sub.Msgs.TryRead(out var msg))
-            {
-                if (msg.Data == null)
-                {
-                    throw new NatsJSException("No response data received");
-                }
+            await using var sub = await Connection.RequestSubAsync<T, PubAckResponse>(
+                    subject: subject,
+                    data: data,
+                    headers: headers,
+                    requestOpts: pubOpts,
+                    replyOpts: new NatsSubOpts
+                    {
+                        Serializer = NatsJSJsonSerializer.Default,
 
-                return msg.Data;
+                        // It's important to set the timeout here so that the subscription can be
+                        // stopped if the server doesn't respond or more likely case is that if there
+                        // is a reconnect to the cluster between the request and waiting for a response,
+                        // without the timeout the publish call will hang forever since the server
+                        // which received the request won't be there to respond anymore.
+                        Timeout = Connection.Opts.RequestTimeout,
+                    },
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                while (sub.Msgs.TryRead(out var msg))
+                {
+                    if (msg.Data == null)
+                    {
+                        throw new NatsJSException("No response data received");
+                    }
+
+                    return msg.Data;
+                }
             }
+
+            await Task.Delay(retryWait, cancellationToken);
         }
 
         // We throw a specific exception here for convenience so that the caller doesn't
@@ -120,11 +155,11 @@ public partial class NatsJSContext
 
     public ValueTask<PubAckResponse> PublishAsync(
         string subject,
-        string? msgId = default,
+        NatsJSPubOpts? opts = default,
         NatsHeaders? headers = default,
-        NatsPubOpts? opts = default,
+        NatsPubOpts? pubOpts = default,
         CancellationToken cancellationToken = default) =>
-        PublishAsync<object?>(subject, default, msgId, headers, opts, cancellationToken);
+        PublishAsync<object?>(subject, default, opts, headers, pubOpts, cancellationToken);
 
     internal string NewInbox() => NatsConnection.NewInbox(Connection.Opts.InboxPrefix);
 
