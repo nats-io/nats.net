@@ -2,5 +2,5 @@
 
 public interface ITest
 {
-    Task Run(CancellationToken cancellationToken = default);
+    Task Run(string runId, CancellationToken cancellationToken = default);
 }

@@ -19,7 +19,7 @@ public class ConsumeTest : ITest
         _logger = _loggerFactory.CreateLogger<ConsumeTest>();
     }
 
-    public async Task Run(CancellationToken cancellationToken = default)
+    public async Task Run(string runId, CancellationToken cancellationToken = default)
     {
         var natsOpts = NatsOpts.Default with
         {
@@ -30,6 +30,7 @@ public class ConsumeTest : ITest
 
         await using var nats = new NatsConnection(natsOpts);
 
+        nats.ConnectionDisconnected += (_, _) => _logger.LogWarning($"[CON] Disconnected");
         nats.ConnectionOpened += (_, _) => _logger.LogInformation($"[CON] Connected to {nats.ServerInfo?.Name}");
 
         await nats.ConnectAsync();
@@ -58,15 +59,31 @@ public class ConsumeTest : ITest
                 {
                     try
                     {
-                        var cts0 = new CancellationTokenSource(30_000);
-                        var cts1 = CancellationTokenSource.CreateLinkedTokenSource(cts.Token, cts0.Token);
-                        await js.PublishAsync(subject: "s1.x", data: $"data_[{DateTime.UtcNow:yyyy-MM-ddTHH:mm:ss.fff}]_{i:D5}", cancellationToken: cts1.Token);
-                        if (i % 100 == 0)
-                            _logger.LogInformation($"{DateTime.UtcNow:yyyy-MM-ddTHH:mm:ss.fff} [SND] ({i})");
-                    }
-                    catch (NatsJSPublishNoResponseException)
-                    {
-                        _logger.LogInformation("Publish no response. Retrying...");
+                        for (var j = 0; j < 10; j++)
+                        {
+                            try
+                            {
+                                var ack = await js.PublishAsync(
+                                    subject: "s1.x",
+                                    data: $"data_[{DateTime.UtcNow:yyyy-MM-ddTHH:mm:ss.fff}]_{i:D5}",
+                                    msgId: $"{i:D5}",
+                                    cancellationToken: cts.Token);
+                                ack.EnsureSuccess();
+
+                                await File.AppendAllTextAsync($"test_{runId}_publish.txt", $"{DateTime.UtcNow:yyyy-MM-ddTHH:mm:ss.fff} [SND] ({i})\n", cts.Token);
+
+                                break;
+                            }
+                            catch (NatsJSDuplicateMessageException)
+                            {
+                                _logger.LogWarning("Publish duplicate. Ignoring...");
+                                break;
+                            }
+                            catch (NatsJSPublishNoResponseException)
+                            {
+                                _logger.LogWarning($"Publish no response. Retrying({j + 1}/10)...");
+                            }
+                        }
                     }
                     catch (NatsJSException e)
                     {
@@ -107,8 +124,7 @@ public class ConsumeTest : ITest
             var count = 0;
             await foreach (var msg in consumer.ConsumeAllAsync<string>(cancellationToken: cts.Token))
             {
-                if (count % 100 == 0)
-                    _logger.LogInformation($"{DateTime.UtcNow:yyyy-MM-ddTHH:mm:ss.fff} [RCV] ({count}) {msg.Subject}: {msg.Data}");
+                await File.AppendAllTextAsync($"test_{runId}_consume.txt", $"{DateTime.UtcNow:yyyy-MM-ddTHH:mm:ss.fff} [RCV] ({count}) {msg.Subject}: {msg.Data}\n", cts.Token);
                 await msg.AckAsync(cancellationToken: cts.Token);
                 count++;
             }

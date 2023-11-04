@@ -1,13 +1,21 @@
 ﻿using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Testing.Failground;
+using ZLogger;
 
-using var loggerFactory = LoggerFactory.Create(builder =>
+var runId = $"{DateTime.UtcNow:yyyyMMddHHmmssfff}";
+
+using var loggerFactory = LoggerFactory.Create(configure: builder =>
 {
     builder
         .SetMinimumLevel(LogLevel.Information)
-        .AddConsole();
+        .AddConsole()
+        .AddZLoggerFile($"test_{runId}.log", configure: options =>
+        {
+            options.FlushRate = TimeSpan.FromSeconds(1);
+        });
 });
+
 var logger = loggerFactory.CreateLogger("Program");
 logger.LogInformation("Starting...");
 
@@ -42,8 +50,10 @@ if (args.Length != 1 || !tests.TryGetValue(args[0], out var test))
 
 try
 {
-    logger.LogInformation("Running test {Name}...", test.GetType().Name);
-    await test.Run(cts.Token);
+    logger.LogInformation("Starting test {Name} ({RunId})...", test.GetType().Name, runId);
+
+    await test.Run(runId, cts.Token);
+
     return 0;
 }
 catch (Exception e)
