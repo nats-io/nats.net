@@ -86,13 +86,17 @@ public partial class NatsJSContext
                 data: data,
                 headers: headers,
                 requestOpts: opts,
-                replyOpts: new NatsSubOpts { Serializer = NatsJSJsonSerializer.Default },
+                replyOpts: new NatsSubOpts
+                {
+                    Serializer = NatsJSJsonSerializer.Default,
+                    Timeout = Connection.Opts.RequestTimeout,
+                },
                 cancellationToken)
             .ConfigureAwait(false);
 
-        if (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+        while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            if (sub.Msgs.TryRead(out var msg))
+            while (sub.Msgs.TryRead(out var msg))
             {
                 if (msg.Data == null)
                 {
@@ -103,7 +107,7 @@ public partial class NatsJSContext
             }
         }
 
-        throw new NatsJSException("No response received");
+        throw new NatsJSPublishNoResponseException();
     }
 
     public ValueTask<PubAckResponse> PublishAsync(

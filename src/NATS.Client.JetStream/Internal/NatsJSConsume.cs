@@ -284,6 +284,15 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
                     else if (headers is { Code: 100, Message: NatsHeaders.Messages.IdleHeartbeat })
                     {
                     }
+                    else if (headers.Code == 409 && string.Equals(headers.MessageText, "Leadership Change", StringComparison.OrdinalIgnoreCase))
+                    {
+                        _logger.LogDebug(NatsJSLogEvents.LeadershipChange, "Leadership Change");
+                        lock (_pendingGate)
+                        {
+                            _pendingBytes = 0;
+                            _pendingMsgs = 0;
+                        }
+                    }
                     else if (headers.HasTerminalJSError())
                     {
                         _userMsgs.Writer.TryComplete(new NatsJSProtocolException($"JetStream server error: {headers.Code} {headers.MessageText}"));
