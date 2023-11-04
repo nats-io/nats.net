@@ -90,11 +90,3 @@ public class NatsJSApiException : NatsJSException
     /// </summary>
     public ApiError Error { get; }
 }
-
-public class NatsJSPublishNoResponseException : NatsJSException
-{
-    public NatsJSPublishNoResponseException()
-        : base("No response received from the server")
-    {
-    }
-}

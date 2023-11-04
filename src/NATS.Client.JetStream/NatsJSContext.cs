@@ -86,23 +86,13 @@ public partial class NatsJSContext
                 data: data,
                 headers: headers,
                 requestOpts: opts,
-                replyOpts: new NatsSubOpts
-                {
-                    Serializer = NatsJSJsonSerializer.Default,
-
-                    // It's important to set the timeout here so that the subscription can be
-                    // stopped if the server doesn't respond or more likely case is that if there
-                    // is a reconnect to the cluster between the request and waiting for a response,
-                    // without the timeout the publish call will hang forever since the server
-                    // which received the request won't be there to respond anymore.
-                    Timeout = Connection.Opts.RequestTimeout,
-                },
+                replyOpts: new NatsSubOpts { Serializer = NatsJSJsonSerializer.Default },
                 cancellationToken)
             .ConfigureAwait(false);
 
-        while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+        if (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            while (sub.Msgs.TryRead(out var msg))
+            if (sub.Msgs.TryRead(out var msg))
             {
                 if (msg.Data == null)
                 {
@@ -113,9 +103,7 @@ public partial class NatsJSContext
             }
         }
 
-        // We throw a specific exception here for convenience so that the caller doesn't
-        // have to check for the exception message etc.
-        throw new NatsJSPublishNoResponseException();
+        throw new NatsJSException("No response received");
     }
 
     public ValueTask<PubAckResponse> PublishAsync(
