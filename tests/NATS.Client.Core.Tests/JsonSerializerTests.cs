@@ -11,9 +11,6 @@ public class JsonSerializerTests
     [Fact]
     public async Task Serialize_any_type()
     {
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var cancellationToken = cts.Token;
-
         var natsOpts = NatsOpts.Default with
         {
             Serializer = NatsJsonSerializer.Default,
@@ -21,6 +18,9 @@ public class JsonSerializerTests
 
         await using var server = NatsServer.Start();
         await using var nats = server.CreateClientConnection(natsOpts);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
 
         await using var sub = await nats.SubscribeAsync<SomeTestData>("foo", cancellationToken: cancellationToken);
         await nats.PingAsync(cancellationToken);
