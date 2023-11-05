@@ -38,6 +38,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
     private int _pongCount;
     private bool _isDisposed;
+    private int _connectionState;
 
     // when reconnect, make new instance.
     private ISocketConnection? _socket;
@@ -84,7 +85,11 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
     public NatsOpts Opts { get; }
 
-    public NatsConnectionState ConnectionState { get; private set; }
+    public NatsConnectionState ConnectionState
+    {
+        get => (NatsConnectionState)Volatile.Read(ref _connectionState);
+        private set => Interlocked.Exchange(ref _connectionState, (int)value);
+    }
 
     public INatsServerInfo? ServerInfo => WritableServerInfo; // server info is set when received INFO
 
