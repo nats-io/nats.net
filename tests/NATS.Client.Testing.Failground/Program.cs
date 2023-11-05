@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using Cysharp.Text;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Testing.Failground;
 using ZLogger;
@@ -8,11 +9,22 @@ var runId = $"{DateTime.UtcNow:yyyyMMddHHmmssfff}";
 using var loggerFactory = LoggerFactory.Create(configure: builder =>
 {
     builder
-        .SetMinimumLevel(LogLevel.Information)
-        .AddConsole()
+        .SetMinimumLevel(LogLevel.Debug)
+        .AddSimpleConsole(options =>
+        {
+            options.SingleLine = true;
+            options.TimestampFormat = "yyyy-MM-dd HH:mm:ss.fff zzz ";
+        })
         .AddZLoggerFile($"test_{runId}.log", configure: options =>
         {
             options.FlushRate = TimeSpan.FromSeconds(1);
+            options.PrefixFormatter = (writer, info) => ZString.Utf8Format(
+                writer,
+                "{0} {1} [{2}] ({3}) ",
+                info.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff zzz"),
+                info.LogLevel,
+                info.CategoryName,
+                info.EventId.Id);
         });
 });
 
