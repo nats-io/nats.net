@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
@@ -7,6 +8,8 @@ namespace NATS.Client.JetStream;
 /// <summary>Provides management and access to NATS JetStream streams and consumers.</summary>
 public partial class NatsJSContext
 {
+    private readonly ILogger _logger;
+
     /// <inheritdoc cref="NatsJSContext(NATS.Client.Core.NatsConnection,NATS.Client.JetStream.NatsJSOpts)"/>>
     public NatsJSContext(NatsConnection connection)
         : this(connection, new NatsJSOpts(connection.Opts))
@@ -22,6 +25,7 @@ public partial class NatsJSContext
     {
         Connection = connection;
         Opts = opts;
+        _logger = connection.Opts.LoggerFactory.CreateLogger<NatsJSContext>();
     }
 
     internal NatsConnection Connection { get; }
@@ -145,7 +149,11 @@ public partial class NatsJSContext
                 }
             }
 
-            await Task.Delay(retryWait, cancellationToken);
+            if (i < retryMax)
+            {
+                _logger.LogDebug(NatsJSLogEvents.PublishNoResponseRetry, "No response received, retrying {RetryCount}/{RetryMax}", i + 1, retryMax);
+                await Task.Delay(retryWait, cancellationToken);
+            }
         }
 
         // We throw a specific exception here for convenience so that the caller doesn't
