@@ -84,7 +84,7 @@ public class JetStreamTest
 
             // Consume
             var cts2 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            var messages = new List<NatsJSMsg<TestData?>>();
+            var messages = new List<NatsJSMsg<TestData>>();
             var cc = await consumer.ConsumeInternalAsync<TestData>(
                 serializer: TestDataJsonSerializer<TestData>.Default,
                 opts: new NatsJSConsumeOpts { MaxMsgs = 100 },

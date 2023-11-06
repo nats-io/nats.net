@@ -78,7 +78,7 @@ try
                 var fetchNoWaitOpts = new NatsJSFetchOpts { MaxMsgs = max };
                 var fetchMsgCount = 0;
 
-                await foreach (var msg in consumer.FetchNoWaitAsync<NatsMemoryOwner<byte>>(fetchNoWaitOpts, cts.Token))
+                await foreach (var msg in consumer.FetchNoWaitAsync<NatsMemoryOwner<byte>>(opts: fetchNoWaitOpts, cancellationToken: cts.Token))
                 {
                     fetchMsgCount++;
                     using (msg.Data)
@@ -116,7 +116,7 @@ try
             {
                 Console.WriteLine($"___\nFETCH {maxMsgs}");
                 await consumer.RefreshAsync(cts.Token);
-                await foreach (var msg in consumer.FetchAsync<NatsMemoryOwner<byte>>(fetchOpts, cts.Token))
+                await foreach (var msg in consumer.FetchAsync<NatsMemoryOwner<byte>>(opts: fetchOpts, cancellationToken: cts.Token))
                 {
                     using (msg.Data)
                     {
@@ -179,7 +179,7 @@ try
                 Console.WriteLine("___\nCONSUME");
                 var stopped = false;
                 var consumeStop = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
-                await foreach (var msg in consumer.ConsumeAsync<NatsMemoryOwner<byte>>(consumeOpts, consumeStop.Token))
+                await foreach (var msg in consumer.ConsumeAsync<NatsMemoryOwner<byte>>(opts: consumeOpts, cancellationToken: consumeStop.Token))
                 {
                     using (msg.Data)
                     {

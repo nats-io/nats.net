@@ -122,7 +122,8 @@ public partial class NatsJSContext
                     data: data,
                     headers: headers,
                     requestSerializer: serializer,
-                    replySerializer: NatsJSJsonSerializer<PubAckResponse>.Default,                    requestOpts: opts,
+                    replySerializer: NatsJSJsonSerializer<PubAckResponse>.Default,
+                    requestOpts: opts,
                     replyOpts: new NatsSubOpts
                     {
                         // It's important to set the timeout here so that the subscription can be
