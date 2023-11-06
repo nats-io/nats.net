@@ -3,11 +3,18 @@
 NATS .NET Client supports serialization of messages using a simple interface [`INatsSerializer<T>`](xref:NATS.Client.Core.INatsSerializer`1).
 
 ```csharp
-public interface INatsSerializer<T>
+public interface INatsSerializer<T> : INatsSerialize<T>, INatsDeserialize<T>
+{
+}
+
+public interface INatsSerialize<in T>
 {
     // Serialize the value to the buffer.
     void Serialize(IBufferWriter<byte> bufferWriter, T value);
+}
 
+public interface INatsSerialize<out T>
+{
     // Deserialize the value from the buffer.
     T? Deserialize(in ReadOnlySequence<byte> buffer);
 }
@@ -33,7 +40,8 @@ Serializer registry is a simple interface that can be used to provide a custom s
 ```csharp
 public interface INatsSerializerRegistry
 {
-    INatsSerializer<T> GetSerializer<T>();
+    INatsSerialize<T> GetSerializer<T>();
+    INatsDeserialize<T> GetDeserializer<T>();
 }
 ```
 
@@ -42,7 +50,7 @@ registry to the default serializer:
 
 ```csharp
 // Same as not specifying a serializer.
-var natsOpts = NatsOpts.Default with { Serializers = NatsDefaultSerializerRegistry.Default };
+var natsOpts = NatsOpts.Default with { SerializerRegistry = NatsDefaultSerializerRegistry.Default };
 
 await using var nats = new NatsConnection(natsOpts);
 
@@ -82,7 +90,7 @@ Then set the serializer as the default for the connection:
 ```csharp
 using NATS.Client.Serializers.Json;
 
-var natsOpts = NatsOpts.Default with { Serializers = NatsJsonSerializerRegistry.Default };
+var natsOpts = NatsOpts.Default with { SerializerRegistry = NatsJsonSerializerRegistry.Default };
 
 await using var nats = new NatsConnection(natsOpts);
 ```
@@ -116,7 +124,7 @@ by providing the registry ([`NatsJsonContextSerializerRegistry`](xref:NATS.Clien
 // Set the custom serializer registry as the default for the connection.
 var myRegistry = new NatsJsonContextSerializerRegistry(MyJsonContext.Default, OtherJsonContext.Default);
 
-var natsOpts = NatsOpts.Default with { Serializers = myRegistry };
+var natsOpts = NatsOpts.Default with { SerializerRegistry = myRegistry };
 
 await using var nats = new NatsConnection(natsOpts);
 
@@ -153,7 +161,7 @@ Here is an example of a custom serializer that uses the Google ProtoBuf serializ
 ```csharp
 public class MyProtoBufSerializer<T> : INatsSerializer<T>
 {
-    public static readonly INatsSerializer Default = new MyProtoBufSerializer();
+    public static readonly INatsSerializer<T> Default = new MyProtoBufSerializer<T>();
 
     public void Serialize(IBufferWriter<byte> bufferWriter, T value)
     {
@@ -180,7 +188,8 @@ public class MyProtoBufSerializer<T> : INatsSerializer<T>
 
 public class MyProtoBufSerializerRegistry : INatsSerializerRegistry
 {
-    public INatsSerializer<T> GetSerializer<T>() => MyProtoBufSerializer<T>.Default;
+    public INatsSerialize<T> GetSerializer<T>() => MyProtoBufSerializer<T>.Default;
+    public INatsDeserialize<T> GetDeserializer<T>() => MyProtoBufSerializer<T>.Default;
 }
 ```
 
@@ -219,10 +228,11 @@ serialize and deserialize messages based on the type:
 ```csharp
 public class MixedSerializerRegistry : INatsSerializerRegistry
 {
-    public INatsSerializer<T> GetSerializer<T>() => new NatsJsonContextSerializer<T>(MyJsonContext.Default, next: MyProtoBufSerializer<T>.Default);
+    public INatsSerialize<T> GetSerializer<T>() => new NatsJsonContextSerializer<T>(MyJsonContext.Default, next: MyProtoBufSerializer<T>.Default);
+    public INatsDeserialize<T> GetDeserializer<T>() => new NatsJsonContextSerializer<T>(MyJsonContext.Default, next: MyProtoBufSerializer<T>.Default);
 }
 
-var natsOpts = NatsOpts.Default with { Serializers =  new MixedSerializerRegistry() };
+var natsOpts = NatsOpts.Default with { SerializerRegistry =  new MixedSerializerRegistry() };
 
 await using var nats = new NatsConnection(natsOpts);
 
@@ -255,7 +265,7 @@ to allocate buffers. They can be used with the default serializer.
 
 ```csharp
 // Same as not specifying a serializer.
-var natsOpts = NatsOpts.Default with { Serializer = NatsDefaultSerializerRegistry.Default };
+var natsOpts = NatsOpts.Default with { SerializeRegistry = NatsDefaultSerializerRegistry.Default };
 
 await using var nats = new NatsConnection(natsOpts);
 
