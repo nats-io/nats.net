@@ -11,17 +11,22 @@ using NATS.Client.Core;
 
     await using var nats = new NatsConnection(natsOpts);
 
-    await using var sub = await nats.SubscribeAsync<string>(subject: "foo");
+    var sub = Task.Run(async () =>
+    {
+        await foreach (var msg in nats.SubscribeAsync<string>("foo"))
+        {
+            // Outputs 'Hello World'
+            Console.WriteLine(msg.Data);
+            break;
+        }
+    });
 
     // Flush the the network buffers to make sure the subscription request has been processed.
     await nats.PingAsync();
 
     await nats.PublishAsync<string>(subject: "foo", data: "Hello World");
 
-    var msg = await sub.Msgs.ReadAsync();
-
-    // Outputs 'Hello World'
-    Console.WriteLine(msg.Data);
+    await sub;
 }
 
 // custom JSON
@@ -30,17 +35,22 @@ using NATS.Client.Core;
 
     await using var nats = new NatsConnection(natsOpts);
 
-    await using var sub = await nats.SubscribeAsync<MyData>(subject: "foo");
+    var sub = Task.Run(async () =>
+    {
+        await foreach (var msg in nats.SubscribeAsync<MyData>("foo"))
+        {
+            // Outputs 'MyData { Id = 1, Name = bar }'
+            Console.WriteLine(msg.Data);
+            break;
+        }
+    });
 
     // Flush the the network buffers to make sure the subscription request has been processed.
     await nats.PingAsync();
 
     await nats.PublishAsync<MyData>(subject: "foo", data: new MyData { Id = 1, Name = "bar" });
 
-    var msg = await sub.Msgs.ReadAsync();
-
-    // Outputs 'MyData { Id = 1, Name = bar }'
-    Console.WriteLine(msg.Data);
+    await sub;
 }
 
 // custom JSON
@@ -49,17 +59,22 @@ using NATS.Client.Core;
 
     var serializer = new NatsJsonContextSerializer<MyData>(MyJsonContext.Default);
 
-    await using var sub = await nats.SubscribeAsync<MyData>(subject: "foo", serializer: serializer);
+    var sub = Task.Run(async () =>
+    {
+        await foreach (var msg in nats.SubscribeAsync<MyData>("foo"))
+        {
+            // Outputs 'MyData { Id = 1, Name = bar }'
+            Console.WriteLine(msg.Data);
+            break;
+        }
+    });
 
     // Flush the the network buffers to make sure the subscription request has been processed.
     await nats.PingAsync();
 
     await nats.PublishAsync<MyData>(subject: "foo", data: new MyData { Id = 1, Name = "bar" }, serializer: serializer);
 
-    var msg = await sub.Msgs.ReadAsync();
-
-    // Outputs 'MyData { Id = 1, Name = bar }'
-    Console.WriteLine(msg.Data);
+    await sub;
 }
 
 // Protobuf
@@ -68,17 +83,22 @@ using NATS.Client.Core;
 
     await using var nats = new NatsConnection(natsOpts);
 
-    await using var sub = await nats.SubscribeAsync<Greeting>(subject: "foo");
+    var sub = Task.Run(async () =>
+    {
+        await foreach (var msg in nats.SubscribeAsync<Greeting>("foo"))
+        {
+            // Outputs '{ "id": 42, "name": "Marvin" }'
+            Console.WriteLine(msg.Data);
+            break;
+        }
+    });
 
     // Flush the the network buffers to make sure the subscription request has been processed.
     await nats.PingAsync();
 
     await nats.PublishAsync(subject: "foo", data: new Greeting { Id = 42, Name = "Marvin" });
 
-    var msg = await sub.Msgs.ReadAsync();
-
-    // Outputs '{ "id": 42, "name": "Marvin" }'
-    Console.WriteLine(msg.Data);
+    await sub;
 }
 
 // Protobuf/JSON
@@ -88,8 +108,25 @@ using NATS.Client.Core;
 
     await using var nats = new NatsConnection(natsOpts);
 
-    await using var sub1 = await nats.SubscribeAsync<Greeting>(subject: "greet");
-    await using var sub2 = await nats.SubscribeAsync<MyData>(subject: "data");
+    var sub1 = Task.Run(async () =>
+    {
+        await foreach (var msg in nats.SubscribeAsync<Greeting>("greet"))
+        {
+            // Outputs '{ "id": 42, "name": "Marvin" }'
+            Console.WriteLine(msg.Data);
+            break;
+        }
+    });
+
+    var sub2 = Task.Run(async () =>
+    {
+        await foreach (var msg in nats.SubscribeAsync<MyData>("data"))
+        {
+            // Outputs 'MyData { Id = 1, Name = bar }'
+            Console.WriteLine(msg.Data);
+            break;
+        }
+    });
 
     // Flush the the network buffers to make sure the subscription request has been processed.
     await nats.PingAsync();
@@ -97,14 +134,8 @@ using NATS.Client.Core;
     await nats.PublishAsync(subject: "greet", data: new Greeting { Id = 42, Name = "Marvin" });
     await nats.PublishAsync(subject: "data", data: new MyData { Id = 1, Name = "Bob" });
 
-    var msg1 = await sub1.Msgs.ReadAsync();
-    var msg2 = await sub2.Msgs.ReadAsync();
-
-    // Outputs '{ "id": 42, "name": "Marvin" }'
-    Console.WriteLine(msg1.Data);
-
-    // Outputs 'MyData { Id = 1, Name = bar }'
-    Console.WriteLine(msg2.Data);
+    await sub1;
+    await sub2;
 }
 
 // Binary
@@ -114,7 +145,19 @@ using NATS.Client.Core;
 
     await using var nats = new NatsConnection(natsOpts);
 
-    await using var sub = await nats.SubscribeAsync<NatsMemoryOwner<byte>>(subject: "foo");
+    var sub = Task.Run(async () =>
+    {
+        await foreach (var msg in nats.SubscribeAsync<NatsMemoryOwner<byte>>(subject: "foo"))
+        {
+            using (var memoryOwner = msg.Data)
+            {
+                // Outputs 'Hi'
+                Console.WriteLine(Encoding.ASCII.GetString(memoryOwner.Memory.Span));
+            }
+
+            break;
+        }
+    });
 
     // Flush the the network buffers to make sure the subscription request has been processed.
     await nats.PingAsync();
@@ -127,13 +170,7 @@ using NATS.Client.Core;
 
     await nats.PublishAsync(subject: "foo", data: bw);
 
-    var msg = await sub.Msgs.ReadAsync();
-
-    using (var memoryOwner = msg.Data)
-    {
-        // Outputs 'Hi'
-        Console.WriteLine(Encoding.ASCII.GetString(memoryOwner.Memory.Span));
-    }
+    await sub;
 }
 
 public class MixedSerializerRegistry : INatsSerializerRegistry

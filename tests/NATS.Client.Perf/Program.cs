@@ -29,14 +29,12 @@ await using var nats2 = server.CreateClientConnection();
 await nats1.PingAsync();
 await nats2.PingAsync();
 
-await using var sub = await nats1.SubscribeAsync<NatsMemoryOwner<byte>>(t.Subject);
-
 var stopwatch = Stopwatch.StartNew();
 
 var subReader = Task.Run(async () =>
 {
     var count = 0;
-    await foreach (var msg in sub.Msgs.ReadAllAsync())
+    await foreach (var msg in nats1.SubscribeAsync<NatsMemoryOwner<byte>>(t.Subject))
     {
         using (msg.Data)
         {

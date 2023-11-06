@@ -29,7 +29,7 @@ public abstract partial class NatsConnectionTest
         var signalComplete = new WaitSignal();
 
         var list = new List<int>();
-        var sub = await subConnection.SubscribeAsync<int>(subject);
+        var sub = await subConnection.SubscribeInternalAsync<int>(subject);
         var register = sub.Register(x =>
         {
             _output.WriteLine($"Received: {x.Data}");
@@ -70,7 +70,7 @@ public abstract partial class NatsConnectionTest
 
             var actual = new List<SampleClass?>();
             var signalComplete = new WaitSignal();
-            var sub = await subConnection.SubscribeAsync<SampleClass>(key);
+            var sub = await subConnection.SubscribeInternalAsync<SampleClass>(key);
             var register = sub.Register(x =>
             {
                 actual.Add(x.Data);
@@ -109,7 +109,7 @@ public abstract partial class NatsConnectionTest
         var text = new StringBuilder(minSize).Insert(0, "a", minSize).ToString();
 
         var sync = 0;
-        var sub = await subConnection.SubscribeAsync<int>(subject);
+        var sub = await subConnection.SubscribeInternalAsync<int>(subject);
         var reg = sub.Register(async m =>
         {
             if (m.Data < 10)
@@ -168,7 +168,7 @@ public abstract partial class NatsConnectionTest
         var sync = 0;
         var waitForReceive300 = new WaitSignal();
         var waitForReceiveFinish = new WaitSignal();
-        var sub = await subConnection.SubscribeAsync<int>(subject);
+        var sub = await subConnection.SubscribeInternalAsync<int>(subject);
         var reg = sub.Register(x =>
         {
             if (x.Data < 10)
@@ -263,7 +263,7 @@ public abstract partial class NatsConnectionTest
         var sync = 0;
         var waitForReceive300 = new WaitSignal();
         var waitForReceiveFinish = new WaitSignal();
-        var sub = await connection1.SubscribeAsync<int>(subject);
+        var sub = await connection1.SubscribeInternalAsync<int>(subject);
         var reg = sub.Register(x =>
         {
             if (x.Data < 10)
