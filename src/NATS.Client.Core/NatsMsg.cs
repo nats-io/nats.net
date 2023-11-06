@@ -98,7 +98,7 @@ public readonly record struct NatsMsg<T>(
     public ValueTask ReplyAsync<TReply>(TReply data, NatsHeaders? headers = default, string? replyTo = default, INatsSerializer<TReply>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         CheckReplyPreconditions();
-        return Connection.PublishAsync(ReplyTo!, data, headers, replyTo, serializer, opts, cancellationToken);
+        return Connection.PublishAsync(ReplyTo, data, headers, replyTo, serializer, opts, cancellationToken);
     }
 
     /// <summary>
@@ -116,10 +116,11 @@ public readonly record struct NatsMsg<T>(
     public ValueTask ReplyAsync<TReply>(NatsMsg<TReply> msg, INatsSerializer<TReply>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         CheckReplyPreconditions();
-        return Connection.PublishAsync(msg with { Subject = ReplyTo! }, serializer, opts, cancellationToken);
+        return Connection.PublishAsync(msg with { Subject = ReplyTo }, serializer, opts, cancellationToken);
     }
 
     [MemberNotNull(nameof(Connection))]
+    [MemberNotNull(nameof(ReplyTo))]
     private void CheckReplyPreconditions()
     {
         if (Connection == default)
