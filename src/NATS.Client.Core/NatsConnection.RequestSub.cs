@@ -14,11 +14,11 @@ public partial class NatsConnection
     {
         var replyTo = NewInbox();
 
-        replySerializer ??= Opts.Serializers.GetSerializer<TReply>();
+        replySerializer ??= Opts.SerializerRegistry.GetSerializer<TReply>();
         var sub = new NatsSub<TReply>(this, SubscriptionManager.InboxSubBuilder, replyTo, queueGroup: default, replyOpts, replySerializer);
         await SubAsync(sub, cancellationToken).ConfigureAwait(false);
 
-        requestSerializer ??= Opts.Serializers.GetSerializer<TRequest>();
+        requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
 
         if (requestOpts?.WaitUntilSent == true)
         {

@@ -137,7 +137,7 @@ public class NatsSvcServer : IAsyncDisposable
 
     private async ValueTask AddEndpointInternalAsync<T>(Func<NatsSvcMsg<T>, ValueTask> handler, string? name, string? subject, string? queueGroup, IDictionary<string, string>? metadata, INatsSerializer<T>? serializer, CancellationToken cancellationToken)
     {
-        serializer ??= _nats.Opts.Serializers.GetSerializer<T>();
+        serializer ??= _nats.Opts.SerializerRegistry.GetSerializer<T>();
 
         var epSubject = subject ?? name ?? throw new NatsSvcException("Either name or subject must be specified");
         var epName = name ?? epSubject.Replace(".", "-");
@@ -317,7 +317,7 @@ public class NatsSvcServer : IAsyncDisposable
             subject ??= name;
             var epSubject = subject != null ? $"{GroupName}{_dot}{subject}" : null;
             queueGroup ??= QueueGroup ?? _server._config.QueueGroup;
-            serializer ??= _server._nats.Opts.Serializers.GetSerializer<T>();
+            serializer ??= _server._nats.Opts.SerializerRegistry.GetSerializer<T>();
             return _server.AddEndpointInternalAsync(handler, name, epSubject, queueGroup, metadata, serializer, cancellationToken);
         }
 

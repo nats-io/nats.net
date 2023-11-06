@@ -7,7 +7,7 @@ using NATS.Client.Core;
 // string
 {
     // Same as not specifying a serializer.
-    var natsOpts = NatsOpts.Default with { Serializers = NatsDefaultSerializerRegistry.Default };
+    var natsOpts = NatsOpts.Default with { SerializerRegistry = NatsDefaultSerializerRegistry.Default };
 
     await using var nats = new NatsConnection(natsOpts);
 
@@ -26,7 +26,7 @@ using NATS.Client.Core;
 
 // custom JSON
 {
-    var natsOpts = NatsOpts.Default with { Serializers = new NatsJsonContextSerializerRegistry(MyJsonContext.Default) };
+    var natsOpts = NatsOpts.Default with { SerializerRegistry = new NatsJsonContextSerializerRegistry(MyJsonContext.Default) };
 
     await using var nats = new NatsConnection(natsOpts);
 
@@ -64,7 +64,7 @@ using NATS.Client.Core;
 
 // Protobuf
 {
-    var natsOpts = NatsOpts.Default with { Serializers = new MyProtoBufSerializerRegistry() };
+    var natsOpts = NatsOpts.Default with { SerializerRegistry = new MyProtoBufSerializerRegistry() };
 
     await using var nats = new NatsConnection(natsOpts);
 
@@ -84,7 +84,7 @@ using NATS.Client.Core;
 // Protobuf/JSON
 {
     var serializers = new MixedSerializerRegistry();
-    var natsOpts = NatsOpts.Default with { Serializers = serializers };
+    var natsOpts = NatsOpts.Default with { SerializerRegistry = serializers };
 
     await using var nats = new NatsConnection(natsOpts);
 
@@ -110,7 +110,7 @@ using NATS.Client.Core;
 // Binary
 {
     // Same as not specifying a serializer.
-    var natsOpts = NatsOpts.Default with { Serializers = NatsDefaultSerializerRegistry.Default };
+    var natsOpts = NatsOpts.Default with { SerializerRegistry = NatsDefaultSerializerRegistry.Default };
 
     await using var nats = new NatsConnection(natsOpts);
 

@@ -102,7 +102,7 @@ public class NatsJSConsumer
     {
         ThrowIfDeleted();
         opts ??= _context.Opts.DefaultNextOpts;
-        serializer ??= _context.Connection.Opts.Serializers.GetSerializer<T>();
+        serializer ??= _context.Connection.Opts.SerializerRegistry.GetSerializer<T>();
 
         await using var f = await FetchInternalAsync<T>(
             serializer,
@@ -139,7 +139,7 @@ public class NatsJSConsumer
     {
         ThrowIfDeleted();
         opts ??= _context.Opts.DefaultFetchOpts;
-        serializer ??= _context.Connection.Opts.Serializers.GetSerializer<T>();
+        serializer ??= _context.Connection.Opts.SerializerRegistry.GetSerializer<T>();
 
         await using var fc = await FetchInternalAsync<T>(serializer, opts, cancellationToken).ConfigureAwait(false);
         await foreach (var jsMsg in fc.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
@@ -200,7 +200,7 @@ public class NatsJSConsumer
     {
         ThrowIfDeleted();
         opts ??= _context.Opts.DefaultFetchOpts;
-        serializer ??= _context.Connection.Opts.Serializers.GetSerializer<T>();
+        serializer ??= _context.Connection.Opts.SerializerRegistry.GetSerializer<T>();
 
         await using var fc = await FetchInternalAsync<T>(serializer, opts with { NoWait = true }, cancellationToken).ConfigureAwait(false);
         await foreach (var jsMsg in fc.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
@@ -226,7 +226,7 @@ public class NatsJSConsumer
         ThrowIfDeleted();
 
         opts ??= new NatsJSConsumeOpts();
-        serializer ??= _context.Connection.Opts.Serializers.GetSerializer<T>();
+        serializer ??= _context.Connection.Opts.SerializerRegistry.GetSerializer<T>();
         var inbox = _context.NewInbox();
 
         var max = NatsJSOptsDefaults.SetMax(opts.MaxMsgs, opts.MaxBytes, opts.ThresholdMsgs, opts.ThresholdBytes);
@@ -276,7 +276,7 @@ public class NatsJSConsumer
     {
         ThrowIfDeleted();
         opts ??= _context.Opts.DefaultFetchOpts;
-        serializer ??= _context.Connection.Opts.Serializers.GetSerializer<T>();
+        serializer ??= _context.Connection.Opts.SerializerRegistry.GetSerializer<T>();
 
         var inbox = _context.NewInbox();
 

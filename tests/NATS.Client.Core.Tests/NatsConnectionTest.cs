@@ -62,7 +62,7 @@ public abstract partial class NatsConnectionTest
 
         foreach (var serializer in new INatsSerializerRegistry[] { serializer1 })
         {
-            var options = NatsOpts.Default with { Serializers = serializer };
+            var options = NatsOpts.Default with { SerializerRegistry = serializer };
             await using var subConnection = server.CreateClientConnection(options);
             await using var pubConnection = server.CreateClientConnection(options);
 

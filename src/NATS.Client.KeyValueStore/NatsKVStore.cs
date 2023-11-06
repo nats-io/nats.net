@@ -168,7 +168,7 @@ public class NatsKVStore
     /// <exception cref="NatsKVException">There was an error with metadata</exception>
     public async ValueTask<NatsKVEntry<T>> GetEntryAsync<T>(string key, ulong revision = default, INatsSerializer<T>? serializer = default, CancellationToken cancellationToken = default)
     {
-        serializer ??= _context.Connection.Opts.Serializers.GetSerializer<T>();
+        serializer ??= _context.Connection.Opts.SerializerRegistry.GetSerializer<T>();
 
         var request = new StreamMsgGetRequest();
         var keySubject = $"$KV.{Bucket}.{key}";
@@ -440,7 +440,7 @@ public class NatsKVStore
     internal async ValueTask<NatsKVWatcher<T>> WatchInternalAsync<T>(string key, INatsSerializer<T>? serializer = default, NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default)
     {
         opts ??= NatsKVWatchOpts.Default;
-        serializer ??= _context.Connection.Opts.Serializers.GetSerializer<T>();
+        serializer ??= _context.Connection.Opts.SerializerRegistry.GetSerializer<T>();
 
         var watcher = new NatsKVWatcher<T>(
             context: _context,
