@@ -23,18 +23,12 @@ public class NatsKVContext
     private static readonly Regex ValidKeyRegex = new(pattern: @"\A[-/_=\.a-zA-Z0-9]+\z", RegexOptions.Compiled);
 
     private readonly NatsJSContext _context;
-    private readonly NatsKVOpts _opts;
 
     /// <summary>
     /// Create a new Key Value Store context
     /// </summary>
     /// <param name="context">JetStream context</param>
-    /// <param name="opts">Key Value Store context options</param>
-    public NatsKVContext(NatsJSContext context, NatsKVOpts? opts = default)
-    {
-        _context = context;
-        _opts = opts ?? new NatsKVOpts();
-    }
+    public NatsKVContext(NatsJSContext context) => _context = context;
 
     /// <summary>
     /// Create a new Key Value Store or get an existing one
@@ -118,7 +112,7 @@ public class NatsKVContext
 
         var stream = await _context.CreateStreamAsync(streamConfig, cancellationToken);
 
-        return new NatsKVStore(config.Bucket, _opts, _context, stream);
+        return new NatsKVStore(config.Bucket, _context, stream);
     }
 
     /// <summary>
@@ -140,7 +134,7 @@ public class NatsKVContext
         }
 
         // TODO: KV mirror
-        return new NatsKVStore(bucket, _opts, _context, stream);
+        return new NatsKVStore(bucket, _context, stream);
     }
 
     /// <summary>

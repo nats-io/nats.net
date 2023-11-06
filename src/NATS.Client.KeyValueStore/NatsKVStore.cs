@@ -45,7 +45,7 @@ public class NatsKVStore
     private readonly NatsJSContext _context;
     private readonly NatsJSStream _stream;
 
-    internal NatsKVStore(string bucket, NatsKVOpts opts, NatsJSContext context, NatsJSStream stream)
+    internal NatsKVStore(string bucket, NatsJSContext context, NatsJSStream stream)
     {
         Bucket = bucket;
         _context = context;
