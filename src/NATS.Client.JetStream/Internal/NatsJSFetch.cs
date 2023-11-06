@@ -8,7 +8,7 @@ using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Internal;
 
-internal class NatsJSFetch<TMsg> : NatsSubBase, INatsJSFetch<TMsg>
+internal class NatsJSFetch<TMsg> : NatsSubBase
 {
     private readonly ILogger _logger;
     private readonly bool _debug;
@@ -189,7 +189,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase, INatsJSFetch<TMsg>
                     }
                     else if (headers.HasTerminalJSError())
                     {
-                        _userMsgs.Writer.TryComplete(new NatsJSProtocolException($"JetStream server error: {headers.Code} {headers.MessageText}"));
+                        _userMsgs.Writer.TryComplete(new NatsJSProtocolException(headers.Code, headers.Message, headers.MessageText));
                         EndSubscription(NatsSubEndReason.JetStreamError);
                     }
                     else

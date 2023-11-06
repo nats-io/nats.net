@@ -63,7 +63,7 @@ public class ManageConsumerTest
             var list = new List<ConsumerInfo>();
             await foreach (var consumer in js.ListConsumersAsync("s1", cts.Token))
             {
-                list.Add(consumer.Info);
+                list.Add(consumer);
             }
 
             Assert.Equal(3, list.Count);
@@ -81,7 +81,7 @@ public class ManageConsumerTest
             var list = new List<ConsumerInfo>();
             await foreach (var consumer in js.ListConsumersAsync("s1", cts.Token))
             {
-                list.Add(consumer.Info);
+                list.Add(consumer);
             }
 
             Assert.Equal(2, list.Count);

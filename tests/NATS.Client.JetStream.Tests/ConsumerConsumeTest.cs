@@ -37,7 +37,7 @@ public class ConsumerConsumeTest
         var consumerOpts = new NatsJSConsumeOpts { MaxMsgs = 10, Serializer = TestDataJsonSerializer.Default };
         var consumer = await js.GetConsumerAsync("s1", "c1", cts.Token);
         var count = 0;
-        await using var cc = await consumer.ConsumeAsync<TestData>(consumerOpts, cancellationToken: cts.Token);
+        await using var cc = await consumer.ConsumeInternalAsync<TestData>(consumerOpts, cancellationToken: cts.Token);
         await foreach (var msg in cc.Msgs.ReadAllAsync(cts.Token))
         {
             await msg.AckAsync(new AckOpts(true), cts.Token);
@@ -111,7 +111,7 @@ public class ConsumerConsumeTest
         };
         var consumer = await js.GetConsumerAsync("s1", "c1", cts.Token);
         var count = 0;
-        var cc = await consumer.ConsumeAsync<TestData>(consumerOpts, cancellationToken: cts.Token);
+        var cc = await consumer.ConsumeInternalAsync<TestData>(consumerOpts, cancellationToken: cts.Token);
         await foreach (var msg in cc.Msgs.ReadAllAsync(cts.Token))
         {
             await msg.AckAsync(new AckOpts(WaitUntilSent: true), cts.Token);
@@ -178,7 +178,7 @@ public class ConsumerConsumeTest
         // Not interested in management messages sent upto this point
         await proxy.FlushFramesAsync(nats);
 
-        var cc = await consumer.ConsumeAsync<TestData>(consumerOpts, cancellationToken: cts.Token);
+        var cc = await consumer.ConsumeInternalAsync<TestData>(consumerOpts, cancellationToken: cts.Token);
 
         var readerTask = Task.Run(async () =>
         {
@@ -255,7 +255,7 @@ public class ConsumerConsumeTest
             ack.EnsureSuccess();
         }
 
-        var cc = await consumer.ConsumeAsync<TestData>(consumerOpts, cancellationToken: cts.Token);
+        var cc = await consumer.ConsumeInternalAsync<TestData>(consumerOpts, cancellationToken: cts.Token);
 
         var signal = new WaitSignal();
         var reader = Task.Run(async () =>
@@ -278,7 +278,7 @@ public class ConsumerConsumeTest
         var infos = new List<ConsumerInfo>();
         await foreach (var natsJSConsumer in stream.ListConsumersAsync(cts.Token))
         {
-            infos.Add(natsJSConsumer.Info);
+            infos.Add(natsJSConsumer);
         }
 
         Assert.Single(infos);
@@ -312,7 +312,8 @@ public class ConsumerConsumeTest
             ack.EnsureSuccess();
         }
 
-        var cc = await consumer.ConsumeAsync<TestData>(consumerOpts, cancellationToken: cts.Token);
+        var consumeStop = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
+        var cc = await consumer.ConsumeInternalAsync<TestData>(consumerOpts, cancellationToken: consumeStop.Token);
 
         var signal = new WaitSignal();
         var reader = Task.Run(async () =>
@@ -325,14 +326,14 @@ public class ConsumerConsumeTest
         });
 
         await signal;
-        cc.Stop();
+        consumeStop.Cancel();
 
         await reader;
 
         var infos = new List<ConsumerInfo>();
         await foreach (var natsJSConsumer in stream.ListConsumersAsync(cts.Token))
         {
-            infos.Add(natsJSConsumer.Info);
+            infos.Add(natsJSConsumer);
         }
 
         Assert.Single(infos);
