@@ -78,7 +78,7 @@ public readonly record struct NatsMsg<T>(
     public ValueTask ReplyAsync(NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         CheckReplyPreconditions();
-        return Connection.PublishAsync(ReplyTo!, headers, replyTo, opts, cancellationToken);
+        return Connection.PublishAsync(ReplyTo, headers, replyTo, opts, cancellationToken);
     }
 
     /// <summary>
