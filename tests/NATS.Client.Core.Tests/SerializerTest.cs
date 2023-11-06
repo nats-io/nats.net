@@ -59,7 +59,7 @@ public class SerializerTest
     }
 }
 
-public class TestSerializer<T> : INatsSerializer2<T>, INatsDeserializer<T>
+public class TestSerializer<T> : INatsSerializer<T>, INatsDeserializer<T>
 {
     public void Serialize(IBufferWriter<byte> bufferWriter, T? value) => throw new TestSerializerException();
 

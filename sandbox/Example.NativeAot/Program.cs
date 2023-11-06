@@ -138,19 +138,19 @@ using NATS.Client.Core;
 
 public class MixedSerializerRegistry : INatsSerializerRegistry
 {
-    public INatsSerializer2<T> GetSerializer<T>() => new NatsJsonContextSerializer<T>(MyJsonContext.Default, MyProtoBufSerializer<T>.Default, MyProtoBufSerializer<T>.Default);
+    public INatsSerializer<T> GetSerializer<T>() => new NatsJsonContextSerializer<T>(MyJsonContext.Default, MyProtoBufSerializer<T>.Default, MyProtoBufSerializer<T>.Default);
 
     public INatsDeserializer<T> GetDeserializer<T>() => new NatsJsonContextSerializer<T>(MyJsonContext.Default, MyProtoBufSerializer<T>.Default, MyProtoBufSerializer<T>.Default);
 }
 
 public class MyProtoBufSerializerRegistry : INatsSerializerRegistry
 {
-    public INatsSerializer2<T> GetSerializer<T>() => MyProtoBufSerializer<T>.Default;
+    public INatsSerializer<T> GetSerializer<T>() => MyProtoBufSerializer<T>.Default;
 
     public INatsDeserializer<T> GetDeserializer<T>() => MyProtoBufSerializer<T>.Default;
 }
 
-public class MyProtoBufSerializer<T> : INatsSerializer2<T>, INatsDeserializer<T>
+public class MyProtoBufSerializer<T> : INatsSerializer<T>, INatsDeserializer<T>
 {
     public static readonly MyProtoBufSerializer<T> Default = new();
 

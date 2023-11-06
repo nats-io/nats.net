@@ -23,7 +23,7 @@ public interface INatsConnection
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
     /// <typeparam name="T">Specifies the type of data that may be sent to the NATS Server.</typeparam>
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous send operation.</returns>
-    ValueTask PublishAsync<T>(string subject, T data, NatsHeaders? headers = default, string? replyTo = default, INatsSerializer2<T>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
+    ValueTask PublishAsync<T>(string subject, T data, NatsHeaders? headers = default, string? replyTo = default, INatsSerializer<T>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Publishes an empty message payload to the given subject name, optionally supplying a reply subject.
@@ -49,7 +49,7 @@ public interface INatsConnection
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
     /// <typeparam name="T">Specifies the type of data that may be sent to the NATS Server.</typeparam>
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous send operation.</returns>
-    ValueTask PublishAsync<T>(in NatsMsg<T> msg, INatsSerializer2<T>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
+    ValueTask PublishAsync<T>(in NatsMsg<T> msg, INatsSerializer<T>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Initiates a subscription to a subject, optionally joining a distributed queue group.
@@ -98,7 +98,7 @@ public interface INatsConnection
         string subject,
         TRequest? data,
         NatsHeaders? headers = default,
-        INatsSerializer2<TRequest>? requestSerializer = default,
+        INatsSerializer<TRequest>? requestSerializer = default,
         INatsDeserializer<TReply>? replyDeserializer = default,
         NatsPubOpts? requestOpts = default,
         NatsSubOpts? replyOpts = default,
@@ -126,7 +126,7 @@ public interface INatsConnection
         string subject,
         TRequest? data,
         NatsHeaders? headers = default,
-        INatsSerializer2<TRequest>? requestSerializer = default,
+        INatsSerializer<TRequest>? requestSerializer = default,
         INatsDeserializer<TReply>? replyDeserializer = default,
         NatsPubOpts? requestOpts = default,
         NatsSubOpts? replyOpts = default,

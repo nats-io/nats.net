@@ -22,7 +22,7 @@ public static class NatsRequestManyExtensions
     public static IAsyncEnumerable<NatsMsg<TReply>> RequestManyAsync<TRequest, TReply>(
         this INatsConnection nats,
         NatsMsg<TRequest> msg,
-        INatsSerializer2<TRequest>? requestSerializer = default,
+        INatsSerializer<TRequest>? requestSerializer = default,
         INatsDeserializer<TReply>? replyDeserializer = default,
         NatsPubOpts? requestOpts = default,
         NatsSubOpts? replyOpts = default,

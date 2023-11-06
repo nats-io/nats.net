@@ -73,7 +73,7 @@ public partial class NatsJSContext
     public async ValueTask<PubAckResponse> PublishAsync<T>(
         string subject,
         T? data,
-        INatsSerializer2<T>? serializer = default,
+        INatsSerializer<T>? serializer = default,
         NatsJSPubOpts? opts = default,
         NatsHeaders? headers = default,
         CancellationToken cancellationToken = default)

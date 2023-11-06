@@ -103,7 +103,7 @@ public readonly record struct NatsMsg<T>(
     /// <see cref="NatsConnection"/>. If not specified, <see cref="NatsDefaultSerializerRegistry"/> will be used.
     /// </para>
     /// </remarks>
-    public ValueTask ReplyAsync<TReply>(TReply data, NatsHeaders? headers = default, string? replyTo = default, INatsSerializer2<TReply>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
+    public ValueTask ReplyAsync<TReply>(TReply data, NatsHeaders? headers = default, string? replyTo = default, INatsSerializer<TReply>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         CheckReplyPreconditions();
         return Connection.PublishAsync(ReplyTo, data, headers, replyTo, serializer, opts, cancellationToken);
@@ -121,7 +121,7 @@ public readonly record struct NatsMsg<T>(
     /// <remarks>
     /// Publishes a new message using the reply-to subject from the this message as the destination subject.
     /// </remarks>
-    public ValueTask ReplyAsync<TReply>(NatsMsg<TReply> msg, INatsSerializer2<TReply>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
+    public ValueTask ReplyAsync<TReply>(NatsMsg<TReply> msg, INatsSerializer<TReply>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         CheckReplyPreconditions();
         return Connection.PublishAsync(msg with { Subject = ReplyTo }, serializer, opts, cancellationToken);

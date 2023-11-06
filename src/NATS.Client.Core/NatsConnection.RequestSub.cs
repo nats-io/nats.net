@@ -6,7 +6,7 @@ public partial class NatsConnection
         string subject,
         TRequest? data,
         NatsHeaders? headers = default,
-        INatsSerializer2<TRequest>? requestSerializer = default,
+        INatsSerializer<TRequest>? requestSerializer = default,
         INatsDeserializer<TReply>? replyDeserializer = default,
         NatsPubOpts? requestOpts = default,
         NatsSubOpts? replyOpts = default,

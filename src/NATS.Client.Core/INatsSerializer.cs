@@ -11,7 +11,7 @@ namespace NATS.Client.Core;
 /// Serializer interface for NATS messages.
 /// </summary>
 /// <typeparam name="T">Serialized object type</typeparam>
-public interface INatsSerializer2<T>
+public interface INatsSerializer<in T>
 {
     /// <summary>
     /// Serialize value to buffer.
@@ -37,7 +37,7 @@ public interface INatsDeserializer<out T>
 
 public interface INatsSerializerRegistry
 {
-    INatsSerializer2<T> GetSerializer<T>();
+    INatsSerializer<T> GetSerializer<T>();
 
     INatsDeserializer<T> GetDeserializer<T>();
 }
@@ -51,7 +51,7 @@ public static class NatsDefaultSerializer<T>
     /// Combined serializer of <see cref="NatsRawSerializer{T}"/> and <see cref="NatsUtf8PrimitivesSerializer{T}"/> set
     /// as the default serializer for NATS messages.
     /// </summary>
-    public static readonly INatsSerializer2<T> DefaultSerializer = NatsRawSerializer<T>.Default;
+    public static readonly INatsSerializer<T> DefaultSerializer = NatsRawSerializer<T>.Default;
 
     public static readonly INatsDeserializer<T> DefaultDeserializer = NatsRawSerializer<T>.Default;
 }
@@ -60,7 +60,7 @@ public class NatsDefaultSerializerRegistry : INatsSerializerRegistry
 {
     public static readonly NatsDefaultSerializerRegistry Default = new();
 
-    public INatsSerializer2<T> GetSerializer<T>() => NatsDefaultSerializer<T>.DefaultSerializer;
+    public INatsSerializer<T> GetSerializer<T>() => NatsDefaultSerializer<T>.DefaultSerializer;
 
     public INatsDeserializer<T> GetDeserializer<T>() => NatsDefaultSerializer<T>.DefaultDeserializer;
 }
@@ -73,11 +73,11 @@ public class NatsDefaultSerializerRegistry : INatsSerializerRegistry
 /// <c>TimeSpan</c>, <c>bool</c>, <c>byte</c>, <c>decimal</c>, <c>double</c>, <c>float</c>,
 /// <c>int</c>, <c>long</c>, <c>sbyte</c>, <c>short</c>, <c>uint</c> and <c>ulong</c>.
 /// </remarks>
-public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer2<T>, INatsDeserializer<T>
+public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>, INatsDeserializer<T>
 {
     public static readonly NatsUtf8PrimitivesSerializer<T> Default = new(default, default);
 
-    private readonly INatsSerializer2<T>? _nextSerializer;
+    private readonly INatsSerializer<T>? _nextSerializer;
     private readonly INatsDeserializer<T>? _nextDeserializer;
 
     /// <summary>
@@ -85,7 +85,7 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer2<T>, INatsDeseria
     /// </summary>
     /// <param name="nextSerializer">The next serializer in chain.</param>
     /// <param name="nextDeserializer">The next deserializer in chain.</param>
-    public NatsUtf8PrimitivesSerializer(INatsSerializer2<T>? nextSerializer, INatsDeserializer<T>? nextDeserializer)
+    public NatsUtf8PrimitivesSerializer(INatsSerializer<T>? nextSerializer, INatsDeserializer<T>? nextDeserializer)
     {
         _nextSerializer = nextSerializer;
         _nextDeserializer = nextDeserializer;
@@ -537,11 +537,11 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer2<T>, INatsDeseria
 /// <summary>
 /// Serializer for binary data.
 /// </summary>
-public class NatsRawSerializer<T> : INatsSerializer2<T>, INatsDeserializer<T>
+public class NatsRawSerializer<T> : INatsSerializer<T>, INatsDeserializer<T>
 {
     public static readonly NatsRawSerializer<T> Default = new(NatsUtf8PrimitivesSerializer<T>.Default, NatsUtf8PrimitivesSerializer<T>.Default);
 
-    private readonly INatsSerializer2<T>? _nextSerializer;
+    private readonly INatsSerializer<T>? _nextSerializer;
     private readonly INatsDeserializer<T>? _nextDeserializer;
 
     /// <summary>
@@ -549,7 +549,7 @@ public class NatsRawSerializer<T> : INatsSerializer2<T>, INatsDeserializer<T>
     /// </summary>
     /// <param name="nextSerializer">Next serializer in chain.</param>
     /// <param name="nextDeserializer">Next deserializer in chain.</param>
-    public NatsRawSerializer(INatsSerializer2<T>? nextSerializer, INatsDeserializer<T>? nextDeserializer)
+    public NatsRawSerializer(INatsSerializer<T>? nextSerializer, INatsDeserializer<T>? nextDeserializer)
     {
         _nextSerializer = nextSerializer;
         _nextDeserializer = nextDeserializer;
@@ -661,7 +661,7 @@ public sealed class NatsJsonContextSerializerRegistry : INatsSerializerRegistry
 
     public NatsJsonContextSerializerRegistry(params JsonSerializerContext[] contexts) => _contexts = contexts;
 
-    public INatsSerializer2<T> GetSerializer<T>() => new NatsJsonContextSerializer<T>(_contexts);
+    public INatsSerializer<T> GetSerializer<T>() => new NatsJsonContextSerializer<T>(_contexts);
 
     public INatsDeserializer<T> GetDeserializer<T>() => new NatsJsonContextSerializer<T>(_contexts);
 }
@@ -669,7 +669,7 @@ public sealed class NatsJsonContextSerializerRegistry : INatsSerializerRegistry
 /// <summary>
 /// Serializer with support for <see cref="JsonSerializerContext"/>.
 /// </summary>
-public sealed class NatsJsonContextSerializer<T> : INatsSerializer2<T>, INatsDeserializer<T>
+public sealed class NatsJsonContextSerializer<T> : INatsSerializer<T>, INatsDeserializer<T>
 {
     private static readonly JsonWriterOptions JsonWriterOpts = new() { Indented = false, SkipValidation = true };
 
@@ -677,7 +677,7 @@ public sealed class NatsJsonContextSerializer<T> : INatsSerializer2<T>, INatsDes
     private static Utf8JsonWriter? _jsonWriter;
 
     private readonly JsonSerializerContext[] _contexts;
-    private readonly INatsSerializer2<T>? _nextSerializer;
+    private readonly INatsSerializer<T>? _nextSerializer;
     private readonly INatsDeserializer<T>? _nextDeserializer;
 
     /// <summary>
@@ -686,14 +686,14 @@ public sealed class NatsJsonContextSerializer<T> : INatsSerializer2<T>, INatsDes
     /// <param name="contexts">Context to use for serialization.</param>
     /// <param name="nextSerializer">Next serializer in chain.</param>
     /// <param name="nextDeserializer">Next deserializer in chain.</param>
-    public NatsJsonContextSerializer(JsonSerializerContext[] contexts, INatsSerializer2<T>? nextSerializer = default, INatsDeserializer<T>? nextDeserializer = default)
+    public NatsJsonContextSerializer(JsonSerializerContext[] contexts, INatsSerializer<T>? nextSerializer = default, INatsDeserializer<T>? nextDeserializer = default)
     {
         _contexts = contexts;
         _nextSerializer = nextSerializer;
         _nextDeserializer = nextDeserializer;
     }
 
-    public NatsJsonContextSerializer(JsonSerializerContext context, INatsSerializer2<T>? nextSerializer = default, INatsDeserializer<T>? nextDeserializer = default)
+    public NatsJsonContextSerializer(JsonSerializerContext context, INatsSerializer<T>? nextSerializer = default, INatsDeserializer<T>? nextDeserializer = default)
         : this(new[] { context }, nextSerializer, nextDeserializer)
     {
     }

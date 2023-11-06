@@ -24,7 +24,7 @@ public static class NatsRequestExtensions
     public static ValueTask<NatsMsg<TReply>> RequestAsync<TRequest, TReply>(
         this INatsConnection nats,
         in NatsMsg<TRequest> msg,
-        INatsSerializer2<TRequest>? requestSerializer = default,
+        INatsSerializer<TRequest>? requestSerializer = default,
         INatsDeserializer<TReply>? replyDeserializer = default,
         NatsPubOpts? requestOpts = default,
         NatsSubOpts? replyOpts = default,

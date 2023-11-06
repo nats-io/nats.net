@@ -9,7 +9,7 @@ internal static class NatsObjJsonSerializer<T>
     private static readonly NatsJsonContextSerializer<T> Default = new(NatsObjJsonSerializerContext.Default);
 
 #pragma warning disable SA1202
-    public static readonly INatsSerializer2<T> DefaultSerializer = Default;
+    public static readonly INatsSerializer<T> DefaultSerializer = Default;
 
     public static readonly INatsDeserializer<T> DefaultDeserializer = Default;
 #pragma warning restore SA1202
