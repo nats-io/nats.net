@@ -16,7 +16,7 @@ public partial class NatsConnection
     }
 
     /// <inheritdoc />
-    public ValueTask PublishAsync<T>(string subject, T? data, NatsHeaders? headers = default, string? replyTo = default, INatsSerializer<T>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
+    public ValueTask PublishAsync<T>(string subject, T? data, NatsHeaders? headers = default, string? replyTo = default, INatsSerialize<T>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         serializer ??= Opts.SerializerRegistry.GetSerializer<T>();
         if (opts?.WaitUntilSent ?? false)
@@ -30,7 +30,7 @@ public partial class NatsConnection
     }
 
     /// <inheritdoc />
-    public ValueTask PublishAsync<T>(in NatsMsg<T> msg, INatsSerializer<T>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
+    public ValueTask PublishAsync<T>(in NatsMsg<T> msg, INatsSerialize<T>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         return PublishAsync<T>(msg.Subject, msg.Data, msg.Headers, msg.ReplyTo, serializer, opts, cancellationToken);
     }

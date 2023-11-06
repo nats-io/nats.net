@@ -6,16 +6,16 @@ public partial class NatsConnection
         string subject,
         TRequest? data,
         NatsHeaders? headers = default,
-        INatsSerializer<TRequest>? requestSerializer = default,
-        INatsDeserializer<TReply>? replyDeserializer = default,
+        INatsSerialize<TRequest>? requestSerializer = default,
+        INatsDeserialize<TReply>? replySerializer = default,
         NatsPubOpts? requestOpts = default,
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default)
     {
         var replyTo = NewInbox();
 
-        replyDeserializer ??= Opts.SerializerRegistry.GetDeserializer<TReply>();
-        var sub = new NatsSub<TReply>(this, SubscriptionManager.InboxSubBuilder, replyTo, queueGroup: default, replyOpts, replyDeserializer);
+        replySerializer ??= Opts.SerializerRegistry.GetDeserializer<TReply>();
+        var sub = new NatsSub<TReply>(this, SubscriptionManager.InboxSubBuilder, replyTo, queueGroup: default, replyOpts, replySerializer);
         await SubAsync(sub, cancellationToken).ConfigureAwait(false);
 
         requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();

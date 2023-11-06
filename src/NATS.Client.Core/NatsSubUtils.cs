@@ -15,18 +15,18 @@ public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
         string subject,
         string? queueGroup,
         NatsSubOpts? opts,
-        INatsDeserializer<T> deserializer)
+        INatsDeserialize<T> serializer)
         : base(connection, manager, subject, queueGroup, opts)
     {
         _msgs = Channel.CreateBounded<NatsMsg<T>>(
             NatsSubUtils.GetChannelOpts(opts?.ChannelOpts));
 
-        Deserializer = deserializer;
+        Serializer = serializer;
     }
 
     public ChannelReader<NatsMsg<T>> Msgs => _msgs.Reader;
 
-    private INatsDeserializer<T> Deserializer { get; }
+    private INatsDeserialize<T> Serializer { get; }
 
     protected override async ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
     {
@@ -37,7 +37,7 @@ public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
             payloadBuffer,
             Connection,
             Connection.HeaderParser,
-            Deserializer);
+            Serializer);
 
         await _msgs.Writer.WriteAsync(natsMsg).ConfigureAwait(false);
 

@@ -77,7 +77,7 @@ public class NatsObjStore
             context: _context,
             stream: $"OBJ_{_bucket}",
             filter: GetChunkSubject(info.Nuid),
-            deserializer: NatsDefaultSerializer<NatsMemoryOwner<byte>>.DefaultDeserializer,
+            serializer: NatsDefaultSerializer<NatsMemoryOwner<byte>>.Default,
             opts: new NatsJSOrderedPushConsumerOpts { DeliverPolicy = ConsumerConfigurationDeliverPolicy.all },
             subOpts: new NatsSubOpts(),
             cancellationToken: cancellationToken);
@@ -389,7 +389,7 @@ public class NatsObjStore
             var response = await _stream.GetAsync(request, cancellationToken);
 
             var base64String = Convert.FromBase64String(response.Message.Data);
-            var data = NatsObjJsonSerializer<ObjectMetadata>.DefaultDeserializer.Deserialize(new ReadOnlySequence<byte>(base64String)) ?? throw new NatsObjException("Can't deserialize object metadata");
+            var data = NatsObjJsonSerializer<ObjectMetadata>.Default.Deserialize(new ReadOnlySequence<byte>(base64String)) ?? throw new NatsObjException("Can't deserialize object metadata");
 
             if (!showDeleted && data.Deleted)
             {
@@ -423,7 +423,7 @@ public class NatsObjStore
             context: _context,
             stream: $"OBJ_{_bucket}",
             filter: $"$O.{_bucket}.M.>",
-            deserializer: NatsDefaultSerializer<NatsMemoryOwner<byte>>.DefaultDeserializer,
+            serializer: NatsDefaultSerializer<NatsMemoryOwner<byte>>.Default,
             opts: new NatsJSOrderedPushConsumerOpts { DeliverPolicy = deliverPolicy },
             subOpts: new NatsSubOpts(),
             cancellationToken: cancellationToken);
@@ -479,7 +479,7 @@ public class NatsObjStore
 
     private async ValueTask PublishMeta(ObjectMetadata meta, CancellationToken cancellationToken)
     {
-        var ack = await _context.PublishAsync(GetMetaSubject(meta.Name), meta, serializer: NatsObjJsonSerializer<ObjectMetadata>.DefaultSerializer, headers: NatsRollupHeaders, cancellationToken: cancellationToken);
+        var ack = await _context.PublishAsync(GetMetaSubject(meta.Name), meta, serializer: NatsObjJsonSerializer<ObjectMetadata>.Default, headers: NatsRollupHeaders, cancellationToken: cancellationToken);
         ack.EnsureSuccess();
     }
 

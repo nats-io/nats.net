@@ -11,13 +11,13 @@ internal class NatsKVWatchSub<T> : NatsSubBase
     private readonly CancellationToken _cancellationToken;
     private readonly NatsConnection _nats;
     private readonly NatsHeaderParser _headerParser;
-    private readonly INatsDeserializer<T> _deserializer;
+    private readonly INatsDeserialize<T> _serializer;
     private readonly ChannelWriter<NatsKVWatchCommandMsg<T>> _commands;
 
     public NatsKVWatchSub(
         NatsJSContext context,
         Channel<NatsKVWatchCommandMsg<T>> commandChannel,
-        INatsDeserializer<T> deserializer,
+        INatsDeserialize<T> serializer,
         NatsSubOpts? opts,
         CancellationToken cancellationToken)
         : base(
@@ -29,7 +29,7 @@ internal class NatsKVWatchSub<T> : NatsSubBase
     {
         _context = context;
         _cancellationToken = cancellationToken;
-        _deserializer = deserializer;
+        _serializer = serializer;
         _nats = context.Connection;
         _headerParser = _nats.HeaderParser;
         _commands = commandChannel.Writer;
@@ -54,7 +54,7 @@ internal class NatsKVWatchSub<T> : NatsSubBase
         ReadOnlySequence<byte>? headersBuffer,
         ReadOnlySequence<byte> payloadBuffer)
     {
-        var msg = new NatsJSMsg<T>(NatsMsg<T>.Build(subject, replyTo, headersBuffer, payloadBuffer, _nats, _headerParser, _deserializer), _context);
+        var msg = new NatsJSMsg<T>(NatsMsg<T>.Build(subject, replyTo, headersBuffer, payloadBuffer, _nats, _headerParser, _serializer), _context);
         await _commands.WriteAsync(new NatsKVWatchCommandMsg<T> { Command = NatsKVWatchCommand.Msg, Msg = msg }, _cancellationToken).ConfigureAwait(false);
     }
 

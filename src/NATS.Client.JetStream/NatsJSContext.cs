@@ -73,7 +73,7 @@ public partial class NatsJSContext
     public async ValueTask<PubAckResponse> PublishAsync<T>(
         string subject,
         T? data,
-        INatsSerializer<T>? serializer = default,
+        INatsSerialize<T>? serializer = default,
         NatsJSPubOpts? opts = default,
         NatsHeaders? headers = default,
         CancellationToken cancellationToken = default)
@@ -122,7 +122,7 @@ public partial class NatsJSContext
                     data: data,
                     headers: headers,
                     requestSerializer: serializer,
-                    replyDeserializer: NatsJSJsonSerializer<PubAckResponse>.DefaultDeserializer,
+                    replySerializer: NatsJSJsonSerializer<PubAckResponse>.Default,
                     requestOpts: opts,
                     replyOpts: new NatsSubOpts
                     {
@@ -202,8 +202,8 @@ public partial class NatsJSContext
                     subject: subject,
                     data: request,
                     headers: default,
-                    requestSerializer: NatsJSJsonSerializer<TRequest>.DefaultSerializer,
-                    replyDeserializer: NatsJSErrorAwareJsonDeserializer<TResponse>.Default,
+                    requestSerializer: NatsJSJsonSerializer<TRequest>.Default,
+                    replySerializer: NatsJSErrorAwareJsonSerializer<TResponse>.Default,
                     cancellationToken: cancellationTimer.Token)
                 .ConfigureAwait(false);
 

@@ -6,13 +6,7 @@ namespace NATS.Client.JetStream.Internal;
 
 internal static class NatsJSJsonSerializer<T>
 {
-    private static readonly NatsJsonContextSerializer<T> Default = new(NatsJSJsonSerializerContext.Default);
-
-#pragma warning disable SA1202
-    public static readonly INatsSerializer<T> DefaultSerializer = Default;
-
-    public static readonly INatsDeserializer<T> DefaultDeserializer = Default;
-#pragma warning restore SA1202
+    public static readonly INatsSerializer<T> Default = new NatsJsonContextSerializer<T>(NatsJSJsonSerializerContext.Default);
 }
 
 [JsonSerializable(typeof(AccountInfoResponse))]

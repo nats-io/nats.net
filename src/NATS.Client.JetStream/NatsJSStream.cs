@@ -175,13 +175,13 @@ public class NatsJSStream
             request: null,
             cancellationToken).ConfigureAwait(false);
 
-    public ValueTask<NatsMsg<T>> GetDirectAsync<T>(StreamMsgGetRequest request, INatsDeserializer<T>? deserializer = default, CancellationToken cancellationToken = default)
+    public ValueTask<NatsMsg<T>> GetDirectAsync<T>(StreamMsgGetRequest request, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
         return _context.Connection.RequestAsync<StreamMsgGetRequest, T>(
             subject: $"{_context.Opts.Prefix}.DIRECT.GET.{_name}",
             data: request,
-            requestSerializer: NatsJSJsonSerializer<StreamMsgGetRequest>.DefaultSerializer,
-            replyDeserializer: deserializer,
+            requestSerializer: NatsJSJsonSerializer<StreamMsgGetRequest>.Default,
+            replySerializer: serializer,
             cancellationToken: cancellationToken);
     }
 

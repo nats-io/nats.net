@@ -31,7 +31,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
     private readonly bool _debug;
     private readonly NatsJSContext _context;
     private readonly string _bucket;
-    private readonly INatsDeserializer<T> _deserializer;
+    private readonly INatsDeserialize<T> _serializer;
     private readonly NatsKVWatchOpts _opts;
     private readonly NatsSubOpts? _subOpts;
     private readonly CancellationToken _cancellationToken;
@@ -58,7 +58,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
         NatsJSContext context,
         string bucket,
         string key,
-        INatsDeserializer<T> deserializer,
+        INatsDeserialize<T> serializer,
         NatsKVWatchOpts opts,
         NatsSubOpts? subOpts,
         CancellationToken cancellationToken)
@@ -67,7 +67,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
         _debug = _logger.IsEnabled(LogLevel.Debug);
         _context = context;
         _bucket = bucket;
-        _deserializer = deserializer;
+        _serializer = serializer;
         _opts = opts;
         _subOpts = subOpts;
         _keyBase = $"$KV.{_bucket}.";
@@ -327,7 +327,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
             await _sub.DisposeAsync();
         }
 
-        _sub = new NatsKVWatchSub<T>(_context, _commandChannel, _deserializer, _subOpts, _cancellationToken);
+        _sub = new NatsKVWatchSub<T>(_context, _commandChannel, _serializer, _subOpts, _cancellationToken);
         await _context.Connection.SubAsync(_sub, _cancellationToken).ConfigureAwait(false);
 
         if (_debug)

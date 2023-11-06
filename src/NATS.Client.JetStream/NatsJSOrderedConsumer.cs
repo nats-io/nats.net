@@ -34,14 +34,14 @@ public class NatsJSOrderedConsumer
     /// <summary>
     /// Consume messages from the stream in order.
     /// </summary>
-    /// <param name="deserializer">Serializer to use for the message type.</param>
+    /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="opts">Consume options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel consume operation.</param>
     /// <typeparam name="T">Serialized message data type.</typeparam>
     /// <returns>Asynchronous enumeration which can be used in a <c>await foreach</c> loop.</returns>
     /// <exception cref="NatsJSProtocolException">There was a JetStream server error.</exception>
     public async IAsyncEnumerable<NatsJSMsg<T>> ConsumeAsync<T>(
-        INatsDeserializer<T>? deserializer = default,
+        INatsDeserialize<T>? serializer = default,
         NatsJSConsumeOpts? opts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -54,7 +54,7 @@ public class NatsJSOrderedConsumer
             var consumer = await RecreateConsumer(consumerName, seq, cancellationToken);
             consumerName = consumer.Info.Name;
 
-            await using var cc = await consumer.ConsumeInternalAsync(deserializer, opts, cancellationToken);
+            await using var cc = await consumer.ConsumeInternalAsync(serializer, opts, cancellationToken);
 
             NatsJSProtocolException? protocolException = default;
             while (true)
@@ -126,13 +126,13 @@ public class NatsJSOrderedConsumer
     /// <summary>
     /// Fetch messages from the stream in order.
     /// </summary>
-    /// <param name="deserializer">Serializer to use for the message type.</param>
+    /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="opts">Fetch options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel fetch operation.</param>
     /// <typeparam name="T">Serialized message data type.</typeparam>
     /// <returns>Asynchronous enumeration which can be used in a <c>await foreach</c> loop.</returns>
     public async IAsyncEnumerable<NatsJSMsg<T>> FetchAsync<T>(
-        INatsDeserializer<T>? deserializer = default,
+        INatsDeserialize<T>? serializer = default,
         NatsJSFetchOpts? opts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -141,7 +141,7 @@ public class NatsJSOrderedConsumer
         var consumer = await RecreateConsumer(_fetchConsumerName, _fetchSeq, cancellationToken);
         _fetchConsumerName = consumer.Info.Name;
 
-        await foreach (var msg in consumer.FetchAsync(deserializer, opts, cancellationToken))
+        await foreach (var msg in consumer.FetchAsync(serializer, opts, cancellationToken))
         {
             if (msg.Metadata is not { } metadata)
                 continue;
@@ -159,12 +159,12 @@ public class NatsJSOrderedConsumer
     /// <summary>
     /// Get the next message from the stream in order.
     /// </summary>
-    /// <param name="deserializer">Serializer to use for the message type.</param>
+    /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="opts">Next options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the underlying fetch operation.</param>
     /// <typeparam name="T">Serialized message data type.</typeparam>
     /// <returns>The next NATS JetStream message in order.</returns>
-    public async ValueTask<NatsJSMsg<T>?> NextAsync<T>(INatsDeserializer<T>? deserializer = default, NatsJSNextOpts? opts = default, CancellationToken cancellationToken = default)
+    public async ValueTask<NatsJSMsg<T>?> NextAsync<T>(INatsDeserialize<T>? serializer = default, NatsJSNextOpts? opts = default, CancellationToken cancellationToken = default)
     {
         opts ??= _context.Opts.DefaultNextOpts;
 
@@ -175,7 +175,7 @@ public class NatsJSOrderedConsumer
             Expires = opts.Expires,
         };
 
-        await foreach (var msg in FetchAsync(deserializer, fetchOpts, cancellationToken))
+        await foreach (var msg in FetchAsync(serializer, fetchOpts, cancellationToken))
         {
             return msg;
         }

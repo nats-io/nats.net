@@ -16,7 +16,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
     private readonly NatsJSContext _context;
     private readonly string _stream;
     private readonly string _consumer;
-    private readonly INatsDeserializer<TMsg> _deserializer;
+    private readonly INatsDeserialize<TMsg> _serializer;
     private readonly Timer _hbTimer;
     private readonly Timer _expiresTimer;
 
@@ -40,7 +40,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         string consumer,
         string subject,
         string? queueGroup,
-        INatsDeserializer<TMsg> deserializer,
+        INatsDeserialize<TMsg> serializer,
         NatsSubOpts? opts)
         : base(context.Connection, context.Connection.SubscriptionManager, subject, queueGroup, opts)
     {
@@ -49,7 +49,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         _context = context;
         _stream = stream;
         _consumer = consumer;
-        _deserializer = deserializer;
+        _serializer = serializer;
 
         _maxMsgs = maxMsgs;
         _maxBytes = maxBytes;
@@ -121,7 +121,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         Connection.PubModelAsync(
             subject: $"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
             data: request,
-            serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.DefaultSerializer,
+            serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
             replyTo: Subject,
             headers: default,
             cancellationToken);
@@ -154,7 +154,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
             replyTo: Subject,
             headers: default,
             value: request,
-            serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.DefaultSerializer,
+            serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
             errorHandler: default,
             cancellationToken: default);
     }
@@ -229,7 +229,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
                     payloadBuffer,
                     Connection,
                     Connection.HeaderParser,
-                    _deserializer),
+                    _serializer),
                 _context);
 
             _pendingMsgs--;

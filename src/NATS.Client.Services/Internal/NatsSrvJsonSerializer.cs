@@ -6,13 +6,7 @@ namespace NATS.Client.Services.Internal;
 
 internal static class NatsSrvJsonSerializer<T>
 {
-    private static readonly NatsJsonContextSerializer<T> Default = new(NatsSrvJsonSerializerContext.Default);
-
-#pragma warning disable SA1202
-    public static readonly INatsSerializer<T> DefaultSerializer = Default;
-
-    public static readonly INatsDeserializer<T> DefaultDeserializer = Default;
-#pragma warning restore SA1202
+    public static readonly INatsSerializer<T> Default = new NatsJsonContextSerializer<T>(NatsSrvJsonSerializerContext.Default);
 }
 
 [JsonSerializable(typeof(InfoResponse))]

@@ -28,7 +28,7 @@ public class ConsumerFetchTest
         var consumer = await js.GetConsumerAsync("s1", "c1", cts.Token);
         var count = 0;
         await using var fc =
-            await consumer.FetchInternalAsync<TestData>(deserializer: TestDataJsonSerializer<TestData>.Default, new NatsJSFetchOpts { MaxMsgs = 10 }, cancellationToken: cts.Token);
+            await consumer.FetchInternalAsync<TestData>(serializer: TestDataJsonSerializer<TestData>.Default, new NatsJSFetchOpts { MaxMsgs = 10 }, cancellationToken: cts.Token);
         await foreach (var msg in fc.Msgs.ReadAllAsync(cts.Token))
         {
             await msg.AckAsync(new AckOpts(WaitUntilSent: true), cts.Token);
@@ -57,7 +57,7 @@ public class ConsumerFetchTest
 
         var consumer = await js.GetConsumerAsync("s1", "c1", cts.Token);
         var count = 0;
-        await foreach (var msg in consumer.FetchNoWaitAsync<TestData>(deserializer: TestDataJsonSerializer<TestData>.Default, new NatsJSFetchOpts { MaxMsgs = 10 }, cancellationToken: cts.Token))
+        await foreach (var msg in consumer.FetchNoWaitAsync<TestData>(serializer: TestDataJsonSerializer<TestData>.Default, new NatsJSFetchOpts { MaxMsgs = 10 }, cancellationToken: cts.Token))
         {
             await msg.AckAsync(new AckOpts(WaitUntilSent: true), cts.Token);
             Assert.Equal(count, msg.Data!.Test);
@@ -92,7 +92,7 @@ public class ConsumerFetchTest
             ack.EnsureSuccess();
         }
 
-        var fc = await consumer.FetchInternalAsync<TestData>(deserializer: TestDataJsonSerializer<TestData>.Default, fetchOpts, cancellationToken: cts.Token);
+        var fc = await consumer.FetchInternalAsync<TestData>(serializer: TestDataJsonSerializer<TestData>.Default, fetchOpts, cancellationToken: cts.Token);
 
         var signal = new WaitSignal();
         var reader = Task.Run(async () =>

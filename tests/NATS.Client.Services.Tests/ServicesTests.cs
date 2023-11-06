@@ -232,7 +232,7 @@ public class ServicesTests
         var responses = new List<T>();
 
         var count = 0;
-        await foreach (var msg in nats.RequestManyAsync<object?, T>(subject, null, replyDeserializer: NatsSrvJsonSerializer<T>.DefaultDeserializer, replyOpts: replyOpts, cancellationToken: ct).ConfigureAwait(false))
+        await foreach (var msg in nats.RequestManyAsync<object?, T>(subject, null, replySerializer: NatsSrvJsonSerializer<T>.Default, replyOpts: replyOpts, cancellationToken: ct).ConfigureAwait(false))
         {
             responses.Add(msg.Data!);
             if (++count == limit)
