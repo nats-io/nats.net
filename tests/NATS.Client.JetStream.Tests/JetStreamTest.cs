@@ -63,7 +63,7 @@ public class JetStreamTest
                 "events.foo",
                 new TestData { Test = 2 },
                 serializer: TestDataJsonSerializer<TestData>.Default,
-                headers: new NatsHeaders { { "Nats-Msg-Id", "test2" } },
+                opts: new NatsJSPubOpts { MsgId = "test2" },
                 cancellationToken: cts1.Token);
             Assert.Null(ack.Error);
             Assert.Equal("events", ack.Stream);
@@ -75,7 +75,7 @@ public class JetStreamTest
                 "events.foo",
                 new TestData { Test = 2 },
                 serializer: TestDataJsonSerializer<TestData>.Default,
-                headers: new NatsHeaders { { "Nats-Msg-Id", "test2" } },
+                opts: new NatsJSPubOpts { MsgId = "test2" },
                 cancellationToken: cts1.Token);
             Assert.Null(ack.Error);
             Assert.Equal("events", ack.Stream);
@@ -84,8 +84,8 @@ public class JetStreamTest
 
             // Consume
             var cts2 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            var messages = new List<NatsJSMsg<TestData>>();
-            var cc = await consumer.ConsumeAsync<TestData>(
+            var messages = new List<NatsJSMsg<TestData?>>();
+            var cc = await consumer.ConsumeInternalAsync<TestData>(
                 serializer: TestDataJsonSerializer<TestData>.Default,
                 opts: new NatsJSConsumeOpts { MaxMsgs = 100 },
                 cancellationToken: cts2.Token);

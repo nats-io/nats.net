@@ -63,8 +63,8 @@ internal class NatsJSOrderedPushConsumer<T>
     private readonly Task _commandTask;
     private readonly long _ackWaitNanos;
 
-    private long _sequenceStream;
-    private long _sequenceConsumer;
+    private ulong _sequenceStream;
+    private ulong _sequenceConsumer;
     private string _consumer;
     private volatile NatsJSOrderedPushConsumerSub<T>? _sub;
     private int _done;
@@ -221,7 +221,7 @@ internal class NatsJSOrderedPushConsumer<T>
 
                                     var sequence = Interlocked.Increment(ref _sequenceConsumer);
 
-                                    if (sequence != (long)metadata.Sequence.Consumer)
+                                    if (sequence != metadata.Sequence.Consumer)
                                     {
                                         CreateSub("sequence-mismatch");
                                         _logger.LogWarning("Missed messages, recreating consumer");
@@ -231,7 +231,7 @@ internal class NatsJSOrderedPushConsumer<T>
                                     // Increment the sequence before writing to the channel in case the channel is full
                                     // and the writer is waiting for the reader to read the message. This way the sequence
                                     // will be correctly incremented in case the timeout kicks in and recreated the consumer.
-                                    Interlocked.Exchange(ref _sequenceStream, (long)metadata.Sequence.Stream);
+                                    Interlocked.Exchange(ref _sequenceStream, metadata.Sequence.Stream);
 
                                     if (!IsDone)
                                     {

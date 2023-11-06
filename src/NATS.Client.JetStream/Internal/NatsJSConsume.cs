@@ -15,11 +15,10 @@ internal struct PullRequest
     public string Origin { get; init; }
 }
 
-internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
+internal class NatsJSConsume<TMsg> : NatsSubBase
 {
     private readonly ILogger _logger;
     private readonly bool _debug;
-    private readonly CancellationTokenSource _cts;
     private readonly Channel<NatsJSMsg<TMsg>> _userMsgs;
     private readonly Channel<PullRequest> _pullRequests;
     private readonly NatsJSContext _context;
@@ -60,8 +59,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
         CancellationToken cancellationToken)
         : base(context.Connection, context.Connection.SubscriptionManager, subject, queueGroup, opts)
     {
-        _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        _cancellationToken = _cts.Token;
+        _cancellationToken = cancellationToken;
         _logger = Connection.Opts.LoggerFactory.CreateLogger<NatsJSConsume<TMsg>>();
         _debug = _logger.IsEnabled(LogLevel.Debug);
         _context = context;
@@ -138,8 +136,6 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
     }
 
     public ChannelReader<NatsJSMsg<TMsg>> Msgs { get; }
-
-    public void Stop() => _cts.Cancel();
 
     public ValueTask CallMsgNextAsync(string origin, ConsumerGetnextRequest request, CancellationToken cancellationToken = default)
     {
@@ -284,9 +280,18 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
                     else if (headers is { Code: 100, Message: NatsHeaders.Messages.IdleHeartbeat })
                     {
                     }
+                    else if (headers.Code == 409 && string.Equals(headers.MessageText, "Leadership Change", StringComparison.OrdinalIgnoreCase))
+                    {
+                        _logger.LogDebug(NatsJSLogEvents.LeadershipChange, "Leadership Change");
+                        lock (_pendingGate)
+                        {
+                            _pendingBytes = 0;
+                            _pendingMsgs = 0;
+                        }
+                    }
                     else if (headers.HasTerminalJSError())
                     {
-                        _userMsgs.Writer.TryComplete(new NatsJSProtocolException($"JetStream server error: {headers.Code} {headers.MessageText}"));
+                        _userMsgs.Writer.TryComplete(new NatsJSProtocolException(headers.Code, headers.Message, headers.MessageText));
                         EndSubscription(NatsSubEndReason.JetStreamError);
                     }
                     else
@@ -425,7 +430,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
 
     private async Task PullLoop()
     {
-        await foreach (var pr in _pullRequests.Reader.ReadAllAsync())
+        await foreach (var pr in _pullRequests.Reader.ReadAllAsync().ConfigureAwait(false))
         {
             var origin = $"pull-loop({pr.Origin})";
             await CallMsgNextAsync(origin, pr.Request).ConfigureAwait(false);

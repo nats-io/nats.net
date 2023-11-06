@@ -49,7 +49,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
     private readonly Task _commandTask;
     private readonly long _ackWaitNanos;
 
-    private long _sequenceStream;
+    private ulong _sequenceStream;
     private long _sequenceConsumer;
     private string _consumer;
     private volatile NatsKVWatchSub<T>? _sub;
@@ -246,7 +246,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
                                     // Increment the sequence before writing to the channel in case the channel is full
                                     // and the writer is waiting for the reader to read the message. This way the sequence
                                     // will be correctly incremented in case the timeout kicks in and recreated the consumer.
-                                    Interlocked.Exchange(ref _sequenceStream, (long)metadata.Sequence.Stream);
+                                    Interlocked.Exchange(ref _sequenceStream, metadata.Sequence.Stream);
 
                                     await _entryChannel.Writer.WriteAsync(entry, _cancellationToken);
                                 }

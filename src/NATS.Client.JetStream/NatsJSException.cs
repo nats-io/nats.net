@@ -36,21 +36,22 @@ public class NatsJSProtocolException : NatsJSException
     /// <summary>
     /// Create JetStream protocol exception.
     /// </summary>
-    /// <param name="message">Error message.</param>
-    public NatsJSProtocolException(string message)
-        : base(message)
+    /// <param name="headerCode">Server error code</param>
+    /// <param name="headerMessage">Server error message enum (if defined)</param>
+    /// <param name="headerMessageText">Server error message string</param>
+    public NatsJSProtocolException(int headerCode, NatsHeaders.Messages headerMessage, string headerMessageText)
+        : base($"JetStream server error: {headerCode} {headerMessageText}")
     {
+        HeaderCode = headerCode;
+        HeaderMessage = headerMessage;
+        HeaderMessageText = headerMessageText;
     }
 
-    /// <summary>
-    /// Create JetStream protocol exception.
-    /// </summary>
-    /// <param name="message">Error message.</param>
-    /// <param name="exception">Inner exception.</param>
-    public NatsJSProtocolException(string message, Exception exception)
-        : base(message, exception)
-    {
-    }
+    public int HeaderCode { get; }
+
+    public NatsHeaders.Messages HeaderMessage { get; }
+
+    public string HeaderMessageText { get; }
 }
 
 /// <summary>
@@ -89,4 +90,12 @@ public class NatsJSApiException : NatsJSException
     /// API error response received from the server.
     /// </summary>
     public ApiError Error { get; }
+}
+
+public class NatsJSPublishNoResponseException : NatsJSException
+{
+    public NatsJSPublishNoResponseException()
+        : base("No response received from the server")
+    {
+    }
 }
