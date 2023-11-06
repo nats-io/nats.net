@@ -239,5 +239,7 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
             {
             }
         }
+
+        logger.LogDebug("WriteLoop finished.");
     }
 }

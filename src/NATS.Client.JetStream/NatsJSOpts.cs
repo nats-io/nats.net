@@ -168,3 +168,31 @@ public record NatsJSFetchOpts
     /// </remarks>
     public INatsSerializer? Serializer { get; init; }
 }
+
+public record NatsJSPubOpts : NatsPubOpts
+{
+    public static readonly NatsJSPubOpts Default = new();
+
+    // ttl time.Duration
+    // id  string
+    public string? MsgId { get; init; }
+
+    // lid string  // Expected last msgId
+    public string? ExpectedLastMsgId { get; init; }
+
+    // str string  // Expected stream name
+    public string? ExpectedStream { get; init; }
+
+    // seq *uint64 // Expected last sequence
+    public ulong? ExpectedLastSequence { get; init; }
+
+    // lss *uint64 // Expected last sequence per subject
+    public ulong? ExpectedLastSubjectSequence { get; init; }
+
+    // Publish retries for NoResponders err.
+    // rwait time.Duration // Retry wait between attempts
+    public TimeSpan RetryWaitBetweenAttempts { get; init; } = TimeSpan.FromMilliseconds(250);
+
+    // rnum  int           // Retry attempts
+    public int RetryAttempts { get; init; } = 2;
+}
