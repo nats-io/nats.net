@@ -13,7 +13,7 @@ public class NatsException : Exception
     }
 }
 
-public class NatsNoReplyException : NatsException
+public sealed class NatsNoReplyException : NatsException
 {
     public NatsNoReplyException()
         : base("No reply received")
