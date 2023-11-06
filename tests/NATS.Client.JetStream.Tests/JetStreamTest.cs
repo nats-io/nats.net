@@ -52,7 +52,7 @@ public class JetStreamTest
             Assert.Equal("consumer1", consumer.Info.Config.Name);
 
             // Publish
-            var ack = await js.PublishAsync("events.foo", new TestData { Test = 1 }, pubOpts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts1.Token);
+            var ack = await js.PublishAsync("events.foo", new TestData { Test = 1 }, opts: new NatsJSPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts1.Token);
             Assert.Null(ack.Error);
             Assert.Equal("events", ack.Stream);
             Assert.Equal(1, (int)ack.Seq);
@@ -62,8 +62,7 @@ public class JetStreamTest
             ack = await js.PublishAsync(
                 "events.foo",
                 new TestData { Test = 2 },
-                pubOpts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default },
-                opts: new NatsJSPubOpts { MsgId = "test2" },
+                opts: new NatsJSPubOpts { MsgId = "test2", Serializer = TestDataJsonSerializer.Default },
                 cancellationToken: cts1.Token);
             Assert.Null(ack.Error);
             Assert.Equal("events", ack.Stream);
@@ -74,8 +73,7 @@ public class JetStreamTest
             ack = await js.PublishAsync(
                 "events.foo",
                 new TestData { Test = 2 },
-                pubOpts: new NatsPubOpts { Serializer = TestDataJsonSerializer.Default },
-                opts: new NatsJSPubOpts { MsgId = "test2" },
+                opts: new NatsJSPubOpts { MsgId = "test2", Serializer = TestDataJsonSerializer.Default },
                 cancellationToken: cts1.Token);
             Assert.Null(ack.Error);
             Assert.Equal("events", ack.Stream);

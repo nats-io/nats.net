@@ -485,7 +485,7 @@ public class NatsObjStore
 
     private async ValueTask PublishMeta(ObjectMetadata meta, CancellationToken cancellationToken)
     {
-        var ack = await _context.PublishAsync(GetMetaSubject(meta.Name), meta, pubOpts: new NatsPubOpts { Serializer = NatsObjJsonSerializer.Default }, headers: NatsRollupHeaders, cancellationToken: cancellationToken);
+        var ack = await _context.PublishAsync(GetMetaSubject(meta.Name), meta, opts: new NatsJSPubOpts { Serializer = NatsObjJsonSerializer.Default }, headers: NatsRollupHeaders, cancellationToken: cancellationToken);
         ack.EnsureSuccess();
     }
 

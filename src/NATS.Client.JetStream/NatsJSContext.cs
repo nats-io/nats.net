@@ -48,9 +48,8 @@ public partial class NatsJSContext
     /// </summary>
     /// <param name="subject">Subject to publish the data to.</param>
     /// <param name="data">Data to publish.</param>
-    /// <param name="opts">JetStream publish options.</param>
+    /// <param name="opts">Publish options.</param>
     /// <param name="headers">Optional message headers.</param>
-    /// <param name="pubOpts">Options to be used by publishing command.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the publishing call or the wait for response.</param>
     /// <typeparam name="T">Type of the data being sent.</typeparam>
     /// <returns>
@@ -75,7 +74,6 @@ public partial class NatsJSContext
         T? data,
         NatsJSPubOpts? opts = default,
         NatsHeaders? headers = default,
-        NatsPubOpts? pubOpts = default,
         CancellationToken cancellationToken = default)
     {
         if (opts != null)
@@ -121,7 +119,7 @@ public partial class NatsJSContext
                     subject: subject,
                     data: data,
                     headers: headers,
-                    requestOpts: pubOpts,
+                    requestOpts: opts,
                     replyOpts: new NatsSubOpts
                     {
                         Serializer = NatsJSJsonSerializer.Default,
@@ -165,9 +163,8 @@ public partial class NatsJSContext
         string subject,
         NatsJSPubOpts? opts = default,
         NatsHeaders? headers = default,
-        NatsPubOpts? pubOpts = default,
         CancellationToken cancellationToken = default) =>
-        PublishAsync<object?>(subject, default, opts, headers, pubOpts, cancellationToken);
+        PublishAsync<object?>(subject, default, opts, headers, cancellationToken);
 
     internal string NewInbox() => NatsConnection.NewInbox(Connection.Opts.InboxPrefix);
 

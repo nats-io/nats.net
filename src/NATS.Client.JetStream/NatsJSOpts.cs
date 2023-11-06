@@ -169,7 +169,7 @@ public record NatsJSFetchOpts
     public INatsSerializer? Serializer { get; init; }
 }
 
-public record NatsJSPubOpts
+public record NatsJSPubOpts : NatsPubOpts
 {
     public static readonly NatsJSPubOpts Default = new();
 
