@@ -93,7 +93,15 @@ public readonly record struct NatsMsg<T>(
     /// <typeparam name="TReply">Specifies the type of data that may be sent to the NATS Server.</typeparam>
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous send operation.</returns>
     /// <remarks>
+    /// <para>
     /// Publishes a new message using the reply-to subject from the this message as the destination subject.
+    /// </para>
+    /// <para>
+    /// If the <paramref name="serializer"/> is not specified, the <see cref="INatsSerializerRegistry"/> assigned to
+    /// the <see cref="NatsConnection"/> will be used to find a serializer for the type <typeparamref name="TReply"/>.
+    /// You can specify a <see cref="INatsSerializerRegistry"/> in <see cref="NatsOpts"/> when creating a
+    /// <see cref="NatsConnection"/>. If not specified, <see cref="NatsDefaultSerializerRegistry"/> will be used.
+    /// </para>
     /// </remarks>
     public ValueTask ReplyAsync<TReply>(TReply data, NatsHeaders? headers = default, string? replyTo = default, INatsSerializer<TReply>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
