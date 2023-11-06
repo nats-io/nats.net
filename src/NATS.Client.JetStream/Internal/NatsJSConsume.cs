@@ -25,7 +25,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
     private readonly string _stream;
     private readonly string _consumer;
     private readonly CancellationToken _cancellationToken;
-    private readonly INatsSerializer<TMsg> _serializer;
+    private readonly INatsDeserializer<TMsg> _deserializer;
     private readonly Timer _timer;
     private readonly Task _pullTask;
 
@@ -54,7 +54,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         string consumer,
         string subject,
         string? queueGroup,
-        INatsSerializer<TMsg> serializer,
+        INatsDeserializer<TMsg> deserializer,
         NatsSubOpts? opts,
         CancellationToken cancellationToken)
         : base(context.Connection, context.Connection.SubscriptionManager, subject, queueGroup, opts)
@@ -65,7 +65,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         _context = context;
         _stream = stream;
         _consumer = consumer;
-        _serializer = serializer;
+        _deserializer = deserializer;
 
         _maxMsgs = maxMsgs;
         _thresholdMsgs = thresholdMsgs;
@@ -150,7 +150,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         return Connection.PubModelAsync(
             subject: $"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
             data: request,
-            serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
+            serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.DefaultSerializer,
             replyTo: Subject,
             headers: default,
             cancellationToken);
@@ -190,7 +190,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
             replyTo: Subject,
             headers: default,
             value: request,
-            serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
+            serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.DefaultSerializer,
             errorHandler: default,
             cancellationToken: default);
     }
@@ -326,7 +326,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                     payloadBuffer,
                     Connection,
                     Connection.HeaderParser,
-                    _serializer),
+                    _deserializer),
                 _context);
 
             lock (_pendingGate)

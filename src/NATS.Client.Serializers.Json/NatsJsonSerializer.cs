@@ -11,7 +11,7 @@ namespace NATS.Client.Serializers.Json;
 /// <remarks>
 /// This serializer is not suitable for native AOT deployments since it might rely on reflection
 /// </remarks>
-public sealed class NatsJsonSerializer<T> : INatsSerializer<T>
+public sealed class NatsJsonSerializer<T> : INatsSerializer2<T>, INatsDeserializer<T>
 {
     private static readonly JsonWriterOptions JsonWriterOpts = new() { Indented = false, SkipValidation = true, };
 
@@ -75,5 +75,7 @@ public sealed class NatsJsonSerializerRegistry : INatsSerializerRegistry
 {
     public static readonly NatsJsonSerializerRegistry Default = new();
 
-    public INatsSerializer<T> GetSerializer<T>() => NatsJsonSerializer<T>.Default;
+    public INatsSerializer2<T> GetSerializer<T>() => NatsJsonSerializer<T>.Default;
+
+    public INatsDeserializer<T> GetDeserializer<T>() => NatsJsonSerializer<T>.Default;
 }

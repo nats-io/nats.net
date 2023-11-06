@@ -49,7 +49,7 @@ using NATS.Client.Core;
 
     var serializer = new NatsJsonContextSerializer<MyData>(MyJsonContext.Default);
 
-    await using var sub = await nats.SubscribeAsync<MyData>(subject: "foo", serializer: serializer);
+    await using var sub = await nats.SubscribeAsync<MyData>(subject: "foo", deserializer: serializer);
 
     // Flush the the network buffers to make sure the subscription request has been processed.
     await nats.PingAsync();
@@ -138,17 +138,21 @@ using NATS.Client.Core;
 
 public class MixedSerializerRegistry : INatsSerializerRegistry
 {
-    public INatsSerializer<T> GetSerializer<T>() => new NatsJsonContextSerializer<T>(MyJsonContext.Default, next: MyProtoBufSerializer<T>.Default);
+    public INatsSerializer2<T> GetSerializer<T>() => new NatsJsonContextSerializer<T>(MyJsonContext.Default, MyProtoBufSerializer<T>.Default, MyProtoBufSerializer<T>.Default);
+
+    public INatsDeserializer<T> GetDeserializer<T>() => new NatsJsonContextSerializer<T>(MyJsonContext.Default, MyProtoBufSerializer<T>.Default, MyProtoBufSerializer<T>.Default);
 }
 
 public class MyProtoBufSerializerRegistry : INatsSerializerRegistry
 {
-    public INatsSerializer<T> GetSerializer<T>() => MyProtoBufSerializer<T>.Default;
+    public INatsSerializer2<T> GetSerializer<T>() => MyProtoBufSerializer<T>.Default;
+
+    public INatsDeserializer<T> GetDeserializer<T>() => MyProtoBufSerializer<T>.Default;
 }
 
-public class MyProtoBufSerializer<T> : INatsSerializer<T>
+public class MyProtoBufSerializer<T> : INatsSerializer2<T>, INatsDeserializer<T>
 {
-    public static readonly INatsSerializer<T> Default = new MyProtoBufSerializer<T>();
+    public static readonly MyProtoBufSerializer<T> Default = new();
 
     public void Serialize(IBufferWriter<byte> bufferWriter, T value)
     {

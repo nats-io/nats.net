@@ -86,7 +86,7 @@ public class JetStreamTest
             var cts2 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             var messages = new List<NatsJSMsg<TestData>>();
             var cc = await consumer.ConsumeInternalAsync<TestData>(
-                serializer: TestDataJsonSerializer<TestData>.Default,
+                deserializer: TestDataJsonSerializer<TestData>.Default,
                 opts: new NatsJSConsumeOpts { MaxMsgs = 100 },
                 cancellationToken: cts2.Token);
             await foreach (var msg in cc.Msgs.ReadAllAsync(cts2.Token))

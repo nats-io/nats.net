@@ -5,12 +5,9 @@ using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Internal;
 
-internal sealed class NatsJSErrorAwareJsonSerializer<T> : INatsSerializer<T>
+internal sealed class NatsJSErrorAwareJsonDeserializer<T> : INatsDeserializer<T>
 {
-    public static readonly NatsJSErrorAwareJsonSerializer<T> Default = new();
-
-    public void Serialize(IBufferWriter<byte> bufferWriter, T? value) =>
-        throw new NotSupportedException();
+    public static readonly NatsJSErrorAwareJsonDeserializer<T> Default = new();
 
     public T? Deserialize(in ReadOnlySequence<byte> buffer)
     {
@@ -25,7 +22,7 @@ internal sealed class NatsJSErrorAwareJsonSerializer<T> : INatsSerializer<T>
             throw new NatsJSApiErrorException(error);
         }
 
-        return NatsJSJsonSerializer<T>.Default.Deserialize(buffer);
+        return NatsJSJsonSerializer<T>.DefaultDeserializer.Deserialize(buffer);
     }
 }
 

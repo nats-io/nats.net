@@ -129,7 +129,7 @@ async Task JetStreamTests()
         // Consume
         var cts2 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var messages = new List<NatsJSMsg<TestData>>();
-        await foreach (var msg in consumer.ConsumeAsync(serializer: TestDataJsonSerializer<TestData>.Default, new NatsJSConsumeOpts { MaxMsgs = 100 }, cancellationToken: cts2.Token))
+        await foreach (var msg in consumer.ConsumeAsync(deserializer: TestDataJsonSerializer<TestData>.Default, new NatsJSConsumeOpts { MaxMsgs = 100 }, cancellationToken: cts2.Token))
         {
             messages.Add(msg);
 
@@ -461,7 +461,7 @@ static async Task<List<T>> FindServices<T>(NatsConnection nats, string subject, 
     var responses = new List<T>();
 
     var count = 0;
-    await foreach (var msg in nats.RequestManyAsync<object?, T>(subject, null, replySerializer: NatsSrvJsonSerializer<T>.Default, replyOpts: replyOpts, cancellationToken: ct).ConfigureAwait(false))
+    await foreach (var msg in nats.RequestManyAsync<object?, T>(subject, null, replyDeserializer: NatsSrvJsonSerializer<T>.DefaultDeserializer, replyOpts: replyOpts, cancellationToken: ct).ConfigureAwait(false))
     {
         responses.Add(msg.Data!);
         if (++count == limit)

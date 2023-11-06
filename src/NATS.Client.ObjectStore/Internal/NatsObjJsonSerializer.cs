@@ -6,7 +6,13 @@ namespace NATS.Client.ObjectStore.Internal;
 
 internal static class NatsObjJsonSerializer<T>
 {
-    public static readonly INatsSerializer<T> Default = new NatsJsonContextSerializer<T>(NatsObjJsonSerializerContext.Default);
+    private static readonly NatsJsonContextSerializer<T> Default = new(NatsObjJsonSerializerContext.Default);
+
+#pragma warning disable SA1202
+    public static readonly INatsSerializer2<T> DefaultSerializer = Default;
+
+    public static readonly INatsDeserializer<T> DefaultDeserializer = Default;
+#pragma warning restore SA1202
 }
 
 [JsonSerializable(typeof(ObjectMetadata))]

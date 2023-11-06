@@ -75,7 +75,7 @@ public class ServiceCompat
                     subject: subject,
                     queueGroup: queueGroup,
                     metadata: metadata,
-                    serializer: default);
+                    deserializer: default);
             }
             else
             {
@@ -85,7 +85,7 @@ public class ServiceCompat
                     subject: subject,
                     queueGroup: queueGroup,
                     metadata: metadata,
-                    serializer: default);
+                    deserializer: default);
             }
         }
 

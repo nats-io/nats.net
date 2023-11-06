@@ -37,13 +37,13 @@ public readonly record struct NatsMsg<T>(
         in ReadOnlySequence<byte> payloadBuffer,
         INatsConnection? connection,
         NatsHeaderParser headerParser,
-        INatsSerializer<T> serializer)
+        INatsDeserializer<T> deserializer)
     {
         // Consider an empty payload as null or default value for value types. This way we are able to
         // receive sentinels as nulls or default values. This might cause an issue with where we are not
         // able to differentiate between an empty sentinel and actual default value of a struct e.g. 0 (zero).
         var data = payloadBuffer.Length > 0
-            ? serializer.Deserialize(payloadBuffer)
+            ? deserializer.Deserialize(payloadBuffer)
             : default;
 
         NatsHeaders? headers = null;
@@ -103,7 +103,7 @@ public readonly record struct NatsMsg<T>(
     /// <see cref="NatsConnection"/>. If not specified, <see cref="NatsDefaultSerializerRegistry"/> will be used.
     /// </para>
     /// </remarks>
-    public ValueTask ReplyAsync<TReply>(TReply data, NatsHeaders? headers = default, string? replyTo = default, INatsSerializer<TReply>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
+    public ValueTask ReplyAsync<TReply>(TReply data, NatsHeaders? headers = default, string? replyTo = default, INatsSerializer2<TReply>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         CheckReplyPreconditions();
         return Connection.PublishAsync(ReplyTo, data, headers, replyTo, serializer, opts, cancellationToken);
@@ -121,7 +121,7 @@ public readonly record struct NatsMsg<T>(
     /// <remarks>
     /// Publishes a new message using the reply-to subject from the this message as the destination subject.
     /// </remarks>
-    public ValueTask ReplyAsync<TReply>(NatsMsg<TReply> msg, INatsSerializer<TReply>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
+    public ValueTask ReplyAsync<TReply>(NatsMsg<TReply> msg, INatsSerializer2<TReply>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         CheckReplyPreconditions();
         return Connection.PublishAsync(msg with { Subject = ReplyTo }, serializer, opts, cancellationToken);

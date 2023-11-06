@@ -23,7 +23,7 @@ public class ConsumerNextTest
         {
             var ack = await js.PublishAsync("s1.foo", new TestData { Test = i }, serializer: TestDataJsonSerializer<TestData>.Default, cancellationToken: cts.Token);
             ack.EnsureSuccess();
-            var next = await consumer.NextAsync<TestData>(serializer: TestDataJsonSerializer<TestData>.Default, cancellationToken: cts.Token);
+            var next = await consumer.NextAsync<TestData>(deserializer: TestDataJsonSerializer<TestData>.Default, cancellationToken: cts.Token);
             if (next is { } msg)
             {
                 await msg.AckAsync(new AckOpts(WaitUntilSent: true), cts.Token);
