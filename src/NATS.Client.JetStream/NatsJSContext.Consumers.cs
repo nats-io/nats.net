@@ -154,7 +154,6 @@ public partial class NatsJSContext
             StreamName = stream,
             Config = new ConsumerConfiguration
             {
-                Name = NuidWriter.NewNuid(),
                 DeliverPolicy = opts.DeliverPolicy,
                 AckPolicy = ConsumerConfigurationAckPolicy.none,
                 ReplayPolicy = opts.ReplayPolicy,
@@ -184,18 +183,8 @@ public partial class NatsJSContext
             request.Config.FilterSubjects = opts.FilterSubjects;
         }
 
-        var subject = $"{Opts.Prefix}.CONSUMER.CREATE.{request.StreamName}";
-
-        if (!string.IsNullOrWhiteSpace(request.Config.Name))
-        {
-            subject += $".{request.Config.Name}";
-            request.Config.Name = default!;
-        }
-
-        if (!string.IsNullOrWhiteSpace(request.Config.FilterSubject))
-        {
-            subject += $".{request.Config.FilterSubject}";
-        }
+        var name = NuidWriter.NewNuid();
+        var subject = $"{Opts.Prefix}.CONSUMER.CREATE.{stream}.{name}";
 
         return JSRequestResponseAsync<ConsumerCreateRequest, ConsumerInfo>(
             subject: subject,
