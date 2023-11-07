@@ -14,7 +14,7 @@ public class PubSubTest : ITest
         _logger = _loggerFactory.CreateLogger<PubSubTest>();
     }
 
-    public async Task Run(string runId, CancellationToken cancellationToken = default)
+    public async Task Run(string runId, CmdArgs args, CancellationToken cancellationToken = default)
     {
         var natsOpts = NatsOpts.Default with
         {

@@ -19,7 +19,7 @@ public class ConsumeTest : ITest
         _logger = _loggerFactory.CreateLogger<ConsumeTest>();
     }
 
-    public async Task Run(string runId, CancellationToken cancellationToken = default)
+    public async Task Run(string runId, CmdArgs args, CancellationToken cancellationToken = default)
     {
         var natsOpts = NatsOpts.Default with
         {
