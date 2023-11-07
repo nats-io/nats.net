@@ -286,10 +286,12 @@ public class ProtocolTest
                 "unsubscribed with max-msgs",
                 () => ((NatsSubBase)sub).EndReason == NatsSubEndReason.MaxMsgs);
 
+            // Wait until msg channel is completed and drained
+            await reg;
+
             Assert.Equal(maxMsgs, Volatile.Read(ref count));
 
             await sub.DisposeAsync();
-            await reg;
         }
     }
 
