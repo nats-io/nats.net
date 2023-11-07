@@ -1,15 +1,14 @@
-# NATS.NET V2
+# NATS .NET V2
 
 NATS.NET V2 is a [NATS](https://nats.io) client for the modern [.NET](https://dot.net/).
 
-## Preview
+## Preview (Beta)
 
-The NATS.NET V2 client is in preview and not recommended for production use yet.
-Codebase is still under development and we implemented majority of the NATS APIs
-including [Core NATS](https://docs.nats.io/nats-concepts/core-nats), most of [JetStream](https://docs.nats.io/nats-concepts/jetstream) features, as well as main
-features of Object Store, Key/Value Store and Services.
+The NATS.NET V2 client is in preview and recommended for testing and feedback.
+Although codebase is still under development, APIs are relatively stable and we are
+looking for feedback on usability and features.
 
-Please test and provide feedback:
+You can provide feedback:
 
 * on [slack.nats.io dotnet channel](https://natsio.slack.com/channels/dotnet)
 * or use GitHub discussions, issues and PRs
@@ -21,12 +20,12 @@ supporting and developing NATS .NET V2 project.
 
 Check out the [documentation](https://nats-io.github.io/nats.net.v2/) for guides and examples.
 
-**Additionally Check out [NATS by example](https://natsbyexample.com) - An evolving collection of runnable, cross-client reference examples for NATS.**
+**Additionally check out [NATS by example](https://natsbyexample.com) - An evolving collection of runnable, cross-client reference examples for NATS.**
 
 ## NATS.NET V2 Goals
 
 - Only support Async I/O (async/await)
-- Target latest .NET LTS Release (currently .NET 6.0)
+- Target latest .NET LTS Release (currently .NET 6.0, soon .NET 8.0)
 
 ## Packages
 
@@ -36,10 +35,12 @@ Check out the [documentation](https://nats-io.github.io/nats.net.v2/) for guides
 - **NATS.Client.KeyValueStore**: [Key/Value Store](https://docs.nats.io/nats-concepts/jetstream/key-value-store)
 - **NATS.Client.ObjectStore**: [Object Store](https://docs.nats.io/nats-concepts/jetstream/obj_store)
 - **NATS.Client.Services**: [Services](https://docs.nats.io/using-nats/developer/services)
+- **NATS.Client.Serializers.Json**: JSON serializer for adhoc types
 
 ## Contributing
 
 - Run `dotnet format` at root directory of project in order to clear warnings that can be auto-formatted
+- Run `dotnet build` at root directory and make sure there are no errors or warnings
 
 ## Attribution
 
