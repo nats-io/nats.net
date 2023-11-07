@@ -231,6 +231,18 @@ public class ServicesTests
         };
         var responses = new List<T>();
 
+        await Retry.Until("service is found", async () =>
+        {
+            var count = 0;
+            await foreach (var msg in nats.RequestManyAsync<object?, T>(subject, null, replySerializer: NatsSrvJsonSerializer<T>.Default, replyOpts: replyOpts, cancellationToken: ct).ConfigureAwait(false))
+            {
+                if (++count == limit)
+                    break;
+            }
+
+            return count == limit;
+        });
+
         var count = 0;
         await foreach (var msg in nats.RequestManyAsync<object?, T>(subject, null, replySerializer: NatsSrvJsonSerializer<T>.Default, replyOpts: replyOpts, cancellationToken: ct).ConfigureAwait(false))
         {

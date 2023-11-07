@@ -19,6 +19,8 @@ public class JsonSerializerTests
         await using var server = NatsServer.Start();
         await using var nats = server.CreateClientConnection(natsOpts);
 
+        // in local runs server start is taking too long when running
+        // the whole suite.
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
