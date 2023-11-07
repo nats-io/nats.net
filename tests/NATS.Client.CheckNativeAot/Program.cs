@@ -1,6 +1,5 @@
 using System.Text;
 using System.Text.Json.Nodes;
-using NATS.Client.Core;
 using NATS.Client.Core.Tests;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Models;
@@ -317,7 +316,7 @@ async Task ServicesTests()
 
     // Check that the endpoints are registered correctly
     {
-        var info = (await FindServices<InfoResponse>(nats, "$SRV.INFO.s1", 1, cancellationToken)).First();
+        var info = (await nats.FindServicesAsync("$SRV.INFO.s1", 1, NatsSrvJsonSerializer<InfoResponse>.Default, cancellationToken)).First();
         Assert.Equal(5, info.Endpoints.Count);
 
         Assert.Equal("foo.baz", info.Endpoints.First(e => e.Name == "baz").Subject);
@@ -355,7 +354,7 @@ async Task ServicesTests()
 
     // Check default queue group and stats handler
     {
-        var info = (await FindServices<InfoResponse>(nats, "$SRV.INFO.s2", 1, cancellationToken)).First();
+        var info = (await nats.FindServicesAsync("$SRV.INFO.s2", 1, NatsSrvJsonSerializer<InfoResponse>.Default, cancellationToken)).First();
         Assert.Single(info.Endpoints);
         var epi = info.Endpoints.First();
 
@@ -364,7 +363,7 @@ async Task ServicesTests()
         Assert.Equal("q2", epi.QueueGroup);
         Assert.Equal("ep-v1", epi.Metadata["ep-k1"]);
 
-        var stat = (await FindServices<StatsResponse>(nats, "$SRV.STATS.s2", 1, cancellationToken)).First();
+        var stat = (await nats.FindServicesAsync("$SRV.STATS.s2", 1, NatsSrvJsonSerializer<StatsResponse>.Default, cancellationToken)).First();
         Assert.Equal("v1", stat.Metadata["k1"]);
         Assert.Equal("v2", stat.Metadata["k2"]);
         Assert.Single(stat.Endpoints);
@@ -414,7 +413,7 @@ async Task ServicesTests2()
         },
         cancellationToken: cancellationToken);
 
-    var info = (await FindServices<InfoResponse>(nats, "$SRV.INFO", 1, cancellationToken)).First();
+    var info = (await nats.FindServicesAsync("$SRV.INFO", 1, NatsSrvJsonSerializer<InfoResponse>.Default, cancellationToken)).First();
     Assert.Single(info.Endpoints);
     var endpointInfo = info.Endpoints.First();
     Assert.Equal("e1", endpointInfo.Name);
@@ -439,7 +438,7 @@ async Task ServicesTests2()
         }
     }
 
-    var stat = (await FindServices<StatsResponse>(nats, "$SRV.STATS", 1, cancellationToken)).First();
+    var stat = (await nats.FindServicesAsync("$SRV.STATS", 1, NatsSrvJsonSerializer<StatsResponse>.Default, cancellationToken)).First();
     Assert.Single(stat.Endpoints);
     var endpointStats = stat.Endpoints.First();
     Assert.Equal("e1", endpointStats.Name);
@@ -450,28 +449,4 @@ async Task ServicesTests2()
     Assert.True(endpointStats.AverageProcessingTime > 0);
 
     Log("OK");
-}
-
-static async Task<List<T>> FindServices<T>(NatsConnection nats, string subject, int limit, CancellationToken ct)
-{
-    var replyOpts = new NatsSubOpts
-    {
-        Timeout = TimeSpan.FromSeconds(2),
-    };
-    var responses = new List<T>();
-
-    var count = 0;
-    await foreach (var msg in nats.RequestManyAsync<object?, T>(subject, null, replySerializer: NatsSrvJsonSerializer<T>.Default, replyOpts: replyOpts, cancellationToken: ct).ConfigureAwait(false))
-    {
-        responses.Add(msg.Data!);
-        if (++count == limit)
-            break;
-    }
-
-    if (count != limit)
-    {
-        throw new Exception($"Find service error: Expected {limit} responses but got {count}");
-    }
-
-    return responses;
 }
