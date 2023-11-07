@@ -13,7 +13,7 @@ public interface INatsSerialize<in T>
     void Serialize(IBufferWriter<byte> bufferWriter, T value);
 }
 
-public interface INatsSerialize<out T>
+public interface INatsDeserialize<out T>
 {
     // Deserialize the value from the buffer.
     T? Deserialize(in ReadOnlySequence<byte> buffer);
