@@ -25,15 +25,12 @@ public class PubSubTest : ITest
 
         await using var nats = new NatsConnection(natsOpts);
 
-        await using var sub = await nats.SubscribeAsync<string>("data", cancellationToken: cancellationToken);
-
         var subTask = Task.Run(async () =>
         {
             try
             {
-                while (true)
+                await foreach (var msg in nats.SubscribeAsync<string>("data", cancellationToken: cancellationToken))
                 {
-                    var msg = await sub.Msgs.ReadAsync(cancellationToken);
                     _logger.LogInformation($"[SUB] Received: {msg.Data}");
                 }
             }

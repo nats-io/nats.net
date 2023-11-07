@@ -66,7 +66,7 @@ public class ConsumeTest : ITest
                                 var ack = await js.PublishAsync(
                                     subject: "s1.x",
                                     data: $"data_[{DateTime.UtcNow:yyyy-MM-ddTHH:mm:ss.fff}]_{i:D5}",
-                                    msgId: $"{i:D5}",
+                                    opts: new NatsJSPubOpts { MsgId = $"{i:D5}" },
                                     cancellationToken: cts.Token);
                                 ack.EnsureSuccess();
 
@@ -122,7 +122,7 @@ public class ConsumeTest : ITest
         try
         {
             var count = 0;
-            await foreach (var msg in consumer.ConsumeAllAsync<string>(cancellationToken: cts.Token))
+            await foreach (var msg in consumer.ConsumeAsync<string>(cancellationToken: cts.Token))
             {
                 await File.AppendAllTextAsync($"test_{runId}_consume.txt", $"{DateTime.UtcNow:yyyy-MM-ddTHH:mm:ss.fff} [RCV] ({count}) {msg.Subject}: {msg.Data}\n", cts.Token);
                 await msg.AckAsync(cancellationToken: cts.Token);
