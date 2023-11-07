@@ -96,7 +96,7 @@ async Task JetStreamTests()
         Assert.Equal("consumer1", consumer.Info.Config.Name);
 
         // Publish
-        var ack = await js.PublishAsync("events.foo", new TestData { Test = 1 }, opts: new NatsJSPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts1.Token);
+        var ack = await js.PublishAsync("events.foo", new TestData { Test = 1 }, serializer: TestDataJsonSerializer<TestData>.Default, cancellationToken: cts1.Token);
         Assert.Null(ack.Error);
         Assert.Equal("events", ack.Stream);
         Assert.Equal(1, (int)ack.Seq);
@@ -106,7 +106,8 @@ async Task JetStreamTests()
         ack = await js.PublishAsync(
             "events.foo",
             new TestData { Test = 2 },
-            opts: new NatsJSPubOpts { MsgId = "test2", Serializer = TestDataJsonSerializer.Default },
+            serializer: TestDataJsonSerializer<TestData>.Default,
+            opts: new NatsJSPubOpts { MsgId = "test2" },
             cancellationToken: cts1.Token);
         Assert.Null(ack.Error);
         Assert.Equal("events", ack.Stream);
@@ -117,7 +118,8 @@ async Task JetStreamTests()
         ack = await js.PublishAsync(
             "events.foo",
             new TestData { Test = 2 },
-            opts: new NatsJSPubOpts { MsgId = "test2", Serializer = TestDataJsonSerializer.Default },
+            serializer: TestDataJsonSerializer<TestData>.Default,
+            opts: new NatsJSPubOpts { MsgId = "test2" },
             cancellationToken: cts1.Token);
         Assert.Null(ack.Error);
         Assert.Equal("events", ack.Stream);
@@ -126,10 +128,8 @@ async Task JetStreamTests()
 
         // Consume
         var cts2 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var messages = new List<NatsJSMsg<TestData?>>();
-        await foreach (var msg in consumer.ConsumeAsync<TestData>(
-                                              new NatsJSConsumeOpts { MaxMsgs = 100, Serializer = TestDataJsonSerializer.Default },
-                                              cancellationToken: cts2.Token))
+        var messages = new List<NatsJSMsg<TestData>>();
+        await foreach (var msg in consumer.ConsumeAsync(serializer: TestDataJsonSerializer<TestData>.Default, new NatsJSConsumeOpts { MaxMsgs = 100 }, cancellationToken: cts2.Token))
         {
             messages.Add(msg);
 
@@ -286,25 +286,25 @@ async Task ServicesTests()
     await s1.AddEndpointAsync<int>(
         name: "baz",
         subject: "foo.baz",
-        handler: m => ValueTask.CompletedTask,
+        handler: _ => ValueTask.CompletedTask,
         cancellationToken: cancellationToken);
 
     await s1.AddEndpointAsync<int>(
         subject: "foo.bar1",
-        handler: m => ValueTask.CompletedTask,
+        handler: _ => ValueTask.CompletedTask,
         cancellationToken: cancellationToken);
 
     var grp1 = await s1.AddGroupAsync("grp1", cancellationToken: cancellationToken);
 
     await grp1.AddEndpointAsync<int>(
         name: "e1",
-        handler: m => ValueTask.CompletedTask,
+        handler: _ => ValueTask.CompletedTask,
         cancellationToken: cancellationToken);
 
     await grp1.AddEndpointAsync<int>(
         name: "e2",
         subject: "foo.bar2",
-        handler: m => ValueTask.CompletedTask,
+        handler: _ => ValueTask.CompletedTask,
         cancellationToken: cancellationToken);
 
     var grp2 = await s1.AddGroupAsync(string.Empty, queueGroup: "q_empty", cancellationToken: cancellationToken);
@@ -312,14 +312,13 @@ async Task ServicesTests()
     await grp2.AddEndpointAsync<int>(
         name: "empty1",
         subject: "foo.empty1",
-        handler: m => ValueTask.CompletedTask,
+        handler: _ => ValueTask.CompletedTask,
         cancellationToken: cancellationToken);
 
     // Check that the endpoints are registered correctly
     {
         var info = (await FindServices<InfoResponse>(nats, "$SRV.INFO.s1", 1, cancellationToken)).First();
         Assert.Equal(5, info.Endpoints.Count);
-        var endpoints = info.Endpoints.ToList();
 
         Assert.Equal("foo.baz", info.Endpoints.First(e => e.Name == "baz").Subject);
         Assert.Equal("q", info.Endpoints.First(e => e.Name == "baz").QueueGroup);
@@ -350,7 +349,7 @@ async Task ServicesTests()
     await s2.AddEndpointAsync<int>(
         name: "s2baz",
         subject: "s2foo.baz",
-        handler: m => ValueTask.CompletedTask,
+        handler: _ => ValueTask.CompletedTask,
         metadata: new Dictionary<string, string> { { "ep-k1", "ep-v1" } },
         cancellationToken: cancellationToken);
 
@@ -425,18 +424,18 @@ async Task ServicesTests2()
         var response = await nats.RequestAsync<int, int>(endpointInfo.Subject, i, cancellationToken: cancellationToken);
         if (i is 7 or 8)
         {
-            Assert.Equal($"{i}", response?.Headers?["Nats-Service-Error-Code"]);
-            Assert.Equal($"Error{i}", response?.Headers?["Nats-Service-Error"]);
+            Assert.Equal($"{i}", response.Headers?["Nats-Service-Error-Code"]);
+            Assert.Equal($"Error{i}", response.Headers?["Nats-Service-Error"]);
         }
         else if (i is 9)
         {
-            Assert.Equal("999", response?.Headers?["Nats-Service-Error-Code"]);
-            Assert.Equal("Handler error", response?.Headers?["Nats-Service-Error"]);
+            Assert.Equal("999", response.Headers?["Nats-Service-Error-Code"]);
+            Assert.Equal("Handler error", response.Headers?["Nats-Service-Error"]);
         }
         else
         {
-            Assert.Equal(i * i, response?.Data);
-            Assert.Null(response?.Headers);
+            Assert.Equal(i * i, response.Data);
+            Assert.Null(response.Headers);
         }
     }
 
@@ -458,12 +457,11 @@ static async Task<List<T>> FindServices<T>(NatsConnection nats, string subject, 
     var replyOpts = new NatsSubOpts
     {
         Timeout = TimeSpan.FromSeconds(2),
-        Serializer = NatsSrvJsonSerializer.Default,
     };
     var responses = new List<T>();
 
     var count = 0;
-    await foreach (var msg in nats.RequestManyAsync<object?, T>(subject, null, replyOpts: replyOpts, cancellationToken: ct).ConfigureAwait(false))
+    await foreach (var msg in nats.RequestManyAsync<object?, T>(subject, null, replySerializer: NatsSrvJsonSerializer<T>.Default, replyOpts: replyOpts, cancellationToken: ct).ConfigureAwait(false))
     {
         responses.Add(msg.Data!);
         if (++count == limit)

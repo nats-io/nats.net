@@ -48,17 +48,19 @@ public class NatsJSConsumer
     /// <summary>
     /// Starts an enumerator consuming messages from the stream using this consumer.
     /// </summary>
+    /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="opts">Consume options. (default: <c>MaxMsgs</c> 1,000)</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the call.</param>
     /// <typeparam name="T">Message type to deserialize.</typeparam>
     /// <returns>Async enumerable of messages which can be used in a <c>await foreach</c> loop.</returns>
     /// <exception cref="NatsJSProtocolException">Consumer is deleted, it's push based or request sent to server is invalid.</exception>
-    public async IAsyncEnumerable<NatsJSMsg<T?>> ConsumeAsync<T>(
+    public async IAsyncEnumerable<NatsJSMsg<T>> ConsumeAsync<T>(
+        INatsDeserialize<T>? serializer = default,
         NatsJSConsumeOpts? opts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         opts ??= _context.Opts.DefaultConsumeOpts;
-        await using var cc = await ConsumeInternalAsync<T>(opts, cancellationToken).ConfigureAwait(false);
+        await using var cc = await ConsumeInternalAsync<T>(serializer, opts, cancellationToken).ConfigureAwait(false);
         await foreach (var jsMsg in cc.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
             yield return jsMsg;
@@ -68,6 +70,7 @@ public class NatsJSConsumer
     /// <summary>
     /// Consume a single message from the stream using this consumer.
     /// </summary>
+    /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="opts">Next message options. (default: 30 seconds timeout)</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the call.</param>
     /// <typeparam name="T">Message type to deserialize.</typeparam>
@@ -95,18 +98,19 @@ public class NatsJSConsumer
     /// }
     /// </code>
     /// </example>
-    public async ValueTask<NatsJSMsg<T?>?> NextAsync<T>(NatsJSNextOpts? opts = default, CancellationToken cancellationToken = default)
+    public async ValueTask<NatsJSMsg<T>?> NextAsync<T>(INatsDeserialize<T>? serializer = default, NatsJSNextOpts? opts = default, CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
         opts ??= _context.Opts.DefaultNextOpts;
+        serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
         await using var f = await FetchInternalAsync<T>(
+            serializer,
             new NatsJSFetchOpts
             {
                 MaxMsgs = 1,
                 IdleHeartbeat = opts.IdleHeartbeat,
                 Expires = opts.Expires,
-                Serializer = opts.Serializer,
             },
             cancellationToken: cancellationToken).ConfigureAwait(false);
 
@@ -115,26 +119,29 @@ public class NatsJSConsumer
             return natsJSMsg;
         }
 
-        return default;
+        return null;
     }
 
     /// <summary>
     /// Consume a set number of messages from the stream using this consumer.
     /// </summary>
+    /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="opts">Fetch options. (default: <c>MaxMsgs</c> 1,000 and timeout in 30 seconds)</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the call.</param>
     /// <typeparam name="T">Message type to deserialize.</typeparam>
     /// <returns>Async enumerable of messages which can be used in a <c>await foreach</c> loop.</returns>
     /// <exception cref="NatsJSProtocolException">Consumer is deleted, it's push based or request sent to server is invalid.</exception>
     /// <exception cref="NatsJSException">There is an error sending the message or this consumer object isn't valid anymore because it was deleted earlier.</exception>
-    public async IAsyncEnumerable<NatsJSMsg<T?>> FetchAsync<T>(
+    public async IAsyncEnumerable<NatsJSMsg<T>> FetchAsync<T>(
+        INatsDeserialize<T>? serializer = default,
         NatsJSFetchOpts? opts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
         opts ??= _context.Opts.DefaultFetchOpts;
+        serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
-        await using var fc = await FetchInternalAsync<T>(opts, cancellationToken).ConfigureAwait(false);
+        await using var fc = await FetchInternalAsync<T>(serializer, opts, cancellationToken).ConfigureAwait(false);
         await foreach (var jsMsg in fc.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
             yield return jsMsg;
@@ -145,6 +152,7 @@ public class NatsJSConsumer
     /// Consume a set number of messages from the stream using this consumer.
     /// Returns immediately if no messages are available.
     /// </summary>
+    /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="opts">Fetch options. (default: <c>MaxMsgs</c> 1,000 and timeout is ignored)</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the call.</param>
     /// <typeparam name="T">Message type to deserialize.</typeparam>
@@ -185,14 +193,16 @@ public class NatsJSConsumer
     /// }
     /// </code>
     /// </example>
-    public async IAsyncEnumerable<NatsJSMsg<T?>> FetchNoWaitAsync<T>(
+    public async IAsyncEnumerable<NatsJSMsg<T>> FetchNoWaitAsync<T>(
+        INatsDeserialize<T>? serializer = default,
         NatsJSFetchOpts? opts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
         opts ??= _context.Opts.DefaultFetchOpts;
+        serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
-        await using var fc = await FetchInternalAsync<T>(opts with { NoWait = true }, cancellationToken).ConfigureAwait(false);
+        await using var fc = await FetchInternalAsync<T>(serializer, opts with { NoWait = true }, cancellationToken).ConfigureAwait(false);
         await foreach (var jsMsg in fc.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
             yield return jsMsg;
@@ -211,18 +221,18 @@ public class NatsJSConsumer
             request: null,
             cancellationToken).ConfigureAwait(false);
 
-    internal async ValueTask<NatsJSConsume<T>> ConsumeInternalAsync<T>(NatsJSConsumeOpts? opts = default, CancellationToken cancellationToken = default)
+    internal async ValueTask<NatsJSConsume<T>> ConsumeInternalAsync<T>(INatsDeserialize<T>? serializer = default, NatsJSConsumeOpts? opts = default, CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
 
         opts ??= new NatsJSConsumeOpts();
-
+        serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
         var inbox = _context.NewInbox();
 
         var max = NatsJSOptsDefaults.SetMax(opts.MaxMsgs, opts.MaxBytes, opts.ThresholdMsgs, opts.ThresholdBytes);
         var timeouts = NatsJSOptsDefaults.SetTimeouts(opts.Expires, opts.IdleHeartbeat);
 
-        var requestOpts = BuildRequestOpts(opts.Serializer, opts.MaxMsgs);
+        var requestOpts = BuildRequestOpts(opts.MaxMsgs);
 
         var sub = new NatsJSConsume<T>(
             stream: _stream,
@@ -230,6 +240,7 @@ public class NatsJSConsumer
             context: _context,
             subject: inbox,
             queueGroup: default,
+            serializer: serializer,
             opts: requestOpts,
             maxMsgs: max.MaxMsgs,
             maxBytes: max.MaxBytes,
@@ -259,18 +270,20 @@ public class NatsJSConsumer
     }
 
     internal async ValueTask<NatsJSFetch<T>> FetchInternalAsync<T>(
+        INatsDeserialize<T>? serializer = default,
         NatsJSFetchOpts? opts = default,
         CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
         opts ??= _context.Opts.DefaultFetchOpts;
+        serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
         var inbox = _context.NewInbox();
 
         var max = NatsJSOptsDefaults.SetMax(opts.MaxMsgs, opts.MaxBytes);
         var timeouts = NatsJSOptsDefaults.SetTimeouts(opts.Expires, opts.IdleHeartbeat);
 
-        var requestOpts = BuildRequestOpts(opts.Serializer, opts.MaxMsgs);
+        var requestOpts = BuildRequestOpts(opts.MaxMsgs);
 
         var sub = new NatsJSFetch<T>(
             stream: _stream,
@@ -278,6 +291,7 @@ public class NatsJSConsumer
             context: _context,
             subject: inbox,
             queueGroup: default,
+            serializer: serializer,
             opts: requestOpts,
             maxMsgs: max.MaxMsgs,
             maxBytes: max.MaxBytes,
@@ -308,10 +322,9 @@ public class NatsJSConsumer
         return sub;
     }
 
-    private static NatsSubOpts BuildRequestOpts(INatsSerializer? serializer, int? maxMsgs) =>
+    private static NatsSubOpts BuildRequestOpts(int? maxMsgs) =>
         new()
         {
-            Serializer = serializer,
             ChannelOpts = new NatsSubChannelOpts
             {
                 // Keep capacity large enough not to block the socket reads.

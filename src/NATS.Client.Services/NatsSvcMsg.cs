@@ -64,12 +64,13 @@ public readonly struct NatsSvcMsg<T>
     /// <param name="data">Data to be sent.</param>
     /// <param name="headers">Optional message headers.</param>
     /// <param name="replyTo">Optional reply-to subject.</param>
+    /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="opts">Optional publishing options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <typeparam name="TReply">A serializable type as data.</typeparam>
     /// <returns>A <seealso cref="ValueTask"/> representing the asynchronous operation.</returns>
-    public ValueTask ReplyAsync<TReply>(TReply data, NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default) =>
-        _msg.ReplyAsync(data, headers, replyTo, opts, cancellationToken);
+    public ValueTask ReplyAsync<TReply>(TReply data, NatsHeaders? headers = default, string? replyTo = default, INatsSerialize<TReply>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default) =>
+        _msg.ReplyAsync(data, headers, replyTo, serializer, opts, cancellationToken);
 
     /// <summary>
     /// Reply with an error and additional data as error body.
@@ -79,11 +80,12 @@ public readonly struct NatsSvcMsg<T>
     /// <param name="data">Error body.</param>
     /// <param name="headers">Optional additional headers.</param>
     /// <param name="replyTo">Optional reply-to subject.</param>
+    /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="opts">Optional publishing options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <typeparam name="TReply">A serializable type as data.</typeparam>
     /// <returns>A <seealso cref="ValueTask"/> representing the asynchronous operation.</returns>
-    public ValueTask ReplyErrorAsync<TReply>(int code, string message, TReply data, NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
+    public ValueTask ReplyErrorAsync<TReply>(int code, string message, TReply data, NatsHeaders? headers = default, string? replyTo = default, INatsSerialize<TReply>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         headers ??= new NatsHeaders();
         headers.Add("Nats-Service-Error-Code", $"{code}");
@@ -92,7 +94,7 @@ public readonly struct NatsSvcMsg<T>
         _endPoint?.IncrementErrors();
         _endPoint?.SetLastError($"{message} ({code})");
 
-        return ReplyAsync(data, headers, replyTo, opts, cancellationToken);
+        return ReplyAsync(data, headers, replyTo, serializer, opts, cancellationToken);
     }
 
     /// <summary>

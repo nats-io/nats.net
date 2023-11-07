@@ -92,18 +92,18 @@ public class ServicesTests
             var response = await nats.RequestAsync<int, int>(endpointInfo.Subject, i, cancellationToken: cancellationToken);
             if (i is 7 or 8)
             {
-                Assert.Equal($"{i}", response?.Headers?["Nats-Service-Error-Code"]);
-                Assert.Equal($"Error{i}", response?.Headers?["Nats-Service-Error"]);
+                Assert.Equal($"{i}", response.Headers?["Nats-Service-Error-Code"]);
+                Assert.Equal($"Error{i}", response.Headers?["Nats-Service-Error"]);
             }
             else if (i is 9)
             {
-                Assert.Equal("999", response?.Headers?["Nats-Service-Error-Code"]);
-                Assert.Equal("Handler error", response?.Headers?["Nats-Service-Error"]);
+                Assert.Equal("999", response.Headers?["Nats-Service-Error-Code"]);
+                Assert.Equal("Handler error", response.Headers?["Nats-Service-Error"]);
             }
             else
             {
-                Assert.Equal(i * i, response?.Data);
-                Assert.Null(response?.Headers);
+                Assert.Equal(i * i, response.Data);
+                Assert.Null(response.Headers);
             }
         }
 
@@ -228,12 +228,11 @@ public class ServicesTests
         var replyOpts = new NatsSubOpts
         {
             Timeout = TimeSpan.FromSeconds(2),
-            Serializer = NatsSrvJsonSerializer.Default,
         };
         var responses = new List<T>();
 
         var count = 0;
-        await foreach (var msg in nats.RequestManyAsync<object?, T>(subject, null, replyOpts: replyOpts, cancellationToken: ct).ConfigureAwait(false))
+        await foreach (var msg in nats.RequestManyAsync<object?, T>(subject, null, replySerializer: NatsSrvJsonSerializer<T>.Default, replyOpts: replyOpts, cancellationToken: ct).ConfigureAwait(false))
         {
             responses.Add(msg.Data!);
             if (++count == limit)

@@ -73,16 +73,14 @@ public class NatsObjStore
             return await store.GetAsync(link.Name, stream, leaveOpen, cancellationToken).ConfigureAwait(false);
         }
 
-        await using var pushConsumer = new NatsJSOrderedPushConsumer<IMemoryOwner<byte>>(
-            _context,
-            $"OBJ_{_bucket}",
-            GetChunkSubject(info.Nuid),
-            new NatsJSOrderedPushConsumerOpts
-            {
-                DeliverPolicy = ConsumerConfigurationDeliverPolicy.all,
-            },
-            new NatsSubOpts(),
-            cancellationToken);
+        await using var pushConsumer = new NatsJSOrderedPushConsumer<NatsMemoryOwner<byte>>(
+            context: _context,
+            stream: $"OBJ_{_bucket}",
+            filter: GetChunkSubject(info.Nuid),
+            serializer: NatsDefaultSerializer<NatsMemoryOwner<byte>>.Default,
+            opts: new NatsJSOrderedPushConsumerOpts { DeliverPolicy = ConsumerConfigurationDeliverPolicy.all },
+            subOpts: new NatsSubOpts(),
+            cancellationToken: cancellationToken);
 
         pushConsumer.Init();
 
@@ -104,14 +102,12 @@ public class NatsObjStore
                     if (pushConsumer.IsDone)
                         continue;
 
-                    if (msg.Data != null)
+                    if (msg.Data.Length > 0)
                     {
-                        using (msg.Data)
-                        {
-                            chunks++;
-                            size += msg.Data.Memory.Length;
-                            await hashedStream.WriteAsync(msg.Data.Memory, cancellationToken);
-                        }
+                        using var memoryOwner = msg.Data;
+                        chunks++;
+                        size += memoryOwner.Memory.Length;
+                        await hashedStream.WriteAsync(memoryOwner.Memory, cancellationToken);
                     }
 
                     var p = msg.Metadata?.NumPending;
@@ -194,10 +190,10 @@ public class NatsObjStore
         meta.Nuid = nuid;
         meta.MTime = DateTimeOffset.UtcNow;
 
-        meta.Options ??= new MetaDataOptions
+        if (meta.Options == null!)
         {
-            MaxChunkSize = DefaultChunkSize,
-        };
+            meta.Options = new MetaDataOptions { MaxChunkSize = DefaultChunkSize };
+        }
 
         if (meta.Options.MaxChunkSize is null or <= 0)
         {
@@ -206,7 +202,7 @@ public class NatsObjStore
 
         var size = 0;
         var chunks = 0;
-        var chunkSize = meta.Options.MaxChunkSize!.Value;
+        var chunkSize = meta.Options.MaxChunkSize.Value;
 
         string digest;
         using (var sha256 = SHA256.Create())
@@ -393,7 +389,7 @@ public class NatsObjStore
             var response = await _stream.GetAsync(request, cancellationToken);
 
             var base64String = Convert.FromBase64String(response.Message.Data);
-            var data = NatsObjJsonSerializer.Default.Deserialize<ObjectMetadata>(new ReadOnlySequence<byte>(base64String)) ?? throw new NatsObjException("Can't deserialize object metadata");
+            var data = NatsObjJsonSerializer<ObjectMetadata>.Default.Deserialize(new ReadOnlySequence<byte>(base64String)) ?? throw new NatsObjException("Can't deserialize object metadata");
 
             if (!showDeleted && data.Deleted)
             {
@@ -424,15 +420,13 @@ public class NatsObjStore
         }
 
         await using var pushConsumer = new NatsJSOrderedPushConsumer<NatsMemoryOwner<byte>>(
-            _context,
-            $"OBJ_{_bucket}",
-            $"$O.{_bucket}.M.>",
-            new NatsJSOrderedPushConsumerOpts
-            {
-                DeliverPolicy = deliverPolicy,
-            },
-            new NatsSubOpts(),
-            cancellationToken);
+            context: _context,
+            stream: $"OBJ_{_bucket}",
+            filter: $"$O.{_bucket}.M.>",
+            serializer: NatsDefaultSerializer<NatsMemoryOwner<byte>>.Default,
+            opts: new NatsJSOrderedPushConsumerOpts { DeliverPolicy = deliverPolicy },
+            subOpts: new NatsSubOpts(),
+            cancellationToken: cancellationToken);
 
         pushConsumer.Init();
 
@@ -485,7 +479,7 @@ public class NatsObjStore
 
     private async ValueTask PublishMeta(ObjectMetadata meta, CancellationToken cancellationToken)
     {
-        var ack = await _context.PublishAsync(GetMetaSubject(meta.Name), meta, opts: new NatsJSPubOpts { Serializer = NatsObjJsonSerializer.Default }, headers: NatsRollupHeaders, cancellationToken: cancellationToken);
+        var ack = await _context.PublishAsync(GetMetaSubject(meta.Name), meta, serializer: NatsObjJsonSerializer<ObjectMetadata>.Default, headers: NatsRollupHeaders, cancellationToken: cancellationToken);
         ack.EnsureSuccess();
     }
 

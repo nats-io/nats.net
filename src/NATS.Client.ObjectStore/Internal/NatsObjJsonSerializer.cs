@@ -4,9 +4,9 @@ using NATS.Client.ObjectStore.Models;
 
 namespace NATS.Client.ObjectStore.Internal;
 
-internal static class NatsObjJsonSerializer
+internal static class NatsObjJsonSerializer<T>
 {
-    public static readonly INatsSerializer Default = new NatsJsonContextSerializer(NatsObjJsonSerializerContext.Default);
+    public static readonly INatsSerializer<T> Default = new NatsJsonContextSerializer<T>(NatsObjJsonSerializerContext.Default);
 }
 
 [JsonSerializable(typeof(ObjectMetadata))]

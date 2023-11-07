@@ -21,9 +21,9 @@ public class ConsumerNextTest
 
         for (var i = 0; i < 10; i++)
         {
-            var ack = await js.PublishAsync("s1.foo", new TestData { Test = i }, opts: new NatsJSPubOpts { Serializer = TestDataJsonSerializer.Default }, cancellationToken: cts.Token);
+            var ack = await js.PublishAsync("s1.foo", new TestData { Test = i }, serializer: TestDataJsonSerializer<TestData>.Default, cancellationToken: cts.Token);
             ack.EnsureSuccess();
-            var next = await consumer.NextAsync<TestData>(new NatsJSNextOpts { Serializer = TestDataJsonSerializer.Default }, cts.Token);
+            var next = await consumer.NextAsync<TestData>(serializer: TestDataJsonSerializer<TestData>.Default, cancellationToken: cts.Token);
             if (next is { } msg)
             {
                 await msg.AckAsync(new AckOpts(WaitUntilSent: true), cts.Token);

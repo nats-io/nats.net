@@ -5,15 +5,6 @@ namespace NATS.Client.Core;
 public record NatsSubOpts
 {
     /// <summary>
-    /// Serializer to use to deserialize the message if a model is being used.
-    /// </summary>
-    /// <remarks>
-    /// If not set, serializer set in connection options or the default JSON serializer
-    /// will be used.
-    /// </remarks>
-    public INatsSerializer? Serializer { get; init; }
-
-    /// <summary>
     /// Number of messages to wait for before automatically unsubscribing.
     /// </summary>
     /// <remarks>

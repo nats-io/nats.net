@@ -1,4 +1,3 @@
-using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Tests;
@@ -31,10 +30,7 @@ public class PublishTest
                 {
                     Test = 1,
                 },
-                opts: new NatsJSPubOpts
-                {
-                    Serializer = TestDataJsonSerializer.Default,
-                },
+                serializer: TestDataJsonSerializer<TestData>.Default,
                 cancellationToken: cts.Token);
             Assert.Null(ack.Error);
             Assert.Equal(1, (int)ack.Seq);
@@ -47,7 +43,8 @@ public class PublishTest
             var ack1 = await js.PublishAsync(
                 subject: "s1.foo",
                 data: new TestData { Test = 2 },
-                opts: new NatsJSPubOpts { MsgId = "2", Serializer = TestDataJsonSerializer.Default },
+                serializer: TestDataJsonSerializer<TestData>.Default,
+                opts: new NatsJSPubOpts { MsgId = "2" },
                 cancellationToken: cts.Token);
             Assert.Null(ack1.Error);
             Assert.Equal(2, (int)ack1.Seq);
@@ -56,7 +53,8 @@ public class PublishTest
             var ack2 = await js.PublishAsync(
                 subject: "s1.foo",
                 data: new TestData { Test = 2 },
-                opts: new NatsJSPubOpts { MsgId = "2", Serializer = TestDataJsonSerializer.Default },
+                serializer: TestDataJsonSerializer<TestData>.Default,
+                opts: new NatsJSPubOpts { MsgId = "2" },
                 cancellationToken: cts.Token);
             Assert.Null(ack2.Error);
             Assert.True(ack2.Duplicate);

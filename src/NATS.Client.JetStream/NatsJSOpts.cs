@@ -118,15 +118,6 @@ public record NatsJSConsumeOpts
     /// Hint for the number of bytes left in buffer that should trigger a low watermark on the client, and influence it to request more data.
     /// </summary>
     public int? ThresholdBytes { get; init; }
-
-    /// <summary>
-    /// Serializer to use to deserialize the message if a model is being used.
-    /// </summary>
-    /// <remarks>
-    /// If not set, serializer set in connection options or the default JSON serializer
-    /// will be used.
-    /// </remarks>
-    public INatsSerializer? Serializer { get; init; }
 }
 
 /// <summary>
@@ -143,15 +134,6 @@ public record NatsJSNextOpts
     /// Amount idle time the server should wait before sending a heartbeat. For requests with expires > 30s, heartbeats should be enabled by default
     /// </summary>
     public TimeSpan? IdleHeartbeat { get; init; }
-
-    /// <summary>
-    /// Serializer to use to deserialize the message if a model is being used.
-    /// </summary>
-    /// <remarks>
-    /// If not set, serializer set in connection options or the default JSON serializer
-    /// will be used.
-    /// </remarks>
-    public INatsSerializer? Serializer { get; init; }
 }
 
 /// <summary>
@@ -183,15 +165,6 @@ public record NatsJSFetchOpts
     /// Does not wait for messages to be available
     /// </summary>
     internal bool NoWait { get; init; }
-
-    /// <summary>
-    /// Serializer to use to deserialize the message if a model is being used.
-    /// </summary>
-    /// <remarks>
-    /// If not set, serializer set in connection options or the default JSON serializer
-    /// will be used.
-    /// </remarks>
-    public INatsSerializer? Serializer { get; init; }
 }
 
 public record NatsJSPubOpts : NatsPubOpts

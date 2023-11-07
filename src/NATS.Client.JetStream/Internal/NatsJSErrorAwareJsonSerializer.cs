@@ -5,16 +5,11 @@ using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Internal;
 
-internal sealed class NatsJSErrorAwareJsonSerializer : INatsSerializer
+internal sealed class NatsJSErrorAwareJsonSerializer<T> : INatsDeserialize<T>
 {
-    public static readonly NatsJSErrorAwareJsonSerializer Default = new();
+    public static readonly NatsJSErrorAwareJsonSerializer<T> Default = new();
 
-    public INatsSerializer? Next => default;
-
-    public void Serialize<T>(IBufferWriter<byte> bufferWriter, T? value) =>
-        throw new NotSupportedException();
-
-    public T? Deserialize<T>(in ReadOnlySequence<byte> buffer)
+    public T? Deserialize(in ReadOnlySequence<byte> buffer)
     {
         // We need to determine what type we're deserializing into
         // .NET 6 new APIs to the rescue: we can read the buffer once
@@ -27,7 +22,7 @@ internal sealed class NatsJSErrorAwareJsonSerializer : INatsSerializer
             throw new NatsJSApiErrorException(error);
         }
 
-        return NatsJSJsonSerializer.Default.Deserialize<T>(buffer);
+        return NatsJSJsonSerializer<T>.Default.Deserialize(buffer);
     }
 }
 

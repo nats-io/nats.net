@@ -1,9 +1,9 @@
 using System.Text.Json.Serialization;
 using NATS.Client.Core;
 
-public static class TestDataJsonSerializer
+public static class TestDataJsonSerializer<T>
 {
-    public static readonly INatsSerializer Default = new NatsJsonContextSerializer(TestDataJsonSerializerContext.Default);
+    public static readonly NatsJsonContextSerializer<T> Default = new(TestDataJsonSerializerContext.Default);
 }
 
 public record TestData

@@ -811,7 +811,7 @@ public struct Vector3
 
 internal static class NatsMsgTestUtils
 {
-    internal static INatsSub<T>? Register<T>(this INatsSub<T>? sub, Action<NatsMsg<T?>> action)
+    internal static INatsSub<T>? Register<T>(this INatsSub<T>? sub, Action<NatsMsg<T>> action)
     {
         if (sub == null)
             return null;

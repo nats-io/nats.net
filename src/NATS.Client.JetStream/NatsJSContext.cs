@@ -48,6 +48,7 @@ public partial class NatsJSContext
     /// </summary>
     /// <param name="subject">Subject to publish the data to.</param>
     /// <param name="data">Data to publish.</param>
+    /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="opts">Publish options.</param>
     /// <param name="headers">Optional message headers.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the publishing call or the wait for response.</param>
@@ -72,6 +73,7 @@ public partial class NatsJSContext
     public async ValueTask<PubAckResponse> PublishAsync<T>(
         string subject,
         T? data,
+        INatsSerialize<T>? serializer = default,
         NatsJSPubOpts? opts = default,
         NatsHeaders? headers = default,
         CancellationToken cancellationToken = default)
@@ -119,11 +121,11 @@ public partial class NatsJSContext
                     subject: subject,
                     data: data,
                     headers: headers,
+                    requestSerializer: serializer,
+                    replySerializer: NatsJSJsonSerializer<PubAckResponse>.Default,
                     requestOpts: opts,
                     replyOpts: new NatsSubOpts
                     {
-                        Serializer = NatsJSJsonSerializer.Default,
-
                         // It's important to set the timeout here so that the subscription can be
                         // stopped if the server doesn't respond or more likely case is that if there
                         // is a reconnect to the cluster between the request and waiting for a response,
@@ -164,7 +166,7 @@ public partial class NatsJSContext
         NatsJSPubOpts? opts = default,
         NatsHeaders? headers = default,
         CancellationToken cancellationToken = default) =>
-        PublishAsync<object?>(subject, default, opts, headers, cancellationToken);
+        PublishAsync<object?>(subject, default, serializer: default, opts, headers, cancellationToken);
 
     internal string NewInbox() => NatsConnection.NewInbox(Connection.Opts.InboxPrefix);
 
@@ -200,9 +202,9 @@ public partial class NatsJSContext
                     subject: subject,
                     data: request,
                     headers: default,
-                    requestOpts: new NatsPubOpts { Serializer = NatsJSJsonSerializer.Default },
-                    replyOpts: new NatsSubOpts { Serializer = NatsJSErrorAwareJsonSerializer.Default },
-                    cancellationTimer.Token)
+                    requestSerializer: NatsJSJsonSerializer<TRequest>.Default,
+                    replySerializer: NatsJSErrorAwareJsonSerializer<TResponse>.Default,
+                    cancellationToken: cancellationTimer.Token)
                 .ConfigureAwait(false);
 
             if (await sub.Msgs.WaitToReadAsync(cancellationTimer.Token).ConfigureAwait(false))

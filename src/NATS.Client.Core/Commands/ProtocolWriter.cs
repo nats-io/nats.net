@@ -98,7 +98,7 @@ internal sealed class ProtocolWriter
         _writer.WriteNewLine();
     }
 
-    public void WritePublish<T>(string subject, string? replyTo, NatsHeaders? headers, T? value, INatsSerializer serializer)
+    public void WritePublish<T>(string subject, string? replyTo, NatsHeaders? headers, T? value, INatsSerialize<T> serializer)
     {
         _bufferPayload.Reset();
 

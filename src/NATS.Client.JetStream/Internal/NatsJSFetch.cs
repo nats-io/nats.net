@@ -12,11 +12,11 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
 {
     private readonly ILogger _logger;
     private readonly bool _debug;
-    private readonly Channel<NatsJSMsg<TMsg?>> _userMsgs;
+    private readonly Channel<NatsJSMsg<TMsg>> _userMsgs;
     private readonly NatsJSContext _context;
     private readonly string _stream;
     private readonly string _consumer;
-    private readonly INatsSerializer _serializer;
+    private readonly INatsDeserialize<TMsg> _serializer;
     private readonly Timer _hbTimer;
     private readonly Timer _expiresTimer;
 
@@ -40,6 +40,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         string consumer,
         string subject,
         string? queueGroup,
+        INatsDeserialize<TMsg> serializer,
         NatsSubOpts? opts)
         : base(context.Connection, context.Connection.SubscriptionManager, subject, queueGroup, opts)
     {
@@ -48,7 +49,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         _context = context;
         _stream = stream;
         _consumer = consumer;
-        _serializer = opts?.Serializer ?? context.Connection.Opts.Serializer;
+        _serializer = serializer;
 
         _maxMsgs = maxMsgs;
         _maxBytes = maxBytes;
@@ -61,7 +62,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         // Keep user channel small to avoid blocking the user code when disposed,
         // otherwise channel reader will continue delivering messages even after
         // this 'fetch' object being disposed.
-        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg?>>(1);
+        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg>>(1);
         Msgs = _userMsgs.Reader;
 
         if (_debug)
@@ -114,13 +115,13 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
             Timeout.InfiniteTimeSpan);
     }
 
-    public ChannelReader<NatsJSMsg<TMsg?>> Msgs { get; }
+    public ChannelReader<NatsJSMsg<TMsg>> Msgs { get; }
 
     public ValueTask CallMsgNextAsync(ConsumerGetnextRequest request, CancellationToken cancellationToken = default) =>
         Connection.PubModelAsync(
             subject: $"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
             data: request,
-            serializer: NatsJSJsonSerializer.Default,
+            serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
             replyTo: Subject,
             headers: default,
             cancellationToken);
@@ -153,7 +154,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
             replyTo: Subject,
             headers: default,
             value: request,
-            serializer: NatsJSJsonSerializer.Default,
+            serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
             errorHandler: default,
             cancellationToken: default);
     }
@@ -220,8 +221,8 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         }
         else
         {
-            var msg = new NatsJSMsg<TMsg?>(
-                NatsMsg<TMsg?>.Build(
+            var msg = new NatsJSMsg<TMsg>(
+                NatsMsg<TMsg>.Build(
                     subject,
                     replyTo,
                     headersBuffer,

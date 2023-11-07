@@ -1,6 +1,5 @@
 using System.Buffers;
 using System.Text;
-using System.Text.Json.Serialization;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
@@ -20,13 +19,13 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
 {
     private readonly ILogger _logger;
     private readonly bool _debug;
-    private readonly Channel<NatsJSMsg<TMsg?>> _userMsgs;
+    private readonly Channel<NatsJSMsg<TMsg>> _userMsgs;
     private readonly Channel<PullRequest> _pullRequests;
     private readonly NatsJSContext _context;
     private readonly string _stream;
     private readonly string _consumer;
     private readonly CancellationToken _cancellationToken;
-    private readonly INatsSerializer _serializer;
+    private readonly INatsDeserialize<TMsg> _serializer;
     private readonly Timer _timer;
     private readonly Task _pullTask;
 
@@ -55,6 +54,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         string consumer,
         string subject,
         string? queueGroup,
+        INatsDeserialize<TMsg> serializer,
         NatsSubOpts? opts,
         CancellationToken cancellationToken)
         : base(context.Connection, context.Connection.SubscriptionManager, subject, queueGroup, opts)
@@ -65,7 +65,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         _context = context;
         _stream = stream;
         _consumer = consumer;
-        _serializer = opts?.Serializer ?? context.Connection.Opts.Serializer;
+        _serializer = serializer;
 
         _maxMsgs = maxMsgs;
         _thresholdMsgs = thresholdMsgs;
@@ -125,7 +125,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         // to the user from the subscription channel (which should be set to a
         // sufficiently large value to avoid blocking socket reads in the
         // NATS connection).
-        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg?>>(1);
+        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg>>(1);
         Msgs = _userMsgs.Reader;
 
         // Capacity as 1 is enough here since it's used for signaling only.
@@ -135,7 +135,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         ResetPending();
     }
 
-    public ChannelReader<NatsJSMsg<TMsg?>> Msgs { get; }
+    public ChannelReader<NatsJSMsg<TMsg>> Msgs { get; }
 
     public ValueTask CallMsgNextAsync(string origin, ConsumerGetnextRequest request, CancellationToken cancellationToken = default)
     {
@@ -150,7 +150,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         return Connection.PubModelAsync(
             subject: $"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
             data: request,
-            serializer: NatsJSJsonSerializer.Default,
+            serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
             replyTo: Subject,
             headers: default,
             cancellationToken);
@@ -190,7 +190,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
             replyTo: Subject,
             headers: default,
             value: request,
-            serializer: NatsJSJsonSerializer.Default,
+            serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
             errorHandler: default,
             cancellationToken: default);
     }
@@ -318,8 +318,8 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         }
         else
         {
-            var msg = new NatsJSMsg<TMsg?>(
-                NatsMsg<TMsg?>.Build(
+            var msg = new NatsJSMsg<TMsg>(
+                NatsMsg<TMsg>.Build(
                     subject,
                     replyTo,
                     headersBuffer,
