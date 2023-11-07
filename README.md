@@ -4,7 +4,7 @@ NATS.NET V2 is a [NATS](https://nats.io) client for the modern [.NET](https://do
 
 ## Preview (Beta)
 
-The NATS.NET V2 client is in preview and recommended for testing and feedback.
+The NATS.NET V2 client is in *beta* phase and recommended for testing and feedback.
 Although codebase is still under development, APIs are relatively stable and we are
 looking for feedback on usability and features.
 
