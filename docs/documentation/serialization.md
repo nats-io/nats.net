@@ -196,7 +196,7 @@ public class MyProtoBufSerializerRegistry : INatsSerializerRegistry
 You can then use the custom serializer as the default for the connection:
 
 ```csharp
-var natsOpts = NatsOpts.Default with { Serializers = new MyProtoBufSerializerRegistry() };
+var natsOpts = NatsOpts.Default with { SerializerRegistry = new MyProtoBufSerializerRegistry() };
 
 await using var nats = new NatsConnection(natsOpts);
 
