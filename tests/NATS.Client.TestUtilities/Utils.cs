@@ -121,3 +121,42 @@ public static class BinaryUtils
         return sb.ToString();
     }
 }
+
+public static class ServiceUtils
+{
+    public static async Task<List<T>> FindServicesAsync<T>(this NatsConnection nats, string subject, int limit, INatsDeserialize<T> serializer, CancellationToken ct)
+    {
+        var replyOpts = new NatsSubOpts
+        {
+            Timeout = TimeSpan.FromSeconds(2),
+        };
+        var responses = new List<T>();
+
+        await Retry.Until("service is found", async () =>
+        {
+            var count = 0;
+            await foreach (var msg in nats.RequestManyAsync<object?, T>(subject, null, replySerializer: serializer, replyOpts: replyOpts, cancellationToken: ct).ConfigureAwait(false))
+            {
+                if (++count == limit)
+                    break;
+            }
+
+            return count == limit;
+        });
+
+        var count = 0;
+        await foreach (var msg in nats.RequestManyAsync<object?, T>(subject, null, replySerializer: serializer, replyOpts: replyOpts, cancellationToken: ct).ConfigureAwait(false))
+        {
+            responses.Add(msg.Data!);
+            if (++count == limit)
+                break;
+        }
+
+        if (count != limit)
+        {
+            throw new Exception($"Find service error: Expected {limit} responses but got {count}");
+        }
+
+        return responses;
+    }
+}
