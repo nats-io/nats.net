@@ -105,14 +105,17 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                     return;
                 }
 
-                self.Pull("heartbeat-timeout", self._maxMsgs, self._maxBytes);
-                self.ResetPending();
-                if (self._debug)
+                if (self.Connection.ConnectionState == NatsConnectionState.Open)
                 {
-                    self._logger.LogDebug(
-                        NatsJSLogEvents.IdleTimeout,
-                        "Idle heartbeat timeout after {Timeout}ns",
-                        self._idle);
+                    self.Pull("heartbeat-timeout", self._maxMsgs, self._maxBytes);
+                    self.ResetPending();
+                    if (self._debug)
+                    {
+                        self._logger.LogDebug(
+                            NatsJSLogEvents.IdleTimeout,
+                            "Idle heartbeat timeout after {Timeout}ns",
+                            self._idle);
+                    }
                 }
             },
             this,
@@ -156,7 +159,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
             cancellationToken);
     }
 
-    public void ResetHeartbeatTimer() => _timer.Change(_hbTimeout, Timeout.Infinite);
+    public void ResetHeartbeatTimer() => _timer.Change(_hbTimeout, _hbTimeout);
 
     public override async ValueTask DisposeAsync()
     {
