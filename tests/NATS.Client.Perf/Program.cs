@@ -29,8 +29,7 @@ await using var nats2 = server.CreateClientConnection();
 await nats1.PingAsync();
 await nats2.PingAsync();
 
-var stopwatch = Stopwatch.StartNew();
-
+var subActive = 0;
 var subReader = Task.Run(async () =>
 {
     var count = 0;
@@ -38,11 +37,27 @@ var subReader = Task.Run(async () =>
     {
         using (msg.Data)
         {
+            if (msg.Data.Length == 1)
+            {
+                Interlocked.Increment(ref subActive);
+                continue;
+            }
+
             if (++count == t.Msgs)
+            {
                 break;
+            }
         }
     }
 });
+
+// Ensure subscription is active
+while (Volatile.Read(ref subActive) == 0)
+{
+    await nats2.PublishAsync(t.Subject, 1);
+}
+
+var stopwatch = Stopwatch.StartNew();
 
 var payload = new ReadOnlySequence<byte>(new byte[t.Size]);
 for (var i = 0; i < t.Msgs; i++)
