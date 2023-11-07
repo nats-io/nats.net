@@ -1,4 +1,5 @@
 using NATS.Client.Core;
+using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
 
@@ -59,6 +60,30 @@ public record NatsJSOpts
     public NatsJSNextOpts DefaultNextOpts { get; init; } = new();
 }
 
+public record NatsJSOrderedConsumerOpts
+{
+    public static readonly NatsJSOrderedConsumerOpts Default = new();
+
+    public string[] FilterSubjects { get; init; } = Array.Empty<string>();
+
+    public ConsumerConfigurationDeliverPolicy DeliverPolicy { get; init; } = ConsumerConfigurationDeliverPolicy.all;
+
+    public ulong OptStartSeq { get; init; } = 0;
+
+    public DateTimeOffset OptStartTime { get; init; } = default;
+
+    public ConsumerConfigurationReplayPolicy ReplayPolicy { get; init; } = ConsumerConfigurationReplayPolicy.instant;
+
+    public TimeSpan InactiveThreshold { get; init; } = TimeSpan.FromMinutes(5);
+
+    public bool HeadersOnly { get; init; } = false;
+
+    /// <summary>
+    /// Maximum number of attempts for the consumer to be recreated (Defaults to unlimited).
+    /// </summary>
+    public int MaxResetAttempts { get; init; } = -1;
+}
+
 /// <summary>
 /// Consumer consume method options.
 /// </summary>
@@ -93,15 +118,6 @@ public record NatsJSConsumeOpts
     /// Hint for the number of bytes left in buffer that should trigger a low watermark on the client, and influence it to request more data.
     /// </summary>
     public int? ThresholdBytes { get; init; }
-
-    /// <summary>
-    /// Serializer to use to deserialize the message if a model is being used.
-    /// </summary>
-    /// <remarks>
-    /// If not set, serializer set in connection options or the default JSON serializer
-    /// will be used.
-    /// </remarks>
-    public INatsSerializer? Serializer { get; init; }
 }
 
 /// <summary>
@@ -118,15 +134,6 @@ public record NatsJSNextOpts
     /// Amount idle time the server should wait before sending a heartbeat. For requests with expires > 30s, heartbeats should be enabled by default
     /// </summary>
     public TimeSpan? IdleHeartbeat { get; init; }
-
-    /// <summary>
-    /// Serializer to use to deserialize the message if a model is being used.
-    /// </summary>
-    /// <remarks>
-    /// If not set, serializer set in connection options or the default JSON serializer
-    /// will be used.
-    /// </remarks>
-    public INatsSerializer? Serializer { get; init; }
 }
 
 /// <summary>
@@ -158,13 +165,32 @@ public record NatsJSFetchOpts
     /// Does not wait for messages to be available
     /// </summary>
     internal bool NoWait { get; init; }
+}
 
-    /// <summary>
-    /// Serializer to use to deserialize the message if a model is being used.
-    /// </summary>
-    /// <remarks>
-    /// If not set, serializer set in connection options or the default JSON serializer
-    /// will be used.
-    /// </remarks>
-    public INatsSerializer? Serializer { get; init; }
+public record NatsJSPubOpts : NatsPubOpts
+{
+    public static readonly NatsJSPubOpts Default = new();
+
+    // ttl time.Duration
+    // id  string
+    public string? MsgId { get; init; }
+
+    // lid string  // Expected last msgId
+    public string? ExpectedLastMsgId { get; init; }
+
+    // str string  // Expected stream name
+    public string? ExpectedStream { get; init; }
+
+    // seq *uint64 // Expected last sequence
+    public ulong? ExpectedLastSequence { get; init; }
+
+    // lss *uint64 // Expected last sequence per subject
+    public ulong? ExpectedLastSubjectSequence { get; init; }
+
+    // Publish retries for NoResponders err.
+    // rwait time.Duration // Retry wait between attempts
+    public TimeSpan RetryWaitBetweenAttempts { get; init; } = TimeSpan.FromMilliseconds(250);
+
+    // rnum  int           // Retry attempts
+    public int RetryAttempts { get; init; } = 2;
 }

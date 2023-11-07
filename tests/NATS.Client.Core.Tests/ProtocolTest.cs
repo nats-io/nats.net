@@ -16,9 +16,9 @@ public class ProtocolTest
         var nats1 = server.CreateClientConnection();
         var (nats2, proxy) = server.CreateProxiedClientConnection();
 
-        var sub1 = await nats2.SubscribeAsync<int>("foo.bar");
-        var sub2 = await nats2.SubscribeAsync<int>("foo.bar");
-        var sub3 = await nats2.SubscribeAsync<int>("foo.baz");
+        var sub1 = await nats2.SubscribeInternalAsync<int>("foo.bar");
+        var sub2 = await nats2.SubscribeInternalAsync<int>("foo.bar");
+        var sub3 = await nats2.SubscribeInternalAsync<int>("foo.baz");
 
         var sync1 = 0;
         var sync2 = 0;
@@ -114,7 +114,7 @@ public class ProtocolTest
         var sync = 0;
         var signal1 = new WaitSignal<NatsMsg<int>>();
         var signal2 = new WaitSignal<NatsMsg<int>>();
-        var sub = await nats.SubscribeAsync<int>("foo.*");
+        var sub = await nats.SubscribeInternalAsync<int>("foo.*");
         var reg = sub.Register(m =>
         {
             switch (m.Subject)
@@ -182,7 +182,7 @@ public class ProtocolTest
         Log("### Auto-unsubscribe after consuming max-msgs");
         {
             var opts = new NatsSubOpts { MaxMsgs = maxMsgs };
-            await using var sub = await nats.SubscribeAsync<int>("foo", opts: opts);
+            await using var sub = await nats.SubscribeInternalAsync<int>("foo", opts: opts);
             sid++;
 
             await Retry.Until("all frames arrived", () => proxy.Frames.Count >= 2);
@@ -212,7 +212,7 @@ public class ProtocolTest
         {
             await proxy.FlushFramesAsync(nats);
 
-            await using var sub = await nats.SubscribeAsync<int>("foo2");
+            await using var sub = await nats.SubscribeInternalAsync<int>("foo2");
             sid++;
             await sub.UnsubscribeAsync();
 
@@ -246,7 +246,7 @@ public class ProtocolTest
             proxy.Reset();
 
             var opts = new NatsSubOpts { MaxMsgs = maxMsgs };
-            var sub = await nats.SubscribeAsync<int>("foo3", opts: opts);
+            var sub = await nats.SubscribeInternalAsync<int>("foo3", opts: opts);
             sid++;
             var count = 0;
             var reg = sub.Register(_ => Interlocked.Increment(ref count));

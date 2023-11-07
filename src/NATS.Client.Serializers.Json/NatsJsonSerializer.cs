@@ -11,7 +11,7 @@ namespace NATS.Client.Serializers.Json;
 /// <remarks>
 /// This serializer is not suitable for native AOT deployments since it might rely on reflection
 /// </remarks>
-public sealed class NatsJsonSerializer : INatsSerializer
+public sealed class NatsJsonSerializer<T> : INatsSerialize<T>, INatsDeserialize<T>
 {
     private static readonly JsonWriterOptions JsonWriterOpts = new() { Indented = false, SkipValidation = true, };
 
@@ -21,18 +21,18 @@ public sealed class NatsJsonSerializer : INatsSerializer
     private readonly JsonSerializerOptions _opts;
 
     /// <summary>
-    /// Creates a new instance of <see cref="NatsJsonSerializer"/> with the specified options.
+    /// Creates a new instance of <see cref="NatsJsonSerializer{T}"/> with the specified options.
     /// </summary>
     /// <param name="opts">Serialization options</param>
     public NatsJsonSerializer(JsonSerializerOptions opts) => _opts = opts;
 
     /// <summary>
-    /// Default instance of <see cref="NatsJsonSerializer"/> with option set to ignore <c>null</c> values when writing.
+    /// Default instance of <see cref="NatsJsonSerializer{T}"/> with option set to ignore <c>null</c> values when writing.
     /// </summary>
-    public static NatsJsonSerializer Default { get; } = new(new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
+    public static NatsJsonSerializer<T> Default { get; } = new(new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
 
     /// <inheritdoc />
-    public void Serialize<T>(IBufferWriter<byte> bufferWriter, T? value)
+    public void Serialize(IBufferWriter<byte> bufferWriter, T? value)
     {
         Utf8JsonWriter writer;
         if (_jsonWriter == null)
@@ -51,7 +51,7 @@ public sealed class NatsJsonSerializer : INatsSerializer
     }
 
     /// <inheritdoc />
-    public T? Deserialize<T>(in ReadOnlySequence<byte> buffer)
+    public T? Deserialize(in ReadOnlySequence<byte> buffer)
     {
         var reader = new Utf8JsonReader(buffer); // Utf8JsonReader is ref struct, no allocate.
         return JsonSerializer.Deserialize<T>(ref reader, _opts);
@@ -69,4 +69,13 @@ public sealed class NatsJsonSerializer : INatsSerializer
 
         public Span<byte> GetSpan(int sizeHint = 0) => Array.Empty<byte>();
     }
+}
+
+public sealed class NatsJsonSerializerRegistry : INatsSerializerRegistry
+{
+    public static readonly NatsJsonSerializerRegistry Default = new();
+
+    public INatsSerialize<T> GetSerializer<T>() => NatsJsonSerializer<T>.Default;
+
+    public INatsDeserialize<T> GetDeserializer<T>() => NatsJsonSerializer<T>.Default;
 }

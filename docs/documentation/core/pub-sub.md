@@ -7,16 +7,25 @@ receives the message.
 ```csharp
 await using var nats = new NatsConnection();
 
-await using sub = await nats.SubscribeAsync<int>("foo");
+var sub = Task.Run(async () =>
+{
+    await foreach(var msg in nats.SubscribeAsync<int>("foo"))
+    {
+        Console.WriteLine($"Received {msg.Subject}: {msg.Data}\n");
+
+        if (msg.Data == -1)
+            break;
+    }
+});
 
 for (int i = 0; i < 10; i++)
 {
     Console.WriteLine($" Publishing {i}...");
     await nats.PublishAsync<int>("foo", i);
+    await Task.Delay(1000);
 }
 
-await foreach (var msg in sub.Msgs.ReadAllAsync())
-{
-    Console.WriteLine($"Received {msg.Subject}: {msg.Data}\n");
-}
+await nats.PublishAsync<int>("foo", -1);
+
+await sub;
 ```

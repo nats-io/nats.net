@@ -5,7 +5,7 @@ namespace NATS.Client.JetStream;
 public static class NatsJSLogEvents
 {
     public static readonly EventId Config = new(2001, nameof(Config));
-    public static readonly EventId Timeout = new(2002, nameof(Timeout));
+    public static readonly EventId PublishNoResponseRetry = new(2002, nameof(PublishNoResponseRetry));
     public static readonly EventId IdleTimeout = new(2003, nameof(IdleTimeout));
     public static readonly EventId Expired = new(2004, nameof(Expired));
     public static readonly EventId ProtocolMessage = new(2005, nameof(ProtocolMessage));

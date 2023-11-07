@@ -3,17 +3,6 @@ using NATS.Client.Core;
 namespace NATS.Client.KeyValueStore;
 
 /// <summary>
-/// Key Value Store options
-/// </summary>
-public record NatsKVOpts
-{
-    /// <summary>
-    /// Optional value serializer to override the default.
-    /// </summary>
-    public INatsSerializer? Serializer { get; init; }
-}
-
-/// <summary>
 /// Key Value Store watch options
 /// </summary>
 public record NatsKVWatchOpts

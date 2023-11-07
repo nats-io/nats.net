@@ -65,39 +65,7 @@ var cmdOpt = args.Length > 1 ? args[1] : "none";
 
 try
 {
-    if (cmd == "fetch")
-    {
-        while (!cts.Token.IsCancellationRequested)
-        {
-            try
-            {
-                Console.WriteLine($"___\nFETCH {maxMsgs}");
-                await consumer.RefreshAsync(cts.Token);
-                await using var sub = await consumer.FetchAsync<NatsMemoryOwner<byte>>(fetchOpts, cts.Token);
-                await foreach (var msg in sub.Msgs.ReadAllAsync(cts.Token))
-                {
-                    using (msg.Data)
-                    {
-                        var message = Encoding.ASCII.GetString(msg.Data.Span);
-                        Console.WriteLine($"Received: {message}");
-                    }
-
-                    await msg.AckAsync(cancellationToken: cts.Token);
-                    Report(++count, stopwatch, $"data: {msg.Data}");
-                }
-            }
-            catch (NatsJSProtocolException e)
-            {
-                Console.WriteLine(e.Message);
-            }
-            catch (NatsJSException e)
-            {
-                Console.WriteLine(e.Message);
-                await Task.Delay(1000);
-            }
-        }
-    }
-    else if (cmd == "fetch-all-no-wait")
+    if (cmd == "fetch-no-wait")
     {
         while (!cts.Token.IsCancellationRequested)
         {
@@ -110,7 +78,7 @@ try
                 var fetchNoWaitOpts = new NatsJSFetchOpts { MaxMsgs = max };
                 var fetchMsgCount = 0;
 
-                await foreach (var msg in consumer.FetchAllNoWaitAsync<NatsMemoryOwner<byte>>(fetchNoWaitOpts, cts.Token))
+                await foreach (var msg in consumer.FetchNoWaitAsync<NatsMemoryOwner<byte>>(opts: fetchNoWaitOpts, cancellationToken: cts.Token))
                 {
                     fetchMsgCount++;
                     using (msg.Data)
@@ -140,7 +108,7 @@ try
             }
         }
     }
-    else if (cmd == "fetch-all")
+    else if (cmd == "fetch")
     {
         while (!cts.Token.IsCancellationRequested)
         {
@@ -148,7 +116,7 @@ try
             {
                 Console.WriteLine($"___\nFETCH {maxMsgs}");
                 await consumer.RefreshAsync(cts.Token);
-                await foreach (var msg in consumer.FetchAllAsync<NatsMemoryOwner<byte>>(fetchOpts, cts.Token))
+                await foreach (var msg in consumer.FetchAsync<NatsMemoryOwner<byte>>(opts: fetchOpts, cancellationToken: cts.Token))
                 {
                     using (msg.Data)
                     {
@@ -178,7 +146,7 @@ try
             try
             {
                 Console.WriteLine("___\nNEXT");
-                var next = await consumer.NextAsync<NatsMemoryOwner<byte>>(nextOpts, cts.Token);
+                var next = await consumer.NextAsync<NatsMemoryOwner<byte>>(opts: nextOpts, cancellationToken: cts.Token);
                 if (next is { } msg)
                 {
                     using (msg.Data)
@@ -209,15 +177,9 @@ try
             try
             {
                 Console.WriteLine("___\nCONSUME");
-                await using var sub = await consumer.ConsumeAsync<NatsMemoryOwner<byte>>(consumeOpts);
-
-                cts.Token.Register(() =>
-                {
-                    sub.DisposeAsync().GetAwaiter().GetResult();
-                });
-
                 var stopped = false;
-                await foreach (var msg in sub.Msgs.ReadAllAsync())
+                var consumeStop = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
+                await foreach (var msg in consumer.ConsumeAsync<NatsMemoryOwner<byte>>(opts: consumeOpts, cancellationToken: consumeStop.Token))
                 {
                     using (msg.Data)
                     {
@@ -226,7 +188,7 @@ try
                         if (message == "stop")
                         {
                             Console.WriteLine("Stopping consumer...");
-                            sub.Stop();
+                            consumeStop.Cancel();
                             stopped = true;
                         }
                     }
@@ -244,36 +206,6 @@ try
                 {
                     Console.WriteLine("Stopped consumer.");
                     break;
-                }
-            }
-            catch (NatsJSProtocolException e)
-            {
-                Console.WriteLine(e.Message);
-            }
-            catch (NatsJSException e)
-            {
-                Console.WriteLine(e.Message);
-                await Task.Delay(1000);
-            }
-        }
-    }
-    else if (cmd == "consume-all")
-    {
-        while (!cts.Token.IsCancellationRequested)
-        {
-            try
-            {
-                Console.WriteLine("___\nCONSUME-ALL");
-                await foreach (var msg in consumer.ConsumeAllAsync<NatsMemoryOwner<byte>>(consumeOpts, cts.Token))
-                {
-                    using (msg.Data)
-                    {
-                        var message = Encoding.ASCII.GetString(msg.Data.Span);
-                        Console.WriteLine($"Received: {message}");
-                    }
-
-                    await msg.AckAsync(cancellationToken: cts.Token);
-                    Report(++count, stopwatch, $"data: {msg.Data}");
                 }
             }
             catch (NatsJSProtocolException e)

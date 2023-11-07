@@ -17,20 +17,17 @@ await using var nats = new NatsConnection();
 
 var subs = new List<NatsSubBase>();
 var replyTasks = new List<Task>();
+var cts = new CancellationTokenSource();
 
 for (int i = 0; i < 3; i++)
 {
     // Create three subscriptions all on the same queue group
-    var sub = await nats.SubscribeAsync<int>("math.double", queueGroup: "maths-service");
-
-    subs.Add(sub);
-
     // Create a background message loop for every subscription
     var replyTaskId = i;
     replyTasks.Add(Task.Run(async () =>
     {
         // Retrieve messages until unsubscribed
-        await foreach (var msg in sub.Msgs.ReadAllAsync())
+        await foreach (var msg in nats.SubscribeAsync<int>("math.double", queueGroup: "maths-service", cancellationToken: cts.Token))
         {
             Console.WriteLine($"[{replyTaskId}] Received request: {msg.Data}");
             await msg.ReplyAsync($"Answer is: {2 * msg.Data}");
@@ -49,9 +46,8 @@ for (int i = 0; i < 10; i++)
 
 Console.WriteLine("Stopping...");
 
-// Unsubscribing or disposing will complete the message loops
-foreach (var sub in subs)
-    await sub.UnsubscribeAsync();
+// Cancellation token will unsubcribe and complete the message loops
+cts.Cancel();
 
 // Make sure all tasks finished cleanly
 await Task.WhenAll(replyTasks);

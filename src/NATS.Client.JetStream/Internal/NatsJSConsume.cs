@@ -1,6 +1,5 @@
 using System.Buffers;
 using System.Text;
-using System.Text.Json.Serialization;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
@@ -16,18 +15,17 @@ internal struct PullRequest
     public string Origin { get; init; }
 }
 
-internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
+internal class NatsJSConsume<TMsg> : NatsSubBase
 {
     private readonly ILogger _logger;
     private readonly bool _debug;
-    private readonly CancellationTokenSource _cts;
-    private readonly Channel<NatsJSMsg<TMsg?>> _userMsgs;
+    private readonly Channel<NatsJSMsg<TMsg>> _userMsgs;
     private readonly Channel<PullRequest> _pullRequests;
     private readonly NatsJSContext _context;
     private readonly string _stream;
     private readonly string _consumer;
     private readonly CancellationToken _cancellationToken;
-    private readonly INatsSerializer _serializer;
+    private readonly INatsDeserialize<TMsg> _serializer;
     private readonly Timer _timer;
     private readonly Task _pullTask;
 
@@ -56,18 +54,18 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
         string consumer,
         string subject,
         string? queueGroup,
+        INatsDeserialize<TMsg> serializer,
         NatsSubOpts? opts,
         CancellationToken cancellationToken)
         : base(context.Connection, context.Connection.SubscriptionManager, subject, queueGroup, opts)
     {
-        _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        _cancellationToken = _cts.Token;
+        _cancellationToken = cancellationToken;
         _logger = Connection.Opts.LoggerFactory.CreateLogger<NatsJSConsume<TMsg>>();
         _debug = _logger.IsEnabled(LogLevel.Debug);
         _context = context;
         _stream = stream;
         _consumer = consumer;
-        _serializer = opts?.Serializer ?? context.Connection.Opts.Serializer;
+        _serializer = serializer;
 
         _maxMsgs = maxMsgs;
         _thresholdMsgs = thresholdMsgs;
@@ -130,7 +128,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
         // to the user from the subscription channel (which should be set to a
         // sufficiently large value to avoid blocking socket reads in the
         // NATS connection).
-        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg?>>(1);
+        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg>>(1);
         Msgs = _userMsgs.Reader;
 
         // Capacity as 1 is enough here since it's used for signaling only.
@@ -140,9 +138,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
         ResetPending();
     }
 
-    public ChannelReader<NatsJSMsg<TMsg?>> Msgs { get; }
-
-    public void Stop() => _cts.Cancel();
+    public ChannelReader<NatsJSMsg<TMsg>> Msgs { get; }
 
     public ValueTask CallMsgNextAsync(string origin, ConsumerGetnextRequest request, CancellationToken cancellationToken = default)
     {
@@ -157,7 +153,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
         return Connection.PubModelAsync(
             subject: $"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
             data: request,
-            serializer: NatsJSJsonSerializer.Default,
+            serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
             replyTo: Subject,
             headers: default,
             cancellationToken);
@@ -197,7 +193,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
             replyTo: Subject,
             headers: default,
             value: request,
-            serializer: NatsJSJsonSerializer.Default,
+            serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
             errorHandler: default,
             cancellationToken: default);
     }
@@ -298,7 +294,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
                     }
                     else if (headers.HasTerminalJSError())
                     {
-                        _userMsgs.Writer.TryComplete(new NatsJSProtocolException($"JetStream server error: {headers.Code} {headers.MessageText}"));
+                        _userMsgs.Writer.TryComplete(new NatsJSProtocolException(headers.Code, headers.Message, headers.MessageText));
                         EndSubscription(NatsSubEndReason.JetStreamError);
                     }
                     else
@@ -325,8 +321,8 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
         }
         else
         {
-            var msg = new NatsJSMsg<TMsg?>(
-                NatsMsg<TMsg?>.Build(
+            var msg = new NatsJSMsg<TMsg>(
+                NatsMsg<TMsg>.Build(
                     subject,
                     replyTo,
                     headersBuffer,
@@ -437,7 +433,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase, INatsJSConsume<TMsg>
 
     private async Task PullLoop()
     {
-        await foreach (var pr in _pullRequests.Reader.ReadAllAsync())
+        await foreach (var pr in _pullRequests.Reader.ReadAllAsync().ConfigureAwait(false))
         {
             var origin = $"pull-loop({pr.Origin})";
             await CallMsgNextAsync(origin, pr.Request).ConfigureAwait(false);

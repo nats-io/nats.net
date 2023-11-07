@@ -5,9 +5,9 @@ using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
 
-public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
+public sealed class NatsSub<T> : NatsSubBase
 {
-    private readonly Channel<NatsMsg<T?>> _msgs;
+    private readonly Channel<NatsMsg<T>> _msgs;
 
     internal NatsSub(
         NatsConnection connection,
@@ -15,22 +15,23 @@ public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
         string subject,
         string? queueGroup,
         NatsSubOpts? opts,
-        INatsSerializer serializer)
-        : base(connection, manager, subject, queueGroup, opts)
+        INatsDeserialize<T> serializer,
+        CancellationToken cancellationToken = default)
+        : base(connection, manager, subject, queueGroup, opts, cancellationToken)
     {
-        _msgs = Channel.CreateBounded<NatsMsg<T?>>(
+        _msgs = Channel.CreateBounded<NatsMsg<T>>(
             NatsSubUtils.GetChannelOpts(opts?.ChannelOpts));
 
         Serializer = serializer;
     }
 
-    public ChannelReader<NatsMsg<T?>> Msgs => _msgs.Reader;
+    public ChannelReader<NatsMsg<T>> Msgs => _msgs.Reader;
 
-    private INatsSerializer Serializer { get; }
+    private INatsDeserialize<T> Serializer { get; }
 
     protected override async ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
     {
-        var natsMsg = NatsMsg<T?>.Build(
+        var natsMsg = NatsMsg<T>.Build(
             subject,
             replyTo,
             headersBuffer,

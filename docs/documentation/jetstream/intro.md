@@ -110,7 +110,7 @@ Check out [JetStream documentation](https://docs.nats.io/nats-concepts/jetstream
 Finally, we're ready to consume the messages we persisted in `shop_orders` stream:
 
 ```csharp
-await foreach (var msg in consumer.ConsumeAllAsync<Order>())
+await foreach (var msg in consumer.ConsumeAsync<Order>())
 {
     var order = msg.Data;
     Console.WriteLine($"Processing {msg.Subject} {order}...");

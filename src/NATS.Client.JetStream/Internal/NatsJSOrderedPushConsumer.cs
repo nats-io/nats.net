@@ -21,7 +21,7 @@ internal readonly struct NatsJSOrderedPushConsumerMsg<T>
 
     public NatsJSOrderedPushConsumerCommand Command { get; init; } = default;
 
-    public NatsJSMsg<T?> Msg { get; init; } = default;
+    public NatsJSMsg<T> Msg { get; init; } = default;
 }
 
 internal record NatsJSOrderedPushConsumerOpts
@@ -48,12 +48,13 @@ internal class NatsJSOrderedPushConsumer<T>
     private readonly NatsJSContext _context;
     private readonly string _stream;
     private readonly string _filter;
+    private readonly INatsDeserialize<T> _serializer;
     private readonly NatsJSOrderedPushConsumerOpts _opts;
     private readonly NatsSubOpts? _subOpts;
     private readonly CancellationToken _cancellationToken;
     private readonly NatsConnection _nats;
     private readonly Channel<NatsJSOrderedPushConsumerMsg<T>> _commandChannel;
-    private readonly Channel<NatsJSMsg<T?>> _msgChannel;
+    private readonly Channel<NatsJSMsg<T>> _msgChannel;
     private readonly Channel<string> _consumerCreateChannel;
     private readonly Timer _timer;
     private readonly int _hbTimeout;
@@ -62,8 +63,8 @@ internal class NatsJSOrderedPushConsumer<T>
     private readonly Task _commandTask;
     private readonly long _ackWaitNanos;
 
-    private long _sequenceStream;
-    private long _sequenceConsumer;
+    private ulong _sequenceStream;
+    private ulong _sequenceConsumer;
     private string _consumer;
     private volatile NatsJSOrderedPushConsumerSub<T>? _sub;
     private int _done;
@@ -72,6 +73,7 @@ internal class NatsJSOrderedPushConsumer<T>
         NatsJSContext context,
         string stream,
         string filter,
+        INatsDeserialize<T> serializer,
         NatsJSOrderedPushConsumerOpts opts,
         NatsSubOpts? subOpts,
         CancellationToken cancellationToken)
@@ -81,6 +83,7 @@ internal class NatsJSOrderedPushConsumer<T>
         _context = context;
         _stream = stream;
         _filter = filter;
+        _serializer = serializer;
         _opts = opts;
         _subOpts = subOpts;
         _cancellationToken = cancellationToken;
@@ -113,7 +116,7 @@ internal class NatsJSOrderedPushConsumer<T>
         // so that we get most accurate view of the stream. We can keep them as 1 until we find a case
         // where it's not enough due to performance for example.
         _commandChannel = Channel.CreateBounded<NatsJSOrderedPushConsumerMsg<T>>(1);
-        _msgChannel = Channel.CreateBounded<NatsJSMsg<T?>>(1);
+        _msgChannel = Channel.CreateBounded<NatsJSMsg<T>>(1);
 
         // A single request to create the consumer is enough because we don't want to create a new consumer
         // back to back in case the consumer is being recreated due to a timeout and a mismatch in consumer
@@ -128,7 +131,7 @@ internal class NatsJSOrderedPushConsumer<T>
         _commandTask = Task.Run(CommandLoop);
     }
 
-    public ChannelReader<NatsJSMsg<T?>> Msgs => _msgChannel.Reader;
+    public ChannelReader<NatsJSMsg<T>> Msgs => _msgChannel.Reader;
 
     public bool IsDone => Volatile.Read(ref _done) > 0;
 
@@ -218,7 +221,7 @@ internal class NatsJSOrderedPushConsumer<T>
 
                                     var sequence = Interlocked.Increment(ref _sequenceConsumer);
 
-                                    if (sequence != (long)metadata.Sequence.Consumer)
+                                    if (sequence != metadata.Sequence.Consumer)
                                     {
                                         CreateSub("sequence-mismatch");
                                         _logger.LogWarning("Missed messages, recreating consumer");
@@ -228,7 +231,7 @@ internal class NatsJSOrderedPushConsumer<T>
                                     // Increment the sequence before writing to the channel in case the channel is full
                                     // and the writer is waiting for the reader to read the message. This way the sequence
                                     // will be correctly incremented in case the timeout kicks in and recreated the consumer.
-                                    Interlocked.Exchange(ref _sequenceStream, (long)metadata.Sequence.Stream);
+                                    Interlocked.Exchange(ref _sequenceStream, metadata.Sequence.Stream);
 
                                     if (!IsDone)
                                     {
@@ -320,7 +323,7 @@ internal class NatsJSOrderedPushConsumer<T>
             await _sub.DisposeAsync();
         }
 
-        _sub = new NatsJSOrderedPushConsumerSub<T>(_context, _commandChannel, _subOpts, _cancellationToken);
+        _sub = new NatsJSOrderedPushConsumerSub<T>(_context, _commandChannel, _serializer, _subOpts, _cancellationToken);
         await _context.Connection.SubAsync(_sub, _cancellationToken).ConfigureAwait(false);
 
         if (_debug)
@@ -395,12 +398,13 @@ internal class NatsJSOrderedPushConsumerSub<T> : NatsSubBase
     private readonly CancellationToken _cancellationToken;
     private readonly NatsConnection _nats;
     private readonly NatsHeaderParser _headerParser;
-    private readonly INatsSerializer _serializer;
+    private readonly INatsDeserialize<T> _serializer;
     private readonly ChannelWriter<NatsJSOrderedPushConsumerMsg<T>> _commands;
 
     public NatsJSOrderedPushConsumerSub(
         NatsJSContext context,
         Channel<NatsJSOrderedPushConsumerMsg<T>> commandChannel,
+        INatsDeserialize<T> serializer,
         NatsSubOpts? opts,
         CancellationToken cancellationToken)
         : base(
@@ -412,7 +416,7 @@ internal class NatsJSOrderedPushConsumerSub<T> : NatsSubBase
     {
         _context = context;
         _cancellationToken = cancellationToken;
-        _serializer = opts?.Serializer ?? context.Connection.Opts.Serializer;
+        _serializer = serializer;
         _nats = context.Connection;
         _headerParser = _nats.HeaderParser;
         _commands = commandChannel.Writer;
@@ -437,7 +441,7 @@ internal class NatsJSOrderedPushConsumerSub<T> : NatsSubBase
         ReadOnlySequence<byte>? headersBuffer,
         ReadOnlySequence<byte> payloadBuffer)
     {
-        var msg = new NatsJSMsg<T?>(NatsMsg<T?>.Build(subject, replyTo, headersBuffer, payloadBuffer, _nats, _headerParser, _serializer), _context);
+        var msg = new NatsJSMsg<T>(NatsMsg<T>.Build(subject, replyTo, headersBuffer, payloadBuffer, _nats, _headerParser, _serializer), _context);
         await _commands.WriteAsync(new NatsJSOrderedPushConsumerMsg<T> { Command = NatsJSOrderedPushConsumerCommand.Msg, Msg = msg }, _cancellationToken).ConfigureAwait(false);
     }
 

@@ -20,7 +20,6 @@ public class SerializerTest
 
             var opts = new NatsPubOpts
             {
-                Serializer = new TestSerializer(),
                 WaitUntilSent = false,
                 ErrorHandler = e =>
                 {
@@ -31,6 +30,7 @@ public class SerializerTest
             await nats.PublishAsync(
                 "foo",
                 0,
+                serializer: new TestSerializer<int>(),
                 opts: opts);
 
             throw await signal;
@@ -41,11 +41,12 @@ public class SerializerTest
             await nats.PublishAsync(
                 "foo",
                 0,
-                opts: new NatsPubOpts { Serializer = new TestSerializer(), WaitUntilSent = true });
+                serializer: new TestSerializer<int>(),
+                opts: new NatsPubOpts { WaitUntilSent = true });
         });
 
         // Check that our connection isn't affected by the exceptions
-        await using var sub = await nats.SubscribeAsync<int>("foo");
+        await using var sub = await nats.SubscribeInternalAsync<int>("foo");
 
         var rtt = await nats.PingAsync();
         Assert.True(rtt > TimeSpan.Zero);
@@ -58,13 +59,11 @@ public class SerializerTest
     }
 }
 
-public class TestSerializer : INatsSerializer
+public class TestSerializer<T> : INatsSerialize<T>, INatsDeserialize<T>
 {
-    public INatsSerializer? Next => default;
+    public void Serialize(IBufferWriter<byte> bufferWriter, T? value) => throw new TestSerializerException();
 
-    public void Serialize<T>(IBufferWriter<byte> bufferWriter, T? value) => throw new TestSerializerException();
-
-    public T? Deserialize<T>(in ReadOnlySequence<byte> buffer) => throw new TestSerializerException();
+    public T? Deserialize(in ReadOnlySequence<byte> buffer) => throw new TestSerializerException();
 }
 
 public class TestSerializerException : Exception

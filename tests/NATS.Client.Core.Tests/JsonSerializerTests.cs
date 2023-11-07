@@ -13,7 +13,7 @@ public class JsonSerializerTests
     {
         var natsOpts = NatsOpts.Default with
         {
-            Serializer = NatsJsonSerializer.Default,
+            SerializerRegistry = NatsJsonSerializerRegistry.Default,
         };
 
         await using var server = NatsServer.Start();
@@ -22,7 +22,7 @@ public class JsonSerializerTests
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await using var sub = await nats.SubscribeAsync<SomeTestData>("foo", cancellationToken: cancellationToken);
+        await using var sub = await nats.SubscribeInternalAsync<SomeTestData>("foo", cancellationToken: cancellationToken);
         await nats.PingAsync(cancellationToken);
         await nats.PublishAsync("foo", new SomeTestData { Name = "bar" }, cancellationToken: cancellationToken);
 

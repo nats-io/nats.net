@@ -17,6 +17,7 @@ public enum NatsSubEndReason
     IdleTimeout,
     IdleHeartbeatTimeout,
     StartUpTimeout,
+    Cancelled,
     Exception,
     JetStreamError,
 }
@@ -32,6 +33,7 @@ public abstract class NatsSubBase
     private readonly TimeSpan _startUpTimeout;
     private readonly TimeSpan _timeout;
     private readonly bool _countPendingMsgs;
+    private readonly CancellationTokenRegistration _tokenRegistration;
     private volatile Timer? _startUpTimeoutTimer;
     private bool _disposed;
     private bool _unsubscribed;
@@ -45,7 +47,8 @@ public abstract class NatsSubBase
         ISubscriptionManager manager,
         string subject,
         string? queueGroup,
-        NatsSubOpts? opts)
+        NatsSubOpts? opts,
+        CancellationToken cancellationToken = default)
     {
         _logger = connection.Opts.LoggerFactory.CreateLogger<NatsSubBase>();
         _debug = _logger.IsEnabled(LogLevel.Debug);
@@ -60,6 +63,14 @@ public abstract class NatsSubBase
         Subject = subject;
         QueueGroup = queueGroup;
         Opts = opts;
+
+        _tokenRegistration = cancellationToken.UnsafeRegister(
+            state =>
+            {
+                var self = (NatsSubBase)state!;
+                self.EndSubscription(NatsSubEndReason.Cancelled);
+            },
+            this);
 
         // Only allocate timers if necessary to reduce GC pressure
         if (_idleTimeout != default)
@@ -172,6 +183,8 @@ public abstract class NatsSubBase
 
             throw Exception;
         }
+
+        _tokenRegistration.Dispose();
 
         return unsubscribeAsync;
     }

@@ -13,9 +13,7 @@ await using var connection = new NatsConnection(options);
 
 Print($"[SUB] Subscribing to subject '{subject}'...\n");
 
-var sub = await connection.SubscribeAsync<byte[]>(subject);
-
-await foreach (var msg in sub.Msgs.ReadAllAsync())
+await foreach (var msg in connection.SubscribeAsync<byte[]>(subject))
 {
     Print($"[RCV] {msg.Subject}: {Encoding.UTF8.GetString(msg.Data!)}\n");
     if (msg.Headers != null)

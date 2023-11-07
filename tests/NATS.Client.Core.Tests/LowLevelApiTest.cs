@@ -28,7 +28,7 @@ public class LowLevelApiTest
         for (var i = 0; i < 10; i++)
         {
             var headers = new NatsHeaders { { "X-Test", $"value-{i}" } };
-            await nats.PubModelAsync<int>($"foo.data{i}", i, NatsDefaultSerializer.Default, "bar", headers);
+            await nats.PubModelAsync<int>($"foo.data{i}", i, NatsDefaultSerializer<int>.Default, "bar", headers);
         }
 
         await nats.PubAsync("foo.done");
