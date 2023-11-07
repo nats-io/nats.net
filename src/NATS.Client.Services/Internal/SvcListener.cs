@@ -11,8 +11,8 @@ internal class SvcListener : IAsyncDisposable
     private readonly string _subject;
     private readonly string _queueGroup;
     private readonly CancellationToken _cancellationToken;
-    private INatsSub<NatsMemoryOwner<byte>>? _sub;
     private Task? _readLoop;
+    private CancellationTokenSource? _cts;
 
     public SvcListener(NatsConnection nats, Channel<SvcMsg> channel, SvcMsgType type, string subject, string queueGroup, CancellationToken cancellationToken)
     {
@@ -24,25 +24,23 @@ internal class SvcListener : IAsyncDisposable
         _cancellationToken = cancellationToken;
     }
 
-    public async ValueTask StartAsync()
+    public ValueTask StartAsync()
     {
-        _sub = await _nats.SubscribeAsync<NatsMemoryOwner<byte>>(_subject, queueGroup: _queueGroup, cancellationToken: _cancellationToken);
+        _cts = CancellationTokenSource.CreateLinkedTokenSource(_cancellationToken);
         _readLoop = Task.Run(async () =>
         {
-            while (await _sub.Msgs.WaitToReadAsync(_cancellationToken).ConfigureAwait(false))
+            await foreach (var msg in _nats.SubscribeAsync<NatsMemoryOwner<byte>>(_subject, _queueGroup, cancellationToken: _cts.Token))
             {
-                while (_sub.Msgs.TryRead(out var msg))
-                {
-                    await _channel.Writer.WriteAsync(new SvcMsg(_type, msg), _cancellationToken).ConfigureAwait(false);
-                }
+                await _channel.Writer.WriteAsync(new SvcMsg(_type, msg), _cancellationToken).ConfigureAwait(false);
             }
         });
+        return ValueTask.CompletedTask;
     }
 
     public async ValueTask DisposeAsync()
     {
-        if (_sub != null)
-            await _sub.DisposeAsync();
+        _cts?.Cancel();
+
         if (_readLoop != null)
             await _readLoop;
     }

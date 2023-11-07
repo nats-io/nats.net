@@ -33,9 +33,11 @@ Subscribe to all `bar` [related subjects](https://docs.nats.io/nats-concepts/sub
 ```csharp
 await using var nats = new NatsConnection();
 
-await using sub = await nats.SubscribeAsync<Bar>("bar.>");
-await foreach (var msg in sub.Msgs.ReadAllAsync())
+await foreach (var msg in nats.Subscription("bar.>"))
 {
+    if (msg.Subject == "bar.exit")
+        break;
+
     Console.WriteLine($"Received {msg.Subject}: {msg.Data}\n");
 }
 ```
@@ -49,6 +51,8 @@ for (int i = 0; i < 10; i++)
     Console.WriteLine($" Publishing {i}...");
     await nats.PublishAsync<Bar>($"bar.baz.{i}", new Bar { Id = i, Name = "Baz" });
 }
+
+await nats.PublishAsync("bar.exit");
 ```
 
 ## Logging
@@ -57,7 +61,22 @@ You should also hook your logger to `NatsConnection` to make sure all is working
 to get help diagnosing any issues you might have:
 
 ```csharp
-var opts = NatsOpts.Default with { LoggerFactory = new MinimumConsoleLoggerFactory(LogLevel.Error) };
+// First add Nuget package Microsoft.Extensions.Logging.Console
+using Microsoft.Extensions.Logging;
+
+using var loggerFactory = LoggerFactory.Create(configure: builder =>
+{
+    builder
+        .SetMinimumLevel(LogLevel.Information)
+        .AddSimpleConsole(options =>
+        {
+            options.SingleLine = true;
+            options.TimestampFormat = "yyyy-MM-dd HH:mm:ss.fff zzz ";
+        });
+});
+
+var opts = NatsOpts.Default with { LoggerFactory = loggerFactory };
+
 await using var nats = new NatsConnection(otps);
 ```
 

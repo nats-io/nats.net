@@ -22,7 +22,7 @@ public class JsonSerializerTests
         await using var server = NatsServer.Start();
         await using var nats = server.CreateClientConnection(natsOpts);
 
-        await using var sub = await nats.SubscribeAsync<SomeTestData>("foo", cancellationToken: cancellationToken);
+        await using var sub = await nats.SubscribeInternalAsync<SomeTestData>("foo", cancellationToken: cancellationToken);
         await nats.PingAsync(cancellationToken);
         await nats.PublishAsync("foo", new SomeTestData { Name = "bar" }, cancellationToken: cancellationToken);
 

@@ -12,7 +12,7 @@ public abstract partial class NatsConnectionTest
         var sync = 0;
         var signal1 = new WaitSignal<NatsMsg<int>>();
         var signal2 = new WaitSignal<NatsMsg<int>>();
-        var sub = await nats.SubscribeAsync<int>("foo");
+        var sub = await nats.SubscribeInternalAsync<int>("foo");
         var reg = sub.Register(m =>
         {
             if (m.Data < 10)

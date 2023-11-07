@@ -23,10 +23,10 @@ conn.OnConnectingAsync = async x =>
 };
 
 // Server
-var sub = await conn.SubscribeAsync<int>("foobar");
+var cts = new CancellationTokenSource();
 var replyTask = Task.Run(async () =>
 {
-    await foreach (var msg in sub.Msgs.ReadAllAsync())
+    await foreach (var msg in conn.SubscribeAsync<int>("foobar", cancellationToken: cts.Token))
     {
         await msg.ReplyAsync($"Hello {msg.Data}");
     }
@@ -35,15 +35,13 @@ var replyTask = Task.Run(async () =>
 // Client(response: "Hello 100")
 var response = await conn.RequestAsync<int, string>("foobar", 100);
 
-await sub.UnsubscribeAsync();
+cts.Cancel();
 await replyTask;
 
 // subscribe
-var subscription = await conn.SubscribeAsync<Person>("foo");
-
 _ = Task.Run(async () =>
 {
-    await foreach (var msg in subscription.Msgs.ReadAllAsync())
+    await foreach (var msg in conn.SubscribeAsync<Person>("foo"))
     {
         Console.WriteLine($"Received {msg.Data}");
     }
@@ -84,11 +82,9 @@ public class Runner : ConsoleAppBase
     [RootCommand]
     public async Task Run()
     {
-        var subscription = await _connection.SubscribeAsync<string>("foo");
-
         _ = Task.Run(async () =>
         {
-            await foreach (var msg in subscription.Msgs.ReadAllAsync())
+            await foreach (var msg in _connection.SubscribeAsync<string>("foo"))
             {
                 Console.WriteLine("Yeah");
             }

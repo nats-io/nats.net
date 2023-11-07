@@ -49,7 +49,7 @@ public class ServicesTests
     [Fact]
     public async Task Add_end_point()
     {
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10_0000));
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
         await using var server = NatsServer.Start();

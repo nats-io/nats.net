@@ -12,8 +12,8 @@ public class WeatherForecastService : IHostedService, IAsyncDisposable
 
     private readonly ILogger<WeatherForecastService> _logger;
     private readonly INatsConnection _natsConnection;
-    private INatsSub<object>? _replySubscription;
     private Task? _replyTask;
+    private CancellationTokenSource? _cts;
 
     public WeatherForecastService(ILogger<WeatherForecastService> logger, INatsConnection natsConnection)
     {
@@ -21,13 +21,13 @@ public class WeatherForecastService : IHostedService, IAsyncDisposable
         _natsConnection = natsConnection;
     }
 
-    public async Task StartAsync(CancellationToken cancellationToken)
+    public Task StartAsync(CancellationToken cancellationToken)
     {
-        _replySubscription = await _natsConnection.SubscribeAsync<object>("weather", cancellationToken: cancellationToken);
+        _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _replyTask = Task.Run(
             async () =>
             {
-                await foreach (var msg in _replySubscription.Msgs.ReadAllAsync(cancellationToken))
+                await foreach (var msg in _natsConnection.SubscribeAsync<object>("weather", cancellationToken: cancellationToken))
                 {
                     var forecasts = Enumerable.Range(1, 5).Select(index => new WeatherForecast
                     {
@@ -40,21 +40,20 @@ public class WeatherForecastService : IHostedService, IAsyncDisposable
             },
             cancellationToken);
         _logger.LogInformation("Weather Forecast Services is running");
+        return Task.CompletedTask;
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("Weather Forecast Services is stopping");
-        if (_replySubscription != null)
-            await _replySubscription.UnsubscribeAsync();
+        _cts?.Cancel();
         if (_replyTask != null)
             await _replyTask;
     }
 
     public async ValueTask DisposeAsync()
     {
-        if (_replySubscription != null)
-            await _replySubscription.DisposeAsync();
+        _cts?.Cancel();
         if (_replyTask != null)
             await _replyTask;
     }

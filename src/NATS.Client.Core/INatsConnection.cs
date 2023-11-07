@@ -58,13 +58,13 @@ public interface INatsConnection
     /// <param name="opts">A <see cref="NatsSubOpts"/> for subscription options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
     /// <typeparam name="T">Specifies the type of data that may be received from the NATS Server.</typeparam>
-    /// <returns>A <see cref="ValueTask{TResult}"/> that represents the asynchronous send operation.</returns>
+    /// <returns>An asynchronous enumerable of <see cref="NatsMsg{T}"/> objects</returns>
     /// <remarks>
     /// Subscribers with the same queue group name, become a queue group,
     /// and only one randomly chosen subscriber of the queue group will
     /// consume a message each time a message is received by the queue group.
     /// </remarks>
-    ValueTask<INatsSub<T>> SubscribeAsync<T>(string subject, string? queueGroup = default, INatsDeserialize<T>? serializer = default, NatsSubOpts? opts = default, CancellationToken cancellationToken = default);
+    IAsyncEnumerable<NatsMsg<T>> SubscribeAsync<T>(string subject, string? queueGroup = default, INatsDeserialize<T>? serializer = default, NatsSubOpts? opts = default, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Create a new inbox subject with the form {Inbox Prefix}.{Unique Connection ID}.{Unique Inbox ID}

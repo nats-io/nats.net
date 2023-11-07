@@ -19,7 +19,7 @@ public class RequestReplyTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var cancellationToken = cts.Token;
 
-        var sub = await nats.SubscribeAsync<int>(subject, cancellationToken: cancellationToken);
+        var sub = await nats.SubscribeInternalAsync<int>(subject, cancellationToken: cancellationToken);
         var reg = sub.Register(async msg =>
         {
             await msg.ReplyAsync(msg.Data * 2, cancellationToken: cancellationToken);
@@ -74,7 +74,7 @@ public class RequestReplyTest
         await using var server = NatsServer.Start();
         await using var nats = server.CreateClientConnection();
 
-        var sub = await nats.SubscribeAsync<int>("foo");
+        var sub = await nats.SubscribeInternalAsync<int>("foo");
         var reg = sub.Register(async msg =>
         {
             for (var i = 0; i < msgs; i++)
@@ -106,7 +106,7 @@ public class RequestReplyTest
         await using var server = NatsServer.Start();
         await using var nats = server.CreateClientConnection();
 
-        var sub = await nats.SubscribeAsync<int>("foo");
+        var sub = await nats.SubscribeInternalAsync<int>("foo");
         var reg = sub.Register(async msg =>
         {
             await msg.ReplyAsync(msg.Data * 2);
@@ -137,7 +137,7 @@ public class RequestReplyTest
         await using var server = NatsServer.Start();
         await using var nats = server.CreateClientConnection();
 
-        var sub = await nats.SubscribeAsync<int>("foo");
+        var sub = await nats.SubscribeInternalAsync<int>("foo");
         var reg = sub.Register(async msg =>
         {
             await msg.ReplyAsync(msg.Data * 2);
@@ -171,7 +171,7 @@ public class RequestReplyTest
         await using var server = NatsServer.Start();
         await using var nats = server.CreateClientConnection();
 
-        var sub = await nats.SubscribeAsync<int>("foo");
+        var sub = await nats.SubscribeInternalAsync<int>("foo");
         var reg = sub.Register(async msg =>
         {
             await Task.Delay(2_000);
@@ -201,7 +201,7 @@ public class RequestReplyTest
         await using var server = NatsServer.Start();
         await using var nats = server.CreateClientConnection();
 
-        var sub = await nats.SubscribeAsync<int>("foo");
+        var sub = await nats.SubscribeInternalAsync<int>("foo");
         var reg = sub.Register(async msg =>
         {
             await msg.ReplyAsync(msg.Data * 2);
@@ -234,7 +234,7 @@ public class RequestReplyTest
         await using var server = NatsServer.Start();
         await using var nats = server.CreateClientConnection();
 
-        var sub = await nats.SubscribeAsync<int>("foo");
+        var sub = await nats.SubscribeInternalAsync<int>("foo");
         var reg = sub.Register(async msg =>
         {
             await msg.ReplyAsync(msg.Data * 2);
@@ -269,7 +269,7 @@ public class RequestReplyTest
 
         await using var server = NatsServer.Start();
         await using var nats = server.CreateClientConnection();
-        await using var sub = await nats.SubscribeAsync<string>("foo", cancellationToken: cts.Token);
+        await using var sub = await nats.SubscribeInternalAsync<string>("foo", cancellationToken: cts.Token);
         var reg = sub.Register(async m =>
         {
             if (m.Data == "1")
@@ -304,7 +304,7 @@ public class RequestReplyTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var cancellationToken = cts.Token;
 
-        var sub = await nats.SubscribeAsync<int>(subject, cancellationToken: cancellationToken);
+        var sub = await nats.SubscribeInternalAsync<int>(subject, cancellationToken: cancellationToken);
         var reg = sub.Register(async msg =>
         {
             await msg.ReplyAsync(msg.Data * 2, cancellationToken: cancellationToken);

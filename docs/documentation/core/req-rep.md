@@ -8,9 +8,7 @@ Create a service that will be responding to requests:
 ```csharp
 await using var nats = new NatsConnection();
 
-await using var sub = await conn.SubscribeAsync<int>("math.double");
-
-await foreach (var msg in sub.Msgs.ReadAllAsync())
+await foreach (var msg in conn.SubscribeAsync<int>("math.double"))
 {
     Console.WriteLine($"Received request: {msg.Data}");
 

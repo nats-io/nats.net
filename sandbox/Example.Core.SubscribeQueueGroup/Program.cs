@@ -11,10 +11,10 @@ Print("[1][CON] Connecting...\n");
 await using var connection1 = new NatsConnection(options);
 
 Print($"[1][SUB] Subscribing to subject '{subject}'...\n");
-var sub1 = await connection1.SubscribeAsync<string>(subject, queueGroup: "My-Workers");
+var cts1 = new CancellationTokenSource();
 var task1 = Task.Run(async () =>
 {
-    await foreach (var msg in sub1.Msgs.ReadAllAsync())
+    await foreach (var msg in connection1.SubscribeAsync<string>(subject, queueGroup: "My-Workers", cancellationToken: cts1.Token))
     {
         Print($"[1][RCV] {msg.Subject}: {msg.Data}\n");
     }
@@ -26,10 +26,10 @@ Print("[2][CON] Connecting...\n");
 await using var connection2 = new NatsConnection(options);
 
 Print($"[2][SUB] Subscribing to subject '{subject}'...\n");
-var sub2 = await connection2.SubscribeAsync<string>(subject, queueGroup: "My-Workers");
+var cts2 = new CancellationTokenSource();
 var task2 = Task.Run(async () =>
 {
-    await foreach (var msg in sub2.Msgs.ReadAllAsync())
+    await foreach (var msg in connection2.SubscribeAsync<string>(subject, queueGroup: "My-Workers", cancellationToken: cts2.Token))
     {
         Print($"[2][RCV] {msg.Subject}: {msg.Data}\n");
     }
@@ -40,10 +40,10 @@ Console.ReadLine();
 // ---
 // Clean-up
 Print($"[1][SUB] Unsubscribing '{subject}'...\n");
-await sub1.DisposeAsync();
+cts1.Cancel();
 
 Print($"[2][SUB] Unsubscribing '{subject}'...\n");
-await sub2.DisposeAsync();
+cts2.Cancel();
 
 await Task.WhenAll(task1, task2);
 
