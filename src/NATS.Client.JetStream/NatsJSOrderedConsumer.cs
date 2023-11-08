@@ -54,43 +54,30 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
         NatsJSConsumeOpts? opts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        cancellationToken = CancellationTokenSource.CreateLinkedTokenSource(_cancellationToken, cancellationToken).Token;
-
         var consumerName = string.Empty;
-        ulong seq = 0;
-        while (!cancellationToken.IsCancellationRequested)
+
+        try
         {
-            var consumer = await RecreateConsumer(consumerName, seq, cancellationToken);
-            consumerName = consumer.Info.Name;
+            cancellationToken = CancellationTokenSource.CreateLinkedTokenSource(_cancellationToken, cancellationToken).Token;
 
-            await using var cc = await consumer.ConsumeInternalAsync(serializer, opts, cancellationToken);
-
-            NatsJSProtocolException? protocolException = default;
-            while (true)
+            ulong seq = 0;
+            while (!cancellationToken.IsCancellationRequested)
             {
-                // We have to check every call to WaitToReadAsync and TryRead for
-                // protocol exceptions individually because we can't yield return
-                // within try-catch.
-                try
-                {
-                    var read = await cc.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
-                    if (!read)
-                        break;
-                }
-                catch (NatsJSProtocolException pe)
-                {
-                    protocolException = pe;
-                    goto CONSUME_LOOP;
-                }
+                var consumer = await RecreateConsumer(consumerName, seq, cancellationToken);
+                consumerName = consumer.Info.Name;
 
+                await using var cc = await consumer.ConsumeInternalAsync(serializer, opts, cancellationToken);
+
+                NatsJSProtocolException? protocolException = default;
                 while (true)
                 {
-                    NatsJSMsg<T> msg;
-
+                    // We have to check every call to WaitToReadAsync and TryRead for
+                    // protocol exceptions individually because we can't yield return
+                    // within try-catch.
                     try
                     {
-                        var canRead = cc.Msgs.TryRead(out msg);
-                        if (!canRead)
+                        var read = await cc.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
+                        if (!read)
                             break;
                     }
                     catch (NatsJSProtocolException pe)
@@ -99,36 +86,58 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
                         goto CONSUME_LOOP;
                     }
 
-                    if (msg.Metadata is not { } metadata)
-                        continue;
+                    while (true)
+                    {
+                        NatsJSMsg<T> msg;
 
-                    seq = metadata.Sequence.Stream;
+                        try
+                        {
+                            var canRead = cc.Msgs.TryRead(out msg);
+                            if (!canRead)
+                                break;
+                        }
+                        catch (NatsJSProtocolException pe)
+                        {
+                            protocolException = pe;
+                            goto CONSUME_LOOP;
+                        }
 
-                    yield return msg;
+                        if (msg.Metadata is not { } metadata)
+                            continue;
+
+                        seq = metadata.Sequence.Stream;
+
+                        yield return msg;
+                    }
                 }
-            }
 
-        CONSUME_LOOP:
-            if (protocolException != null)
-            {
-                if (protocolException
-                    is { HeaderCode: 409, HeaderMessage: NatsHeaders.Messages.ConsumerDeleted }
-                    or { HeaderCode: 404 })
+                CONSUME_LOOP:
+                if (protocolException != null)
                 {
-                    // Ignore missing consumer errors and let the
-                    // consumer be recreated above.
+                    if (protocolException
+                        is { HeaderCode: 409, HeaderMessage: NatsHeaders.Messages.ConsumerDeleted }
+                        or { HeaderCode: 404 })
+                    {
+                        // Ignore missing consumer errors and let the
+                        // consumer be recreated above.
+                    }
+                    else
+                    {
+                        await TryDeleteConsumer(consumerName, cancellationToken);
+                        throw protocolException;
+                    }
                 }
-                else
-                {
-                    await TryDeleteConsumer(consumerName, cancellationToken);
-                    throw protocolException;
-                }
-            }
 
-            if (await TryDeleteConsumer(consumerName, cancellationToken))
-            {
-                consumerName = string.Empty;
+                if (await TryDeleteConsumer(consumerName, cancellationToken))
+                {
+                    consumerName = string.Empty;
+                }
             }
+        }
+        finally
+        {
+            if (!string.IsNullOrWhiteSpace(consumerName))
+                await TryDeleteConsumer(consumerName, cancellationToken);
         }
     }
 
