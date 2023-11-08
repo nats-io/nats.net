@@ -8,7 +8,7 @@ namespace NATS.Client.ObjectStore;
 /// <summary>
 /// Object Store context.
 /// </summary>
-public class NatsObjContext
+public class NatsObjContext : INatsObjContext
 {
     private static readonly Regex ValidBucketRegex = new(pattern: @"\A[a-zA-Z0-9_-]+\z", RegexOptions.Compiled);
 
@@ -26,7 +26,7 @@ public class NatsObjContext
     /// <param name="bucket">Bucket name.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>Object store object.</returns>
-    public ValueTask<NatsObjStore> CreateObjectStore(string bucket, CancellationToken cancellationToken = default) =>
+    public ValueTask<INatsObjStore> CreateObjectStore(string bucket, CancellationToken cancellationToken = default) =>
         CreateObjectStore(new NatsObjConfig(bucket), cancellationToken);
 
     /// <summary>
@@ -35,7 +35,7 @@ public class NatsObjContext
     /// <param name="config">Object store configuration.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>Object store object.</returns>
-    public async ValueTask<NatsObjStore> CreateObjectStore(NatsObjConfig config, CancellationToken cancellationToken = default)
+    public async ValueTask<INatsObjStore> CreateObjectStore(NatsObjConfig config, CancellationToken cancellationToken = default)
     {
         ValidateBucketName(config.Bucket);
 
@@ -65,7 +65,13 @@ public class NatsObjContext
         return new NatsObjStore(config, this, _context, stream);
     }
 
-    public async ValueTask<NatsObjStore> GetObjectStoreAsync(string bucket, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Get an existing object store.
+    /// </summary>
+    /// <param name="bucket">Bucket name</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>The Object Store object</returns>
+    public async ValueTask<INatsObjStore> GetObjectStoreAsync(string bucket, CancellationToken cancellationToken = default)
     {
         ValidateBucketName(bucket);
         var stream = await _context.GetStreamAsync($"OBJ_{bucket}", cancellationToken: cancellationToken);

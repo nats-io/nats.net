@@ -16,7 +16,7 @@ namespace NATS.Client.ObjectStore;
 /// <summary>
 /// NATS Object Store.
 /// </summary>
-public class NatsObjStore
+public class NatsObjStore : INatsObjStore
 {
     private const int DefaultChunkSize = 128 * 1024;
     private const string NatsRollup = "Nats-Rollup";
@@ -26,18 +26,22 @@ public class NatsObjStore
 
     private static readonly Regex ValidObjectRegex = new(pattern: @"\A[-/_=\.a-zA-Z0-9]+\z", RegexOptions.Compiled);
 
-    private readonly string _bucket;
     private readonly NatsObjContext _objContext;
     private readonly NatsJSContext _context;
     private readonly NatsJSStream _stream;
 
     internal NatsObjStore(NatsObjConfig config, NatsObjContext objContext, NatsJSContext context, NatsJSStream stream)
     {
-        _bucket = config.Bucket;
+        Bucket = config.Bucket;
         _objContext = objContext;
         _context = context;
         _stream = stream;
     }
+
+    /// <summary>
+    /// Object store bucket name.
+    /// </summary>
+    public string Bucket { get; }
 
     /// <summary>
     /// Get object by key.
@@ -75,7 +79,7 @@ public class NatsObjStore
 
         await using var pushConsumer = new NatsJSOrderedPushConsumer<NatsMemoryOwner<byte>>(
             context: _context,
-            stream: $"OBJ_{_bucket}",
+            stream: $"OBJ_{Bucket}",
             filter: GetChunkSubject(info.Nuid),
             serializer: NatsDefaultSerializer<NatsMemoryOwner<byte>>.Default,
             opts: new NatsJSOrderedPushConsumerOpts { DeliverPolicy = ConsumerConfigurationDeliverPolicy.all },
@@ -186,7 +190,7 @@ public class NatsObjStore
         }
 
         var nuid = NewNuid();
-        meta.Bucket = _bucket;
+        meta.Bucket = Bucket;
         meta.Nuid = nuid;
         meta.MTime = DateTimeOffset.UtcNow;
 
@@ -275,7 +279,7 @@ public class NatsObjStore
             try
             {
                 await _context.JSRequestResponseAsync<StreamPurgeRequest, StreamPurgeResponse>(
-                    subject: $"{_context.Opts.Prefix}.STREAM.PURGE.OBJ_{_bucket}",
+                    subject: $"{_context.Opts.Prefix}.STREAM.PURGE.OBJ_{Bucket}",
                     request: new StreamPurgeRequest
                     {
                         Filter = GetChunkSubject(info.Nuid),
@@ -292,6 +296,14 @@ public class NatsObjStore
         return meta;
     }
 
+    /// <summary>
+    /// Update object metadata
+    /// </summary>
+    /// <param name="key">Object key</param>
+    /// <param name="meta">Object metadata</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>Object metadata</returns>
+    /// <exception cref="NatsObjException">There is already an object with the same name</exception>
     public async ValueTask<ObjectMetadata> UpdateMetaAsync(string key, ObjectMetadata meta, CancellationToken cancellationToken = default)
     {
         ValidateObjectName(meta.Name);
@@ -321,6 +333,23 @@ public class NatsObjStore
         return info;
     }
 
+    /// <summary>
+    /// Add a link to another object
+    /// </summary>
+    /// <param name="link">Link name</param>
+    /// <param name="target">Target object's name</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>Metadata of the new link object</returns>
+    public ValueTask<ObjectMetadata> AddLinkAsync(string link, string target, CancellationToken cancellationToken = default) =>
+        AddLinkAsync(link, new ObjectMetadata { Name = target, Bucket = Bucket }, cancellationToken);
+
+    /// <summary>
+    /// Add a link to another object
+    /// </summary>
+    /// <param name="link">Link name</param>
+    /// <param name="target">Target object's metadata</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>Metadata of the new link object</returns>
     public async ValueTask<ObjectMetadata> AddLinkAsync(string link, ObjectMetadata target, CancellationToken cancellationToken = default)
     {
         ValidateObjectName(link);
@@ -351,7 +380,7 @@ public class NatsObjStore
         var info = new ObjectMetadata
         {
             Name = link,
-            Bucket = _bucket,
+            Bucket = Bucket,
             Nuid = NewNuid(),
             Options = new MetaDataOptions
             {
@@ -366,6 +395,76 @@ public class NatsObjStore
         await PublishMeta(info, cancellationToken);
 
         return info;
+    }
+
+    /// <summary>
+    /// Add a link to another object store
+    /// </summary>
+    /// <param name="link">Object's name to be linked</param>
+    /// <param name="target">Target object store</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>Metadata of the new link object</returns>
+    /// <exception cref="NatsObjException">Object with the same name already exists</exception>
+    public async ValueTask<ObjectMetadata> AddBucketLinkAsync(string link, INatsObjStore target, CancellationToken cancellationToken = default)
+    {
+        ValidateObjectName(link);
+
+        try
+        {
+            var checkLink = await GetInfoAsync(link, showDeleted: true, cancellationToken: cancellationToken).ConfigureAwait(false);
+            if (checkLink.Options?.Link is null)
+            {
+                throw new NatsObjException("Object already exists");
+            }
+        }
+        catch (NatsObjNotFoundException)
+        {
+        }
+
+        var info = new ObjectMetadata
+        {
+            Name = link,
+            Bucket = Bucket,
+            Nuid = NewNuid(),
+            Options = new MetaDataOptions
+            {
+                Link = new NatsObjLink
+                {
+                    Name = link,
+                    Bucket = target.Bucket,
+                },
+            },
+        };
+
+        await PublishMeta(info, cancellationToken);
+
+        return info;
+    }
+
+    /// <summary>
+    /// Seal the object store. No further modifications will be allowed.
+    /// </summary>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <exception cref="NatsObjException">Update operation failed</exception>
+    public async ValueTask SealAsync(CancellationToken cancellationToken = default)
+    {
+        var info = await _context.JSRequestResponseAsync<object, StreamInfoResponse>(
+            subject: $"{_context.Opts.Prefix}.STREAM.INFO.{_stream.Info.Config.Name}",
+            request: null,
+            cancellationToken).ConfigureAwait(false);
+
+        var config = info.Config;
+        config.Sealed = true;
+
+        var response = await _context.JSRequestResponseAsync<StreamConfiguration, StreamUpdateResponse>(
+            subject: $"{_context.Opts.Prefix}.STREAM.UPDATE.{_stream.Info.Config.Name}",
+            request: config,
+            cancellationToken);
+
+        if (!response.Config.Sealed)
+        {
+            throw new NatsObjException("Can't seal object store");
+        }
     }
 
     /// <summary>
@@ -409,11 +508,51 @@ public class NatsObjStore
         }
     }
 
+    /// <summary>
+    /// List all the objects in this store.
+    /// </summary>
+    /// <param name="opts">List options</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>An async enumerable object metadata to be used in an <c>await foreach</c></returns>
+    public IAsyncEnumerable<ObjectMetadata> ListAsync(NatsObjListOpts? opts = default, CancellationToken cancellationToken = default)
+    {
+        opts ??= new NatsObjListOpts();
+        var watchOpts = new NatsObjWatchOpts
+        {
+            UpdatesOnly = false,
+            IgnoreDeletes = !opts.ShowDeleted,
+        };
+        return WatchAsync(watchOpts, cancellationToken);
+    }
+
+    /// <summary>
+    /// Retrieves run-time status about the backing store of the bucket.
+    /// </summary>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>Object store status</returns>
+    public async ValueTask<NatsObjStatus> GetStatusAsync(CancellationToken cancellationToken = default)
+    {
+        await _stream.RefreshAsync(cancellationToken);
+        return new NatsObjStatus(Bucket, _stream.Info);
+    }
+
+    /// <summary>
+    /// Watch for changes in the underlying store and receive meta information updates.
+    /// </summary>
+    /// <param name="opts">Watch options</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>An async enumerable object metadata to be used in an <c>await foreach</c></returns>
     public async IAsyncEnumerable<ObjectMetadata> WatchAsync(NatsObjWatchOpts? opts = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         opts ??= new NatsObjWatchOpts();
 
         var deliverPolicy = ConsumerConfigurationDeliverPolicy.all;
+
+        if (!opts.IncludeHistory)
+        {
+            deliverPolicy = ConsumerConfigurationDeliverPolicy.last_per_subject;
+        }
+
         if (opts.UpdatesOnly)
         {
             deliverPolicy = ConsumerConfigurationDeliverPolicy.@new;
@@ -421,8 +560,8 @@ public class NatsObjStore
 
         await using var pushConsumer = new NatsJSOrderedPushConsumer<NatsMemoryOwner<byte>>(
             context: _context,
-            stream: $"OBJ_{_bucket}",
-            filter: $"$O.{_bucket}.M.>",
+            stream: $"OBJ_{Bucket}",
+            filter: $"$O.{Bucket}.M.>",
             serializer: NatsDefaultSerializer<NatsMemoryOwner<byte>>.Default,
             opts: new NatsJSOrderedPushConsumerOpts { DeliverPolicy = deliverPolicy },
             subOpts: new NatsSubOpts(),
@@ -430,16 +569,29 @@ public class NatsObjStore
 
         pushConsumer.Init();
 
-        await foreach (var msg in pushConsumer.Msgs.ReadAllAsync(cancellationToken))
+        await foreach (var msg in pushConsumer.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
             if (pushConsumer.IsDone)
                 continue;
             using (msg.Data)
             {
-                var info = JsonSerializer.Deserialize(msg.Data.Memory.Span, NatsObjJsonSerializerContext.Default.ObjectMetadata);
-                if (info != null)
+                if (msg.Metadata is { } metadata)
                 {
-                    yield return info;
+                    var info = JsonSerializer.Deserialize(msg.Data.Memory.Span, NatsObjJsonSerializerContext.Default.ObjectMetadata);
+                    if (info != null)
+                    {
+                        if (!opts.IgnoreDeletes || !info.Deleted)
+                        {
+                            info.MTime = metadata.Timestamp;
+                            yield return info;
+                        }
+                    }
+
+                    if (!opts.UpdatesOnly)
+                    {
+                        if (metadata.NumPending == 0)
+                            break;
+                    }
                 }
             }
         }
@@ -483,9 +635,9 @@ public class NatsObjStore
         ack.EnsureSuccess();
     }
 
-    private string GetMetaSubject(string key) => $"$O.{_bucket}.M.{Base64UrlEncoder.Encode(key)}";
+    private string GetMetaSubject(string key) => $"$O.{Bucket}.M.{Base64UrlEncoder.Encode(key)}";
 
-    private string GetChunkSubject(string nuid) => $"$O.{_bucket}.C.{nuid}";
+    private string GetChunkSubject(string nuid) => $"$O.{Bucket}.C.{nuid}";
 
     private string NewNuid()
     {
@@ -514,5 +666,16 @@ public class NatsObjStore
 
 public record NatsObjWatchOpts
 {
+    public bool IgnoreDeletes { get; init; }
+
+    public bool IncludeHistory { get; init; }
+
     public bool UpdatesOnly { get; init; }
 }
+
+public record NatsObjListOpts
+{
+    public bool ShowDeleted { get; init; }
+}
+
+public record NatsObjStatus(string Bucket, StreamInfo Info);
