@@ -12,7 +12,7 @@ namespace NATS.Client.Services;
 /// <summary>
 /// NATS service server.
 /// </summary>
-public class NatsSvcServer : IAsyncDisposable
+public class NatsSvcServer : INatsSvcServer
 {
     private readonly ILogger _logger;
     private readonly string _id;
