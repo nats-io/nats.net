@@ -115,7 +115,7 @@ public class OrderedConsumeTest : ITest
         try
         {
             var count = 0;
-            await foreach (var msg in consumer.ConsumeAsync<int>(cancellationToken: cts.Token))
+            await foreach (var msg in consumer.ConsumeAsync<int>(opts: new NatsJSConsumeOpts { MaxMsgs = 100 }, cancellationToken: cts.Token))
             {
                 if (count != msg.Data)
                     throw new Exception($"Unordered {count} != {msg.Data}");
