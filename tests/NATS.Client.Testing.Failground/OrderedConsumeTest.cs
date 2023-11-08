@@ -110,7 +110,7 @@ public class OrderedConsumeTest : ITest
 
         var consumer = await js.CreateOrderedConsumerAsync("s1", cancellationToken: cancellationToken);
 
-        _logger.LogInformation("Created consumer {Name}", consumer.Info.Config.Name);
+        _logger.LogInformation("Created ordered consumer");
 
         try
         {
