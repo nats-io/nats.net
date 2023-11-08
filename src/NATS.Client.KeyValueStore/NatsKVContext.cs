@@ -17,7 +17,7 @@ public enum NatsKVStorageType
 /// <summary>
 /// Key Value Store context
 /// </summary>
-public class NatsKVContext
+public class NatsKVContext : INatsKVContext
 {
     private static readonly Regex ValidBucketRegex = new(pattern: @"\A[a-zA-Z0-9_-]+\z", RegexOptions.Compiled);
     private static readonly Regex ValidKeyRegex = new(pattern: @"\A[-/_=\.a-zA-Z0-9]+\z", RegexOptions.Compiled);
@@ -36,7 +36,7 @@ public class NatsKVContext
     /// <param name="bucket">Name of the bucket</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>Key Value Store</returns>
-    public ValueTask<NatsKVStore> CreateStoreAsync(string bucket, CancellationToken cancellationToken = default)
+    public ValueTask<INatsKVStore> CreateStoreAsync(string bucket, CancellationToken cancellationToken = default)
         => CreateStoreAsync(new NatsKVConfig(bucket), cancellationToken);
 
     /// <summary>
@@ -46,7 +46,7 @@ public class NatsKVContext
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>Key Value Store</returns>
     /// <exception cref="NatsKVException">There was an issue with configuration</exception>
-    public async ValueTask<NatsKVStore> CreateStoreAsync(NatsKVConfig config, CancellationToken cancellationToken = default)
+    public async ValueTask<INatsKVStore> CreateStoreAsync(NatsKVConfig config, CancellationToken cancellationToken = default)
     {
         ValidateBucketName(config.Bucket);
 
@@ -122,7 +122,7 @@ public class NatsKVContext
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>Key Value Store</returns>
     /// <exception cref="NatsKVException">There was an issue with configuration</exception>
-    public async ValueTask<NatsKVStore> GetStoreAsync(string bucket, CancellationToken cancellationToken = default)
+    public async ValueTask<INatsKVStore> GetStoreAsync(string bucket, CancellationToken cancellationToken = default)
     {
         ValidateBucketName(bucket);
 

@@ -30,7 +30,7 @@ public class NatsKVWatcherTest
         var (nats2, proxy) = server.CreateProxiedClientConnection();
         var js2 = new NatsJSContext(nats2);
         var kv2 = new NatsKVContext(js2);
-        var store2 = await kv2.CreateStoreAsync(config, cancellationToken: cancellationToken);
+        var store2 = (NatsKVStore)await kv2.CreateStoreAsync(config, cancellationToken: cancellationToken);
         var watcher = await store2.WatchInternalAsync<NatsMemoryOwner<byte>>("k1.*", cancellationToken: cancellationToken);
 
         await store1.PutAsync("k1.p1", 1, cancellationToken);
@@ -155,7 +155,7 @@ public class NatsKVWatcherTest
         var (nats2, proxy) = server.CreateProxiedClientConnection();
         var js2 = new NatsJSContext(nats2);
         var kv2 = new NatsKVContext(js2);
-        var store2 = await kv2.CreateStoreAsync(bucket, cancellationToken: cancellationToken);
+        var store2 = (NatsKVStore)await kv2.CreateStoreAsync(bucket, cancellationToken: cancellationToken);
         var watcher = await store2.WatchInternalAsync<NatsMemoryOwner<byte>>("k1.*", cancellationToken: cancellationToken);
 
         // Swallow heartbeats
