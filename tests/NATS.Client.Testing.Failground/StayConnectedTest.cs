@@ -25,6 +25,9 @@ public class StayConnectedTest : ITest
 
         await using var nats = new NatsConnection(natsOpts);
 
+        nats.ConnectionDisconnected += (_, _) => _logger.LogWarning($"[CON] Disconnected");
+        nats.ConnectionOpened += (_, _) => _logger.LogInformation($"[CON] Connected to {nats.ServerInfo?.Name}");
+
         var maxRetry = args.MaxRetry > 0 ? args.MaxRetry : 10_000;
 
         // Connect

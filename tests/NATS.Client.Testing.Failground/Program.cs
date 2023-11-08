@@ -46,6 +46,7 @@ try
     var tests = new Dictionary<string, ITest>
     {
         { "consumer", new ConsumeTest(loggerFactory) },
+        { "ordered-consumer", new OrderedConsumeTest(loggerFactory) },
         { "pub-sub", new PubSubTest(loggerFactory) },
         { "stay-connected", new StayConnectedTest(loggerFactory) },
     };
