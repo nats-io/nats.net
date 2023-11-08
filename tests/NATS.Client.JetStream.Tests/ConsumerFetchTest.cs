@@ -25,7 +25,7 @@ public class ConsumerFetchTest
             ack.EnsureSuccess();
         }
 
-        var consumer = await js.GetConsumerAsync("s1", "c1", cts.Token);
+        var consumer = (NatsJSConsumer)await js.GetConsumerAsync("s1", "c1", cts.Token);
         var count = 0;
         await using var fc =
             await consumer.FetchInternalAsync<TestData>(serializer: TestDataJsonSerializer<TestData>.Default, new NatsJSFetchOpts { MaxMsgs = 10 }, cancellationToken: cts.Token);
@@ -55,7 +55,7 @@ public class ConsumerFetchTest
             ack.EnsureSuccess();
         }
 
-        var consumer = await js.GetConsumerAsync("s1", "c1", cts.Token);
+        var consumer = (NatsJSConsumer)await js.GetConsumerAsync("s1", "c1", cts.Token);
         var count = 0;
         await foreach (var msg in consumer.FetchNoWaitAsync<TestData>(serializer: TestDataJsonSerializer<TestData>.Default, new NatsJSFetchOpts { MaxMsgs = 10 }, cancellationToken: cts.Token))
         {
@@ -77,7 +77,7 @@ public class ConsumerFetchTest
 
         var js = new NatsJSContext(nats);
         var stream = await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
-        var consumer = await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+        var consumer = (NatsJSConsumer)await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
 
         var fetchOpts = new NatsJSFetchOpts
         {

@@ -7,7 +7,7 @@ namespace NATS.Client.JetStream;
 /// <summary>
 /// NATS JetStream ordered consumer.
 /// </summary>
-public class NatsJSOrderedConsumer
+public class NatsJSOrderedConsumer : INatsJSConsumer
 {
     private readonly string _stream;
     private readonly NatsJSContext _context;
@@ -29,7 +29,16 @@ public class NatsJSOrderedConsumer
         _context = context;
         _opts = opts;
         _cancellationToken = cancellationToken;
+
+        // For ordered consumer we start with an empty consumer info object
+        // since consumers are created and updated during fetch and consume.
+        Info = new ConsumerInfo();
     }
+
+    /// <summary>
+    /// Consumer info object created during consume and fetch operations.
+    /// </summary>
+    public ConsumerInfo Info { get; private set; }
 
     /// <summary>
     /// Consume messages from the stream in order.
@@ -183,6 +192,12 @@ public class NatsJSOrderedConsumer
         return default;
     }
 
+    /// <summary>
+    /// For ordered consumer this is a no-op.
+    /// </summary>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    public ValueTask RefreshAsync(CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
+
     private async Task<NatsJSConsumer> RecreateConsumer(string consumer, ulong seq, CancellationToken cancellationToken)
     {
         var consumerOpts = _opts;
@@ -223,6 +238,8 @@ public class NatsJSOrderedConsumer
         }
 
         var info = await _context.CreateOrderedConsumerInternalAsync(_stream, consumerOpts, cancellationToken);
+
+        Info = info;
 
         return new NatsJSConsumer(_context, info);
     }

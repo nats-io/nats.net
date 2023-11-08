@@ -35,7 +35,7 @@ public class ConsumerConsumeTest
         }
 
         var consumerOpts = new NatsJSConsumeOpts { MaxMsgs = 10 };
-        var consumer = await js.GetConsumerAsync("s1", "c1", cts.Token);
+        var consumer = (NatsJSConsumer)await js.GetConsumerAsync("s1", "c1", cts.Token);
         var count = 0;
         await using var cc = await consumer.ConsumeInternalAsync<TestData>(serializer: TestDataJsonSerializer<TestData>.Default, consumerOpts, cancellationToken: cts.Token);
         await foreach (var msg in cc.Msgs.ReadAllAsync(cts.Token))
@@ -108,7 +108,7 @@ public class ConsumerConsumeTest
             MaxMsgs = 10,
             IdleHeartbeat = TimeSpan.FromSeconds(5),
         };
-        var consumer = await js.GetConsumerAsync("s1", "c1", cts.Token);
+        var consumer = (NatsJSConsumer)await js.GetConsumerAsync("s1", "c1", cts.Token);
         var count = 0;
         var cc = await consumer.ConsumeInternalAsync<TestData>(serializer: TestDataJsonSerializer<TestData>.Default, consumerOpts, cancellationToken: cts.Token);
         await foreach (var msg in cc.Msgs.ReadAllAsync(cts.Token))
@@ -171,7 +171,7 @@ public class ConsumerConsumeTest
             MaxMsgs = 10,
         };
 
-        var consumer = await js.GetConsumerAsync("s1", "c1", cts.Token);
+        var consumer = (NatsJSConsumer)await js.GetConsumerAsync("s1", "c1", cts.Token);
 
         // Not interested in management messages sent upto this point
         await proxy.FlushFramesAsync(nats);
@@ -237,7 +237,7 @@ public class ConsumerConsumeTest
 
         var js = new NatsJSContext(nats);
         var stream = await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
-        var consumer = await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+        var consumer = (NatsJSConsumer)await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
 
         var consumerOpts = new NatsJSConsumeOpts
         {
@@ -293,7 +293,7 @@ public class ConsumerConsumeTest
 
         var js = new NatsJSContext(nats);
         var stream = await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
-        var consumer = await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+        var consumer = (NatsJSConsumer)await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
 
         var consumerOpts = new NatsJSConsumeOpts
         {
