@@ -78,7 +78,8 @@ try
                 var fetchNoWaitOpts = new NatsJSFetchOpts { MaxMsgs = max };
                 var fetchMsgCount = 0;
 
-                await foreach (var msg in consumer.FetchNoWaitAsync<NatsMemoryOwner<byte>>(opts: fetchNoWaitOpts, cancellationToken: cts.Token))
+                // NoWaitFetch is a specialized operation not available on the public interface.
+                await foreach (var msg in ((NatsJSConsumer)consumer).FetchNoWaitAsync<NatsMemoryOwner<byte>>(opts: fetchNoWaitOpts, cancellationToken: cts.Token))
                 {
                     fetchMsgCount++;
                     using (msg.Data)

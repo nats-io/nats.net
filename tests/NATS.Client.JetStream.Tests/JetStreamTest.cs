@@ -34,7 +34,7 @@ public class JetStreamTest
             Assert.Equal("events", stream.Info.Config.Name);
 
             // Create consumer
-            var consumer = await js.CreateConsumerAsync(
+            var consumer = (NatsJSConsumer)await js.CreateConsumerAsync(
                 new ConsumerCreateRequest
                 {
                     StreamName = "events",

@@ -5,7 +5,7 @@ using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
 
-public partial class NatsJSContext
+public partial class NatsJSContext : INatsJSContext
 {
     /// <summary>
     /// Creates new ordered consumer.
@@ -14,13 +14,13 @@ public partial class NatsJSContext
     /// <param name="opts">Ordered consumer options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>The NATS JetStream consumer object which can be used retrieving ordered data from the stream.</returns>
-    public ValueTask<NatsJSOrderedConsumer> CreateOrderedConsumerAsync(
+    public ValueTask<INatsJSConsumer> CreateOrderedConsumerAsync(
         string stream,
         NatsJSOrderedConsumerOpts? opts = default,
         CancellationToken cancellationToken = default)
     {
         opts ??= NatsJSOrderedConsumerOpts.Default;
-        return new ValueTask<NatsJSOrderedConsumer>(new NatsJSOrderedConsumer(stream, this, opts, cancellationToken));
+        return new ValueTask<INatsJSConsumer>(new NatsJSOrderedConsumer(stream, this, opts, cancellationToken));
     }
 
     /// <summary>
@@ -33,7 +33,7 @@ public partial class NatsJSContext
     /// <returns>The NATS JetStream consumer object which can be used retrieving data from the stream.</returns>
     /// <exception cref="NatsJSException">Ack policy is set to <c>none</c> or there was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
-    public ValueTask<NatsJSConsumer> CreateConsumerAsync(
+    public ValueTask<INatsJSConsumer> CreateConsumerAsync(
         string stream,
         string consumer,
         ConsumerConfigurationAckPolicy ackPolicy = ConsumerConfigurationAckPolicy.@explicit,
@@ -59,7 +59,7 @@ public partial class NatsJSContext
     /// <returns>The NATS JetStream consumer object which can be used retrieving data from the stream.</returns>
     /// <exception cref="NatsJSException">Ack policy is set to <c>none</c> or there was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
-    public async ValueTask<NatsJSConsumer> CreateConsumerAsync(
+    public async ValueTask<INatsJSConsumer> CreateConsumerAsync(
         ConsumerCreateRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -94,7 +94,7 @@ public partial class NatsJSContext
     /// <returns>The NATS JetStream consumer object which can be used retrieving data from the stream.</returns>
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
-    public async ValueTask<NatsJSConsumer> GetConsumerAsync(string stream, string consumer, CancellationToken cancellationToken = default)
+    public async ValueTask<INatsJSConsumer> GetConsumerAsync(string stream, string consumer, CancellationToken cancellationToken = default)
     {
         var response = await JSRequestResponseAsync<object, ConsumerInfo>(
             subject: $"{Opts.Prefix}.CONSUMER.INFO.{stream}.{consumer}",
