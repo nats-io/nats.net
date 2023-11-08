@@ -1,3 +1,4 @@
+using System.IO.IsolatedStorage;
 using System.Security.Cryptography;
 using System.Text;
 using NATS.Client.Core.Tests;
@@ -222,5 +223,148 @@ public class ObjectStoreTest
         var hash1 = Convert.ToBase64String(SHA256.HashData(await File.ReadAllBytesAsync(filename1, cancellationToken)));
 
         Assert.Equal(hash, hash1);
+    }
+
+    [Fact]
+    public async Task Add_link()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+        var js = new NatsJSContext(nats);
+        var obj = new NatsObjContext(js);
+
+        var store1 = await obj.CreateObjectStore(new NatsObjConfig("b1"), cancellationToken);
+        var store2 = await obj.CreateObjectStore(new NatsObjConfig("b2"), cancellationToken);
+
+        await store1.PutAsync("k1", new byte[] { 42 }, cancellationToken: cancellationToken);
+
+        // Link
+        {
+            await store1.AddLinkAsync(link: "link1", target: "k1", cancellationToken: cancellationToken);
+
+            var info = await store1.GetInfoAsync("link1", cancellationToken: cancellationToken);
+            Assert.Equal("k1", info.Options?.Link?.Name);
+            Assert.Equal("b1", info.Options?.Link?.Bucket);
+            Assert.Equal("link1", info.Name);
+            Assert.Equal("b1", info.Bucket);
+
+            var bytes = await store1.GetBytesAsync("link1", cancellationToken: cancellationToken);
+            Assert.Single(bytes);
+            Assert.Equal(42, bytes[0]);
+        }
+
+        // Bucket Link
+        {
+            await store2.AddBucketLinkAsync(link: "k1", store1, cancellationToken: cancellationToken);
+
+            var info = await store2.GetInfoAsync("k1", cancellationToken: cancellationToken);
+            Assert.Equal("k1", info.Options?.Link?.Name);
+            Assert.Equal("b1", info.Options?.Link?.Bucket);
+            Assert.Equal("k1", info.Name);
+            Assert.Equal("b2", info.Bucket);
+
+            var bytes = await store2.GetBytesAsync("k1", cancellationToken: cancellationToken);
+            Assert.Single(bytes);
+            Assert.Equal(42, bytes[0]);
+        }
+    }
+
+    [Fact]
+    public async Task Seal_and_get_status()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+        var js = new NatsJSContext(nats);
+        var obj = new NatsObjContext(js);
+
+        var store = await obj.CreateObjectStore(new NatsObjConfig("b1"), cancellationToken);
+
+        await store.PutAsync("k1", new byte[] { 42 }, cancellationToken: cancellationToken);
+
+        // Status
+        {
+            var status = await store.GetStatusAsync(cancellationToken);
+            Assert.Equal(store.Bucket, status.Bucket);
+            Assert.False(status.Info.Config.Sealed);
+        }
+
+        await store.SealAsync(cancellationToken);
+
+        // Updated status
+        {
+            var status = await store.GetStatusAsync(cancellationToken);
+            Assert.Equal(store.Bucket, status.Bucket);
+            Assert.True(status.Info.Config.Sealed);
+        }
+
+        var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () =>
+            await store.PutAsync("k2", new byte[] { 13 }, cancellationToken: cancellationToken));
+
+        Assert.Equal(400, exception.Error.Code);
+        Assert.Equal("invalid operation on sealed stream", exception.Error.Description);
+        Assert.Equal(10109, exception.Error.ErrCode);
+    }
+
+    [Fact]
+    public async Task List()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+        var js = new NatsJSContext(nats);
+        var obj = new NatsObjContext(js);
+
+        var store = await obj.CreateObjectStore(new NatsObjConfig("b1"), cancellationToken);
+
+        await store.PutAsync("k1", new byte[] { 42 }, cancellationToken: cancellationToken);
+        await store.PutAsync("k2", new byte[] { 43 }, cancellationToken: cancellationToken);
+        await store.PutAsync("k3", new byte[] { 44 }, cancellationToken: cancellationToken);
+        await store.PutAsync("k4", new byte[] { 13 }, cancellationToken: cancellationToken);
+        await store.DeleteAsync("k4", cancellationToken: cancellationToken);
+
+        // List
+        {
+            var infos = new List<ObjectMetadata>();
+            await foreach (var info in store.ListAsync(cancellationToken: cancellationToken))
+            {
+                infos.Add(info);
+            }
+
+            Assert.Equal(3, infos.Count);
+            Assert.Equal("k1", infos[0].Name);
+            Assert.Equal("k2", infos[1].Name);
+            Assert.Equal("k3", infos[2].Name);
+            Assert.False(infos[0].Deleted);
+            Assert.False(infos[1].Deleted);
+            Assert.False(infos[2].Deleted);
+        }
+
+        // List show deleted
+        {
+            var infos = new List<ObjectMetadata>();
+            var opts = new NatsObjListOpts { ShowDeleted = true };
+            await foreach (var info in store.ListAsync(opts, cancellationToken: cancellationToken))
+            {
+                infos.Add(info);
+            }
+
+            Assert.Equal(4, infos.Count);
+            Assert.Equal("k1", infos[0].Name);
+            Assert.Equal("k2", infos[1].Name);
+            Assert.Equal("k3", infos[2].Name);
+            Assert.Equal("k4", infos[3].Name);
+            Assert.False(infos[0].Deleted);
+            Assert.False(infos[1].Deleted);
+            Assert.False(infos[2].Deleted);
+            Assert.True(infos[3].Deleted);
+        }
     }
 }

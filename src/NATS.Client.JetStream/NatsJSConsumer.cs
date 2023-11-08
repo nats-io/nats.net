@@ -9,7 +9,7 @@ namespace NATS.Client.JetStream;
 /// <summary>
 /// Represents a NATS JetStream consumer.
 /// </summary>
-public class NatsJSConsumer
+public class NatsJSConsumer : INatsJSConsumer
 {
     private readonly NatsJSContext _context;
     private readonly string _stream;

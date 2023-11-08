@@ -62,7 +62,6 @@ public class NatsSubTests
                 }
             });
 
-
             var pub = Task.Run(async () =>
             {
                 while (Volatile.Read(ref sync) == 0)
