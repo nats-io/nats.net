@@ -156,61 +156,7 @@ public class NatsServer : IAsyncDisposable
 
     public static NatsServer Start() => Start(new NullOutputHelper(), TransportType.Tcp);
 
-    public static bool SupportsTlsFirst()
-    {
-        var (configFileName, _, _) = GetCmd(new NatsServerOptsBuilder().UseTransport(TransportType.Tls, tlsFirst: true).Build());
-
-        Process? process = null;
-        try
-        {
-            process = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = NatsServerPath,
-                    Arguments = $"-c \"{configFileName}\"",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                },
-            };
-
-            var mre = new ManualResetEventSlim();
-            var matched = 0;
-            DataReceivedEventHandler? handler = (_, e) =>
-            {
-                if (e.Data != null)
-                {
-                    if (Regex.IsMatch(e.Data, @"(?:\[INF\] Server is ready|error parsing)"))
-                    {
-                        mre.Set();
-                    }
-
-                    if (Regex.IsMatch(e.Data, @"Clients that are not using ""TLS Handshake First"" option will fail to connect"))
-                    {
-                        Interlocked.Increment(ref matched);
-                    }
-                }
-            };
-            process.OutputDataReceived += handler;
-            process.ErrorDataReceived += handler;
-
-            process.Start();
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
-
-            if (!mre.Wait(10_000))
-            {
-                throw new Exception("Can't start nats-server");
-            }
-
-            return Volatile.Read(ref matched) > 0;
-        }
-        finally
-        {
-            process?.Kill();
-        }
-    }
+    public static bool SupportsTlsFirst() => new Version("2.10.4") <= Version;
 
     public static NatsServer StartWithTrace(ITestOutputHelper outputHelper)
         => Start(
