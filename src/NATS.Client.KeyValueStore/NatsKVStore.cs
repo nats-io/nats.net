@@ -43,9 +43,9 @@ public class NatsKVStore : INatsKVStore
     private const string NatsSequence = "Nats-Sequence";
     private const string NatsTimeStamp = "Nats-Time-Stamp";
     private readonly NatsJSContext _context;
-    private readonly NatsJSStream _stream;
+    private readonly INatsJSStream _stream;
 
-    internal NatsKVStore(string bucket, NatsJSContext context, NatsJSStream stream)
+    internal NatsKVStore(string bucket, NatsJSContext context, INatsJSStream stream)
     {
         Bucket = bucket;
         _context = context;

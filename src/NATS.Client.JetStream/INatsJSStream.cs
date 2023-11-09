@@ -1,29 +1,14 @@
-using NATS.Client.Core;
-using NATS.Client.JetStream.Internal;
+﻿using NATS.Client.Core;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
 
-/// <summary>
-/// Represents a NATS JetStream stream.
-/// </summary>
-public class NatsJSStream : INatsJSStream
+public interface INatsJSStream
 {
-    private readonly NatsJSContext _context;
-    private readonly string _name;
-    private bool _deleted;
-
-    internal NatsJSStream(NatsJSContext context, StreamInfo info)
-    {
-        _context = context;
-        Info = info;
-        _name = info.Config.Name;
-    }
-
     /// <summary>
     /// Stream info object as retrieved from NATS JetStream server at the time this object was created, updated or refreshed.
     /// </summary>
-    public StreamInfo Info { get; private set; }
+    StreamInfo Info { get; }
 
     /// <summary>
     /// Delete this stream.
@@ -33,11 +18,7 @@ public class NatsJSStream : INatsJSStream
     /// <exception cref="NatsJSException">There is an error retrieving the response or this consumer object isn't valid anymore because it was deleted earlier.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     /// <remarks>After deletion this object can't be used anymore.</remarks>
-    public async ValueTask<bool> DeleteAsync(CancellationToken cancellationToken = default)
-    {
-        ThrowIfDeleted();
-        return _deleted = await _context.DeleteStreamAsync(_name, cancellationToken);
-    }
+    ValueTask<bool> DeleteAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Purge data from this stream. Leaves the stream.
@@ -48,11 +29,7 @@ public class NatsJSStream : INatsJSStream
     /// <exception cref="NatsJSException">There is an error retrieving the response or this consumer object isn't valid anymore because it was deleted earlier.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     /// <remarks>After deletion this object can't be used anymore.</remarks>
-    public async ValueTask<StreamPurgeResponse> PurgeAsync(StreamPurgeRequest request, CancellationToken cancellationToken = default)
-    {
-        ThrowIfDeleted();
-        return await _context.PurgeStreamAsync(_name, request, cancellationToken);
-    }
+    ValueTask<StreamPurgeResponse> PurgeAsync(StreamPurgeRequest request, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Deletes a message from a stream.
@@ -62,11 +39,7 @@ public class NatsJSStream : INatsJSStream
     /// <returns>Delete message response</returns>
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
-    public async ValueTask<StreamMsgDeleteResponse> DeleteMessageAsync(StreamMsgDeleteRequest request, CancellationToken cancellationToken = default)
-    {
-        ThrowIfDeleted();
-        return await _context.DeleteMessageAsync(_name, request, cancellationToken);
-    }
+    ValueTask<StreamMsgDeleteResponse> DeleteMessageAsync(StreamMsgDeleteRequest request, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Update stream properties on the server.
@@ -75,14 +48,9 @@ public class NatsJSStream : INatsJSStream
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <exception cref="NatsJSException">There is an error retrieving the response or this consumer object isn't valid anymore because it was deleted earlier.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
-    public async ValueTask UpdateAsync(
+    ValueTask UpdateAsync(
         StreamUpdateRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        ThrowIfDeleted();
-        var response = await _context.UpdateStreamAsync(request, cancellationToken);
-        Info = response.Info;
-    }
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Creates new consumer for this stream if it doesn't exists or returns an existing one with the same name.
@@ -93,17 +61,7 @@ public class NatsJSStream : INatsJSStream
     /// <returns>The NATS JetStream consumer object which can be used retrieving data from the stream.</returns>
     /// <exception cref="NatsJSException">Ack policy is set to <c>none</c> or there is an error retrieving the response or this consumer object isn't valid anymore because it was deleted earlier.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
-    public ValueTask<INatsJSConsumer> CreateConsumerAsync(string consumer, ConsumerConfigurationAckPolicy ackPolicy = ConsumerConfigurationAckPolicy.@explicit, CancellationToken cancellationToken = default)
-    {
-        ThrowIfDeleted();
-        return _context.CreateConsumerAsync(_name, consumer, ackPolicy, cancellationToken);
-    }
-
-    public ValueTask<INatsJSConsumer> CreateOrderedConsumerAsync(NatsJSOrderedConsumerOpts? opts = default, CancellationToken cancellationToken = default)
-    {
-        ThrowIfDeleted();
-        return _context.CreateOrderedConsumerAsync(_name, opts, cancellationToken);
-    }
+    ValueTask<INatsJSConsumer> CreateConsumerAsync(string consumer, ConsumerConfigurationAckPolicy ackPolicy = ConsumerConfigurationAckPolicy.@explicit, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Creates new consumer for this stream if it doesn't exists or returns an existing one with the same name.
@@ -113,11 +71,9 @@ public class NatsJSStream : INatsJSStream
     /// <returns>The NATS JetStream consumer object which can be used retrieving data from the stream.</returns>
     /// <exception cref="NatsJSException">Ack policy is set to <c>none</c> or there is an error retrieving the response or this consumer object isn't valid anymore because it was deleted earlier.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
-    public ValueTask<INatsJSConsumer> CreateConsumerAsync(ConsumerCreateRequest request, CancellationToken cancellationToken = default)
-    {
-        ThrowIfDeleted();
-        return _context.CreateConsumerAsync(request, cancellationToken);
-    }
+    ValueTask<INatsJSConsumer> CreateConsumerAsync(ConsumerCreateRequest request, CancellationToken cancellationToken = default);
+
+    ValueTask<INatsJSConsumer> CreateOrderedConsumerAsync(NatsJSOrderedConsumerOpts? opts = default, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Gets consumer information from the server and creates a NATS JetStream consumer <see cref="NatsJSConsumer"/>.
@@ -127,11 +83,7 @@ public class NatsJSStream : INatsJSStream
     /// <returns>The NATS JetStream consumer object which can be used retrieving data from the stream.</returns>
     /// <exception cref="NatsJSException">There is an error retrieving the response or this consumer object isn't valid anymore because it was deleted earlier.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
-    public ValueTask<INatsJSConsumer> GetConsumerAsync(string consumer, CancellationToken cancellationToken = default)
-    {
-        ThrowIfDeleted();
-        return _context.GetConsumerAsync(_name, consumer, cancellationToken);
-    }
+    ValueTask<INatsJSConsumer> GetConsumerAsync(string consumer, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Enumerates through consumers belonging to this stream.
@@ -143,11 +95,7 @@ public class NatsJSStream : INatsJSStream
     /// <remarks>
     /// Note that paging isn't implemented. You might receive only a partial list of consumers if there are a lot of them.
     /// </remarks>
-    public IAsyncEnumerable<ConsumerInfo> ListConsumersAsync(CancellationToken cancellationToken = default)
-    {
-        ThrowIfDeleted();
-        return _context.ListConsumersAsync(_name, cancellationToken);
-    }
+    IAsyncEnumerable<ConsumerInfo> ListConsumersAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Delete a consumer from this stream.
@@ -157,11 +105,7 @@ public class NatsJSStream : INatsJSStream
     /// <returns>Whether the deletion was successful.</returns>
     /// <exception cref="NatsJSException">There is an error retrieving the response or this consumer object isn't valid anymore because it was deleted earlier.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
-    public ValueTask<bool> DeleteConsumerAsync(string consumer, CancellationToken cancellationToken = default)
-    {
-        ThrowIfDeleted();
-        return _context.DeleteConsumerAsync(_name, consumer, cancellationToken);
-    }
+    ValueTask<bool> DeleteConsumerAsync(string consumer, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Retrieve the stream info from the server and update this stream.
@@ -169,31 +113,9 @@ public class NatsJSStream : INatsJSStream
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
-    public async ValueTask RefreshAsync(CancellationToken cancellationToken = default) =>
-        Info = await _context.JSRequestResponseAsync<object, StreamInfoResponse>(
-            subject: $"{_context.Opts.Prefix}.STREAM.INFO.{_name}",
-            request: null,
-            cancellationToken).ConfigureAwait(false);
+    ValueTask RefreshAsync(CancellationToken cancellationToken = default);
 
-    public ValueTask<NatsMsg<T>> GetDirectAsync<T>(StreamMsgGetRequest request, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
-    {
-        return _context.Connection.RequestAsync<StreamMsgGetRequest, T>(
-            subject: $"{_context.Opts.Prefix}.DIRECT.GET.{_name}",
-            data: request,
-            requestSerializer: NatsJSJsonSerializer<StreamMsgGetRequest>.Default,
-            replySerializer: serializer,
-            cancellationToken: cancellationToken);
-    }
+    ValueTask<NatsMsg<T>> GetDirectAsync<T>(StreamMsgGetRequest request, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default);
 
-    public ValueTask<StreamMsgGetResponse> GetAsync(StreamMsgGetRequest request, CancellationToken cancellationToken = default) =>
-        _context.JSRequestResponseAsync<StreamMsgGetRequest, StreamMsgGetResponse>(
-            subject: $"{_context.Opts.Prefix}.STREAM.MSG.GET.{_name}",
-            request: request,
-            cancellationToken);
-
-    private void ThrowIfDeleted()
-    {
-        if (_deleted)
-            throw new NatsJSException($"Stream '{_name}' is deleted");
-    }
+    ValueTask<StreamMsgGetResponse> GetAsync(StreamMsgGetRequest request, CancellationToken cancellationToken = default);
 }
