@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using Cysharp.Diagnostics;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace NATS.Client.Core.Tests;
 
@@ -25,15 +26,17 @@ public class NatsServer : IAsyncDisposable
     private static readonly string NatsServerPath = $"nats-server{Ext}";
     private static readonly Version Version;
 
-    private readonly CancellationTokenSource _cancellationTokenSource = new();
-    private readonly string? _configFileName;
+    private CancellationTokenSource? _cancellationTokenSource;
+    private string? _configFileName;
     private readonly string? _jetStreamStoreDir;
     private readonly ITestOutputHelper _outputHelper;
-    private readonly Task<string[]> _processOut;
-    private readonly Task<string[]> _processErr;
+    private Task<string[]> _processOut;
+    private Task<string[]> _processErr;
     private readonly TransportType _transportType;
     private readonly OutputHelperLoggerFactory _loggerFactory;
     private int _disposed;
+
+    public Process ServerProcess { get; private set; }
 
     static NatsServer()
     {
@@ -59,6 +62,7 @@ public class NatsServer : IAsyncDisposable
         _outputHelper = outputHelper;
         _transportType = opts.TransportType;
         Opts = opts;
+        _loggerFactory = new OutputHelperLoggerFactory(_outputHelper, this);
 
         if (opts.EnableJetStream)
         {
@@ -66,12 +70,17 @@ public class NatsServer : IAsyncDisposable
             Directory.CreateDirectory(_jetStreamStoreDir);
             opts.JetStreamStoreDir = _jetStreamStoreDir;
         }
+    }
 
-        (_configFileName, var config, var cmd) = GetCmd(opts);
+    public void StartServerProcess()
+    {
+        _cancellationTokenSource = new CancellationTokenSource();
 
-        outputHelper.WriteLine("ProcessStart: " + cmd + Environment.NewLine + config);
+        (_configFileName, var config, var cmd) = GetCmd(Opts);
+
+        _outputHelper.WriteLine("ProcessStart: " + cmd + Environment.NewLine + config);
         var (p, stdout, stderr) = ProcessX.GetDualAsyncEnumerable(cmd);
-
+        ServerProcess = p;
         _processOut = EnumerateWithLogsAsync(stdout, _cancellationTokenSource.Token);
         _processErr = EnumerateWithLogsAsync(stderr, _cancellationTokenSource.Token);
 
@@ -83,7 +92,7 @@ public class NatsServer : IAsyncDisposable
             {
                 try
                 {
-                    await client.ConnectAsync("localhost", Opts.ServerPort, _cancellationTokenSource.Token);
+                    await client.ConnectAsync("127.0.0.1", Opts.ServerPort, _cancellationTokenSource.Token);
                     if (client.Connected)
                         return;
                 }
@@ -106,17 +115,16 @@ public class NatsServer : IAsyncDisposable
             _processErr.GetAwaiter().GetResult(); // throw exception
         }
 
-        outputHelper.WriteLine("OK to Process Start, Port:" + Opts.ServerPort);
-        _loggerFactory = new OutputHelperLoggerFactory(_outputHelper, this);
+        _outputHelper.WriteLine("OK to Process Start, Port:" + Opts.ServerPort);
     }
 
     public NatsServerOpts Opts { get; }
 
     public string ClientUrl => _transportType switch
     {
-        TransportType.Tcp => $"nats://localhost:{Opts.ServerPort}",
-        TransportType.Tls => $"tls://localhost:{Opts.ServerPort}",
-        TransportType.WebSocket => $"ws://localhost:{Opts.WebSocketPort}",
+        TransportType.Tcp => $"nats://127.0.0.1:{Opts.ServerPort}",
+        TransportType.Tls => $"tls://127.0.0.1:{Opts.ServerPort}",
+        TransportType.WebSocket => $"ws://127.0.0.1:{Opts.WebSocketPort}",
         _ => throw new ArgumentOutOfRangeException(),
     };
 
@@ -178,6 +186,7 @@ public class NatsServer : IAsyncDisposable
             try
             {
                 server = new NatsServer(outputHelper, opts);
+                server.StartServerProcess();
                 nats = server.CreateClientConnection(clientOpts ?? NatsOpts.Default, reTryCount: 3);
 #pragma warning disable CA2012
                 return server;
@@ -196,17 +205,26 @@ public class NatsServer : IAsyncDisposable
         throw new Exception("Can't start nats-server and connect to it");
     }
 
-    public async ValueTask DisposeAsync()
+    public async ValueTask RestartAsync()
     {
-        if (Interlocked.Increment(ref _disposed) != 1)
-        {
-            return;
-        }
+        var t1 = ServerProcess.StartTime;
 
-        _cancellationTokenSource.Cancel(); // trigger of process kill.
-        _cancellationTokenSource.Dispose();
+        await StopAsync();
+        StartServerProcess();
+
+        var t2 = ServerProcess.StartTime;
+
+        if (t1 == t2)
+            throw new Exception("Can't restart nats-server");
+    }
+
+    public async ValueTask StopAsync()
+    {
         try
         {
+            _cancellationTokenSource?.Cancel(); // trigger of process kill.
+            _cancellationTokenSource?.Dispose();
+
             var processLogs = await _processErr; // wait for process exit, nats output info to stderror
             if (processLogs.Length != 0)
             {
@@ -218,6 +236,39 @@ public class NatsServer : IAsyncDisposable
             }
         }
         catch (OperationCanceledException)
+        {
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (Interlocked.Increment(ref _disposed) != 1)
+        {
+            return;
+        }
+
+        try
+        {
+            _cancellationTokenSource?.Cancel(); // trigger of process kill.
+            _cancellationTokenSource?.Dispose();
+
+            var processLogs = await _processErr; // wait for process exit, nats output info to stderror
+            if (processLogs.Length != 0)
+            {
+                _outputHelper.WriteLine("Process Logs of " + Opts.ServerPort);
+                foreach (var item in processLogs)
+                {
+                    _outputHelper.WriteLine(item);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (ObjectDisposedException)
         {
         }
         finally
@@ -258,7 +309,7 @@ public class NatsServer : IAsyncDisposable
         var client = new NatsConnection((options ?? NatsOpts.Default) with
         {
             LoggerFactory = _loggerFactory,
-            Url = $"nats://localhost:{proxy.Port}",
+            Url = $"nats://127.0.0.1:{proxy.Port}",
             ConnectTimeout = TimeSpan.FromSeconds(10),
         });
 
@@ -398,22 +449,29 @@ public record LogMessage(
 
 public class NatsCluster : IAsyncDisposable
 {
-    public NatsCluster(ITestOutputHelper outputHelper, TransportType transportType)
+    private readonly ITestOutputHelper _outputHelper;
+
+    public NatsCluster(ITestOutputHelper outputHelper, TransportType transportType, Action<int, NatsServerOptsBuilder>? configure = default)
     {
-        var opts1 = new NatsServerOptsBuilder()
-            .UseTransport(transportType)
-            .EnableClustering()
-            .Build();
+        _outputHelper = outputHelper;
 
-        var opts2 = new NatsServerOptsBuilder()
+        var builder1 = new NatsServerOptsBuilder()
             .UseTransport(transportType)
-            .EnableClustering()
-            .Build();
+            .EnableClustering();
+        configure?.Invoke(1, builder1);
+        var opts1 = builder1.Build();
 
-        var opts3 = new NatsServerOptsBuilder()
+        var builder2 = new NatsServerOptsBuilder()
             .UseTransport(transportType)
-            .EnableClustering()
-            .Build();
+            .EnableClustering();
+        configure?.Invoke(2, builder2);
+        var opts2 = builder2.Build();
+
+        var builder3 = new NatsServerOptsBuilder()
+            .UseTransport(transportType)
+            .EnableClustering();
+        configure?.Invoke(3, builder3);
+        var opts3 = builder3.Build();
 
         // By querying the ports we set the values lazily on all the opts.
         outputHelper.WriteLine($"opts1.ServerPort={opts1.ServerPort}");
@@ -444,8 +502,13 @@ public class NatsCluster : IAsyncDisposable
             opt.SetRoutes(routes);
         }
 
+        _outputHelper.WriteLine($"Starting server 1...");
         Server1 = NatsServer.Start(outputHelper, opts1);
+
+        _outputHelper.WriteLine($"Starting server 2...");
         Server2 = NatsServer.Start(outputHelper, opts2);
+
+        _outputHelper.WriteLine($"Starting server 3...");
         Server3 = NatsServer.Start(outputHelper, opts3);
     }
 
@@ -457,8 +520,13 @@ public class NatsCluster : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        _outputHelper.WriteLine($"Stopping server 1...");
         await Server1.DisposeAsync();
+
+        _outputHelper.WriteLine($"Stopping server 2...");
         await Server2.DisposeAsync();
+
+        _outputHelper.WriteLine($"Stopping server 3...");
         await Server3.DisposeAsync();
     }
 }
