@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.JetStream.Models;
 
@@ -9,6 +10,7 @@ namespace NATS.Client.JetStream;
 /// </summary>
 public class NatsJSOrderedConsumer : INatsJSConsumer
 {
+    private readonly ILogger<NatsJSOrderedConsumer> _logger;
     private readonly string _stream;
     private readonly NatsJSContext _context;
     private readonly NatsJSOrderedConsumerOpts _opts;
@@ -25,6 +27,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel consume and fetch operations.</param>
     public NatsJSOrderedConsumer(string stream, NatsJSContext context, NatsJSOrderedConsumerOpts opts, CancellationToken cancellationToken)
     {
+        _logger = context.Connection.Opts.LoggerFactory.CreateLogger<NatsJSOrderedConsumer>();
         _stream = stream;
         _context = context;
         _opts = opts;
@@ -65,6 +68,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
             {
                 var consumer = await RecreateConsumer(consumerName, seq, cancellationToken);
                 consumerName = consumer.Info.Name;
+                _logger.LogDebug($"Created {consumerName} with sequence {seq}");
 
                 await using var cc = await consumer.ConsumeInternalAsync(serializer, opts, cancellationToken);
 
@@ -215,7 +219,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
         {
             consumerOpts = _opts with
             {
-                OptStartSeq = _fetchSeq + 1,
+                OptStartSeq = seq + 1,
                 DeliverPolicy = ConsumerConfigurationDeliverPolicy.by_start_sequence,
             };
 
