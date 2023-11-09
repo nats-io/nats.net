@@ -154,7 +154,7 @@ public interface INatsJSContext
     /// <returns>The NATS JetStream stream object which can be used to manage the stream.</returns>
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
-    ValueTask<NatsJSStream> CreateStreamAsync(string stream, string[] subjects, CancellationToken cancellationToken = default);
+    ValueTask<INatsJSStream> CreateStreamAsync(string stream, string[] subjects, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Creates a new stream if it doesn't exist or returns an existing stream with the same name.
@@ -164,7 +164,7 @@ public interface INatsJSContext
     /// <returns>The NATS JetStream stream object which can be used to manage the stream.</returns>
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
-    ValueTask<NatsJSStream> CreateStreamAsync(
+    ValueTask<INatsJSStream> CreateStreamAsync(
         StreamConfiguration request,
         CancellationToken cancellationToken = default);
 
@@ -217,7 +217,7 @@ public interface INatsJSContext
     /// <returns>The NATS JetStream stream object which can be used to manage the stream.</returns>
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
-    ValueTask<NatsJSStream> GetStreamAsync(
+    ValueTask<INatsJSStream> GetStreamAsync(
         string stream,
         StreamInfoRequest? request = null,
         CancellationToken cancellationToken = default);
@@ -245,7 +245,7 @@ public interface INatsJSContext
     /// <remarks>
     /// Note that paging isn't implemented. You might receive only a partial list of streams if there are a lot of them.
     /// </remarks>
-    IAsyncEnumerable<NatsJSStream> ListStreamsAsync(
+    IAsyncEnumerable<INatsJSStream> ListStreamsAsync(
         string? subject = default,
         CancellationToken cancellationToken = default);
 }
