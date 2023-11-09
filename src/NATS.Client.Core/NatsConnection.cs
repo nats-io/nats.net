@@ -262,7 +262,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
                 }
                 else
                 {
-                    var conn = new TcpConnection();
+                    var conn = new TcpConnection(_logger);
                     await conn.ConnectAsync(target.Host, target.Port, Opts.ConnectTimeout).ConfigureAwait(false);
                     _socket = conn;
 
@@ -484,7 +484,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
                     }
                     else
                     {
-                        var conn = new TcpConnection();
+                        var conn = new TcpConnection(_logger);
                         await conn.ConnectAsync(url.Host, url.Port, Opts.ConnectTimeout).ConfigureAwait(false);
                         _socket = conn;
 
