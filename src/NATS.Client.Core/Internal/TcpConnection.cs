@@ -2,6 +2,7 @@ using System.Net.Security;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Microsoft.Extensions.Logging;
 
 namespace NATS.Client.Core.Internal;
 
@@ -15,12 +16,14 @@ internal sealed class SocketClosedException : Exception
 
 internal sealed class TcpConnection : ISocketConnection
 {
+    private readonly ILogger _logger;
     private readonly Socket _socket;
     private readonly TaskCompletionSource<Exception> _waitForClosedSource = new();
     private int _disposed;
 
-    public TcpConnection()
+    public TcpConnection(ILogger logger)
     {
+        _logger = logger;
         _socket = new Socket(Socket.OSSupportsIPv6 ? AddressFamily.InterNetworkV6 : AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         if (Socket.OSSupportsIPv6)
         {
@@ -125,6 +128,7 @@ internal sealed class TcpConnection : ISocketConnection
         if (Interlocked.Increment(ref _disposed) == 1)
         {
             return new SslStreamConnection(
+                _logger,
                 new SslStream(new NetworkStream(_socket, true)),
                 tlsOpts,
                 tlsCerts,

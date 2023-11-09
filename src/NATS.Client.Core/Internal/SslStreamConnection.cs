@@ -2,11 +2,13 @@ using System.Net.Security;
 using System.Runtime.CompilerServices;
 using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
+using Microsoft.Extensions.Logging;
 
 namespace NATS.Client.Core.Internal;
 
 internal sealed class SslStreamConnection : ISocketConnection
 {
+    private readonly ILogger _logger;
     private readonly SslStream _sslStream;
     private readonly TaskCompletionSource<Exception> _waitForClosedSource;
     private readonly NatsTlsOpts _tlsOpts;
@@ -14,8 +16,9 @@ internal sealed class SslStreamConnection : ISocketConnection
     private readonly CancellationTokenSource _closeCts = new();
     private int _disposed;
 
-    public SslStreamConnection(SslStream sslStream, NatsTlsOpts tlsOpts, TlsCerts? tlsCerts, TaskCompletionSource<Exception> waitForClosedSource)
+    public SslStreamConnection(ILogger logger, SslStream sslStream, NatsTlsOpts tlsOpts, TlsCerts? tlsCerts, TaskCompletionSource<Exception> waitForClosedSource)
     {
+        _logger = logger;
         _sslStream = sslStream;
         _tlsOpts = tlsOpts;
         _tlsCerts = tlsCerts;
@@ -127,7 +130,14 @@ internal sealed class SslStreamConnection : ISocketConnection
             sslPolicyErrors |= SslPolicyErrors.RemoteCertificateChainErrors;
         }
 
-        return sslPolicyErrors == SslPolicyErrors.None;
+        var success = sslPolicyErrors == SslPolicyErrors.None;
+
+        if (!success)
+        {
+            _logger.LogError("TLS certificate validation failed: {SslPolicyErrors}", sslPolicyErrors);
+        }
+
+        return success;
     }
 
     private SslClientAuthenticationOptions SslClientAuthenticationOptions(NatsUri uri)
