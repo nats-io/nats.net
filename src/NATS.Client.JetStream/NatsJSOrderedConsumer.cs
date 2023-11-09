@@ -115,7 +115,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
                     }
                 }
 
-                CONSUME_LOOP:
+            CONSUME_LOOP:
                 if (protocolException != null)
                 {
                     if (protocolException

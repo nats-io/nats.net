@@ -1,4 +1,4 @@
-﻿namespace NATS.Client.Services;
+namespace NATS.Client.Services;
 
 /// <summary>
 /// NATS Services context.

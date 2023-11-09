@@ -20,7 +20,7 @@ public class NatsConsumeTests
 
             var sub = Task.Run(async () =>
             {
-                await js.CreateStreamAsync("s1", new [] { "s1.*" });
+                await js.CreateStreamAsync("s1", new[] { "s1.*" });
 
                 var consumer = await js.CreateOrderedConsumerAsync("s1");
 

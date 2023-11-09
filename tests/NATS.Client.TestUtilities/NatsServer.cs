@@ -26,17 +26,15 @@ public class NatsServer : IAsyncDisposable
     private static readonly string NatsServerPath = $"nats-server{Ext}";
     private static readonly Version Version;
 
-    private CancellationTokenSource? _cancellationTokenSource;
-    private string? _configFileName;
     private readonly string? _jetStreamStoreDir;
     private readonly ITestOutputHelper _outputHelper;
-    private Task<string[]> _processOut;
-    private Task<string[]> _processErr;
     private readonly TransportType _transportType;
     private readonly OutputHelperLoggerFactory _loggerFactory;
+    private CancellationTokenSource? _cancellationTokenSource;
+    private Task<string[]>? _processOut;
+    private Task<string[]>? _processErr;
+    private string? _configFileName;
     private int _disposed;
-
-    public Process ServerProcess { get; private set; }
 
     static NatsServer()
     {
@@ -72,51 +70,7 @@ public class NatsServer : IAsyncDisposable
         }
     }
 
-    public void StartServerProcess()
-    {
-        _cancellationTokenSource = new CancellationTokenSource();
-
-        (_configFileName, var config, var cmd) = GetCmd(Opts);
-
-        _outputHelper.WriteLine("ProcessStart: " + cmd + Environment.NewLine + config);
-        var (p, stdout, stderr) = ProcessX.GetDualAsyncEnumerable(cmd);
-        ServerProcess = p;
-        _processOut = EnumerateWithLogsAsync(stdout, _cancellationTokenSource.Token);
-        _processErr = EnumerateWithLogsAsync(stderr, _cancellationTokenSource.Token);
-
-        // Check for start server
-        Task.Run(async () =>
-        {
-            using var client = new TcpClient();
-            while (!_cancellationTokenSource.IsCancellationRequested)
-            {
-                try
-                {
-                    await client.ConnectAsync("127.0.0.1", Opts.ServerPort, _cancellationTokenSource.Token);
-                    if (client.Connected)
-                        return;
-                }
-                catch
-                {
-                    // ignore
-                }
-
-                await Task.Delay(500, _cancellationTokenSource.Token);
-            }
-        }).Wait(5000); // timeout
-
-        if (_processOut.IsFaulted)
-        {
-            _processOut.GetAwaiter().GetResult(); // throw exception
-        }
-
-        if (_processErr.IsFaulted)
-        {
-            _processErr.GetAwaiter().GetResult(); // throw exception
-        }
-
-        _outputHelper.WriteLine("OK to Process Start, Port:" + Opts.ServerPort);
-    }
+    public Process? ServerProcess { get; private set; }
 
     public NatsServerOpts Opts { get; }
 
@@ -205,14 +159,60 @@ public class NatsServer : IAsyncDisposable
         throw new Exception("Can't start nats-server and connect to it");
     }
 
+    public void StartServerProcess()
+    {
+        _cancellationTokenSource = new CancellationTokenSource();
+
+        (_configFileName, var config, var cmd) = GetCmd(Opts);
+
+        _outputHelper.WriteLine("ProcessStart: " + cmd + Environment.NewLine + config);
+        var (p, stdout, stderr) = ProcessX.GetDualAsyncEnumerable(cmd);
+        ServerProcess = p;
+        _processOut = EnumerateWithLogsAsync(stdout, _cancellationTokenSource.Token);
+        _processErr = EnumerateWithLogsAsync(stderr, _cancellationTokenSource.Token);
+
+        // Check for start server
+        Task.Run(async () =>
+        {
+            using var client = new TcpClient();
+            while (!_cancellationTokenSource.IsCancellationRequested)
+            {
+                try
+                {
+                    await client.ConnectAsync("127.0.0.1", Opts.ServerPort, _cancellationTokenSource.Token);
+                    if (client.Connected)
+                        return;
+                }
+                catch
+                {
+                    // ignore
+                }
+
+                await Task.Delay(500, _cancellationTokenSource.Token);
+            }
+        }).Wait(5000); // timeout
+
+        if (_processOut.IsFaulted)
+        {
+            _processOut.GetAwaiter().GetResult(); // throw exception
+        }
+
+        if (_processErr.IsFaulted)
+        {
+            _processErr.GetAwaiter().GetResult(); // throw exception
+        }
+
+        _outputHelper.WriteLine("OK to Process Start, Port:" + Opts.ServerPort);
+    }
+
     public async ValueTask RestartAsync()
     {
-        var t1 = ServerProcess.StartTime;
+        var t1 = ServerProcess?.StartTime;
 
         await StopAsync();
         StartServerProcess();
 
-        var t2 = ServerProcess.StartTime;
+        var t2 = ServerProcess?.StartTime;
 
         if (t1 == t2)
             throw new Exception("Can't restart nats-server");
@@ -225,7 +225,7 @@ public class NatsServer : IAsyncDisposable
             _cancellationTokenSource?.Cancel(); // trigger of process kill.
             _cancellationTokenSource?.Dispose();
 
-            var processLogs = await _processErr; // wait for process exit, nats output info to stderror
+            var processLogs = await _processErr!; // wait for process exit, nats output info to stderror
             if (processLogs.Length != 0)
             {
                 _outputHelper.WriteLine("Process Logs of " + Opts.ServerPort);
@@ -255,7 +255,7 @@ public class NatsServer : IAsyncDisposable
             _cancellationTokenSource?.Cancel(); // trigger of process kill.
             _cancellationTokenSource?.Dispose();
 
-            var processLogs = await _processErr; // wait for process exit, nats output info to stderror
+            var processLogs = await _processErr!; // wait for process exit, nats output info to stderror
             if (processLogs.Length != 0)
             {
                 _outputHelper.WriteLine("Process Logs of " + Opts.ServerPort);
