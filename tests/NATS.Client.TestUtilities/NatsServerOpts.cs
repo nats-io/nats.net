@@ -18,6 +18,7 @@ public sealed class NatsServerOptsBuilder
     private bool _enableTls;
     private bool _tlsFirst;
     private bool _enableJetStream;
+    private string? _serverName;
     private string? _tlsServerCertFile;
     private string? _tlsServerKeyFile;
     private string? _tlsCaFile;
@@ -32,6 +33,7 @@ public sealed class NatsServerOptsBuilder
         EnableTls = _enableTls,
         TlsFirst = _tlsFirst,
         EnableJetStream = _enableJetStream,
+        ServerName = _serverName,
         TlsServerCertFile = _tlsServerCertFile,
         TlsServerKeyFile = _tlsServerKeyFile,
         TlsCaFile = _tlsCaFile,
@@ -82,6 +84,12 @@ public sealed class NatsServerOptsBuilder
             _enableWebSocket = true;
         }
 
+        return this;
+    }
+
+    public NatsServerOptsBuilder WithServerName(string serverName)
+    {
+        _serverName = serverName;
         return this;
     }
 
@@ -137,6 +145,10 @@ public sealed class NatsServerOpts : IDisposable
 
     public bool EnableJetStream { get; init; }
 
+    public string? ServerName { get; init; }
+
+    public string? ServerHost { get; init; } = "127.0.0.1";
+
     public string? JetStreamStoreDir { get; set; }
 
     public bool ServerDisposeReturnsPorts { get; init; } = true;
@@ -170,7 +182,13 @@ public sealed class NatsServerOpts : IDisposable
         get
         {
             var sb = new StringBuilder();
-            sb.AppendLine($"port: {ServerPort}");
+
+            if (ServerName != null)
+            {
+                sb.AppendLine($"server_name: {ServerName}");
+            }
+
+            sb.AppendLine($"listen: {ServerHost}:{ServerPort}");
 
             if (Trace)
             {
@@ -190,7 +208,7 @@ public sealed class NatsServerOpts : IDisposable
             {
                 sb.AppendLine("cluster {");
                 sb.AppendLine("  name: nats");
-                sb.AppendLine($"  port: {ClusteringPort}");
+                sb.AppendLine($"  listen: {ServerHost}:{ClusteringPort}");
                 sb.AppendLine($"  routes: [{_routes}]");
                 sb.AppendLine("}");
             }
@@ -234,7 +252,7 @@ public sealed class NatsServerOpts : IDisposable
 
     public void SetRoutes(IEnumerable<NatsServerOpts> options)
     {
-        _routes = string.Join(",", options.Select(o => $"nats://localhost:{o.ClusteringPort}"));
+        _routes = string.Join(",", options.Select(o => $"nats://127.0.0.1:{o.ClusteringPort}"));
     }
 
     public void Dispose()

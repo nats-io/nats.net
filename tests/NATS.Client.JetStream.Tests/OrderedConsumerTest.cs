@@ -42,6 +42,47 @@ public class OrderedConsumerTest
     }
 
     [Fact]
+    public async Task Consume_reconnect_publish()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+        var js = new NatsJSContext(nats);
+
+        var stream = await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
+
+        for (var i = 0; i < 100; i++)
+        {
+            if (i % 10 == 0)
+            {
+                await server.RestartAsync();
+            }
+
+            (await js.PublishAsync("s1.foo", i, cancellationToken: cts.Token)).EnsureSuccess();
+        }
+
+        (await js.PublishAsync("s1.foo", -1, cancellationToken: cts.Token)).EnsureSuccess();
+
+        var consumer = (NatsJSOrderedConsumer)await stream.CreateOrderedConsumerAsync(cancellationToken: cts.Token);
+
+        var consumeOpts = new NatsJSConsumeOpts
+        {
+            MaxMsgs = 3,
+            Expires = TimeSpan.FromSeconds(3),
+        };
+        var count = 0;
+        await foreach (var msg in consumer.ConsumeAsync<int>(opts: consumeOpts, cancellationToken: cts.Token))
+        {
+            if (msg.Data == -1)
+                break;
+            Assert.Equal(count, msg.Data);
+            count++;
+        }
+
+        Assert.Equal(100, count);
+    }
+
+    [Fact]
     public async Task Fetch_test()
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
