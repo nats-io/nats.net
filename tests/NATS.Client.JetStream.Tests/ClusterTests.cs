@@ -1,4 +1,4 @@
-﻿using NATS.Client.Core.Tests;
+using NATS.Client.Core.Tests;
 
 namespace NATS.Client.JetStream.Tests;
 
