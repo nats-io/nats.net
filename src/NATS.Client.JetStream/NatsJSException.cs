@@ -99,3 +99,29 @@ public class NatsJSPublishNoResponseException : NatsJSException
     {
     }
 }
+
+public class NatsJSApiNoResponseException : NatsJSException
+{
+    public NatsJSApiNoResponseException()
+        : base("No API response received from the server")
+    {
+    }
+}
+
+public class NatsJSTimeoutException : NatsJSException
+{
+    public NatsJSTimeoutException(string type)
+        : base($"{type} timed out") =>
+        Type = type;
+
+    public string Type { get; }
+}
+
+public class NatsJSConnectionException : NatsJSException
+{
+    public NatsJSConnectionException(string reason)
+        : base($"Connection error: {reason}") =>
+        Reason = reason;
+
+    public string Reason { get; }
+}

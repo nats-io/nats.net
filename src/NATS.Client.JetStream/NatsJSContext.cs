@@ -202,6 +202,7 @@ public partial class NatsJSContext
                     subject: subject,
                     data: request,
                     headers: default,
+                    replyOpts: new NatsSubOpts { Timeout = Connection.Opts.RequestTimeout },
                     requestSerializer: NatsJSJsonSerializer<TRequest>.Default,
                     replySerializer: NatsJSErrorAwareJsonSerializer<TResponse>.Default,
                     cancellationToken: cancellationTimer.Token)
@@ -233,7 +234,7 @@ public partial class NatsJSContext
                 throw sb.Exception;
             }
 
-            throw new NatsJSException("No response received");
+            throw new NatsJSApiNoResponseException();
         }
         finally
         {
