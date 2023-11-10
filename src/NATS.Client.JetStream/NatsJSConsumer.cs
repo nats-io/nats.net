@@ -61,6 +61,10 @@ public class NatsJSConsumer : INatsJSConsumer
     {
         opts ??= _context.Opts.DefaultConsumeOpts;
         await using var cc = await ConsumeInternalAsync<T>(serializer, opts, cancellationToken).ConfigureAwait(false);
+
+        // Keep subscription alive (since it's a wek ref in subscription manager) until we're done.
+        using var anchor = _context.Connection.RegisterSubAnchor(cc);
+
         await foreach (var jsMsg in cc.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
             yield return jsMsg;

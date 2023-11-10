@@ -74,6 +74,9 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
 
                 await using (var cc = await consumer.OrderedConsumeInternalAsync(serializer, opts, cancellationToken))
                 {
+                    // Keep subscription alive (since it's a wek ref in subscription manager) until we're done.
+                    using var anchor = _context.Connection.RegisterSubAnchor(cc);
+
                     while (true)
                     {
                         // We have to check every call to WaitToReadAsync and TryRead for
