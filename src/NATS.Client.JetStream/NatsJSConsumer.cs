@@ -269,6 +269,54 @@ public class NatsJSConsumer : INatsJSConsumer
         return sub;
     }
 
+    internal async ValueTask<NatsJSOrderedConsume<T>> OrderedConsumeInternalAsync<T>(INatsDeserialize<T>? serializer = default, NatsJSConsumeOpts? opts = default, CancellationToken cancellationToken = default)
+    {
+        ThrowIfDeleted();
+
+        opts ??= new NatsJSConsumeOpts();
+        serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
+        var inbox = _context.NewInbox();
+
+        var max = NatsJSOptsDefaults.SetMax(opts.MaxMsgs, opts.MaxBytes, opts.ThresholdMsgs, opts.ThresholdBytes);
+        var timeouts = NatsJSOptsDefaults.SetTimeouts(opts.Expires, opts.IdleHeartbeat);
+
+        var requestOpts = BuildRequestOpts(opts.MaxMsgs);
+
+        var sub = new NatsJSOrderedConsume<T>(
+            stream: _stream,
+            consumer: _consumer,
+            context: _context,
+            subject: inbox,
+            queueGroup: default,
+            serializer: serializer,
+            opts: requestOpts,
+            maxMsgs: max.MaxMsgs,
+            maxBytes: max.MaxBytes,
+            thresholdMsgs: max.ThresholdMsgs,
+            thresholdBytes: max.ThresholdBytes,
+            expires: timeouts.Expires,
+            idle: timeouts.IdleHeartbeat,
+            cancellationToken: cancellationToken);
+
+        await _context.Connection.SubAsync(sub: sub, cancellationToken).ConfigureAwait(false);
+
+        // Start consuming with the first Pull Request
+        await sub.CallMsgNextAsync(
+            "init",
+            new ConsumerGetnextRequest
+            {
+                Batch = max.MaxMsgs,
+                MaxBytes = max.MaxBytes,
+                IdleHeartbeat = timeouts.IdleHeartbeat.ToNanos(),
+                Expires = timeouts.Expires.ToNanos(),
+            },
+            cancellationToken).ConfigureAwait(false);
+
+        sub.ResetHeartbeatTimer();
+
+        return sub;
+    }
+
     internal async ValueTask<NatsJSFetch<T>> FetchInternalAsync<T>(
         INatsDeserialize<T>? serializer = default,
         NatsJSFetchOpts? opts = default,
