@@ -281,7 +281,23 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
             }
         }
 
-        var info = await _context.CreateOrderedConsumerInternalAsync(_stream, consumerOpts, cancellationToken);
+        ConsumerInfo info;
+        for (var i = 0; ; i++)
+        {
+            try
+            {
+                info = await _context.CreateOrderedConsumerInternalAsync(_stream, consumerOpts, cancellationToken);
+                break;
+            }
+            catch (NatsJSApiNoResponseException)
+            {
+            }
+
+            if (i == _opts.MaxResetAttempts)
+            {
+                throw new NatsJSException("Maximum number of create attempts reached.");
+            }
+        }
 
         Info = info;
 
