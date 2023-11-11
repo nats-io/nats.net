@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using NATS.Client.Core;
 using NATS.Client.Testing.Failground;
 
 try
@@ -60,6 +61,42 @@ try
 
     try
     {
+        logger.LogDebug("Starting health checks ({Id})...", cmdArgs.Id);
+
+        _ = Task.Run(async () =>
+        {
+            var natsOpts = NatsOpts.Default;
+
+            if (cmdArgs.Server != null)
+            {
+                natsOpts = natsOpts with { Url = cmdArgs.Server };
+            }
+
+            await using var nats = new NatsConnection(natsOpts);
+
+            var subject = $"healthcheck.{cmdArgs.Id}";
+
+            logger.LogTrace("Subscribing to {Subject}...", subject);
+
+            await foreach (var msg in nats.SubscribeAsync<NatsMemoryOwner<byte>>(subject))
+            {
+                if (msg.Data.Length > 0)
+                {
+                    var buffer = NatsMemoryOwner<byte>.Allocate(msg.Data.Length);
+
+                    using (var memoryOwner = msg.Data)
+                        memoryOwner.Memory.CopyTo(buffer.Memory);
+
+                    logger.LogDebug("Sending health check response...");
+                    await msg.ReplyAsync(buffer);
+                }
+                else
+                {
+                    logger.LogError("Health check failed: no data received");
+                }
+            }
+        });
+
         logger.LogInformation("Starting test {Name} ({RunId})...", test.GetType().Name, runId);
 
         await test.Run(runId, cmdArgs, cts.Token);

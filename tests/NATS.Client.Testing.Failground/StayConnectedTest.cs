@@ -59,15 +59,12 @@ public class StayConnectedTest : ITest
             if (nats.ConnectionState == NatsConnectionState.Open)
                 continue;
 
-            _logger.LogWarning("Disconnected. Reconnecting...");
-
             var stopwatch = Stopwatch.StartNew();
             var connected = false;
             while (!cancellationToken.IsCancellationRequested && stopwatch.ElapsedMilliseconds < maxRetry)
             {
                 if (nats.ConnectionState == NatsConnectionState.Open)
                 {
-                    _logger.LogInformation("Connected!");
                     connected = true;
                     break;
                 }

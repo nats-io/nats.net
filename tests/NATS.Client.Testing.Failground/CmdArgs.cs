@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 
 namespace NATS.Client.Testing.Failground;
 
@@ -11,6 +12,8 @@ public record CmdArgs
     public int MaxRetry { get; set; }
 
     public string? Server { get; set; }
+
+    public bool Help { get; set; }
 
     public bool Trace { get; set; }
 
@@ -85,7 +88,34 @@ public record CmdArgs
                 case "trace":
                     cmd.Trace = true;
                     break;
+                case "help":
+                    cmd.Help = true;
+                    break;
+                default:
+                    throw new Exception($"Option not found: {key}");
                 }
+            }
+
+            if (args.Length == 0 || cmd.Help)
+            {
+                cmd.Error = $"""
+                            Usage: {Process.GetCurrentProcess().ProcessName} [options]
+
+                               --server <url>        NATS server URL(s)
+                               --max-retry <ms>      Maximum time for retries in milliseconds
+                               --id <id>             Test ID
+                               --workload <name>     Test workload
+                               --params <params>     Test workload parameters (JSON file)
+                               --debug               Enable debug logging
+                               --trace               Enable trace logging
+                               --help                Show this help
+
+                            Examples:
+
+                                {Process.GetCurrentProcess().ProcessName} --workload stay-connected --id test123
+                                {Process.GetCurrentProcess().ProcessName} --workload stay-connected --debug
+
+                            """;
             }
 
             return cmd;
