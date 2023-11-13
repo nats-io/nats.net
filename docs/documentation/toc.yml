@@ -33,5 +33,8 @@
 - name: Serialization
   href: serialization.md
 
+- name: Security
+  href: security.md
+
 - name: Updating Documentation
   href: update-docs.md
