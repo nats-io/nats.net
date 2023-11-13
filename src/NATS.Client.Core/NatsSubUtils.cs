@@ -5,7 +5,7 @@ using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
 
-public sealed class NatsSub<T> : NatsSubBase
+public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
 {
     private readonly Channel<NatsMsg<T>> _msgs;
 

@@ -19,7 +19,7 @@ public class SubscriptionTest
 
         async Task Isolator()
         {
-            var sub = await nats.SubscribeInternalAsync<int>("foo");
+            var sub = await nats.SubscribeCoreAsync<int>("foo");
 
             await Retry.Until(
                 reason: "unsubscribed",
@@ -58,7 +58,7 @@ public class SubscriptionTest
 
         async Task Isolator()
         {
-            var sub = await nats.SubscribeInternalAsync<int>("foo");
+            var sub = await nats.SubscribeCoreAsync<int>("foo");
 
             await Retry.Until("unsubscribed", () => proxy.ClientFrames.Count(f => f.Message.StartsWith("SUB")) == 1);
 
@@ -90,8 +90,8 @@ public class SubscriptionTest
         await using var nats = server.CreateClientConnection();
         var subject = nats.NewInbox();
 
-        await using var sub1 = await nats.SubscribeInternalAsync<int>(subject, opts: new NatsSubOpts { MaxMsgs = 1 });
-        await using var sub2 = await nats.SubscribeInternalAsync<int>(subject, opts: new NatsSubOpts { MaxMsgs = 2 });
+        await using var sub1 = await nats.SubscribeCoreAsync<int>(subject, opts: new NatsSubOpts { MaxMsgs = 1 });
+        await using var sub2 = await nats.SubscribeCoreAsync<int>(subject, opts: new NatsSubOpts { MaxMsgs = 2 });
 
         for (var i = 0; i < 3; i++)
         {
@@ -131,7 +131,7 @@ public class SubscriptionTest
         const int maxMsgs = 99;
         var opts = new NatsSubOpts { MaxMsgs = maxMsgs };
 
-        await using var sub = await nats.SubscribeInternalAsync<int>(subject, opts: opts);
+        await using var sub = await nats.SubscribeCoreAsync<int>(subject, opts: opts);
 
         // send more messages than max to check we only get max
         for (var i = 0; i < maxMsgs + 10; i++)
@@ -161,7 +161,7 @@ public class SubscriptionTest
         const string subject = "foo2";
         var opts = new NatsSubOpts { Timeout = TimeSpan.FromSeconds(1) };
 
-        await using var sub = await nats.SubscribeInternalAsync<int>(subject, opts: opts);
+        await using var sub = await nats.SubscribeCoreAsync<int>(subject, opts: opts);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
@@ -183,7 +183,7 @@ public class SubscriptionTest
         const string subject = "foo3";
         var opts = new NatsSubOpts { IdleTimeout = TimeSpan.FromSeconds(3) };
 
-        await using var sub = await nats.SubscribeInternalAsync<int>(subject, opts: opts);
+        await using var sub = await nats.SubscribeCoreAsync<int>(subject, opts: opts);
 
         await nats.PublishAsync(subject, 0);
         await nats.PublishAsync(subject, 1);
@@ -212,7 +212,7 @@ public class SubscriptionTest
         await using var server = NatsServer.Start();
         await using var nats = server.CreateClientConnection();
         const string subject = "foo4";
-        await using var sub = await nats.SubscribeInternalAsync<int>(subject);
+        await using var sub = await nats.SubscribeCoreAsync<int>(subject);
 
         await sub.UnsubscribeAsync();
 
@@ -242,10 +242,10 @@ public class SubscriptionTest
         try
         {
             var subject1 = nats.NewInbox();
-            await using var sub1 = await nats.SubscribeInternalAsync<int>(subject1);
+            await using var sub1 = await nats.SubscribeCoreAsync<int>(subject1);
 
             var subject2 = nats.NewInbox();
-            await using var sub2 = await nats.SubscribeInternalAsync<int>(subject2);
+            await using var sub2 = await nats.SubscribeCoreAsync<int>(subject2);
 
             await nats.PingAsync();
 
