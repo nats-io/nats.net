@@ -21,7 +21,7 @@ public class CancellationTest
         await using var pubConnection = server.CreateClientConnection(NatsOpts.Default with { CommandTimeout = TimeSpan.FromSeconds(1) });
         await pubConnection.ConnectAsync();
 
-        await subConnection.SubscribeInternalAsync<string>("foo");
+        await subConnection.SubscribeCoreAsync<string>("foo");
 
         var cmd = new SleepWriteCommand("PUB foo 5\r\naiueo", TimeSpan.FromSeconds(10));
         pubConnection.PostDirectWrite(cmd);
