@@ -166,7 +166,7 @@ internal sealed class SslStreamConnection : ISocketConnection
         var options = new SslClientAuthenticationOptions
         {
             TargetHost = uri.Host,
-            EnabledSslProtocols = SslProtocols.Tls12,
+            EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
             ClientCertificates = _tlsCerts?.ClientCerts,
             LocalCertificateSelectionCallback = lcsCb,
             RemoteCertificateValidationCallback = rcsCb,

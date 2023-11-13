@@ -1,4 +1,4 @@
-﻿namespace NATS.Client.Testing.Failground;
+namespace NATS.Client.Testing.Failground;
 
 public interface ITest
 {

@@ -17,10 +17,13 @@ public sealed class NatsServerOptsBuilder
     private bool _enableWebSocket;
     private bool _enableTls;
     private bool _tlsFirst;
+    private bool _tlsVerify;
     private bool _enableJetStream;
     private string? _serverName;
     private string? _tlsServerCertFile;
     private string? _tlsServerKeyFile;
+    private string? _tlsClientCertFile;
+    private string? _tlsClientKeyFile;
     private string? _tlsCaFile;
     private TransportType? _transportType;
     private bool _serverDisposeReturnsPorts;
@@ -32,10 +35,13 @@ public sealed class NatsServerOptsBuilder
         EnableWebSocket = _enableWebSocket,
         EnableTls = _enableTls,
         TlsFirst = _tlsFirst,
+        TlsVerify = _tlsVerify,
         EnableJetStream = _enableJetStream,
         ServerName = _serverName,
         TlsServerCertFile = _tlsServerCertFile,
         TlsServerKeyFile = _tlsServerKeyFile,
+        TlsClientCertFile = _tlsClientCertFile,
+        TlsClientKeyFile = _tlsClientKeyFile,
         TlsCaFile = _tlsCaFile,
         ExtraConfigs = _extraConfigs,
         TransportType = _transportType ?? TransportType.Tcp,
@@ -62,7 +68,7 @@ public sealed class NatsServerOptsBuilder
         return this;
     }
 
-    public NatsServerOptsBuilder UseTransport(TransportType transportType, bool tlsFirst = false)
+    public NatsServerOptsBuilder UseTransport(TransportType transportType, bool tlsFirst = false, bool tlsVerify = false)
     {
         _transportType = transportType;
 
@@ -76,8 +82,16 @@ public sealed class NatsServerOptsBuilder
             _enableTls = true;
             _tlsServerCertFile = "resources/certs/server-cert.pem";
             _tlsServerKeyFile = "resources/certs/server-key.pem";
+
+            if (tlsVerify)
+            {
+                _tlsClientCertFile = "resources/certs/client-cert.pem";
+                _tlsClientKeyFile = "resources/certs/client-key.pem";
+            }
+
             _tlsCaFile = "resources/certs/ca-cert.pem";
             _tlsFirst = tlsFirst;
+            _tlsVerify = tlsVerify;
         }
         else if (transportType == TransportType.WebSocket)
         {
@@ -165,6 +179,8 @@ public sealed class NatsServerOpts : IDisposable
 
     public bool TlsFirst { get; init; } = false;
 
+    public bool TlsVerify { get; init; } = false;
+
     public TransportType TransportType { get; init; }
 
     public bool Trace { get; init; }
@@ -231,6 +247,11 @@ public sealed class NatsServerOpts : IDisposable
                 if (TlsFirst)
                 {
                     sb.AppendLine($"  handshake_first: true");
+                }
+
+                if (TlsVerify)
+                {
+                    sb.AppendLine($"  verify_and_map: true");
                 }
 
                 sb.AppendLine("}");
