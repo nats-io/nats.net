@@ -16,7 +16,7 @@ public class NatsSubTests
             async Task Isolator()
             {
                 // Subscription is not being disposed here
-                var natsSub = await nats.SubscribeInternalAsync<string>("foo");
+                var natsSub = await nats.SubscribeCoreAsync<string>("foo");
                 Assert.That(natsSub.Subject, Is.EqualTo("foo"));
             }
 

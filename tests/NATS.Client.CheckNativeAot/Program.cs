@@ -33,7 +33,7 @@ async Task RequestReplyTests()
     await using var server = NatsServer.Start();
     await using var nats = server.CreateClientConnection();
 
-    var sub = await nats.SubscribeInternalAsync<int>("foo");
+    var sub = await nats.SubscribeCoreAsync<int>("foo");
     var reg = sub.Register(async msg =>
     {
         await msg.ReplyAsync(msg.Data * 2);

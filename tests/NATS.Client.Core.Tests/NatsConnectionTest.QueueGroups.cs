@@ -14,8 +14,8 @@ public abstract partial class NatsConnectionTest
         await using var conn2 = server.CreateClientConnection();
         await using var conn3 = server.CreateClientConnection();
 
-        var sub1 = await conn1.SubscribeInternalAsync<int>("foo.*", queueGroup: "my-group");
-        var sub2 = await conn2.SubscribeInternalAsync<int>("foo.*", queueGroup: "my-group");
+        var sub1 = await conn1.SubscribeCoreAsync<int>("foo.*", queueGroup: "my-group");
+        var sub2 = await conn2.SubscribeCoreAsync<int>("foo.*", queueGroup: "my-group");
 
         var signal = new WaitSignal();
         var cts = new CancellationTokenSource();
