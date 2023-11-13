@@ -13,8 +13,8 @@ jobs:
       fail-fast: false
       matrix:
         config:
-#          - branch: release/v2.9.23
-#          - branch: latest
+          - branch: release/v2.9.23
+          - branch: latest
           - branch: main
     runs-on: ubuntu-latest
     env:
@@ -47,78 +47,78 @@ jobs:
 
       - name: Test Core
         run: dotnet test -c Debug --no-build --logger:"console;verbosity=normal" tests/NATS.Client.Core.Tests/NATS.Client.Core.Tests.csproj
-#
-#      - name: Test JetStream
-#        run: dotnet test -c Debug --no-build --logger:"console;verbosity=normal" tests/NATS.Client.JetStream.Tests/NATS.Client.JetStream.Tests.csproj
-#
-#      - name: Test Key/Value Store
-#        run: dotnet test -c Debug --no-build --logger:"console;verbosity=normal" tests/NATS.Client.KeyValueStore.Tests/NATS.Client.KeyValueStore.Tests.csproj
-#
-#      - name: Test Object Store
-#        run: dotnet test -c Debug --no-build --logger:"console;verbosity=normal" tests/NATS.Client.ObjectStore.Tests/NATS.Client.ObjectStore.Tests.csproj
-#
-#      - name: Test Services
-#        run: dotnet test -c Debug --no-build --logger:"console;verbosity=normal" tests/NATS.Client.Services.Tests/NATS.Client.Services.Tests.csproj
-#
-#      - name: Check Native AOT
-#        run: |
-#          cd tests/NATS.Client.CheckNativeAot
-#          dotnet publish -r linux-x64 -c Release -o dist
-#          cd dist
-#          ls -lh
-#          file NATS.Client.CheckNativeAot
-#          ./NATS.Client.CheckNativeAot
-#
-#  memory_test:
-#    name: memory test
-#    strategy:
-#      fail-fast: false
-#      matrix:
-#        config:
-#          - branch: release/v2.9.23
-#          - branch: latest
-#          - branch: main
-#    runs-on: windows-latest
-#    env:
-#      DOTNET_CLI_TELEMETRY_OPTOUT: 1
-#      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
-#      NUGET_XMLDOC_MODE: skip
-#    steps:
-#      - name: Checkout
-#        uses: actions/checkout@v3
-#        with:
-#          fetch-depth: 0
-#
-#      - name: Setup dotnet
-#        uses: actions/setup-dotnet@v3
-#        with:
-#          dotnet-version: '8.x'
-#          dotnet-quality: 'preview'
-#
-#      - name: Get nats-server
-#        shell: bash
-#        run: |
-#          mkdir tools-nats-server && cd tools-nats-server
-#          for i in 1 2 3
-#          do
-#            curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@${{ matrix.config.branch }} | PREFIX=. sh && break || sleep 30
-#          done
-#          mv nats-server nats-server.exe
-#          cygpath -w "$(pwd)" | tee -a "$GITHUB_PATH"
-#
-#      - name: Check nats-server
-#        run: nats-server -v
-#
-#      - name: Get tools
-#        run: |
-#          Invoke-WebRequest https://download.jetbrains.com/resharper/JetBrains.dotMemoryUnit.3.2.20220510.zip -OutFile dotMemoryUnit.zip
-#          Expand-Archive dotMemoryUnit.zip
-#          nuget install NUnit.ConsoleRunner -version 3.16.3
-#          $current_path = (Get-Item .).FullName
-#          echo "$current_path\dotMemoryUnit" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-#
-#      - name: Build
-#        run:  dotnet build -c Debug
-#
-#      - name: Memory Test
-#        run: dotMemoryUnit .\NUnit.ConsoleRunner.3.16.3\tools\nunit3-console.exe --propagate-exit-code -- .\tests\NATS.Client.Core.MemoryTests\bin\Debug\net6.0\NATS.Client.Core.MemoryTests.dll
+
+      - name: Test JetStream
+        run: dotnet test -c Debug --no-build --logger:"console;verbosity=normal" tests/NATS.Client.JetStream.Tests/NATS.Client.JetStream.Tests.csproj
+
+      - name: Test Key/Value Store
+        run: dotnet test -c Debug --no-build --logger:"console;verbosity=normal" tests/NATS.Client.KeyValueStore.Tests/NATS.Client.KeyValueStore.Tests.csproj
+
+      - name: Test Object Store
+        run: dotnet test -c Debug --no-build --logger:"console;verbosity=normal" tests/NATS.Client.ObjectStore.Tests/NATS.Client.ObjectStore.Tests.csproj
+
+      - name: Test Services
+        run: dotnet test -c Debug --no-build --logger:"console;verbosity=normal" tests/NATS.Client.Services.Tests/NATS.Client.Services.Tests.csproj
+
+      - name: Check Native AOT
+        run: |
+          cd tests/NATS.Client.CheckNativeAot
+          dotnet publish -r linux-x64 -c Release -o dist
+          cd dist
+          ls -lh
+          file NATS.Client.CheckNativeAot
+          ./NATS.Client.CheckNativeAot
+
+  memory_test:
+    name: memory test
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - branch: release/v2.9.23
+          - branch: latest
+          - branch: main
+    runs-on: windows-latest
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+      NUGET_XMLDOC_MODE: skip
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup dotnet
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.x'
+          dotnet-quality: 'preview'
+
+      - name: Get nats-server
+        shell: bash
+        run: |
+          mkdir tools-nats-server && cd tools-nats-server
+          for i in 1 2 3
+          do
+            curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@${{ matrix.config.branch }} | PREFIX=. sh && break || sleep 30
+          done
+          mv nats-server nats-server.exe
+          cygpath -w "$(pwd)" | tee -a "$GITHUB_PATH"
+
+      - name: Check nats-server
+        run: nats-server -v
+
+      - name: Get tools
+        run: |
+          Invoke-WebRequest https://download.jetbrains.com/resharper/JetBrains.dotMemoryUnit.3.2.20220510.zip -OutFile dotMemoryUnit.zip
+          Expand-Archive dotMemoryUnit.zip
+          nuget install NUnit.ConsoleRunner -version 3.16.3
+          $current_path = (Get-Item .).FullName
+          echo "$current_path\dotMemoryUnit" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Build
+        run:  dotnet build -c Debug
+
+      - name: Memory Test
+        run: dotMemoryUnit .\NUnit.ConsoleRunner.3.16.3\tools\nunit3-console.exe --propagate-exit-code -- .\tests\NATS.Client.Core.MemoryTests\bin\Debug\net6.0\NATS.Client.Core.MemoryTests.dll
