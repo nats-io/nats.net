@@ -28,16 +28,22 @@ public class OrderedConsumeTest : ITest
             natsOpts = natsOpts with { Url = args.Server };
         }
 
-        await using var nats = new NatsConnection(natsOpts);
+        await using var nats1 = new NatsConnection(natsOpts);
+        await using var nats2 = new NatsConnection(natsOpts);
 
-        nats.ConnectionDisconnected += (_, _) => _logger.LogWarning($"[CON] Disconnected");
-        nats.ConnectionOpened += (_, _) => _logger.LogInformation($"[CON] Connected to {nats.ServerInfo?.Name}");
+        nats1.ConnectionDisconnected += (_, _) => _logger.LogWarning($"[CON-1] Disconnected");
+        nats1.ConnectionOpened += (_, _) => _logger.LogInformation($"[CON-1] Connected to {nats1.ServerInfo?.Name}");
 
-        await nats.ConnectAsync();
+        nats2.ConnectionDisconnected += (_, _) => _logger.LogWarning($"[CON-2] Disconnected");
+        nats2.ConnectionOpened += (_, _) => _logger.LogInformation($"[CON-2] Connected to {nats2.ServerInfo?.Name}");
 
-        var js = new NatsJSContext(nats);
+        await nats1.ConnectAsync();
+        await nats2.ConnectAsync();
 
-        var stream = await js.CreateStreamAsync(
+        var js1 = new NatsJSContext(nats1);
+        var js2 = new NatsJSContext(nats2);
+
+        var stream = await js1.CreateStreamAsync(
             new StreamConfiguration
             {
                 Name = "s1",
@@ -68,14 +74,14 @@ public class OrderedConsumeTest : ITest
                                 if (i > 0)
                                     opts = opts with { ExpectedLastMsgId = $"{i - 1}" };
 
-                                var ack = await js.PublishAsync(
+                                var ack = await js2.PublishAsync(
                                     subject: "s1.x",
                                     data: i,
                                     opts: opts,
                                     cancellationToken: cts.Token);
                                 ack.EnsureSuccess();
 
-                                await File.AppendAllTextAsync($"test_{runId}_publish.txt", $"{DateTime.UtcNow:yyyy-MM-ddTHH:mm:ss.fff} [SND] ({i})\n", cts.Token);
+                                await File.AppendAllTextAsync($"test_publish.txt", $"{DateTime.UtcNow:yyyy-MM-ddTHH:mm:ss.fff} [SND] ({i})\n", cts.Token);
 
                                 break;
                             }
@@ -95,7 +101,7 @@ public class OrderedConsumeTest : ITest
                         _logger.LogError(e, "Publish error");
                     }
 
-                    await Task.Delay(TimeSpan.FromSeconds(.5), cancellationToken);
+                    await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
                 }
             }
             catch (Exception e)
@@ -108,7 +114,7 @@ public class OrderedConsumeTest : ITest
             }
         });
 
-        var consumer = await js.CreateOrderedConsumerAsync("s1", cancellationToken: cancellationToken);
+        var consumer = await js1.CreateOrderedConsumerAsync("s1", cancellationToken: cancellationToken);
 
         _logger.LogInformation("Created ordered consumer");
 
@@ -120,7 +126,7 @@ public class OrderedConsumeTest : ITest
                 if (count != msg.Data)
                     throw new Exception($"Unordered {count} != {msg.Data}");
 
-                await File.AppendAllTextAsync($"test_{runId}_consume.txt", $"{DateTime.UtcNow:yyyy-MM-ddTHH:mm:ss.fff} [RCV] ({count}) {msg.Subject}: {msg.Data}\n", cts.Token);
+                await File.AppendAllTextAsync($"test_consume.txt", $"{DateTime.UtcNow:yyyy-MM-ddTHH:mm:ss.fff} [RCV] ({count}) {msg.Subject}: {msg.Data}\n", cts.Token);
                 await msg.AckAsync(cancellationToken: cts.Token);
                 count++;
             }

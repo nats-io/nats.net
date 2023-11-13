@@ -68,36 +68,24 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
             {
                 var consumer = await RecreateConsumer(consumerName, seq, cancellationToken);
                 consumerName = consumer.Info.Name;
-                _logger.LogDebug($"Created {consumerName} with sequence {seq}");
-
-                await using var cc = await consumer.ConsumeInternalAsync(serializer, opts, cancellationToken);
+                _logger.LogInformation("Created {ConsumerName} with sequence {Seq}", consumerName, seq);
 
                 NatsJSProtocolException? protocolException = default;
-                while (true)
+
+                await using (var cc = await consumer.OrderedConsumeInternalAsync(serializer, opts, cancellationToken))
                 {
-                    // We have to check every call to WaitToReadAsync and TryRead for
-                    // protocol exceptions individually because we can't yield return
-                    // within try-catch.
-                    try
-                    {
-                        var read = await cc.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
-                        if (!read)
-                            break;
-                    }
-                    catch (NatsJSProtocolException pe)
-                    {
-                        protocolException = pe;
-                        goto CONSUME_LOOP;
-                    }
+                    // Keep subscription alive (since it's a wek ref in subscription manager) until we're done.
+                    using var anchor = _context.Connection.RegisterSubAnchor(cc);
 
                     while (true)
                     {
-                        NatsJSMsg<T> msg;
-
+                        // We have to check every call to WaitToReadAsync and TryRead for
+                        // protocol exceptions individually because we can't yield return
+                        // within try-catch.
                         try
                         {
-                            var canRead = cc.Msgs.TryRead(out msg);
-                            if (!canRead)
+                            var read = await cc.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
+                            if (!read)
                                 break;
                         }
                         catch (NatsJSProtocolException pe)
@@ -105,17 +93,57 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
                             protocolException = pe;
                             goto CONSUME_LOOP;
                         }
+                        catch (NatsJSConnectionException e)
+                        {
+                            _logger.LogWarning($"{e.Message}. Retrying...");
+                            goto CONSUME_LOOP;
+                        }
+                        catch (NatsJSTimeoutException e)
+                        {
+                            _logger.LogWarning($"{e.Message}. Retrying...");
+                            goto CONSUME_LOOP;
+                        }
 
-                        if (msg.Metadata is not { } metadata)
-                            continue;
+                        while (true)
+                        {
+                            NatsJSMsg<T> msg;
 
-                        seq = metadata.Sequence.Stream;
+                            try
+                            {
+                                var canRead = cc.Msgs.TryRead(out msg);
+                                if (!canRead)
+                                    break;
+                            }
+                            catch (NatsJSProtocolException pe)
+                            {
+                                protocolException = pe;
+                                goto CONSUME_LOOP;
+                            }
+                            catch (NatsJSConnectionException e)
+                            {
+                                _logger.LogWarning($"{e.Message}. Retrying...");
+                                goto CONSUME_LOOP;
+                            }
+                            catch (NatsJSTimeoutException e)
+                            {
+                                _logger.LogWarning($"{e.Message}. Retrying...");
+                                goto CONSUME_LOOP;
+                            }
 
-                        yield return msg;
+                            if (msg.Metadata is not { } metadata)
+                                continue;
+
+                            seq = metadata.Sequence.Stream;
+
+                            yield return msg;
+                        }
                     }
                 }
 
-            CONSUME_LOOP:
+                CONSUME_LOOP:
+
+                _logger.LogWarning("Consumer loop exited");
+
                 if (protocolException != null)
                 {
                     if (protocolException
@@ -234,6 +262,9 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
                         await _context.DeleteConsumerAsync(_stream, consumer, cancellationToken);
                         break;
                     }
+                    catch (NatsJSApiNoResponseException)
+                    {
+                    }
                     catch (NatsJSApiException apiException)
                     {
                         if (apiException.Error.Code == 404)
@@ -250,7 +281,23 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
             }
         }
 
-        var info = await _context.CreateOrderedConsumerInternalAsync(_stream, consumerOpts, cancellationToken);
+        ConsumerInfo info;
+        for (var i = 0; ; i++)
+        {
+            try
+            {
+                info = await _context.CreateOrderedConsumerInternalAsync(_stream, consumerOpts, cancellationToken);
+                break;
+            }
+            catch (NatsJSApiNoResponseException)
+            {
+            }
+
+            if (i == _opts.MaxResetAttempts)
+            {
+                throw new NatsJSException("Maximum number of create attempts reached.");
+            }
+        }
 
         Info = info;
 
