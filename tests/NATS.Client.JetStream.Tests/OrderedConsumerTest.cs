@@ -44,10 +44,11 @@ public class OrderedConsumerTest
     [Fact]
     public async Task Consume_reconnect_publish()
     {
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         await using var server = NatsServer.StartJS();
         await using var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         var stream = await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
 
