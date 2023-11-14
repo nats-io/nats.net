@@ -65,7 +65,7 @@ We can publish to the `shop_orders` stream and receive a confirmation that our m
 for (var i = 0; i < 10; i++)
 {
     // Notice we're using JetStream context to publish and receive ACKs
-    var ack = await js.PublishAsync($"orders.new.{i}", new Order(i));
+    var ack = await js.PublishAsync($"orders.new.{i}", new Order(i), serializer: orderSerializer);
     ack.EnsureSuccess();
 }
 ```
@@ -110,7 +110,7 @@ Check out [JetStream documentation](https://docs.nats.io/nats-concepts/jetstream
 Finally, we're ready to consume the messages we persisted in `shop_orders` stream:
 
 ```csharp
-await foreach (var msg in consumer.ConsumeAsync<Order>())
+await foreach (var msg in consumer.ConsumeAsync<Order>(serializer: orderSerializer))
 {
     var order = msg.Data;
     Console.WriteLine($"Processing {msg.Subject} {order}...");
@@ -137,3 +137,5 @@ await using var nats = new NatsConnection(otps);
 to be interested in that subject.
 
 [Consuming messages from streams](consume.md) explains different ways of retrieving persisted messages.
+
+[Serialization](../serialization.md) covers how to configure serializers for your messages.

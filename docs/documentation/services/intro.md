@@ -100,3 +100,5 @@ await grp1.AddEndPointAsync<int>(name: "ep1", handler: async m =>
     // handle message
 });
 ```
+
+See also: [Serialization](../serialization.md)
