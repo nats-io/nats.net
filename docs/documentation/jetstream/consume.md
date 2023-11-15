@@ -19,7 +19,7 @@ process it and call next again for another.
 ```csharp
 while (!cancellationToken.IsCancellationRequested)
 {
-    var next = await consumer.NextAsync<Order>();
+    var next = await consumer.NextAsync<Order>(serializer: orderSerializer);
 
     if (next is { } msg)
     {
@@ -42,7 +42,7 @@ fast it can process messages without overwhelming the application process.
 while (!cancellationToken.IsCancellationRequested)
 {
     // Consume a batch of messages (1000 by default)
-    await foreach (var msg in consumer.FetchAsync<Order>())
+    await foreach (var msg in consumer.FetchAsync<Order>(serializer: orderSerializer))
     {
         // Process message
         await msg.AckAsync();
@@ -59,7 +59,7 @@ overlapped so that there is a constant flow of messages from the JetStream serve
 or `MaxBytes` and respective thresholds to not overwhelm the application and to not waste server resources.
 
 ```csharp
-await foreach (var msg in consumer.ConsumeAsync<Order>())
+await foreach (var msg in consumer.ConsumeAsync<Order>(serializer: orderSerializer))
 {
     // Process message
     await msg.AckAsync();
@@ -88,7 +88,7 @@ while (!cancellationToken.IsCancellationRequested)
     try
     {
         await consumer.RefreshAsync(); // or try to recreate consumer
-        await foreach (var msg in consumer.ConsumeAsync<Order>())
+        await foreach (var msg in consumer.ConsumeAsync<Order>(serializer: orderSerializer))
         {
             // Process message
             await msg.AckAsync();
@@ -108,3 +108,5 @@ while (!cancellationToken.IsCancellationRequested)
 
 Depending on your application you should configure streams and consumers with appropriate settings so that the
 messages are processed and stored based on your requirements.
+
+See also: [Serialization](../serialization.md)

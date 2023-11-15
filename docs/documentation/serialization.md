@@ -49,22 +49,37 @@ You can use the default serializer by not specifying a serializer in the connect
 registry to the default serializer:
 
 ```csharp
+using NATS.Client.Core;
+
 // Same as not specifying a serializer.
 var natsOpts = NatsOpts.Default with { SerializerRegistry = NatsDefaultSerializerRegistry.Default };
 
 await using var nats = new NatsConnection(natsOpts);
 
-await using INatsSub<string> sub = await nats.SubscribeAsync<string>(subject: "foo");
+var subscriber = Task.Run(async () =>
+{
+    // Default serializer knows how to deal with UTF8 strings, numbers and binary data.
+    await foreach (var msg in nats.SubscribeAsync<string>("foo"))
+    {
+        // Check for the end of messages.
+        if (msg.Data == null)
+            break;
 
-// Flush the the network buffers to make sure the subscription request has been processed.
-await nats.PingAsync();
+        // Outputs 'Hello World'
+        Console.WriteLine(msg.Data);
+    }
+});
 
+// Give subscriber a chance to connect.
+await Task.Delay(1000);
+
+// Default serializer knows how to deal with UTF8 strings, numbers and binary data.
 await nats.PublishAsync<string>(subject: "foo", data: "Hello World");
 
-NatsMsg<string?> msg = await sub.Msgs.ReadAsync();
+// Signal the end of messages by sending an empty payload.
+await nats.PublishAsync(subject: "foo");
 
-// Outputs 'Hello World'
-Console.WriteLine(msg.Data);
+await subscriber;
 ```
 
 The default serializer is designed to be used by developers who want to only work with binary data, and provide an out
@@ -128,27 +143,47 @@ var natsOpts = NatsOpts.Default with { SerializerRegistry = myRegistry };
 
 await using var nats = new NatsConnection(natsOpts);
 
-await using INatsSub<MyData> sub = await nats.SubscribeAsync<MyData>(subject: "foo");
+var subscriber = Task.Run(async () =>
+{
+    await foreach (var msg in nats.SubscribeAsync<MyData>("foo"))
+    {
+        // Outputs 'MyData { Id = 1, Name = bar }'
+        Console.WriteLine(msg.Data);
+        break;
+    }
+});
 
-// ...
+// Give subscriber a chance to connect.
+await Task.Delay(1000);
 
 await nats.PublishAsync<MyData>(subject: "foo", data: new MyData { Id = 1, Name = "bar" });
 
-// ...
+await subscriber;
 ```
 
 You can also set the serializer for a specific subscription or publish call:
 
 ```csharp
-var myJson = new NatsJsonContextSerializer(MyJsonContext.Default);
+await using var nats = new NatsConnection();
 
-await using INatsSub<MyData> sub = await nats.SubscribeAsync<MyData>(subject: "foo", serializer: myJson);
+var serializer = new NatsJsonContextSerializer<MyData>(MyJsonContext.Default);
 
-// ...
+var subscriber = Task.Run(async () =>
+{
+    await foreach (var msg in nats.SubscribeAsync<MyData>("foo", serializer: serializer))
+    {
+        // Outputs 'MyData { Id = 1, Name = bar }'
+        Console.WriteLine(msg.Data);
+        break;
+    }
+});
 
-await nats.PublishAsync<MyData>(subject: "foo", data: new MyData { Id = 1, Name = "bar" }, serializer: myJson);
+// Give subscriber a chance to connect.
+await Task.Delay(1000);
 
-// ...
+await nats.PublishAsync<MyData>(subject: "foo", data: new MyData { Id = 1, Name = "bar" }, serializer: serializer);
+
+await subscriber;
 ```
 
 ## Using Custom Serializer
@@ -200,17 +235,22 @@ var natsOpts = NatsOpts.Default with { SerializerRegistry = new MyProtoBufSerial
 
 await using var nats = new NatsConnection(natsOpts);
 
-await using var sub = await nats.SubscribeAsync<Greeting>(subject: "foo");
+var subscriber = Task.Run(async () =>
+{
+    await foreach (var msg in nats.SubscribeAsync<Greeting>("foo"))
+    {
+        // Outputs '{ "id": 42, "name": "Marvin" }'
+        Console.WriteLine(msg.Data);
+        break;
+    }
+});
 
-// Flush the the network buffers to make sure the subscription request has been processed.
-await nats.PingAsync();
+// Give subscriber a chance to connect.
+await Task.Delay(1000);
 
 await nats.PublishAsync(subject: "foo", data: new Greeting { Id = 42, Name = "Marvin" });
 
-var msg = await sub.Msgs.ReadAsync();
-
-// Outputs '{ "id": 42, "name": "Marvin" }'
-Console.WriteLine(msg.Data);
+await subscriber;
 ```
 
 ## Using Multiple Serializers (chaining)
@@ -236,23 +276,33 @@ var natsOpts = NatsOpts.Default with { SerializerRegistry =  new MixedSerializer
 
 await using var nats = new NatsConnection(natsOpts);
 
-await using var sub1 = await nats.SubscribeAsync<Greeting>(subject: "greet");
-await using var sub2 = await nats.SubscribeAsync<MyData>(subject: "data");
+var subscriber1 = Task.Run(async () =>
+{
+    await foreach (var msg in nats.SubscribeAsync<Greeting>("greet"))
+    {
+        // Outputs '{ "id": 42, "name": "Marvin" }'
+        Console.WriteLine(msg.Data);
+        break;
+    }
+});
 
-// Flush the the network buffers to make sure the subscription request has been processed.
-await nats.PingAsync();
+var subscriber2 = Task.Run(async () =>
+{
+    await foreach (var msg in nats.SubscribeAsync<MyData>("data"))
+    {
+        // Outputs 'MyData { Id = 1, Name = bar }'
+        Console.WriteLine(msg.Data);
+        break;
+    }
+});
+
+// Give subscribers a chance to connect.
+await Task.Delay(1000);
 
 await nats.PublishAsync(subject: "greet", data: new Greeting { Id = 42, Name = "Marvin" });
 await nats.PublishAsync(subject: "data", data: new MyData { Id = 1, Name = "Bob" });
 
-var msg1 = await sub1.Msgs.ReadAsync();
-var msg2 = await sub2.Msgs.ReadAsync();
-
-// Outputs '{ "id": 42, "name": "Marvin" }'
-Console.WriteLine(msg1.Data);
-
-// Outputs 'MyData { Id = 1, Name = bar }'
-Console.WriteLine(msg2.Data);
+await Task.WhenAll(subscriber1, subscriber2);
 ```
 
 ## Dealing with Binary Data and Buffers
@@ -264,15 +314,33 @@ are [`IMemoryOwner<byte>`](https://learn.microsoft.com/dotnet/api/system.buffers
 to allocate buffers. They can be used with the default serializer.
 
 ```csharp
+using System.Text;
+using NATS.Client.Core;
+
 // Same as not specifying a serializer.
-var natsOpts = NatsOpts.Default with { SerializeRegistry = NatsDefaultSerializerRegistry.Default };
+var natsOpts = NatsOpts.Default with { SerializerRegistry = NatsDefaultSerializerRegistry.Default };
 
 await using var nats = new NatsConnection(natsOpts);
 
-await using var sub = await nats.SubscribeAsync<NatsMemoryOwner<byte>>(subject: "foo");
+var subscriber = Task.Run(async () =>
+{
+    // Default serializer knows how to deal with binary data types like NatsMemoryOwner<byte>.
+    await foreach (var msg in nats.SubscribeAsync<NatsMemoryOwner<byte>>("foo"))
+    {
+        // Check for the end of messages.
+        if (msg.Data.Length == 0)
+            break;
 
-// Flush the the network buffers to make sure the subscription request has been processed.
-await nats.PingAsync();
+        // Dispose the memory owner after using it so it can be returned to the pool.
+        using var memoryOwner = msg.Data;
+
+        // Outputs 'Hi'
+        Console.WriteLine(Encoding.ASCII.GetString(memoryOwner.Memory.Span));
+    }
+});
+
+// Give subscriber a chance to connect.
+await Task.Delay(1000);
 
 // Don't reuse NatsBufferWriter, it's disposed and returned to the pool
 // by the publisher after being written to network.
@@ -282,16 +350,13 @@ memory.Span[0] = (byte)'H';
 memory.Span[1] = (byte)'i';
 bw.Advance(2);
 
+// Default serializer knows how to deal with binary data types like NatsBufferWriter<byte>.
 await nats.PublishAsync(subject: "foo", data: bw);
 
-var msg = await sub.Msgs.ReadAsync();
+// Signal the end of messages by sending an empty payload.
+await nats.PublishAsync(subject: "foo");
 
-// Dispose the memory owner after using it so it can be retunrned to the pool.
-using (var memoryOwner = msg.Data)
-{
-    // Outputs 'Hi'
-    Console.WriteLine(Encoding.ASCII.GetString(memoryOwner.Memory.Span));
-}
+await subscriber;
 ```
 
 Advantage of using [`NatsMemoryOwner<T>`](xref:NATS.Client.Core.NatsMemoryOwner`1) and [`NatsBufferWriter<T>`](xref:NATS.Client.Core.NatsBufferWriter`1) is that they can be used with the default serializer and
