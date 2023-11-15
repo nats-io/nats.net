@@ -1,7 +1,7 @@
-using System.IO.IsolatedStorage;
 using System.Security.Cryptography;
 using System.Text;
 using NATS.Client.Core.Tests;
+using NATS.Client.JetStream.Models;
 using NATS.Client.ObjectStore.Internal;
 using NATS.Client.ObjectStore.Models;
 
@@ -366,5 +366,33 @@ public class ObjectStoreTest
             Assert.False(infos[2].Deleted);
             Assert.True(infos[3].Deleted);
         }
+    }
+
+    [Fact]
+    public async Task Compressed_storage()
+    {
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+        var js = new NatsJSContext(nats);
+        var obj = new NatsObjContext(js);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        var store1 = await obj.CreateObjectStore(new NatsObjConfig("b1") { IsCompressed = false }, cancellationToken);
+        var store2 = await obj.CreateObjectStore(new NatsObjConfig("b2") { IsCompressed = true }, cancellationToken);
+
+        Assert.Equal("b1", store1.Bucket);
+        Assert.Equal("b2", store2.Bucket);
+
+        var status1 = await store1.GetStatusAsync(cancellationToken);
+        Assert.Equal("b1", status1.Bucket);
+        Assert.Equal("OBJ_b1", status1.Info.Config.Name);
+        Assert.Equal(StreamConfigurationCompression.none, status1.Info.Config.Compression);
+
+        var status2 = await store2.GetStatusAsync(cancellationToken);
+        Assert.Equal("b2", status2.Bucket);
+        Assert.Equal("OBJ_b2", status2.Info.Config.Name);
+        Assert.Equal(StreamConfigurationCompression.s2, status2.Info.Config.Compression);
     }
 }

@@ -94,6 +94,7 @@ public class NatsKVContext : INatsKVContext
             MaxBytes = config.MaxBytes,
             MaxAge = config.MaxAge.ToNanos(),
             MaxMsgSize = config.MaxValueSize,
+            Compression = config.IsCompressed ? StreamConfigurationCompression.s2 : StreamConfigurationCompression.none,
             Storage = storage,
             Republish = republish!,
             AllowRollupHdrs = true,
