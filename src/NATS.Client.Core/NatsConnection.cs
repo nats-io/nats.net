@@ -35,8 +35,6 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
     private readonly CancellationTokenSource _disposedCancellationTokenSource;
     private readonly string _name;
     private readonly TimeSpan _socketComponentDisposeTimeout = TimeSpan.FromSeconds(5);
-    private readonly int _maxReconnectRetry;
-    private readonly int[] _backOffPolicy;
 
     private int _pongCount;
     private bool _isDisposed;
@@ -54,6 +52,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
     private ClientOpts _clientOpts;
     private UserCredentials? _userCredentials;
     private int _connectRetry;
+    private TimeSpan _backoff = TimeSpan.Zero;
 
     public NatsConnection()
         : this(NatsOpts.Default)
@@ -77,8 +76,6 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         _logger = opts.LoggerFactory.CreateLogger<NatsConnection>();
         _clientOpts = ClientOpts.Create(Opts);
         HeaderParser = new NatsHeaderParser(opts.HeaderEncoding);
-        _maxReconnectRetry = opts.MaxReconnectRetry;
-        _backOffPolicy = opts.ReconnectBackoffPolicyMilliseconds;
     }
 
     // events
@@ -528,6 +525,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
             lock (_gate)
             {
                 _connectRetry = 0;
+                _backoff = TimeSpan.Zero;
                 _logger.LogInformation("Connect succeed {0}, NATS {1}", _name, url);
                 ConnectionState = NatsConnectionState.Open;
                 _pingTimerCancellationTokenSource = new CancellationTokenSource();
@@ -569,27 +567,39 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
     private async Task WaitWithJitterAsync()
     {
         int retry;
-        int backoff;
+        TimeSpan backoff;
         lock (_gate)
         {
             retry = _connectRetry++;
 
-            if (_backOffPolicy.Length > 0)
+            if (Opts.ReconnectWait >= Opts.ReconnectWaitMax)
             {
-                var max = _backOffPolicy.Length - 1;
-                backoff = _backOffPolicy[retry > max ? max : retry];
+                _backoff = Opts.ReconnectWait;
+            }
+            else if (_backoff == TimeSpan.Zero)
+            {
+                _backoff = Opts.ReconnectWait;
+            }
+            else if (_backoff == Opts.ReconnectWaitMax)
+            {
             }
             else
             {
-                backoff = 0;
+                _backoff *= 2;
+                if (_backoff > Opts.ReconnectWaitMax)
+                {
+                    _backoff = Opts.ReconnectWaitMax;
+                }
             }
+
+            backoff = _backoff;
         }
 
-        if (_maxReconnectRetry > 0 && retry > _maxReconnectRetry)
+        if (Opts.MaxReconnectRetry > 0 && retry > Opts.MaxReconnectRetry)
             throw new NatsException("Max connect retry exceeded.");
 
         var jitter = Random.Shared.NextDouble() * Opts.ReconnectJitter.TotalMilliseconds;
-        var waitTime = Opts.ReconnectWait + TimeSpan.FromMilliseconds(jitter) + TimeSpan.FromMilliseconds(backoff);
+        var waitTime = TimeSpan.FromMilliseconds(jitter) + backoff;
         if (waitTime != TimeSpan.Zero)
         {
             _logger.LogTrace("Wait {0}ms to reconnect.", waitTime.TotalMilliseconds);

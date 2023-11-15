@@ -13,7 +13,7 @@ public class ConnectionRetryTest
         await using var nats = server.CreateClientConnection(new NatsOpts
         {
             MaxReconnectRetry = 2,
-            ReconnectBackoffPolicyMilliseconds = new[] { 0 },
+            ReconnectWaitMax = TimeSpan.Zero,
             ReconnectWait = TimeSpan.FromSeconds(.1),
         });
 
@@ -36,7 +36,7 @@ public class ConnectionRetryTest
         await using var nats = server.CreateClientConnection(new NatsOpts
         {
             MaxReconnectRetry = 10,
-            ReconnectBackoffPolicyMilliseconds = new[] { 2000 },
+            ReconnectWaitMax = TimeSpan.Zero,
             ReconnectWait = TimeSpan.FromSeconds(2),
         });
 

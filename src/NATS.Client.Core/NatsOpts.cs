@@ -79,14 +79,14 @@ public sealed record NatsOpts
     public int MaxReconnectRetry { get; init; } = -1;
 
     /// <summary>
-    /// Backoff policy for reconnect attempts. (default: 0, 250, 250, 500, 500, 3000, 5000)
+    /// Backoff delay limit for reconnect attempts. (default: 5 seconds)
     /// </summary>
     /// <remarks>
-    /// This is a list of milliseconds to wait between reconnect attempts where the next element is used with every attempt.
-    /// When the number of retry attempts reaches the end of the list, it will keep using the last element
-    /// which is 5 seconds by default.
+    /// When the connection is lost, the client will wait for <see cref="ReconnectWait"/> before attempting to reconnect.
+    /// Every failed attempt will increase the wait time by 2x, up to <see cref="ReconnectWaitMax"/>.
+    /// If <see cref="ReconnectWaitMax"/> is equal to or less than <see cref="ReconnectWait"/>, the delay will be constant.
     /// </remarks>
-    public int[] ReconnectBackoffPolicyMilliseconds { get; init; } = { 0, 250, 250, 500, 500, 3000, 5000 };
+    public TimeSpan ReconnectWaitMax { get; init; } = TimeSpan.FromSeconds(5);
 
     internal NatsUri[] GetSeedUris()
     {
