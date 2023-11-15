@@ -139,7 +139,7 @@ public class NatsKVStore : INatsKVStore
 
         try
         {
-            var ack = await _context.PublishAsync(subject, headers: headers, cancellationToken: cancellationToken);
+            var ack = await _context.PublishAsync<object?>(subject, null, headers: headers, cancellationToken: cancellationToken);
             ack.EnsureSuccess();
         }
         catch (NatsJSApiException e)

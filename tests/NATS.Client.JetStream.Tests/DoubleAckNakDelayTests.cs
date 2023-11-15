@@ -1,4 +1,4 @@
-﻿using System.Text.RegularExpressions;
+using System.Text.RegularExpressions;
 using NATS.Client.Core.Tests;
 
 namespace NATS.Client.JetStream.Tests;

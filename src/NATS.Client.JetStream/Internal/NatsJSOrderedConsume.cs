@@ -151,7 +151,7 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
     internal override IEnumerable<ICommand> GetReconnectCommands(int sid)
     {
         // Override normal subscription behavior to resubscribe on reconnect
-       yield break;
+        yield break;
     }
 
     protected override async ValueTask ReceiveInternalAsync(

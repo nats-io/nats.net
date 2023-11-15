@@ -21,22 +21,6 @@ public interface INatsJSContext
     /// <summary>
     /// Creates new consumer if it doesn't exists or returns an existing one with the same name.
     /// </summary>
-    /// <param name="stream">Stream name to create the consumer under.</param>
-    /// <param name="consumer">Name of the consumer.</param>
-    /// <param name="ackPolicy">Ack policy to use. Must not be set to <c>none</c>. Default is <c>explicit</c>.</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <returns>The NATS JetStream consumer object which can be used retrieving data from the stream.</returns>
-    /// <exception cref="NatsJSException">Ack policy is set to <c>none</c> or there was an issue retrieving the response.</exception>
-    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
-    ValueTask<INatsJSConsumer> CreateConsumerAsync(
-        string stream,
-        string consumer,
-        ConsumerConfigurationAckPolicy ackPolicy = ConsumerConfigurationAckPolicy.@explicit,
-        CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Creates new consumer if it doesn't exists or returns an existing one with the same name.
-    /// </summary>
     /// <param name="request">Consumer creation request to be sent to NATS JetStream server.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>The NATS JetStream consumer object which can be used retrieving data from the stream.</returns>
@@ -119,42 +103,6 @@ public interface INatsJSContext
         NatsJSPubOpts? opts = default,
         NatsHeaders? headers = default,
         CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Sends an empty payload to a stream associated with the subject.
-    /// </summary>
-    /// <param name="subject">Subject to publish the data to.</param>
-    /// <param name="opts">Publish options.</param>
-    /// <param name="headers">Optional message headers.</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the publishing call or the wait for response.</param>
-    /// <returns>
-    /// The ACK response to indicate if stream accepted the message as well as additional
-    /// information like the sequence number of the message stored by the stream.
-    /// </returns>
-    /// <exception cref="NatsJSException">There was a problem receiving the response.</exception>
-    /// <remarks>
-    /// <para>
-    /// Note that if the subject isn't backed by a stream or the connected NATS server
-    /// isn't running with JetStream enabled, this call will hang waiting for an ACK
-    /// until the request times out.
-    /// </para>
-    /// </remarks>
-    ValueTask<PubAckResponse> PublishAsync(
-        string subject,
-        NatsJSPubOpts? opts = default,
-        NatsHeaders? headers = default,
-        CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Creates a new stream if it doesn't exist or returns an existing stream with the same name.
-    /// </summary>
-    /// <param name="stream">Name of the stream to create. (e.g. my_events)</param>
-    /// <param name="subjects">List of subjects stream will persist messages from. (e.g. events.*)</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <returns>The NATS JetStream stream object which can be used to manage the stream.</returns>
-    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
-    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
-    ValueTask<INatsJSStream> CreateStreamAsync(string stream, string[] subjects, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Creates a new stream if it doesn't exist or returns an existing stream with the same name.

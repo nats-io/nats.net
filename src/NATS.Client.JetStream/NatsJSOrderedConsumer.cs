@@ -140,7 +140,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
                     }
                 }
 
-                CONSUME_LOOP:
+            CONSUME_LOOP:
 
                 _logger.LogWarning("Consumer loop exited");
 

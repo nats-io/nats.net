@@ -26,34 +26,6 @@ public partial class NatsJSContext : INatsJSContext
     /// <summary>
     /// Creates new consumer if it doesn't exists or returns an existing one with the same name.
     /// </summary>
-    /// <param name="stream">Stream name to create the consumer under.</param>
-    /// <param name="consumer">Name of the consumer.</param>
-    /// <param name="ackPolicy">Ack policy to use. Must not be set to <c>none</c>. Default is <c>explicit</c>.</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <returns>The NATS JetStream consumer object which can be used retrieving data from the stream.</returns>
-    /// <exception cref="NatsJSException">Ack policy is set to <c>none</c> or there was an issue retrieving the response.</exception>
-    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
-    public ValueTask<INatsJSConsumer> CreateConsumerAsync(
-        string stream,
-        string consumer,
-        ConsumerConfigurationAckPolicy ackPolicy = ConsumerConfigurationAckPolicy.@explicit,
-        CancellationToken cancellationToken = default) =>
-        CreateConsumerAsync(
-            new ConsumerCreateRequest
-            {
-                StreamName = stream,
-                Config = new ConsumerConfiguration
-                {
-                    Name = consumer,
-                    DurableName = consumer,
-                    AckPolicy = ackPolicy,
-                },
-            },
-            cancellationToken);
-
-    /// <summary>
-    /// Creates new consumer if it doesn't exists or returns an existing one with the same name.
-    /// </summary>
     /// <param name="request">Consumer creation request to be sent to NATS JetStream server.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>The NATS JetStream consumer object which can be used retrieving data from the stream.</returns>
