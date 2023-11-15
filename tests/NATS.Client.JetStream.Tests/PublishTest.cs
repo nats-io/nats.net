@@ -193,9 +193,13 @@ public class PublishTest
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
+        // use different connection to create stream and consumer to avoid request timeouts
+        await using var nats0 = server.CreateClientConnection();
+        var js0 = new NatsJSContext(nats0);
+        await js0.CreateStreamAsync("s1", new[] { "s1.>" }, cts.Token);
+        await js0.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+
         var js = new NatsJSContext(nats);
-        await js.CreateStreamAsync("s1", new[] { "s1.>" }, cts.Token);
-        await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
 
         // Publish succeeds without retry
         {
