@@ -21,7 +21,7 @@ public class NatsConsumeTests
 
             var sub = Task.Run(async () =>
             {
-                await js.CreateStreamAsync(new StreamCreateRequest { Name = "s1", Subjects = new[] { "s1,*" } });
+                await js.CreateStreamAsync(new StreamCreateRequest { Name = "s1", Subjects = new[] { "s1.*" } });
 
                 var consumer = await js.CreateConsumerAsync(new ConsumerCreateRequest { StreamName = "s1", Config = new ConsumerConfiguration { Name = "c1", DurableName = "c1", AckPolicy = ConsumerConfigurationAckPolicy.@explicit } });
 
@@ -99,7 +99,7 @@ public class NatsConsumeTests
 
             var sub = Task.Run(async () =>
             {
-                await js.CreateStreamAsync(new StreamCreateRequest { Name = "s1", Subjects = new[] { "s1,*" } });
+                await js.CreateStreamAsync(new StreamCreateRequest { Name = "s1", Subjects = new[] { "s1.*" } });
 
                 var consumer = await js.CreateOrderedConsumerAsync("s1");
 
