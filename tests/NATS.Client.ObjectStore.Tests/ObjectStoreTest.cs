@@ -368,7 +368,7 @@ public class ObjectStoreTest
         }
     }
 
-    [Fact]
+    [SkipIfNatsServer(versionEarlierThan: "2.10")]
     public async Task Compressed_storage()
     {
         await using var server = NatsServer.StartJS();

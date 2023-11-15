@@ -523,7 +523,7 @@ public class KeyValueStoreTest
         Assert.Equal(10, status.Info.Config.MaxMsgsPerSubject);
     }
 
-    [Fact]
+    [SkipIfNatsServer(versionEarlierThan: "2.10")]
     public async Task Compressed_storage()
     {
         await using var server = NatsServer.StartJS();
