@@ -1,4 +1,4 @@
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
@@ -21,12 +21,12 @@ public class ConsumeTest : ITest
 
     public async Task Run(string runId, CmdArgs args, CancellationToken cancellationToken = default)
     {
-        var natsOpts = NatsOpts.Default with
+        var natsOpts = NatsOpts.Default with { LoggerFactory = _loggerFactory };
+
+        if (args.Server != null)
         {
-            Url = "nats://192.168.0.183:4222",
-            // Url = "nats://127.0.0.1:4222",
-            LoggerFactory = _loggerFactory,
-        };
+            natsOpts = natsOpts with { Url = args.Server };
+        }
 
         await using var nats = new NatsConnection(natsOpts);
 
@@ -66,7 +66,6 @@ public class ConsumeTest : ITest
                                 var ack = await js.PublishAsync(
                                     subject: "s1.x",
                                     data: $"data_[{DateTime.UtcNow:yyyy-MM-ddTHH:mm:ss.fff}]_{i:D5}",
-                                    opts: new NatsJSPubOpts { MsgId = $"{i:D5}" },
                                     cancellationToken: cts.Token);
                                 ack.EnsureSuccess();
 
