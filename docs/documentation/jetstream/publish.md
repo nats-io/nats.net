@@ -27,7 +27,7 @@ var js = new NatsJSContext(nats);
 
 var order = new Order { OrderId = 1 };
 
-var ack = await js.PublishAsync("orders.new.1", order);
+var ack = await js.PublishAsync("orders.new.1", order, serializer: orderSerializer);
 
 ack.EnsureSuccess();
 
@@ -42,9 +42,11 @@ by ignoring duplicate messages as indicated by the message ID. Message ID is not
 as metadata, part of the message headers.
 
 ```csharp
-var ack = await js.PublishAsync("orders.new.1", order, msgId: "1");
+var ack = await js.PublishAsync("orders.new.1", order, opts: new NatsJSPubOpts { MsgId = "1" }, serializer: orderSerializer);
 if (ack.Duplicate)
 {
     // A message with the same ID was published before
 }
 ```
+
+See also: [Serialization](../serialization.md)

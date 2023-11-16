@@ -14,7 +14,7 @@ public class Test
 
         Log($"Connected to NATS server {url}");
 
-        await using var sub = await nats.SubscribeInternalAsync<Memory<byte>>("tests.>");
+        await using var sub = await nats.SubscribeCoreAsync<Memory<byte>>("tests.>");
 
         Log($"Subscribed to {sub.Subject}");
         Log($"Ready to receive test messages...");

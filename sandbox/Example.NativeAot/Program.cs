@@ -35,7 +35,7 @@ using NATS.Client.Core;
 
     await using var nats = new NatsConnection(natsOpts);
 
-    var sub = Task.Run(async () =>
+    var subscriber = Task.Run(async () =>
     {
         await foreach (var msg in nats.SubscribeAsync<MyData>("foo"))
         {
@@ -45,12 +45,12 @@ using NATS.Client.Core;
         }
     });
 
-    // Flush the the network buffers to make sure the subscription request has been processed.
-    await nats.PingAsync();
+    // Give subscriber a chance to connect.
+    await Task.Delay(1000);
 
     await nats.PublishAsync<MyData>(subject: "foo", data: new MyData { Id = 1, Name = "bar" });
 
-    await sub;
+    await subscriber;
 }
 
 // custom JSON
@@ -59,9 +59,9 @@ using NATS.Client.Core;
 
     var serializer = new NatsJsonContextSerializer<MyData>(MyJsonContext.Default);
 
-    var sub = Task.Run(async () =>
+    var subscriber = Task.Run(async () =>
     {
-        await foreach (var msg in nats.SubscribeAsync<MyData>("foo"))
+        await foreach (var msg in nats.SubscribeAsync<MyData>("foo", serializer: serializer))
         {
             // Outputs 'MyData { Id = 1, Name = bar }'
             Console.WriteLine(msg.Data);
@@ -69,12 +69,12 @@ using NATS.Client.Core;
         }
     });
 
-    // Flush the the network buffers to make sure the subscription request has been processed.
-    await nats.PingAsync();
+    // Give subscriber a chance to connect.
+    await Task.Delay(1000);
 
     await nats.PublishAsync<MyData>(subject: "foo", data: new MyData { Id = 1, Name = "bar" }, serializer: serializer);
 
-    await sub;
+    await subscriber;
 }
 
 // Protobuf
@@ -83,7 +83,7 @@ using NATS.Client.Core;
 
     await using var nats = new NatsConnection(natsOpts);
 
-    var sub = Task.Run(async () =>
+    var subscriber = Task.Run(async () =>
     {
         await foreach (var msg in nats.SubscribeAsync<Greeting>("foo"))
         {
@@ -93,12 +93,12 @@ using NATS.Client.Core;
         }
     });
 
-    // Flush the the network buffers to make sure the subscription request has been processed.
-    await nats.PingAsync();
+    // Give subscriber a chance to connect.
+    await Task.Delay(1000);
 
     await nats.PublishAsync(subject: "foo", data: new Greeting { Id = 42, Name = "Marvin" });
 
-    await sub;
+    await subscriber;
 }
 
 // Protobuf/JSON
@@ -108,7 +108,7 @@ using NATS.Client.Core;
 
     await using var nats = new NatsConnection(natsOpts);
 
-    var sub1 = Task.Run(async () =>
+    var subscriber1 = Task.Run(async () =>
     {
         await foreach (var msg in nats.SubscribeAsync<Greeting>("greet"))
         {
@@ -118,7 +118,7 @@ using NATS.Client.Core;
         }
     });
 
-    var sub2 = Task.Run(async () =>
+    var subscriber2 = Task.Run(async () =>
     {
         await foreach (var msg in nats.SubscribeAsync<MyData>("data"))
         {
@@ -128,14 +128,13 @@ using NATS.Client.Core;
         }
     });
 
-    // Flush the the network buffers to make sure the subscription request has been processed.
-    await nats.PingAsync();
+    // Give subscribers a chance to connect.
+    await Task.Delay(1000);
 
     await nats.PublishAsync(subject: "greet", data: new Greeting { Id = 42, Name = "Marvin" });
     await nats.PublishAsync(subject: "data", data: new MyData { Id = 1, Name = "Bob" });
 
-    await sub1;
-    await sub2;
+    await Task.WhenAll(subscriber1, subscriber2);
 }
 
 // Binary
@@ -159,8 +158,8 @@ using NATS.Client.Core;
         }
     });
 
-    // Flush the the network buffers to make sure the subscription request has been processed.
-    await nats.PingAsync();
+    // Give subscriber a chance to connect.
+    await Task.Delay(1000);
 
     var bw = new NatsBufferWriter<byte>();
     var memory = bw.GetMemory(2);

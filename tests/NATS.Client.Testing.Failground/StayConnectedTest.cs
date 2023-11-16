@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.Testing.Failground;

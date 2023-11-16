@@ -111,7 +111,7 @@ public abstract partial class NatsConnectionTest
         var signalComplete2 = new WaitSignal();
 
         var syncCount = 0;
-        var natsSub = await subConnection.SubscribeInternalAsync<int>(subject);
+        var natsSub = await subConnection.SubscribeCoreAsync<int>(subject);
         var register = natsSub.Register(x =>
         {
             Interlocked.Increment(ref syncCount);

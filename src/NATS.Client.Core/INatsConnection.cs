@@ -67,6 +67,31 @@ public interface INatsConnection
     IAsyncEnumerable<NatsMsg<T>> SubscribeAsync<T>(string subject, string? queueGroup = default, INatsDeserialize<T>? serializer = default, NatsSubOpts? opts = default, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Initiates a subscription to a subject, optionally joining a distributed queue group
+    /// and returns a <see cref="INatsSub{T}"/> object which provides more control over the subscription.
+    /// </summary>
+    /// <param name="subject">The subject name to subscribe to.</param>
+    /// <param name="queueGroup">If specified, the subscriber will join this queue group.</param>
+    /// <param name="serializer">Serializer to use for the message type.</param>
+    /// <param name="opts">A <see cref="NatsSubOpts"/> for subscription options.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
+    /// <typeparam name="T">Specifies the type of data that may be received from the NATS Server.</typeparam>
+    /// <returns>An asynchronous task that completes with the NATS subscription.</returns>
+    /// <remarks>
+    /// <para>
+    /// Subscribers with the same queue group name, become a queue group,
+    /// and only one randomly chosen subscriber of the queue group will
+    /// consume a message each time a message is received by the queue group.
+    /// </para>
+    /// <para>
+    /// This method returns a <see cref="INatsSub{T}"/> object which provides slightly lower level
+    /// control over the subscription. You can use this object to create your own core messaging
+    /// patterns or to create your own higher level abstractions.
+    /// </para>
+    /// </remarks>
+    ValueTask<INatsSub<T>> SubscribeCoreAsync<T>(string subject, string? queueGroup = default, INatsDeserialize<T>? serializer = default, NatsSubOpts? opts = default, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Create a new inbox subject with the form {Inbox Prefix}.{Unique Connection ID}.{Unique Inbox ID}
     /// </summary>
     /// <returns>A <see cref="string"/> containing a unique inbox subject.</returns>

@@ -83,3 +83,5 @@ await foreach (var entry in store.WatchAllAsync<ShopOrder>())
 // [RCV] NatsKVEntry { Bucket = shop_orders, Key = order-1, Value = ShopOrder { Id = 1 }, Revision = 1, Delta = 0,
 //       Created = 12/10/2023 15:31:51 +00:00, Operation = Put }
 ```
+
+See also: [Serialization](../serialization.md)

@@ -1,4 +1,6 @@
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
+using System.Text;
 using NATS.Client.Core;
 using NATS.Client.JetStream.Internal;
 
@@ -57,6 +59,8 @@ public readonly struct NatsJSMsg<T>
     /// </summary>
     public NatsJSMsgMetadata? Metadata => _replyToDateTimeAndSeq.Value;
 
+    private string? ReplyTo => _msg.ReplyTo;
+
     /// <summary>
     /// Reply with an empty message.
     /// </summary>
@@ -79,13 +83,26 @@ public readonly struct NatsJSMsg<T>
     /// <summary>
     /// Signals that the message will not be processed now and processing can move onto the next message.
     /// </summary>
+    /// <param name="delay">Delay redelivery of the message.</param>
     /// <param name="opts">Ack options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the call.</param>
     /// <returns>A <see cref="ValueTask"/> representing the async call.</returns>
     /// <remarks>
-    /// Messages rejected using <c>NACK</c> will be resent by the NATS JetStream server after the configured timeout.
+    /// Messages rejected using <c>-NAK</c> will be resent by the NATS JetStream server after the configured timeout
+    /// or the delay parameter if it's specified.
     /// </remarks>
-    public ValueTask NackAsync(AckOpts opts = default, CancellationToken cancellationToken = default) => SendAckAsync(NatsJSConstants.Nack, opts, cancellationToken);
+    public ValueTask NakAsync(AckOpts opts = default, TimeSpan delay = default, CancellationToken cancellationToken = default)
+    {
+        if (delay == default)
+        {
+            return SendAckAsync(NatsJSConstants.Nak, opts, cancellationToken);
+        }
+        else
+        {
+            var nakDelayed = new ReadOnlySequence<byte>(Encoding.ASCII.GetBytes($"-NAK {{\"delay\": {delay.ToNanos()}}}"));
+            return SendAckAsync(nakDelayed, opts, cancellationToken);
+        }
+    }
 
     /// <summary>
     /// Indicates that work is ongoing and the wait period should be extended.
@@ -113,18 +130,42 @@ public readonly struct NatsJSMsg<T>
     /// <returns>A <see cref="ValueTask"/> representing the async call.</returns>
     public ValueTask AckTerminateAsync(AckOpts opts = default, CancellationToken cancellationToken = default) => SendAckAsync(NatsJSConstants.AckTerminate, opts, cancellationToken);
 
-    private ValueTask SendAckAsync(ReadOnlySequence<byte> payload, AckOpts opts = default, CancellationToken cancellationToken = default)
+    private async ValueTask SendAckAsync(ReadOnlySequence<byte> payload, AckOpts opts = default, CancellationToken cancellationToken = default)
     {
+        CheckPreconditions();
+
         if (_msg == default)
             throw new NatsJSException("No user message, can't acknowledge");
 
-        return _msg.ReplyAsync(
-            data: payload,
-            opts: new NatsPubOpts
-            {
-                WaitUntilSent = opts.WaitUntilSent ?? _context.Opts.AckOpts.WaitUntilSent,
-            },
-            cancellationToken: cancellationToken);
+        if ((opts.DoubleAck ?? _context.Opts.AckOpts.DoubleAck) == true)
+        {
+            await Connection.RequestAsync<ReadOnlySequence<byte>, object?>(ReplyTo, payload, cancellationToken: cancellationToken);
+        }
+        else
+        {
+            await _msg.ReplyAsync(
+                data: payload,
+                opts: new NatsPubOpts
+                {
+                    WaitUntilSent = opts.WaitUntilSent ?? _context.Opts.AckOpts.WaitUntilSent,
+                },
+                cancellationToken: cancellationToken);
+        }
+    }
+
+    [MemberNotNull(nameof(Connection))]
+    [MemberNotNull(nameof(ReplyTo))]
+    private void CheckPreconditions()
+    {
+        if (Connection == default)
+        {
+            throw new NatsException("unable to send acknowledgment; message did not originate from a consumer");
+        }
+
+        if (string.IsNullOrWhiteSpace(ReplyTo))
+        {
+            throw new NatsException("unable to send acknowledgment; ReplyTo is empty");
+        }
     }
 }
 
@@ -132,4 +173,5 @@ public readonly struct NatsJSMsg<T>
 /// Options to be used when acknowledging messages received from a stream using a consumer.
 /// </summary>
 /// <param name="WaitUntilSent">Wait for the publish to be flushed down to the network.</param>
-public readonly record struct AckOpts(bool? WaitUntilSent);
+/// <param name="DoubleAck">Ask server for an acknowledgment.</param>
+public readonly record struct AckOpts(bool? WaitUntilSent = false, bool? DoubleAck = false);

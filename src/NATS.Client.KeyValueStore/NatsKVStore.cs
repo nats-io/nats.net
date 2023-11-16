@@ -54,26 +54,21 @@ public class NatsKVStore : INatsKVStore
 
     public string Bucket { get; }
 
-    /// <summary>
-    /// Put a value into the bucket using the key
-    /// </summary>
-    /// <param name="key">Key of the entry</param>
-    /// <param name="value">Value of the entry</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <typeparam name="T">Serialized value type</typeparam>
-    public async ValueTask<ulong> PutAsync<T>(string key, T value, CancellationToken cancellationToken = default)
+    /// <inheritdoc />
+    public async ValueTask<ulong> PutAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
-        var ack = await _context.PublishAsync($"$KV.{Bucket}.{key}", value, cancellationToken: cancellationToken);
+        var ack = await _context.PublishAsync($"$KV.{Bucket}.{key}", value, serializer: serializer, cancellationToken: cancellationToken);
         ack.EnsureSuccess();
         return ack.Seq;
     }
 
-    public async ValueTask<ulong> CreateAsync<T>(string key, T value, CancellationToken cancellationToken = default)
+    /// <inheritdoc />
+    public async ValueTask<ulong> CreateAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
         // First try to create a new entry
         try
         {
-            return await UpdateAsync(key, value, revision: 0, cancellationToken);
+            return await UpdateAsync(key, value, revision: 0, serializer, cancellationToken);
         }
         catch (NatsKVWrongLastRevisionException)
         {
@@ -86,19 +81,20 @@ public class NatsKVStore : INatsKVStore
         }
         catch (NatsKVKeyDeletedException e)
         {
-            return await UpdateAsync(key, value, e.Revision, cancellationToken);
+            return await UpdateAsync(key, value, e.Revision, serializer, cancellationToken);
         }
 
         throw new NatsKVCreateException();
     }
 
-    public async ValueTask<ulong> UpdateAsync<T>(string key, T value, ulong revision, CancellationToken cancellationToken = default)
+    /// <inheritdoc />
+    public async ValueTask<ulong> UpdateAsync<T>(string key, T value, ulong revision, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
         var headers = new NatsHeaders { { NatsExpectedLastSubjectSequence, revision.ToString() } };
 
         try
         {
-            var ack = await _context.PublishAsync($"$KV.{Bucket}.{key}", value, headers: headers, cancellationToken: cancellationToken);
+            var ack = await _context.PublishAsync($"$KV.{Bucket}.{key}", value, headers: headers, serializer: serializer, cancellationToken: cancellationToken);
             ack.EnsureSuccess();
 
             return ack.Seq;
