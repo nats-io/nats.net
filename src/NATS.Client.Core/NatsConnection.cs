@@ -572,13 +572,13 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         {
             retry = _connectRetry++;
 
-            if (Opts.ReconnectWait >= Opts.ReconnectWaitMax)
+            if (Opts.ReconnectWaitMin >= Opts.ReconnectWaitMax)
             {
-                _backoff = Opts.ReconnectWait;
+                _backoff = Opts.ReconnectWaitMin;
             }
             else if (_backoff == TimeSpan.Zero)
             {
-                _backoff = Opts.ReconnectWait;
+                _backoff = Opts.ReconnectWaitMin;
             }
             else if (_backoff == Opts.ReconnectWaitMax)
             {
@@ -589,6 +589,10 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
                 if (_backoff > Opts.ReconnectWaitMax)
                 {
                     _backoff = Opts.ReconnectWaitMax;
+                }
+                else if (_backoff <= TimeSpan.Zero)
+                {
+                    _backoff = TimeSpan.FromSeconds(1);
                 }
             }
 

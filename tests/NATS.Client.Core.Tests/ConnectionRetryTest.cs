@@ -14,7 +14,7 @@ public class ConnectionRetryTest
         {
             MaxReconnectRetry = 2,
             ReconnectWaitMax = TimeSpan.Zero,
-            ReconnectWait = TimeSpan.FromSeconds(.1),
+            ReconnectWaitMin = TimeSpan.FromSeconds(.1),
         });
 
         var signal = new WaitSignal();
@@ -37,7 +37,7 @@ public class ConnectionRetryTest
         {
             MaxReconnectRetry = 10,
             ReconnectWaitMax = TimeSpan.Zero,
-            ReconnectWait = TimeSpan.FromSeconds(2),
+            ReconnectWaitMin = TimeSpan.FromSeconds(2),
         });
 
         var signal = new WaitSignal();

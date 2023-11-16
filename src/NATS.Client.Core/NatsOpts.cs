@@ -47,7 +47,7 @@ public sealed record NatsOpts
     /// <summary>
     /// Minimum amount of time to wait between reconnect attempts. (default: 2s)
     /// </summary>
-    public TimeSpan ReconnectWait { get; init; } = TimeSpan.FromSeconds(2);
+    public TimeSpan ReconnectWaitMin { get; init; } = TimeSpan.FromSeconds(2);
 
     /// <summary>
     /// Random amount of time to wait between reconnect attempts. (default: 100ms)
@@ -82,9 +82,9 @@ public sealed record NatsOpts
     /// Backoff delay limit for reconnect attempts. (default: 5 seconds)
     /// </summary>
     /// <remarks>
-    /// When the connection is lost, the client will wait for <see cref="ReconnectWait"/> before attempting to reconnect.
+    /// When the connection is lost, the client will wait for <see cref="ReconnectWaitMin"/> before attempting to reconnect.
     /// Every failed attempt will increase the wait time by 2x, up to <see cref="ReconnectWaitMax"/>.
-    /// If <see cref="ReconnectWaitMax"/> is equal to or less than <see cref="ReconnectWait"/>, the delay will be constant.
+    /// If <see cref="ReconnectWaitMax"/> is equal to or less than <see cref="ReconnectWaitMin"/>, the delay will be constant.
     /// </remarks>
     public TimeSpan ReconnectWaitMax { get; init; } = TimeSpan.FromSeconds(5);
 
