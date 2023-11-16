@@ -23,35 +23,33 @@ public partial class NatsJSContext : INatsJSContext
         return new ValueTask<INatsJSConsumer>(new NatsJSOrderedConsumer(stream, this, opts, cancellationToken));
     }
 
-    /// <summary>
-    /// Creates new consumer if it doesn't exists or returns an existing one with the same name.
-    /// </summary>
-    /// <param name="request">Consumer creation request to be sent to NATS JetStream server.</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <returns>The NATS JetStream consumer object which can be used retrieving data from the stream.</returns>
-    /// <exception cref="NatsJSException">Ack policy is set to <c>none</c> or there was an issue retrieving the response.</exception>
-    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <inheritdoc />>
     public async ValueTask<INatsJSConsumer> CreateConsumerAsync(
-        ConsumerCreateRequest request,
+        string stream,
+        ConsumerConfiguration config,
         CancellationToken cancellationToken = default)
     {
         // TODO: Adjust API subject according to server version and filter subject
-        var subject = $"{Opts.Prefix}.CONSUMER.CREATE.{request.StreamName}";
+        var subject = $"{Opts.Prefix}.CONSUMER.CREATE.{stream}";
 
-        if (!string.IsNullOrWhiteSpace(request.Config.Name))
+        if (!string.IsNullOrWhiteSpace(config.Name))
         {
-            subject += $".{request.Config.Name}";
-            request.Config.Name = default!;
+            subject += $".{config.Name}";
+            config.Name = default!;
         }
 
-        if (!string.IsNullOrWhiteSpace(request.Config.FilterSubject))
+        if (!string.IsNullOrWhiteSpace(config.FilterSubject))
         {
-            subject += $".{request.Config.FilterSubject}";
+            subject += $".{config.FilterSubject}";
         }
 
         var response = await JSRequestResponseAsync<ConsumerCreateRequest, ConsumerInfo>(
             subject: subject,
-            request,
+            new ConsumerCreateRequest
+            {
+                StreamName = stream,
+                Config = config,
+            },
             cancellationToken);
 
         return new NatsJSConsumer(this, response);

@@ -21,9 +21,9 @@ public class NatsConsumeTests
 
             var sub = Task.Run(async () =>
             {
-                await js.CreateStreamAsync(new StreamCreateRequest { Name = "s1", Subjects = new[] { "s1.*" } });
+                await js.CreateStreamAsync(new StreamConfiguration { Name = "s1", Subjects = new[] { "s1.*" } });
 
-                var consumer = await js.CreateConsumerAsync(new ConsumerCreateRequest { StreamName = "s1", Config = new ConsumerConfiguration { Name = "c1", DurableName = "c1", AckPolicy = ConsumerConfigurationAckPolicy.@explicit } });
+                var consumer = await js.CreateConsumerAsync("s1", new ConsumerConfiguration { Name = "c1", DurableName = "c1", AckPolicy = ConsumerConfigurationAckPolicy.@explicit });
 
                 var count = 0;
                 await foreach (var msg in consumer.ConsumeAsync<int>(opts: new NatsJSConsumeOpts { MaxMsgs = 100 }))
@@ -99,7 +99,7 @@ public class NatsConsumeTests
 
             var sub = Task.Run(async () =>
             {
-                await js.CreateStreamAsync(new StreamCreateRequest { Name = "s1", Subjects = new[] { "s1.*" } });
+                await js.CreateStreamAsync(new StreamConfiguration { Name = "s1", Subjects = new[] { "s1.*" } });
 
                 var consumer = await js.CreateOrderedConsumerAsync("s1");
 

@@ -35,17 +35,14 @@ public class JetStreamTest
 
             // Create consumer
             var consumer = (NatsJSConsumer)await js.CreateConsumerAsync(
-                new ConsumerCreateRequest
+                "events",
+                new ConsumerConfiguration
                 {
-                    StreamName = "events",
-                    Config = new ConsumerConfiguration
-                    {
-                        Name = "consumer1",
-                        DurableName = "consumer1",
+                    Name = "consumer1",
+                    DurableName = "consumer1",
 
-                        // Turn on ACK so we can test them below
-                        AckPolicy = ConsumerConfigurationAckPolicy.@explicit,
-                    },
+                    // Turn on ACK so we can test them below
+                    AckPolicy = ConsumerConfigurationAckPolicy.@explicit,
                 },
                 cts1.Token);
             Assert.Equal("events", consumer.Info.StreamName);

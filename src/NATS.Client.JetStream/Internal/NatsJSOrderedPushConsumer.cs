@@ -361,7 +361,8 @@ internal class NatsJSOrderedPushConsumer<T>
         }
 
         await _context.CreateConsumerAsync(
-            new ConsumerCreateRequest { StreamName = _stream, Config = config, },
+            _stream,
+            config,
             cancellationToken: _cancellationToken);
 
         if (_debug)

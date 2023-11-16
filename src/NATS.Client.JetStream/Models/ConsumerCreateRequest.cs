@@ -4,7 +4,7 @@ namespace NATS.Client.JetStream.Models;
 /// A request to the JetStream $JS.API.CONSUMER.CREATE and $JS.API.CONSUMER.DURABLE.CREATE APIs
 /// </summary>
 
-public record ConsumerCreateRequest
+internal record ConsumerCreateRequest
 {
     /// <summary>
     /// The name of the stream to create the consumer in

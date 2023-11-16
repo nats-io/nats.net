@@ -104,16 +104,13 @@ public class ConsumeTest : ITest
         });
 
         var consumer = await js.CreateConsumerAsync(
-            new ConsumerCreateRequest
+            "s1",
+            new ConsumerConfiguration
             {
-                StreamName = "s1",
-                Config = new ConsumerConfiguration
-                {
-                    Name = "c1",
-                    DurableName = "c1",
-                    AckPolicy = ConsumerConfigurationAckPolicy.@explicit,
-                    NumReplicas = 3,
-                },
+                Name = "c1",
+                DurableName = "c1",
+                AckPolicy = ConsumerConfigurationAckPolicy.@explicit,
+                NumReplicas = 3,
             },
             cancellationToken);
 

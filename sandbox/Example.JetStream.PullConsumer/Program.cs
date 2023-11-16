@@ -19,7 +19,7 @@ await using var nats = new NatsConnection(options);
 
 var js = new NatsJSContext(nats);
 
-var consumer = await js.CreateConsumerAsync(new ConsumerCreateRequest { StreamName = "s1", Config = new ConsumerConfiguration { Name = "c1", DurableName = "c1", AckPolicy = ConsumerConfigurationAckPolicy.@explicit } });
+var consumer = await js.CreateConsumerAsync("s1", new ConsumerConfiguration { Name = "c1", DurableName = "c1", AckPolicy = ConsumerConfigurationAckPolicy.@explicit });
 
 var idle = TimeSpan.FromSeconds(5);
 var expires = TimeSpan.FromSeconds(10);

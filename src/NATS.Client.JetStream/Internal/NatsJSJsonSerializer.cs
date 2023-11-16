@@ -46,7 +46,6 @@ internal static class NatsJSJsonSerializer<T>
 [JsonSerializable(typeof(StoredMessage))]
 [JsonSerializable(typeof(StreamAlternate))]
 [JsonSerializable(typeof(StreamConfiguration))]
-[JsonSerializable(typeof(StreamCreateRequest))]
 [JsonSerializable(typeof(StreamCreateResponse))]
 [JsonSerializable(typeof(StreamDeleteResponse))]
 [JsonSerializable(typeof(StreamInfo))]
