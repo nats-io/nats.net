@@ -51,6 +51,8 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
     private TlsCerts? _tlsCerts;
     private ClientOpts _clientOpts;
     private UserCredentials? _userCredentials;
+    private int _connectRetry;
+    private TimeSpan _backoff = TimeSpan.Zero;
 
     public NatsConnection()
         : this(NatsOpts.Default)
@@ -432,7 +434,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
             {
                 ConnectionState = NatsConnectionState.Reconnecting;
                 _waitForOpenConnection.TrySetCanceled();
-                _waitForOpenConnection = new TaskCompletionSource();
+                _waitForOpenConnection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 _pingTimerCancellationTokenSource?.Cancel();
             }
 
@@ -522,6 +524,8 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
             lock (_gate)
             {
+                _connectRetry = 0;
+                _backoff = TimeSpan.Zero;
                 _logger.LogInformation("Connect succeed {0}, NATS {1}", _name, url);
                 ConnectionState = NatsConnectionState.Open;
                 _pingTimerCancellationTokenSource = new CancellationTokenSource();
@@ -535,6 +539,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         {
             if (ex is OperationCanceledException)
                 return;
+            _waitForOpenConnection.TrySetException(ex);
             _logger.LogError(ex, "Unknown error, loop stopped and connection is invalid state.");
         }
     }
@@ -561,8 +566,44 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
     private async Task WaitWithJitterAsync()
     {
+        int retry;
+        TimeSpan backoff;
+        lock (_gate)
+        {
+            retry = _connectRetry++;
+
+            if (Opts.ReconnectWaitMin >= Opts.ReconnectWaitMax)
+            {
+                _backoff = Opts.ReconnectWaitMin;
+            }
+            else if (_backoff == TimeSpan.Zero)
+            {
+                _backoff = Opts.ReconnectWaitMin;
+            }
+            else if (_backoff == Opts.ReconnectWaitMax)
+            {
+            }
+            else
+            {
+                _backoff *= 2;
+                if (_backoff > Opts.ReconnectWaitMax)
+                {
+                    _backoff = Opts.ReconnectWaitMax;
+                }
+                else if (_backoff <= TimeSpan.Zero)
+                {
+                    _backoff = TimeSpan.FromSeconds(1);
+                }
+            }
+
+            backoff = _backoff;
+        }
+
+        if (Opts.MaxReconnectRetry > 0 && retry > Opts.MaxReconnectRetry)
+            throw new NatsException("Max connect retry exceeded.");
+
         var jitter = Random.Shared.NextDouble() * Opts.ReconnectJitter.TotalMilliseconds;
-        var waitTime = Opts.ReconnectWait + TimeSpan.FromMilliseconds(jitter);
+        var waitTime = TimeSpan.FromMilliseconds(jitter) + backoff;
         if (waitTime != TimeSpan.Zero)
         {
             _logger.LogTrace("Wait {0}ms to reconnect.", waitTime.TotalMilliseconds);
