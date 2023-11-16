@@ -27,7 +27,7 @@ public record ConsumerInfo
 
     [System.Text.Json.Serialization.JsonPropertyName("config")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
-    public ConsumerConfiguration Config { get; set; } = default!;
+    public ConsumerConfig Config { get; set; } = default!;
 
     /// <summary>
     /// The time the Consumer was created

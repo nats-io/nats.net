@@ -36,7 +36,7 @@ internal record NatsJSOrderedPushConsumerOpts
     /// </summary>
     public TimeSpan IdleHeartbeat { get; init; } = TimeSpan.FromSeconds(5);
 
-    public ConsumerConfigurationDeliverPolicy DeliverPolicy { get; init; } = ConsumerConfigurationDeliverPolicy.all;
+    public ConsumerConfigDeliverPolicy DeliverPolicy { get; init; } = ConsumerConfigDeliverPolicy.all;
 
     public bool HeadersOnly { get; init; } = false;
 }
@@ -335,11 +335,11 @@ internal class NatsJSOrderedPushConsumer<T>
 
         var sequence = Volatile.Read(ref _sequenceStream);
 
-        var config = new ConsumerConfiguration
+        var config = new ConsumerConfig
         {
             Name = Consumer,
-            DeliverPolicy = ConsumerConfigurationDeliverPolicy.all,
-            AckPolicy = ConsumerConfigurationAckPolicy.none,
+            DeliverPolicy = ConsumerConfigDeliverPolicy.all,
+            AckPolicy = ConsumerConfigAckPolicy.none,
             DeliverSubject = _sub.Subject,
             FilterSubject = _filter,
             FlowControl = true,
@@ -348,7 +348,7 @@ internal class NatsJSOrderedPushConsumer<T>
             MaxDeliver = 1,
             MemStorage = true,
             NumReplicas = 1,
-            ReplayPolicy = ConsumerConfigurationReplayPolicy.instant,
+            ReplayPolicy = ConsumerConfigReplayPolicy.instant,
         };
 
         config.DeliverPolicy = _opts.DeliverPolicy;
@@ -356,7 +356,7 @@ internal class NatsJSOrderedPushConsumer<T>
 
         if (sequence > 0)
         {
-            config.DeliverPolicy = ConsumerConfigurationDeliverPolicy.by_start_sequence;
+            config.DeliverPolicy = ConsumerConfigDeliverPolicy.by_start_sequence;
             config.OptStartSeq = sequence + 1;
         }
 

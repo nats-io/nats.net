@@ -44,7 +44,7 @@ public class OrderedConsumeTest : ITest
         var js2 = new NatsJSContext(nats2);
 
         var stream = await js1.CreateStreamAsync(
-            new StreamConfiguration
+            new StreamConfig
             {
                 Name = "s1",
                 Subjects = new[] { "s1.*" },

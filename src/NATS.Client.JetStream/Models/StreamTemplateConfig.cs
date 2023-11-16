@@ -4,7 +4,7 @@ namespace NATS.Client.JetStream.Models;
 /// The data structure that describe the configuration of a NATS JetStream Stream Template
 /// </summary>
 
-public record StreamTemplateConfiguration
+public record StreamTemplateConfig
 {
     /// <summary>
     /// A unique name for the Stream Template.
@@ -27,5 +27,5 @@ public record StreamTemplateConfiguration
     [System.Text.Json.Serialization.JsonPropertyName("config")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required]
-    public StreamConfiguration Config { get; set; } = new StreamConfiguration();
+    public StreamConfig Config { get; set; } = new StreamConfig();
 }

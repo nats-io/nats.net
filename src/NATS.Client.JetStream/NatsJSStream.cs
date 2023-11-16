@@ -98,7 +98,7 @@ public class NatsJSStream : INatsJSStream
     /// <returns>The NATS JetStream consumer object which can be used retrieving data from the stream.</returns>
     /// <exception cref="NatsJSException">Ack policy is set to <c>none</c> or there is an error retrieving the response or this consumer object isn't valid anymore because it was deleted earlier.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
-    public ValueTask<INatsJSConsumer> CreateConsumerAsync(ConsumerConfiguration config, CancellationToken cancellationToken = default)
+    public ValueTask<INatsJSConsumer> CreateConsumerAsync(ConsumerConfig config, CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
         return _context.CreateConsumerAsync(_name, config, cancellationToken);

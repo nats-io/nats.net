@@ -9,7 +9,7 @@ public record StreamRestoreRequest
     [System.Text.Json.Serialization.JsonPropertyName("config")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required]
-    public StreamConfiguration Config { get; set; } = new StreamConfiguration();
+    public StreamConfig Config { get; set; } = new StreamConfig();
 
     [System.Text.Json.Serialization.JsonPropertyName("state")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]

@@ -42,17 +42,17 @@ public class KeyValueStoreTest
         // You can't create a 'non-direct' KV store using the API
         // We're using the stream API directly to create a stream
         // that doesn't allow direct gets.
-        await js.CreateStreamAsync(new StreamConfiguration
+        await js.CreateStreamAsync(new StreamConfig
         {
             Name = $"KV_{bucket}",
             Subjects = new[] { $"$KV.{bucket}.>" },
             AllowDirect = false, // this property makes the switch
-            Discard = StreamConfigurationDiscard.@new,
+            Discard = StreamConfigDiscard.@new,
             DenyDelete = true,
             DenyPurge = false,
             NumReplicas = 1,
             MaxMsgsPerSubject = 10,
-            Retention = StreamConfigurationRetention.limits,
+            Retention = StreamConfigRetention.limits,
             DuplicateWindow = 120000000000,
         });
 

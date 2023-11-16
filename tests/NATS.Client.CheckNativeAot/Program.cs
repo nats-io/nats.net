@@ -72,20 +72,20 @@ async Task JetStreamTests()
 
         // Create stream
         var stream = await js.CreateStreamAsync(
-            request: new StreamConfiguration { Name = "events", Subjects = new[] { "events.*" }, },
+            request: new StreamConfig { Name = "events", Subjects = new[] { "events.*" }, },
             cancellationToken: cts1.Token);
         Assert.Equal("events", stream.Info.Config.Name);
 
         // Create consumer
         var consumer = await js.CreateConsumerAsync(
             "events",
-            new ConsumerConfiguration
+            new ConsumerConfig
             {
                 Name = "consumer1",
                 DurableName = "consumer1",
 
                 // Turn on ACK so we can test them below
-                AckPolicy = ConsumerConfigurationAckPolicy.@explicit,
+                AckPolicy = ConsumerConfigAckPolicy.@explicit,
             },
             cts1.Token);
         Assert.Equal("events", consumer.Info.StreamName);
@@ -153,7 +153,7 @@ async Task JetStreamTests()
         var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () =>
         {
             await js.CreateStreamAsync(
-                request: new StreamConfiguration
+                request: new StreamConfig
                 {
                     Name = "events2",
                     Subjects = new[] { "events.*" },

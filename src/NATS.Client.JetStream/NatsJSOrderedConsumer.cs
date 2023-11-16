@@ -248,7 +248,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
             consumerOpts = _opts with
             {
                 OptStartSeq = seq + 1,
-                DeliverPolicy = ConsumerConfigurationDeliverPolicy.by_start_sequence,
+                DeliverPolicy = ConsumerConfigDeliverPolicy.by_start_sequence,
             };
 
             if (consumer != string.Empty)

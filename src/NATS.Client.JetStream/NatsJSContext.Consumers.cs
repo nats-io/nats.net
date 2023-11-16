@@ -26,7 +26,7 @@ public partial class NatsJSContext : INatsJSContext
     /// <inheritdoc />>
     public async ValueTask<INatsJSConsumer> CreateConsumerAsync(
         string stream,
-        ConsumerConfiguration config,
+        ConsumerConfig config,
         CancellationToken cancellationToken = default)
     {
         // TODO: Adjust API subject according to server version and filter subject
@@ -122,10 +122,10 @@ public partial class NatsJSContext : INatsJSContext
         var request = new ConsumerCreateRequest
         {
             StreamName = stream,
-            Config = new ConsumerConfiguration
+            Config = new ConsumerConfig
             {
                 DeliverPolicy = opts.DeliverPolicy,
-                AckPolicy = ConsumerConfigurationAckPolicy.none,
+                AckPolicy = ConsumerConfigAckPolicy.none,
                 ReplayPolicy = opts.ReplayPolicy,
                 InactiveThreshold = opts.InactiveThreshold.ToNanos(),
                 NumReplicas = 1,

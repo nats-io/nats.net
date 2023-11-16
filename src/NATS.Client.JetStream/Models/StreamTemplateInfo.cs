@@ -5,7 +5,7 @@ public record StreamTemplateInfo
     [System.Text.Json.Serialization.JsonPropertyName("config")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required]
-    public StreamTemplateConfiguration Config { get; set; } = new StreamTemplateConfiguration();
+    public StreamTemplateConfig Config { get; set; } = new StreamTemplateConfig();
 
     /// <summary>
     /// List of Streams managed by this Template

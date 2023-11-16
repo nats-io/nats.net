@@ -29,7 +29,7 @@ public interface INatsJSContext
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     ValueTask<INatsJSConsumer> CreateConsumerAsync(
         string stream,
-        ConsumerConfiguration config,
+        ConsumerConfig config,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -115,7 +115,7 @@ public interface INatsJSContext
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     ValueTask<INatsJSStream> CreateStreamAsync(
-        StreamConfiguration request,
+        StreamConfig request,
         CancellationToken cancellationToken = default);
 
     /// <summary>

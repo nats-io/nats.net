@@ -14,10 +14,10 @@ public partial class NatsJSContext
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     public async ValueTask<INatsJSStream> CreateStreamAsync(
-        StreamConfiguration request,
+        StreamConfig request,
         CancellationToken cancellationToken = default)
     {
-        var response = await JSRequestResponseAsync<StreamConfiguration, StreamInfo>(
+        var response = await JSRequestResponseAsync<StreamConfig, StreamInfo>(
             subject: $"{Opts.Prefix}.STREAM.CREATE.{request.Name}",
             request,
             cancellationToken);

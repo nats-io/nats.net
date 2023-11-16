@@ -1,12 +1,12 @@
 namespace NATS.Client.JetStream.Models;
 
-public record ConsumerConfiguration
+public record ConsumerConfig
 {
     [System.Text.Json.Serialization.JsonPropertyName("deliver_policy")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
     [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
-    public ConsumerConfigurationDeliverPolicy DeliverPolicy { get; set; } = default!;
+    public ConsumerConfigDeliverPolicy DeliverPolicy { get; set; } = default!;
 
     [System.Text.Json.Serialization.JsonPropertyName("opt_start_seq")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
@@ -52,7 +52,7 @@ public record ConsumerConfiguration
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
     [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
-    public ConsumerConfigurationAckPolicy AckPolicy { get; set; } = ConsumerConfigurationAckPolicy.none;
+    public ConsumerConfigAckPolicy AckPolicy { get; set; } = ConsumerConfigAckPolicy.none;
 
     /// <summary>
     /// How long (in nanoseconds) to allow messages to remain un-acknowledged before attempting redelivery
@@ -88,7 +88,7 @@ public record ConsumerConfiguration
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
     [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
-    public ConsumerConfigurationReplayPolicy ReplayPolicy { get; set; } = NATS.Client.JetStream.Models.ConsumerConfigurationReplayPolicy.instant;
+    public ConsumerConfigReplayPolicy ReplayPolicy { get; set; } = NATS.Client.JetStream.Models.ConsumerConfigReplayPolicy.instant;
 
     [System.Text.Json.Serialization.JsonPropertyName("sample_freq")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
