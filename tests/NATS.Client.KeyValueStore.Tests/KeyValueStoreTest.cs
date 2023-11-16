@@ -544,11 +544,11 @@ public class KeyValueStoreTest
         var status1 = await store1.GetStatusAsync(cancellationToken);
         Assert.Equal("kv1", status1.Bucket);
         Assert.Equal("KV_kv1", status1.Info.Config.Name);
-        Assert.Equal(StreamConfigurationCompression.none, status1.Info.Config.Compression);
+        Assert.Equal(StreamConfigCompression.none, status1.Info.Config.Compression);
 
         var status2 = await store2.GetStatusAsync(cancellationToken);
         Assert.Equal("kv2", status2.Bucket);
         Assert.Equal("KV_kv2", status2.Info.Config.Name);
-        Assert.Equal(StreamConfigurationCompression.s2, status2.Info.Config.Compression);
+        Assert.Equal(StreamConfigCompression.s2, status2.Info.Config.Compression);
     }
 }
