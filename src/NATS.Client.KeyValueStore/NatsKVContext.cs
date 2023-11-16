@@ -71,8 +71,8 @@ public class NatsKVContext : INatsKVContext
         }
 
         var storage = config.Storage == NatsKVStorageType.File
-            ? StreamConfigurationStorage.file
-            : StreamConfigurationStorage.memory;
+            ? StreamConfigStorage.file
+            : StreamConfigStorage.memory;
 
         var republish = config.Republish != null
             ? new Republish
@@ -85,7 +85,7 @@ public class NatsKVContext : INatsKVContext
 
         var replicas = config.NumberOfReplicas > 0 ? config.NumberOfReplicas : 1;
 
-        var streamConfig = new StreamConfiguration
+        var streamConfig = new StreamConfig
         {
             Name = BucketToStream(config.Bucket),
             Description = config.Description!,
@@ -94,7 +94,7 @@ public class NatsKVContext : INatsKVContext
             MaxBytes = config.MaxBytes,
             MaxAge = config.MaxAge.ToNanos(),
             MaxMsgSize = config.MaxValueSize,
-            Compression = config.Compression ? StreamConfigurationCompression.s2 : StreamConfigurationCompression.none,
+            Compression = config.Compression ? StreamConfigCompression.s2 : StreamConfigCompression.none,
             Storage = storage,
             Republish = republish!,
             AllowRollupHdrs = true,
@@ -102,12 +102,12 @@ public class NatsKVContext : INatsKVContext
             DenyPurge = false,
             AllowDirect = true,
             NumReplicas = replicas,
-            Discard = StreamConfigurationDiscard.@new,
+            Discard = StreamConfigDiscard.@new,
 
             // TODO: KV mirrors
             // MirrorDirect =
             // Mirror =
-            Retention = StreamConfigurationRetention.limits, // from ADR-8
+            Retention = StreamConfigRetention.limits, // from ADR-8
             DuplicateWindow = 120000000000, // from ADR-8
         };
 

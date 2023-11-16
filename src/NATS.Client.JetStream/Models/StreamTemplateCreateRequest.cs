@@ -4,6 +4,6 @@ namespace NATS.Client.JetStream.Models;
 /// A request to the JetStream $JS.API.STREAM.TEMPLATE.CREATE API
 /// </summary>
 
-public record StreamTemplateCreateRequest : StreamTemplateConfiguration
+public record StreamTemplateCreateRequest : StreamTemplateConfig
 {
 }

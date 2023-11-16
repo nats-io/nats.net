@@ -42,17 +42,17 @@ public class KeyValueStoreTest
         // You can't create a 'non-direct' KV store using the API
         // We're using the stream API directly to create a stream
         // that doesn't allow direct gets.
-        await js.CreateStreamAsync(new StreamConfiguration
+        await js.CreateStreamAsync(new StreamConfig
         {
             Name = $"KV_{bucket}",
             Subjects = new[] { $"$KV.{bucket}.>" },
             AllowDirect = false, // this property makes the switch
-            Discard = StreamConfigurationDiscard.@new,
+            Discard = StreamConfigDiscard.@new,
             DenyDelete = true,
             DenyPurge = false,
             NumReplicas = 1,
             MaxMsgsPerSubject = 10,
-            Retention = StreamConfigurationRetention.limits,
+            Retention = StreamConfigRetention.limits,
             DuplicateWindow = 120000000000,
         });
 
@@ -544,11 +544,11 @@ public class KeyValueStoreTest
         var status1 = await store1.GetStatusAsync(cancellationToken);
         Assert.Equal("kv1", status1.Bucket);
         Assert.Equal("KV_kv1", status1.Info.Config.Name);
-        Assert.Equal(StreamConfigurationCompression.none, status1.Info.Config.Compression);
+        Assert.Equal(StreamConfigCompression.none, status1.Info.Config.Compression);
 
         var status2 = await store2.GetStatusAsync(cancellationToken);
         Assert.Equal("kv2", status2.Bucket);
         Assert.Equal("KV_kv2", status2.Info.Config.Name);
-        Assert.Equal(StreamConfigurationCompression.s2, status2.Info.Config.Compression);
+        Assert.Equal(StreamConfigCompression.s2, status2.Info.Config.Compression);
     }
 }

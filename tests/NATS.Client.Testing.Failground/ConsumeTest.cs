@@ -38,12 +38,7 @@ public class ConsumeTest : ITest
         var js = new NatsJSContext(nats);
 
         var stream = await js.CreateStreamAsync(
-            new StreamConfiguration
-            {
-                Name = "s1",
-                Subjects = new[] { "s1.*" },
-                NumReplicas = 3,
-            },
+            new StreamConfig(name: "s1", subjects: new[] { "s1.*" }) { NumReplicas = 3 },
             cancellationToken);
 
         _logger.LogInformation("Created stream {Name}", stream.Info.Config.Name);
@@ -104,16 +99,13 @@ public class ConsumeTest : ITest
         });
 
         var consumer = await js.CreateConsumerAsync(
-            new ConsumerCreateRequest
+            "s1",
+            new ConsumerConfig
             {
-                StreamName = "s1",
-                Config = new ConsumerConfiguration
-                {
-                    Name = "c1",
-                    DurableName = "c1",
-                    AckPolicy = ConsumerConfigurationAckPolicy.@explicit,
-                    NumReplicas = 3,
-                },
+                Name = "c1",
+                DurableName = "c1",
+                AckPolicy = ConsumerConfigAckPolicy.@explicit,
+                NumReplicas = 3,
             },
             cancellationToken);
 

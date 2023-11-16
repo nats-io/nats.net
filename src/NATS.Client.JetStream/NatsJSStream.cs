@@ -84,21 +84,6 @@ public class NatsJSStream : INatsJSStream
         Info = response.Info;
     }
 
-    /// <summary>
-    /// Creates new consumer for this stream if it doesn't exists or returns an existing one with the same name.
-    /// </summary>
-    /// <param name="consumer">Name of the consumer.</param>
-    /// <param name="ackPolicy">Ack policy to use. Must not be set to <c>none</c>. Default is <c>explicit</c>.</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <returns>The NATS JetStream consumer object which can be used retrieving data from the stream.</returns>
-    /// <exception cref="NatsJSException">Ack policy is set to <c>none</c> or there is an error retrieving the response or this consumer object isn't valid anymore because it was deleted earlier.</exception>
-    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
-    public ValueTask<INatsJSConsumer> CreateConsumerAsync(string consumer, ConsumerConfigurationAckPolicy ackPolicy = ConsumerConfigurationAckPolicy.@explicit, CancellationToken cancellationToken = default)
-    {
-        ThrowIfDeleted();
-        return _context.CreateConsumerAsync(_name, consumer, ackPolicy, cancellationToken);
-    }
-
     public ValueTask<INatsJSConsumer> CreateOrderedConsumerAsync(NatsJSOrderedConsumerOpts? opts = default, CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
@@ -108,15 +93,15 @@ public class NatsJSStream : INatsJSStream
     /// <summary>
     /// Creates new consumer for this stream if it doesn't exists or returns an existing one with the same name.
     /// </summary>
-    /// <param name="request">Consumer creation request to be sent to NATS JetStream server.</param>
+    /// <param name="config">Consumer configuration.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>The NATS JetStream consumer object which can be used retrieving data from the stream.</returns>
     /// <exception cref="NatsJSException">Ack policy is set to <c>none</c> or there is an error retrieving the response or this consumer object isn't valid anymore because it was deleted earlier.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
-    public ValueTask<INatsJSConsumer> CreateConsumerAsync(ConsumerCreateRequest request, CancellationToken cancellationToken = default)
+    public ValueTask<INatsJSConsumer> CreateConsumerAsync(ConsumerConfig config, CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
-        return _context.CreateConsumerAsync(request, cancellationToken);
+        return _context.CreateConsumerAsync(_name, config, cancellationToken);
     }
 
     /// <summary>

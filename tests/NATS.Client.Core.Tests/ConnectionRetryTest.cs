@@ -1,4 +1,4 @@
-﻿namespace NATS.Client.Core.Tests;
+namespace NATS.Client.Core.Tests;
 
 public class ConnectionRetryTest
 {

@@ -82,7 +82,7 @@ public class NatsObjStore : INatsObjStore
             stream: $"OBJ_{Bucket}",
             filter: GetChunkSubject(info.Nuid),
             serializer: NatsDefaultSerializer<NatsMemoryOwner<byte>>.Default,
-            opts: new NatsJSOrderedPushConsumerOpts { DeliverPolicy = ConsumerConfigurationDeliverPolicy.all },
+            opts: new NatsJSOrderedPushConsumerOpts { DeliverPolicy = ConsumerConfigDeliverPolicy.all },
             subOpts: new NatsSubOpts(),
             cancellationToken: cancellationToken);
 
@@ -456,7 +456,7 @@ public class NatsObjStore : INatsObjStore
         var config = info.Config;
         config.Sealed = true;
 
-        var response = await _context.JSRequestResponseAsync<StreamConfiguration, StreamUpdateResponse>(
+        var response = await _context.JSRequestResponseAsync<StreamConfig, StreamUpdateResponse>(
             subject: $"{_context.Opts.Prefix}.STREAM.UPDATE.{_stream.Info.Config.Name}",
             request: config,
             cancellationToken);
@@ -533,7 +533,7 @@ public class NatsObjStore : INatsObjStore
     public async ValueTask<NatsObjStatus> GetStatusAsync(CancellationToken cancellationToken = default)
     {
         await _stream.RefreshAsync(cancellationToken);
-        var isCompressed = _stream.Info.Config.Compression != StreamConfigurationCompression.none;
+        var isCompressed = _stream.Info.Config.Compression != StreamConfigCompression.none;
         return new NatsObjStatus(Bucket, isCompressed, _stream.Info);
     }
 
@@ -547,16 +547,16 @@ public class NatsObjStore : INatsObjStore
     {
         opts ??= new NatsObjWatchOpts();
 
-        var deliverPolicy = ConsumerConfigurationDeliverPolicy.all;
+        var deliverPolicy = ConsumerConfigDeliverPolicy.all;
 
         if (!opts.IncludeHistory)
         {
-            deliverPolicy = ConsumerConfigurationDeliverPolicy.last_per_subject;
+            deliverPolicy = ConsumerConfigDeliverPolicy.last_per_subject;
         }
 
         if (opts.UpdatesOnly)
         {
-            deliverPolicy = ConsumerConfigurationDeliverPolicy.@new;
+            deliverPolicy = ConsumerConfigDeliverPolicy.@new;
         }
 
         await using var pushConsumer = new NatsJSOrderedPushConsumer<NatsMemoryOwner<byte>>(

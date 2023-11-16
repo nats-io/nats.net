@@ -3,6 +3,7 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
+using NATS.Client.JetStream.Models;
 
 var cts = new CancellationTokenSource();
 
@@ -18,7 +19,7 @@ await using var nats = new NatsConnection(options);
 
 var js = new NatsJSContext(nats);
 
-var consumer = await js.CreateConsumerAsync("s1", "c1");
+var consumer = await js.CreateConsumerAsync("s1", new ConsumerConfig { Name = "c1", DurableName = "c1", AckPolicy = ConsumerConfigAckPolicy.@explicit });
 
 var idle = TimeSpan.FromSeconds(5);
 var expires = TimeSpan.FromSeconds(10);

@@ -2,6 +2,7 @@ using JetBrains.dotMemoryUnit;
 using NATS.Client.Core.Tests;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Internal;
+using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.Core.MemoryTests;
 
@@ -20,9 +21,9 @@ public class NatsConsumeTests
 
             var sub = Task.Run(async () =>
             {
-                await js.CreateStreamAsync("s1", new[] { "s1.*" });
+                await js.CreateStreamAsync(new StreamConfig { Name = "s1", Subjects = new[] { "s1.*" } });
 
-                var consumer = await js.CreateConsumerAsync("s1", "c1");
+                var consumer = await js.CreateConsumerAsync("s1", new ConsumerConfig { Name = "c1", DurableName = "c1", AckPolicy = ConsumerConfigAckPolicy.@explicit });
 
                 var count = 0;
                 await foreach (var msg in consumer.ConsumeAsync<int>(opts: new NatsJSConsumeOpts { MaxMsgs = 100 }))
@@ -98,7 +99,7 @@ public class NatsConsumeTests
 
             var sub = Task.Run(async () =>
             {
-                await js.CreateStreamAsync("s1", new[] { "s1.*" });
+                await js.CreateStreamAsync(new StreamConfig { Name = "s1", Subjects = new[] { "s1.*" } });
 
                 var consumer = await js.CreateOrderedConsumerAsync("s1");
 

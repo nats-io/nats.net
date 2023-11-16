@@ -339,11 +339,11 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
 
         var sequence = Volatile.Read(ref _sequenceStream);
 
-        var config = new ConsumerConfiguration
+        var config = new ConsumerConfig
         {
             Name = Consumer,
-            DeliverPolicy = ConsumerConfigurationDeliverPolicy.all,
-            AckPolicy = ConsumerConfigurationAckPolicy.none,
+            DeliverPolicy = ConsumerConfigDeliverPolicy.all,
+            AckPolicy = ConsumerConfigAckPolicy.none,
             DeliverSubject = _sub.Subject,
             FilterSubject = _filter,
             FlowControl = true,
@@ -352,17 +352,17 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
             MaxDeliver = 1,
             MemStorage = true,
             NumReplicas = 1,
-            ReplayPolicy = ConsumerConfigurationReplayPolicy.instant,
+            ReplayPolicy = ConsumerConfigReplayPolicy.instant,
         };
 
         if (!_opts.IncludeHistory)
         {
-            config.DeliverPolicy = ConsumerConfigurationDeliverPolicy.last_per_subject;
+            config.DeliverPolicy = ConsumerConfigDeliverPolicy.last_per_subject;
         }
 
         if (_opts.UpdatesOnly)
         {
-            config.DeliverPolicy = ConsumerConfigurationDeliverPolicy.@new;
+            config.DeliverPolicy = ConsumerConfigDeliverPolicy.@new;
         }
 
         if (_opts.MetaOnly)
@@ -372,12 +372,13 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
 
         if (sequence > 0)
         {
-            config.DeliverPolicy = ConsumerConfigurationDeliverPolicy.by_start_sequence;
+            config.DeliverPolicy = ConsumerConfigDeliverPolicy.by_start_sequence;
             config.OptStartSeq = sequence + 1;
         }
 
         await _context.CreateConsumerAsync(
-            new ConsumerCreateRequest { StreamName = _stream, Config = config, },
+            _stream,
+            config,
             cancellationToken: _cancellationToken);
 
         if (_debug)

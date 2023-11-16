@@ -8,28 +8,16 @@ public partial class NatsJSContext
     /// <summary>
     /// Creates a new stream if it doesn't exist or returns an existing stream with the same name.
     /// </summary>
-    /// <param name="stream">Name of the stream to create. (e.g. my_events)</param>
-    /// <param name="subjects">List of subjects stream will persist messages from. (e.g. events.*)</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <returns>The NATS JetStream stream object which can be used to manage the stream.</returns>
-    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
-    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
-    public ValueTask<INatsJSStream> CreateStreamAsync(string stream, string[] subjects, CancellationToken cancellationToken = default) =>
-        CreateStreamAsync(new StreamCreateRequest { Name = stream, Subjects = subjects }, cancellationToken);
-
-    /// <summary>
-    /// Creates a new stream if it doesn't exist or returns an existing stream with the same name.
-    /// </summary>
     /// <param name="request">Stream configuration request to be sent to NATS JetStream server.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>The NATS JetStream stream object which can be used to manage the stream.</returns>
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     public async ValueTask<INatsJSStream> CreateStreamAsync(
-        StreamConfiguration request,
+        StreamConfig request,
         CancellationToken cancellationToken = default)
     {
-        var response = await JSRequestResponseAsync<StreamConfiguration, StreamInfo>(
+        var response = await JSRequestResponseAsync<StreamConfig, StreamInfo>(
             subject: $"{Opts.Prefix}.STREAM.CREATE.{request.Name}",
             request,
             cancellationToken);

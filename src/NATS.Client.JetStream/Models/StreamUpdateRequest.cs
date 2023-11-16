@@ -4,6 +4,6 @@ namespace NATS.Client.JetStream.Models;
 /// A request to the JetStream $JS.API.STREAM.UPDATE API
 /// </summary>
 
-public record StreamUpdateRequest : StreamConfiguration
+public record StreamUpdateRequest : StreamConfig
 {
 }

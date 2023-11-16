@@ -8,7 +8,7 @@ public record StreamInfo
     [System.Text.Json.Serialization.JsonPropertyName("config")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required]
-    public StreamConfiguration Config { get; set; } = new StreamConfiguration();
+    public StreamConfig Config { get; set; } = new StreamConfig();
 
     /// <summary>
     /// Detail about the current State of the Stream

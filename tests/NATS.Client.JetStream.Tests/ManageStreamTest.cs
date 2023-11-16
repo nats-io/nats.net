@@ -12,12 +12,12 @@ public class ManageStreamTest
     [Fact]
     public async Task Account_info_create_get_update_stream()
     {
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var cancellationToken = cts.Token;
-
         await using var server = NatsServer.StartJS();
         var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
 
         // Account Info
         {
@@ -28,7 +28,7 @@ public class ManageStreamTest
         // Create
         {
             var stream = await js.CreateStreamAsync(
-                request: new StreamConfiguration { Name = "events", Subjects = new[] { "events.*" } },
+                request: new StreamConfig { Name = "events", Subjects = new[] { "events.*" } },
                 cancellationToken: cancellationToken);
             Assert.Equal("events", stream.Info.Config.Name);
 

@@ -4,7 +4,7 @@ namespace NATS.Client.JetStream.Models;
 /// A request to the JetStream $JS.API.CONSUMER.CREATE and $JS.API.CONSUMER.DURABLE.CREATE APIs
 /// </summary>
 
-public record ConsumerCreateRequest
+internal record ConsumerCreateRequest
 {
     /// <summary>
     /// The name of the stream to create the consumer in
@@ -19,5 +19,5 @@ public record ConsumerCreateRequest
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("config")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
-    public ConsumerConfiguration Config { get; set; } = default!;
+    public ConsumerConfig Config { get; set; } = default!;
 }

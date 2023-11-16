@@ -66,13 +66,13 @@ public record NatsJSOrderedConsumerOpts
 
     public string[] FilterSubjects { get; init; } = Array.Empty<string>();
 
-    public ConsumerConfigurationDeliverPolicy DeliverPolicy { get; init; } = ConsumerConfigurationDeliverPolicy.all;
+    public ConsumerConfigDeliverPolicy DeliverPolicy { get; init; } = ConsumerConfigDeliverPolicy.all;
 
     public ulong OptStartSeq { get; init; } = 0;
 
     public DateTimeOffset OptStartTime { get; init; } = default;
 
-    public ConsumerConfigurationReplayPolicy ReplayPolicy { get; init; } = ConsumerConfigurationReplayPolicy.instant;
+    public ConsumerConfigReplayPolicy ReplayPolicy { get; init; } = ConsumerConfigReplayPolicy.instant;
 
     public TimeSpan InactiveThreshold { get; init; } = TimeSpan.FromMinutes(5);
 

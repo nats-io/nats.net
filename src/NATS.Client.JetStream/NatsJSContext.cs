@@ -161,13 +161,6 @@ public partial class NatsJSContext
         throw new NatsJSPublishNoResponseException();
     }
 
-    public ValueTask<PubAckResponse> PublishAsync(
-        string subject,
-        NatsJSPubOpts? opts = default,
-        NatsHeaders? headers = default,
-        CancellationToken cancellationToken = default) =>
-        PublishAsync<object?>(subject, default, serializer: default, opts, headers, cancellationToken);
-
     internal string NewInbox() => NatsConnection.NewInbox(Connection.Opts.InboxPrefix);
 
     internal async ValueTask<TResponse> JSRequestResponseAsync<TRequest, TResponse>(

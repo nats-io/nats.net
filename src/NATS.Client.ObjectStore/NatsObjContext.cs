@@ -40,10 +40,10 @@ public class NatsObjContext : INatsObjContext
         ValidateBucketName(config.Bucket);
 
         var storage = config.Storage == NatsObjStorageType.File
-            ? StreamConfigurationStorage.file
-            : StreamConfigurationStorage.memory;
+            ? StreamConfigStorage.file
+            : StreamConfigStorage.memory;
 
-        var streamConfiguration = new StreamConfiguration
+        var streamConfig = new StreamConfig
         {
             Name = $"OBJ_{config.Bucket}",
             Description = config.Description!,
@@ -53,15 +53,15 @@ public class NatsObjContext : INatsObjContext
             Storage = storage,
             NumReplicas = config.NumberOfReplicas,
             /* TODO: Placement = */
-            Discard = StreamConfigurationDiscard.@new,
+            Discard = StreamConfigDiscard.@new,
             AllowRollupHdrs = true,
             AllowDirect = true,
             Metadata = config.Metadata!,
-            Retention = StreamConfigurationRetention.limits,
-            Compression = config.Compression ? StreamConfigurationCompression.s2 : StreamConfigurationCompression.none,
+            Retention = StreamConfigRetention.limits,
+            Compression = config.Compression ? StreamConfigCompression.s2 : StreamConfigCompression.none,
         };
 
-        var stream = await _context.CreateStreamAsync(streamConfiguration, cancellationToken);
+        var stream = await _context.CreateStreamAsync(streamConfig, cancellationToken);
         return new NatsObjStore(config, this, _context, stream);
     }
 

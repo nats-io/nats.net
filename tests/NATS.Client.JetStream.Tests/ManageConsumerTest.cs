@@ -12,26 +12,19 @@ public class ManageConsumerTest
     [Fact]
     public async Task Create_get_consumer()
     {
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-
         await using var server = NatsServer.StartJS();
         var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
         await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
 
         // Create
         {
             var consumer = await js.CreateConsumerAsync(
-                new ConsumerCreateRequest
-                {
-                    StreamName = "s1",
-                    Config = new ConsumerConfiguration
-                    {
-                        Name = "c1",
-                        DurableName = "c1",
-                        AckPolicy = ConsumerConfigurationAckPolicy.@explicit,
-                    },
-                },
+                "s1",
+                new ConsumerConfig("c1"),
                 cts.Token);
             Assert.Equal("s1", consumer.Info.StreamName);
             Assert.Equal("c1", consumer.Info.Config.Name);
