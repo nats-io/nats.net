@@ -44,12 +44,7 @@ public class OrderedConsumeTest : ITest
         var js2 = new NatsJSContext(nats2);
 
         var stream = await js1.CreateStreamAsync(
-            new StreamConfig
-            {
-                Name = "s1",
-                Subjects = new[] { "s1.*" },
-                NumReplicas = 3,
-            },
+            new StreamConfig(name: "s1", subjects: new[] { "s1.*" }) { NumReplicas = 3 },
             cancellationToken);
 
         _logger.LogInformation("Created stream {Name}", stream.Info.Config.Name);

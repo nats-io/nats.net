@@ -72,7 +72,7 @@ async Task JetStreamTests()
 
         // Create stream
         var stream = await js.CreateStreamAsync(
-            request: new StreamConfig { Name = "events", Subjects = new[] { "events.*" }, },
+            request: new StreamConfig("events", new[] { "events.*" }),
             cancellationToken: cts1.Token);
         Assert.Equal("events", stream.Info.Config.Name);
 
@@ -153,11 +153,7 @@ async Task JetStreamTests()
         var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () =>
         {
             await js.CreateStreamAsync(
-                request: new StreamConfig
-                {
-                    Name = "events2",
-                    Subjects = new[] { "events.*" },
-                },
+                request: new StreamConfig("events2", new[] { "events.*" }),
                 cancellationToken: cts.Token);
         });
         Assert.Equal(400, exception.Error.Code);

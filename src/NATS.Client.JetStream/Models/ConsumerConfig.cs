@@ -2,6 +2,17 @@ namespace NATS.Client.JetStream.Models;
 
 public record ConsumerConfig
 {
+    public ConsumerConfig()
+    {
+    }
+
+    public ConsumerConfig(string name)
+    {
+        Name = name;
+        DurableName = name;
+        AckPolicy = ConsumerConfigAckPolicy.@explicit;
+    }
+
     [System.Text.Json.Serialization.JsonPropertyName("deliver_policy")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]

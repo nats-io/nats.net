@@ -2,6 +2,16 @@ namespace NATS.Client.JetStream.Models;
 
 public record StreamConfig
 {
+    internal StreamConfig()
+    {
+    }
+
+    public StreamConfig(string name, ICollection<string> subjects)
+    {
+        Name = name;
+        Subjects = subjects;
+    }
+
     /// <summary>
     /// A unique name for the Stream, empty for Stream Templates.
     /// </summary>

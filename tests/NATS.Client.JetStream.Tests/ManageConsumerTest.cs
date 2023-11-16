@@ -24,12 +24,7 @@ public class ManageConsumerTest
         {
             var consumer = await js.CreateConsumerAsync(
                 "s1",
-                new ConsumerConfig
-                {
-                    Name = "c1",
-                    DurableName = "c1",
-                    AckPolicy = ConsumerConfigAckPolicy.@explicit,
-                },
+                new ConsumerConfig("c1"),
                 cts.Token);
             Assert.Equal("s1", consumer.Info.StreamName);
             Assert.Equal("c1", consumer.Info.Config.Name);
