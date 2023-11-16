@@ -59,7 +59,7 @@ public record NatsKVConfig
     /// <summary>
     /// Use compressed storage.
     /// </summary>
-    public bool IsCompressed { get; init; }
+    public bool Compression { get; init; }
 
     // TODO: Bucket mirror configuration.
     // pub mirror: Option<Source>,

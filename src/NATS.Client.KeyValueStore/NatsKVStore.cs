@@ -354,7 +354,8 @@ public class NatsKVStore : INatsKVStore
     public async ValueTask<NatsKVStatus> GetStatusAsync(CancellationToken cancellationToken = default)
     {
         await _stream.RefreshAsync(cancellationToken);
-        return new NatsKVStatus(Bucket, _stream.Info);
+        var isCompressed = _stream.Info.Config.Compression != StreamConfigurationCompression.none;
+        return new NatsKVStatus(Bucket, isCompressed, _stream.Info);
     }
 
     /// <summary>
@@ -457,4 +458,4 @@ public class NatsKVStore : INatsKVStore
     }
 }
 
-public record NatsKVStatus(string Bucket, StreamInfo Info);
+public record NatsKVStatus(string Bucket, bool IsCompressed, StreamInfo Info);

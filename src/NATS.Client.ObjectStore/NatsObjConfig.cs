@@ -48,5 +48,5 @@ public record NatsObjConfig(string Bucket)
     /// <summary>
     /// Use compressed storage.
     /// </summary>
-    public bool IsCompressed { get; init; }
+    public bool Compression { get; init; }
 }

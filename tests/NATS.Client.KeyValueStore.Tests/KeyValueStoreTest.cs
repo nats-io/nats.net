@@ -535,8 +535,8 @@ public class KeyValueStoreTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        var store1 = await kv.CreateStoreAsync(new NatsKVConfig("kv1") { IsCompressed = false }, cancellationToken: cancellationToken);
-        var store2 = await kv.CreateStoreAsync(new NatsKVConfig("kv2") { IsCompressed = true }, cancellationToken: cancellationToken);
+        var store1 = await kv.CreateStoreAsync(new NatsKVConfig("kv1") { Compression = false }, cancellationToken: cancellationToken);
+        var store2 = await kv.CreateStoreAsync(new NatsKVConfig("kv2") { Compression = true }, cancellationToken: cancellationToken);
 
         Assert.Equal("kv1", store1.Bucket);
         Assert.Equal("kv2", store2.Bucket);

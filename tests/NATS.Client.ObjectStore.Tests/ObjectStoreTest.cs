@@ -379,8 +379,8 @@ public class ObjectStoreTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        var store1 = await obj.CreateObjectStore(new NatsObjConfig("b1") { IsCompressed = false }, cancellationToken);
-        var store2 = await obj.CreateObjectStore(new NatsObjConfig("b2") { IsCompressed = true }, cancellationToken);
+        var store1 = await obj.CreateObjectStore(new NatsObjConfig("b1") { Compression = false }, cancellationToken);
+        var store2 = await obj.CreateObjectStore(new NatsObjConfig("b2") { Compression = true }, cancellationToken);
 
         Assert.Equal("b1", store1.Bucket);
         Assert.Equal("b2", store2.Bucket);
