@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Buffers.Text;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Tests;
@@ -33,9 +32,9 @@ public class NatsKVWatcherTest
         var store2 = (NatsKVStore)await kv2.CreateStoreAsync(config, cancellationToken: cancellationToken);
         var watcher = await store2.WatchInternalAsync<NatsMemoryOwner<byte>>("k1.*", cancellationToken: cancellationToken);
 
-        await store1.PutAsync("k1.p1", 1, cancellationToken);
-        await store1.PutAsync("k1.p1", 2, cancellationToken);
-        await store1.PutAsync("k1.p1", 3, cancellationToken);
+        await store1.PutAsync("k1.p1", 1, cancellationToken: cancellationToken);
+        await store1.PutAsync("k1.p1", 2, cancellationToken: cancellationToken);
+        await store1.PutAsync("k1.p1", 3, cancellationToken: cancellationToken);
 
         var count = 0;
 
@@ -64,9 +63,9 @@ public class NatsKVWatcherTest
         await signal;
 
         // Check that default history config is deep enough
-        await store1.PutAsync("k1.p1", 4, cancellationToken);
-        await store1.PutAsync("k1.p1", 5, cancellationToken);
-        await store1.PutAsync("k1.p1", 6, cancellationToken);
+        await store1.PutAsync("k1.p1", 4, cancellationToken: cancellationToken);
+        await store1.PutAsync("k1.p1", 5, cancellationToken: cancellationToken);
+        await store1.PutAsync("k1.p1", 6, cancellationToken: cancellationToken);
 
         await foreach (var entry in watcher.Entries.ReadAllAsync(cancellationToken))
         {
@@ -161,14 +160,14 @@ public class NatsKVWatcherTest
         // Swallow heartbeats
         proxy.ServerInterceptors.Add(m => m?.Contains("Idle Heartbeat") ?? false ? null : m);
 
-        await store1.PutAsync("k1.p1", 1, cancellationToken);
+        await store1.PutAsync("k1.p1", 1, cancellationToken: cancellationToken);
 
         var e1 = await watcher.Entries.ReadAsync(cancellationToken);
         Assert.Equal(1, (int)e1.Revision);
         var count = 1;
 
-        await store1.PutAsync("k1.p1", 2, cancellationToken);
-        await store1.PutAsync("k1.p1", 3, cancellationToken);
+        await store1.PutAsync("k1.p1", 2, cancellationToken: cancellationToken);
+        await store1.PutAsync("k1.p1", 3, cancellationToken: cancellationToken);
 
         var consumer1 = ((NatsKVWatcher<NatsMemoryOwner<byte>>)watcher).Consumer;
 
@@ -189,9 +188,9 @@ public class NatsKVWatcherTest
             }
         }
 
-        await store1.PutAsync("k1.p1", 4, cancellationToken);
-        await store1.PutAsync("k1.p1", 5, cancellationToken);
-        await store1.PutAsync("k1.p1", 6, cancellationToken);
+        await store1.PutAsync("k1.p1", 4, cancellationToken: cancellationToken);
+        await store1.PutAsync("k1.p1", 5, cancellationToken: cancellationToken);
+        await store1.PutAsync("k1.p1", 6, cancellationToken: cancellationToken);
 
         var signal = new WaitSignal(timeout);
         server.OnLog += log =>
