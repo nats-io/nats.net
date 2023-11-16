@@ -22,9 +22,10 @@ public static class ServerVersions
 
 public class NatsServer : IAsyncDisposable
 {
+    public static readonly Version Version;
+
     private static readonly string Ext = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? ".exe" : string.Empty;
     private static readonly string NatsServerPath = $"nats-server{Ext}";
-    private static readonly Version Version;
 
     private readonly string? _jetStreamStoreDir;
     private readonly ITestOutputHelper _outputHelper;
@@ -550,11 +551,16 @@ public sealed class SkipIfNatsServer : FactAttribute
 
     static SkipIfNatsServer() => SupportsTlsFirst = NatsServer.SupportsTlsFirst();
 
-    public SkipIfNatsServer(bool doesNotSupportTlsFirst = false)
+    public SkipIfNatsServer(bool doesNotSupportTlsFirst = false, string? versionEarlierThan = default)
     {
         if (doesNotSupportTlsFirst && !SupportsTlsFirst)
         {
             Skip = "NATS server doesn't support TLS first";
+        }
+
+        if (versionEarlierThan != null && new Version(versionEarlierThan) > NatsServer.Version)
+        {
+            Skip = $"NATS server version ({NatsServer.Version}) is earlier than {versionEarlierThan}";
         }
     }
 }

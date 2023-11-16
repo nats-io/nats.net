@@ -522,4 +522,33 @@ public class KeyValueStoreTest
         Assert.Equal("KV_kv1", status.Info.Config.Name);
         Assert.Equal(10, status.Info.Config.MaxMsgsPerSubject);
     }
+
+    [SkipIfNatsServer(versionEarlierThan: "2.10")]
+    public async Task Compressed_storage()
+    {
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        var store1 = await kv.CreateStoreAsync(new NatsKVConfig("kv1") { Compression = false }, cancellationToken: cancellationToken);
+        var store2 = await kv.CreateStoreAsync(new NatsKVConfig("kv2") { Compression = true }, cancellationToken: cancellationToken);
+
+        Assert.Equal("kv1", store1.Bucket);
+        Assert.Equal("kv2", store2.Bucket);
+
+        var status1 = await store1.GetStatusAsync(cancellationToken);
+        Assert.Equal("kv1", status1.Bucket);
+        Assert.Equal("KV_kv1", status1.Info.Config.Name);
+        Assert.Equal(StreamConfigurationCompression.none, status1.Info.Config.Compression);
+
+        var status2 = await store2.GetStatusAsync(cancellationToken);
+        Assert.Equal("kv2", status2.Bucket);
+        Assert.Equal("KV_kv2", status2.Info.Config.Name);
+        Assert.Equal(StreamConfigurationCompression.s2, status2.Info.Config.Compression);
+    }
 }

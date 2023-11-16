@@ -44,4 +44,9 @@ public record NatsObjConfig(string Bucket)
     /// Additional metadata for the bucket.
     /// </summary>
     public Dictionary<string, string>? Metadata { get; init; }
+
+    /// <summary>
+    /// Use compressed storage.
+    /// </summary>
+    public bool Compression { get; init; }
 }

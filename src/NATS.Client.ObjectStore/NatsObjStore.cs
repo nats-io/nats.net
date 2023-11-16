@@ -533,7 +533,8 @@ public class NatsObjStore : INatsObjStore
     public async ValueTask<NatsObjStatus> GetStatusAsync(CancellationToken cancellationToken = default)
     {
         await _stream.RefreshAsync(cancellationToken);
-        return new NatsObjStatus(Bucket, _stream.Info);
+        var isCompressed = _stream.Info.Config.Compression != StreamConfigurationCompression.none;
+        return new NatsObjStatus(Bucket, isCompressed, _stream.Info);
     }
 
     /// <summary>
@@ -678,4 +679,4 @@ public record NatsObjListOpts
     public bool ShowDeleted { get; init; }
 }
 
-public record NatsObjStatus(string Bucket, StreamInfo Info);
+public record NatsObjStatus(string Bucket, bool IsCompressed, StreamInfo Info);
