@@ -19,6 +19,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
     private readonly INatsDeserialize<TMsg> _serializer;
     private readonly Timer _hbTimer;
     private readonly Timer _expiresTimer;
+    private readonly NatsJSNotificationChannel? _notificationChannel;
 
     private readonly long _maxMsgs;
     private readonly long _maxBytes;
@@ -40,8 +41,10 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         string consumer,
         string subject,
         string? queueGroup,
+        Func<INatsJSNotification, CancellationToken, Task>? notificationHandler,
         INatsDeserialize<TMsg> serializer,
-        NatsSubOpts? opts)
+        NatsSubOpts? opts,
+        CancellationToken cancellationToken)
         : base(context.Connection, context.Connection.SubscriptionManager, subject, queueGroup, opts)
     {
         _logger = Connection.Opts.LoggerFactory.CreateLogger<NatsJSFetch<TMsg>>();
@@ -50,6 +53,11 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         _stream = stream;
         _consumer = consumer;
         _serializer = serializer;
+
+        if (notificationHandler is { } handler)
+        {
+            _notificationChannel = new NatsJSNotificationChannel(handler, e => _userMsgs?.Writer.TryComplete(e), cancellationToken);
+        }
 
         _maxMsgs = maxMsgs;
         _maxBytes = maxBytes;
@@ -84,6 +92,8 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
             static state =>
             {
                 var self = (NatsJSFetch<TMsg>)state!;
+                self._notificationChannel?.Notify(new NatsJSTimeoutNotification());
+
                 self.EndSubscription(NatsSubEndReason.IdleHeartbeatTimeout);
                 if (self._debug)
                 {
@@ -134,6 +144,10 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         await base.DisposeAsync().ConfigureAwait(false);
         await _hbTimer.DisposeAsync().ConfigureAwait(false);
         await _expiresTimer.DisposeAsync().ConfigureAwait(false);
+        if (_notificationChannel != null)
+        {
+            await _notificationChannel.DisposeAsync();
+        }
     }
 
     internal override IEnumerable<ICommand> GetReconnectCommands(int sid)
