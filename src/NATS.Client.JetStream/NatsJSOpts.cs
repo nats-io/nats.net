@@ -18,7 +18,7 @@ public record NatsJSOpts
     /// <summary>
     /// Complete prefix to prepend to JetStream API subjects as it's dynamically built from ApiPrefix and Domain properties.
     /// </summary>
-    public string Prefix => string.IsNullOrEmpty(Domain) ? ApiPrefix : $"{Prefix}.{Domain}";
+    public string Prefix => string.IsNullOrEmpty(Domain) ? ApiPrefix : $"{ApiPrefix}.{Domain}";
 
     /// <summary>
     /// Prefix to prepend to JetStream API subjects. (default: $JS.API)
