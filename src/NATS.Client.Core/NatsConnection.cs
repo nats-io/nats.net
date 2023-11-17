@@ -631,6 +631,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
             backoff = _backoff;
         }
 
+        // After two auth errors we will not retry.
         if (stop)
             throw new NatsException("Won't retry anymore.");
 
