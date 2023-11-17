@@ -55,7 +55,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         string consumer,
         string subject,
         string? queueGroup,
-        Func<INatsJSNotification, Task>? notificationHandler,
+        Func<INatsJSNotification, CancellationToken, Task>? notificationHandler,
         INatsDeserialize<TMsg> serializer,
         NatsSubOpts? opts,
         CancellationToken cancellationToken)
@@ -71,7 +71,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
 
         if (notificationHandler is { } handler)
         {
-            _notificationChannel = new NatsJSNotificationChannel(handler, e => _userMsgs?.Writer.TryComplete(e));
+            _notificationChannel = new NatsJSNotificationChannel(handler, e => _userMsgs?.Writer.TryComplete(e), cancellationToken);
         }
 
         _maxMsgs = maxMsgs;

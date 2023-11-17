@@ -107,7 +107,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
                         }
                         catch (NatsJSTimeoutException e)
                         {
-                            notificationHandler?.Invoke(new NatsJSTimeoutNotification());
+                            notificationHandler?.Invoke(new NatsJSTimeoutNotification(), cancellationToken);
                             _logger.LogWarning($"{e.Message}. Retrying...");
                             goto CONSUME_LOOP;
                         }
@@ -138,7 +138,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
                             }
                             catch (NatsJSTimeoutException e)
                             {
-                                notificationHandler?.Invoke(new NatsJSTimeoutNotification());
+                                notificationHandler?.Invoke(new NatsJSTimeoutNotification(), cancellationToken);
                                 _logger.LogWarning($"{e.Message}. Retrying...");
                                 goto CONSUME_LOOP;
                             }

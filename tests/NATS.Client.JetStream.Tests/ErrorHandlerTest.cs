@@ -27,7 +27,7 @@ public class ErrorHandlerTest
         var timeoutNotifications = 0;
         var opts = new NatsJSNextOpts
         {
-            NotificationHandler = e =>
+            NotificationHandler = (e, _) =>
             {
                 if (e is NatsJSTimeoutNotification)
                 {
@@ -80,7 +80,7 @@ public class ErrorHandlerTest
         var opts = new NatsJSConsumeOpts
         {
             MaxMsgs = 10,
-            NotificationHandler = e =>
+            NotificationHandler = (e, _) =>
             {
                 if (e is NatsJSTimeoutNotification)
                 {
@@ -144,7 +144,7 @@ public class ErrorHandlerTest
         var timeoutNotifications = 0;
         var opts = new NatsJSNextOpts
         {
-            NotificationHandler = e =>
+            NotificationHandler = (e, _) =>
             {
                 if (e is NatsJSTimeoutNotification)
                 {
@@ -201,7 +201,7 @@ public class ErrorHandlerTest
         var opts = new NatsJSConsumeOpts
         {
             MaxMsgs = 10,
-            NotificationHandler = e =>
+            NotificationHandler = (e, _) =>
             {
                 if (e is NatsJSTimeoutNotification)
                 {
@@ -258,7 +258,7 @@ public class ErrorHandlerTest
         var opts = new NatsJSConsumeOpts
         {
             MaxMsgs = 10,
-            NotificationHandler = e => throw new TestConsumerNotificationException(),
+            NotificationHandler = (_, _) => throw new TestConsumerNotificationException(),
             Expires = TimeSpan.FromSeconds(6),
             IdleHeartbeat = TimeSpan.FromSeconds(3),
         };

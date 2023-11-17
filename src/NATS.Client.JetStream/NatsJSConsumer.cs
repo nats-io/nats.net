@@ -418,7 +418,8 @@ public class NatsJSConsumer : INatsJSConsumer
             maxBytes: max.MaxBytes,
             expires: timeouts.Expires,
             notificationHandler: opts.NotificationHandler,
-            idle: timeouts.IdleHeartbeat);
+            idle: timeouts.IdleHeartbeat,
+            cancellationToken: cancellationToken);
 
         await _context.Connection.SubAsync(sub: sub, cancellationToken).ConfigureAwait(false);
 

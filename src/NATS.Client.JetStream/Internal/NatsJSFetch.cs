@@ -41,9 +41,10 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         string consumer,
         string subject,
         string? queueGroup,
-        Func<INatsJSNotification, Task>? notificationHandler,
+        Func<INatsJSNotification, CancellationToken, Task>? notificationHandler,
         INatsDeserialize<TMsg> serializer,
-        NatsSubOpts? opts)
+        NatsSubOpts? opts,
+        CancellationToken cancellationToken)
         : base(context.Connection, context.Connection.SubscriptionManager, subject, queueGroup, opts)
     {
         _logger = Connection.Opts.LoggerFactory.CreateLogger<NatsJSFetch<TMsg>>();
@@ -55,7 +56,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
 
         if (notificationHandler is { } handler)
         {
-            _notificationChannel = new NatsJSNotificationChannel(handler, e => _userMsgs?.Writer.TryComplete(e));
+            _notificationChannel = new NatsJSNotificationChannel(handler, e => _userMsgs?.Writer.TryComplete(e), cancellationToken);
         }
 
         _maxMsgs = maxMsgs;

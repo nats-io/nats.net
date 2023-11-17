@@ -119,7 +119,7 @@ public record NatsJSConsumeOpts
     /// </summary>
     public int? ThresholdBytes { get; init; }
 
-    public Func<INatsJSNotification, Task>? NotificationHandler { get; init; }
+    public Func<INatsJSNotification, CancellationToken, Task>? NotificationHandler { get; init; }
 }
 
 /// <summary>
@@ -137,7 +137,7 @@ public record NatsJSNextOpts
     /// </summary>
     public TimeSpan? IdleHeartbeat { get; init; }
 
-    public Func<INatsJSNotification, Task>? NotificationHandler { get; init; }
+    public Func<INatsJSNotification, CancellationToken, Task>? NotificationHandler { get; init; }
 }
 
 /// <summary>
@@ -165,7 +165,7 @@ public record NatsJSFetchOpts
     /// </summary>
     public TimeSpan? IdleHeartbeat { get; init; }
 
-    public Func<INatsJSNotification, Task>? NotificationHandler { get; init; }
+    public Func<INatsJSNotification, CancellationToken, Task>? NotificationHandler { get; init; }
 
     /// <summary>
     /// Does not wait for messages to be available
