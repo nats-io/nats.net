@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 
 namespace NATS.Client.Core.Tests;
@@ -27,7 +27,8 @@ authorization: {
             {
                 AuthOpts = new NatsAuthOpts
                 {
-                    Username = "a", Password = "b",
+                    Username = "a",
+                    Password = "b",
                 },
             });
 
@@ -35,7 +36,8 @@ authorization: {
         {
             AuthOpts = new NatsAuthOpts
             {
-                Username = "a", Password = "b",
+                Username = "a",
+                Password = "b",
             },
         });
 
@@ -92,7 +94,8 @@ authorization: {
             {
                 AuthOpts = new NatsAuthOpts
                 {
-                    Username = "a", Password = "b",
+                    Username = "a",
+                    Password = "b",
                 },
             });
 
@@ -100,7 +103,8 @@ authorization: {
         {
             AuthOpts = new NatsAuthOpts
             {
-                Username = "a", Password = "b",
+                Username = "a",
+                Password = "b",
             },
             IgnoreAuthErrorAbort = true,
         });

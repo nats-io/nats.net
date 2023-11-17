@@ -53,7 +53,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
     private UserCredentials? _userCredentials;
     private int _connectRetry;
     private TimeSpan _backoff = TimeSpan.Zero;
-    private string _lastAuthError;
+    private string _lastAuthError = string.Empty;
     private bool _stopRetries;
 
     public NatsConnection()
@@ -435,7 +435,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
                     _lastAuthError = error;
                 }
 
-                if (!Opts.IgnoreAuthErrorAbort && last == error)
+                if (!Opts.IgnoreAuthErrorAbort && string.Equals(last, error))
                 {
                     lock (_gate)
                     {
