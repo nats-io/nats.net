@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
+using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
@@ -57,7 +58,15 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
         NatsJSConsumeOpts? opts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        opts ??= _context.Opts.DefaultConsumeOpts;
         var consumerName = string.Empty;
+
+        NatsJSNotificationChannel? notificationChannel = null;
+        if (opts.NotificationHandler is { } handler)
+        {
+            var loggerFactory = _context.Connection.Opts.LoggerFactory;
+            notificationChannel = new NatsJSNotificationChannel(handler, loggerFactory, cancellationToken);
+        }
 
         try
         {
@@ -88,6 +97,10 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
                             if (!read)
                                 break;
                         }
+                        catch (OperationCanceledException)
+                        {
+                            break;
+                        }
                         catch (NatsJSProtocolException pe)
                         {
                             protocolException = pe;
@@ -100,6 +113,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
                         }
                         catch (NatsJSTimeoutException e)
                         {
+                            notificationChannel?.Notify(new NatsJSTimeoutNotification());
                             _logger.LogWarning($"{e.Message}. Retrying...");
                             goto CONSUME_LOOP;
                         }
@@ -114,6 +128,10 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
                                 if (!canRead)
                                     break;
                             }
+                            catch (OperationCanceledException)
+                            {
+                                break;
+                            }
                             catch (NatsJSProtocolException pe)
                             {
                                 protocolException = pe;
@@ -126,6 +144,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
                             }
                             catch (NatsJSTimeoutException e)
                             {
+                                notificationChannel?.Notify(new NatsJSTimeoutNotification());
                                 _logger.LogWarning($"{e.Message}. Retrying...");
                                 goto CONSUME_LOOP;
                             }
@@ -170,6 +189,8 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
         {
             if (!string.IsNullOrWhiteSpace(consumerName))
                 await TryDeleteConsumer(consumerName, cancellationToken);
+            if (notificationChannel != null)
+                await notificationChannel.DisposeAsync();
         }
     }
 
@@ -223,6 +244,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
             MaxMsgs = 1,
             IdleHeartbeat = opts.IdleHeartbeat,
             Expires = opts.Expires,
+            NotificationHandler = opts.NotificationHandler,
         };
 
         await foreach (var msg in FetchAsync(serializer, fetchOpts, cancellationToken))

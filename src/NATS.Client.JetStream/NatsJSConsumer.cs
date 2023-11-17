@@ -62,12 +62,44 @@ public class NatsJSConsumer : INatsJSConsumer
         opts ??= _context.Opts.DefaultConsumeOpts;
         await using var cc = await ConsumeInternalAsync<T>(serializer, opts, cancellationToken).ConfigureAwait(false);
 
-        // Keep subscription alive (since it's a wek ref in subscription manager) until we're done.
+        // Keep subscription alive (since it's a weak ref in subscription manager) until we're done.
         using var anchor = _context.Connection.RegisterSubAnchor(cc);
 
-        await foreach (var jsMsg in cc.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        while (!cancellationToken.IsCancellationRequested)
         {
-            yield return jsMsg;
+            // We have to check calls individually since we can't use yield return in try-catch blocks.
+            bool ready;
+            try
+            {
+                ready = await cc.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                ready = false;
+            }
+
+            if (!ready)
+                yield break;
+
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                bool read;
+                NatsJSMsg<T> jsMsg;
+                try
+                {
+                    read = cc.Msgs.TryRead(out jsMsg);
+                }
+                catch (OperationCanceledException)
+                {
+                    read = false;
+                    jsMsg = default;
+                }
+
+                if (!read)
+                    break;
+
+                yield return jsMsg;
+            }
         }
     }
 
@@ -115,6 +147,7 @@ public class NatsJSConsumer : INatsJSConsumer
                 MaxMsgs = 1,
                 IdleHeartbeat = opts.IdleHeartbeat,
                 Expires = opts.Expires,
+                NotificationHandler = opts.NotificationHandler,
             },
             cancellationToken: cancellationToken).ConfigureAwait(false);
 
@@ -146,9 +179,45 @@ public class NatsJSConsumer : INatsJSConsumer
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
         await using var fc = await FetchInternalAsync<T>(serializer, opts, cancellationToken).ConfigureAwait(false);
-        await foreach (var jsMsg in fc.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+
+        // Keep subscription alive (since it's a weak ref in subscription manager) until we're done.
+        using var anchor = _context.Connection.RegisterSubAnchor(fc);
+
+        while (!cancellationToken.IsCancellationRequested)
         {
-            yield return jsMsg;
+            // We have to check calls individually since we can't use yield return in try-catch blocks.
+            bool ready;
+            try
+            {
+                ready = await fc.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                ready = false;
+            }
+
+            if (!ready)
+                yield break;
+
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                bool read;
+                NatsJSMsg<T> jsMsg;
+                try
+                {
+                    read = fc.Msgs.TryRead(out jsMsg);
+                }
+                catch (OperationCanceledException)
+                {
+                    read = false;
+                    jsMsg = default;
+                }
+
+                if (!read)
+                    break;
+
+                yield return jsMsg;
+            }
         }
     }
 
@@ -252,6 +321,7 @@ public class NatsJSConsumer : INatsJSConsumer
             thresholdBytes: max.ThresholdBytes,
             expires: timeouts.Expires,
             idle: timeouts.IdleHeartbeat,
+            notificationHandler: opts.NotificationHandler,
             cancellationToken: cancellationToken);
 
         await _context.Connection.SubAsync(sub: sub, cancellationToken).ConfigureAwait(false);
@@ -273,11 +343,10 @@ public class NatsJSConsumer : INatsJSConsumer
         return sub;
     }
 
-    internal async ValueTask<NatsJSOrderedConsume<T>> OrderedConsumeInternalAsync<T>(INatsDeserialize<T>? serializer = default, NatsJSConsumeOpts? opts = default, CancellationToken cancellationToken = default)
+    internal async ValueTask<NatsJSOrderedConsume<T>> OrderedConsumeInternalAsync<T>(INatsDeserialize<T>? serializer, NatsJSConsumeOpts opts, CancellationToken cancellationToken)
     {
         ThrowIfDeleted();
 
-        opts ??= new NatsJSConsumeOpts();
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
         var inbox = _context.NewInbox();
 
@@ -348,6 +417,7 @@ public class NatsJSConsumer : INatsJSConsumer
             maxMsgs: max.MaxMsgs,
             maxBytes: max.MaxBytes,
             expires: timeouts.Expires,
+            notificationHandler: opts.NotificationHandler,
             idle: timeouts.IdleHeartbeat);
 
         await _context.Connection.SubAsync(sub: sub, cancellationToken).ConfigureAwait(false);

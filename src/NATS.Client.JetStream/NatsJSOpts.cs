@@ -118,6 +118,8 @@ public record NatsJSConsumeOpts
     /// Hint for the number of bytes left in buffer that should trigger a low watermark on the client, and influence it to request more data.
     /// </summary>
     public int? ThresholdBytes { get; init; }
+
+    public Func<INatsJSNotification, Task>? NotificationHandler { get; init; }
 }
 
 /// <summary>
@@ -134,6 +136,8 @@ public record NatsJSNextOpts
     /// Amount idle time the server should wait before sending a heartbeat. For requests with expires > 30s, heartbeats should be enabled by default
     /// </summary>
     public TimeSpan? IdleHeartbeat { get; init; }
+
+    public Func<INatsJSNotification, Task>? NotificationHandler { get; init; }
 }
 
 /// <summary>
@@ -160,6 +164,8 @@ public record NatsJSFetchOpts
     /// Amount idle time the server should wait before sending a heartbeat. For requests with expires > 30s, heartbeats should be enabled by default
     /// </summary>
     public TimeSpan? IdleHeartbeat { get; init; }
+
+    public Func<INatsJSNotification, Task>? NotificationHandler { get; init; }
 
     /// <summary>
     /// Does not wait for messages to be available

@@ -28,6 +28,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
     private readonly INatsDeserialize<TMsg> _serializer;
     private readonly Timer _timer;
     private readonly Task _pullTask;
+    private readonly NatsJSNotificationChannel? _notificationChannel;
 
     private readonly long _maxMsgs;
     private readonly long _expires;
@@ -54,6 +55,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         string consumer,
         string subject,
         string? queueGroup,
+        Func<INatsJSNotification, Task>? notificationHandler,
         INatsDeserialize<TMsg> serializer,
         NatsSubOpts? opts,
         CancellationToken cancellationToken)
@@ -66,6 +68,11 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         _stream = stream;
         _consumer = consumer;
         _serializer = serializer;
+
+        if (notificationHandler is { } handler)
+        {
+            _notificationChannel = new NatsJSNotificationChannel(handler, Connection.Opts.LoggerFactory);
+        }
 
         _maxMsgs = maxMsgs;
         _thresholdMsgs = thresholdMsgs;
@@ -96,6 +103,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
             static state =>
             {
                 var self = (NatsJSConsume<TMsg>)state!;
+                self._notificationChannel?.Notify(new NatsJSTimeoutNotification());
 
                 if (self._cancellationToken.IsCancellationRequested)
                 {
@@ -167,6 +175,10 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         await base.DisposeAsync().ConfigureAwait(false);
         await _pullTask.ConfigureAwait(false);
         await _timer.DisposeAsync().ConfigureAwait(false);
+        if (_notificationChannel != null)
+        {
+            await _notificationChannel.DisposeAsync();
+        }
     }
 
     internal override IEnumerable<ICommand> GetReconnectCommands(int sid)
