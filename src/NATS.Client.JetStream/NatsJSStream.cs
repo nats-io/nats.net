@@ -119,7 +119,7 @@ public class NatsJSStream : INatsJSStream
     }
 
     /// <summary>
-    /// Enumerates through consumers belong to this stream.
+    /// Enumerates through consumers that belong to this stream.
     /// </summary>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>Async enumerable of consumer objects. Can be used in a <c>await foreach</c> loop.</returns>
