@@ -1,10 +1,12 @@
-# NATS.NET V2
+# NATS.Net
 
-NATS.NET V2 is a [NATS](https://nats.io) client for the modern [.NET](https://dot.net/).
+NATS.Net is a [NATS](https://nats.io) client for the modern [.NET](https://dot.net/).
 
-## Preview (Beta)
+## Release Candidate
 
-The NATS.NET V2 client is in *beta* phase and recommended for testing and feedback.
+The NATS.Net is ready to *Go Live*!
+
+Big thank you to our contributors.
 
 ## Roadmap
 
@@ -16,7 +18,9 @@ The NATS.NET V2 client is in *beta* phase and recommended for testing and feedba
 - [x] .NET 8.0 support (Native AOT)
 - [x] Implementation of missing major features (e.g. JetStream ordered consumers)
 - [x] Beta phase
-- [ ] Testing and bug fixing
+- [x] Testing and bug fixing
+- [x] Release Candidate
+- [ ] Documentation and examples updates
 - [ ] General Availability
 
 ## What's Next
