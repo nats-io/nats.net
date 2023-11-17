@@ -2,13 +2,13 @@
 
 public class OptionsTests
 {
-    [Fact]
-    public void Api_prefix()
-    {
-        new NatsJSOpts(new NatsOpts(), apiPrefix: "$JS.API").Prefix.Should().Be("$JS.API");
-        new NatsJSOpts(new NatsOpts(), apiPrefix: "$JS.API", domain: "ABC").Prefix.Should().Be("$JS.API.ABC");
-        new NatsJSOpts(new NatsOpts(), apiPrefix: "$JS.API", domain: null).Prefix.Should().Be("$JS.API");
-        new NatsJSOpts(new NatsOpts(), apiPrefix: null, domain: null).Prefix.Should().Be("$JS.API");
-        new NatsJSOpts(new NatsOpts()).Prefix.Should().Be("$JS.API");
-    }
+    [Theory]
+    [InlineData(null, null, "$JS.API")]
+    [InlineData("OTHER", null, "OTHER")]
+    [InlineData(null, "ABC", "$JS.API.ABC")]
+    [InlineData("$JS.API", null, "$JS.API")]
+    [InlineData("$JS.API", "ABC", "$JS.API.ABC")]
+    [InlineData("OTHER", "ABC", "OTHER.ABC")]
+    public void Api_prefix(string? prefix, string? domain, string expected) =>
+        new NatsJSOpts(new NatsOpts(), apiPrefix: prefix, domain: domain).Prefix.Should().Be(expected);
 }
