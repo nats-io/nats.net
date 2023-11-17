@@ -137,7 +137,7 @@ public class ErrorHandlerTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         var stream = await js.CreateStreamAsync(new StreamConfig("s1", new[] { "s1.*" }), cts.Token);
-        var consumer = await stream.CreateOrderedConsumerAsync(cancellationToken: cts.Token);
+        var consumer = (NatsJSOrderedConsumer)await stream.CreateOrderedConsumerAsync(cancellationToken: cts.Token);
 
         (await js.PublishAsync("s1.1", 1, cancellationToken: cts.Token)).EnsureSuccess();
 
@@ -163,17 +163,20 @@ public class ErrorHandlerTest
         {
             msg.Subject.Should().Be("s1.1");
             msg.Data.Should().Be(1);
-            await msg.AckAsync(cancellationToken: cts.Token);
         }
         else
         {
             Assert.Fail("No message received.");
         }
 
+        // Create an empty stream since ordered consumer will pick up messages from beginning everytime.
+        var stream2 = await js.CreateStreamAsync(new StreamConfig("s2", new[] { "s2.*" }), cts.Token);
+        var consumer2 = (NatsJSOrderedConsumer)await stream2.CreateOrderedConsumerAsync(cancellationToken: cts.Token);
+
         // Swallow heartbeats
         proxy.ServerInterceptors.Add(m => m?.Contains("Idle Heartbeat") ?? false ? null : m);
 
-        var next2 = await consumer.NextAsync<int>(opts: opts, cancellationToken: cts.Token);
+        var next2 = await consumer2.NextAsync<int>(opts: opts, cancellationToken: cts.Token);
         Assert.Null(next2);
         Assert.Equal(1, Volatile.Read(ref timeoutNotifications));
     }
@@ -214,7 +217,6 @@ public class ErrorHandlerTest
         {
             msg.Data.Should().Be(1);
             msg.Subject.Should().Be("s1.1");
-            await msg.AckAsync(cancellationToken: cts.Token);
             break;
         }
 
