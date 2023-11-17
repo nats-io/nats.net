@@ -34,7 +34,6 @@ public class NatsServer : IAsyncDisposable
     private CancellationTokenSource? _cancellationTokenSource;
     private Task<string[]>? _processOut;
     private Task<string[]>? _processErr;
-    private string? _configFileName;
     private int _disposed;
 
     static NatsServer()
@@ -70,6 +69,8 @@ public class NatsServer : IAsyncDisposable
             opts.JetStreamStoreDir = _jetStreamStoreDir;
         }
     }
+
+    public string? ConfigFile { get; private set; }
 
     public Process? ServerProcess { get; private set; }
 
@@ -164,7 +165,7 @@ public class NatsServer : IAsyncDisposable
     {
         _cancellationTokenSource = new CancellationTokenSource();
 
-        (_configFileName, var config, var cmd) = GetCmd(Opts);
+        (ConfigFile, var config, var cmd) = GetCmd(Opts);
 
         _outputHelper.WriteLine("ProcessStart: " + cmd + Environment.NewLine + config);
         var (p, stdout, stderr) = ProcessX.GetDualAsyncEnumerable(cmd);
@@ -274,9 +275,9 @@ public class NatsServer : IAsyncDisposable
         }
         finally
         {
-            if (_configFileName != null)
+            if (ConfigFile != null)
             {
-                File.Delete(_configFileName);
+                File.Delete(ConfigFile);
             }
 
             if (_jetStreamStoreDir != null)
@@ -561,6 +562,17 @@ public sealed class SkipIfNatsServer : FactAttribute
         if (versionEarlierThan != null && new Version(versionEarlierThan) > NatsServer.Version)
         {
             Skip = $"NATS server version ({NatsServer.Version}) is earlier than {versionEarlierThan}";
+        }
+    }
+}
+
+public sealed class SkipOnPlatform : FactAttribute
+{
+    public SkipOnPlatform(string platform, string reason)
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Create(platform)))
+        {
+            Skip = $"Platform {platform} is not supported: {reason}";
         }
     }
 }
