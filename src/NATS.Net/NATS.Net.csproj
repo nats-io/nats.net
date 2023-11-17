@@ -9,7 +9,7 @@
 
     <!-- NuGet Packaging -->
     <PackageTags>pubsub;messaging</PackageTags>
-    <Description>NATS client for the modern .NET.</Description>
+    <Description>NATS client for modern .NET.</Description>
     <IsPackable>true</IsPackable>
   </PropertyGroup>
 
