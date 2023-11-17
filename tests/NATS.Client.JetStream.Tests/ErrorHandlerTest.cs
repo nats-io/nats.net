@@ -177,6 +177,7 @@ public class ErrorHandlerTest
         proxy.ServerInterceptors.Add(m => m?.Contains("Idle Heartbeat") ?? false ? null : m);
 
         var next2 = await consumer2.NextAsync<int>(opts: opts, cancellationToken: cts.Token);
+
         Assert.Null(next2);
         Assert.Equal(1, Volatile.Read(ref timeoutNotifications));
     }
