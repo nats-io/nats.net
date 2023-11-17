@@ -1,20 +1,12 @@
-# NATS .NET V2
+# NATS.Net
 
-NATS.NET V2 is a [NATS](https://nats.io) client for the modern [.NET](https://dot.net/).
+NATS.Net is a [NATS](https://nats.io) client for the modern [.NET](https://dot.net/).
 
-## Preview (Beta)
+## Release Candidate
 
-The NATS.NET V2 client is in *beta* phase and recommended for testing and feedback.
-Although codebase is still under development, APIs are relatively stable and we are
-looking for feedback on usability and features.
+The NATS.Net is ready to *Go Live*!
 
-You can provide feedback:
-
-* on [slack.nats.io dotnet channel](https://natsio.slack.com/channels/dotnet)
-* or use GitHub discussions, issues and PRs
-
-Thank you to our contributors so far. We feel we are growing slowly as a community and we appreciate your help
-supporting and developing NATS .NET V2 project.
+Big thank you to our contributors.
 
 ## Documentation
 
@@ -22,13 +14,14 @@ Check out the [documentation](https://nats-io.github.io/nats.net.v2/) for guides
 
 **Additionally check out [NATS by example](https://natsbyexample.com) - An evolving collection of runnable, cross-client reference examples for NATS.**
 
-## NATS.NET V2 Goals
+## NATS.Net Goals
 
 - Only support Async I/O (async/await)
 - Target latest .NET LTS Release (currently .NET 6.0, soon .NET 8.0)
 
 ## Packages
 
+- **NATS.Net**: Meta package that includes all other packages (except serialization)
 - **NATS.Client.Core**: [Core NATS](https://docs.nats.io/nats-concepts/core-nats)
 - **NATS.Client.Hosting**: extension to configure DI container
 - **NATS.Client.JetStream**: [JetStream](https://docs.nats.io/nats-concepts/jetstream)
@@ -41,6 +34,8 @@ Check out the [documentation](https://nats-io.github.io/nats.net.v2/) for guides
 
 - Run `dotnet format` at root directory of project in order to clear warnings that can be auto-formatted
 - Run `dotnet build` at root directory and make sure there are no errors or warnings
+
+Find us on [slack.nats.io dotnet channel](https://natsio.slack.com/channels/dotnet)
 
 ## Attribution
 

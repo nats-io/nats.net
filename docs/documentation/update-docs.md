@@ -5,7 +5,7 @@ view locally and submit a Pull Request to be included in this documentation site
 
 ## Runnig DocFX locally
 
-Clone the NATS.NET V2 repository, then run `docfx` local server to view this documentation site.
+Clone the NATS.Net ([nats-io/nats.net.v2](https://github.com/nats-io/nats.net.v2)) repository, then run `docfx` local server to view this documentation site.
 You mush have [DocFX installed](https://dotnet.github.io/docfx/):
 
 ```
