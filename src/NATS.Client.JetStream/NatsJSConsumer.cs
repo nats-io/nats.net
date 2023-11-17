@@ -151,6 +151,9 @@ public class NatsJSConsumer : INatsJSConsumer
             },
             cancellationToken: cancellationToken).ConfigureAwait(false);
 
+        // Keep subscription alive (since it's a weak ref in subscription manager) until we're done.
+        using var anchor = _context.Connection.RegisterSubAnchor(f);
+
         await foreach (var natsJSMsg in f.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
             return natsJSMsg;

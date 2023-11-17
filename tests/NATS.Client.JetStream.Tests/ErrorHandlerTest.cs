@@ -56,7 +56,11 @@ public class ErrorHandlerTest
         // Swallow heartbeats
         proxy.ServerInterceptors.Add(m => m?.Contains("Idle Heartbeat") ?? false ? null : m);
 
-        var next2 = await consumer.NextAsync<int>(opts: opts, cancellationToken: cts.Token);
+        // Create an empty stream to potentially reduce the chance of having a message.
+        var stream2 = await js.CreateStreamAsync(new StreamConfig("s2", new[] { "s2.*" }), cts.Token);
+        var consumer2 = await stream2.CreateConsumerAsync(new ConsumerConfig("c2"), cts.Token);
+
+        var next2 = await consumer2.NextAsync<int>(opts: opts, cancellationToken: cts.Token);
         Assert.Null(next2);
         Assert.Equal(1, Volatile.Read(ref timeoutNotifications));
     }
