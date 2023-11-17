@@ -55,7 +55,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
 
         if (notificationHandler is { } handler)
         {
-            _notificationChannel = new NatsJSNotificationChannel(handler, Connection.Opts.LoggerFactory);
+            _notificationChannel = new NatsJSNotificationChannel(handler, e => _userMsgs?.Writer.TryComplete(e));
         }
 
         _maxMsgs = maxMsgs;

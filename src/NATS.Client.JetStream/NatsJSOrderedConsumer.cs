@@ -60,13 +60,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
     {
         opts ??= _context.Opts.DefaultConsumeOpts;
         var consumerName = string.Empty;
-
-        NatsJSNotificationChannel? notificationChannel = null;
-        if (opts.NotificationHandler is { } handler)
-        {
-            var loggerFactory = _context.Connection.Opts.LoggerFactory;
-            notificationChannel = new NatsJSNotificationChannel(handler, loggerFactory, cancellationToken);
-        }
+        var notificationHandler = opts.NotificationHandler;
 
         try
         {
@@ -113,7 +107,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
                         }
                         catch (NatsJSTimeoutException e)
                         {
-                            notificationChannel?.Notify(new NatsJSTimeoutNotification());
+                            notificationHandler?.Invoke(new NatsJSTimeoutNotification());
                             _logger.LogWarning($"{e.Message}. Retrying...");
                             goto CONSUME_LOOP;
                         }
@@ -144,7 +138,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
                             }
                             catch (NatsJSTimeoutException e)
                             {
-                                notificationChannel?.Notify(new NatsJSTimeoutNotification());
+                                notificationHandler?.Invoke(new NatsJSTimeoutNotification());
                                 _logger.LogWarning($"{e.Message}. Retrying...");
                                 goto CONSUME_LOOP;
                             }
@@ -189,8 +183,6 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
         {
             if (!string.IsNullOrWhiteSpace(consumerName))
                 await TryDeleteConsumer(consumerName, cancellationToken);
-            if (notificationChannel != null)
-                await notificationChannel.DisposeAsync();
         }
     }
 

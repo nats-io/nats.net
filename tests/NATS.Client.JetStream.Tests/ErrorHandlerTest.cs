@@ -242,4 +242,58 @@ public class ErrorHandlerTest
 
         Assert.True(Volatile.Read(ref timeoutNotifications) > 0);
     }
+
+    [Fact]
+    public async Task Exception_propagation_handling()
+    {
+        await using var server = NatsServer.StartJS();
+        var (nats1, proxy) = server.CreateProxiedClientConnection();
+        await using var nats = nats1;
+        var js = new NatsJSContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var stream = await js.CreateStreamAsync(new StreamConfig("s1", new[] { "s1.*" }), cts.Token);
+
+        var opts = new NatsJSConsumeOpts
+        {
+            MaxMsgs = 10,
+            NotificationHandler = e => throw new TestConsumerNotificationException(),
+            Expires = TimeSpan.FromSeconds(6),
+            IdleHeartbeat = TimeSpan.FromSeconds(3),
+        };
+
+        // Swallow heartbeats
+        proxy.ServerInterceptors.Add(m => m?.Contains("Idle Heartbeat") ?? false ? null : m);
+
+        try
+        {
+            var consumer = await stream.CreateConsumerAsync(new ConsumerConfig("c1"), cts.Token);
+            await foreach (var unused in consumer.ConsumeAsync<int>(opts: opts, cancellationToken: cts.Token))
+            {
+            }
+
+            throw new Exception("Should have thrown");
+        }
+        catch (TestConsumerNotificationException)
+        {
+        }
+
+        try
+        {
+            var consumer = await stream.CreateOrderedConsumerAsync(cancellationToken: cts.Token);
+            await foreach (var unused in consumer.ConsumeAsync<int>(opts: opts, cancellationToken: cts.Token))
+            {
+            }
+
+            throw new Exception("Should have thrown");
+        }
+        catch (TestConsumerNotificationException)
+        {
+        }
+    }
+}
+
+public class TestConsumerNotificationException : Exception
+{
 }
