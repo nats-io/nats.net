@@ -53,6 +53,8 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
     private UserCredentials? _userCredentials;
     private int _connectRetry;
     private TimeSpan _backoff = TimeSpan.Zero;
+    private string _lastAuthError;
+    private bool _stopRetries;
 
     public NatsConnection()
         : this(NatsOpts.Default)
@@ -413,9 +415,37 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
             // receive COMMAND response (PONG or ERROR)
             await waitForPongOrErrorSignal.Task.ConfigureAwait(false);
+
+            lock (_gate)
+            {
+                _lastAuthError = string.Empty;
+            }
         }
-        catch (Exception)
+        catch (Exception e)
         {
+            if (e is NatsServerException { IsAuthError: true } se)
+            {
+                _logger.LogWarning("Authentication error: {Error}", se.Error);
+
+                var error = se.Error;
+                string last;
+                lock (_gate)
+                {
+                    last = _lastAuthError;
+                    _lastAuthError = error;
+                }
+
+                if (!Opts.IgnoreAuthErrorAbort && last == error)
+                {
+                    lock (_gate)
+                    {
+                        _stopRetries = true;
+                    }
+
+                    _logger.LogError("Received same authentication error ({Error}) twice in a row. Stopping retires", se.Error);
+                }
+            }
+
             infoParsedSignal.TrySetCanceled();
             await DisposeSocketAsync(true).ConfigureAwait(false);
             throw;
@@ -540,7 +570,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
             if (ex is OperationCanceledException)
                 return;
             _waitForOpenConnection.TrySetException(ex);
-            _logger.LogError(ex, "Unknown error, loop stopped and connection is invalid state.");
+            _logger.LogError(ex, "Retry loop stopped and connection state is invalid");
         }
     }
 
@@ -566,10 +596,12 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
     private async Task WaitWithJitterAsync()
     {
+        bool stop;
         int retry;
         TimeSpan backoff;
         lock (_gate)
         {
+            stop = _stopRetries;
             retry = _connectRetry++;
 
             if (Opts.ReconnectWaitMin >= Opts.ReconnectWaitMax)
@@ -598,6 +630,9 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
             backoff = _backoff;
         }
+
+        if (stop)
+            throw new NatsException("Won't retry anymore.");
 
         if (Opts.MaxReconnectRetry > 0 && retry > Opts.MaxReconnectRetry)
             throw new NatsException("Max connect retry exceeded.");

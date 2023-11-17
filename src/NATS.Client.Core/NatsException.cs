@@ -20,3 +20,20 @@ public sealed class NatsNoReplyException : NatsException
     {
     }
 }
+
+public sealed class NatsServerException : NatsException
+{
+    public NatsServerException(string error)
+        : base($"Server error: {error}")
+    {
+        Error = error;
+        IsAuthError = Error.Contains("authorization violation", StringComparison.OrdinalIgnoreCase)
+                      || Error.Contains("user authentication expired", StringComparison.OrdinalIgnoreCase)
+                      || Error.Contains("user authentication revoked", StringComparison.OrdinalIgnoreCase)
+                      || Error.Contains("account authentication expired", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public string Error { get; }
+
+    public bool IsAuthError { get; }
+}

@@ -112,8 +112,15 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
     // -ERR <error message>
     private static string ParseError(in ReadOnlySequence<byte> errorSlice)
     {
-        // SKip `-ERR `
-        return Encoding.UTF8.GetString(errorSlice.Slice(5));
+        // -ERR ''
+        if (errorSlice.Length <= 7)
+        {
+            return string.Empty;
+        }
+
+        // -ERR 'Error message'
+        // Skip -ERR and quotes:
+        return Encoding.UTF8.GetString(errorSlice.Slice(6, errorSlice.Length - 7));
     }
 
     private async Task ReadLoopAsync()
@@ -347,14 +354,14 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                 var newPosition = newBuffer.PositionOf((byte)'\n');
                 var error = ParseError(newBuffer.Slice(0, buffer.GetOffset(newPosition!.Value) - 1));
                 _logger.LogError(error);
-                _waitForPongOrErrorSignal.TrySetException(new NatsException(error));
+                _waitForPongOrErrorSignal.TrySetException(new NatsServerException(error));
                 return newBuffer.Slice(newBuffer.GetPosition(1, newPosition!.Value));
             }
             else
             {
                 var error = ParseError(buffer.Slice(0, buffer.GetOffset(position.Value) - 1));
                 _logger.LogError(error);
-                _waitForPongOrErrorSignal.TrySetException(new NatsException(error));
+                _waitForPongOrErrorSignal.TrySetException(new NatsServerException(error));
                 return buffer.Slice(buffer.GetPosition(1, position.Value));
             }
         }

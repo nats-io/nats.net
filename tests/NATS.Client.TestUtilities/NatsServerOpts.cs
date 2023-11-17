@@ -118,6 +118,12 @@ public sealed class NatsServerOptsBuilder
         _extraConfigs.Add(File.ReadAllText(config));
         return this;
     }
+
+    public NatsServerOptsBuilder AddServerConfigText(string configText)
+    {
+        _extraConfigs.Add(configText);
+        return this;
+    }
 }
 
 public sealed class NatsServerOpts : IDisposable

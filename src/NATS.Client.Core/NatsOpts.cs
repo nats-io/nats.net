@@ -88,6 +88,12 @@ public sealed record NatsOpts
     /// </remarks>
     public TimeSpan ReconnectWaitMax { get; init; } = TimeSpan.FromSeconds(5);
 
+    /// <summary>
+    /// Opts-out of the default connect behavior of aborting
+    /// subsequent reconnect attempts if server returns the same auth error twice.
+    /// </summary>
+    public bool IgnoreAuthErrorAbort { get; init; } = false;
+
     internal NatsUri[] GetSeedUris()
     {
         var urls = Url.Split(',');
