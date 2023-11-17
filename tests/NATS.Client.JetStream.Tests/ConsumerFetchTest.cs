@@ -112,7 +112,7 @@ public class ConsumerFetchTest
 
         await reader;
 
-        var infos = new List<ConsumerInfo>();
+        var infos = new List<INatsJSConsumer>();
         await foreach (var natsJSConsumer in stream.ListConsumersAsync(cts.Token))
         {
             infos.Add(natsJSConsumer);
@@ -120,6 +120,6 @@ public class ConsumerFetchTest
 
         Assert.Single(infos);
 
-        Assert.True(infos[0].NumAckPending > 0);
+        Assert.True(infos[0].Info.NumAckPending > 0);
     }
 }

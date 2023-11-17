@@ -73,27 +73,52 @@ public partial class NatsJSContext : INatsJSContext
         return new NatsJSConsumer(this, response);
     }
 
-    /// <summary>
-    /// Enumerates through consumers belonging to a stream.
-    /// </summary>
-    /// <param name="stream">Stream name the consumers belong to.</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <returns>Async enumerable of consumer info objects. Can be used in a <c>await foreach</c> loop.</returns>
-    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
-    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
-    /// <remarks>
-    /// Note that paging isn't implemented. You might receive only a partial list of consumers if there are a lot of them.
-    /// </remarks>
-    public async IAsyncEnumerable<ConsumerInfo> ListConsumersAsync(
+    /// <inheritdoc />
+    public async IAsyncEnumerable<INatsJSConsumer> ListConsumersAsync(
         string stream,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var response = await JSRequestResponseAsync<ConsumerListRequest, ConsumerListResponse>(
-            subject: $"{Opts.Prefix}.CONSUMER.LIST.{stream}",
-            new ConsumerListRequest { Offset = 0 },
-            cancellationToken);
-        foreach (var consumer in response.Consumers)
-            yield return consumer;
+        var offset = 0;
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            var response = await JSRequestResponseAsync<ConsumerListRequest, ConsumerListResponse>(
+                subject: $"{Opts.Prefix}.CONSUMER.LIST.{stream}",
+                new ConsumerListRequest { Offset = offset },
+                cancellationToken);
+
+            if (response.Consumers.Count == 0)
+            {
+                yield break;
+            }
+
+            foreach (var consumer in response.Consumers)
+                yield return new NatsJSConsumer(this, consumer);
+
+            offset += response.Consumers.Count;
+        }
+    }
+
+    /// <inheritdoc />
+    public async IAsyncEnumerable<string> ListConsumerNamesAsync(
+        string stream,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var offset = 0;
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            var response = await JSRequestResponseAsync<ConsumerNamesRequest, ConsumerNamesResponse>(
+                subject: $"{Opts.Prefix}.CONSUMER.NAMES.{stream}",
+                new ConsumerNamesRequest { Offset = offset },
+                cancellationToken);
+
+            if (response.Consumers.Count == 0)
+                yield break;
+
+            foreach (var consumer in response.Consumers)
+                yield return consumer;
+
+            offset += response.Consumers.Count;
+        }
     }
 
     /// <summary>

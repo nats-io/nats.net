@@ -119,19 +119,29 @@ public class NatsJSStream : INatsJSStream
     }
 
     /// <summary>
-    /// Enumerates through consumers belonging to this stream.
+    /// Enumerates through consumers that belong to this stream.
     /// </summary>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>Async enumerable of consumer objects. Can be used in a <c>await foreach</c> loop.</returns>
     /// <exception cref="NatsJSException">There is an error retrieving the response or this consumer object isn't valid anymore because it was deleted earlier.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
-    /// <remarks>
-    /// Note that paging isn't implemented. You might receive only a partial list of consumers if there are a lot of them.
-    /// </remarks>
-    public IAsyncEnumerable<ConsumerInfo> ListConsumersAsync(CancellationToken cancellationToken = default)
+    public IAsyncEnumerable<INatsJSConsumer> ListConsumersAsync(CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
         return _context.ListConsumersAsync(_name, cancellationToken);
+    }
+
+    /// <summary>
+    /// Enumerates through consumer names that belong to this stream.
+    /// </summary>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>Async enumerable of consumer names. Can be used in a <c>await foreach</c> loop.</returns>
+    /// <exception cref="NatsJSException">There is an error retrieving the response or this consumer object isn't valid anymore because it was deleted earlier.</exception>
+    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    public IAsyncEnumerable<string> ListConsumerNamesAsync(CancellationToken cancellationToken = default)
+    {
+        ThrowIfDeleted();
+        return _context.ListConsumerNamesAsync(_name, cancellationToken);
     }
 
     /// <summary>

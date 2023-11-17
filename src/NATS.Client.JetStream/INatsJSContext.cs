@@ -51,10 +51,19 @@ public interface INatsJSContext
     /// <returns>Async enumerable of consumer info objects. Can be used in a <c>await foreach</c> loop.</returns>
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
-    /// <remarks>
-    /// Note that paging isn't implemented. You might receive only a partial list of consumers if there are a lot of them.
-    /// </remarks>
-    IAsyncEnumerable<ConsumerInfo> ListConsumersAsync(
+    IAsyncEnumerable<INatsJSConsumer> ListConsumersAsync(
+        string stream,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Enumerates through consumer names belonging to a stream.
+    /// </summary>
+    /// <param name="stream">Stream name the consumers belong to.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>Async enumerable of consumer info objects. Can be used in a <c>await foreach</c> loop.</returns>
+    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
+    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    IAsyncEnumerable<string> ListConsumerNamesAsync(
         string stream,
         CancellationToken cancellationToken = default);
 
@@ -192,9 +201,6 @@ public interface INatsJSContext
     /// <returns>Async enumerable of stream objects. Can be used in a <c>await foreach</c> loop.</returns>
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
-    /// <remarks>
-    /// Note that paging isn't implemented. You might receive only a partial list of streams if there are a lot of them.
-    /// </remarks>
     IAsyncEnumerable<INatsJSStream> ListStreamsAsync(
         string? subject = default,
         CancellationToken cancellationToken = default);
