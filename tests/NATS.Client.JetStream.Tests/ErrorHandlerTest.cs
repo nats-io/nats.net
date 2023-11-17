@@ -146,8 +146,9 @@ public class ErrorHandlerTest
         (await js.PublishAsync("s1.1", 1, cancellationToken: cts.Token)).EnsureSuccess();
 
         var timeoutNotifications = 0;
-        var opts = new NatsJSNextOpts
+        var opts = new NatsJSFetchOpts
         {
+            MaxMsgs = 10,
             NotificationHandler = (e, _) =>
             {
                 if (e is NatsJSTimeoutNotification)
@@ -161,28 +162,31 @@ public class ErrorHandlerTest
             IdleHeartbeat = TimeSpan.FromSeconds(3),
         };
 
-        // Next is fetch under the hood.
-        var next = await consumer.NextAsync<int>(opts: opts, cancellationToken: cts.Token);
-        if (next is { } msg)
+        var count1 = 0;
+        await foreach (var msg in consumer.FetchAsync<int>(opts: opts, cancellationToken: cts.Token))
         {
             msg.Subject.Should().Be("s1.1");
             msg.Data.Should().Be(1);
+            await msg.AckAsync(cancellationToken: cts.Token);
+            count1++;
         }
-        else
-        {
-            Assert.Fail("No message received.");
-        }
+
+        Assert.Equal(1, count1);
+
+        // Swallow heartbeats
+        proxy.ServerInterceptors.Add(m => m?.Contains("Idle Heartbeat") ?? false ? null : m);
 
         // Create an empty stream since ordered consumer will pick up messages from beginning everytime.
         var stream2 = await js.CreateStreamAsync(new StreamConfig("s2", new[] { "s2.*" }), cts.Token);
         var consumer2 = (NatsJSOrderedConsumer)await stream2.CreateOrderedConsumerAsync(cancellationToken: cts.Token);
 
-        // Swallow heartbeats
-        proxy.ServerInterceptors.Add(m => m?.Contains("Idle Heartbeat") ?? false ? null : m);
+        var count = 0;
+        await foreach (var unused in consumer2.FetchAsync<int>(opts: opts, cancellationToken: cts.Token))
+        {
+            count++;
+        }
 
-        var next2 = await consumer2.NextAsync<int>(opts: opts, cancellationToken: cts.Token);
-
-        Assert.Null(next2);
+        Assert.Equal(0, count);
         Assert.Equal(1, Volatile.Read(ref timeoutNotifications));
     }
 
