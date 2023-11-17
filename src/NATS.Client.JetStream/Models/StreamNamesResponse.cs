@@ -6,7 +6,7 @@ namespace NATS.Client.JetStream.Models;
 
 public record StreamNamesResponse : IterableResponse
 {
-    [System.Text.Json.Serialization.JsonPropertyName("consumers")]
+    [System.Text.Json.Serialization.JsonPropertyName("streams")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public System.Collections.Generic.ICollection<string> Consumers { get; set; } = default!;
+    public System.Collections.Generic.ICollection<string>? Streams { get; set; }
 }

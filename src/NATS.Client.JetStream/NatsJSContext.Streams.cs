@@ -133,18 +133,61 @@ public partial class NatsJSContext
     /// <returns>Async enumerable of stream objects. Can be used in a <c>await foreach</c> loop.</returns>
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
-    /// <remarks>
-    /// Note that paging isn't implemented. You might receive only a partial list of streams if there are a lot of them.
-    /// </remarks>
     public async IAsyncEnumerable<INatsJSStream> ListStreamsAsync(
         string? subject = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var response = await JSRequestResponseAsync<StreamListRequest, StreamListResponse>(
-            subject: $"{Opts.Prefix}.STREAM.LIST",
-            request: new StreamListRequest { Offset = 0, Subject = subject! },
-            cancellationToken);
-        foreach (var stream in response.Streams)
-            yield return new NatsJSStream(this, stream);
+        var offset = 0;
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            var response = await JSRequestResponseAsync<StreamListRequest, StreamListResponse>(
+                subject: $"{Opts.Prefix}.STREAM.LIST",
+                request: new StreamListRequest
+                {
+                    Offset = offset,
+                    Subject = subject,
+                },
+                cancellationToken);
+
+            if (response.Streams.Count == 0)
+                yield break;
+
+            foreach (var stream in response.Streams)
+                yield return new NatsJSStream(this, stream);
+
+            offset += response.Streams.Count;
+        }
+    }
+
+    /// <summary>
+    /// List stream names.
+    /// </summary>
+    /// <param name="subject">Limit the list to streams matching this subject filter.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>Async enumerable list of stream names to be used in a <c>await foreach</c> loop.</returns>
+    public async IAsyncEnumerable<string> ListStreamNamesAsync(string? subject = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var offset = 0;
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            var response = await JSRequestResponseAsync<StreamNamesRequest, StreamNamesResponse>(
+                subject: $"{Opts.Prefix}.STREAM.NAMES",
+                request: new StreamNamesRequest
+                {
+                    Subject = subject,
+                    Offset = offset,
+                },
+                cancellationToken);
+
+            if (response.Streams == null || response.Streams.Count == 0)
+            {
+                yield break;
+            }
+
+            foreach (var stream in response.Streams)
+                yield return stream;
+
+            offset += response.Streams.Count;
+        }
     }
 }

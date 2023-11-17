@@ -81,10 +81,16 @@ public interface INatsJSStream
     /// <returns>Async enumerable of consumer objects. Can be used in a <c>await foreach</c> loop.</returns>
     /// <exception cref="NatsJSException">There is an error retrieving the response or this consumer object isn't valid anymore because it was deleted earlier.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
-    /// <remarks>
-    /// Note that paging isn't implemented. You might receive only a partial list of consumers if there are a lot of them.
-    /// </remarks>
-    IAsyncEnumerable<ConsumerInfo> ListConsumersAsync(CancellationToken cancellationToken = default);
+    IAsyncEnumerable<INatsJSConsumer> ListConsumersAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Enumerates through consumers names belonging to this stream.
+    /// </summary>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>Async enumerable of consumer names. Can be used in a <c>await foreach</c> loop.</returns>
+    /// <exception cref="NatsJSException">There is an error retrieving the response or this consumer object isn't valid anymore because it was deleted earlier.</exception>
+    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    IAsyncEnumerable<string> ListConsumerNamesAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Delete a consumer from this stream.
