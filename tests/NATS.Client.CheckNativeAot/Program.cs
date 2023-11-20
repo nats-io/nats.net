@@ -47,10 +47,10 @@ async Task RequestReplyTests()
     var count = 0;
     await foreach (var msg in nats.RequestManyAsync<int, int?>("foo", 1, cancellationToken: cts.Token))
     {
-        Assert.Equal(results[count++], msg.Data);
+        AssertEqual(results[count++], msg.Data);
     }
 
-    Assert.Equal(3, count);
+    AssertEqual(3, count);
 
     await sub.DisposeAsync();
     await reg;
@@ -74,7 +74,7 @@ async Task JetStreamTests()
         var stream = await js.CreateStreamAsync(
             request: new StreamConfig("events", new[] { "events.*" }),
             cancellationToken: cts1.Token);
-        Assert.Equal("events", stream.Info.Config.Name);
+        AssertEqual("events", stream.Info.Config.Name);
 
         // Create consumer
         var consumer = await js.CreateConsumerAsync(
@@ -88,15 +88,15 @@ async Task JetStreamTests()
                 AckPolicy = ConsumerConfigAckPolicy.@explicit,
             },
             cts1.Token);
-        Assert.Equal("events", consumer.Info.StreamName);
-        Assert.Equal("consumer1", consumer.Info.Config.Name);
+        AssertEqual("events", consumer.Info.StreamName);
+        AssertEqual("consumer1", consumer.Info.Config.Name);
 
         // Publish
         var ack = await js.PublishAsync("events.foo", new TestData { Test = 1 }, serializer: TestDataJsonSerializer<TestData>.Default, cancellationToken: cts1.Token);
-        Assert.Null(ack.Error);
-        Assert.Equal("events", ack.Stream);
-        Assert.Equal(1, (int)ack.Seq);
-        Assert.False(ack.Duplicate);
+        AssertNull(ack.Error);
+        AssertEqual("events", ack.Stream);
+        AssertEqual(1, (int)ack.Seq);
+        AssertFalse(ack.Duplicate);
 
         // Message ID
         ack = await js.PublishAsync(
@@ -105,10 +105,10 @@ async Task JetStreamTests()
             serializer: TestDataJsonSerializer<TestData>.Default,
             opts: new NatsJSPubOpts { MsgId = "test2" },
             cancellationToken: cts1.Token);
-        Assert.Null(ack.Error);
-        Assert.Equal("events", ack.Stream);
-        Assert.Equal(2, (int)ack.Seq);
-        Assert.False(ack.Duplicate);
+        AssertNull(ack.Error);
+        AssertEqual("events", ack.Stream);
+        AssertEqual(2, (int)ack.Seq);
+        AssertFalse(ack.Duplicate);
 
         // Duplicate
         ack = await js.PublishAsync(
@@ -117,10 +117,10 @@ async Task JetStreamTests()
             serializer: TestDataJsonSerializer<TestData>.Default,
             opts: new NatsJSPubOpts { MsgId = "test2" },
             cancellationToken: cts1.Token);
-        Assert.Null(ack.Error);
-        Assert.Equal("events", ack.Stream);
-        Assert.Equal(2, (int)ack.Seq);
-        Assert.True(ack.Duplicate);
+        AssertNull(ack.Error);
+        AssertEqual("events", ack.Stream);
+        AssertEqual(2, (int)ack.Seq);
+        AssertTrue(ack.Duplicate);
 
         // Consume
         var cts2 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -141,25 +141,25 @@ async Task JetStreamTests()
             }
         }
 
-        Assert.Equal(2, messages.Count);
-        Assert.Equal("events.foo", messages[0].Subject);
-        Assert.Equal("events.foo", messages[1].Subject);
+        AssertEqual(2, messages.Count);
+        AssertEqual("events.foo", messages[0].Subject);
+        AssertEqual("events.foo", messages[1].Subject);
     }
 
     // Handle errors
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var js = new NatsJSContext(nats);
-        var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () =>
+        var exception = await AssertThrowsAsync<NatsJSApiException>(async () =>
         {
             await js.CreateStreamAsync(
                 request: new StreamConfig("events2", new[] { "events.*" }),
                 cancellationToken: cts.Token);
         });
-        Assert.Equal(400, exception.Error.Code);
+        AssertEqual(400, exception.Error.Code);
 
         // subjects overlap with an existing stream
-        Assert.Equal(10065, exception.Error.ErrCode);
+        AssertEqual(10065, exception.Error.ErrCode);
     }
 
     // Delete stream
@@ -171,15 +171,15 @@ async Task JetStreamTests()
         await js.DeleteStreamAsync("events", cts.Token);
 
         // Error
-        var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () =>
+        var exception = await AssertThrowsAsync<NatsJSApiException>(async () =>
         {
             await js.DeleteStreamAsync("events2", cts.Token);
         });
 
-        Assert.Equal(404, exception.Error.Code);
+        AssertEqual(404, exception.Error.Code);
 
         // stream not found
-        Assert.Equal(10059, exception.Error.ErrCode);
+        AssertEqual(10059, exception.Error.ErrCode);
     }
 
     Log("OK");
@@ -200,7 +200,7 @@ async Task KVTests()
     await store.PutAsync("k1", "v1");
 
     var entry = await store.GetEntryAsync<string>("k1");
-    Assert.Equal("v1", entry.Value);
+    AssertEqual("v1", entry.Value);
 
     Log("OK");
 }
@@ -240,7 +240,7 @@ async Task ObjectStoreTests()
         await store.GetAsync("k1", memoryStream, cancellationToken: cancellationToken);
         await memoryStream.FlushAsync(cancellationToken);
         var buffer = memoryStream.ToArray();
-        Assert.Equal(buffer90, Encoding.ASCII.GetString(buffer));
+        AssertEqual(buffer90, Encoding.ASCII.GetString(buffer));
     }
 
     // buffer with smaller last chunk
@@ -256,7 +256,7 @@ async Task ObjectStoreTests()
         await store.GetAsync("k2", memoryStream, cancellationToken: cancellationToken);
         await memoryStream.FlushAsync(cancellationToken);
         var buffer = memoryStream.ToArray();
-        Assert.Equal(buffer90 + "09-45", Encoding.ASCII.GetString(buffer));
+        AssertEqual(buffer90 + "09-45", Encoding.ASCII.GetString(buffer));
     }
 
     Log("OK");
@@ -310,22 +310,22 @@ async Task ServicesTests()
     // Check that the endpoints are registered correctly
     {
         var info = (await nats.FindServicesAsync("$SRV.INFO.s1", 1, NatsSrvJsonSerializer<InfoResponse>.Default, cancellationToken)).First();
-        Assert.Equal(5, info.Endpoints.Count);
+        AssertEqual(5, info.Endpoints.Count);
 
-        Assert.Equal("foo.baz", info.Endpoints.First(e => e.Name == "baz").Subject);
-        Assert.Equal("q", info.Endpoints.First(e => e.Name == "baz").QueueGroup);
+        AssertEqual("foo.baz", info.Endpoints.First(e => e.Name == "baz").Subject);
+        AssertEqual("q", info.Endpoints.First(e => e.Name == "baz").QueueGroup);
 
-        Assert.Equal("foo.bar1", info.Endpoints.First(e => e.Name == "foo-bar1").Subject);
-        Assert.Equal("q", info.Endpoints.First(e => e.Name == "foo-bar1").QueueGroup);
+        AssertEqual("foo.bar1", info.Endpoints.First(e => e.Name == "foo-bar1").Subject);
+        AssertEqual("q", info.Endpoints.First(e => e.Name == "foo-bar1").QueueGroup);
 
-        Assert.Equal("grp1.e1", info.Endpoints.First(e => e.Name == "e1").Subject);
-        Assert.Equal("q", info.Endpoints.First(e => e.Name == "e1").QueueGroup);
+        AssertEqual("grp1.e1", info.Endpoints.First(e => e.Name == "e1").Subject);
+        AssertEqual("q", info.Endpoints.First(e => e.Name == "e1").QueueGroup);
 
-        Assert.Equal("grp1.foo.bar2", info.Endpoints.First(e => e.Name == "e2").Subject);
-        Assert.Equal("q", info.Endpoints.First(e => e.Name == "e2").QueueGroup);
+        AssertEqual("grp1.foo.bar2", info.Endpoints.First(e => e.Name == "e2").Subject);
+        AssertEqual("q", info.Endpoints.First(e => e.Name == "e2").QueueGroup);
 
-        Assert.Equal("foo.empty1", info.Endpoints.First(e => e.Name == "empty1").Subject);
-        Assert.Equal("q_empty", info.Endpoints.First(e => e.Name == "empty1").QueueGroup);
+        AssertEqual("foo.empty1", info.Endpoints.First(e => e.Name == "empty1").Subject);
+        AssertEqual("q_empty", info.Endpoints.First(e => e.Name == "empty1").QueueGroup);
     }
 
     await using var s2 = await svc.AddServiceAsync(
@@ -348,22 +348,22 @@ async Task ServicesTests()
     // Check default queue group and stats handler
     {
         var info = (await nats.FindServicesAsync("$SRV.INFO.s2", 1, NatsSrvJsonSerializer<InfoResponse>.Default, cancellationToken)).First();
-        Assert.Single(info.Endpoints);
+        AssertSingle(info.Endpoints);
         var epi = info.Endpoints.First();
 
-        Assert.Equal("s2baz", epi.Name);
-        Assert.Equal("s2foo.baz", epi.Subject);
-        Assert.Equal("q2", epi.QueueGroup);
-        Assert.Equal("ep-v1", epi.Metadata["ep-k1"]);
+        AssertEqual("s2baz", epi.Name);
+        AssertEqual("s2foo.baz", epi.Subject);
+        AssertEqual("q2", epi.QueueGroup);
+        AssertEqual("ep-v1", epi.Metadata["ep-k1"]);
 
         var stat = (await nats.FindServicesAsync("$SRV.STATS.s2", 1, NatsSrvJsonSerializer<StatsResponse>.Default, cancellationToken)).First();
-        Assert.Equal("v1", stat.Metadata["k1"]);
-        Assert.Equal("v2", stat.Metadata["k2"]);
-        Assert.Single(stat.Endpoints);
+        AssertEqual("v1", stat.Metadata["k1"]);
+        AssertEqual("v2", stat.Metadata["k2"]);
+        AssertSingle(stat.Endpoints);
         var eps = stat.Endpoints.First();
-        Assert.Equal("stat-v1", eps.Data["stat-k1"]?.GetValue<string>());
-        Assert.Equal("stat-v2", eps.Data["stat-k2"]?.GetValue<string>());
-        Assert.Equal("s2baz", eps.Data["ep_name"]?.GetValue<string>());
+        AssertEqual("stat-v1", eps.Data["stat-k1"]?.GetValue<string>());
+        AssertEqual("stat-v2", eps.Data["stat-k2"]?.GetValue<string>());
+        AssertEqual("s2baz", eps.Data["ep_name"]?.GetValue<string>());
     }
 
     Log("OK");
@@ -407,39 +407,83 @@ async Task ServicesTests2()
         cancellationToken: cancellationToken);
 
     var info = (await nats.FindServicesAsync("$SRV.INFO", 1, NatsSrvJsonSerializer<InfoResponse>.Default, cancellationToken)).First();
-    Assert.Single(info.Endpoints);
+    AssertSingle(info.Endpoints);
     var endpointInfo = info.Endpoints.First();
-    Assert.Equal("e1", endpointInfo.Name);
+    AssertEqual("e1", endpointInfo.Name);
 
     for (var i = 0; i < 10; i++)
     {
         var response = await nats.RequestAsync<int, int>(endpointInfo.Subject, i, cancellationToken: cancellationToken);
         if (i is 7 or 8)
         {
-            Assert.Equal($"{i}", response.Headers?["Nats-Service-Error-Code"]);
-            Assert.Equal($"Error{i}", response.Headers?["Nats-Service-Error"]);
+            AssertEqual($"{i}", response.Headers?["Nats-Service-Error-Code"][0]);
+            AssertEqual($"Error{i}", response.Headers?["Nats-Service-Error"][0]);
         }
         else if (i is 9)
         {
-            Assert.Equal("999", response.Headers?["Nats-Service-Error-Code"]);
-            Assert.Equal("Handler error", response.Headers?["Nats-Service-Error"]);
+            AssertEqual("999", response.Headers?["Nats-Service-Error-Code"][0]);
+            AssertEqual("Handler error", response.Headers?["Nats-Service-Error"][0]);
         }
         else
         {
-            Assert.Equal(i * i, response.Data);
-            Assert.Null(response.Headers);
+            AssertEqual(i * i, response.Data);
+            AssertNull(response.Headers);
         }
     }
 
     var stat = (await nats.FindServicesAsync("$SRV.STATS", 1, NatsSrvJsonSerializer<StatsResponse>.Default, cancellationToken)).First();
-    Assert.Single(stat.Endpoints);
+    AssertSingle(stat.Endpoints);
     var endpointStats = stat.Endpoints.First();
-    Assert.Equal("e1", endpointStats.Name);
-    Assert.Equal(10, endpointStats.NumRequests);
-    Assert.Equal(3, endpointStats.NumErrors);
-    Assert.Equal("999:Handler error", endpointStats.LastError);
-    Assert.True(endpointStats.ProcessingTime > 0);
-    Assert.True(endpointStats.AverageProcessingTime > 0);
+    AssertEqual("e1", endpointStats.Name);
+    AssertEqual(10L, endpointStats.NumRequests);
+    AssertEqual(3L, endpointStats.NumErrors);
+    AssertEqual("999:Handler error", endpointStats.LastError);
+    AssertTrue(endpointStats.ProcessingTime > 0);
+    AssertTrue(endpointStats.AverageProcessingTime > 0);
 
     Log("OK");
+}
+
+void AssertEqual(object? q, object? b)
+{
+    if (!Equals(q, b))
+        throw new Exception($"Expected {q} but got {b}");
+}
+
+void AssertTrue(bool a)
+{
+    if (!a)
+        throw new Exception("Expected true");
+}
+
+void AssertFalse(bool a)
+{
+    if (a)
+        throw new Exception("Expected false");
+}
+
+void AssertNull(object? a)
+{
+    if (a != null)
+        throw new Exception("Expected null");
+}
+
+void AssertSingle<T>(ICollection<T> a)
+{
+    if (a.Count != 1)
+        throw new Exception("Expected single");
+}
+
+async Task<T> AssertThrowsAsync<T>(Func<Task> func)
+    where T : Exception
+{
+    try
+    {
+        await func();
+        throw new Exception("Expected exception");
+    }
+    catch (T e)
+    {
+        return e;
+    }
 }

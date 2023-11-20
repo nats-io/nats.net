@@ -150,7 +150,15 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
             _logger.Log(LogLevel.Information, $"Disposing connection {_name}.");
 
             await DisposeSocketAsync(false).ConfigureAwait(false);
-            _pingTimerCancellationTokenSource?.Cancel();
+            if (_pingTimerCancellationTokenSource != null)
+            {
+#if NET6_0
+                _pingTimerCancellationTokenSource.Cancel();
+#else
+                await _pingTimerCancellationTokenSource.CancelAsync().ConfigureAwait(false);
+#endif
+            }
+
             foreach (var item in _writerState.PendingPromises)
             {
                 item.SetCanceled();
@@ -158,7 +166,11 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
             await SubscriptionManager.DisposeAsync().ConfigureAwait(false);
             _waitForOpenConnection.TrySetCanceled();
+#if NET6_0
             _disposedCancellationTokenSource.Cancel();
+#else
+            await _disposedCancellationTokenSource.CancelAsync().ConfigureAwait(false);
+#endif
         }
     }
 

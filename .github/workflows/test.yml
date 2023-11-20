@@ -62,10 +62,22 @@ jobs:
       - name: Check Native AOT
         run: |
           cd tests/NATS.Client.CheckNativeAot
-          dotnet publish -r linux-x64 -c Release -o dist
+          rm -rf bin obj
+          dotnet publish -r linux-x64 -c Release -o dist | tee output.txt
+
+          # check for warnings
+          grep -i warning output.txt && exit 1
+
           cd dist
           ls -lh
+
+          # make sure it's executable
           file NATS.Client.CheckNativeAot
+          file NATS.Client.CheckNativeAot | grep ELF || exit 1
+
+          # can't be less than a meg
+          ls --size NATS.Client.CheckNativeAot | perl -lne'/(\d+)/; exit(1) if $1 < 1024' || exit 1
+
           ./NATS.Client.CheckNativeAot
 
   memory_test:

@@ -36,7 +36,11 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
     {
         if (Interlocked.Increment(ref _disposed) == 1)
         {
+#if NET6_0
             _cancellationTokenSource.Cancel();
+#else
+            await _cancellationTokenSource.CancelAsync().ConfigureAwait(false);
+#endif
             await _writeLoop.ConfigureAwait(false); // wait for drain writer
         }
     }
