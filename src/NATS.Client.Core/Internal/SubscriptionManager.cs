@@ -104,7 +104,11 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
 
     public async ValueTask DisposeAsync()
     {
+#if NET6_0
         _cts.Cancel();
+#else
+        await _cts.CancelAsync().ConfigureAwait(false);
+#endif
 
         WeakReference<NatsSubBase>[] subRefs;
         lock (_gate)

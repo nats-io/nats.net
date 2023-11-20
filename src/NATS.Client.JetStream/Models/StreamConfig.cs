@@ -49,7 +49,11 @@ public record StreamConfig
     [System.Text.Json.Serialization.JsonPropertyName("retention")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+#if NET6_0
     [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
+#else
+    [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<StreamConfigRetention>))]
+#endif
     public StreamConfigRetention Retention { get; set; } = NATS.Client.JetStream.Models.StreamConfigRetention.limits;
 
     /// <summary>
@@ -106,7 +110,11 @@ public record StreamConfig
     [System.Text.Json.Serialization.JsonPropertyName("storage")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+#if NET6_0
     [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
+#else
+    [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<StreamConfigStorage>))]
+#endif
     public StreamConfigStorage Storage { get; set; } = StreamConfigStorage.file;
 
     /// <summary>
@@ -114,7 +122,11 @@ public record StreamConfig
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("compression")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+#if NET6_0
     [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
+#else
+    [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<StreamConfigCompression>))]
+#endif
     public StreamConfigCompression Compression { get; set; } = NATS.Client.JetStream.Models.StreamConfigCompression.none;
 
     /// <summary>
@@ -144,7 +156,11 @@ public record StreamConfig
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("discard")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+#if NET6_0
     [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
+#else
+    [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<StreamConfigDiscard>))]
+#endif
     public StreamConfigDiscard Discard { get; set; } = StreamConfigDiscard.old;
 
     /// <summary>

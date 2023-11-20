@@ -7,10 +7,11 @@
         <Nullable>enable</Nullable>
         <PublishAot>true</PublishAot>
         <IsPackable>false</IsPackable>
+        <TrimmerSingleWarn>false</TrimmerSingleWarn>
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\src\NATS.Client.Core\NATS.Client.Core.csproj" />
+      <ProjectReference Include="..\..\src\NATS.Net\NATS.Net.csproj" />
       <ProjectReference Include="..\Example.ProtoBufMessages\Example.ProtoBufMessages.csproj" />
     </ItemGroup>
 

@@ -3,6 +3,8 @@ using System.Text;
 using System.Text.Json.Serialization;
 using Google.Protobuf;
 using NATS.Client.Core;
+using NATS.Client.JetStream;
+using NATS.Client.JetStream.Models;
 
 // string
 {
@@ -170,6 +172,15 @@ using NATS.Client.Core;
     await nats.PublishAsync(subject: "foo", data: bw);
 
     await sub;
+}
+
+// JS
+{
+    await using var nats = new NatsConnection();
+    var js = new NatsJSContext(nats);
+
+    var stream = await js.CreateStreamAsync(new StreamConfig("s1",  new[] { "s1.*" }));
+    Console.WriteLine(stream.Info.Config.Name);
 }
 
 public class MixedSerializerRegistry : INatsSerializerRegistry
