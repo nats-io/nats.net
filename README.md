@@ -17,7 +17,7 @@ Check out the [documentation](https://nats-io.github.io/nats.net.v2/) for guides
 ## NATS.Net Goals
 
 - Only support Async I/O (async/await)
-- Target latest .NET LTS Release (currently .NET 6.0, soon .NET 8.0)
+- Target current .NET LTS releases (currently .NET 6.0 & .NET 8.0)
 
 ## Packages
 
