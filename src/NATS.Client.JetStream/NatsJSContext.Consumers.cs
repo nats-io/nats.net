@@ -150,7 +150,7 @@ public partial class NatsJSContext : INatsJSContext
             Config = new ConsumerConfig
             {
                 DeliverPolicy = opts.DeliverPolicy,
-                AckPolicy = ConsumerConfigAckPolicy.none,
+                AckPolicy = ConsumerConfigAckPolicy.None,
                 ReplayPolicy = opts.ReplayPolicy,
                 InactiveThreshold = opts.InactiveThreshold.ToNanos(),
                 NumReplicas = 1,

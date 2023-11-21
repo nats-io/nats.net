@@ -40,8 +40,8 @@ public class NatsObjContext : INatsObjContext
         ValidateBucketName(config.Bucket);
 
         var storage = config.Storage == NatsObjStorageType.File
-            ? StreamConfigStorage.file
-            : StreamConfigStorage.memory;
+            ? StreamConfigStorage.File
+            : StreamConfigStorage.Memory;
 
         var streamConfig = new StreamConfig
         {
@@ -53,12 +53,12 @@ public class NatsObjContext : INatsObjContext
             Storage = storage,
             NumReplicas = config.NumberOfReplicas,
             /* TODO: Placement = */
-            Discard = StreamConfigDiscard.@new,
+            Discard = StreamConfigDiscard.New,
             AllowRollupHdrs = true,
             AllowDirect = true,
             Metadata = config.Metadata!,
-            Retention = StreamConfigRetention.limits,
-            Compression = config.Compression ? StreamConfigCompression.s2 : StreamConfigCompression.none,
+            Retention = StreamConfigRetention.Limits,
+            Compression = config.Compression ? StreamConfigCompression.S2 : StreamConfigCompression.None,
         };
 
         var stream = await _context.CreateStreamAsync(streamConfig, cancellationToken);

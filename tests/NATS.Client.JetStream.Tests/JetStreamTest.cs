@@ -42,7 +42,7 @@ public class JetStreamTest
                     DurableName = "consumer1",
 
                     // Turn on ACK so we can test them below
-                    AckPolicy = ConsumerConfigAckPolicy.@explicit,
+                    AckPolicy = ConsumerConfigAckPolicy.Explicit,
                 },
                 cts1.Token);
             Assert.Equal("events", consumer.Info.StreamName);

@@ -1,3 +1,5 @@
+using NATS.Client.JetStream.Internal;
+
 namespace NATS.Client.JetStream.Models;
 
 public record ConsumerConfig
@@ -10,16 +12,14 @@ public record ConsumerConfig
     {
         Name = name;
         DurableName = name;
-        AckPolicy = ConsumerConfigAckPolicy.@explicit;
+        AckPolicy = ConsumerConfigAckPolicy.Explicit;
     }
 
     [System.Text.Json.Serialization.JsonPropertyName("deliver_policy")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
 #if NET6_0
-    [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
-#else
-    [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<ConsumerConfigDeliverPolicy>))]
+    [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonStringEnumConverter<ConsumerConfigDeliverPolicy>))]
 #endif
     public ConsumerConfigDeliverPolicy DeliverPolicy { get; set; } = default!;
 
@@ -67,11 +67,9 @@ public record ConsumerConfig
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
 #if NET6_0
-    [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
-#else
-    [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<ConsumerConfigAckPolicy>))]
+    [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonStringEnumConverter<ConsumerConfigAckPolicy>))]
 #endif
-    public ConsumerConfigAckPolicy AckPolicy { get; set; } = ConsumerConfigAckPolicy.none;
+    public ConsumerConfigAckPolicy AckPolicy { get; set; } = ConsumerConfigAckPolicy.None;
 
     /// <summary>
     /// How long (in nanoseconds) to allow messages to remain un-acknowledged before attempting redelivery
@@ -107,11 +105,9 @@ public record ConsumerConfig
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
 #if NET6_0
-    [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
-#else
-    [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<ConsumerConfigReplayPolicy>))]
+    [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonStringEnumConverter<ConsumerConfigReplayPolicy>))]
 #endif
-    public ConsumerConfigReplayPolicy ReplayPolicy { get; set; } = NATS.Client.JetStream.Models.ConsumerConfigReplayPolicy.instant;
+    public ConsumerConfigReplayPolicy ReplayPolicy { get; set; } = NATS.Client.JetStream.Models.ConsumerConfigReplayPolicy.Instant;
 
     [System.Text.Json.Serialization.JsonPropertyName("sample_freq")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]

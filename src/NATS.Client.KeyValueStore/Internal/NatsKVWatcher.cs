@@ -342,8 +342,8 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
         var config = new ConsumerConfig
         {
             Name = Consumer,
-            DeliverPolicy = ConsumerConfigDeliverPolicy.all,
-            AckPolicy = ConsumerConfigAckPolicy.none,
+            DeliverPolicy = ConsumerConfigDeliverPolicy.All,
+            AckPolicy = ConsumerConfigAckPolicy.None,
             DeliverSubject = _sub.Subject,
             FilterSubject = _filter,
             FlowControl = true,
@@ -352,17 +352,17 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
             MaxDeliver = 1,
             MemStorage = true,
             NumReplicas = 1,
-            ReplayPolicy = ConsumerConfigReplayPolicy.instant,
+            ReplayPolicy = ConsumerConfigReplayPolicy.Instant,
         };
 
         if (!_opts.IncludeHistory)
         {
-            config.DeliverPolicy = ConsumerConfigDeliverPolicy.last_per_subject;
+            config.DeliverPolicy = ConsumerConfigDeliverPolicy.LastPerSubject;
         }
 
         if (_opts.UpdatesOnly)
         {
-            config.DeliverPolicy = ConsumerConfigDeliverPolicy.@new;
+            config.DeliverPolicy = ConsumerConfigDeliverPolicy.New;
         }
 
         if (_opts.MetaOnly)
@@ -372,7 +372,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
 
         if (sequence > 0)
         {
-            config.DeliverPolicy = ConsumerConfigDeliverPolicy.by_start_sequence;
+            config.DeliverPolicy = ConsumerConfigDeliverPolicy.ByStartSequence;
             config.OptStartSeq = sequence + 1;
         }
 

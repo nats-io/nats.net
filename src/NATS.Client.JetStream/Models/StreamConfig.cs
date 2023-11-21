@@ -1,3 +1,5 @@
+using NATS.Client.JetStream.Internal;
+
 namespace NATS.Client.JetStream.Models;
 
 public record StreamConfig
@@ -50,11 +52,9 @@ public record StreamConfig
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
 #if NET6_0
-    [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
-#else
-    [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<StreamConfigRetention>))]
+    [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonStringEnumConverter<StreamConfigRetention>))]
 #endif
-    public StreamConfigRetention Retention { get; set; } = NATS.Client.JetStream.Models.StreamConfigRetention.limits;
+    public StreamConfigRetention Retention { get; set; } = NATS.Client.JetStream.Models.StreamConfigRetention.Limits;
 
     /// <summary>
     /// How many Consumers can be defined for a given Stream. -1 for unlimited.
@@ -111,11 +111,9 @@ public record StreamConfig
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
 #if NET6_0
-    [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
-#else
-    [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<StreamConfigStorage>))]
+    [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonStringEnumConverter<StreamConfigStorage>))]
 #endif
-    public StreamConfigStorage Storage { get; set; } = StreamConfigStorage.file;
+    public StreamConfigStorage Storage { get; set; } = StreamConfigStorage.File;
 
     /// <summary>
     /// Optional compression algorithm used for the Stream.
@@ -123,11 +121,9 @@ public record StreamConfig
     [System.Text.Json.Serialization.JsonPropertyName("compression")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
 #if NET6_0
-    [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
-#else
-    [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<StreamConfigCompression>))]
+    [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonStringEnumConverter<StreamConfigCompression>))]
 #endif
-    public StreamConfigCompression Compression { get; set; } = NATS.Client.JetStream.Models.StreamConfigCompression.none;
+    public StreamConfigCompression Compression { get; set; } = NATS.Client.JetStream.Models.StreamConfigCompression.None;
 
     /// <summary>
     /// How many replicas to keep for each message.
@@ -157,11 +153,9 @@ public record StreamConfig
     [System.Text.Json.Serialization.JsonPropertyName("discard")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
 #if NET6_0
-    [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
-#else
-    [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<StreamConfigDiscard>))]
+    [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonStringEnumConverter<StreamConfigDiscard>))]
 #endif
-    public StreamConfigDiscard Discard { get; set; } = StreamConfigDiscard.old;
+    public StreamConfigDiscard Discard { get; set; } = StreamConfigDiscard.Old;
 
     /// <summary>
     /// The time window to track duplicate messages for, expressed in nanoseconds. 0 for default
