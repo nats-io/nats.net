@@ -7,7 +7,23 @@ namespace NATS.Client.JetStream.Internal;
 
 internal static class NatsJSJsonSerializer<T>
 {
+#if NET6_0
     public static readonly INatsSerializer<T> Default = new NatsJsonContextSerializer<T>(NatsJSJsonSerializerContext.Default);
+#else
+    public static readonly INatsSerializer<T> Default = new NatsJsonContextSerializer<T>(new NatsJSJsonSerializerContext(new JsonSerializerOptions
+    {
+        Converters =
+        {
+            new JsonStringEnumConverter<ConsumerConfigDeliverPolicy>(JsonNamingPolicy.SnakeCaseLower),
+            new JsonStringEnumConverter<ConsumerConfigAckPolicy>(JsonNamingPolicy.SnakeCaseLower),
+            new JsonStringEnumConverter<ConsumerConfigReplayPolicy>(JsonNamingPolicy.SnakeCaseLower),
+            new JsonStringEnumConverter<StreamConfigCompression>(JsonNamingPolicy.SnakeCaseLower),
+            new JsonStringEnumConverter<StreamConfigDiscard>(JsonNamingPolicy.SnakeCaseLower),
+            new JsonStringEnumConverter<StreamConfigRetention>(JsonNamingPolicy.SnakeCaseLower),
+            new JsonStringEnumConverter<StreamConfigStorage>(JsonNamingPolicy.SnakeCaseLower),
+        },
+    }));
+#endif
 }
 
 [JsonSerializable(typeof(AccountInfoResponse))]
@@ -88,6 +104,7 @@ internal partial class NatsJSJsonSerializerContext : JsonSerializerContext
 {
 }
 
+#if NET6_0
 internal class NatsJSJsonStringEnumConverter<TEnum> : JsonConverter<TEnum>
     where TEnum : struct, Enum
 {
@@ -174,7 +191,7 @@ internal class NatsJSJsonStringEnumConverter<TEnum> : JsonConverter<TEnum>
             case "interest":
                 return (TEnum)(object)StreamConfigRetention.Interest;
             case "workqueue":
-                return (TEnum)(object)StreamConfigRetention.WorkQueue;
+                return (TEnum)(object)StreamConfigRetention.Workqueue;
             }
         }
 
@@ -279,7 +296,7 @@ internal class NatsJSJsonStringEnumConverter<TEnum> : JsonConverter<TEnum>
             case StreamConfigRetention.Interest:
                 writer.WriteStringValue("interest");
                 return;
-            case StreamConfigRetention.WorkQueue:
+            case StreamConfigRetention.Workqueue:
                 writer.WriteStringValue("workqueue");
                 return;
             }
@@ -300,3 +317,4 @@ internal class NatsJSJsonStringEnumConverter<TEnum> : JsonConverter<TEnum>
         throw new InvalidOperationException($"Writing unknown enum value {value.GetType().Name}.{value}");
     }
 }
+#endif

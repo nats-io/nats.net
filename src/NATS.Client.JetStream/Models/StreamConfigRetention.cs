@@ -4,5 +4,5 @@ public enum StreamConfigRetention
 {
     Limits = 0,
     Interest = 1,
-    WorkQueue = 2,
+    Workqueue = 2,
 }

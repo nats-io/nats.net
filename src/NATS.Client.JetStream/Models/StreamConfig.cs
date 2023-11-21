@@ -51,7 +51,9 @@ public record StreamConfig
     [System.Text.Json.Serialization.JsonPropertyName("retention")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+#if NET6_0
     [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonStringEnumConverter<StreamConfigRetention>))]
+#endif
     public StreamConfigRetention Retention { get; set; } = NATS.Client.JetStream.Models.StreamConfigRetention.Limits;
 
     /// <summary>
@@ -108,7 +110,9 @@ public record StreamConfig
     [System.Text.Json.Serialization.JsonPropertyName("storage")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+#if NET6_0
     [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonStringEnumConverter<StreamConfigStorage>))]
+#endif
     public StreamConfigStorage Storage { get; set; } = StreamConfigStorage.File;
 
     /// <summary>
@@ -116,7 +120,9 @@ public record StreamConfig
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("compression")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+#if NET6_0
     [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonStringEnumConverter<StreamConfigCompression>))]
+#endif
     public StreamConfigCompression Compression { get; set; } = NATS.Client.JetStream.Models.StreamConfigCompression.None;
 
     /// <summary>
@@ -146,7 +152,9 @@ public record StreamConfig
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("discard")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+#if NET6_0
     [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonStringEnumConverter<StreamConfigDiscard>))]
+#endif
     public StreamConfigDiscard Discard { get; set; } = StreamConfigDiscard.Old;
 
     /// <summary>

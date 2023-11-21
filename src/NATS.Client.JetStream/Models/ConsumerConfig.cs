@@ -18,7 +18,9 @@ public record ConsumerConfig
     [System.Text.Json.Serialization.JsonPropertyName("deliver_policy")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+#if NET6_0
     [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonStringEnumConverter<ConsumerConfigDeliverPolicy>))]
+#endif
     public ConsumerConfigDeliverPolicy DeliverPolicy { get; set; } = default!;
 
     [System.Text.Json.Serialization.JsonPropertyName("opt_start_seq")]
@@ -64,7 +66,9 @@ public record ConsumerConfig
     [System.Text.Json.Serialization.JsonPropertyName("ack_policy")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+#if NET6_0
     [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonStringEnumConverter<ConsumerConfigAckPolicy>))]
+#endif
     public ConsumerConfigAckPolicy AckPolicy { get; set; } = ConsumerConfigAckPolicy.None;
 
     /// <summary>
@@ -100,7 +104,9 @@ public record ConsumerConfig
     [System.Text.Json.Serialization.JsonPropertyName("replay_policy")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+#if NET6_0
     [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonStringEnumConverter<ConsumerConfigReplayPolicy>))]
+#endif
     public ConsumerConfigReplayPolicy ReplayPolicy { get; set; } = NATS.Client.JetStream.Models.ConsumerConfigReplayPolicy.Instant;
 
     [System.Text.Json.Serialization.JsonPropertyName("sample_freq")]

@@ -115,7 +115,7 @@ public class EnumJsonTests
     [Theory]
     [InlineData(StreamConfigRetention.Limits, "\"retention\":\"limits\"")]
     [InlineData(StreamConfigRetention.Interest, "\"retention\":\"interest\"")]
-    [InlineData(StreamConfigRetention.WorkQueue, "\"retention\":\"workqueue\"")]
+    [InlineData(StreamConfigRetention.Workqueue, "\"retention\":\"workqueue\"")]
     public void StreamConfigRetention_test(StreamConfigRetention value, string expected)
     {
         var serializer = NatsJSJsonSerializer<StreamConfig>.Default;
