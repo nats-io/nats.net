@@ -388,11 +388,11 @@ public class ObjectStoreTest
         var status1 = await store1.GetStatusAsync(cancellationToken);
         Assert.Equal("b1", status1.Bucket);
         Assert.Equal("OBJ_b1", status1.Info.Config.Name);
-        Assert.Equal(StreamConfigCompression.none, status1.Info.Config.Compression);
+        Assert.Equal(StreamConfigCompression.None, status1.Info.Config.Compression);
 
         var status2 = await store2.GetStatusAsync(cancellationToken);
         Assert.Equal("b2", status2.Bucket);
         Assert.Equal("OBJ_b2", status2.Info.Config.Name);
-        Assert.Equal(StreamConfigCompression.s2, status2.Info.Config.Compression);
+        Assert.Equal(StreamConfigCompression.S2, status2.Info.Config.Compression);
     }
 }

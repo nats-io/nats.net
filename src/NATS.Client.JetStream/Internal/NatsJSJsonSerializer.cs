@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using NATS.Client.Core;
 using NATS.Client.JetStream.Models;
@@ -85,4 +86,217 @@ internal static class NatsJSJsonSerializer<T>
 [JsonSerializable(typeof(Tier))]
 internal partial class NatsJSJsonSerializerContext : JsonSerializerContext
 {
+}
+
+internal class NatsJSJsonStringEnumConverter<TEnum> : JsonConverter<TEnum>
+    where TEnum : struct, Enum
+{
+    public override TEnum Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType != JsonTokenType.String)
+        {
+            throw new InvalidOperationException();
+        }
+
+        var stringValue = reader.GetString();
+
+        if (typeToConvert == typeof(ConsumerConfigDeliverPolicy))
+        {
+            switch (stringValue)
+            {
+            case "all":
+                return (TEnum)(object)ConsumerConfigDeliverPolicy.All;
+            case "last":
+                return (TEnum)(object)ConsumerConfigDeliverPolicy.Last;
+            case "new":
+                return (TEnum)(object)ConsumerConfigDeliverPolicy.New;
+            case "by_start_sequence":
+                return (TEnum)(object)ConsumerConfigDeliverPolicy.ByStartSequence;
+            case "by_start_time":
+                return (TEnum)(object)ConsumerConfigDeliverPolicy.ByStartTime;
+            case "last_per_subject":
+                return (TEnum)(object)ConsumerConfigDeliverPolicy.LastPerSubject;
+            }
+        }
+
+        if (typeToConvert == typeof(ConsumerConfigAckPolicy))
+        {
+            switch (stringValue)
+            {
+            case "none":
+                return (TEnum)(object)ConsumerConfigAckPolicy.None;
+            case "all":
+                return (TEnum)(object)ConsumerConfigAckPolicy.All;
+            case "explicit":
+                return (TEnum)(object)ConsumerConfigAckPolicy.Explicit;
+            }
+        }
+
+        if (typeToConvert == typeof(ConsumerConfigReplayPolicy))
+        {
+            switch (stringValue)
+            {
+            case "instant":
+                return (TEnum)(object)ConsumerConfigReplayPolicy.Instant;
+            case "original":
+                return (TEnum)(object)ConsumerConfigReplayPolicy.Original;
+            }
+        }
+
+        if (typeToConvert == typeof(StreamConfigCompression))
+        {
+            switch (stringValue)
+            {
+            case "none":
+                return (TEnum)(object)StreamConfigCompression.None;
+            case "s2":
+                return (TEnum)(object)StreamConfigCompression.S2;
+            }
+        }
+
+        if (typeToConvert == typeof(StreamConfigDiscard))
+        {
+            switch (stringValue)
+            {
+            case "old":
+                return (TEnum)(object)StreamConfigDiscard.Old;
+            case "new":
+                return (TEnum)(object)StreamConfigDiscard.New;
+            }
+        }
+
+        if (typeToConvert == typeof(StreamConfigRetention))
+        {
+            switch (stringValue)
+            {
+            case "limits":
+                return (TEnum)(object)StreamConfigRetention.Limits;
+            case "interest":
+                return (TEnum)(object)StreamConfigRetention.Interest;
+            case "workqueue":
+                return (TEnum)(object)StreamConfigRetention.WorkQueue;
+            }
+        }
+
+        if (typeToConvert == typeof(StreamConfigStorage))
+        {
+            switch (stringValue)
+            {
+            case "file":
+                return (TEnum)(object)StreamConfigStorage.File;
+            case "memory":
+                return (TEnum)(object)StreamConfigStorage.Memory;
+            }
+        }
+
+        throw new InvalidOperationException($"Reading unknown enum type {typeToConvert.Name} or value {stringValue}");
+    }
+
+    public override void Write(Utf8JsonWriter writer, TEnum value, JsonSerializerOptions options)
+    {
+        if (value is ConsumerConfigDeliverPolicy consumerConfigDeliverPolicy)
+        {
+            switch (consumerConfigDeliverPolicy)
+            {
+            case ConsumerConfigDeliverPolicy.All:
+                writer.WriteStringValue("all");
+                return;
+            case ConsumerConfigDeliverPolicy.Last:
+                writer.WriteStringValue("last");
+                return;
+            case ConsumerConfigDeliverPolicy.New:
+                writer.WriteStringValue("new");
+                return;
+            case ConsumerConfigDeliverPolicy.ByStartSequence:
+                writer.WriteStringValue("by_start_sequence");
+                return;
+            case ConsumerConfigDeliverPolicy.ByStartTime:
+                writer.WriteStringValue("by_start_time");
+                return;
+            case ConsumerConfigDeliverPolicy.LastPerSubject:
+                writer.WriteStringValue("last_per_subject");
+                return;
+            }
+        }
+        else if (value is ConsumerConfigAckPolicy consumerConfigAckPolicy)
+        {
+            switch (consumerConfigAckPolicy)
+            {
+            case ConsumerConfigAckPolicy.None:
+                writer.WriteStringValue("none");
+                return;
+            case ConsumerConfigAckPolicy.All:
+                writer.WriteStringValue("all");
+                return;
+            case ConsumerConfigAckPolicy.Explicit:
+                writer.WriteStringValue("explicit");
+                return;
+            }
+        }
+        else if (value is ConsumerConfigReplayPolicy consumerConfigReplayPolicy)
+        {
+            switch (consumerConfigReplayPolicy)
+            {
+            case ConsumerConfigReplayPolicy.Instant:
+                writer.WriteStringValue("instant");
+                return;
+            case ConsumerConfigReplayPolicy.Original:
+                writer.WriteStringValue("original");
+                return;
+            }
+        }
+        else if (value is StreamConfigCompression streamConfigCompression)
+        {
+            switch (streamConfigCompression)
+            {
+            case StreamConfigCompression.None:
+                writer.WriteStringValue("none");
+                return;
+            case StreamConfigCompression.S2:
+                writer.WriteStringValue("s2");
+                return;
+            }
+        }
+        else if (value is StreamConfigDiscard streamConfigDiscard)
+        {
+            switch (streamConfigDiscard)
+            {
+            case StreamConfigDiscard.Old:
+                writer.WriteStringValue("old");
+                return;
+            case StreamConfigDiscard.New:
+                writer.WriteStringValue("new");
+                return;
+            }
+        }
+        else if (value is StreamConfigRetention streamConfigRetention)
+        {
+            switch (streamConfigRetention)
+            {
+            case StreamConfigRetention.Limits:
+                writer.WriteStringValue("limits");
+                return;
+            case StreamConfigRetention.Interest:
+                writer.WriteStringValue("interest");
+                return;
+            case StreamConfigRetention.WorkQueue:
+                writer.WriteStringValue("workqueue");
+                return;
+            }
+        }
+        else if (value is StreamConfigStorage streamConfigStorage)
+        {
+            switch (streamConfigStorage)
+            {
+            case StreamConfigStorage.File:
+                writer.WriteStringValue("file");
+                return;
+            case StreamConfigStorage.Memory:
+                writer.WriteStringValue("memory");
+                return;
+            }
+        }
+
+        throw new InvalidOperationException($"Writing unknown enum value {value.GetType().Name}.{value}");
+    }
 }

@@ -82,7 +82,7 @@ public class NatsObjStore : INatsObjStore
             stream: $"OBJ_{Bucket}",
             filter: GetChunkSubject(info.Nuid),
             serializer: NatsDefaultSerializer<NatsMemoryOwner<byte>>.Default,
-            opts: new NatsJSOrderedPushConsumerOpts { DeliverPolicy = ConsumerConfigDeliverPolicy.all },
+            opts: new NatsJSOrderedPushConsumerOpts { DeliverPolicy = ConsumerConfigDeliverPolicy.All },
             subOpts: new NatsSubOpts(),
             cancellationToken: cancellationToken);
 
@@ -533,7 +533,7 @@ public class NatsObjStore : INatsObjStore
     public async ValueTask<NatsObjStatus> GetStatusAsync(CancellationToken cancellationToken = default)
     {
         await _stream.RefreshAsync(cancellationToken);
-        var isCompressed = _stream.Info.Config.Compression != StreamConfigCompression.none;
+        var isCompressed = _stream.Info.Config.Compression != StreamConfigCompression.None;
         return new NatsObjStatus(Bucket, isCompressed, _stream.Info);
     }
 
@@ -547,16 +547,16 @@ public class NatsObjStore : INatsObjStore
     {
         opts ??= new NatsObjWatchOpts();
 
-        var deliverPolicy = ConsumerConfigDeliverPolicy.all;
+        var deliverPolicy = ConsumerConfigDeliverPolicy.All;
 
         if (!opts.IncludeHistory)
         {
-            deliverPolicy = ConsumerConfigDeliverPolicy.last_per_subject;
+            deliverPolicy = ConsumerConfigDeliverPolicy.LastPerSubject;
         }
 
         if (opts.UpdatesOnly)
         {
-            deliverPolicy = ConsumerConfigDeliverPolicy.@new;
+            deliverPolicy = ConsumerConfigDeliverPolicy.New;
         }
 
         await using var pushConsumer = new NatsJSOrderedPushConsumer<NatsMemoryOwner<byte>>(

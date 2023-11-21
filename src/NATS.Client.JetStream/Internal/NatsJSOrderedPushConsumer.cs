@@ -36,7 +36,7 @@ internal record NatsJSOrderedPushConsumerOpts
     /// </summary>
     public TimeSpan IdleHeartbeat { get; init; } = TimeSpan.FromSeconds(5);
 
-    public ConsumerConfigDeliverPolicy DeliverPolicy { get; init; } = ConsumerConfigDeliverPolicy.all;
+    public ConsumerConfigDeliverPolicy DeliverPolicy { get; init; } = ConsumerConfigDeliverPolicy.All;
 
     public bool HeadersOnly { get; init; } = false;
 }
@@ -338,8 +338,8 @@ internal class NatsJSOrderedPushConsumer<T>
         var config = new ConsumerConfig
         {
             Name = Consumer,
-            DeliverPolicy = ConsumerConfigDeliverPolicy.all,
-            AckPolicy = ConsumerConfigAckPolicy.none,
+            DeliverPolicy = ConsumerConfigDeliverPolicy.All,
+            AckPolicy = ConsumerConfigAckPolicy.None,
             DeliverSubject = _sub.Subject,
             FilterSubject = _filter,
             FlowControl = true,
@@ -348,7 +348,7 @@ internal class NatsJSOrderedPushConsumer<T>
             MaxDeliver = 1,
             MemStorage = true,
             NumReplicas = 1,
-            ReplayPolicy = ConsumerConfigReplayPolicy.instant,
+            ReplayPolicy = ConsumerConfigReplayPolicy.Instant,
         };
 
         config.DeliverPolicy = _opts.DeliverPolicy;
@@ -356,7 +356,7 @@ internal class NatsJSOrderedPushConsumer<T>
 
         if (sequence > 0)
         {
-            config.DeliverPolicy = ConsumerConfigDeliverPolicy.by_start_sequence;
+            config.DeliverPolicy = ConsumerConfigDeliverPolicy.ByStartSequence;
             config.OptStartSeq = sequence + 1;
         }
 
