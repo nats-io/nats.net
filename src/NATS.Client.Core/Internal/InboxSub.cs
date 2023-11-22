@@ -78,7 +78,7 @@ internal class InboxSubBuilder : ISubscriptionManager
     {
         if (!_bySubject.TryGetValue(subject, out var subTable))
         {
-            _logger.LogWarning($"Unregistered message inbox received for {subject}");
+            _logger.LogWarning(NatsLogEvents.InboxSubscription, "Unregistered message inbox received for {Subject}", subject);
             return;
         }
 
@@ -92,14 +92,14 @@ internal class InboxSubBuilder : ISubscriptionManager
     {
         if (!_bySubject.TryGetValue(sub.Subject, out var subTable))
         {
-            _logger.LogWarning($"Unregistered message inbox received for {sub.Subject}");
+            _logger.LogWarning(NatsLogEvents.InboxSubscription, "Unregistered message inbox received for {Subject}", sub.Subject);
             return ValueTask.CompletedTask;
         }
 
         lock (subTable)
         {
             if (!subTable.Remove(sub))
-                _logger.LogWarning($"Unregistered message inbox received for {sub.Subject}");
+                _logger.LogWarning(NatsLogEvents.InboxSubscription, "Unregistered message inbox received for {Subject}", sub.Subject);
 
             if (!subTable.Any())
             {

@@ -89,7 +89,7 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
             static state =>
             {
                 var self = (NatsJSOrderedConsume<TMsg>)state!;
-                self._logger.LogWarning("Idle heartbeat timeout");
+                self._logger.LogWarning(NatsJSLogEvents.IdleTimeout, "Idle heartbeat timeout");
                 self._userMsgs.Writer.TryComplete(new NatsJSTimeoutException("idle-heartbeat"));
             },
             this,
@@ -123,7 +123,7 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
 
         if (_debug)
         {
-            _logger.LogDebug("Sending pull request for {Origin} {Msgs}, {Bytes}", origin, request.Batch, request.MaxBytes);
+            _logger.LogDebug(NatsJSLogEvents.PullRequest, "Sending pull request for {Origin} {Msgs}, {Bytes}", origin, request.Batch, request.MaxBytes);
         }
 
         return Connection.PubModelAsync(
@@ -255,10 +255,7 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
                     }
                     else
                     {
-                        if (_debug)
-                        {
-                            _logger.LogDebug(NatsJSLogEvents.ProtocolMessage, "Protocol message: {Code} {Description}", headers.Code, headers.MessageText);
-                        }
+                        _logger.LogWarning(NatsJSLogEvents.ProtocolMessage, "Unhandled protocol message: {Code} {Description}", headers.Code, headers.MessageText);
                     }
                 }
                 else
@@ -327,7 +324,7 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
 
     private void ConnectionOnConnectionDisconnected(object? sender, string e)
     {
-        _logger.LogWarning("Disconnected {Reason}", e);
+        _logger.LogWarning(NatsJSLogEvents.Connection, "Disconnected {Reason}", e);
         _userMsgs.Writer.TryComplete(new NatsJSConnectionException(e));
     }
 

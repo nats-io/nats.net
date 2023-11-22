@@ -57,7 +57,7 @@ internal sealed class ThreadPoolWorkItem<T> : IThreadPoolWorkItem
             {
                 if (_loggerFactory != null)
                 {
-                    _loggerFactory.CreateLogger<ThreadPoolWorkItem<T>>().LogError(ex, "Error occured during execute callback on ThreadPool.");
+                    _loggerFactory.CreateLogger<ThreadPoolWorkItem<T>>().LogError(NatsLogEvents.Internal, ex, "Error occured during execute callback on ThreadPool");
                 }
             }
         }

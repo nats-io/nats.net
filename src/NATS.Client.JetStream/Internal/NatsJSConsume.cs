@@ -155,7 +155,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
 
         if (_debug)
         {
-            _logger.LogDebug("Sending pull request for {Origin} {Msgs}, {Bytes}", origin, request.Batch, request.MaxBytes);
+            _logger.LogDebug(NatsJSLogEvents.PullRequest, "Sending pull request for {Origin} {Msgs}, {Bytes}", origin, request.Batch, request.MaxBytes);
         }
 
         return Connection.PubModelAsync(
@@ -311,10 +311,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                     }
                     else
                     {
-                        if (_debug)
-                        {
-                            _logger.LogDebug(NatsJSLogEvents.ProtocolMessage, "Protocol message: {Code} {Description}", headers.Code, headers.MessageText);
-                        }
+                        _logger.LogWarning(NatsJSLogEvents.ProtocolMessage, "Unhandled protocol message: {Code} {Description}", headers.Code, headers.MessageText);
                     }
                 }
                 else

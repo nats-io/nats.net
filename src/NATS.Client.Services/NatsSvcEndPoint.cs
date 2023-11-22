@@ -195,7 +195,7 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
         }
         catch (Exception e)
         {
-            _logger.LogError(e, "Endpoint {Name} error building message", Name);
+            _logger.LogError(NatsSvcLogEvents.Endpoint, e, "Endpoint {Name} error building message", Name);
             exception = e;
 
             // Most likely a serialization error.
@@ -240,7 +240,7 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
                     body = string.Empty;
 
                     // Only log unknown exceptions
-                    _logger.LogError(e, "Endpoint {Name} error processing message", Name);
+                    _logger.LogError(NatsSvcLogEvents.Endpoint, e, "Endpoint {Name} error processing message", Name);
                 }
 
                 try
@@ -256,7 +256,7 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
                 }
                 catch (Exception e1)
                 {
-                    _logger.LogError(e1, "Endpoint {Name} error responding", Name);
+                    _logger.LogError(NatsSvcLogEvents.Endpoint, e1, "Endpoint {Name} error responding", Name);
                 }
             }
             finally

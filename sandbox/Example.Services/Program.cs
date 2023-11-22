@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.Services;
 
-var opts = NatsOpts.Default with { LoggerFactory = new MinimumConsoleLoggerFactory(LogLevel.Error) };
+var opts = NatsOpts.Default with { LoggerFactory = LoggerFactory.Create(builder => builder.AddConsole()) };
 
 var nats = new NatsConnection(opts);
 var svc = new NatsSvcContext(nats);

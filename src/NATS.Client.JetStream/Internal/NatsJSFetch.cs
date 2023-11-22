@@ -209,14 +209,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
                     }
                     else
                     {
-                        if (_debug)
-                        {
-                            _logger.LogDebug(
-                                NatsJSLogEvents.ProtocolMessage,
-                                "Protocol message: {Code} {Description}",
-                                headers.Code,
-                                headers.MessageText);
-                        }
+                        _logger.LogWarning(NatsJSLogEvents.ProtocolMessage, "Unhandled protocol message: {Code} {Description}", headers.Code, headers.MessageText);
                     }
                 }
                 else

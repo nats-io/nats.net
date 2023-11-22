@@ -234,14 +234,14 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
 
                         if (_trace)
                         {
-                            _logger.LogTrace("HMSG trace dump: {MsgHeader}", msgHeader.Dump());
+                            _logger.LogTrace(NatsLogEvents.Protocol, "HMSG trace dump: {MsgHeader}", msgHeader.Dump());
                         }
 
                         var (subject, sid, replyTo, headersLength, totalLength) = ParseHMessageHeader(msgHeader);
 
                         if (_trace)
                         {
-                            _logger.LogTrace("HMSG trace parsed: {Subject} {Sid} {ReplyTo} {HeadersLength} {TotalLength}", subject, sid, replyTo, headersLength, totalLength);
+                            _logger.LogTrace(NatsLogEvents.Protocol, "HMSG trace parsed: {Subject} {Sid} {ReplyTo} {HeadersLength} {TotalLength}", subject, sid, replyTo, headersLength, totalLength);
                         }
 
                         var payloadLength = totalLength - headersLength;
@@ -294,7 +294,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error occured during read loop.");
+                _logger.LogError(NatsLogEvents.Protocol, ex, "Error occured during read loop");
                 continue;
             }
         }
@@ -353,14 +353,14 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                 var newBuffer = await _socketReader.ReadUntilReceiveNewLineAsync().ConfigureAwait(false);
                 var newPosition = newBuffer.PositionOf((byte)'\n');
                 var error = ParseError(newBuffer.Slice(0, buffer.GetOffset(newPosition!.Value) - 1));
-                _logger.LogError(error);
+                _logger.LogError(NatsLogEvents.Protocol, "Server error {Error}", error);
                 _waitForPongOrErrorSignal.TrySetException(new NatsServerException(error));
                 return newBuffer.Slice(newBuffer.GetPosition(1, newPosition!.Value));
             }
             else
             {
                 var error = ParseError(buffer.Slice(0, buffer.GetOffset(position.Value) - 1));
-                _logger.LogError(error);
+                _logger.LogError(NatsLogEvents.Protocol, "Server error {Error}", error);
                 _waitForPongOrErrorSignal.TrySetException(new NatsServerException(error));
                 return buffer.Slice(buffer.GetPosition(1, position.Value));
             }
@@ -391,7 +391,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
 
                 var serverInfo = ParseInfo(newBuffer);
                 _connection.WritableServerInfo = serverInfo;
-                _logger.LogInformation("Received ServerInfo: {0}", serverInfo);
+                _logger.LogInformation(NatsLogEvents.Protocol, "Received server info: {ServerInfo}", serverInfo);
                 _waitForInfoSignal.TrySetResult();
                 await _infoParsed.ConfigureAwait(false);
                 return newBuffer.Slice(newBuffer.GetPosition(1, newPosition!.Value));
@@ -400,7 +400,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
             {
                 var serverInfo = ParseInfo(buffer);
                 _connection.WritableServerInfo = serverInfo;
-                _logger.LogInformation("Received ServerInfo: {0}", serverInfo);
+                _logger.LogInformation(NatsLogEvents.Protocol, "Received server info: {ServerInfo}", serverInfo);
                 _waitForInfoSignal.TrySetResult();
                 await _infoParsed.ConfigureAwait(false);
                 return buffer.Slice(buffer.GetPosition(1, position.Value));
@@ -409,7 +409,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         else
         {
             // reaches invalid line, log warn and try to get newline and go to nextloop.
-            _logger.LogWarning("reaches invalid line.");
+            _logger.LogWarning(NatsLogEvents.Protocol, "Reaches invalid line");
             Interlocked.Decrement(ref _connection.Counter.ReceivedMessages);
 
             var position = buffer.PositionOf((byte)'\n');
