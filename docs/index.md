@@ -1,27 +1,16 @@
-# NATS.Net
+# Welcome to NATS.Net
 
-NATS.Net is a [NATS](https://nats.io) client for the modern [.NET](https://dot.net/).
+NATS.Net is an open source [NATS](https://nats.io) client library for modern [.NET](https://dot.net/). NATS.Net fully supports async programming,
+recent APIs like Span, IAsyncEnumerable, Channels and takes advantage of .NET's performance improvements while providing
+a pleasant developer experience.
 
-## Release Candidate
+[NATS](https://nats.io) is a lightweight and high-performance messaging system designed for asynchronous communication among
+different software components, with modern clustering, security and persistence streaming support
+out of the box, in a [single compact binary with no dependencies](https://nats.io/download/), available for any modern
+platform, enabling vast variety of deployment options from edge, IoT, Kubernetes to bare-metal.
 
-The NATS.Net is ready to *Go Live*!
-
-Big thank you to our contributors.
-
-## Roadmap
-
-- [x] Core NATS
-- [x] JetStream initial support
-- [x] KV initial support
-- [x] Object Store initial support
-- [x] Service API initial support
-- [x] .NET 8.0 support (Native AOT)
-- [x] Implementation of missing major features (e.g. JetStream ordered consumers)
-- [x] Beta phase
-- [x] Testing and bug fixing
-- [x] Release Candidate
-- [ ] Documentation and examples updates
-- [ ] General Availability
+NATS.Net brings the power of NATS to the .NET platform, enabling developers to build distributed, cloud native, modern
+applications using the tools and languages they already know and love.
 
 ## What's Next
 
