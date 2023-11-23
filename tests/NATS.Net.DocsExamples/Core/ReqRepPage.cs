@@ -16,6 +16,7 @@ public class ReqRepPage
 
         var cts = new CancellationTokenSource();
 
+        var sub = Task.Run(async () =>
         {
             #region sub
             await using var nats = new NatsConnection();
@@ -24,10 +25,10 @@ public class ReqRepPage
             {
                 Console.WriteLine($"Received request: {msg.Data}");
 
-                await msg.ReplyAsync($"Answer is: { 2 * msg.Data }");
+                await msg.ReplyAsync($"Answer is: {2 * msg.Data}");
             }
             #endregion
-        }
+        });
 
         await Task.Delay(1000);
 
@@ -37,10 +38,12 @@ public class ReqRepPage
 
             var reply = await nats.RequestAsync<int, string>("math.double", 2);
 
-            Console.WriteLine($"Received reply: {reply}");
+            Console.WriteLine($"Received reply: {reply.Data}");
             #endregion
         }
 
         cts.Cancel();
+
+        await sub;
     }
 }

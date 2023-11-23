@@ -36,7 +36,6 @@ public class PubSubPage
             {
                 Console.WriteLine($" Publishing {i}...");
                 await nats.PublishAsync<int>("foo", i);
-                await Task.Delay(1000);
             }
 
             // Signal subscription to stop

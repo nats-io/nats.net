@@ -47,6 +47,18 @@ public class IntroPage
             #endregion
         }
 
+        try
+        {
+            await using var nats = new NatsConnection();
+            var js = new NatsJSContext(nats);
+            await js.DeleteStreamAsync("orders");
+            await Task.Delay(1000);
+        }
+        catch
+        {
+            // ignore
+        }
+
         {
             #region jetstream
             await using var nats = new NatsConnection();
