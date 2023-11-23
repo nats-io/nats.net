@@ -11,10 +11,22 @@ these docs. You can also create a Pull Request in GitHub using the _Edit this pa
 ## Quick Start
 
 You can [download the latest](https://nats.io/download/) `nats-server` for your platform and run it without any arguments.
+
+```shell
+$ nats-server
+```
+
 `nats-server` will listen on its default TCP port 4222. By default `nats-server` will not support persistence and only
 provide the foundational messaging features also called [Core NATS](https://docs.nats.io/nats-concepts/core-nats). You can
 also enable [JetStream](https://docs.nats.io/nats-concepts/jetstream) by passing the `-js` flag to `nats-server` and enable
 persistence and other advanced features.
+
+If you prefer using containers, you can also run the latest
+[NATS server image](https://docs.nats.io/running-a-nats-service/nats_docker) using Docker:
+
+```shell
+$ docker run nats
+```
 
 Here are some quick examples to get you started with NATS.Net:
 
@@ -36,7 +48,7 @@ Reference [NATS.Net](https://www.nuget.org/packages/NATS.Net) NuGet package in y
 
 # [JetStream](#tab/jetstream)
 
-JetStream is the built-in distributed persistence system built-in to the same NATS server binary. Messages published
+JetStream is the distributed persistence system built-in to the same NATS server binary. Messages published
 to JetStream are stored on the NATS JetStream server and can be retrieved by consumers any time after publishing.
 
 Start NATS server with JetStream enabled:
@@ -67,7 +79,7 @@ NATS messaging and persistence.
 
 [Core NATS](core/intro.md) is the base set of functionalities and qualities of service offered by a NATS service infrastructure.
 
-[JetStream](jetstream/intro.md) is the built-in distributed persistence system built-in to the same NATS server binary.
+[JetStream](jetstream/intro.md) is the distributed persistence system built-in to the same NATS server binary.
 
 [Key/Value Store](key-value-store/intro.md) is the built-in distributed persistent associative arrays built on top of JetStream.
 
