@@ -77,13 +77,13 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
                 }
                 else
                 {
-                    _logger.LogWarning($"Subscription GCd but was never disposed {subject}/{sid}");
+                    _logger.LogWarning(NatsLogEvents.Subscription, "Subscription GCd but was never disposed {Subject}/{Sid}", subject, sid);
                     orphanSid = sid;
                 }
             }
             else
             {
-                _logger.LogWarning($"Can't find subscription for {subject}/{sid}");
+                _logger.LogWarning(NatsLogEvents.Subscription, "Can\'t find subscription for {Subject}/{Sid}", subject, sid);
             }
         }
 
@@ -95,7 +95,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
             }
             catch (Exception e)
             {
-                _logger.LogWarning($"Error unsubscribing orphan SID during publish: {e.GetBaseException().Message}");
+                _logger.LogWarning(NatsLogEvents.Subscription, "Error unsubscribing orphan SID during publish: {Message}", e.GetBaseException().Message);
             }
         }
 
@@ -252,14 +252,17 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
                         continue;
 
                     // NatsSub object GCed
-                    _logger.LogWarning($"Subscription GCd but was never disposed {sidMetadata.Subject}/{sid}");
+                    _logger.LogWarning(NatsLogEvents.Subscription, "Subscription GCd but was never disposed {SidMetadataSubject}/{Sid}", sidMetadata.Subject, sid);
                     orphanSids ??= new List<int>();
                     orphanSids.Add(sid);
                 }
             }
 
             if (orphanSids != null)
+            {
+                _logger.LogWarning(NatsLogEvents.Subscription, "Unsubscribing orphan subscriptions");
                 await UnsubscribeSidsAsync(orphanSids).ConfigureAwait(false);
+            }
         }
     }
 
@@ -269,11 +272,12 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
         {
             try
             {
+                _logger.LogWarning(NatsLogEvents.Subscription, "Unsubscribing orphan subscription {Sid}", sid);
                 await _connection.UnsubscribeAsync(sid).ConfigureAwait(false);
             }
             catch (Exception e)
             {
-                _logger.LogWarning($"Error unsubscribing during cleanup: {e.GetBaseException().Message}");
+                _logger.LogWarning(NatsLogEvents.Subscription, "Error unsubscribing during cleanup: {Error}", e.GetBaseException().Message);
             }
         }
     }

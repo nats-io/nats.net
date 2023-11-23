@@ -53,7 +53,7 @@ internal sealed class SocketReader
             _stopwatch.Stop();
             if (_isTraceLogging)
             {
-                _logger.LogTrace("Socket.ReceiveAsync Size: {0} Elapsed: {1}ms", read, _stopwatch.Elapsed.TotalMilliseconds);
+                _logger.LogTrace(NatsLogEvents.TcpSocket, "Socket.ReceiveAsync Size: {Size} Elapsed: {ElapsedMs}ms", read, _stopwatch.Elapsed.TotalMilliseconds);
             }
 
             if (read == 0)
@@ -98,7 +98,7 @@ internal sealed class SocketReader
             _stopwatch.Stop();
             if (_isTraceLogging)
             {
-                _logger.LogTrace("Socket.ReceiveAsync Size: {0} Elapsed: {1}ms", read, _stopwatch.Elapsed.TotalMilliseconds);
+                _logger.LogTrace(NatsLogEvents.TcpSocket, "Socket.ReceiveAsync Size: {Size} Elapsed: {ElapsedMs}ms", read, _stopwatch.Elapsed.TotalMilliseconds);
             }
 
             if (read == 0)

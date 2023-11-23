@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 
 var subject = "foo.*";
-var options = NatsOpts.Default with { LoggerFactory = new MinimumConsoleLoggerFactory(LogLevel.Error) };
+var options = NatsOpts.Default with { LoggerFactory = LoggerFactory.Create(builder => builder.AddConsole()) };
 
 Print("[CON] Connecting...\n");
 

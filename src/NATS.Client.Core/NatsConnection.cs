@@ -147,7 +147,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         if (!_isDisposed)
         {
             _isDisposed = true;
-            _logger.Log(LogLevel.Information, $"Disposing connection {_name}.");
+            _logger.Log(LogLevel.Information, NatsLogEvents.Connection, "Disposing connection {Name}", _name);
 
             await DisposeSocketAsync(false).ConfigureAwait(false);
             if (_pingTimerCancellationTokenSource != null)
@@ -232,7 +232,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
                 return ValueTask.CompletedTask;
             }
 
-            _logger.LogError(ex, "Failed to send unsubscribe command.");
+            _logger.LogError(NatsLogEvents.Subscription, ex, "Failed to send unsubscribe command");
         }
 
         return ValueTask.CompletedTask;
@@ -265,11 +265,11 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
                 var target = (uri.Host, uri.Port);
                 if (OnConnectingAsync != null)
                 {
-                    _logger.LogInformation("Try to invoke OnConnectingAsync before connect to NATS.");
+                    _logger.LogInformation(NatsLogEvents.Connection, "Try to invoke OnConnectingAsync before connect to NATS");
                     target = await OnConnectingAsync(target).ConfigureAwait(false);
                 }
 
-                _logger.LogInformation("Try to connect NATS {0}", uri);
+                _logger.LogInformation(NatsLogEvents.Connection, "Try to connect NATS {0}", uri);
                 if (uri.IsWebSocket)
                 {
                     var conn = new WebSocketConnection();
@@ -296,7 +296,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Fail to connect NATS {0}", uri);
+                _logger.LogError(NatsLogEvents.Connection, ex, "Fail to connect NATS {Url}", uri);
             }
         }
 
@@ -336,7 +336,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         lock (_gate)
         {
             var url = _currentConnectUri;
-            _logger.LogInformation("Connect succeed {0}, NATS {1}", _name, url);
+            _logger.LogInformation(NatsLogEvents.Connection, "Connect succeed {Name}, NATS {Url}", _name, url);
             ConnectionState = NatsConnectionState.Open;
             _pingTimerCancellationTokenSource = new CancellationTokenSource();
             StartPingTimer(_pingTimerCancellationTokenSource.Token);
@@ -382,7 +382,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
                     // do TLS upgrade
                     var targetUri = FixTlsHost(_currentConnectUri);
 
-                    _logger.LogDebug("Perform TLS Upgrade to " + targetUri);
+                    _logger.LogDebug(NatsLogEvents.Security, "Perform TLS Upgrade to {Uri}", targetUri);
 
                     // cancel INFO parsed signal and dispose current socket reader
                     infoParsedSignal.SetCanceled();
@@ -437,7 +437,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         {
             if (e is NatsServerException { IsAuthError: true } se)
             {
-                _logger.LogWarning("Authentication error: {Error}", se.Error);
+                _logger.LogWarning(NatsLogEvents.Security, "Authentication error: {Error}", se.Error);
 
                 var error = se.Error;
                 string last;
@@ -454,7 +454,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
                         _stopRetries = true;
                     }
 
-                    _logger.LogError("Received same authentication error ({Error}) twice in a row. Stopping retires", se.Error);
+                    _logger.LogError(NatsLogEvents.Security, "Received same authentication error ({Error}) twice in a row. Stopping retires", se.Error);
                 }
             }
 
@@ -471,7 +471,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
             // If dispose this client, WaitForClosed throws OperationCanceledException so stop reconnect-loop correctly.
             await _socket!.WaitForClosed.ConfigureAwait(false);
 
-            _logger.LogTrace($"Detect connection {_name} closed, start to cleanup current connection and start to reconnect.");
+            _logger.LogTrace(NatsLogEvents.Connection, "Connection {Name} is closed. Will cleanup and reconnect", _name);
             lock (_gate)
             {
                 ConnectionState = NatsConnectionState.Reconnecting;
@@ -510,7 +510,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
                     if (OnConnectingAsync != null)
                     {
                         var target = (url.Host, url.Port);
-                        _logger.LogInformation("Try to invoke OnConnectingAsync before connect to NATS.");
+                        _logger.LogInformation(NatsLogEvents.Connection, "Try to invoke OnConnectingAsync before connect to NATS");
                         var newTarget = await OnConnectingAsync(target).ConfigureAwait(false);
 
                         if (newTarget.Host != target.Host || newTarget.Port != target.Port)
@@ -519,7 +519,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
                         }
                     }
 
-                    _logger.LogInformation("Try to connect NATS {0}", url);
+                    _logger.LogInformation(NatsLogEvents.Connection, "Tried to connect NATS {Url}", url);
                     if (url.IsWebSocket)
                     {
                         var conn = new WebSocketConnection();
@@ -556,7 +556,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
             {
                 if (url != null)
                 {
-                    _logger.LogError(ex, "Fail to connect NATS {0}", url);
+                    _logger.LogError(NatsLogEvents.Connection, ex, "Failed to connect NATS {Url}", url);
                 }
 
                 ReconnectFailed?.Invoke(this, url?.ToString() ?? string.Empty);
@@ -568,7 +568,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
             {
                 _connectRetry = 0;
                 _backoff = TimeSpan.Zero;
-                _logger.LogInformation("Connect succeed {0}, NATS {1}", _name, url);
+                _logger.LogInformation(NatsLogEvents.Connection, "Connection succeeded {Name}, NATS {Url}", _name, url);
                 ConnectionState = NatsConnectionState.Open;
                 _pingTimerCancellationTokenSource = new CancellationTokenSource();
                 StartPingTimer(_pingTimerCancellationTokenSource.Token);
@@ -582,7 +582,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
             if (ex is OperationCanceledException)
                 return;
             _waitForOpenConnection.TrySetException(ex);
-            _logger.LogError(ex, "Retry loop stopped and connection state is invalid");
+            _logger.LogError(NatsLogEvents.Connection, ex, "Retry loop stopped and connection state is invalid");
         }
     }
 
@@ -654,7 +654,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         var waitTime = TimeSpan.FromMilliseconds(jitter) + backoff;
         if (waitTime != TimeSpan.Zero)
         {
-            _logger.LogTrace("Wait {0}ms to reconnect.", waitTime.TotalMilliseconds);
+            _logger.LogTrace(NatsLogEvents.Connection, "Waiting {WaitMs}ms to reconnect", waitTime.TotalMilliseconds);
             await Task.Delay(waitTime).ConfigureAwait(false);
         }
     }
@@ -672,7 +672,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
             {
                 if (Interlocked.Increment(ref _pongCount) > Opts.MaxPingOut)
                 {
-                    _logger.LogInformation("Detect MaxPingOut, try to connection abort.");
+                    _logger.LogInformation(NatsLogEvents.Connection, "Server didn't respond to our ping requests. Aborting connection");
                     if (_socket != null)
                     {
                         await _socket.AbortConnectionAsync(cancellationToken).ConfigureAwait(false);
@@ -733,7 +733,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Error occured when disposing {description}.");
+            _logger.LogError(NatsLogEvents.Connection, ex, $"Error occured when disposing {description}");
         }
     }
 

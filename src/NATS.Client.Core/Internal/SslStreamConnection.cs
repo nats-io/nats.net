@@ -142,7 +142,7 @@ internal sealed class SslStreamConnection : ISocketConnection
 
         if (!success)
         {
-            _logger.LogError("TLS certificate validation failed: {SslPolicyErrors}", sslPolicyErrors);
+            _logger.LogError(NatsLogEvents.Security, "TLS certificate validation failed: {SslPolicyErrors}", sslPolicyErrors);
         }
 
         return success;

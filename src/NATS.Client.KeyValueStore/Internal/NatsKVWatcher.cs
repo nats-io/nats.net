@@ -176,7 +176,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
                                     {
                                         var exception = new NatsKVException("Message metadata is missing");
                                         _entryChannel.Writer.TryComplete(exception);
-                                        _logger.LogError("Protocol error: unexpected number ({Count}) of KV-Operation headers", operationValues.Count);
+                                        _logger.LogError(NatsKVLogEvents.Protocol, "Protocol error: unexpected number ({Count}) of KV-Operation headers", operationValues.Count);
                                         return;
                                     }
 
@@ -202,7 +202,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
                             {
                                 if (msg.Subject.Length <= _keyBase.Length)
                                 {
-                                    _logger.LogWarning("Protocol error: unexpected message subject {Subject}", msg.Subject);
+                                    _logger.LogWarning(NatsKVLogEvents.Protocol, "Protocol error: unexpected message subject {Subject}", msg.Subject);
                                     continue;
                                 }
 
@@ -223,7 +223,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
                                     if (sequence != (long)metadata.Sequence.Consumer)
                                     {
                                         CreateSub("sequence-mismatch");
-                                        _logger.LogWarning("Missed messages, recreating consumer");
+                                        _logger.LogWarning(NatsKVLogEvents.RecreateConsumer, "Missed messages, recreating consumer");
                                         continue;
                                     }
 
@@ -252,7 +252,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
                                 }
                                 else
                                 {
-                                    _logger.LogWarning("Protocol error: Message metadata is missing");
+                                    _logger.LogWarning(NatsKVLogEvents.Protocol, "Protocol error: Message metadata is missing");
                                 }
                             }
                         }
@@ -262,12 +262,12 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
                         }
                         else
                         {
-                            _logger.LogError("Internal error: unexpected command {Command}", subCommand);
+                            _logger.LogError(NatsKVLogEvents.Internal, "Internal error: unexpected command {Command}", subCommand);
                         }
                     }
                     catch (Exception e)
                     {
-                        _logger.LogWarning(e, "Command error");
+                        _logger.LogWarning(NatsKVLogEvents.Internal, e, "Command error");
                     }
                 }
             }
@@ -277,7 +277,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
         }
         catch (Exception e)
         {
-            _logger.LogError(e, "Unexpected command loop error");
+            _logger.LogError(NatsKVLogEvents.Internal, e, "Unexpected command loop error");
         }
     }
 
@@ -295,7 +295,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
                     }
                     catch (Exception e)
                     {
-                        _logger.LogWarning(e, "Consumer create error");
+                        _logger.LogWarning(NatsKVLogEvents.NewConsumer, e, "Consumer create error");
                     }
                 }
             }
@@ -305,7 +305,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
         }
         catch (Exception e)
         {
-            _logger.LogError(e, "Unexpected consumer create loop error");
+            _logger.LogError(NatsKVLogEvents.Internal, e, "Unexpected consumer create loop error");
         }
     }
 

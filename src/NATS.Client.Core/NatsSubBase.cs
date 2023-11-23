@@ -285,7 +285,7 @@ public abstract class NatsSubBase
     protected void EndSubscription(NatsSubEndReason reason)
     {
         if (_debug)
-            _logger.LogDebug("End subscription {Reason}", reason);
+            _logger.LogDebug(NatsLogEvents.Subscription, "End subscription {Reason}", reason);
 
         lock (this)
         {

@@ -13,7 +13,7 @@ Console.CancelKeyPress += (_, e) =>
     cts.Cancel();
 };
 
-var options = NatsOpts.Default with { LoggerFactory = new MinimumConsoleLoggerFactory(LogLevel.Error) };
+var options = NatsOpts.Default with { LoggerFactory = LoggerFactory.Create(builder => builder.AddConsole()) };
 
 await using var nats = new NatsConnection(options);
 

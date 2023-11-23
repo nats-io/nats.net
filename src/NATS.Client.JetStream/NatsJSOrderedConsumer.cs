@@ -71,7 +71,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
             {
                 var consumer = await RecreateConsumer(consumerName, seq, cancellationToken);
                 consumerName = consumer.Info.Name;
-                _logger.LogInformation("Created {ConsumerName} with sequence {Seq}", consumerName, seq);
+                _logger.LogInformation(NatsJSLogEvents.NewConsumer, "Created {ConsumerName} with sequence {Seq}", consumerName, seq);
 
                 NatsJSProtocolException? protocolException = default;
 
@@ -102,13 +102,13 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
                         }
                         catch (NatsJSConnectionException e)
                         {
-                            _logger.LogWarning($"{e.Message}. Retrying...");
+                            _logger.LogWarning(NatsJSLogEvents.Retry, "{Error}. Retrying...", e.Message);
                             goto CONSUME_LOOP;
                         }
                         catch (NatsJSTimeoutException e)
                         {
                             notificationHandler?.Invoke(new NatsJSTimeoutNotification(), cancellationToken);
-                            _logger.LogWarning($"{e.Message}. Retrying...");
+                            _logger.LogWarning(NatsJSLogEvents.Retry, "{Error}. Retrying...", e.Message);
                             goto CONSUME_LOOP;
                         }
 
@@ -133,13 +133,13 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
                             }
                             catch (NatsJSConnectionException e)
                             {
-                                _logger.LogWarning($"{e.Message}. Retrying...");
+                                _logger.LogWarning(NatsJSLogEvents.Retry, "{Error}. Retrying...", e.Message);
                                 goto CONSUME_LOOP;
                             }
                             catch (NatsJSTimeoutException e)
                             {
                                 notificationHandler?.Invoke(new NatsJSTimeoutNotification(), cancellationToken);
-                                _logger.LogWarning($"{e.Message}. Retrying...");
+                                _logger.LogWarning(NatsJSLogEvents.Retry, "{Error}. Retrying...", e.Message);
                                 goto CONSUME_LOOP;
                             }
 
@@ -155,7 +155,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
 
             CONSUME_LOOP:
 
-                _logger.LogWarning("Consumer loop exited");
+                _logger.LogWarning(NatsJSLogEvents.Internal, "Consumer loop exited");
 
                 if (protocolException != null)
                 {

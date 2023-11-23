@@ -4,7 +4,7 @@ using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.ObjectStore;
 
-var opts = NatsOpts.Default with { LoggerFactory = new MinimumConsoleLoggerFactory(LogLevel.Error) };
+var opts = NatsOpts.Default with { LoggerFactory = LoggerFactory.Create(builder => builder.AddConsole()) };
 
 var nats = new NatsConnection(opts);
 var js = new NatsJSContext(nats);

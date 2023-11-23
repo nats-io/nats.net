@@ -224,7 +224,7 @@ internal class NatsJSOrderedPushConsumer<T>
                                     if (sequence != metadata.Sequence.Consumer)
                                     {
                                         CreateSub("sequence-mismatch");
-                                        _logger.LogWarning("Missed messages, recreating consumer");
+                                        _logger.LogWarning(NatsJSLogEvents.RecreateConsumer, "Missed messages, recreating consumer");
                                         continue;
                                     }
 
@@ -248,7 +248,7 @@ internal class NatsJSOrderedPushConsumer<T>
                                 }
                                 else
                                 {
-                                    _logger.LogWarning("Protocol error: Message metadata is missing");
+                                    _logger.LogWarning(NatsJSLogEvents.ProtocolMessage, "Protocol error: Message metadata is missing");
                                 }
                             }
                         }
@@ -258,12 +258,12 @@ internal class NatsJSOrderedPushConsumer<T>
                         }
                         else
                         {
-                            _logger.LogError("Internal error: unexpected command {Command}", subCommand);
+                            _logger.LogError(NatsJSLogEvents.Internal, "Internal error: unexpected command {Command}", subCommand);
                         }
                     }
                     catch (Exception e)
                     {
-                        _logger.LogWarning(e, "Command error");
+                        _logger.LogWarning(NatsJSLogEvents.Internal, e, "Command error");
                     }
                 }
             }
@@ -273,7 +273,7 @@ internal class NatsJSOrderedPushConsumer<T>
         }
         catch (Exception e)
         {
-            _logger.LogError(e, "Unexpected command loop error");
+            _logger.LogError(NatsJSLogEvents.Internal, e, "Unexpected command loop error");
         }
     }
 
@@ -291,7 +291,7 @@ internal class NatsJSOrderedPushConsumer<T>
                     }
                     catch (Exception e)
                     {
-                        _logger.LogWarning(e, "Consumer create error");
+                        _logger.LogWarning(NatsJSLogEvents.RecreateConsumer, e, "Consumer create error");
                     }
                 }
             }
@@ -301,7 +301,7 @@ internal class NatsJSOrderedPushConsumer<T>
         }
         catch (Exception e)
         {
-            _logger.LogError(e, "Unexpected consumer create loop error");
+            _logger.LogError(NatsJSLogEvents.Internal, e, "Unexpected consumer create loop error");
         }
     }
 
