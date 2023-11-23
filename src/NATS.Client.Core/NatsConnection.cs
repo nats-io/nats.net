@@ -654,7 +654,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         var waitTime = TimeSpan.FromMilliseconds(jitter) + backoff;
         if (waitTime != TimeSpan.Zero)
         {
-            _logger.LogTrace(NatsLogEvents.Connection, "Wait {WaitMs}ms to reconnect", waitTime.TotalMilliseconds);
+            _logger.LogTrace(NatsLogEvents.Connection, "Waiting {WaitMs}ms to reconnect", waitTime.TotalMilliseconds);
             await Task.Delay(waitTime).ConfigureAwait(false);
         }
     }
