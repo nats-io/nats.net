@@ -1,15 +1,20 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿#pragma warning disable SA1123
+#pragma warning disable SA1124
+#pragma warning disable SA1509
+
 using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Net.DocsExamples;
 
-[SuppressMessage("StyleCop.CSharp.ReadabilityRules", "SA1123:Do not place regions within elements", Justification = "docs")]
 public class IntroPage
 {
     public async Task Run()
     {
+        Console.WriteLine("____________________________________________________________");
+        Console.WriteLine("NATS.Net.DocsExamples.IntroPage");
+
         {
             #region core-nats
             await using var nats = new NatsConnection();

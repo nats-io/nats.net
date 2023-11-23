@@ -6,7 +6,7 @@ of explanation, in a simplified sense you can think of Core NATS as the
 [wire protocol](https://docs.nats.io/reference/reference-protocols/nats-protocol) defining a simple but powerful
 pub/sub functionality and the concept of [Subject-Based Messaging](https://docs.nats.io/nats-concepts/subjects).
 
-## Core NATS Quick Start
+## Quick Start
 
 [Download the latest](https://nats.io/download/) `nats-server` for your platform and run it without any arguments. `nats-server` will listen
 on its default TCP port 4222.
@@ -15,70 +15,28 @@ on its default TCP port 4222.
 $ nats-server
 ```
 
-Install `NATS.Client.Core` preview from Nuget.
+Install [NATS.Net](https://www.nuget.org/packages/NATS.Net)
+and [NATS.Client.Serializers.Json](https://www.nuget.org/packages/NATS.Client.Serializers.Json) from Nuget.
 
 Given that we have a plain class `Bar`, we can publish and subscribe to our `nats-server` sending
 and receiving `Bar` objects:
 
-```csharp
-public record Bar
-{
-    public int Id { get; set; }
-    public string Name { get; set; }
-}
-```
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Core/IntroPage.cs#bar)]
 
 Subscribe to all `bar` [related subjects](https://docs.nats.io/nats-concepts/subjects):
 
-```csharp
-await using var nats = new NatsConnection();
-
-await foreach (var msg in nats.Subscription("bar.>"))
-{
-    if (msg.Subject == "bar.exit")
-        break;
-
-    Console.WriteLine($"Received {msg.Subject}: {msg.Data}\n");
-}
-```
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Core/IntroPage.cs#sub)]
 
 Publish `Bar` objects to related `bar` [subjects](https://docs.nats.io/nats-concepts/subjects):
-```csharp
-await using var nats = new NatsConnection();
-
-for (int i = 0; i < 10; i++)
-{
-    Console.WriteLine($" Publishing {i}...");
-    await nats.PublishAsync<Bar>($"bar.baz.{i}", new Bar { Id = i, Name = "Baz" });
-}
-
-await nats.PublishAsync("bar.exit");
-```
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Core/IntroPage.cs#pub)]
 
 ## Logging
 
 You should also hook your logger to `NatsConnection` to make sure all is working as expected or
 to get help diagnosing any issues you might have:
 
-```csharp
-// First add Nuget package Microsoft.Extensions.Logging.Console
-using Microsoft.Extensions.Logging;
-
-using var loggerFactory = LoggerFactory.Create(configure: builder =>
-{
-    builder
-        .SetMinimumLevel(LogLevel.Information)
-        .AddSimpleConsole(options =>
-        {
-            options.SingleLine = true;
-            options.TimestampFormat = "yyyy-MM-dd HH:mm:ss.fff zzz ";
-        });
-});
-
-var opts = NatsOpts.Default with { LoggerFactory = loggerFactory };
-
-await using var nats = new NatsConnection(otps);
-```
+(For this example you need to add [Microsoft.Extensions.Logging.Console](https://www.nuget.org/packages/Microsoft.Extensions.Logging.Console) from Nuget.)
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Core/IntroPage.cs#logging)]
 
 ## What's Next
 

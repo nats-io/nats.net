@@ -1,3 +1,4 @@
+#if DEBUG
 using System.Buffers;
 using System.Text;
 
@@ -59,3 +60,4 @@ public static class DebuggingExtensions
         return sb.ToString();
     }
 }
+#endif

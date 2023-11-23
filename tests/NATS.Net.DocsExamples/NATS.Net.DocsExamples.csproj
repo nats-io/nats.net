@@ -9,7 +9,12 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\..\src\NATS.Client.Serializers.Json\NATS.Client.Serializers.Json.csproj" />
       <ProjectReference Include="..\..\src\NATS.Net\NATS.Net.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="6.0.0" />
     </ItemGroup>
 
 </Project>

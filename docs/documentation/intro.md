@@ -30,7 +30,7 @@ Start NATS server with default options:
 $ nats-server
 ```
 
-Reference [NATS.Net NuGet package](https://www.nuget.org/packages/NATS.Net/) in your project:
+Reference [NATS.Net](https://www.nuget.org/packages/NATS.Net) NuGet package in your project:
 
 [!code-csharp[](../../tests/NATS.Net.DocsExamples/IntroPage.cs#core-nats)]
 
@@ -52,9 +52,12 @@ Reference [NATS.Net NuGet package](https://www.nuget.org/packages/NATS.Net/) in 
 ---
 
 > [!NOTE]
-> Every NatConnection instance is a TCP connection to a NATS server. Typically an application will only need one
-> connection and many subscriptions and publishers would share the same connection. Connections are heavy while
-> subscriptions and publishers are light. NATS.Net should be able to handle large numbers of subscriptions
+> Every [`NatsConnection`](xref:NATS.Client.Core.NatsConnection) instance is a TCP connection to a NATS server.
+> Typically an application will only need one
+> connection and many subscriptions and publishers would share that same connection. Connections are relatively
+> heavyweight and expensive to create while
+> subscriptions and publishers are lightweight internal NATS protocol handlers.
+> NATS.Net should be able to handle large numbers of subscriptions
 > and publishers per connection.
 
 Now you should be able to run NATS server on your machine and use the above code samples to see the basics of

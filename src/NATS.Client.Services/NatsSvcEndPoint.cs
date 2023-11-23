@@ -69,8 +69,8 @@ public interface INatsSvcEndpoint : IAsyncDisposable
 /// </summary>
 public abstract class NatsSvcEndpointBase : NatsSubBase, INatsSvcEndpoint
 {
-    protected NatsSvcEndpointBase(NatsConnection connection, ISubscriptionManager manager, string subject, string? queueGroup, NatsSubOpts? opts)
-        : base(connection, manager, subject, queueGroup, opts)
+    protected NatsSvcEndpointBase(NatsConnection connection, string subject, string? queueGroup, NatsSubOpts? opts)
+        : base(connection, connection.SubscriptionManager, subject, queueGroup, opts)
     {
     }
 
@@ -132,7 +132,7 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
     /// <param name="opts">Subscription options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     public NatsSvcEndpoint(NatsConnection nats, string? queueGroup, string name, Func<NatsSvcMsg<T>, ValueTask> handler, string subject, IDictionary<string, string>? metadata, INatsDeserialize<T> serializer, NatsSubOpts? opts, CancellationToken cancellationToken)
-        : base(nats, nats.SubscriptionManager, subject, queueGroup, opts)
+        : base(nats, subject, queueGroup, opts)
     {
         _logger = nats.Opts.LoggerFactory.CreateLogger<NatsSvcEndpoint<T>>();
         _handler = handler;
