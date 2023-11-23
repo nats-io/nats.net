@@ -1,10 +1,8 @@
 # NATS.Net
 
-NATS.Net is a [NATS](https://nats.io) client for the modern [.NET](https://dot.net/).
+[NATS](https://nats.io) client for modern [.NET](https://dot.net/).
 
-## Release Candidate
-
-The NATS.Net is ready to *Go Live*!
+NATS.Net v2.0 (GA) is suitable for production use.
 
 Big thank you to our contributors.
 
