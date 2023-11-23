@@ -49,15 +49,26 @@ public class IntroPage
 
         try
         {
+            await using var nats1 = new NatsConnection();
+            var js1 = new NatsJSContext(nats1);
+            await js1.DeleteStreamAsync("shop_orders");
+            await Task.Delay(1000);
+        }
+        catch (NatsJSApiException)
+        {
+        }
+
+        try
+        {
             await using var nats = new NatsConnection();
             var js = new NatsJSContext(nats);
             await js.DeleteStreamAsync("orders");
             await Task.Delay(1000);
         }
-        catch
+        catch (NatsJSApiException)
         {
-            // ignore
         }
+
 
         {
             #region jetstream

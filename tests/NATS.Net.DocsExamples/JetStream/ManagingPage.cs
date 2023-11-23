@@ -25,12 +25,20 @@ public class ManagingPage
 
         try
         {
+            await js.DeleteStreamAsync("shop_orders");
+            await Task.Delay(1000);
+        }
+        catch (NatsJSApiException)
+        {
+        }
+
+        try
+        {
             await js.DeleteStreamAsync("orders");
             await Task.Delay(1000);
         }
-        catch
+        catch (NatsJSApiException)
         {
-            // ignore
         }
 
         #region stream

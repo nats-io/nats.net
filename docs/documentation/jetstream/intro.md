@@ -34,20 +34,15 @@ stream and will keep track of which messages were delivered and acknowledged by 
 $ nats-server -js
 ```
 
-Install `NATS.Client.JetStream` preview from Nuget.
+Install [NATS.Net](https://www.nuget.org/packages/NATS.Net) from Nuget.
 
 Before we can do anything, we need a JetStream context:
 
-```csharp
-await using var nats = new NatsConnection();
-var js = new NatsJSContext(nats);
-```
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/IntroPage.cs#js-connection)]
 
 Let's create our stream first. In JetStream, a stream is simply a storage for messages:
 
-```csharp
-await js.CreateStreamAsync(stream: "shop_orders", subjects: new []{"orders.>"});
-```
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/IntroPage.cs#js-stream)]
 
 We can save messages in a stream by publishing them to the subjects the stream is interested in, which is `orders.>` in
 our case, meaning any subject prefixed with `orders.` e.g. `orders.new.123`. Have a look at NATS documentation about
@@ -55,20 +50,13 @@ our case, meaning any subject prefixed with `orders.` e.g. `orders.new.123`. Hav
 
 Given that we have a record `Order`, we can publish and consume stream of `Order` objects:
 
-```csharp
-public record Order(int OrderId);
-```
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/IntroPage.cs#serializer)]
+
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/IntroPage.cs#js-serializer)]
 
 We can publish to the `shop_orders` stream and receive a confirmation that our message is persisted:
 
-```csharp
-for (var i = 0; i < 10; i++)
-{
-    // Notice we're using JetStream context to publish and receive ACKs
-    var ack = await js.PublishAsync($"orders.new.{i}", new Order(i), serializer: orderSerializer);
-    ack.EnsureSuccess();
-}
-```
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/IntroPage.cs#js-publish)]
 
 Now that we have a few messages in our stream, let's see its status using the [NATS command
 line client](https://github.com/nats-io/natscli):
@@ -109,25 +97,15 @@ Check out [JetStream documentation](https://docs.nats.io/nats-concepts/jetstream
 
 Finally, we're ready to consume the messages we persisted in `shop_orders` stream:
 
-```csharp
-await foreach (var msg in consumer.ConsumeAsync<Order>(serializer: orderSerializer))
-{
-    var order = msg.Data;
-    Console.WriteLine($"Processing {msg.Subject} {order}...");
-    await msg.AckAsync();
-    // this loop never ends unless there is an error
-}
-```
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/IntroPage.cs#consumer-consume)]
 
 ## Logging
 
 You should also hook your logger to `NatsConnection` to make sure all is working as expected or
 to get help diagnosing any issues you might have:
 
-```csharp
-var opts = NatsOpts.Default with { LoggerFactory = new MinimumConsoleLoggerFactory(LogLevel.Error) };
-await using var nats = new NatsConnection(otps);
-```
+(For this example you need to add [Microsoft.Extensions.Logging.Console](https://www.nuget.org/packages/Microsoft.Extensions.Logging.Console) from Nuget.)
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Core/IntroPage.cs#logging)]
 
 ## What's Next
 

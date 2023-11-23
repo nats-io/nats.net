@@ -6,13 +6,7 @@ that it was successfully stored.
 
 The subject must be configured on a stream to be persisted:
 
-```csharp
-await using var nats = new NatsConnection();
-var js = new NatsJSContext(nats);
-
-await js.CreateStreamAsync("orders", subjects: new []{"orders.>"});
-```
-
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/PublishPage.cs#js)]
 or using the nats cli:
 
 ```shell
@@ -21,18 +15,9 @@ $ nats stream create orders --subjects 'orders.>'
 
 Then you can publish to subjects captured by the stream:
 
-```csharp
-await using var nats = new NatsConnection();
-var js = new NatsJSContext(nats);
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/PublishPage.cs#publish)]
 
-var order = new Order { OrderId = 1 };
-
-var ack = await js.PublishAsync("orders.new.1", order, serializer: orderSerializer);
-
-ack.EnsureSuccess();
-
-public record Order(int OrderId);
-```
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/IntroPage.cs#serializer)]
 
 ## Message Deduplication
 
@@ -41,12 +26,7 @@ JetStream support
 by ignoring duplicate messages as indicated by the message ID. Message ID is not part of the message but rather passed
 as metadata, part of the message headers.
 
-```csharp
-var ack = await js.PublishAsync("orders.new.1", order, opts: new NatsJSPubOpts { MsgId = "1" }, serializer: orderSerializer);
-if (ack.Duplicate)
-{
-    // A message with the same ID was published before
-}
-```
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/PublishPage.cs#publish-duplicate)]
 
-See also: [Serialization](../serialization.md)
+> [!NOTE]
+> See also [Serialization](../serialization.md) section for more information about different serialization options.
