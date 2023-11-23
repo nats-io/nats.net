@@ -14,20 +14,15 @@ To be able to use Services you need to running the `nats-server`.
 $ nats-server
 ```
 
-Install `NATS.Client.Services` preview from Nuget.
+Install [NATS.Net](https://www.nuget.org/packages/NATS.Net) from Nuget.
 
 Before we can do anything, we need a Services context:
 
-```csharp
-await using var nats = new NatsConnection();
-var svc = new NatsSvcContext(nats);
-```
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Services/IntroPage.cs#svc)]
 
 Let's create our first service:
 
-```csharp
-await using var testService = await svc.AddServiceAsync("test", "1.0.0");
-```
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Services/IntroPage.cs#add)]
 
 Now that we have a service in our stream, let's see its status using the [NATS command
 line client](https://github.com/nats-io/natscli) (make sure you have at least v0.1.1):
@@ -52,18 +47,7 @@ Statistics for 0 Endpoint(s):
 
 Now we can add endpoints to our service:
 
-```csharp
-await testService.AddEndPointAsync<int>(name: "divide42", handler: async m =>
-{
-    if (m.Data == 0)
-    {
-        await m.ReplyErrorAsync(400, "Division by zero");
-        return;
-    }
-
-    await m.ReplyAsync(42 / m.Data);
-});
-```
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Services/IntroPage.cs#endpoint)]
 
 We can also confirm that our endpoint is registered by using the NATS command line:
 
@@ -92,13 +76,8 @@ as well as an optional common subject prefix for all endpoints.
 
 You can group your endpoints optionally in different [queue groups](https://docs.nats.io/nats-concepts/core-nats/queue):
 
-```csharp
-var grp1 = await testService.AddGroupAsync("grp1");
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Services/IntroPage.cs#grp)]
 
-await grp1.AddEndPointAsync<int>(name: "ep1", handler: async m =>
-{
-    // handle message
-});
-```
-
-See also: [Serialization](../serialization.md)
+> [!NOTE]
+> Examples in this page uses primitive types for simplicity. See [Serialization](../serialization.md) section for more
+> information about different serialization options.

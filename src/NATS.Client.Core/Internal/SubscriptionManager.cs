@@ -6,7 +6,7 @@ using NATS.Client.Core.Commands;
 
 namespace NATS.Client.Core.Internal;
 
-public interface ISubscriptionManager
+internal interface ISubscriptionManager
 {
     public ValueTask RemoveAsync(NatsSubBase sub);
 }

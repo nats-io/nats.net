@@ -10,77 +10,31 @@ Code below demonstrates multiple subscriptions on the same queue group,
 receiving messages randomly distributed among them. This example also shows
 how queue groups can be used to load balance responders:
 
-```csharp
-using NATS.Client.Core;
-
-await using var nats = new NatsConnection();
-
-var subs = new List<NatsSubBase>();
-var replyTasks = new List<Task>();
-var cts = new CancellationTokenSource();
-
-for (int i = 0; i < 3; i++)
-{
-    // Create three subscriptions all on the same queue group
-    // Create a background message loop for every subscription
-    var replyTaskId = i;
-    replyTasks.Add(Task.Run(async () =>
-    {
-        // Retrieve messages until unsubscribed
-        await foreach (var msg in nats.SubscribeAsync<int>("math.double", queueGroup: "maths-service", cancellationToken: cts.Token))
-        {
-            Console.WriteLine($"[{replyTaskId}] Received request: {msg.Data}");
-            await msg.ReplyAsync($"Answer is: {2 * msg.Data}");
-        }
-
-        Console.WriteLine($"[{replyTaskId}] Done");
-    }));
-}
-
-// Send a few requests
-for (int i = 0; i < 10; i++)
-{
-    var reply = await nats.RequestAsync<int, string>("math.double", i);
-    Console.WriteLine($"Reply: '{reply}'");
-}
-
-Console.WriteLine("Stopping...");
-
-// Cancellation token will unsubcribe and complete the message loops
-cts.Cancel();
-
-// Make sure all tasks finished cleanly
-await Task.WhenAll(replyTasks);
-
-Console.WriteLine("Bye");
-```
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Core/QueuePage.cs#queue)]
 
 Output should look similar to this:
 
-```
-[0] Received request: 0
+```text
+[1] Received request: 0
 Reply: 'Answer is: 0'
 [2] Received request: 1
 Reply: 'Answer is: 2'
-[1] Received request: 2
+[2] Received request: 2
 Reply: 'Answer is: 4'
-[0] Received request: 3
+[2] Received request: 3
 Reply: 'Answer is: 6'
-[0] Received request: 4
+[2] Received request: 4
 Reply: 'Answer is: 8'
-[1] Received request: 5
-Reply: 'Answer is: 10'
-[2] Received request: 6
-Reply: 'Answer is: 12'
+[0] Received request: 5
 [0] Received request: 7
 Reply: 'Answer is: 14'
 [1] Received request: 8
 Reply: 'Answer is: 16'
-[0] Received request: 9
+[1] Received request: 9
 Reply: 'Answer is: 18'
 Stopping...
+[2] Done
 [0] Done
 [1] Done
-[2] Done
-Bye
+All done
 ```

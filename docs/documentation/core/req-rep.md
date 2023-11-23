@@ -5,23 +5,8 @@ A request is sent, and the application either waits on the response with a certa
 or receives a response asynchronously.
 
 Create a service that will be responding to requests:
-```csharp
-await using var nats = new NatsConnection();
-
-await foreach (var msg in conn.SubscribeAsync<int>("math.double"))
-{
-    Console.WriteLine($"Received request: {msg.Data}");
-
-    await msg.ReplyAsync($"Answer is: { 2 * msg.Data }");
-}
-```
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Core/ReqRepPage.cs#sub)]
 
 Reply to a request is asynchronously received using an _inbox_ subscription
 behind the scenes:
-```csharp
-await using var nats = new NatsConnection();
-
-var reply = await nats.RequestAsync<int, string>("math.double", 2);
-
-Console.WriteLine($"Received reply: {reply}")
-```
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Core/ReqRepPage.cs#reqrep)]

@@ -9,7 +9,7 @@ using System.Text;
 /// <summary>
 /// Encodes and Decodes strings as Base64Url encoding.
 /// </summary>
-public static class Base64UrlEncoder
+internal static class Base64UrlEncoder
 {
     private const char Base64PadCharacter = '=';
     private const char Base64Character62 = '+';

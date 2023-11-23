@@ -28,7 +28,7 @@ public class ManageStreamTest
         // Create
         {
             var stream = await js.CreateStreamAsync(
-                request: new StreamConfig { Name = "events", Subjects = new[] { "events.*" } },
+                config: new StreamConfig { Name = "events", Subjects = new[] { "events.*" } },
                 cancellationToken: cancellationToken);
             Assert.Equal("events", stream.Info.Config.Name);
 

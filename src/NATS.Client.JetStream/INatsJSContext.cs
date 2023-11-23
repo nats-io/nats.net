@@ -118,13 +118,13 @@ public interface INatsJSContext
     /// <summary>
     /// Creates a new stream if it doesn't exist or returns an existing stream with the same name.
     /// </summary>
-    /// <param name="request">Stream configuration request to be sent to NATS JetStream server.</param>
+    /// <param name="config">Stream configuration request to be sent to NATS JetStream server.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>The NATS JetStream stream object which can be used to manage the stream.</returns>
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     ValueTask<INatsJSStream> CreateStreamAsync(
-        StreamConfig request,
+        StreamConfig config,
         CancellationToken cancellationToken = default);
 
     /// <summary>

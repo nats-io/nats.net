@@ -12,8 +12,8 @@
       "disableGitFeatures": false,
       "disableDefaultFilter": false,
       "noRestore": false,
-      "namespaceLayout": "flattened",
-      "memberLayout": "samePage",
+      "namespaceLayout": "nested",
+      "memberLayout": "separatePages",
       "allowCompilationErrors": false
     }
   ],
@@ -51,6 +51,11 @@
     ],
     "postProcessors": [],
     "keepFileLink": false,
-    "disableGitFeatures": false
+    "disableGitFeatures": false,
+    "sitemap": {
+      "baseUrl": "https://nats-io.github.io/nats.net.v2",
+      "priority": 0.1,
+      "changefreq": "monthly"
+    }
   }
 }

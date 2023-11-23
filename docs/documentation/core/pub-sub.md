@@ -4,56 +4,32 @@ NATS implements a publish-subscribe message distribution model for one-to-many c
 A publisher sends a message on a subject and any active subscriber listening on that subject
 receives the message.
 
-```csharp
-await using var nats = new NatsConnection();
-
-var sub = Task.Run(async () =>
-{
-    await foreach(var msg in nats.SubscribeAsync<int>("foo"))
-    {
-        Console.WriteLine($"Received {msg.Subject}: {msg.Data}\n");
-
-        if (msg.Data == -1)
-            break;
-    }
-});
-
-for (int i = 0; i < 10; i++)
-{
-    Console.WriteLine($" Publishing {i}...");
-    await nats.PublishAsync<int>("foo", i);
-    await Task.Delay(1000);
-}
-
-await nats.PublishAsync<int>("foo", -1);
-
-await sub;
-```
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Core/PubSubPage.cs#pubsub)]
 
 ## Subscriptions with Lower Level Control
 
-The `SubscribeAsync()` method is a convenient way to subscribe to a subject and receive messages without much effort.
-If you need more control over how subscription is handled, you can use the `SubscribeCoreAsync()` method instead.
+The
+[`SubscribeAsync()`](xref:NATS.Client.Core.INatsConnection.SubscribeAsync``1(System.String,System.String,NATS.Client.Core.INatsDeserialize{``0},NATS.Client.Core.NatsSubOpts,System.Threading.CancellationToken))
+method is a convenient way to subscribe to a subject and receive messages without much effort.
+If you need more control over how subscription is handled, you can use the
+[`SubscribeCoreAsync()`](xref:NATS.Client.Core.INatsConnection.SubscribeCoreAsync``1(System.String,System.String,NATS.Client.Core.INatsDeserialize{``0},NATS.Client.Core.NatsSubOpts,System.Threading.CancellationToken))
+method instead.
 
-```csharp
-await using var nats = new NatsConnection();
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Core/PubSubPage.cs#lowlevel)]
 
-await using sub = await nats.SubscribeAsync<int>("foo");
+> [!NOTE]
+> [`NatsConnection`](xref:NATS.Client.Core.NatsConnection) establishes the first server connection when the first call to subscribe or publish is made.
+> This is why we call the `ConnectAsync()` method explicitly before subscribe or publishing any messages in the example above,
+> making sure the subscription request is received by the server before any publish requests, avoiding potential race conditions
+> of subscribe and publish method establishing the first connection.
 
-for (int i = 0; i < 10; i++)
-{
-    Console.WriteLine($" Publishing {i}...");
-    await nats.PublishAsync<int>("foo", i);
-}
 
-await nats.PublishAsync<int>("foo", -1);
-
-await foreach (var msg in sub.Msgs.ReadAllAsync())
-{
-    Console.WriteLine($"Received {msg.Subject}: {msg.Data}\n");
-    if (msg.Data == -1)
-        break;
-}
-
-await sub.UnsubscribeAsync();
-```
+> [!NOTE]
+> [`PingAsync()`](xref:NATS.Client.Core.INatsConnection.PingAsync(System.Threading.CancellationToken)) is somewhat a
+> special method in all NATS clients. It is used to send a ping to the server and
+> receive a pong back while measuring the round trip time. Since it waits for the server to respond, as a side effect
+> it also flushes the outgoing buffers.
+>
+> Remember that every [`NatsConnection`](xref:NATS.Client.Core.NatsConnection) instance is a single TCP connection
+> and all the calls sent to the server are
+> essentially serialized back to back after they're picked up from internal queues and buffers.

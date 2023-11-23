@@ -6,11 +6,7 @@ manage consumers directly, bypassing the need to get or create a stream first.
 
 You can create a context using an existing NATS connection:
 
-```csharp
-await using var nats = new NatsConnection();
-
-var js = new NatsJSContext(nats);
-```
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/ManagingPage.cs#js)]
 
 ## Streams
 
@@ -22,9 +18,7 @@ successfully stored.
 
 An example of creating a stream:
 
-```csharp
-await js.CreateStreamAsync("orders", subjects: new []{"orders.>"});
-```
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/ManagingPage.cs#stream)]
 
 However, in practice streams are usually managed separately from the applications, for example using the [NATS command
 line client](https://github.com/nats-io/natscli) you can create a stream interactively:
@@ -48,10 +42,5 @@ delivered and acknowledged by clients.
 
 Unlike streams, consumers are accessed by NATS client libraries as part of message consumption:
 
-```csharp
-// Create or get a consumer
-var consumer = await js.CreateConsumerAsync(stream: "orders", consumer: "order_processor");
-
-// Get an existing consumer
-var consumer = await js.GetConsumerAsync(stream: "orders", consumer: "order_processor");
-```
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/ManagingPage.cs#consumer-create)]
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/ManagingPage.cs#consumer-get)]

@@ -29,7 +29,7 @@ public class JetStreamTest
 
             // Create stream
             var stream = await js.CreateStreamAsync(
-                request: new StreamConfig { Name = "events", Subjects = new[] { "events.*" }, },
+                config: new StreamConfig { Name = "events", Subjects = new[] { "events.*" }, },
                 cancellationToken: cts1.Token);
             Assert.Equal("events", stream.Info.Config.Name);
 
@@ -115,7 +115,7 @@ public class JetStreamTest
             var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () =>
             {
                 await js.CreateStreamAsync(
-                    request: new StreamConfig
+                    config: new StreamConfig
                     {
                         Name = "events2",
                         Subjects = new[] { "events.*" },

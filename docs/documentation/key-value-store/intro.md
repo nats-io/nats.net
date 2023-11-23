@@ -16,21 +16,19 @@ To be able to use KV you need to enable JetStream by running the server with `-j
 $ nats-server -js
 ```
 
-Install `NATS.Client.KeyValueStore` preview from Nuget.
+Install [NATS.Net](https://www.nuget.org/packages/NATS.Net)
+and [NATS.Client.Serializers.Json](https://www.nuget.org/packages/NATS.Client.Serializers.Json) from Nuget.
+
+> [!NOTE]
+> See also [Serialization](../serialization.md) section for more information about different serialization options.
 
 Before we can do anything, we need a Key/Value Store context:
 
-```csharp
-await using var nats = new NatsConnection();
-var js = new NatsJSContext(nats);
-var kv = new NatsKVContext(js);
-```
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/KeyValueStore/IntroPage.cs#kv)]
 
 Let's create our store first. In Key/Value Store, a bucket is simply a storage for key/value pairs:
 
-```csharp
-var store = await kv.CreateStoreAsync("shop_orders");
-```
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/KeyValueStore/IntroPage.cs#store)]
 
 Now that we have a KV bucket in our stream, let's see its status using the [NATS command
 line client](https://github.com/nats-io/natscli):
@@ -49,15 +47,8 @@ $ nats kv ls
 We can save values in a bucket by putting them using a key, which is `order-1` in our case. We can also retrieve the
 saved value by its key:
 
-```csharp
-await store.PutAsync("order-1", new ShopOrder(Id: 1));
-
-var entry = await store.GetEntryAsync<ShopOrder>("order-1");
-
-Console.WriteLine($"[GET] {entry.Value}");
-
-public record ShopOrder(int Id);
-```
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/KeyValueStore/IntroPage.cs#put)]
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/KeyValueStore/IntroPage.cs#order)]
 
 We can also confirm that our value is persisted by using the NATS command line:
 
@@ -73,15 +64,4 @@ shop_orders > order-1 created @ 12 Oct 23 15:31 UTC
 Key/Value Store supports watchers that allow you to be notified when a value is added, updated or deleted from a
 bucket. Let's see how we can use watchers to be notified when a value is added to our bucket:
 
-```csharp
-await foreach (var entry in store.WatchAllAsync<ShopOrder>())
-{
-    Console.WriteLine($"[RCV] {entry}");
-}
-
-// Outputs:
-// [RCV] NatsKVEntry { Bucket = shop_orders, Key = order-1, Value = ShopOrder { Id = 1 }, Revision = 1, Delta = 0,
-//       Created = 12/10/2023 15:31:51 +00:00, Operation = Put }
-```
-
-See also: [Serialization](../serialization.md)
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/KeyValueStore/IntroPage.cs#watch)]
