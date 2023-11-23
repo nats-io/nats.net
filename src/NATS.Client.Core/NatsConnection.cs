@@ -556,7 +556,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
             {
                 if (url != null)
                 {
-                    _logger.LogError(NatsLogEvents.Connection, ex, "Fail to connect NATS {Url}", url);
+                    _logger.LogError(NatsLogEvents.Connection, ex, "Failed to connect NATS {Url}", url);
                 }
 
                 ReconnectFailed?.Invoke(this, url?.ToString() ?? string.Empty);
