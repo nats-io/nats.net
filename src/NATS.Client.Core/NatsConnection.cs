@@ -519,7 +519,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
                         }
                     }
 
-                    _logger.LogInformation(NatsLogEvents.Connection, "Try to connect NATS {Url}", url);
+                    _logger.LogInformation(NatsLogEvents.Connection, "Tried to connect NATS {Url}", url);
                     if (url.IsWebSocket)
                     {
                         var conn = new WebSocketConnection();
