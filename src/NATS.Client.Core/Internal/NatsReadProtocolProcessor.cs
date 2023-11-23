@@ -409,7 +409,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         else
         {
             // reaches invalid line, log warn and try to get newline and go to nextloop.
-            _logger.LogWarning(NatsLogEvents.Protocol, "Reaches invalid line");
+            _logger.LogWarning(NatsLogEvents.Protocol, "Reached invalid line");
             Interlocked.Decrement(ref _connection.Counter.ReceivedMessages);
 
             var position = buffer.PositionOf((byte)'\n');
