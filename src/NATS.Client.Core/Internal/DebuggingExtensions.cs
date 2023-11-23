@@ -1,10 +1,9 @@
-#if DEBUG
 using System.Buffers;
 using System.Text;
 
 namespace NATS.Client.Core.Internal;
 
-public static class DebuggingExtensions
+internal static class DebuggingExtensions
 {
     public static string Dump(this ReadOnlySequence<byte> buffer)
     {
@@ -60,4 +59,3 @@ public static class DebuggingExtensions
         return sb.ToString();
     }
 }
-#endif
