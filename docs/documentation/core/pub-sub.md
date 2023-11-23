@@ -18,11 +18,17 @@ method instead.
 [!code-csharp[](../../../tests/NATS.Net.DocsExamples/Core/PubSubPage.cs#lowlevel)]
 
 > [!NOTE]
+> [`NatsConnection`](xref:NATS.Client.Core.NatsConnection) establishes the first server connection when the first call to subscribe or publish is made.
+> This is why we call the `ConnectAsync()` method explicitly before subscribe or publishing any messages in the example above,
+> making sure the subscription request is received by the server before any publish requests, avoiding potential race conditions
+> of subscribe and publish method establishing the first connection.
+
+
+> [!NOTE]
 > [`PingAsync()`](xref:NATS.Client.Core.INatsConnection.PingAsync(System.Threading.CancellationToken)) is somewhat a
 > special method in all NATS clients. It is used to send a ping to the server and
 > receive a pong back while measuring the round trip time. Since it waits for the server to respond, as a side effect
-> it also flushes the outgoing buffer. This is why we call it before publishing any messages in the example above,
-> making sure the subscription request is received by the server before any publish requests.
+> it also flushes the outgoing buffers.
 >
 > Remember that every [`NatsConnection`](xref:NATS.Client.Core.NatsConnection) instance is a single TCP connection
 > and all the calls sent to the server are

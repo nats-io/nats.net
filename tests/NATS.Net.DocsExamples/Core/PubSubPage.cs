@@ -50,10 +50,11 @@ public class PubSubPage
             #region lowlevel
             await using var nats = new NatsConnection();
 
-            await using INatsSub<int> sub = await nats.SubscribeCoreAsync<int>("foo");
+            // Connections are lazy, so we need to connect explicitly
+            // to avoid any races between subscription and publishing.
+            await nats.ConnectAsync();
 
-            // Make sure subscription has reached the server
-            await nats.PingAsync();
+            await using INatsSub<int> sub = await nats.SubscribeCoreAsync<int>("foo");
 
             for (var i = 0; i < 10; i++)
             {
