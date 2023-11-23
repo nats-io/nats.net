@@ -471,7 +471,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
             // If dispose this client, WaitForClosed throws OperationCanceledException so stop reconnect-loop correctly.
             await _socket!.WaitForClosed.ConfigureAwait(false);
 
-            _logger.LogTrace(NatsLogEvents.Connection, "Detect connection {Name} closed, start to cleanup current connection and start to reconnect", _name);
+            _logger.LogTrace(NatsLogEvents.Connection, "Connection {Name} is closed. Will cleanup and reconnect", _name);
             lock (_gate)
             {
                 ConnectionState = NatsConnectionState.Reconnecting;
@@ -672,7 +672,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
             {
                 if (Interlocked.Increment(ref _pongCount) > Opts.MaxPingOut)
                 {
-                    _logger.LogInformation(NatsLogEvents.Connection, "Detect MaxPingOut, try to connection abort");
+                    _logger.LogInformation(NatsLogEvents.Connection, "Server didn't respond to our ping requests. Aborting connection");
                     if (_socket != null)
                     {
                         await _socket.AbortConnectionAsync(cancellationToken).ConfigureAwait(false);
