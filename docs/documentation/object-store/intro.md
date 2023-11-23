@@ -17,21 +17,16 @@ To be able to use Object Store you need to enable JetStream by running the serve
 $ nats-server -js
 ```
 
-Install `NATS.Client.ObjectStore` preview from Nuget.
+Install [NATS.Net](https://www.nuget.org/packages/NATS.Net) from Nuget.
 
 Before we can do anything, we need an Object Store context:
 
-```csharp
-await using var nats = new NatsConnection();
-var js = new NatsJSContext(nats);
-var obj = new NatsObjContext(js);
-```
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/ObjectStore/IntroPage.cs#obj)]
 
 Let's create our store first. In Object Store, a bucket is simply a storage for key/object pairs:
 
-```csharp
-var store = await obj.CreateObjectStore("test-bucket");
-```
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/ObjectStore/IntroPage.cs#store)]
+
 
 Now that we have a bucket in our stream, let's see its status using the [NATS command
 line client](https://github.com/nats-io/natscli):
@@ -50,11 +45,7 @@ $ nats object ls
 We can save objects in a bucket by putting them using a key, which is `my/random/data.bin` in our case. We can also retrieve the
 saved value by its key:
 
-```csharp
-await store.PutAsync("my/random/data.bin", File.OpenRead("data.bin"));
-
-await store.GetAsync("my/random/data.bin", File.OpenWrite("data_copy.bin"));
-```
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/ObjectStore/IntroPage.cs#putget)]
 
 We can also confirm that our value is persisted by using the NATS command line:
 
@@ -74,30 +65,12 @@ Object information for test-bucket > my/random/data.bin
 
 We can get information about a key in a bucket:
 
-```csharp
-var metadata = await store.GetInfoAsync("my/random/data.bin");
-
-Console.WriteLine("Metadata:");
-Console.WriteLine($"  Bucket: {metadata.Bucket}");
-Console.WriteLine($"  Name: {metadata.Name}");
-Console.WriteLine($"  Size: {metadata.Size}");
-Console.WriteLine($"  Time: {metadata.MTime}");
-Console.WriteLine($"  Chunks: {metadata.Chunks}");
-
-// Outputs:
-// Metadata:
-//   Bucket: test-bucket
-//   Name: my/random/data.bin
-//   Size: 10485760
-//   Time: 18/10/2023 15:13:22 +00:00
-//   Chunks: 80
-
-```
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/ObjectStore/IntroPage.cs#info)]
 
 ### Delete
 
 We can delete a key from a bucket:
 
-```csharp
-await store.DeleteAsync("my/random/data.bin");
-```
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/ObjectStore/IntroPage.cs#delete)]
+
+See the API reference for the full list of [Object Store](xref:NATS.Client.ObjectStore.INatsObjStore) operations.

@@ -9,6 +9,8 @@ using NATS.Client.JetStream.Models;
 #pragma warning disable SA1124
 #pragma warning disable SA1509
 #pragma warning disable SA1515
+#pragma warning disable CS8602 // Dereference of a possibly null reference.
+#pragma warning disable CS0168 // Variable is declared but never used
 
 namespace NATS.Net.DocsExamples.JetStream;
 

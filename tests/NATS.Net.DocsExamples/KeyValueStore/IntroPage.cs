@@ -77,5 +77,3 @@ public class IntroPage
     public record ShopOrder(int Id);
     #endregion
 }
-
-

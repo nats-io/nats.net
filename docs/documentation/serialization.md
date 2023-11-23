@@ -1,27 +1,11 @@
 # Serialization
 
-NATS .NET Client supports serialization of messages using a simple interface [`INatsSerializer<T>`](xref:NATS.Client.Core.INatsSerializer`1).
+NATS.Net supports serialization of messages using a simple interface [`INatsSerializer<T>`](xref:NATS.Client.Core.INatsSerializer`1).
 
-```csharp
-public interface INatsSerializer<T> : INatsSerialize<T>, INatsDeserialize<T>
-{
-}
-
-public interface INatsSerialize<in T>
-{
-    // Serialize the value to the buffer.
-    void Serialize(IBufferWriter<byte> bufferWriter, T value);
-}
-
-public interface INatsDeserialize<out T>
-{
-    // Deserialize the value from the buffer.
-    T? Deserialize(in ReadOnlySequence<byte> buffer);
-}
-```
-
-By default, the client uses the [`NatsDefaultSerializer<T>`](xref:NATS.Client.Core.NatsDefaultSerializer`1) which can handle binary data, UTF8 strings and numbers. You can provide your own
-serializer by implementing the [`INatsSerializer<T>`](xref:NATS.Client.Core.INatsSerializer`1) interface or using the [`NatsJsonContextSerializer<T>`](xref:NATS.Client.Core.NatsJsonContextSerializer`1) for generated
+By default, the client uses the [`NatsDefaultSerializer<T>`](xref:NATS.Client.Core.NatsDefaultSerializer`1)
+which can handle binary data, UTF8 strings and numbers. You can provide your own
+serializer by implementing the [`INatsSerializer<T>`](xref:NATS.Client.Core.INatsSerializer`1) interface or using the
+[`NatsJsonContextSerializer<T>`](xref:NATS.Client.Core.NatsJsonContextSerializer`1) for generated
 JSON serialization. Serializers can also be chained together to provide multiple serialization formats typically
 depending on the types being used.
 
@@ -35,80 +19,17 @@ strings and numbers. It uses the following rules to determine the type of the da
 - If the data is a primitive (for example `DateTime`, `int` or `double`. See also [`NatsUtf8PrimitivesSerializer<T>`](xref:NATS.Client.Core.NatsUtf8PrimitivesSerializer`1)) it is treated as the primitive encoded as a UTF8 string.
 - For any other type, the serializer will throw an exception.
 
-Serializer registry is a simple interface that can be used to provide a custom serializer instances for specific types:
+Serialising custom data formats can be done by implementing the serializer registry interface
+[`INatsSerializerRegistry`](xref:NATS.Client.Core.INatsSerializerRegistry)
+that can be used to provide a custom serializer instances for specific types.
 
-```csharp
-public interface INatsSerializerRegistry
-{
-    INatsSerialize<T> GetSerializer<T>();
-    INatsDeserialize<T> GetDeserializer<T>();
-}
-```
+You would be using the default serializer by not specifying a serializer registry in connection options
+or by setting it to the default explicitly:
 
-You can use the default serializer by not specifying a serializer in the connection options or by setting the serializer
-registry to the default serializer:
-
-```csharp
-using NATS.Client.Core;
-
-// Same as not specifying a serializer.
-var natsOpts = NatsOpts.Default with { SerializerRegistry = NatsDefaultSerializerRegistry.Default };
-
-await using var nats = new NatsConnection(natsOpts);
-
-var subscriber = Task.Run(async () =>
-{
-    // Default serializer knows how to deal with UTF8 strings, numbers and binary data.
-    await foreach (var msg in nats.SubscribeAsync<string>("foo"))
-    {
-        // Check for the end of messages.
-        if (msg.Data == null)
-            break;
-
-        // Outputs 'Hello World'
-        Console.WriteLine(msg.Data);
-    }
-});
-
-// Give subscriber a chance to connect.
-await Task.Delay(1000);
-
-// Default serializer knows how to deal with UTF8 strings, numbers and binary data.
-await nats.PublishAsync<string>(subject: "foo", data: "Hello World");
-
-// Signal the end of messages by sending an empty payload.
-await nats.PublishAsync(subject: "foo");
-
-await subscriber;
-```
+[!code-csharp[](../../tests/NATS.Net.DocsExamples/SerializationPage.cs#default)]
 
 The default serializer is designed to be used by developers who want to only work with binary data, and provide an out
 of the box experience for basic use cases like sending and receiving UTF8 strings.
-
-### Using JSON Serialization with Reflection
-
-If you're not using [Native AOT deployments](https://learn.microsoft.com/dotnet/core/deploying/native-aot) you can use
-the [`NatsJsonSerializer<T>`](xref:NATS.Client.Serializers.Json.NatsJsonSerializer`1) to serialize and deserialize
-messages. [`NatsJsonSerializer<T>`](xref:NATS.Client.Serializers.Json.NatsJsonSerializer`1) uses [`System.Text.Json`](https://learn.microsoft.com/dotnet/api/system.text.json)
-APIs that can work with types that are not registered to generate serialization code.
-
-Using this serializer is most useful for use cases where you want to send and receive JSON messages and you don't want to
-worry about registering types. It's also useful for prototyping and testing. To use the serializer you need to install
-the `NATS.Client.Serializers.Json` Nuget package.
-
-```shell
-$ dotnet add package NATS.Client.Serializers.Json --prerelease
-```
-
-Then set the serializer as the default for the connection:
-
-```csharp
-using NATS.Client.Serializers.Json;
-
-var natsOpts = NatsOpts.Default with { SerializerRegistry = NatsJsonSerializerRegistry.Default };
-
-await using var nats = new NatsConnection(natsOpts);
-```
 
 ## Using JSON Serializer Context
 
@@ -118,73 +39,16 @@ to generate the serialization code at compile time. This is the recommended JSON
 required for [Native AOT deployments](https://learn.microsoft.com/dotnet/core/deploying/native-aot).
 
 First you need to define your JSON classes and a context to generate the serialization code:
-```csharp
-public record MyData
-{
-    [JsonPropertyName("id")]
-    public int Id { get; set; }
-
-    [JsonPropertyName("name")]
-    public string? Name { get; set; }
-}
-
-[JsonSerializable(typeof(MyData))]
-internal partial class MyJsonContext : JsonSerializerContext;
-```
+[!code-csharp[](../../tests/NATS.Net.DocsExamples/SerializationPage.cs#my-data)]
 
 Then you can use the [`NatsJsonContextSerializer<T>`](xref:NATS.Client.Core.NatsJsonContextSerializer`1) to serialize and deserialize messages
 by providing the registry ([`NatsJsonContextSerializerRegistry`](xref:NATS.Client.Core.NatsJsonContextSerializerRegistry)) with the connection options:
 
-```csharp
-// Set the custom serializer registry as the default for the connection.
-var myRegistry = new NatsJsonContextSerializerRegistry(MyJsonContext.Default, OtherJsonContext.Default);
-
-var natsOpts = NatsOpts.Default with { SerializerRegistry = myRegistry };
-
-await using var nats = new NatsConnection(natsOpts);
-
-var subscriber = Task.Run(async () =>
-{
-    await foreach (var msg in nats.SubscribeAsync<MyData>("foo"))
-    {
-        // Outputs 'MyData { Id = 1, Name = bar }'
-        Console.WriteLine(msg.Data);
-        break;
-    }
-});
-
-// Give subscriber a chance to connect.
-await Task.Delay(1000);
-
-await nats.PublishAsync<MyData>(subject: "foo", data: new MyData { Id = 1, Name = "bar" });
-
-await subscriber;
-```
+[!code-csharp[](../../tests/NATS.Net.DocsExamples/SerializationPage.cs#my-data-usage)]
 
 You can also set the serializer for a specific subscription or publish call:
 
-```csharp
-await using var nats = new NatsConnection();
-
-var serializer = new NatsJsonContextSerializer<MyData>(MyJsonContext.Default);
-
-var subscriber = Task.Run(async () =>
-{
-    await foreach (var msg in nats.SubscribeAsync<MyData>("foo", serializer: serializer))
-    {
-        // Outputs 'MyData { Id = 1, Name = bar }'
-        Console.WriteLine(msg.Data);
-        break;
-    }
-});
-
-// Give subscriber a chance to connect.
-await Task.Delay(1000);
-
-await nats.PublishAsync<MyData>(subject: "foo", data: new MyData { Id = 1, Name = "bar" }, serializer: serializer);
-
-await subscriber;
-```
+[!code-csharp[](../../tests/NATS.Net.DocsExamples/SerializationPage.cs#my-data-publish)]
 
 ## Using Custom Serializer
 
@@ -193,65 +57,11 @@ support a custom serialization format or if you need to support multiple seriali
 
 Here is an example of a custom serializer that uses the Google ProtoBuf serializer to serialize and deserialize:
 
-```csharp
-public class MyProtoBufSerializer<T> : INatsSerializer<T>
-{
-    public static readonly INatsSerializer<T> Default = new MyProtoBufSerializer<T>();
-
-    public void Serialize(IBufferWriter<byte> bufferWriter, T value)
-    {
-        if (value is IMessage message)
-        {
-            message.WriteTo(bufferWriter);
-        }
-        else
-        {
-            throw new NatsException($"Can't serialize {typeof(T)}");
-        }
-    }
-
-    public T? Deserialize(in ReadOnlySequence<byte> buffer)
-    {
-        if (typeof(T) == typeof(Greeting))
-        {
-            return (T)(object)Greeting.Parser.ParseFrom(buffer);
-        }
-
-        throw new NatsException($"Can't deserialize {typeof(T)}");
-    }
-}
-
-public class MyProtoBufSerializerRegistry : INatsSerializerRegistry
-{
-    public INatsSerialize<T> GetSerializer<T>() => MyProtoBufSerializer<T>.Default;
-    public INatsDeserialize<T> GetDeserializer<T>() => MyProtoBufSerializer<T>.Default;
-}
-```
+[!code-csharp[](../../tests/NATS.Net.DocsExamples/SerializationPage.cs#custom-serializer)]
 
 You can then use the custom serializer as the default for the connection:
 
-```csharp
-var natsOpts = NatsOpts.Default with { SerializerRegistry = new MyProtoBufSerializerRegistry() };
-
-await using var nats = new NatsConnection(natsOpts);
-
-var subscriber = Task.Run(async () =>
-{
-    await foreach (var msg in nats.SubscribeAsync<Greeting>("foo"))
-    {
-        // Outputs '{ "id": 42, "name": "Marvin" }'
-        Console.WriteLine(msg.Data);
-        break;
-    }
-});
-
-// Give subscriber a chance to connect.
-await Task.Delay(1000);
-
-await nats.PublishAsync(subject: "foo", data: new Greeting { Id = 42, Name = "Marvin" });
-
-await subscriber;
-```
+[!code-csharp[](../../tests/NATS.Net.DocsExamples/SerializationPage.cs#custom)]
 
 ## Using Multiple Serializers (chaining)
 
@@ -265,45 +75,8 @@ interface since the next serializer would not be exposed to external users of th
 Here is an example of a serializer that uses the Google ProtoBuf serializer and the [`NatsJsonContextSerializer<T>`](xref:NATS.Client.Core.NatsJsonContextSerializer`1) to
 serialize and deserialize messages based on the type:
 
-```csharp
-public class MixedSerializerRegistry : INatsSerializerRegistry
-{
-    public INatsSerialize<T> GetSerializer<T>() => new NatsJsonContextSerializer<T>(MyJsonContext.Default, next: MyProtoBufSerializer<T>.Default);
-    public INatsDeserialize<T> GetDeserializer<T>() => new NatsJsonContextSerializer<T>(MyJsonContext.Default, next: MyProtoBufSerializer<T>.Default);
-}
-
-var natsOpts = NatsOpts.Default with { SerializerRegistry =  new MixedSerializerRegistry() };
-
-await using var nats = new NatsConnection(natsOpts);
-
-var subscriber1 = Task.Run(async () =>
-{
-    await foreach (var msg in nats.SubscribeAsync<Greeting>("greet"))
-    {
-        // Outputs '{ "id": 42, "name": "Marvin" }'
-        Console.WriteLine(msg.Data);
-        break;
-    }
-});
-
-var subscriber2 = Task.Run(async () =>
-{
-    await foreach (var msg in nats.SubscribeAsync<MyData>("data"))
-    {
-        // Outputs 'MyData { Id = 1, Name = bar }'
-        Console.WriteLine(msg.Data);
-        break;
-    }
-});
-
-// Give subscribers a chance to connect.
-await Task.Delay(1000);
-
-await nats.PublishAsync(subject: "greet", data: new Greeting { Id = 42, Name = "Marvin" });
-await nats.PublishAsync(subject: "data", data: new MyData { Id = 1, Name = "Bob" });
-
-await Task.WhenAll(subscriber1, subscriber2);
-```
+[!code-csharp[](../../tests/NATS.Net.DocsExamples/SerializationPage.cs#mixed)]
+[!code-csharp[](../../tests/NATS.Net.DocsExamples/SerializationPage.cs#chain)]
 
 ## Dealing with Binary Data and Buffers
 
@@ -313,54 +86,33 @@ The [`NatsMemoryOwner<T>`](xref:NATS.Client.Core.NatsMemoryOwner`1) and [`NatsBu
 are [`IMemoryOwner<byte>`](https://learn.microsoft.com/dotnet/api/system.buffers.imemoryowner-1) and [`IBufferWriter<T>`](https://learn.microsoft.com/dotnet/api/system.buffers.ibufferwriter-1) implementations that use the [`ArrayPool`](https://learn.microsoft.com/dotnet/api/system.buffers.arraypool-1)
 to allocate buffers. They can be used with the default serializer.
 
-```csharp
-using System.Text;
-using NATS.Client.Core;
-
-// Same as not specifying a serializer.
-var natsOpts = NatsOpts.Default with { SerializerRegistry = NatsDefaultSerializerRegistry.Default };
-
-await using var nats = new NatsConnection(natsOpts);
-
-var subscriber = Task.Run(async () =>
-{
-    // Default serializer knows how to deal with binary data types like NatsMemoryOwner<byte>.
-    await foreach (var msg in nats.SubscribeAsync<NatsMemoryOwner<byte>>("foo"))
-    {
-        // Check for the end of messages.
-        if (msg.Data.Length == 0)
-            break;
-
-        // Dispose the memory owner after using it so it can be returned to the pool.
-        using var memoryOwner = msg.Data;
-
-        // Outputs 'Hi'
-        Console.WriteLine(Encoding.ASCII.GetString(memoryOwner.Memory.Span));
-    }
-});
-
-// Give subscriber a chance to connect.
-await Task.Delay(1000);
-
-// Don't reuse NatsBufferWriter, it's disposed and returned to the pool
-// by the publisher after being written to network.
-var bw = new NatsBufferWriter<byte>();
-var memory = bw.GetMemory(2);
-memory.Span[0] = (byte)'H';
-memory.Span[1] = (byte)'i';
-bw.Advance(2);
-
-// Default serializer knows how to deal with binary data types like NatsBufferWriter<byte>.
-await nats.PublishAsync(subject: "foo", data: bw);
-
-// Signal the end of messages by sending an empty payload.
-await nats.PublishAsync(subject: "foo");
-
-await subscriber;
-```
+[!code-csharp[](../../tests/NATS.Net.DocsExamples/SerializationPage.cs#buffers)]
 
 Advantage of using [`NatsMemoryOwner<T>`](xref:NATS.Client.Core.NatsMemoryOwner`1) and [`NatsBufferWriter<T>`](xref:NATS.Client.Core.NatsBufferWriter`1) is that they can be used with the default serializer and
 they can be used to allocate buffers from the [`ArrayPool<T>`](https://learn.microsoft.com/dotnet/api/system.buffers.arraypool-1) which can be reused. This is useful if you need to allocate
 buffers for binary data and you want to avoid allocating buffers on for every operation (e.g. `new byte[]`) reducing
 garbage collection pressure. They may also be useful for example, if your subscription may receive messages with
 different formats and the only way to determine the format is by reading the message.
+
+## Using JSON Serialization with Reflection
+
+If you're not using [Native AOT deployments](https://learn.microsoft.com/dotnet/core/deploying/native-aot) you can use
+the [`NatsJsonSerializer<T>`](xref:NATS.Client.Serializers.Json.NatsJsonSerializer`1) to serialize and deserialize
+messages. [`NatsJsonSerializer<T>`](xref:NATS.Client.Serializers.Json.NatsJsonSerializer`1) uses [`System.Text.Json`](https://learn.microsoft.com/dotnet/api/system.text.json)
+APIs that can work with types that are not registered to generate serialization code.
+
+Using this serializer is most useful for use cases where you want to send and receive JSON messages and you don't want to
+worry about registering types. It's also useful for prototyping and testing. To use the serializer you need to install
+the [`NATS.Client.Serializers.Json`](https://www.nuget.org/packages/NATS.Client.Serializers.Json) Nuget package.
+
+```shell
+$ dotnet add package NATS.Client.Serializers.Json
+```
+
+Then set the serializer as the default for the connection:
+
+[!code-csharp[](../../tests/NATS.Net.DocsExamples/SerializationPage.cs#using-json)]
+[!code-csharp[](../../tests/NATS.Net.DocsExamples/SerializationPage.cs#json)]
+
+Now you can use any type without worrying about registering it. [`System.Text.Json`](https://learn.microsoft.com/dotnet/api/system.text.json)
+serializer will use reflection to serialize and deserialize the messages.

@@ -41,7 +41,6 @@ public class IntroPage
         {
         }
 
-
         #region js-connection
         await using var nats = new NatsConnection();
         var js = new NatsJSContext(nats);
@@ -92,5 +91,9 @@ public partial class OrderJsonSerializerContext : JsonSerializerContext
 {
 }
 
-public record Order(int OrderId);
+public record Order(int OrderId)
+{
+    public int OrderId { get; set; } = OrderId;
+}
+
 #endregion

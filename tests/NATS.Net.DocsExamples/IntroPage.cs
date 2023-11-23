@@ -69,14 +69,13 @@ public class IntroPage
         {
         }
 
-
         {
             #region jetstream
             await using var nats = new NatsConnection();
             var js = new NatsJSContext(nats);
 
             // Create a stream to store the messages
-            await js.CreateStreamAsync(new StreamConfig(name: "orders", subjects: new [] { "orders.*" }));
+            await js.CreateStreamAsync(new StreamConfig(name: "orders", subjects: new[] { "orders.*" }));
 
             for (var i = 0; i < 10; i++)
             {
