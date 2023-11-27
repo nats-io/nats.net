@@ -130,13 +130,11 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
             Timeout.Infinite,
             Timeout.Infinite);
 
-        // Keep user channel small to avoid blocking the user code
-        // when disposed otherwise channel reader will continue delivering messages
-        // if there are messages queued up already. This channel is used to pass messages
+        // This channel is used to pass messages
         // to the user from the subscription channel (which should be set to a
         // sufficiently large value to avoid blocking socket reads in the
         // NATS connection).
-        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg>>(1);
+        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg>>(1000);
         Msgs = _userMsgs.Reader;
 
         // Capacity as 1 is enough here since it's used for signaling only.

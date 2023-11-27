@@ -67,10 +67,11 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         _pendingMsgs = _maxMsgs;
         _pendingBytes = _maxBytes;
 
-        // Keep user channel small to avoid blocking the user code when disposed,
-        // otherwise channel reader will continue delivering messages even after
-        // this 'fetch' object being disposed.
-        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg>>(1);
+        // This channel is used to pass messages
+        // to the user from the subscription channel (which should be set to a
+        // sufficiently large value to avoid blocking socket reads in the
+        // NATS connection).
+        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg>>(1000);
         Msgs = _userMsgs.Reader;
 
         if (_debug)
