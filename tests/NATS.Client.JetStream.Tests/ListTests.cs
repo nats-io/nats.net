@@ -94,7 +94,7 @@ public class ListTests
 
         for (var i = 0; i < total; i++)
         {
-            await js.CreateConsumerAsync("s1", new ConsumerConfig($"c{i:D5}"), cts.Token);
+            await js.CreateOrUpdateConsumerAsync("s1", new ConsumerConfig($"c{i:D5}"), cts.Token);
         }
 
         // List names

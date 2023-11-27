@@ -356,7 +356,7 @@ internal class NatsJSOrderedPushConsumer<T>
             config.OptStartSeq = sequence + 1;
         }
 
-        await _context.CreateConsumerAsync(
+        await _context.CreateOrUpdateConsumerAsync(
             _stream,
             config,
             cancellationToken: _cancellationToken);

@@ -49,7 +49,7 @@ public class ConsumerPage
 
         await js.CreateStreamAsync(new StreamConfig(name: "orders", subjects: new[] { "orders.>" }));
 
-        var consumer = await js.CreateConsumerAsync(stream: "orders", new ConsumerConfig("order_processor"));
+        var consumer = await js.CreateOrUpdateConsumerAsync(stream: "orders", new ConsumerConfig("order_processor"));
 
         // Use generated JSON serializer
         var orderSerializer = new NatsJsonContextSerializer<Order>(OrderJsonSerializerContext.Default);

@@ -86,7 +86,7 @@ public class IntroPage
             }
 
             // Create a consumer to receive the messages
-            var consumer = await js.CreateConsumerAsync("orders", new ConsumerConfig("order_processor"));
+            var consumer = await js.CreateOrUpdateConsumerAsync("orders", new ConsumerConfig("order_processor"));
 
             await foreach (var jsMsg in consumer.ConsumeAsync<string>())
             {

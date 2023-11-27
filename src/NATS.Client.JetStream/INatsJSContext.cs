@@ -19,7 +19,7 @@ public interface INatsJSContext
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Creates new consumer if it doesn't exists or returns an existing one with the same name.
+    /// Creates new consumer if it doesn't exists or updates an existing one with the same name.
     /// </summary>
     /// <param name="stream">Name of the stream to create consumer under.</param>
     /// <param name="config">Consumer configuration.</param>
@@ -27,7 +27,7 @@ public interface INatsJSContext
     /// <returns>The NATS JetStream consumer object which can be used retrieving data from the stream.</returns>
     /// <exception cref="NatsJSException">Ack policy is set to <c>none</c> or there was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
-    ValueTask<INatsJSConsumer> CreateConsumerAsync(
+    ValueTask<INatsJSConsumer> CreateOrUpdateConsumerAsync(
         string stream,
         ConsumerConfig config,
         CancellationToken cancellationToken = default);

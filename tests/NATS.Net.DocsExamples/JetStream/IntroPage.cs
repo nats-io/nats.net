@@ -66,7 +66,7 @@ public class IntroPage
         #endregion
 
         #region js-consumer
-        var consumer = await js.CreateConsumerAsync(stream: "shop_orders", new ConsumerConfig("order_processor"));
+        var consumer = await js.CreateOrUpdateConsumerAsync(stream: "shop_orders", new ConsumerConfig("order_processor"));
         #endregion
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));

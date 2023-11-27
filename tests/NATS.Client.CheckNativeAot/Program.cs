@@ -77,7 +77,7 @@ async Task JetStreamTests()
         AssertEqual("events", stream.Info.Config.Name);
 
         // Create consumer
-        var consumer = await js.CreateConsumerAsync(
+        var consumer = await js.CreateOrUpdateConsumerAsync(
             "events",
             new ConsumerConfig
             {

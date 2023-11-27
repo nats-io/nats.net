@@ -24,7 +24,7 @@ public partial class NatsJSContext : INatsJSContext
     }
 
     /// <inheritdoc />>
-    public async ValueTask<INatsJSConsumer> CreateConsumerAsync(
+    public async ValueTask<INatsJSConsumer> CreateOrUpdateConsumerAsync(
         string stream,
         ConsumerConfig config,
         CancellationToken cancellationToken = default)
