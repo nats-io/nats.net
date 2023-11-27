@@ -1,4 +1,4 @@
-﻿using NATS.Client.Core.Tests;
+using NATS.Client.Core.Tests;
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -23,11 +23,12 @@ public class DoubleAckTest
 
         // fetch loop
         {
-            var consumer = (NatsJSConsumer) await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+            var consumer = (NatsJSConsumer)await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
 
             var fetchOpts = new NatsJSFetchOpts
             {
-                MaxMsgs = 100, Expires = TimeSpan.FromSeconds(5),
+                MaxMsgs = 100,
+                Expires = TimeSpan.FromSeconds(5),
             };
 
             var count = 0;
@@ -44,11 +45,12 @@ public class DoubleAckTest
 
         // consume loop
         {
-            var consumer = (NatsJSConsumer) await js.CreateConsumerAsync("s1", "c2", cancellationToken: cts.Token);
+            var consumer = (NatsJSConsumer)await js.CreateConsumerAsync("s1", "c2", cancellationToken: cts.Token);
 
             var opts = new NatsJSConsumeOpts
             {
-                MaxMsgs = 100, Expires = TimeSpan.FromSeconds(5),
+                MaxMsgs = 100,
+                Expires = TimeSpan.FromSeconds(5),
             };
 
             var count = 0;
@@ -62,6 +64,5 @@ public class DoubleAckTest
 
             Assert.Equal(100, count);
         }
-
     }
 }

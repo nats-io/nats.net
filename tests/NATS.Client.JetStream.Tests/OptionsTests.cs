@@ -1,4 +1,4 @@
-﻿namespace NATS.Client.JetStream.Tests;
+namespace NATS.Client.JetStream.Tests;
 
 public class OptionsTests
 {

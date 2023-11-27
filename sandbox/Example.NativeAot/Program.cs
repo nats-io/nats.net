@@ -179,7 +179,7 @@ using NATS.Client.JetStream.Models;
     await using var nats = new NatsConnection();
     var js = new NatsJSContext(nats);
 
-    var stream = await js.CreateStreamAsync(new StreamConfig("s1",  new[] { "s1.*" }));
+    var stream = await js.CreateStreamAsync(new StreamConfig("s1", new[] { "s1.*" }));
     Console.WriteLine(stream.Info.Config.Name);
 }
 

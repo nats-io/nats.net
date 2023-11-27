@@ -1,4 +1,4 @@
-﻿// ReSharper disable SuggestVarOrType_Elsewhere
+// ReSharper disable SuggestVarOrType_Elsewhere
 
 using System.Text.Json.Serialization;
 using NATS.Client.Core;

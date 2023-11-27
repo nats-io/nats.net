@@ -1,4 +1,4 @@
-﻿// ReSharper disable SuggestVarOrType_Elsewhere
+// ReSharper disable SuggestVarOrType_Elsewhere
 #pragma warning disable SA1123
 #pragma warning disable SA1124
 #pragma warning disable SA1509
