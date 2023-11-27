@@ -43,11 +43,15 @@ jobs:
 
       - if: ${{ fromJSON(steps.tag.outputs.create) }}
         name: Pack
-        run: dotnet pack -c Release -o dist
+        # https://learn.microsoft.com/en-us/nuget/create-packages/symbol-packages-snupkg
+        run: dotnet pack -c Release -o dist -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg
 
       - if: ${{ fromJSON(steps.tag.outputs.create) }}
         name: Push
-        run: dotnet nuget push dist/*.nupkg -s https://api.nuget.org/v3/index.json -k "${{ secrets.NUGET_API_KEY }}" --skip-duplicate
+        run: |
+          cd dist
+          # this should upload snupkgs in the same folder
+          dotnet nuget push *.nupkg -s https://api.nuget.org/v3/index.json -k "${{ secrets.NUGET_API_KEY }}" --skip-duplicate
 
       - if: ${{ fromJSON(steps.tag.outputs.create) }}
         run: dotnet tool update -g docfx
