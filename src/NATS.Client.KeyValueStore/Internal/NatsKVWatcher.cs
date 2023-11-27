@@ -376,7 +376,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
             config.OptStartSeq = sequence + 1;
         }
 
-        await _context.CreateConsumerAsync(
+        await _context.CreateOrUpdateConsumerAsync(
             _stream,
             config,
             cancellationToken: _cancellationToken);

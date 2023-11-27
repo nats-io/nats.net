@@ -48,7 +48,7 @@ public class ManagingPage
         {
             #region consumer-create
             // Create or get a consumer
-            var consumer = await js.CreateConsumerAsync(stream: "orders", new ConsumerConfig("order_processor"));
+            var consumer = await js.CreateOrUpdateConsumerAsync(stream: "orders", new ConsumerConfig("order_processor"));
             #endregion
         }
 

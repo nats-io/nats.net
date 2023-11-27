@@ -22,7 +22,7 @@ public class ManageConsumerTest
 
         // Create
         {
-            var consumer = await js.CreateConsumerAsync(
+            var consumer = await js.CreateOrUpdateConsumerAsync(
                 "s1",
                 new ConsumerConfig("c1"),
                 cts.Token);

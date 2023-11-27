@@ -20,7 +20,7 @@ public class ErrorHandlerTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         var stream = await js.CreateStreamAsync(new StreamConfig("s1", new[] { "s1.*" }), cts.Token);
-        var consumer = await stream.CreateConsumerAsync(new ConsumerConfig("c1"), cts.Token);
+        var consumer = await stream.CreateOrUpdateConsumerAsync(new ConsumerConfig("c1"), cts.Token);
 
         (await js.PublishAsync("s1.1", 1, cancellationToken: cts.Token)).EnsureSuccess();
 
@@ -58,7 +58,7 @@ public class ErrorHandlerTest
 
         // Create an empty stream to potentially reduce the chance of having a message.
         var stream2 = await js.CreateStreamAsync(new StreamConfig("s2", new[] { "s2.*" }), cts.Token);
-        var consumer2 = await stream2.CreateConsumerAsync(new ConsumerConfig("c2"), cts.Token);
+        var consumer2 = await stream2.CreateOrUpdateConsumerAsync(new ConsumerConfig("c2"), cts.Token);
 
         var next2 = await consumer2.NextAsync<int>(opts: opts, cancellationToken: cts.Token);
         Assert.Null(next2);
@@ -76,7 +76,7 @@ public class ErrorHandlerTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         var stream = await js.CreateStreamAsync(new StreamConfig("s1", new[] { "s1.*" }), cts.Token);
-        var consumer = await stream.CreateConsumerAsync(new ConsumerConfig("c1"), cts.Token);
+        var consumer = await stream.CreateOrUpdateConsumerAsync(new ConsumerConfig("c1"), cts.Token);
 
         (await js.PublishAsync("s1.1", 1, cancellationToken: cts.Token)).EnsureSuccess();
 
@@ -276,7 +276,7 @@ public class ErrorHandlerTest
 
         try
         {
-            var consumer = await stream.CreateConsumerAsync(new ConsumerConfig("c1"), cts.Token);
+            var consumer = await stream.CreateOrUpdateConsumerAsync(new ConsumerConfig("c1"), cts.Token);
             await foreach (var unused in consumer.ConsumeAsync<int>(opts: opts, cancellationToken: cts.Token))
             {
             }
