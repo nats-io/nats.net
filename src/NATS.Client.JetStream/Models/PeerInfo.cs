@@ -1,3 +1,5 @@
+using NATS.Client.JetStream.Internal;
+
 namespace NATS.Client.JetStream.Models;
 
 public record PeerInfo
@@ -22,7 +24,8 @@ public record PeerInfo
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("active")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
-    public double Active { get; set; } = default!;
+    [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonNanosecondsConverter))]
+    public TimeSpan Active { get; set; }
 
     /// <summary>
     /// Indicates the node is considered offline by the group

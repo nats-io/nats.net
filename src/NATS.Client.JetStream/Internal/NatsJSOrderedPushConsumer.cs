@@ -58,10 +58,8 @@ internal class NatsJSOrderedPushConsumer<T>
     private readonly Channel<string> _consumerCreateChannel;
     private readonly Timer _timer;
     private readonly int _hbTimeout;
-    private readonly long _idleHbNanos;
     private readonly Task _consumerCreateTask;
     private readonly Task _commandTask;
-    private readonly long _ackWaitNanos;
 
     private ulong _sequenceStream;
     private ulong _sequenceConsumer;
@@ -88,9 +86,7 @@ internal class NatsJSOrderedPushConsumer<T>
         _subOpts = subOpts;
         _cancellationToken = cancellationToken;
         _nats = context.Connection;
-        _ackWaitNanos = TimeSpan.FromHours(22).ToNanos();
         _hbTimeout = (int)(opts.IdleHeartbeat * 2).TotalMilliseconds;
-        _idleHbNanos = opts.IdleHeartbeat.ToNanos();
         _consumer = NewNuid();
 
         _nats.ConnectionDisconnected += OnDisconnected;
@@ -105,7 +101,7 @@ internal class NatsJSOrderedPushConsumer<T>
                     self._logger.LogDebug(
                         NatsJSLogEvents.IdleTimeout,
                         "Idle heartbeat timeout after {Timeout}ns",
-                        self._idleHbNanos);
+                        self._opts.IdleHeartbeat);
                 }
             },
             this,
@@ -343,8 +339,8 @@ internal class NatsJSOrderedPushConsumer<T>
             DeliverSubject = _sub.Subject,
             FilterSubject = _filter,
             FlowControl = true,
-            IdleHeartbeat = _idleHbNanos,
-            AckWait = _ackWaitNanos,
+            IdleHeartbeat = _opts.IdleHeartbeat,
+            AckWait = TimeSpan.FromHours(22),
             MaxDeliver = 1,
             MemStorage = true,
             NumReplicas = 1,

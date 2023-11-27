@@ -152,7 +152,7 @@ public partial class NatsJSContext : INatsJSContext
                 DeliverPolicy = opts.DeliverPolicy,
                 AckPolicy = ConsumerConfigAckPolicy.None,
                 ReplayPolicy = opts.ReplayPolicy,
-                InactiveThreshold = opts.InactiveThreshold.ToNanos(),
+                InactiveThreshold = opts.InactiveThreshold,
                 NumReplicas = 1,
                 MemStorage = true,
             },

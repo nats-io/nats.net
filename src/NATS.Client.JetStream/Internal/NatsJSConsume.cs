@@ -31,8 +31,8 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
     private readonly NatsJSNotificationChannel? _notificationChannel;
 
     private readonly long _maxMsgs;
-    private readonly long _expires;
-    private readonly long _idle;
+    private readonly TimeSpan _expires;
+    private readonly TimeSpan _idle;
     private readonly long _hbTimeout;
     private readonly long _thresholdMsgs;
     private readonly long _maxBytes;
@@ -78,8 +78,8 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         _thresholdMsgs = thresholdMsgs;
         _maxBytes = maxBytes;
         _thresholdBytes = thresholdBytes;
-        _expires = expires.ToNanos();
-        _idle = idle.ToNanos();
+        _expires = expires;
+        _idle = idle;
         _hbTimeout = (int)(idle * 2).TotalMilliseconds;
 
         if (_debug)

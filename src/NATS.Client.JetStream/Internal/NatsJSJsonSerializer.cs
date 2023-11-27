@@ -318,3 +318,21 @@ internal class NatsJSJsonStringEnumConverter<TEnum> : JsonConverter<TEnum>
     }
 }
 #endif
+
+internal class NatsJSJsonNanosecondsConverter : JsonConverter<TimeSpan>
+{
+    public override TimeSpan Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType != JsonTokenType.Number)
+        {
+            throw new InvalidOperationException("Expected number");
+        }
+
+        var value = reader.GetInt64();
+
+        return TimeSpan.FromMilliseconds(value / 1_000_000.0);
+    }
+
+    public override void Write(Utf8JsonWriter writer, TimeSpan value, JsonSerializerOptions options) =>
+        writer.WriteNumberValue((long)(value.TotalMilliseconds * 1_000_000L));
+}

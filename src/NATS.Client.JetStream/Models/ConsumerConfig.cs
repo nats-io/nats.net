@@ -76,8 +76,8 @@ public record ConsumerConfig
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("ack_wait")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
-    public long AckWait { get; set; } = default!;
+    [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonNanosecondsConverter))]
+    public TimeSpan AckWait { get; set; }
 
     /// <summary>
     /// The number of times a message will be redelivered to consumers if not acknowledged in time
@@ -134,8 +134,8 @@ public record ConsumerConfig
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("idle_heartbeat")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
-    public long IdleHeartbeat { get; set; } = default!;
+    [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonNanosecondsConverter))]
+    public TimeSpan IdleHeartbeat { get; set; }
 
     /// <summary>
     /// For push consumers this will regularly send an empty mess with Status header 100 and a reply subject, consumers must reply to these messages to control the rate of message delivery
@@ -178,8 +178,8 @@ public record ConsumerConfig
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("max_expires")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
-    public long MaxExpires { get; set; } = default!;
+    [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonNanosecondsConverter))]
+    public TimeSpan MaxExpires { get; set; }
 
     /// <summary>
     /// The maximum bytes value that maybe set when dong a pull on a Pull Consumer
@@ -194,8 +194,8 @@ public record ConsumerConfig
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("inactive_threshold")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
-    public long InactiveThreshold { get; set; } = default!;
+    [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonNanosecondsConverter))]
+    public TimeSpan InactiveThreshold { get; set; }
 
     /// <summary>
     /// List of durations in Go format that represents a retry time scale for NaK'd messages

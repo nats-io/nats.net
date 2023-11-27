@@ -336,8 +336,8 @@ public class NatsJSConsumer : INatsJSConsumer
             {
                 Batch = max.MaxMsgs,
                 MaxBytes = max.MaxBytes,
-                IdleHeartbeat = timeouts.IdleHeartbeat.ToNanos(),
-                Expires = timeouts.Expires.ToNanos(),
+                IdleHeartbeat = timeouts.IdleHeartbeat,
+                Expires = timeouts.Expires,
             },
             cancellationToken).ConfigureAwait(false);
 
@@ -383,8 +383,8 @@ public class NatsJSConsumer : INatsJSConsumer
             {
                 Batch = max.MaxMsgs,
                 MaxBytes = max.MaxBytes,
-                IdleHeartbeat = timeouts.IdleHeartbeat.ToNanos(),
-                Expires = timeouts.Expires.ToNanos(),
+                IdleHeartbeat = timeouts.IdleHeartbeat,
+                Expires = timeouts.Expires,
             },
             cancellationToken).ConfigureAwait(false);
 
@@ -437,8 +437,8 @@ public class NatsJSConsumer : INatsJSConsumer
                 {
                     Batch = max.MaxMsgs,
                     MaxBytes = max.MaxBytes,
-                    IdleHeartbeat = timeouts.IdleHeartbeat.ToNanos(),
-                    Expires = timeouts.Expires.ToNanos(),
+                    IdleHeartbeat = timeouts.IdleHeartbeat,
+                    Expires = timeouts.Expires,
                     NoWait = opts.NoWait,
                 },
             cancellationToken).ConfigureAwait(false);

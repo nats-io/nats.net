@@ -92,7 +92,7 @@ public class NatsKVContext : INatsKVContext
             Subjects = subjects,
             MaxMsgsPerSubject = history,
             MaxBytes = config.MaxBytes,
-            MaxAge = config.MaxAge.ToNanos(),
+            MaxAge = config.MaxAge,
             MaxMsgSize = config.MaxValueSize,
             Compression = config.Compression ? StreamConfigCompression.S2 : StreamConfigCompression.None,
             Storage = storage,
@@ -108,7 +108,7 @@ public class NatsKVContext : INatsKVContext
             // MirrorDirect =
             // Mirror =
             Retention = StreamConfigRetention.Limits, // from ADR-8
-            DuplicateWindow = 120000000000, // from ADR-8
+            DuplicateWindow = TimeSpan.FromMinutes(2), // 120_000_000_000ns, from ADR-8
         };
 
         var stream = await _context.CreateStreamAsync(streamConfig, cancellationToken);

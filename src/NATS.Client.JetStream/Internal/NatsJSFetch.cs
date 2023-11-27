@@ -23,8 +23,8 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
 
     private readonly long _maxMsgs;
     private readonly long _maxBytes;
-    private readonly long _expires;
-    private readonly long _idle;
+    private readonly TimeSpan _expires;
+    private readonly TimeSpan _idle;
     private readonly long _hbTimeout;
 
     private long _pendingMsgs;
@@ -61,8 +61,8 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
 
         _maxMsgs = maxMsgs;
         _maxBytes = maxBytes;
-        _expires = expires.ToNanos();
-        _idle = idle.ToNanos();
+        _expires = expires;
+        _idle = idle;
         _hbTimeout = (int)(idle * 2).TotalMilliseconds;
         _pendingMsgs = _maxMsgs;
         _pendingBytes = _maxBytes;
