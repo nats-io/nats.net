@@ -76,7 +76,7 @@ public class NatsJSStream : INatsJSStream
     /// <exception cref="NatsJSException">There is an error retrieving the response or this consumer object isn't valid anymore because it was deleted earlier.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     public async ValueTask UpdateAsync(
-        StreamUpdateRequest request,
+        StreamConfig request,
         CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();

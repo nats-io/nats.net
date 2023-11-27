@@ -190,7 +190,7 @@ public interface INatsJSContext
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     ValueTask<NatsJSStream> UpdateStreamAsync(
-        StreamUpdateRequest request,
+        StreamConfig request,
         CancellationToken cancellationToken = default);
 
     /// <summary>
