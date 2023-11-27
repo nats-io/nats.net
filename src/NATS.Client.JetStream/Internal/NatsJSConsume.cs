@@ -86,17 +86,14 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         {
             _logger.LogDebug(
                 NatsJSLogEvents.Config,
-                "Consume setup {@Config}",
-                new
-                {
-                    maxMsgs,
-                    thresholdMsgs,
-                    maxBytes,
-                    thresholdBytes,
-                    expires,
-                    idle,
-                    _hbTimeout,
-                });
+                "Consume setup maxMsgs:{MaxMsgs}, thresholdMsgs:{ThresholdMsgs}, maxBytes:{MaxBytes}, thresholdBytes:{ThresholdBytes}, expires:{Expires}, idle:{Idle}, hbTimeout:{HbTimeout}",
+                maxMsgs,
+                thresholdMsgs,
+                maxBytes,
+                thresholdBytes,
+                expires,
+                idle,
+                _hbTimeout);
         }
 
         _timer = new Timer(

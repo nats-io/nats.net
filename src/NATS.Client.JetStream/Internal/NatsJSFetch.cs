@@ -78,15 +78,12 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         {
             _logger.LogDebug(
                 NatsJSLogEvents.Config,
-                "Fetch setup {@Config}",
-                new
-                {
-                    maxMsgs,
-                    maxBytes,
-                    expires,
-                    idle,
-                    _hbTimeout,
-                });
+                "Fetch setup maxMsgs:{MaxMsgs} maxBytes:{MaxBytes} expires:{Expires} idle:{Idle} hbTimeout:{HbTimeout}",
+                maxMsgs,
+                maxBytes,
+                expires,
+                idle,
+                _hbTimeout);
         }
 
         _hbTimer = new Timer(
