@@ -48,7 +48,7 @@ public class NatsObjContext : INatsObjContext
             Name = $"OBJ_{config.Bucket}",
             Description = config.Description!,
             Subjects = new[] { $"$O.{config.Bucket}.C.>", $"$O.{config.Bucket}.M.>" },
-            MaxAge = config.MaxAge?.ToNanos() ?? 0,
+            MaxAge = config.MaxAge ?? TimeSpan.Zero,
             MaxBytes = config.MaxBytes ?? -1,
             Storage = storage,
             NumReplicas = config.NumberOfReplicas,

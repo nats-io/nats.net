@@ -53,7 +53,7 @@ public class KeyValueStoreTest
             NumReplicas = 1,
             MaxMsgsPerSubject = 10,
             Retention = StreamConfigRetention.Limits,
-            DuplicateWindow = 120000000000,
+            DuplicateWindow = TimeSpan.FromMinutes(2), // 120_000_000_000ns
         });
 
         var store = await kv.GetStoreAsync("b1");

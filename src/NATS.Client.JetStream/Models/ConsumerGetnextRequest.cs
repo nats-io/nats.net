@@ -1,3 +1,5 @@
+using NATS.Client.JetStream.Internal;
+
 namespace NATS.Client.JetStream.Models;
 
 /// <summary>
@@ -11,8 +13,8 @@ public record ConsumerGetnextRequest
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("expires")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
-    public long Expires { get; set; } = default!;
+    [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonNanosecondsConverter))]
+    public TimeSpan Expires { get; set; }
 
     /// <summary>
     /// How many messages the server should deliver to the requestor
@@ -42,6 +44,6 @@ public record ConsumerGetnextRequest
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("idle_heartbeat")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
-    public long IdleHeartbeat { get; set; } = default!;
+    [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonNanosecondsConverter))]
+    public TimeSpan IdleHeartbeat { get; set; }
 }

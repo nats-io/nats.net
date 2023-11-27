@@ -93,8 +93,8 @@ public record StreamConfig
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("max_age")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
-    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
-    public long MaxAge { get; set; } = default!;
+    [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonNanosecondsConverter))]
+    public TimeSpan MaxAge { get; set; }
 
     /// <summary>
     /// The largest message that will be accepted by the Stream. -1 for unlimited.
@@ -162,8 +162,8 @@ public record StreamConfig
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("duplicate_window")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
-    public long DuplicateWindow { get; set; } = default!;
+    [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonNanosecondsConverter))]
+    public TimeSpan DuplicateWindow { get; set; }
 
     /// <summary>
     /// Placement directives to consider when placing replicas of this stream, random placement when unset

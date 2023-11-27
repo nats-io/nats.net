@@ -1,3 +1,5 @@
+using NATS.Client.JetStream.Internal;
+
 namespace NATS.Client.JetStream.Models;
 
 /// <summary>
@@ -41,8 +43,8 @@ public record StreamSourceInfo
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("active")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
-    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
-    public long Active { get; set; } = default!;
+    [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonNanosecondsConverter))]
+    public TimeSpan Active { get; set; }
 
     [System.Text.Json.Serialization.JsonPropertyName("external")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
