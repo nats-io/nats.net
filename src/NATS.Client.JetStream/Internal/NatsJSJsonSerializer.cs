@@ -96,7 +96,6 @@ internal static class NatsJSJsonSerializer<T>
 [JsonSerializable(typeof(StreamTemplateInfoResponse))]
 [JsonSerializable(typeof(StreamTemplateNamesRequest))]
 [JsonSerializable(typeof(StreamTemplateNamesResponse))]
-[JsonSerializable(typeof(StreamUpdateRequest))]
 [JsonSerializable(typeof(StreamUpdateResponse))]
 [JsonSerializable(typeof(SubjectTransform))]
 [JsonSerializable(typeof(Tier))]

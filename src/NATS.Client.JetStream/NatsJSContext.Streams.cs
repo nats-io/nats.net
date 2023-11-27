@@ -115,10 +115,10 @@ public partial class NatsJSContext
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     public async ValueTask<NatsJSStream> UpdateStreamAsync(
-        StreamUpdateRequest request,
+        StreamConfig request,
         CancellationToken cancellationToken = default)
     {
-        var response = await JSRequestResponseAsync<StreamUpdateRequest, StreamUpdateResponse>(
+        var response = await JSRequestResponseAsync<StreamConfig, StreamUpdateResponse>(
             subject: $"{Opts.Prefix}.STREAM.UPDATE.{request.Name}",
             request: request,
             cancellationToken);
