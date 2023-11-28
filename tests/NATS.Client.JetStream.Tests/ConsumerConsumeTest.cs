@@ -258,13 +258,12 @@ public class ConsumerConsumeTest
         var signal2 = new WaitSignal();
         var reader = Task.Run(async () =>
         {
-            var count = 0;
             await foreach (var msg in cc.Msgs.ReadAllAsync(cts.Token))
             {
                 await msg.AckAsync(cancellationToken: cts.Token);
                 signal1.Pulse();
                 await signal2;
-_output.WriteLine($">>>>>>>> {count++}");
+
                 // dispose will end the loop
             }
         });
