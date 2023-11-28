@@ -54,6 +54,32 @@ public abstract partial class NatsConnectionTest
     }
 
     [Fact]
+    public async Task PubSubNoRespondersTest()
+    {
+        await using var server = NatsServer.StartWithTrace(_output);
+
+        // For no_responders to work we need to the publisher and subscriber to be using the same connection
+        await using var subConnection = server.CreateClientConnection(NatsOpts.Default with { NoResponders = true });
+
+        var signalComplete = new WaitSignal();
+        var replyToAddress = subConnection.NewInbox();
+        var code = 0;
+        var sub = await subConnection.SubscribeCoreAsync<int>(replyToAddress);
+        var register = sub.Register(x =>
+        {
+            if (x.Headers is not null)
+            {
+                code = x.Headers.Code;
+                signalComplete.Pulse();
+            }
+        });
+        await subConnection.PingAsync(); // wait for subscribe complete
+        await subConnection.PublishAsync(Guid.NewGuid().ToString(), 1, replyTo: replyToAddress);
+        await signalComplete;
+        Assert.Equal(503, code);
+    }
+
+    [Fact]
     public async Task EncodingTest()
     {
         await using var server = NatsServer.Start(_output, _transportType);

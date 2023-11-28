@@ -21,6 +21,7 @@ internal sealed class ClientOpts
         Password = opts.AuthOpts.Password;
         AuthToken = opts.AuthOpts.Token;
         JWT = opts.AuthOpts.Jwt;
+        NoResponders = opts.NoResponders;
     }
 
     /// <summary>Optional boolean. If set to true, the server (version 1.2.0+) will not send originating messages from this connection to its own subscriptions. Clients should set this to true only for server supporting this feature, which is when proto in the INFO protocol is set to at least 1.</summary>

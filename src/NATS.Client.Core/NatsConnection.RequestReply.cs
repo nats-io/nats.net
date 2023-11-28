@@ -32,6 +32,11 @@ public partial class NatsConnection
         {
             if (sub.Msgs.TryRead(out var msg))
             {
+                if (msg.Headers?.Code == 503)
+                {
+                    throw new NatsNoRespondersException();
+                }
+
                 return msg;
             }
         }
