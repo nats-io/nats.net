@@ -142,12 +142,10 @@ public record NatsJSNextOpts
 /// </summary>
 public record NatsJSFetchOpts
 {
-    public NatsJSFetchOpts(int? maxMsgs) => MaxMsgs = maxMsgs;
-
     /// <summary>
     /// Maximum number of messages to return
     /// </summary>
-    public int? MaxMsgs { get; }
+    public int? MaxMsgs { get; init;  }
 
     /// <summary>
     /// Amount of time to wait for the request to expire

@@ -44,8 +44,9 @@ var consumeOpts = new NatsJSConsumeOpts
     IdleHeartbeat = idle,
 };
 
-var fetchOpts = new NatsJSFetchOpts(maxMsgs)
+var fetchOpts = new NatsJSFetchOpts
 {
+    MaxMsgs = maxMsgs,
     MaxBytes = maxBytes,
     Expires = expires,
     IdleHeartbeat = idle,
@@ -75,7 +76,7 @@ try
                 Console.WriteLine($"___\nFETCH-NO-WAIT {max}");
                 await consumer.RefreshAsync(cts.Token);
 
-                var fetchNoWaitOpts = new NatsJSFetchOpts(max);
+                var fetchNoWaitOpts = new NatsJSFetchOpts { MaxMsgs = max };
                 var fetchMsgCount = 0;
 
                 // NoWaitFetch is a specialized operation not available on the public interface.

@@ -146,8 +146,9 @@ public class ErrorHandlerTest
         (await js.PublishAsync("s1.1", 1, cancellationToken: cts.Token)).EnsureSuccess();
 
         var timeoutNotifications = 0;
-        var opts = new NatsJSFetchOpts(10)
+        var opts = new NatsJSFetchOpts
         {
+            MaxMsgs = 10,
             NotificationHandler = (e, _) =>
             {
                 if (e is NatsJSTimeoutNotification)

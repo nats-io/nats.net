@@ -141,8 +141,9 @@ public class NatsJSConsumer : INatsJSConsumer
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
         await using var f = await FetchInternalAsync<T>(
-            new NatsJSFetchOpts(1)
+            new NatsJSFetchOpts
             {
+                MaxMsgs = 1,
                 IdleHeartbeat = opts.IdleHeartbeat,
                 Expires = opts.Expires,
                 NotificationHandler = opts.NotificationHandler,
@@ -160,13 +161,6 @@ public class NatsJSConsumer : INatsJSConsumer
 
         return null;
     }
-
-    /// <inheritdoc />
-    public IAsyncEnumerable<NatsJSMsg<T>> FetchAsync<T>(
-        int maxMsgs,
-        INatsDeserialize<T>? serializer = default,
-        CancellationToken cancellationToken = default) =>
-        FetchAsync(new NatsJSFetchOpts(maxMsgs), serializer, cancellationToken);
 
     /// <inheritdoc />
     public async IAsyncEnumerable<NatsJSMsg<T>> FetchAsync<T>(

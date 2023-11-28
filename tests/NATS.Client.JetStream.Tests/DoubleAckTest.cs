@@ -25,8 +25,9 @@ public class DoubleAckTest
         {
             var consumer = (NatsJSConsumer)await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
 
-            var fetchOpts = new NatsJSFetchOpts(100)
+            var fetchOpts = new NatsJSFetchOpts
             {
+                MaxMsgs = 100,
                 Expires = TimeSpan.FromSeconds(5),
             };
 

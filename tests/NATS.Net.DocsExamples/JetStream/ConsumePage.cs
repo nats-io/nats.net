@@ -74,7 +74,7 @@ public class ConsumerPage
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
             var cancellationToken = cts.Token;
             #region consumer-fetch
-            await foreach (var msg in consumer.FetchAsync<Order>(1000, serializer: orderSerializer).WithCancellation(cancellationToken))
+            await foreach (var msg in consumer.FetchAsync<Order>(new NatsJSFetchOpts { MaxMsgs = 1000 }, serializer: orderSerializer).WithCancellation(cancellationToken))
             {
                 // Process message
                 await msg.AckAsync();

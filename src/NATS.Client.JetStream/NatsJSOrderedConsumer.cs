@@ -188,20 +188,6 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
     /// <summary>
     /// Fetch messages from the stream in order.
     /// </summary>
-    /// <param name="maxMsgs">Maximum number of messages to return.</param>
-    /// <param name="serializer">Serializer to use for the message type.</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel fetch operation.</param>
-    /// <typeparam name="T">Serialized message data type.</typeparam>
-    /// <returns>Asynchronous enumeration which can be used in a <c>await foreach</c> loop.</returns>
-    public IAsyncEnumerable<NatsJSMsg<T>> FetchAsync<T>(
-        int maxMsgs,
-        INatsDeserialize<T>? serializer = default,
-        CancellationToken cancellationToken = default) =>
-        FetchAsync(new NatsJSFetchOpts(maxMsgs), serializer, cancellationToken);
-
-    /// <summary>
-    /// Fetch messages from the stream in order.
-    /// </summary>
     /// <param name="opts">Fetch options.</param>
     /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel fetch operation.</param>
@@ -244,8 +230,9 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
     {
         opts ??= _context.Opts.DefaultNextOpts;
 
-        var fetchOpts = new NatsJSFetchOpts(1)
+        var fetchOpts = new NatsJSFetchOpts
         {
+            MaxMsgs = 1,
             IdleHeartbeat = opts.IdleHeartbeat,
             Expires = opts.Expires,
             NotificationHandler = opts.NotificationHandler,
