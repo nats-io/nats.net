@@ -70,10 +70,10 @@ public class ConsumerFetchTest
     [Fact]
     public async Task Fetch_dispose_test()
     {
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         await using var server = NatsServer.StartJS();
-
         await using var nats = server.CreateClientConnection();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         var js = new NatsJSContext(nats);
         var stream = await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
@@ -113,6 +113,14 @@ public class ConsumerFetchTest
         await fc.DisposeAsync();
 
         // At this point we should only have ACKed one message
+        await Retry.Until(
+            "ack pending 9",
+            async () =>
+            {
+                var c = await js.GetConsumerAsync("s1", "c1", cts.Token);
+                return c.Info.NumAckPending == 9;
+            },
+            timeout: TimeSpan.FromSeconds(20));
         await consumer.RefreshAsync(cts.Token);
         Assert.Equal(9, consumer.Info.NumAckPending);
 
@@ -120,6 +128,14 @@ public class ConsumerFetchTest
 
         await reader;
 
+        await Retry.Until(
+            "ack pending 0",
+            async () =>
+            {
+                var c = await js.GetConsumerAsync("s1", "c1", cts.Token);
+                return c.Info.NumAckPending == 0;
+            },
+            timeout: TimeSpan.FromSeconds(20));
         await consumer.RefreshAsync(cts.Token);
         Assert.Equal(0, consumer.Info.NumAckPending);
     }

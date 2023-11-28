@@ -230,10 +230,10 @@ public class ConsumerConsumeTest
     [Fact]
     public async Task Consume_dispose_test()
     {
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         await using var server = NatsServer.StartJS();
-
         await using var nats = server.CreateClientConnection();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         var js = new NatsJSContext(nats);
         var stream = await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
@@ -241,7 +241,7 @@ public class ConsumerConsumeTest
 
         var consumerOpts = new NatsJSConsumeOpts
         {
-            MaxMsgs = 10,
+            MaxMsgs = 100,
             IdleHeartbeat = TimeSpan.FromSeconds(5),
             Expires = TimeSpan.FromSeconds(10),
         };
@@ -264,7 +264,7 @@ public class ConsumerConsumeTest
                 await msg.AckAsync(cancellationToken: cts.Token);
                 signal1.Pulse();
                 await signal2;
-
+_output.WriteLine($">>>>>>>> {count++}");
                 // dispose will end the loop
             }
         });
@@ -276,6 +276,14 @@ public class ConsumerConsumeTest
         await cc.DisposeAsync();
 
         // At this point we should only have ACKed one message
+        await Retry.Until(
+            "ack pending 9",
+            async () =>
+            {
+                var c = await js.GetConsumerAsync("s1", "c1", cts.Token);
+                return c.Info.NumAckPending == 9;
+            },
+            timeout: TimeSpan.FromSeconds(20));
         await consumer.RefreshAsync(cts.Token);
         Assert.Equal(9, consumer.Info.NumAckPending);
 
@@ -283,6 +291,14 @@ public class ConsumerConsumeTest
 
         await reader;
 
+        await Retry.Until(
+            "ack pending 0",
+            async () =>
+            {
+                var c = await js.GetConsumerAsync("s1", "c1", cts.Token);
+                return c.Info.NumAckPending == 0;
+            },
+            timeout: TimeSpan.FromSeconds(20));
         await consumer.RefreshAsync(cts.Token);
         Assert.Equal(0, consumer.Info.NumAckPending);
     }
@@ -290,10 +306,10 @@ public class ConsumerConsumeTest
     [Fact]
     public async Task Consume_stop_test()
     {
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         await using var server = NatsServer.StartJS();
-
         await using var nats = server.CreateClientConnection();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         var js = new NatsJSContext(nats);
         var stream = await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
@@ -301,12 +317,12 @@ public class ConsumerConsumeTest
 
         var consumerOpts = new NatsJSConsumeOpts
         {
-            MaxMsgs = 10,
+            MaxMsgs = 100,
             IdleHeartbeat = TimeSpan.FromSeconds(2),
             Expires = TimeSpan.FromSeconds(4),
         };
 
-        for (var i = 0; i < 100; i++)
+        for (var i = 0; i < 10; i++)
         {
             var ack = await js.PublishAsync("s1.foo", new TestData { Test = i }, serializer: TestDataJsonSerializer<TestData>.Default, cancellationToken: cts.Token);
             ack.EnsureSuccess();
@@ -315,29 +331,51 @@ public class ConsumerConsumeTest
         var consumeStop = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
         var cc = await consumer.ConsumeInternalAsync<TestData>(serializer: TestDataJsonSerializer<TestData>.Default, consumerOpts, cancellationToken: consumeStop.Token);
 
-        var signal = new WaitSignal();
+        var signal1 = new WaitSignal();
+        var signal2 = new WaitSignal();
         var reader = Task.Run(async () =>
         {
             await foreach (var msg in cc.Msgs.ReadAllAsync(cts.Token))
             {
                 await msg.AckAsync(cancellationToken: cts.Token);
-                signal.Pulse();
+                signal1.Pulse();
+                await signal2;
+
+                // dispose will end the loop
             }
         });
 
-        await signal;
+        await signal1;
+
+        // After cancelled consume waits for all the pending messages to be delivered to the loop
+        // since the channel reader carries on reading the messages in its internal queue.
         consumeStop.Cancel();
+
+        // At this point we should only have ACKed one message
+        await Retry.Until(
+            "ack pending 9",
+            async () =>
+            {
+                var c = await js.GetConsumerAsync("s1", "c1", cts.Token);
+                return c.Info.NumAckPending == 9;
+            },
+            timeout: TimeSpan.FromSeconds(20));
+        await consumer.RefreshAsync(cts.Token);
+        Assert.Equal(9, consumer.Info.NumAckPending);
+
+        signal2.Pulse();
 
         await reader;
 
-        var infos = new List<INatsJSConsumer>();
-        await foreach (var natsJSConsumer in stream.ListConsumersAsync(cts.Token))
-        {
-            infos.Add(natsJSConsumer);
-        }
-
-        Assert.Single(infos);
-
-        Assert.True(infos[0].Info.NumAckPending == 0);
+        await Retry.Until(
+            "ack pending 0",
+            async () =>
+            {
+                var c = await js.GetConsumerAsync("s1", "c1", cts.Token);
+                return c.Info.NumAckPending == 0;
+            },
+            timeout: TimeSpan.FromSeconds(20));
+        await consumer.RefreshAsync(cts.Token);
+        Assert.Equal(0, consumer.Info.NumAckPending);
     }
 }
