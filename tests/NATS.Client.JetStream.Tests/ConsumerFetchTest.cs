@@ -94,32 +94,33 @@ public class ConsumerFetchTest
 
         var fc = await consumer.FetchInternalAsync<TestData>(serializer: TestDataJsonSerializer<TestData>.Default, fetchOpts, cancellationToken: cts.Token);
 
-        var signal = new WaitSignal();
+        var signal1 = new WaitSignal();
+        var signal2 = new WaitSignal();
         var reader = Task.Run(async () =>
         {
             await foreach (var msg in fc.Msgs.ReadAllAsync(cts.Token))
             {
                 await msg.AckAsync(cancellationToken: cts.Token);
-                signal.Pulse();
-
-                // Introduce delay to make sure not all messages will be acked.
-                await Task.Delay(1_000, cts.Token);
+                signal1.Pulse();
+                await signal2;
             }
         });
 
-        await signal;
+        await signal1;
+
+        // Dispose waits for all the pending messages to be delivered to the loop
+        // since the channel reader carries on reading the messages in its internal queue.
         await fc.DisposeAsync();
+
+        // At this point we should only have ACKed one message
+        await consumer.RefreshAsync(cts.Token);
+        Assert.Equal(9, consumer.Info.NumAckPending);
+
+        signal2.Pulse();
 
         await reader;
 
-        var infos = new List<INatsJSConsumer>();
-        await foreach (var natsJSConsumer in stream.ListConsumersAsync(cts.Token))
-        {
-            infos.Add(natsJSConsumer);
-        }
-
-        Assert.Single(infos);
-
-        Assert.True(infos[0].Info.NumAckPending > 0);
+        await consumer.RefreshAsync(cts.Token);
+        Assert.Equal(0, consumer.Info.NumAckPending);
     }
 }

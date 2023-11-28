@@ -139,7 +139,12 @@ public readonly struct NatsJSMsg<T>
 
         if ((opts.DoubleAck ?? _context.Opts.AckOpts.DoubleAck) == true)
         {
-            await Connection.RequestAsync<ReadOnlySequence<byte>, object?>(ReplyTo, payload, cancellationToken: cancellationToken);
+            await Connection.RequestAsync<ReadOnlySequence<byte>, object?>(
+                subject: ReplyTo,
+                data: payload,
+                requestSerializer: NatsRawSerializer<ReadOnlySequence<byte>>.Default,
+                replySerializer: NatsRawSerializer<object?>.Default,
+                cancellationToken: cancellationToken);
         }
         else
         {
@@ -149,6 +154,7 @@ public readonly struct NatsJSMsg<T>
                 {
                     WaitUntilSent = opts.WaitUntilSent ?? _context.Opts.AckOpts.WaitUntilSent,
                 },
+                serializer: NatsRawSerializer<ReadOnlySequence<byte>>.Default,
                 cancellationToken: cancellationToken);
         }
     }
