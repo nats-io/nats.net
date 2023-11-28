@@ -1,4 +1,4 @@
-using NATS.Client.Core.Tests;
+﻿using NATS.Client.Core.Tests;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Tests;
@@ -146,9 +146,8 @@ public class ErrorHandlerTest
         (await js.PublishAsync("s1.1", 1, cancellationToken: cts.Token)).EnsureSuccess();
 
         var timeoutNotifications = 0;
-        var opts = new NatsJSFetchOpts
+        var opts = new NatsJSFetchOpts(10)
         {
-            MaxMsgs = 10,
             NotificationHandler = (e, _) =>
             {
                 if (e is NatsJSTimeoutNotification)

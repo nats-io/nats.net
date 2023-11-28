@@ -103,9 +103,8 @@ public class OrderedConsumerTest
         for (var i = 0; i < 10;)
         {
             _output.WriteLine("Fetching...");
-            var fetchOpts = new NatsJSFetchOpts
+            var fetchOpts = new NatsJSFetchOpts(3)
             {
-                MaxMsgs = 3,
                 Expires = TimeSpan.FromSeconds(3),
             };
             await foreach (var msg in consumer.FetchAsync<int>(opts: fetchOpts, cancellationToken: cts.Token))
