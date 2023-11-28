@@ -150,6 +150,13 @@ public abstract partial class NatsConnectionTest
                 return;
             }
 
+            // Trigger a timeout
+            if (m.Data == 11)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(6));
+                return;
+            }
+
             await m.ReplyAsync(text + m.Data);
         });
 
@@ -168,7 +175,7 @@ public abstract partial class NatsConnectionTest
 
         // timeout check
         await Assert.ThrowsAsync<NatsNoReplyException>(async () =>
-            await pubConnection.RequestAsync<int, string>("foo", 10, replyOpts: new NatsSubOpts { Timeout = TimeSpan.FromSeconds(1) }));
+            await pubConnection.RequestAsync<int, string>(subject, 11, replyOpts: new NatsSubOpts { Timeout = TimeSpan.FromSeconds(1) }));
 
         await sub.DisposeAsync();
         await reg;
