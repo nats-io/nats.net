@@ -44,8 +44,6 @@ public sealed record NatsOpts
 
     public int MaxPingOut { get; init; } = 2;
 
-    public bool NoResponders { get; set; } = false;
-
     /// <summary>
     /// Minimum amount of time to wait between reconnect attempts. (default: 2s)
     /// </summary>

@@ -32,7 +32,7 @@ public partial class NatsConnection
         {
             if (sub.Msgs.TryRead(out var msg))
             {
-                if (msg.Headers?.Code == 503)
+                if (msg.IsNoRespondersError)
                 {
                     throw new NatsNoRespondersException();
                 }

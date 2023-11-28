@@ -73,7 +73,7 @@ public class RequestReplyTest
 
         // Enable no responders, and do not set a timeout. We should get a response with a 503 header code.
         {
-            await using var nats = server.CreateClientConnection(NatsOpts.Default with { NoResponders = true });
+            await using var nats = server.CreateClientConnection();
             await Assert.ThrowsAsync<NatsNoRespondersException>(async () => await nats.RequestAsync<int, int>(Guid.NewGuid().ToString(), 0));
         }
     }

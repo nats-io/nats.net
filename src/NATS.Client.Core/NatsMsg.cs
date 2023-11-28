@@ -60,9 +60,9 @@ public readonly record struct NatsMsg<T>(
         }
 
         var size = subject.Length
-            + (replyTo?.Length ?? 0)
-            + (headersBuffer?.Length ?? 0)
-            + payloadBuffer.Length;
+                   + (replyTo?.Length ?? 0)
+                   + (headersBuffer?.Length ?? 0)
+                   + payloadBuffer.Length;
 
         return new NatsMsg<T>(subject, replyTo, (int)size, headers, data, connection);
     }
@@ -141,4 +141,6 @@ public readonly record struct NatsMsg<T>(
             throw new NatsException("unable to send reply; ReplyTo is empty");
         }
     }
+
+    public bool IsNoRespondersError => Headers?.Code == 503;
 }

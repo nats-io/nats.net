@@ -59,7 +59,7 @@ public abstract partial class NatsConnectionTest
         await using var server = NatsServer.StartWithTrace(_output);
 
         // For no_responders to work we need to the publisher and subscriber to be using the same connection
-        await using var subConnection = server.CreateClientConnection(NatsOpts.Default with { NoResponders = true });
+        await using var subConnection = server.CreateClientConnection();
 
         var signalComplete = new WaitSignal();
         var replyToAddress = subConnection.NewInbox();
