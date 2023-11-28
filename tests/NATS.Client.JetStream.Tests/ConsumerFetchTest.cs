@@ -70,10 +70,10 @@ public class ConsumerFetchTest
     [Fact]
     public async Task Fetch_dispose_test()
     {
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         await using var server = NatsServer.StartJS();
-
         await using var nats = server.CreateClientConnection();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         var js = new NatsJSContext(nats);
         var stream = await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
@@ -93,32 +93,49 @@ public class ConsumerFetchTest
 
         var fc = await consumer.FetchInternalAsync<TestData>(serializer: TestDataJsonSerializer<TestData>.Default, opts: fetchOpts, cancellationToken: cts.Token);
 
-        var signal = new WaitSignal();
+        var signal1 = new WaitSignal();
+        var signal2 = new WaitSignal();
         var reader = Task.Run(async () =>
         {
             await foreach (var msg in fc.Msgs.ReadAllAsync(cts.Token))
             {
                 await msg.AckAsync(cancellationToken: cts.Token);
-                signal.Pulse();
-
-                // Introduce delay to make sure not all messages will be acked.
-                await Task.Delay(1_000, cts.Token);
+                signal1.Pulse();
+                await signal2;
             }
         });
 
-        await signal;
+        await signal1;
+
+        // Dispose waits for all the pending messages to be delivered to the loop
+        // since the channel reader carries on reading the messages in its internal queue.
         await fc.DisposeAsync();
+
+        // At this point we should only have ACKed one message
+        await Retry.Until(
+            "ack pending 9",
+            async () =>
+            {
+                var c = await js.GetConsumerAsync("s1", "c1", cts.Token);
+                return c.Info.NumAckPending == 9;
+            },
+            timeout: TimeSpan.FromSeconds(20));
+        await consumer.RefreshAsync(cts.Token);
+        Assert.Equal(9, consumer.Info.NumAckPending);
+
+        signal2.Pulse();
 
         await reader;
 
-        var infos = new List<INatsJSConsumer>();
-        await foreach (var natsJSConsumer in stream.ListConsumersAsync(cts.Token))
-        {
-            infos.Add(natsJSConsumer);
-        }
-
-        Assert.Single(infos);
-
-        Assert.True(infos[0].Info.NumAckPending > 0);
+        await Retry.Until(
+            "ack pending 0",
+            async () =>
+            {
+                var c = await js.GetConsumerAsync("s1", "c1", cts.Token);
+                return c.Info.NumAckPending == 0;
+            },
+            timeout: TimeSpan.FromSeconds(20));
+        await consumer.RefreshAsync(cts.Token);
+        Assert.Equal(0, consumer.Info.NumAckPending);
     }
 }

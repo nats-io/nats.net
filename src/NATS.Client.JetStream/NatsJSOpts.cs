@@ -10,6 +10,11 @@ public record NatsJSOpts
 {
     public NatsJSOpts(NatsOpts opts, string? apiPrefix = default, string? domain = default, AckOpts? ackOpts = default)
     {
+        if (apiPrefix != null && domain != null)
+        {
+            throw new NatsJSException("Cannot specify both ApiPrefix and Domain.");
+        }
+
         ApiPrefix = apiPrefix ?? "$JS.API";
         AckOpts = ackOpts ?? new AckOpts(opts.WaitUntilSent);
         Domain = domain;
@@ -18,17 +23,17 @@ public record NatsJSOpts
     /// <summary>
     /// Complete prefix to prepend to JetStream API subjects as it's dynamically built from ApiPrefix and Domain properties.
     /// </summary>
-    public string Prefix => string.IsNullOrEmpty(Domain) ? ApiPrefix : $"{ApiPrefix}.{Domain}";
+    public string Prefix => string.IsNullOrEmpty(Domain) ? ApiPrefix : $"$JS.{Domain}.API";
 
     /// <summary>
     /// Prefix to prepend to JetStream API subjects. (default: $JS.API)
     /// </summary>
-    public string ApiPrefix { get; init; }
+    public string ApiPrefix { get; }
 
     /// <summary>
     /// JetStream domain to use in JetStream API subjects. (default: null)
     /// </summary>
-    public string? Domain { get; init; }
+    public string? Domain { get; }
 
     /// <summary>
     /// Message ACK options <see cref="AckOpts"/>.
