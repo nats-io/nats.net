@@ -245,7 +245,7 @@ public class NatsJSConsumer : INatsJSConsumer
     /// const int max = 10;
     /// var count = 0;
     ///
-    /// await foreach (var msg in consumer.FetchAllNoWaitAsync&lt;int&gt;(new NatsJSFetchOpts(max)))
+    /// await foreach (var msg in consumer.FetchAllNoWaitAsync&lt;int&gt;(new NatsJSFetchOpts { MaxMsgs = max }))
     /// {
     ///     count++;
     ///     Process(msg);
