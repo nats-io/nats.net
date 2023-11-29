@@ -1,7 +1,6 @@
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
-using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
@@ -189,14 +188,14 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
     /// <summary>
     /// Fetch messages from the stream in order.
     /// </summary>
-    /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="opts">Fetch options.</param>
+    /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel fetch operation.</param>
     /// <typeparam name="T">Serialized message data type.</typeparam>
     /// <returns>Asynchronous enumeration which can be used in a <c>await foreach</c> loop.</returns>
     public async IAsyncEnumerable<NatsJSMsg<T>> FetchAsync<T>(
+        NatsJSFetchOpts opts,
         INatsDeserialize<T>? serializer = default,
-        NatsJSFetchOpts? opts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         cancellationToken = CancellationTokenSource.CreateLinkedTokenSource(_cancellationToken, cancellationToken).Token;
@@ -204,7 +203,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
         var consumer = await RecreateConsumer(_fetchConsumerName, _fetchSeq, cancellationToken);
         _fetchConsumerName = consumer.Info.Name;
 
-        await foreach (var msg in consumer.FetchAsync(serializer, opts, cancellationToken))
+        await foreach (var msg in consumer.FetchAsync(opts, serializer, cancellationToken))
         {
             if (msg.Metadata is not { } metadata)
                 continue;
@@ -239,7 +238,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
             NotificationHandler = opts.NotificationHandler,
         };
 
-        await foreach (var msg in FetchAsync(serializer, fetchOpts, cancellationToken))
+        await foreach (var msg in FetchAsync(fetchOpts, serializer, cancellationToken))
         {
             return msg;
         }

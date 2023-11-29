@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using NATS.Client.Core.Tests;
 
 namespace NATS.Client.JetStream.Tests;

@@ -141,7 +141,6 @@ public class NatsJSConsumer : INatsJSConsumer
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
         await using var f = await FetchInternalAsync<T>(
-            serializer,
             new NatsJSFetchOpts
             {
                 MaxMsgs = 1,
@@ -149,6 +148,7 @@ public class NatsJSConsumer : INatsJSConsumer
                 Expires = opts.Expires,
                 NotificationHandler = opts.NotificationHandler,
             },
+            serializer,
             cancellationToken: cancellationToken).ConfigureAwait(false);
 
         // Keep subscription alive (since it's a weak ref in subscription manager) until we're done.
@@ -162,26 +162,16 @@ public class NatsJSConsumer : INatsJSConsumer
         return null;
     }
 
-    /// <summary>
-    /// Consume a set number of messages from the stream using this consumer.
-    /// </summary>
-    /// <param name="serializer">Serializer to use for the message type.</param>
-    /// <param name="opts">Fetch options. (default: <c>MaxMsgs</c> 1,000 and timeout in 30 seconds)</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the call.</param>
-    /// <typeparam name="T">Message type to deserialize.</typeparam>
-    /// <returns>Async enumerable of messages which can be used in a <c>await foreach</c> loop.</returns>
-    /// <exception cref="NatsJSProtocolException">Consumer is deleted, it's push based or request sent to server is invalid.</exception>
-    /// <exception cref="NatsJSException">There is an error sending the message or this consumer object isn't valid anymore because it was deleted earlier.</exception>
+    /// <inheritdoc />
     public async IAsyncEnumerable<NatsJSMsg<T>> FetchAsync<T>(
+        NatsJSFetchOpts opts,
         INatsDeserialize<T>? serializer = default,
-        NatsJSFetchOpts? opts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
-        opts ??= _context.Opts.DefaultFetchOpts;
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
-        await using var fc = await FetchInternalAsync<T>(serializer, opts, cancellationToken).ConfigureAwait(false);
+        await using var fc = await FetchInternalAsync<T>(opts, serializer, cancellationToken).ConfigureAwait(false);
 
         // Keep subscription alive (since it's a weak ref in subscription manager) until we're done.
         using var anchor = _context.Connection.RegisterSubAnchor(fc);
@@ -270,15 +260,14 @@ public class NatsJSConsumer : INatsJSConsumer
     /// </code>
     /// </example>
     public async IAsyncEnumerable<NatsJSMsg<T>> FetchNoWaitAsync<T>(
+        NatsJSFetchOpts opts,
         INatsDeserialize<T>? serializer = default,
-        NatsJSFetchOpts? opts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
-        opts ??= _context.Opts.DefaultFetchOpts;
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
-        await using var fc = await FetchInternalAsync<T>(serializer, opts with { NoWait = true }, cancellationToken).ConfigureAwait(false);
+        await using var fc = await FetchInternalAsync<T>(opts with { NoWait = true }, serializer, cancellationToken).ConfigureAwait(false);
         await foreach (var jsMsg in fc.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
             yield return jsMsg;
@@ -394,12 +383,11 @@ public class NatsJSConsumer : INatsJSConsumer
     }
 
     internal async ValueTask<NatsJSFetch<T>> FetchInternalAsync<T>(
+        NatsJSFetchOpts opts,
         INatsDeserialize<T>? serializer = default,
-        NatsJSFetchOpts? opts = default,
         CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
-        opts ??= _context.Opts.DefaultFetchOpts;
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
         var inbox = _context.NewInbox();

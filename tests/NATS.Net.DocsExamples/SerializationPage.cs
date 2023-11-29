@@ -1,4 +1,4 @@
-﻿// ReSharper disable AccessToDisposedClosure
+// ReSharper disable AccessToDisposedClosure
 // ReSharper disable RedundantTypeArgumentsOfMethod
 // ReSharper disable ReturnTypeCanBeNotNullable
 // ReSharper disable UnusedAutoPropertyAccessor.Global

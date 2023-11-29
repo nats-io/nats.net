@@ -52,14 +52,6 @@ public record NatsJSOpts
     public NatsJSConsumeOpts DefaultConsumeOpts { get; init; } = new() { MaxMsgs = 1_000 };
 
     /// <summary>
-    /// Default fetch options to be used in fetch calls in this context.
-    /// </summary>
-    /// <remarks>
-    /// Defaults to MaxMsgs = 1,000.
-    /// </remarks>
-    public NatsJSFetchOpts DefaultFetchOpts { get; init; } = new() { MaxMsgs = 1_000 };
-
-    /// <summary>
     /// Default next options to be used in next calls in this context.
     /// </summary>
     public NatsJSNextOpts DefaultNextOpts { get; init; } = new();
@@ -153,7 +145,7 @@ public record NatsJSFetchOpts
     /// <summary>
     /// Maximum number of messages to return
     /// </summary>
-    public int? MaxMsgs { get; init; }
+    public int? MaxMsgs { get; init;  }
 
     /// <summary>
     /// Amount of time to wait for the request to expire
