@@ -30,6 +30,8 @@ public readonly record struct NatsMsg<T>(
     T? Data,
     INatsConnection? Connection)
 {
+    public bool IsNoRespondersError => Headers?.Code == 503;
+
     internal static NatsMsg<T> Build(
         string subject,
         string? replyTo,
@@ -60,9 +62,9 @@ public readonly record struct NatsMsg<T>(
         }
 
         var size = subject.Length
-            + (replyTo?.Length ?? 0)
-            + (headersBuffer?.Length ?? 0)
-            + payloadBuffer.Length;
+                   + (replyTo?.Length ?? 0)
+                   + (headersBuffer?.Length ?? 0)
+                   + payloadBuffer.Length;
 
         return new NatsMsg<T>(subject, replyTo, (int)size, headers, data, connection);
     }

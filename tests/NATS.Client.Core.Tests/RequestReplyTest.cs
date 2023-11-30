@@ -50,8 +50,18 @@ public class RequestReplyTest
                 RequestTimeout = TimeSpan.FromSeconds(1),
             });
 
+            var sub = await nats.SubscribeCoreAsync<int>("foo");
+            var reg = sub.Register(async msg =>
+            {
+                await Task.Delay(TimeSpan.FromSeconds(2));
+            });
+            await nats.PingAsync();
+
             await Assert.ThrowsAsync<NatsNoReplyException>(async () =>
                 await nats.RequestAsync<int, int>("foo", 0));
+
+            await sub.DisposeAsync();
+            await reg;
         }
 
         // Cancellation token usage
@@ -59,10 +69,32 @@ public class RequestReplyTest
             await using var nats = server.CreateClientConnection();
 
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+            var sub = await nats.SubscribeCoreAsync<int>("foo");
+            var reg = sub.Register(async msg =>
+            {
+                await Task.Delay(TimeSpan.FromSeconds(2));
+            });
+            await nats.PingAsync();
+
             await Assert.ThrowsAsync<OperationCanceledException>(async () =>
             {
                 await nats.RequestAsync<int, int>("foo", 0, cancellationToken: cts.Token);
             });
+
+            await sub.DisposeAsync();
+            await reg;
+        }
+    }
+
+    [Fact]
+    public async Task Request_reply_no_responders_test()
+    {
+        await using var server = NatsServer.Start();
+
+        // Enable no responders, and do not set a timeout. We should get a response with a 503 header code.
+        {
+            await using var nats = server.CreateClientConnection();
+            await Assert.ThrowsAsync<NatsNoRespondersException>(async () => await nats.RequestAsync<int, int>(Guid.NewGuid().ToString(), 0));
         }
     }
 

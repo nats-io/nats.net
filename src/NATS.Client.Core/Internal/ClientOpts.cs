@@ -88,7 +88,7 @@ internal sealed class ClientOpts
     public bool Headers { get; init; } = false;
 
     [JsonPropertyName("no_responders")]
-    public bool NoResponders { get; init; } = false;
+    public bool NoResponders { get; init; } = true;
 
     public static ClientOpts Create(NatsOpts opts)
     {

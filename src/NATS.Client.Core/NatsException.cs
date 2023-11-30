@@ -21,6 +21,14 @@ public sealed class NatsNoReplyException : NatsException
     }
 }
 
+public sealed class NatsNoRespondersException : NatsException
+{
+    public NatsNoRespondersException()
+        : base("No responders")
+    {
+    }
+}
+
 public sealed class NatsServerException : NatsException
 {
     public NatsServerException(string error)
