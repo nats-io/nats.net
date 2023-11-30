@@ -60,7 +60,23 @@ public class ErrorHandlerTest
         var stream2 = await js.CreateStreamAsync(new StreamConfig("s2", new[] { "s2.*" }), cts.Token);
         var consumer2 = await stream2.CreateOrUpdateConsumerAsync(new ConsumerConfig("c2"), cts.Token);
 
-        var next2 = await consumer2.NextAsync<int>(opts: opts, cancellationToken: cts.Token);
+        // reduce expires time out to increase the chance of receiving notification.
+        var opts2 = new NatsJSNextOpts
+        {
+            NotificationHandler = (e, _) =>
+            {
+                if (e is NatsJSTimeoutNotification)
+                {
+                    Interlocked.Increment(ref timeoutNotifications);
+                }
+
+                return Task.CompletedTask;
+            },
+            Expires = TimeSpan.FromSeconds(2),
+            IdleHeartbeat = TimeSpan.FromSeconds(1),
+        };
+
+        var next2 = await consumer2.NextAsync<int>(opts: opts2, cancellationToken: cts.Token);
         Assert.Null(next2);
         Assert.Equal(1, Volatile.Read(ref timeoutNotifications));
     }

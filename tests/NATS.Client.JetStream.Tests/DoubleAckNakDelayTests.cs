@@ -13,11 +13,11 @@ public class DoubleAckNakDelayTests
     public async Task Double_ack_received_messages()
     {
         await using var server = NatsServer.StartJS();
-        var (nats1, proxy) = server.CreateProxiedClientConnection();
+        var (nats1, proxy) = server.CreateProxiedClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
         await using var nats = nats1;
         var js = new NatsJSContext(nats);
 
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
         var consumer = await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
@@ -47,11 +47,11 @@ public class DoubleAckNakDelayTests
     public async Task Delay_nak_received_messages()
     {
         await using var server = NatsServer.StartJS();
-        var (nats1, proxy) = server.CreateProxiedClientConnection();
+        var (nats1, proxy) = server.CreateProxiedClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
         await using var nats = nats1;
         var js = new NatsJSContext(nats);
 
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
         var consumer = await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);

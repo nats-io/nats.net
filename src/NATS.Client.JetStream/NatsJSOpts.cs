@@ -145,7 +145,7 @@ public record NatsJSFetchOpts
     /// <summary>
     /// Maximum number of messages to return
     /// </summary>
-    public int? MaxMsgs { get; init;  }
+    public int? MaxMsgs { get; init; }
 
     /// <summary>
     /// Amount of time to wait for the request to expire
