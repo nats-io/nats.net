@@ -12,6 +12,8 @@ public class NatsConsumeTests
     [Test]
     public void Subscription_should_not_be_collected_when_in_consume_async_enumerator()
     {
+        Console.WriteLine(">>> STARTING: MEM CONSUMER TEST");
+
         var server = NatsServer.StartJSWithTrace(new TestTextWriterOutput(Console.Out));
         try
         {
@@ -101,6 +103,8 @@ public class NatsConsumeTests
     [Test]
     public void Subscription_should_not_be_collected_when_in_ordered_consume_async_enumerator()
     {
+        Console.WriteLine(">>> STARTING: MEM ORDERED CONSUMER TEST");
+
         var server = NatsServer.StartJSWithTrace(new TestTextWriterOutput(Console.Out));
         try
         {
