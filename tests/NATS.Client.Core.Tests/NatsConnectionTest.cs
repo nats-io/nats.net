@@ -54,6 +54,32 @@ public abstract partial class NatsConnectionTest
     }
 
     [Fact]
+    public async Task PubSubNoRespondersTest()
+    {
+        await using var server = NatsServer.StartWithTrace(_output);
+
+        // For no_responders to work we need to the publisher and subscriber to be using the same connection
+        await using var subConnection = server.CreateClientConnection();
+
+        var signalComplete = new WaitSignal();
+        var replyToAddress = subConnection.NewInbox();
+        var code = 0;
+        var sub = await subConnection.SubscribeCoreAsync<int>(replyToAddress);
+        var register = sub.Register(x =>
+        {
+            if (x.Headers is not null)
+            {
+                code = x.Headers.Code;
+                signalComplete.Pulse();
+            }
+        });
+        await subConnection.PingAsync(); // wait for subscribe complete
+        await subConnection.PublishAsync(Guid.NewGuid().ToString(), 1, replyTo: replyToAddress);
+        await signalComplete;
+        Assert.Equal(503, code);
+    }
+
+    [Fact]
     public async Task EncodingTest()
     {
         await using var server = NatsServer.Start(_output, _transportType);
@@ -124,6 +150,13 @@ public abstract partial class NatsConnectionTest
                 return;
             }
 
+            // Trigger a timeout
+            if (m.Data == 11)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(6));
+                return;
+            }
+
             await m.ReplyAsync(text + m.Data);
         });
 
@@ -142,7 +175,7 @@ public abstract partial class NatsConnectionTest
 
         // timeout check
         await Assert.ThrowsAsync<NatsNoReplyException>(async () =>
-            await pubConnection.RequestAsync<int, string>("foo", 10, replyOpts: new NatsSubOpts { Timeout = TimeSpan.FromSeconds(1) }));
+            await pubConnection.RequestAsync<int, string>(subject, 11, replyOpts: new NatsSubOpts { Timeout = TimeSpan.FromSeconds(1) }));
 
         await sub.DisposeAsync();
         await reg;

@@ -32,6 +32,11 @@ public partial class NatsConnection
         {
             if (sub.Msgs.TryRead(out var msg))
             {
+                if (msg.IsNoRespondersError)
+                {
+                    throw new NatsNoRespondersException();
+                }
+
                 return msg;
             }
         }
