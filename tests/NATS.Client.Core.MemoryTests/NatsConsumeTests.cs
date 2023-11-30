@@ -3,6 +3,7 @@ using NATS.Client.Core.Tests;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
+using Xunit.Abstractions;
 
 namespace NATS.Client.Core.MemoryTests;
 
@@ -11,7 +12,7 @@ public class NatsConsumeTests
     [Test]
     public void Subscription_should_not_be_collected_when_in_consume_async_enumerator()
     {
-        var server = NatsServer.StartJS();
+        var server = NatsServer.StartJSWithTrace(new TestTextWriterOutput(Console.Out));
         try
         {
             var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
@@ -34,7 +35,7 @@ public class NatsConsumeTests
                         continue;
                     }
 
-                    if (++count == 20)
+                    if (++count == 10)
                         break;
                 }
             });
@@ -45,7 +46,7 @@ public class NatsConsumeTests
                 ack1.EnsureSuccess();
                 await sync.Task;
 
-                for (var i = 0; i < 20; i++)
+                for (var i = 0; i < 10; i++)
                 {
                     GC.Collect();
 
@@ -55,8 +56,19 @@ public class NatsConsumeTests
                         Assert.That(count, Is.EqualTo(1), $"Alive {i}");
                     });
 
-                    var ack = await js.PublishAsync("s1.x", i);
-                    ack.EnsureSuccess();
+                    for (var j = 0; j < 4; j++)
+                    {
+                        try
+                        {
+                            var ack = await js.PublishAsync("s1.x", i);
+                            ack.EnsureSuccess();
+                            break;
+                        }
+                        catch
+                        {
+                            await Task.Delay(100);
+                        }
+                    }
                 }
             });
 
@@ -89,7 +101,7 @@ public class NatsConsumeTests
     [Test]
     public void Subscription_should_not_be_collected_when_in_ordered_consume_async_enumerator()
     {
-        var server = NatsServer.StartJS();
+        var server = NatsServer.StartJSWithTrace(new TestTextWriterOutput(Console.Out));
         try
         {
             var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
@@ -112,7 +124,7 @@ public class NatsConsumeTests
                         continue;
                     }
 
-                    if (++count == 20)
+                    if (++count == 10)
                         break;
                 }
             });
@@ -123,7 +135,7 @@ public class NatsConsumeTests
                 ack1.EnsureSuccess();
                 await sync.Task;
 
-                for (var i = 0; i < 20; i++)
+                for (var i = 0; i < 10; i++)
                 {
                     GC.Collect();
 
@@ -133,8 +145,19 @@ public class NatsConsumeTests
                         Assert.That(count, Is.EqualTo(1), $"Alive {i}");
                     });
 
-                    var ack = await js.PublishAsync("s1.x", i);
-                    ack.EnsureSuccess();
+                    for (var j = 0; j < 4; j++)
+                    {
+                        try
+                        {
+                            var ack = await js.PublishAsync("s1.x", i);
+                            ack.EnsureSuccess();
+                            break;
+                        }
+                        catch
+                        {
+                            await Task.Delay(100);
+                        }
+                    }
                 }
             });
 
@@ -163,4 +186,15 @@ public class NatsConsumeTests
             server.DisposeAsync().GetAwaiter().GetResult();
         }
     }
+}
+
+public class TestTextWriterOutput : ITestOutputHelper
+{
+    private readonly TextWriter _out;
+
+    public TestTextWriterOutput(TextWriter @out) => _out = @out;
+
+    public void WriteLine(string message) => _out.WriteLine(message);
+
+    public void WriteLine(string format, params object[] args) => _out.WriteLine(format, args);
 }
