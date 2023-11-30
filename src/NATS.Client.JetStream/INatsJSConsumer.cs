@@ -19,7 +19,7 @@ public interface INatsJSConsumer
     /// <typeparam name="T">Message type to deserialize.</typeparam>
     /// <returns>Async enumerable of messages which can be used in a <c>await foreach</c> loop.</returns>
     /// <exception cref="NatsJSProtocolException">Consumer is deleted, it's push based or request sent to server is invalid.</exception>
-    IAsyncEnumerable<NatsJSMsg<T>> ConsumeAsync<T>(
+    IAsyncEnumerable<INatsJSMsg<T>> ConsumeAsync<T>(
         INatsDeserialize<T>? serializer = default,
         NatsJSConsumeOpts? opts = default,
         CancellationToken cancellationToken = default);
@@ -55,7 +55,7 @@ public interface INatsJSConsumer
     /// }
     /// </code>
     /// </example>
-    ValueTask<NatsJSMsg<T>?> NextAsync<T>(INatsDeserialize<T>? serializer = default, NatsJSNextOpts? opts = default, CancellationToken cancellationToken = default);
+    ValueTask<INatsJSMsg<T>?> NextAsync<T>(INatsDeserialize<T>? serializer = default, NatsJSNextOpts? opts = default, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Consume a set number of messages from the stream using this consumer.
@@ -67,7 +67,7 @@ public interface INatsJSConsumer
     /// <returns>Async enumerable of messages which can be used in a <c>await foreach</c> loop.</returns>
     /// <exception cref="NatsJSProtocolException">Consumer is deleted, it's push based or request sent to server is invalid.</exception>
     /// <exception cref="NatsJSException">There is an error sending the message or this consumer object isn't valid anymore because it was deleted earlier.</exception>
-    IAsyncEnumerable<NatsJSMsg<T>> FetchAsync<T>(
+    IAsyncEnumerable<INatsJSMsg<T>> FetchAsync<T>(
         NatsJSFetchOpts opts,
         INatsDeserialize<T>? serializer = default,
         CancellationToken cancellationToken = default);

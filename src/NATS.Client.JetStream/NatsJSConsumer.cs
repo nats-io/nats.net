@@ -54,7 +54,7 @@ public class NatsJSConsumer : INatsJSConsumer
     /// <typeparam name="T">Message type to deserialize.</typeparam>
     /// <returns>Async enumerable of messages which can be used in a <c>await foreach</c> loop.</returns>
     /// <exception cref="NatsJSProtocolException">Consumer is deleted, it's push based or request sent to server is invalid.</exception>
-    public async IAsyncEnumerable<NatsJSMsg<T>> ConsumeAsync<T>(
+    public async IAsyncEnumerable<INatsJSMsg<T>> ConsumeAsync<T>(
         INatsDeserialize<T>? serializer = default,
         NatsJSConsumeOpts? opts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -134,7 +134,7 @@ public class NatsJSConsumer : INatsJSConsumer
     /// }
     /// </code>
     /// </example>
-    public async ValueTask<NatsJSMsg<T>?> NextAsync<T>(INatsDeserialize<T>? serializer = default, NatsJSNextOpts? opts = default, CancellationToken cancellationToken = default)
+    public async ValueTask<INatsJSMsg<T>?> NextAsync<T>(INatsDeserialize<T>? serializer = default, NatsJSNextOpts? opts = default, CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
         opts ??= _context.Opts.DefaultNextOpts;
@@ -163,7 +163,7 @@ public class NatsJSConsumer : INatsJSConsumer
     }
 
     /// <inheritdoc />
-    public async IAsyncEnumerable<NatsJSMsg<T>> FetchAsync<T>(
+    public async IAsyncEnumerable<INatsJSMsg<T>> FetchAsync<T>(
         NatsJSFetchOpts opts,
         INatsDeserialize<T>? serializer = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
