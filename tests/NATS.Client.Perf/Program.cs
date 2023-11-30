@@ -53,8 +53,9 @@ var subReader = Task.Run(async () =>
 });
 
 // Ensure subscription is active
-while (Volatile.Read(ref subActive) == 0)
+while (Interlocked.CompareExchange(ref subActive, 0, 0) == 0)
 {
+    await Task.Delay(1000);
     await nats2.PublishAsync(t.Subject, 1);
 }
 
