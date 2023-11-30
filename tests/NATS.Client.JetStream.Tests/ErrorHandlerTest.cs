@@ -271,7 +271,24 @@ public class ErrorHandlerTest
         var consume = Task.Run(
             async () =>
             {
-                await foreach (var unused in consumer.ConsumeAsync<int>(opts: opts, cancellationToken: consumeCts.Token))
+                // reduce heartbeat time out to increase the chance of receiving notification.
+                var opts2 = new NatsJSConsumeOpts
+                {
+                    MaxMsgs = 10,
+                    NotificationHandler = (e, _) =>
+                    {
+                        if (e is NatsJSTimeoutNotification)
+                        {
+                            Interlocked.Increment(ref timeoutNotifications);
+                        }
+
+                        return Task.CompletedTask;
+                    },
+                    Expires = TimeSpan.FromSeconds(6),
+                    IdleHeartbeat = TimeSpan.FromSeconds(1),
+                };
+
+                await foreach (var unused in consumer.ConsumeAsync<int>(opts: opts2, cancellationToken: consumeCts.Token))
                 {
                 }
             },
