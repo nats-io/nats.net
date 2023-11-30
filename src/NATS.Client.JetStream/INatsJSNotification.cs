@@ -5,7 +5,9 @@ public interface INatsJSNotification
     string Name { get; }
 }
 
-public class NatsJSTimeoutNotification : INatsJSNotification
+public record NatsJSTimeoutNotification : INatsJSNotification
 {
     public string Name => "Timeout";
 }
+
+public record NatsJSProtocolNotification(string Name, int HeaderCode, string HeaderMessageText) : INatsJSNotification;
