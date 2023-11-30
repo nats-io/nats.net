@@ -112,7 +112,7 @@ public class NatsJSMsg<T> : INatsJSMsg<T>
     private readonly NatsMsg<T> _msg;
     private readonly Lazy<NatsJSMsgMetadata?> _replyToDateTimeAndSeq;
 
-    internal NatsJSMsg(NatsMsg<T> msg, NatsJSContext context)
+    public NatsJSMsg(NatsMsg<T> msg, NatsJSContext context)
     {
         _msg = msg;
         _context = context;
