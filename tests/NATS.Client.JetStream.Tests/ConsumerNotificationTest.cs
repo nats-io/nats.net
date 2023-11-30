@@ -52,7 +52,9 @@ public class ConsumerNotificationTest
         };
 
         var signal1 = new WaitSignal();
-        var consumeTask = Task.Run(async () => {
+
+        var consumeTask = Task.Run(async () =>
+        {
             await foreach (var unused in consumer1.ConsumeAsync<int>(opts: natsJSConsumeOpts, cancellationToken: cts1.Token))
             {
                 signal1.Pulse();
@@ -60,7 +62,9 @@ public class ConsumerNotificationTest
         });
 
         var signal2 = new WaitSignal();
-        var fetchTask = Task.Run(async () => {
+
+        var fetchTask = Task.Run(async () =>
+        {
             await foreach (var unused in consumer2.FetchAsync<int>(opts: natsJSFetchOpts, cancellationToken: cts2.Token))
             {
                 signal2.Pulse();
