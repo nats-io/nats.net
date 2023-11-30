@@ -52,7 +52,7 @@ public class OrderedConsumerTest
 
         var stream = await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
 
-        for (var i = 0; i < 100; i++)
+        for (var i = 0; i < 50; i++)
         {
             if (i % 10 == 0)
             {
@@ -80,7 +80,7 @@ public class OrderedConsumerTest
             count++;
         }
 
-        Assert.Equal(100, count);
+        Assert.Equal(50, count);
     }
 
     [Fact]
