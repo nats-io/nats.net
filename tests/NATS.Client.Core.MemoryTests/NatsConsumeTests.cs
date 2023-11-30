@@ -20,7 +20,7 @@ public class NatsConsumeTests
             var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
             var js = new NatsJSContext(nats);
 
-            var rtt = nats.PingAsync().GetAwaiter().GetResult();
+            var rtt = nats.PingAsync().AsTask().GetAwaiter().GetResult();
             Console.WriteLine($">>> RTT: {rtt.TotalMilliseconds}ms");
 
             var sync = new TaskCompletionSource();
@@ -47,8 +47,20 @@ public class NatsConsumeTests
 
             var pub = Task.Run(async () =>
             {
-                var ack1 = await js.PublishAsync("s1.x", -1);
-                ack1.EnsureSuccess();
+                for (var j = 0; j < 4; j++)
+                {
+                    try
+                    {
+                        var ack1 = await js.PublishAsync("s1.x", -1);
+                        ack1.EnsureSuccess();
+                        break;
+                    }
+                    catch (NatsNoRespondersException)
+                    {
+                        await Task.Delay(100);
+                    }
+                }
+
                 await sync.Task;
 
                 for (var i = 0; i < 10; i++)
@@ -99,7 +111,7 @@ public class NatsConsumeTests
         }
         finally
         {
-            server.DisposeAsync().GetAwaiter().GetResult();
+            server.DisposeAsync().AsTask().GetAwaiter().GetResult();
         }
     }
 
@@ -114,7 +126,7 @@ public class NatsConsumeTests
             var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
             var js = new NatsJSContext(nats);
 
-            var rtt = nats.PingAsync().GetAwaiter().GetResult();
+            var rtt = nats.PingAsync().AsTask().GetAwaiter().GetResult();
             Console.WriteLine($">>> RTT: {rtt.TotalMilliseconds}ms");
 
             var sync = new TaskCompletionSource();
@@ -141,8 +153,20 @@ public class NatsConsumeTests
 
             var pub = Task.Run(async () =>
             {
-                var ack1 = await js.PublishAsync("s1.x", -1);
-                ack1.EnsureSuccess();
+                for (var j = 0; j < 4; j++)
+                {
+                    try
+                    {
+                        var ack1 = await js.PublishAsync("s1.x", -1);
+                        ack1.EnsureSuccess();
+                        break;
+                    }
+                    catch (NatsNoRespondersException)
+                    {
+                        await Task.Delay(100);
+                    }
+                }
+
                 await sync.Task;
 
                 for (var i = 0; i < 10; i++)
@@ -193,7 +217,7 @@ public class NatsConsumeTests
         }
         finally
         {
-            server.DisposeAsync().GetAwaiter().GetResult();
+            server.DisposeAsync().AsTask().GetAwaiter().GetResult();
         }
     }
 }
