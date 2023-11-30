@@ -1,4 +1,4 @@
-﻿using NATS.Client.Core.Tests;
+using NATS.Client.Core.Tests;
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -27,7 +27,8 @@ public class DoubleAckTest
 
             var fetchOpts = new NatsJSFetchOpts
             {
-                MaxMsgs = 100, Expires = TimeSpan.FromSeconds(5),
+                MaxMsgs = 100,
+                Expires = TimeSpan.FromSeconds(5),
             };
 
             var count = 0;
@@ -48,7 +49,8 @@ public class DoubleAckTest
 
             var opts = new NatsJSConsumeOpts
             {
-                MaxMsgs = 100, Expires = TimeSpan.FromSeconds(5),
+                MaxMsgs = 100,
+                Expires = TimeSpan.FromSeconds(5),
             };
 
             var count = 0;

@@ -1,4 +1,4 @@
-﻿// ReSharper disable SuggestVarOrType_Elsewhere
+// ReSharper disable SuggestVarOrType_Elsewhere
 
 using NATS.Client.Core;
 using NATS.Client.JetStream;

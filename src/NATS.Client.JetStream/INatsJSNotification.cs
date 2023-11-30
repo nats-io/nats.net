@@ -1,5 +1,3 @@
-﻿using NATS.Client.Core;
-
 namespace NATS.Client.JetStream;
 
 public interface INatsJSNotification

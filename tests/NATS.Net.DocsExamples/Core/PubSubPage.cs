@@ -1,4 +1,4 @@
-﻿// ReSharper disable SuggestVarOrType_Elsewhere
+// ReSharper disable SuggestVarOrType_Elsewhere
 #pragma warning disable SA1123
 #pragma warning disable SA1124
 #pragma warning disable SA1509
@@ -54,7 +54,7 @@ public class PubSubPage
             // to avoid any races between subscription and publishing.
             await nats.ConnectAsync();
 
-            await using INatsSub<int> sub = await nats.SubscribeCoreAsync<int>("foo");
+            await using var sub = await nats.SubscribeCoreAsync<int>("foo");
 
             for (var i = 0; i < 10; i++)
             {

@@ -60,16 +60,16 @@ public interface INatsJSConsumer
     /// <summary>
     /// Consume a set number of messages from the stream using this consumer.
     /// </summary>
-    /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="opts">Fetch options. (default: <c>MaxMsgs</c> 1,000 and timeout in 30 seconds)</param>
+    /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the call.</param>
     /// <typeparam name="T">Message type to deserialize.</typeparam>
     /// <returns>Async enumerable of messages which can be used in a <c>await foreach</c> loop.</returns>
     /// <exception cref="NatsJSProtocolException">Consumer is deleted, it's push based or request sent to server is invalid.</exception>
     /// <exception cref="NatsJSException">There is an error sending the message or this consumer object isn't valid anymore because it was deleted earlier.</exception>
     IAsyncEnumerable<NatsJSMsg<T>> FetchAsync<T>(
+        NatsJSFetchOpts opts,
         INatsDeserialize<T>? serializer = default,
-        NatsJSFetchOpts? opts = default,
         CancellationToken cancellationToken = default);
 
     /// <summary>
