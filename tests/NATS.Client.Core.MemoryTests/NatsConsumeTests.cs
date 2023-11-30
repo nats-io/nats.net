@@ -20,6 +20,9 @@ public class NatsConsumeTests
             var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
             var js = new NatsJSContext(nats);
 
+            var rtt = nats.PingAsync().GetAwaiter().GetResult();
+            Console.WriteLine($">>> RTT: {rtt.TotalMilliseconds}ms");
+
             var sync = new TaskCompletionSource();
 
             var sub = Task.Run(async () =>
@@ -110,6 +113,9 @@ public class NatsConsumeTests
         {
             var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
             var js = new NatsJSContext(nats);
+
+            var rtt = nats.PingAsync().GetAwaiter().GetResult();
+            Console.WriteLine($">>> RTT: {rtt.TotalMilliseconds}ms");
 
             var sync = new TaskCompletionSource();
 
