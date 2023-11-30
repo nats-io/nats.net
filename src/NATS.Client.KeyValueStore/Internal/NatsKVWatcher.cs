@@ -21,7 +21,7 @@ internal readonly struct NatsKVWatchCommandMsg<T>
 
     public NatsKVWatchCommand Command { get; init; } = default;
 
-    public NatsJSMsg<T> Msg { get; init; } = default;
+    public NatsJSMsg<T>? Msg { get; init; } = default;
 }
 
 internal class NatsKVWatcher<T> : IAsyncDisposable
@@ -156,10 +156,9 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
                     {
                         var subCommand = command.Command;
 
-                        if (subCommand == NatsKVWatchCommand.Msg)
+                        if (subCommand == NatsKVWatchCommand.Msg && command.Msg is { } msg)
                         {
                             ResetHeartbeatTimer();
-                            var msg = command.Msg;
 
                             var operation = NatsKVOperation.Put;
 

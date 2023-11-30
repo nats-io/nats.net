@@ -84,21 +84,21 @@ public class NatsJSConsumer : INatsJSConsumer
             while (!cancellationToken.IsCancellationRequested)
             {
                 bool read;
-                NatsJSMsg<T> jsMsg;
+                NatsJSMsg<T>? jsMsg;
                 try
                 {
                     read = cc.Msgs.TryRead(out jsMsg);
                 }
                 catch (OperationCanceledException)
                 {
-                    read = false;
-                    jsMsg = default;
+                    break;
                 }
 
                 if (!read)
                     break;
 
-                yield return jsMsg;
+                if (jsMsg != null)
+                    yield return jsMsg;
             }
         }
     }
@@ -195,21 +195,21 @@ public class NatsJSConsumer : INatsJSConsumer
             while (!cancellationToken.IsCancellationRequested)
             {
                 bool read;
-                NatsJSMsg<T> jsMsg;
+                NatsJSMsg<T>? jsMsg;
                 try
                 {
                     read = fc.Msgs.TryRead(out jsMsg);
                 }
                 catch (OperationCanceledException)
                 {
-                    read = false;
-                    jsMsg = default;
+                    break;
                 }
 
                 if (!read)
                     break;
 
-                yield return jsMsg;
+                if (jsMsg != null)
+                    yield return jsMsg;
             }
         }
     }

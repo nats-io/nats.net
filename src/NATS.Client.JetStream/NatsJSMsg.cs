@@ -103,6 +103,13 @@ public interface INatsJSMsg<T>
 }
 
 /// <summary>
+/// Options to be used when acknowledging messages received from a stream using a consumer.
+/// </summary>
+/// <param name="WaitUntilSent">Wait for the publish to be flushed down to the network.</param>
+/// <param name="DoubleAck">Ask server for an acknowledgment.</param>
+public readonly record struct AckOpts(bool? WaitUntilSent = false, bool? DoubleAck = false);
+
+/// <summary>
 /// NATS JetStream message with <see cref="NatsMsg{T}"/> and control messages.
 /// </summary>
 /// <typeparam name="T">User message type</typeparam>
@@ -270,10 +277,3 @@ public class NatsJSMsg<T> : INatsJSMsg<T>
         }
     }
 }
-
-/// <summary>
-/// Options to be used when acknowledging messages received from a stream using a consumer.
-/// </summary>
-/// <param name="WaitUntilSent">Wait for the publish to be flushed down to the network.</param>
-/// <param name="DoubleAck">Ask server for an acknowledgment.</param>
-public readonly record struct AckOpts(bool? WaitUntilSent = false, bool? DoubleAck = false);
