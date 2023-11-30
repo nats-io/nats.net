@@ -14,7 +14,7 @@ public class NatsConsumeTests
         var server = NatsServer.StartJS();
         try
         {
-            var nats = server.CreateClientConnection();
+            var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
             var js = new NatsJSContext(nats);
 
             var sync = new TaskCompletionSource();
@@ -92,7 +92,7 @@ public class NatsConsumeTests
         var server = NatsServer.StartJS();
         try
         {
-            var nats = server.CreateClientConnection();
+            var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
             var js = new NatsJSContext(nats);
 
             var sync = new TaskCompletionSource();

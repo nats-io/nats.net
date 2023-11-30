@@ -11,7 +11,7 @@ public class NatsSubTests
         var server = NatsServer.Start();
         try
         {
-            var nats = server.CreateClientConnection();
+            var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
 
             async Task Isolator()
             {
@@ -42,7 +42,7 @@ public class NatsSubTests
         var server = NatsServer.Start();
         try
         {
-            var nats = server.CreateClientConnection();
+            var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
 
             var sync = 0;
 
