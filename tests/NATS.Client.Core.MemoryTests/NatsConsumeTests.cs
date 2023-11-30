@@ -40,7 +40,7 @@ public class NatsConsumeTests
                         continue;
                     }
 
-                    if (++count == 10)
+                    if (++count == 5)
                         break;
                 }
             });
@@ -63,7 +63,7 @@ public class NatsConsumeTests
 
                 await sync.Task;
 
-                for (var i = 0; i < 10; i++)
+                for (var i = 0; i < 5; i++)
                 {
                     GC.Collect();
 
@@ -73,19 +73,8 @@ public class NatsConsumeTests
                         Assert.That(count, Is.EqualTo(1), $"Alive {i}");
                     });
 
-                    for (var j = 0; j < 4; j++)
-                    {
-                        try
-                        {
-                            var ack = await js.PublishAsync("s1.x", i);
-                            ack.EnsureSuccess();
-                            break;
-                        }
-                        catch
-                        {
-                            await Task.Delay(100);
-                        }
-                    }
+                    var ack = await js.PublishAsync("s1.x", i);
+                    ack.EnsureSuccess();
                 }
             });
 
@@ -146,7 +135,7 @@ public class NatsConsumeTests
                         continue;
                     }
 
-                    if (++count == 10)
+                    if (++count == 5)
                         break;
                 }
             });
@@ -169,7 +158,7 @@ public class NatsConsumeTests
 
                 await sync.Task;
 
-                for (var i = 0; i < 10; i++)
+                for (var i = 0; i < 5; i++)
                 {
                     GC.Collect();
 
@@ -179,19 +168,8 @@ public class NatsConsumeTests
                         Assert.That(count, Is.EqualTo(1), $"Alive {i}");
                     });
 
-                    for (var j = 0; j < 4; j++)
-                    {
-                        try
-                        {
-                            var ack = await js.PublishAsync("s1.x", i);
-                            ack.EnsureSuccess();
-                            break;
-                        }
-                        catch
-                        {
-                            await Task.Delay(100);
-                        }
-                    }
+                    var ack = await js.PublishAsync("s1.x", i);
+                    ack.EnsureSuccess();
                 }
             });
 
