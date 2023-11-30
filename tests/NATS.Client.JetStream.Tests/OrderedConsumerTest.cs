@@ -45,7 +45,7 @@ public class OrderedConsumerTest
     public async Task Consume_reconnect_publish()
     {
         await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
