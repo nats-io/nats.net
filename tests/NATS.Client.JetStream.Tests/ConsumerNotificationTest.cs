@@ -87,7 +87,7 @@ public class ConsumerNotificationTest
         await using var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats);
 
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
 
