@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using NATS.Client.Core.Tests;
 using NATS.Client.JetStream.Models;
 
