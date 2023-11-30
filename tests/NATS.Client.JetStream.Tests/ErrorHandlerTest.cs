@@ -60,7 +60,7 @@ public class ErrorHandlerTest
         var stream2 = await js.CreateStreamAsync(new StreamConfig("s2", new[] { "s2.*" }), cts.Token);
         var consumer2 = await stream2.CreateOrUpdateConsumerAsync(new ConsumerConfig("c2"), cts.Token);
 
-        // reduce expires time out to increase the chance of receiving notification.
+        // reduce heartbeat time out to increase the chance of receiving notification.
         var opts2 = new NatsJSNextOpts
         {
             NotificationHandler = (e, _) =>
@@ -72,7 +72,7 @@ public class ErrorHandlerTest
 
                 return Task.CompletedTask;
             },
-            Expires = TimeSpan.FromSeconds(2),
+            Expires = TimeSpan.FromSeconds(5),
             IdleHeartbeat = TimeSpan.FromSeconds(1),
         };
 
@@ -196,7 +196,7 @@ public class ErrorHandlerTest
         var stream2 = await js.CreateStreamAsync(new StreamConfig("s2", new[] { "s2.*" }), cts.Token);
         var consumer2 = (NatsJSOrderedConsumer)await stream2.CreateOrderedConsumerAsync(cancellationToken: cts.Token);
 
-        // reduce expires time out to increase the chance of receiving notification.
+        // reduce heartbeat time out to increase the chance of receiving notification.
         var opts2 = new NatsJSFetchOpts
         {
             MaxMsgs = 10,
@@ -209,7 +209,7 @@ public class ErrorHandlerTest
 
                 return Task.CompletedTask;
             },
-            Expires = TimeSpan.FromSeconds(2),
+            Expires = TimeSpan.FromSeconds(5),
             IdleHeartbeat = TimeSpan.FromSeconds(1),
         };
 

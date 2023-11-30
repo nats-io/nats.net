@@ -33,7 +33,8 @@ var subActive = 0;
 var subReader = Task.Run(async () =>
 {
     var count = 0;
-    await foreach (var msg in nats1.SubscribeAsync<NatsMemoryOwner<byte>>(t.Subject))
+    await using var sub = await nats1.SubscribeCoreAsync<NatsMemoryOwner<byte>>(t.Subject);
+    await foreach (var msg in sub.Msgs.ReadAllAsync())
     {
         using (msg.Data)
         {
