@@ -113,7 +113,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
 
                         while (true)
                         {
-                            NatsJSMsg<T>? msg;
+                            NatsJSMsg<T> msg;
 
                             try
                             {
@@ -142,7 +142,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
                                 goto CONSUME_LOOP;
                             }
 
-                            if (msg?.Metadata is not { } metadata)
+                            if (msg.Metadata is not { } metadata)
                                 continue;
 
                             seq = metadata.Sequence.Stream;

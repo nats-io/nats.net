@@ -21,7 +21,7 @@ internal readonly struct NatsJSOrderedPushConsumerMsg<T>
 
     public NatsJSOrderedPushConsumerCommand Command { get; init; } = default;
 
-    public NatsJSMsg<T>? Msg { get; init; } = default;
+    public NatsJSMsg<T> Msg { get; init; } = default;
 }
 
 internal record NatsJSOrderedPushConsumerOpts
@@ -177,9 +177,10 @@ internal class NatsJSOrderedPushConsumer<T>
                     {
                         var subCommand = command.Command;
 
-                        if (subCommand == NatsJSOrderedPushConsumerCommand.Msg && command.Msg is { } msg)
+                        if (subCommand == NatsJSOrderedPushConsumerCommand.Msg)
                         {
                             ResetHeartbeatTimer();
+                            var msg = command.Msg;
 
                             var subSubject = _sub?.Subject;
 
