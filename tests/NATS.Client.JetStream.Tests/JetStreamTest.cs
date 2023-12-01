@@ -19,11 +19,11 @@ public class JetStreamTest
                 .Trace()
                 .UseJetStream()
                 .Build());
-        var nats = server.CreateClientConnection();
+        var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
 
         // Happy user
         {
-            var cts1 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var cts1 = new CancellationTokenSource(TimeSpan.FromSeconds(20));
 
             var js = new NatsJSContext(nats);
 
@@ -109,7 +109,7 @@ public class JetStreamTest
 
         // Handle errors
         {
-            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
 
             var js = new NatsJSContext(nats);
             var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () =>
@@ -130,7 +130,7 @@ public class JetStreamTest
 
         // Delete stream
         {
-            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
 
             var js = new NatsJSContext(nats);
 

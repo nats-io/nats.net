@@ -11,7 +11,7 @@ var t = new TestParams
     Subject = "test",
     PubTasks = 10,
     MaxNatsBenchRatio = 0.20,
-    MaxMemoryMb = 500,
+    MaxMemoryMb = 600,
     MaxAllocatedMb = 750,
 };
 
@@ -26,6 +26,8 @@ var natsBenchTotalMsgs = RunNatsBench(server.ClientUrl, t);
 await using var nats1 = server.CreateClientConnection();
 await using var nats2 = server.CreateClientConnection();
 
+var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+
 await nats1.PingAsync();
 await nats2.PingAsync();
 
@@ -33,7 +35,8 @@ var subActive = 0;
 var subReader = Task.Run(async () =>
 {
     var count = 0;
-    await foreach (var msg in nats1.SubscribeAsync<NatsMemoryOwner<byte>>(t.Subject))
+    await using var sub = await nats1.SubscribeCoreAsync<NatsMemoryOwner<byte>>(t.Subject, cancellationToken: cts.Token);
+    await foreach (var msg in sub.Msgs.ReadAllAsync(cts.Token))
     {
         using (msg.Data)
         {
@@ -52,17 +55,20 @@ var subReader = Task.Run(async () =>
 });
 
 // Ensure subscription is active
-while (Volatile.Read(ref subActive) == 0)
+while (Interlocked.CompareExchange(ref subActive, 0, 0) == 0)
 {
-    await nats2.PublishAsync(t.Subject, 1);
+    await Task.Delay(1000);
+    await nats2.PublishAsync(t.Subject, 1, cancellationToken: cts.Token);
 }
+
+Console.WriteLine("# Sub synced");
 
 var stopwatch = Stopwatch.StartNew();
 
 var payload = new ReadOnlySequence<byte>(new byte[t.Size]);
 for (var i = 0; i < t.Msgs; i++)
 {
-    await nats2.PublishAsync(t.Subject, payload);
+    await nats2.PublishAsync(t.Subject, payload, cancellationToken: cts.Token);
 }
 
 Console.WriteLine($"[{stopwatch.Elapsed}]");

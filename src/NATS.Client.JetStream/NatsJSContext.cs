@@ -141,6 +141,11 @@ public partial class NatsJSContext
             {
                 while (sub.Msgs.TryRead(out var msg))
                 {
+                    if (msg.IsNoRespondersError)
+                    {
+                        throw new NatsNoRespondersException();
+                    }
+
                     if (msg.Data == null)
                     {
                         throw new NatsJSException("No response data received");

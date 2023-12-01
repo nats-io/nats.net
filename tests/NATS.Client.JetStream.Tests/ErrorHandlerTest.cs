@@ -60,7 +60,23 @@ public class ErrorHandlerTest
         var stream2 = await js.CreateStreamAsync(new StreamConfig("s2", new[] { "s2.*" }), cts.Token);
         var consumer2 = await stream2.CreateOrUpdateConsumerAsync(new ConsumerConfig("c2"), cts.Token);
 
-        var next2 = await consumer2.NextAsync<int>(opts: opts, cancellationToken: cts.Token);
+        // reduce heartbeat time out to increase the chance of receiving notification.
+        var opts2 = new NatsJSNextOpts
+        {
+            NotificationHandler = (e, _) =>
+            {
+                if (e is NatsJSTimeoutNotification)
+                {
+                    Interlocked.Increment(ref timeoutNotifications);
+                }
+
+                return Task.CompletedTask;
+            },
+            Expires = TimeSpan.FromSeconds(5),
+            IdleHeartbeat = TimeSpan.FromSeconds(1),
+        };
+
+        var next2 = await consumer2.NextAsync<int>(opts: opts2, cancellationToken: cts.Token);
         Assert.Null(next2);
         Assert.Equal(1, Volatile.Read(ref timeoutNotifications));
     }
@@ -180,8 +196,25 @@ public class ErrorHandlerTest
         var stream2 = await js.CreateStreamAsync(new StreamConfig("s2", new[] { "s2.*" }), cts.Token);
         var consumer2 = (NatsJSOrderedConsumer)await stream2.CreateOrderedConsumerAsync(cancellationToken: cts.Token);
 
+        // reduce heartbeat time out to increase the chance of receiving notification.
+        var opts2 = new NatsJSFetchOpts
+        {
+            MaxMsgs = 10,
+            NotificationHandler = (e, _) =>
+            {
+                if (e is NatsJSTimeoutNotification)
+                {
+                    Interlocked.Increment(ref timeoutNotifications);
+                }
+
+                return Task.CompletedTask;
+            },
+            Expires = TimeSpan.FromSeconds(5),
+            IdleHeartbeat = TimeSpan.FromSeconds(1),
+        };
+
         var count = 0;
-        await foreach (var unused in consumer2.FetchAsync<int>(opts: opts, cancellationToken: cts.Token))
+        await foreach (var unused in consumer2.FetchAsync<int>(opts: opts2, cancellationToken: cts.Token))
         {
             count++;
         }
@@ -238,7 +271,24 @@ public class ErrorHandlerTest
         var consume = Task.Run(
             async () =>
             {
-                await foreach (var unused in consumer.ConsumeAsync<int>(opts: opts, cancellationToken: consumeCts.Token))
+                // reduce heartbeat time out to increase the chance of receiving notification.
+                var opts2 = new NatsJSConsumeOpts
+                {
+                    MaxMsgs = 10,
+                    NotificationHandler = (e, _) =>
+                    {
+                        if (e is NatsJSTimeoutNotification)
+                        {
+                            Interlocked.Increment(ref timeoutNotifications);
+                        }
+
+                        return Task.CompletedTask;
+                    },
+                    Expires = TimeSpan.FromSeconds(6),
+                    IdleHeartbeat = TimeSpan.FromSeconds(1),
+                };
+
+                await foreach (var unused in consumer.ConsumeAsync<int>(opts: opts2, cancellationToken: consumeCts.Token))
                 {
                 }
             },

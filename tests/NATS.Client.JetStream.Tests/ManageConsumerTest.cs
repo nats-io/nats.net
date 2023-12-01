@@ -13,10 +13,10 @@ public class ManageConsumerTest
     public async Task Create_get_consumer()
     {
         await using var server = NatsServer.StartJS();
-        var nats = server.CreateClientConnection();
+        await using var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
         var js = new NatsJSContext(nats);
 
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
 
         await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
 

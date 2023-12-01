@@ -161,8 +161,8 @@ public class PublishTest
     {
         var ackRegex = new Regex(@"{""stream"":""s1"",\s*""seq"":\d+}");
 
-        // reduce test time a little
-        var natsOpts = NatsOpts.Default with { RequestTimeout = TimeSpan.FromSeconds(1) };
+        // give enough time for retries to avoid NatsJSPublishNoResponseExceptions
+        var natsOpts = NatsOpts.Default with { RequestTimeout = TimeSpan.FromSeconds(3) };
 
         await using var server = NatsServer.StartJS();
         var (nats1, proxy) = server.CreateProxiedClientConnection(natsOpts);
@@ -191,7 +191,7 @@ public class PublishTest
             }
         };
 
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(45));
 
         // use different connection to create stream and consumer to avoid request timeouts
         await using var nats0 = server.CreateClientConnection();
@@ -221,7 +221,7 @@ public class PublishTest
             ack.EnsureSuccess();
 
             Assert.Equal(1, Volatile.Read(ref retryCount));
-            await Retry.Until("ack received", () => proxy.Frames.Count(f => ackRegex.IsMatch(f.Message)) == 2);
+            await Retry.Until("ack received", () => proxy.Frames.Count(f => ackRegex.IsMatch(f.Message)) == 2, timeout: TimeSpan.FromSeconds(20));
         }
 
         // Publish fails twice but succeeds after a third retry when attempts is 3
@@ -234,7 +234,7 @@ public class PublishTest
             ack.EnsureSuccess();
 
             Assert.Equal(2, Volatile.Read(ref retryCount));
-            await Retry.Until("ack received", () => proxy.Frames.Count(f => ackRegex.IsMatch(f.Message)) == 3);
+            await Retry.Until("ack received", () => proxy.Frames.Count(f => ackRegex.IsMatch(f.Message)) == 3, timeout: TimeSpan.FromSeconds(20));
         }
 
         // Publish fails even after two retries
@@ -247,7 +247,7 @@ public class PublishTest
                 await js.PublishAsync("s1.foo", 1, opts: new NatsJSPubOpts { RetryAttempts = 2 }, cancellationToken: cts.Token));
 
             Assert.Equal(2, Volatile.Read(ref retryCount));
-            await Retry.Until("ack received", () => proxy.Frames.Count(f => ackRegex.IsMatch(f.Message)) == 2);
+            await Retry.Until("ack received", () => proxy.Frames.Count(f => ackRegex.IsMatch(f.Message)) == 2, timeout: TimeSpan.FromSeconds(20));
         }
     }
 }

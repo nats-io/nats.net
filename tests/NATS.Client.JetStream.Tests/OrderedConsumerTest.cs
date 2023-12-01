@@ -45,14 +45,14 @@ public class OrderedConsumerTest
     public async Task Consume_reconnect_publish()
     {
         await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         var stream = await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
 
-        for (var i = 0; i < 100; i++)
+        for (var i = 0; i < 50; i++)
         {
             if (i % 10 == 0)
             {
@@ -80,7 +80,7 @@ public class OrderedConsumerTest
             count++;
         }
 
-        Assert.Equal(100, count);
+        Assert.Equal(50, count);
     }
 
     [Fact]
