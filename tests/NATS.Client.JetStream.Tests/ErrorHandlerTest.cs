@@ -313,12 +313,13 @@ public class ErrorHandlerTest
 
         var stream = await js.CreateStreamAsync(new StreamConfig("s1", new[] { "s1.*" }), cts.Token);
 
+        // reduce heartbeat time out to increase the chance of receiving notification.
         var opts = new NatsJSConsumeOpts
         {
             MaxMsgs = 10,
             NotificationHandler = (_, _) => throw new TestConsumerNotificationException(),
             Expires = TimeSpan.FromSeconds(6),
-            IdleHeartbeat = TimeSpan.FromSeconds(3),
+            IdleHeartbeat = TimeSpan.FromSeconds(1),
         };
 
         // Swallow heartbeats
@@ -331,7 +332,7 @@ public class ErrorHandlerTest
             {
             }
 
-            throw new Exception("Should have thrown");
+            throw new Exception("Should have thrown (consumer)");
         }
         catch (TestConsumerNotificationException)
         {
@@ -344,7 +345,7 @@ public class ErrorHandlerTest
             {
             }
 
-            throw new Exception("Should have thrown");
+            throw new Exception("Should have thrown (ordered consumer)");
         }
         catch (TestConsumerNotificationException)
         {
