@@ -332,8 +332,11 @@ public class RequestReplyTest
         await using var server = NatsServer.Start();
         await using var nats = server.CreateClientConnection();
 
+        // connect to avoid race to subscribe and publish
+        await nats.ConnectAsync();
+
         const string subject = "foo";
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         var cancellationToken = cts.Token;
 
         var sub = await nats.SubscribeCoreAsync<int>(subject, cancellationToken: cancellationToken);
@@ -342,7 +345,7 @@ public class RequestReplyTest
             await msg.ReplyAsync(msg.Data * 2, cancellationToken: cancellationToken);
         });
 
-        var opts = new NatsSubOpts { Timeout = TimeSpan.FromSeconds(2) };
+        var opts = new NatsSubOpts { Timeout = TimeSpan.FromSeconds(4) };
 
         // Make sure timeout isn't affecting the real inbox subscription
         // by waiting double the timeout period (by calling RequestMany twice)

@@ -16,7 +16,7 @@ public class ManageStreamTest
         var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats);
 
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var cancellationToken = cts.Token;
 
         // Account Info

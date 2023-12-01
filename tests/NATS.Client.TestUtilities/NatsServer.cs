@@ -149,11 +149,11 @@ public class NatsServer : IAsyncDisposable
             }
             catch
             {
-                server?.DisposeAsync();
+                server?.DisposeAsync().AsTask().GetAwaiter().GetResult();
             }
             finally
             {
-                nats?.DisposeAsync();
+                nats?.DisposeAsync().AsTask().GetAwaiter().GetResult();
 #pragma warning restore CA2012
             }
         }
@@ -329,7 +329,7 @@ public class NatsServer : IAsyncDisposable
                 try
                 {
 #pragma warning disable CA2012
-                    nats.PingAsync().GetAwaiter().GetResult();
+                    nats.PingAsync().AsTask().GetAwaiter().GetResult();
 #pragma warning restore CA2012
                 }
                 catch (NatsException e)

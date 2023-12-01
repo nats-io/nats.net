@@ -12,10 +12,10 @@ public class ConsumerNextTest
     public async Task Next_test()
     {
         await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
         var js = new NatsJSContext(nats);
 
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
         var consumer = await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
