@@ -3,6 +3,27 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace NATS.Client.Core;
 
+/// <summary>
+/// This interface provides an optional contract when passing
+/// messages to processing methods which is usually helpful in
+/// creating test doubles in unit testing.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Using this interface is optional and should not affect functionality.
+/// </para>
+/// <para>
+/// There is a performance penalty when using this interface because
+/// <see cref="NatsMsg{T}"/> is a value type and boxing is required.
+/// A boxing allocation occurs when a value type is converted to the
+/// interface type. This is because the interface type is a reference
+/// type and the value type must be converted to a reference type.
+/// You should benchmark your application to determine if the
+/// interface is worth the performance penalty or makes any noticeable
+/// degradation in performance.
+/// </para>
+/// </remarks>
+/// <typeparam name="T">Data type of the payload</typeparam>
 public interface INatsMsg<T>
 {
     bool IsNoRespondersError { get; }
