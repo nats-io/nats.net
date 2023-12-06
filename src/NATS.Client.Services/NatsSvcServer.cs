@@ -110,6 +110,71 @@ public class NatsSvcServer : INatsSvcServer
         return ValueTask.FromResult(group);
     }
 
+    /// <inheritdoc />
+    public StatsResponse GetStats()
+    {
+        var endPoints = _endPoints.Select(ep =>
+        {
+            JsonNode? statsData;
+            try
+            {
+                statsData = _config.StatsHandler?.Invoke(ep.Value);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error calling stats handler for {Endpoint}", ep.Key);
+                statsData = null;
+            }
+
+            return new EndpointStats
+            {
+                Name = ep.Key,
+                Subject = ep.Value.Subject,
+                QueueGroup = ep.Value.QueueGroup!,
+                Data = statsData!,
+                ProcessingTime = ep.Value.ProcessingTime,
+                NumRequests = ep.Value.Requests,
+                NumErrors = ep.Value.Errors,
+                LastError = ep.Value.LastError ?? string.Empty,
+                AverageProcessingTime = ep.Value.AverageProcessingTime,
+            };
+        }).ToList();
+
+        var response = new StatsResponse
+        {
+            Name = _config.Name,
+            Id = _id,
+            Version = _config.Version,
+            Metadata = _config.Metadata!,
+            Endpoints = endPoints,
+            Started = _started,
+        };
+        return response;
+    }
+
+    /// <inheritdoc />
+    public InfoResponse GetInfo()
+    {
+        var endPoints = _endPoints.Select(ep => new EndpointInfo
+        {
+            Name = ep.Key,
+            Subject = ep.Value.Subject,
+            QueueGroup = ep.Value.QueueGroup!,
+            Metadata = ep.Value.Metadata!,
+        }).ToList();
+
+        var infoResponse = new InfoResponse
+        {
+            Name = _config.Name,
+            Id = _id,
+            Version = _config.Version,
+            Description = _config.Description!,
+            Metadata = _config.Metadata!,
+            Endpoints = endPoints,
+        };
+        return infoResponse;
+    }
+
     /// <summary>
     /// Stop the service.
     /// </summary>
@@ -172,7 +237,7 @@ public class NatsSvcServer : INatsSvcServer
                     }
 
                     await svcMsg.Msg.ReplyAsync(
-                        new PingResponse
+                        data: new PingResponse
                         {
                             Name = _config.Name,
                             Id = _id,
@@ -189,24 +254,8 @@ public class NatsSvcServer : INatsSvcServer
                         // empty request payload
                     }
 
-                    var endPoints = _endPoints.Select(ep => new EndpointInfo
-                    {
-                        Name = ep.Key,
-                        Subject = ep.Value.Subject,
-                        QueueGroup = ep.Value.QueueGroup!,
-                        Metadata = ep.Value.Metadata!,
-                    }).ToList();
-
                     await svcMsg.Msg.ReplyAsync(
-                        new InfoResponse
-                        {
-                            Name = _config.Name,
-                            Id = _id,
-                            Version = _config.Version,
-                            Description = _config.Description!,
-                            Metadata = _config.Metadata!,
-                            Endpoints = endPoints,
-                        },
+                        data: GetInfo(),
                         serializer: NatsSrvJsonSerializer<InfoResponse>.Default,
                         cancellationToken: _cancellationToken);
                 }
@@ -217,45 +266,8 @@ public class NatsSvcServer : INatsSvcServer
                         // empty request payload
                     }
 
-                    var endPoints = _endPoints.Select(ep =>
-                    {
-                        JsonNode? statsData;
-                        try
-                        {
-                            statsData = _config.StatsHandler?.Invoke(ep.Value);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex, "Error calling stats handler for {Endpoint}", ep.Key);
-                            statsData = null;
-                        }
-
-                        return new EndpointStats
-                        {
-                            Name = ep.Key,
-                            Subject = ep.Value.Subject,
-                            QueueGroup = ep.Value.QueueGroup!,
-                            Data = statsData!,
-                            ProcessingTime = ep.Value.ProcessingTime,
-                            NumRequests = ep.Value.Requests,
-                            NumErrors = ep.Value.Errors,
-                            LastError = ep.Value.LastError ?? string.Empty,
-                            AverageProcessingTime = ep.Value.AverageProcessingTime,
-                        };
-                    }).ToList();
-
-                    var response = new StatsResponse
-                    {
-                        Name = _config.Name,
-                        Id = _id,
-                        Version = _config.Version,
-                        Metadata = _config.Metadata!,
-                        Endpoints = endPoints,
-                        Started = _started,
-                    };
-
                     await svcMsg.Msg.ReplyAsync(
-                        response,
+                        data: GetStats(),
                         serializer: NatsSrvJsonSerializer<StatsResponse>.Default,
                         cancellationToken: _cancellationToken);
                 }
