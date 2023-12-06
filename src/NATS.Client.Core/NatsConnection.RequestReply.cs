@@ -62,8 +62,13 @@ public partial class NatsConnection
         {
             while (sub.Msgs.TryRead(out var msg))
             {
+                if (msg.IsNoRespondersError)
+                {
+                    throw new NatsNoRespondersException();
+                }
+
                 // Received end of stream sentinel
-                if (msg.Data is null)
+                if (msg.HasNoPayload)
                 {
                     yield break;
                 }

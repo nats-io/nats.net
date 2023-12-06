@@ -3,6 +3,14 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace NATS.Client.Core;
 
+[Flags]
+public enum NatsMsgFlags : byte
+{
+    None = 0,
+    NoPayload = 1,
+    NoResponders = 2,
+}
+
 /// <summary>
 /// NATS message structure as defined by the protocol.
 /// </summary>
@@ -12,6 +20,7 @@ namespace NATS.Client.Core;
 /// <param name="Headers">Pass additional information using name-value pairs.</param>
 /// <param name="Data">Serializable data object.</param>
 /// <param name="Connection">NATS connection this message is associated to.</param>
+/// <param name="Flags">Message flags.</param>
 /// <typeparam name="T">Specifies the type of data that may be sent to the NATS Server.</typeparam>
 /// <remarks>
 /// <para>Connection property is used to provide reply functionality.</para>
@@ -28,9 +37,12 @@ public readonly record struct NatsMsg<T>(
     int Size,
     NatsHeaders? Headers,
     T? Data,
-    INatsConnection? Connection)
+    INatsConnection? Connection,
+    NatsMsgFlags Flags = NatsMsgFlags.None)
 {
-    public bool IsNoRespondersError => Headers?.Code == 503;
+    public bool IsNoRespondersError => Flags.HasFlag(NatsMsgFlags.NoResponders);
+
+    public bool HasNoPayload => Flags.HasFlag(NatsMsgFlags.NoPayload);
 
     internal static NatsMsg<T> Build(
         string subject,
@@ -41,9 +53,13 @@ public readonly record struct NatsMsg<T>(
         NatsHeaderParser headerParser,
         INatsDeserialize<T> serializer)
     {
-        // Consider an empty payload as null or default value for value types. This way we are able to
-        // receive sentinels as nulls or default values. This might cause an issue with where we are not
-        // able to differentiate between an empty sentinel and actual default value of a struct e.g. 0 (zero).
+        var flags = NatsMsgFlags.None;
+
+        if (payloadBuffer.Length == 0)
+        {
+            flags |= NatsMsgFlags.NoPayload;
+        }
+
         var data = payloadBuffer.Length > 0
             ? serializer.Deserialize(payloadBuffer)
             : default;
@@ -58,6 +74,11 @@ public readonly record struct NatsMsg<T>(
                 throw new NatsException("Error parsing headers");
             }
 
+            if (payloadBuffer.Length == 0 && headers is { Count: 0, Code: 503 })
+            {
+                flags |= NatsMsgFlags.NoResponders;
+            }
+
             headers.SetReadOnly();
         }
 
@@ -66,7 +87,7 @@ public readonly record struct NatsMsg<T>(
                    + (headersBuffer?.Length ?? 0)
                    + payloadBuffer.Length;
 
-        return new NatsMsg<T>(subject, replyTo, (int)size, headers, data, connection);
+        return new NatsMsg<T>(subject, replyTo, (int)size, headers, data, connection, flags);
     }
 
     /// <summary>
