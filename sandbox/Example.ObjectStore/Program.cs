@@ -11,7 +11,7 @@ var js = new NatsJSContext(nats);
 var obj = new NatsObjContext(js);
 
 Log("Create object store...");
-var store = await obj.CreateObjectStore("test-bucket");
+var store = await obj.CreateObjectStoreAsync("test-bucket");
 
 var data = new byte[1024 * 1024 * 10];
 Random.Shared.NextBytes(data);
