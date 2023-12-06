@@ -11,7 +11,7 @@ public interface INatsObjContext
     /// <param name="bucket">Bucket name.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>Object store object.</returns>
-    ValueTask<INatsObjStore> CreateObjectStore(string bucket, CancellationToken cancellationToken = default);
+    ValueTask<INatsObjStore> CreateObjectStoreAsync(string bucket, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Create a new object store.
@@ -19,7 +19,7 @@ public interface INatsObjContext
     /// <param name="config">Object store configuration.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>Object store object.</returns>
-    ValueTask<INatsObjStore> CreateObjectStore(NatsObjConfig config, CancellationToken cancellationToken = default);
+    ValueTask<INatsObjStore> CreateObjectStoreAsync(NatsObjConfig config, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Get an existing object store.
