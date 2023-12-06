@@ -4,10 +4,27 @@ namespace NATS.Client.JetStream.Models;
 
 public record ConsumerConfig
 {
+    /// <summary>
+    /// Create an ephemeral consumer configuration.
+    /// </summary>
+    /// <remarks>
+    /// When <c>DurableName</c> is not specified, the consumer is ephemeral.
+    /// This default constructor doesn't set any properties explicitly.
+    /// </remarks>
     public ConsumerConfig()
     {
     }
 
+    /// <summary>
+    /// Create a durable consumer configuration.
+    /// </summary>
+    /// <param name="name">Durable name</param>
+    /// <remarks>
+    /// To create a durable consumer, the properties <c>Name</c> and <c>DurableName</c>
+    /// must be specified. You must also specify the <c>AckPolicy</c> as other than <c>None</c>.
+    /// This constructor sets the <c>Name</c> and <c>DurableName</c> to the same value specified
+    /// in <paramref name="name"/> parameter and sets the <c>AckPolicy</c> to <c>Explicit</c>.
+    /// </remarks>
     public ConsumerConfig(string name)
     {
         Name = name;
