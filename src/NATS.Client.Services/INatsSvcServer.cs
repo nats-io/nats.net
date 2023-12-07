@@ -45,11 +45,11 @@ public interface INatsSvcServer : IAsyncDisposable
     /// Get current stats for the service.
     /// </summary>
     /// <returns>Stats response object</returns>
-    StatsResponse GetStats();
+    StatsResponse Stats();
 
     /// <summary>
     /// Get current info for the service.
     /// </summary>
     /// <returns>Info response object</returns>
-    InfoResponse GetInfo();
+    InfoResponse Info();
 }

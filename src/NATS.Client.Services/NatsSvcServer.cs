@@ -111,7 +111,7 @@ public class NatsSvcServer : INatsSvcServer
     }
 
     /// <inheritdoc />
-    public StatsResponse GetStats()
+    public StatsResponse Stats()
     {
         var endPoints = _endPoints.Select(ep =>
         {
@@ -153,7 +153,7 @@ public class NatsSvcServer : INatsSvcServer
     }
 
     /// <inheritdoc />
-    public InfoResponse GetInfo()
+    public InfoResponse Info()
     {
         var endPoints = _endPoints.Select(ep => new EndpointInfo
         {
@@ -255,7 +255,7 @@ public class NatsSvcServer : INatsSvcServer
                     }
 
                     await svcMsg.Msg.ReplyAsync(
-                        data: GetInfo(),
+                        data: Info(),
                         serializer: NatsSrvJsonSerializer<InfoResponse>.Default,
                         cancellationToken: _cancellationToken);
                 }
@@ -267,7 +267,7 @@ public class NatsSvcServer : INatsSvcServer
                     }
 
                     await svcMsg.Msg.ReplyAsync(
-                        data: GetStats(),
+                        data: Stats(),
                         serializer: NatsSrvJsonSerializer<StatsResponse>.Default,
                         cancellationToken: _cancellationToken);
                 }

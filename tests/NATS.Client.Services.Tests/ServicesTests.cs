@@ -83,7 +83,7 @@ public class ServicesTests
             cancellationToken: cancellationToken);
 
         var info1 = (await nats.FindServicesAsync("$SRV.INFO", 1, NatsSrvJsonSerializer<InfoResponse>.Default, cancellationToken)).First();
-        var info2 = s1.GetInfo();
+        var info2 = s1.Info();
         foreach (var info in new[] { info1, info2 })
         {
             Assert.Single(info.Endpoints);
@@ -114,7 +114,7 @@ public class ServicesTests
         }
 
         var stat1 = (await nats.FindServicesAsync("$SRV.STATS", 1, NatsSrvJsonSerializer<StatsResponse>.Default, cancellationToken)).First();
-        var stat2 = s1.GetStats();
+        var stat2 = s1.Stats();
         foreach (var stat in new[] { stat1, stat2 })
         {
             Assert.Single(stat.Endpoints);
