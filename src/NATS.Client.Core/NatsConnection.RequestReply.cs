@@ -7,8 +7,6 @@ namespace NATS.Client.Core;
 
 public partial class NatsConnection
 {
-    private static readonly NatsSubOpts DefaultReplyOpts = new() { MaxMsgs = 1 };
-
     /// <inheritdoc />
     public string NewInbox() => NewInbox(InboxPrefix);
 
@@ -23,20 +21,14 @@ public partial class NatsConnection
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default)
     {
-        var opts = SetReplyOptsDefaults(replyOpts);
-
-        await using var sub = await RequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, opts, cancellationToken)
+        replyOpts = SetReplyOptsDefaults(replyOpts);
+        await using var sub = await RequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
             .ConfigureAwait(false);
 
         if (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
             if (sub.Msgs.TryRead(out var msg))
             {
-                if (msg.IsNoRespondersError)
-                {
-                    throw new NatsNoRespondersException();
-                }
-
                 return msg;
             }
         }
@@ -55,6 +47,7 @@ public partial class NatsConnection
         NatsSubOpts? replyOpts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        replyOpts = SetReplyManyOptsDefaults(replyOpts);
         await using var sub = await RequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
             .ConfigureAwait(false);
 
@@ -62,12 +55,6 @@ public partial class NatsConnection
         {
             while (sub.Msgs.TryRead(out var msg))
             {
-                // Received end of stream sentinel
-                if (msg.Data is null)
-                {
-                    yield break;
-                }
-
                 yield return msg;
             }
         }
@@ -111,11 +98,32 @@ public partial class NatsConnection
 
     private NatsSubOpts SetReplyOptsDefaults(NatsSubOpts? replyOpts)
     {
-        var opts = replyOpts ?? DefaultReplyOpts;
+        var opts = replyOpts ?? new NatsSubOpts { MaxMsgs = 1 };
+        return SetBaseReplyOptsDefaults(opts);
+    }
 
-        if ((opts.Timeout ?? default) == default)
+    private NatsSubOpts SetReplyManyOptsDefaults(NatsSubOpts? replyOpts)
+    {
+        var opts = replyOpts ?? new NatsSubOpts();
+
+        if (!opts.StopOnEmptyMsg.HasValue)
+        {
+            opts = opts with { StopOnEmptyMsg = true };
+        }
+
+        return SetBaseReplyOptsDefaults(opts);
+    }
+
+    private NatsSubOpts SetBaseReplyOptsDefaults(NatsSubOpts opts)
+    {
+        if (!opts.Timeout.HasValue)
         {
             opts = opts with { Timeout = Opts.RequestTimeout };
+        }
+
+        if (!opts.ThrowIfNoResponders.HasValue)
+        {
+            opts = opts with { ThrowIfNoResponders = true };
         }
 
         return opts;
