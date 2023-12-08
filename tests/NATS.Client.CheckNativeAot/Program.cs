@@ -217,7 +217,7 @@ async Task ObjectStoreTests()
     var js = new NatsJSContext(nats);
     var ob = new NatsObjContext(js);
 
-    var store = await ob.CreateObjectStore(new NatsObjConfig("b1"), cancellationToken);
+    var store = await ob.CreateObjectStoreAsync(new NatsObjConfig("b1"), cancellationToken);
 
     var stringBuilder = new StringBuilder();
     for (var i = 0; i < 9; i++)

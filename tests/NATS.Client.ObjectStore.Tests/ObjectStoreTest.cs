@@ -24,7 +24,7 @@ public class ObjectStoreTest
         var js = new NatsJSContext(nats);
         var ob = new NatsObjContext(js);
 
-        await ob.CreateObjectStore(new NatsObjConfig("b1"), cancellationToken);
+        await ob.CreateObjectStoreAsync(new NatsObjConfig("b1"), cancellationToken);
 
         await foreach (var stream in js.ListStreamsAsync(cancellationToken: cancellationToken))
         {
@@ -51,7 +51,7 @@ public class ObjectStoreTest
         var js = new NatsJSContext(nats);
         var ob = new NatsObjContext(js);
 
-        var store = await ob.CreateObjectStore(new NatsObjConfig("b1"), cancellationToken);
+        var store = await ob.CreateObjectStoreAsync(new NatsObjConfig("b1"), cancellationToken);
 
         var stringBuilder = new StringBuilder();
         for (var i = 0; i < 9; i++)
@@ -113,7 +113,7 @@ public class ObjectStoreTest
         var js = new NatsJSContext(nats);
         var ob = new NatsObjContext(js);
 
-        var store = await ob.CreateObjectStore(new NatsObjConfig("b1"), cancellationToken);
+        var store = await ob.CreateObjectStoreAsync(new NatsObjConfig("b1"), cancellationToken);
 
         var stringBuilder = new StringBuilder();
         for (var i = 0; i < 9; i++)
@@ -167,7 +167,7 @@ public class ObjectStoreTest
         var js = new NatsJSContext(nats);
         var ob = new NatsObjContext(js);
 
-        var store = await ob.CreateObjectStore(new NatsObjConfig("b1"), cancellationToken);
+        var store = await ob.CreateObjectStoreAsync(new NatsObjConfig("b1"), cancellationToken);
         await store.PutAsync("k1", new byte[] { 65, 66, 67 }, cancellationToken);
 
         var info = await store.GetInfoAsync("k1", cancellationToken: cancellationToken);
@@ -205,7 +205,7 @@ public class ObjectStoreTest
         var js = new NatsJSContext(nats);
         var obj = new NatsObjContext(js);
 
-        var store = await obj.CreateObjectStore(new NatsObjConfig("b1"), cancellationToken);
+        var store = await obj.CreateObjectStoreAsync(new NatsObjConfig("b1"), cancellationToken);
 
         var data = new byte[1024 * 1024 * 10];
         Random.Shared.NextBytes(data);
@@ -236,8 +236,8 @@ public class ObjectStoreTest
         var js = new NatsJSContext(nats);
         var obj = new NatsObjContext(js);
 
-        var store1 = await obj.CreateObjectStore(new NatsObjConfig("b1"), cancellationToken);
-        var store2 = await obj.CreateObjectStore(new NatsObjConfig("b2"), cancellationToken);
+        var store1 = await obj.CreateObjectStoreAsync(new NatsObjConfig("b1"), cancellationToken);
+        var store2 = await obj.CreateObjectStoreAsync(new NatsObjConfig("b2"), cancellationToken);
 
         await store1.PutAsync("k1", new byte[] { 42 }, cancellationToken: cancellationToken);
 
@@ -283,7 +283,7 @@ public class ObjectStoreTest
         var js = new NatsJSContext(nats);
         var obj = new NatsObjContext(js);
 
-        var store = await obj.CreateObjectStore(new NatsObjConfig("b1"), cancellationToken);
+        var store = await obj.CreateObjectStoreAsync(new NatsObjConfig("b1"), cancellationToken);
 
         await store.PutAsync("k1", new byte[] { 42 }, cancellationToken: cancellationToken);
 
@@ -322,7 +322,7 @@ public class ObjectStoreTest
         var js = new NatsJSContext(nats);
         var obj = new NatsObjContext(js);
 
-        var store = await obj.CreateObjectStore(new NatsObjConfig("b1"), cancellationToken);
+        var store = await obj.CreateObjectStoreAsync(new NatsObjConfig("b1"), cancellationToken);
 
         await store.PutAsync("k1", new byte[] { 42 }, cancellationToken: cancellationToken);
         await store.PutAsync("k2", new byte[] { 43 }, cancellationToken: cancellationToken);
@@ -379,8 +379,8 @@ public class ObjectStoreTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        var store1 = await obj.CreateObjectStore(new NatsObjConfig("b1") { Compression = false }, cancellationToken);
-        var store2 = await obj.CreateObjectStore(new NatsObjConfig("b2") { Compression = true }, cancellationToken);
+        var store1 = await obj.CreateObjectStoreAsync(new NatsObjConfig("b1") { Compression = false }, cancellationToken);
+        var store2 = await obj.CreateObjectStoreAsync(new NatsObjConfig("b2") { Compression = true }, cancellationToken);
 
         Assert.Equal("b1", store1.Bucket);
         Assert.Equal("b2", store2.Bucket);
