@@ -10,7 +10,7 @@ public class SlowConsumerTest
     public async Task Slow_consumer()
     {
         await using var server = NatsServer.Start();
-        var nats = server.CreateClientConnection(new NatsOpts { SubscriptionChannelCapacity = 3 });
+        var nats = server.CreateClientConnection(new NatsOpts { SubPendingChannelCapacity = 3 });
 
         var lost = 0;
         nats.OnError += (_, e) =>

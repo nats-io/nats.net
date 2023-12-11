@@ -79,9 +79,9 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         _logger = opts.LoggerFactory.CreateLogger<NatsConnection>();
         _clientOpts = ClientOpts.Create(Opts);
         HeaderParser = new NatsHeaderParser(opts.HeaderEncoding);
-        _defaultSubscriptionChannelOpts = new BoundedChannelOptions(opts.SubscriptionChannelCapacity)
+        _defaultSubscriptionChannelOpts = new BoundedChannelOptions(opts.SubPendingChannelCapacity)
         {
-            FullMode = opts.SubscriptionChannelFullMode,
+            FullMode = opts.SubPendingChannelFullMode,
             SingleWriter = true,
             SingleReader = false,
             AllowSynchronousContinuations = false,

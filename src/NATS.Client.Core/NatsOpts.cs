@@ -97,13 +97,13 @@ public sealed record NatsOpts
 
     /// <summary>
     /// This value will be used for subscriptions internal bounded message channel capacity.
-    /// The default subscriber pending message limit is 65536.
+    /// The default subscriber pending message limit is 1024.
     /// </summary>
-    public int SubscriptionChannelCapacity { get; init; } = 65536;
+    public int SubPendingChannelCapacity { get; init; } = 1024;
 
     /// <summary>
     /// This value will be used for subscriptions internal bounded message channel <c>FullMode</c>.
-    /// The default is to drop oldest message when full (<c>BoundedChannelFullMode.DropOldest</c>).
+    /// The default is to drop newest message when full (<c>BoundedChannelFullMode.DropNewest</c>).
     /// </summary>
     /// <remarks>
     /// If the client reaches this internal limit (bounded channel capacity), by default it will drop messages
@@ -112,7 +112,7 @@ public sealed record NatsOpts
     /// from this condition or set a different default such as <c>BoundedChannelFullMode.Wait</c> in which
     /// case it might risk server disconnecting the client as a slow consumer.
     /// </remarks>
-    public BoundedChannelFullMode SubscriptionChannelFullMode { get; init; } = BoundedChannelFullMode.DropOldest;
+    public BoundedChannelFullMode SubPendingChannelFullMode { get; init; } = BoundedChannelFullMode.DropNewest;
 
     internal NatsUri[] GetSeedUris()
     {
