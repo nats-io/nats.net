@@ -21,7 +21,7 @@ public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
     {
         _msgs = Channel.CreateBounded<NatsMsg<T>>(
             connection.GetChannelOpts(connection.Opts, opts?.ChannelOpts),
-            msg => connection.MessageDropped(this, _msgs?.Reader.Count ?? 0, msg));
+            msg => Connection.MessageDropped(this, _msgs?.Reader.Count ?? 0, msg));
 
         Serializer = serializer;
     }
