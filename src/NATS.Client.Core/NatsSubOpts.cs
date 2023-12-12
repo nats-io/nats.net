@@ -53,7 +53,8 @@ public record NatsSubOpts
     public bool? StopOnEmptyMsg { get; init; }
 
     /// <summary>
-    /// If true, throw an exception if a no responders status message is received.
+    /// If true, end the subscription and throw an exception if a
+    /// no responders status message is received.
     /// The no responders status message will not be delivered to the subscription.
     /// </summary>
     /// <remarks>

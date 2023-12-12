@@ -10,6 +10,18 @@ public partial class NatsConnection
     /// <inheritdoc />
     public string NewInbox() => NewInbox(InboxPrefix);
 
+    private static readonly NatsSubOpts ReplyOptsDefault = new NatsSubOpts
+    {
+        MaxMsgs = 1,
+        ThrowIfNoResponders = true,
+    };
+
+    private static readonly NatsSubOpts ReplyManyOptsDefault = new NatsSubOpts
+    {
+        StopOnEmptyMsg = true,
+        ThrowIfNoResponders = true,
+    };
+
     /// <inheritdoc />
     public async ValueTask<NatsMsg<TReply>> RequestAsync<TRequest, TReply>(
         string subject,
@@ -98,14 +110,18 @@ public partial class NatsConnection
 
     private NatsSubOpts SetReplyOptsDefaults(NatsSubOpts? replyOpts)
     {
-        var opts = replyOpts ?? new NatsSubOpts { MaxMsgs = 1 };
+        var opts = replyOpts ?? ReplyOptsDefault;
+        if (!opts.MaxMsgs.HasValue)
+        {
+            opts = opts with { MaxMsgs = 1 };
+        }
+
         return SetBaseReplyOptsDefaults(opts);
     }
 
     private NatsSubOpts SetReplyManyOptsDefaults(NatsSubOpts? replyOpts)
     {
-        var opts = replyOpts ?? new NatsSubOpts();
-
+        var opts = replyOpts ?? ReplyManyOptsDefault;
         if (!opts.StopOnEmptyMsg.HasValue)
         {
             opts = opts with { StopOnEmptyMsg = true };
