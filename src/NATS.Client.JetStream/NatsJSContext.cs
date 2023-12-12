@@ -133,6 +133,9 @@ public partial class NatsJSContext
                         // without the timeout the publish call will hang forever since the server
                         // which received the request won't be there to respond anymore.
                         Timeout = Connection.Opts.RequestTimeout,
+
+                        // If JetStream is disabled, a no responders error will be returned
+                        ThrowIfNoResponders = true,
                     },
                     cancellationToken)
                 .ConfigureAwait(false);
@@ -141,11 +144,6 @@ public partial class NatsJSContext
             {
                 while (sub.Msgs.TryRead(out var msg))
                 {
-                    if (msg.IsNoRespondersError)
-                    {
-                        throw new NatsNoRespondersException();
-                    }
-
                     if (msg.Data == null)
                     {
                         throw new NatsJSException("No response data received");
