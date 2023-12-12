@@ -519,6 +519,7 @@ public class NatsObjStore : INatsObjStore
         opts ??= new NatsObjListOpts();
         var watchOpts = new NatsObjWatchOpts
         {
+            InitialSetOnly = true,
             UpdatesOnly = false,
             IgnoreDeletes = !opts.ShowDeleted,
         };
@@ -588,7 +589,7 @@ public class NatsObjStore : INatsObjStore
                         }
                     }
 
-                    if (!opts.UpdatesOnly)
+                    if (opts.InitialSetOnly)
                     {
                         if (metadata.NumPending == 0)
                             break;
@@ -672,6 +673,11 @@ public record NatsObjWatchOpts
     public bool IncludeHistory { get; init; }
 
     public bool UpdatesOnly { get; init; }
+
+    /// <summary>
+    /// Only return the initial set of objects and don't watch for further updates.
+    /// </summary>
+    public bool InitialSetOnly { get; init; }
 }
 
 public record NatsObjListOpts

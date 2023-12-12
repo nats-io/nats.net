@@ -15,6 +15,7 @@ public enum NatsSubEndReason
     MaxBytes,
     Timeout,
     IdleTimeout,
+    EmptyMsg,
     IdleHeartbeatTimeout,
     StartUpTimeout,
     Cancelled,
@@ -24,6 +25,7 @@ public enum NatsSubEndReason
 
 public abstract class NatsSubBase
 {
+    private static readonly byte[] NoRespondersHeaderSequence = { (byte)' ', (byte)'5', (byte)'0', (byte)'3' };
     private readonly ILogger _logger;
     private readonly bool _debug;
     private readonly ISubscriptionManager _manager;
@@ -192,6 +194,20 @@ public abstract class NatsSubBase
     public virtual async ValueTask ReceiveAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
     {
         ResetIdleTimeout();
+
+        // check for empty payload conditions
+        if (payloadBuffer.Length == 0)
+        {
+            switch (Opts)
+            {
+            case { ThrowIfNoResponders: true } when headersBuffer is { Length: >= 12 } && headersBuffer.Value.Slice(8, 4).ToSpan().SequenceEqual(NoRespondersHeaderSequence):
+                SetException(new NatsNoRespondersException());
+                return;
+            case { StopOnEmptyMsg: true }:
+                EndSubscription(NatsSubEndReason.EmptyMsg);
+                return;
+            }
+        }
 
         try
         {

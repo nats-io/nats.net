@@ -20,7 +20,8 @@ public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
         : base(connection, manager, subject, queueGroup, opts, cancellationToken)
     {
         _msgs = Channel.CreateBounded<NatsMsg<T>>(
-            NatsSubUtils.GetChannelOpts(opts?.ChannelOpts));
+            connection.GetChannelOpts(connection.Opts, opts?.ChannelOpts),
+            msg => Connection.MessageDropped(this, _msgs?.Reader.Count ?? 0, msg));
 
         Serializer = serializer;
     }
@@ -63,38 +64,4 @@ public class NatsSubException : NatsException
     public Memory<byte> Payload { get; }
 
     public Memory<byte> Headers { get; }
-}
-
-internal sealed class NatsSubUtils
-{
-    private static readonly BoundedChannelOptions DefaultChannelOpts =
-        new BoundedChannelOptions(1_000)
-        {
-            FullMode = BoundedChannelFullMode.Wait,
-            SingleWriter = true,
-            SingleReader = false,
-            AllowSynchronousContinuations = false,
-        };
-
-    internal static BoundedChannelOptions GetChannelOpts(
-        NatsSubChannelOpts? subChannelOpts)
-    {
-        if (subChannelOpts is { } overrideOpts)
-        {
-            return new BoundedChannelOptions(overrideOpts.Capacity ??
-                                             DefaultChannelOpts.Capacity)
-            {
-                AllowSynchronousContinuations =
-                    DefaultChannelOpts.AllowSynchronousContinuations,
-                FullMode =
-                    overrideOpts.FullMode ?? DefaultChannelOpts.FullMode,
-                SingleWriter = DefaultChannelOpts.SingleWriter,
-                SingleReader = DefaultChannelOpts.SingleReader,
-            };
-        }
-        else
-        {
-            return DefaultChannelOpts;
-        }
-    }
 }

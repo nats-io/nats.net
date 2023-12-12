@@ -38,7 +38,7 @@ public class IntroPage
         }
 
         #region store
-        var store = await obj.CreateObjectStore("test-bucket");
+        var store = await obj.CreateObjectStoreAsync("test-bucket");
         #endregion
 
         await File.WriteAllTextAsync("data.bin", "tests");

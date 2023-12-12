@@ -7,14 +7,9 @@ on:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 jobs:
   nuget:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     name: dotnet
     runs-on: ubuntu-latest
     steps:
@@ -52,23 +47,6 @@ jobs:
           cd dist
           # this should upload snupkgs in the same folder
           dotnet nuget push *.nupkg -s https://api.nuget.org/v3/index.json -k "${{ secrets.NUGET_API_KEY }}" --skip-duplicate
-
-      - if: ${{ fromJSON(steps.tag.outputs.create) }}
-        run: dotnet tool update -g docfx
-
-      - if: ${{ fromJSON(steps.tag.outputs.create) }}
-        run: docfx docs/docfx.json
-
-      - if: ${{ fromJSON(steps.tag.outputs.create) }}
-        name: Upload artifact
-        uses: actions/upload-pages-artifact@v1
-        with:
-          path: docs/_site
-
-      - if: ${{ fromJSON(steps.tag.outputs.create) }}
-        name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v2
 
       - if: ${{ fromJSON(steps.tag.outputs.create) }}
         name: Tag

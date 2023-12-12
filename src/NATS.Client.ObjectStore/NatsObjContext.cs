@@ -26,8 +26,8 @@ public class NatsObjContext : INatsObjContext
     /// <param name="bucket">Bucket name.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>Object store object.</returns>
-    public ValueTask<INatsObjStore> CreateObjectStore(string bucket, CancellationToken cancellationToken = default) =>
-        CreateObjectStore(new NatsObjConfig(bucket), cancellationToken);
+    public ValueTask<INatsObjStore> CreateObjectStoreAsync(string bucket, CancellationToken cancellationToken = default) =>
+        CreateObjectStoreAsync(new NatsObjConfig(bucket), cancellationToken);
 
     /// <summary>
     /// Create a new object store.
@@ -35,7 +35,7 @@ public class NatsObjContext : INatsObjContext
     /// <param name="config">Object store configuration.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>Object store object.</returns>
-    public async ValueTask<INatsObjStore> CreateObjectStore(NatsObjConfig config, CancellationToken cancellationToken = default)
+    public async ValueTask<INatsObjStore> CreateObjectStoreAsync(NatsObjConfig config, CancellationToken cancellationToken = default)
     {
         ValidateBucketName(config.Bucket);
 

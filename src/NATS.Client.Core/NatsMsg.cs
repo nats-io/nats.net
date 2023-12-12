@@ -122,8 +122,6 @@ public readonly record struct NatsMsg<T>(
     T? Data,
     INatsConnection? Connection) : INatsMsg<T>
 {
-    public bool IsNoRespondersError => Headers?.Code == 503;
-
     internal static NatsMsg<T> Build(
         string subject,
         string? replyTo,

@@ -35,6 +35,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
     private readonly CancellationTokenSource _disposedCancellationTokenSource;
     private readonly string _name;
     private readonly TimeSpan _socketComponentDisposeTimeout = TimeSpan.FromSeconds(5);
+    private readonly BoundedChannelOptions _defaultSubscriptionChannelOpts;
 
     private int _pongCount;
     private bool _isDisposed;
@@ -78,6 +79,13 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         _logger = opts.LoggerFactory.CreateLogger<NatsConnection>();
         _clientOpts = ClientOpts.Create(Opts);
         HeaderParser = new NatsHeaderParser(opts.HeaderEncoding);
+        _defaultSubscriptionChannelOpts = new BoundedChannelOptions(opts.SubPendingChannelCapacity)
+        {
+            FullMode = opts.SubPendingChannelFullMode,
+            SingleWriter = true,
+            SingleReader = false,
+            AllowSynchronousContinuations = false,
+        };
     }
 
     // events
@@ -86,6 +94,8 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
     public event EventHandler<string>? ConnectionOpened;
 
     public event EventHandler<string>? ReconnectFailed;
+
+    public event EventHandler<INatsError>? OnError;
 
     public NatsOpts Opts { get; }
 
@@ -238,6 +248,34 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         return ValueTask.CompletedTask;
     }
 
+    internal void MessageDropped<T>(NatsSub<T> natsSub, int pending, NatsMsg<T> msg)
+    {
+        var subject = msg.Subject;
+        _logger.LogWarning("Dropped message from {Subject} with {Pending} pending messages", subject, pending);
+        OnError?.Invoke(this, new MessageDroppedError(natsSub, pending, subject, msg.ReplyTo, msg.Headers, msg.Data));
+    }
+
+    internal BoundedChannelOptions GetChannelOpts(NatsOpts connectionOpts, NatsSubChannelOpts? subChannelOpts)
+    {
+        if (subChannelOpts is { } overrideOpts)
+        {
+            return new BoundedChannelOptions(overrideOpts.Capacity ??
+                                             _defaultSubscriptionChannelOpts.Capacity)
+            {
+                AllowSynchronousContinuations =
+                    _defaultSubscriptionChannelOpts.AllowSynchronousContinuations,
+                FullMode =
+                    overrideOpts.FullMode ?? _defaultSubscriptionChannelOpts.FullMode,
+                SingleWriter = _defaultSubscriptionChannelOpts.SingleWriter,
+                SingleReader = _defaultSubscriptionChannelOpts.SingleReader,
+            };
+        }
+        else
+        {
+            return _defaultSubscriptionChannelOpts;
+        }
+    }
+
     private async ValueTask InitialConnectAsync()
     {
         Debug.Assert(ConnectionState == NatsConnectionState.Connecting, "Connection state");
@@ -250,8 +288,8 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
                 throw new NatsException($"URI {uri} requires TLS but TlsMode is set to Disable");
         }
 
-        if (Opts.TlsOpts.HasTlsFile)
-            _tlsCerts = new TlsCerts(Opts.TlsOpts);
+        if (Opts.TlsOpts.HasTlsCerts)
+            _tlsCerts = await TlsCerts.FromNatsTlsOptsAsync(Opts.TlsOpts).ConfigureAwait(false);
 
         if (!Opts.AuthOpts.IsAnonymous)
         {

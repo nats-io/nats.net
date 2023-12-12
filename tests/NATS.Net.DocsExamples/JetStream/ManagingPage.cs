@@ -1,3 +1,4 @@
+// ReSharper disable RedundantAssignment
 // ReSharper disable SuggestVarOrType_Elsewhere
 
 using NATS.Client.Core;
@@ -56,6 +57,37 @@ public class ManagingPage
             #region consumer-get
             // Get an existing consumer
             var consumer = await js.GetConsumerAsync(stream: "orders", consumer: "order_processor");
+            #endregion
+        }
+
+        {
+            #region consumer-durable
+            // Create a durable consumer
+            var durableConfig = new ConsumerConfig("durable_processor");
+
+            // Same as above
+            durableConfig = new ConsumerConfig
+            {
+                Name = "durable_processor",
+                DurableName = "durable_processor",
+                AckPolicy = ConsumerConfigAckPolicy.Explicit,
+            };
+
+            var consumer = await js.CreateOrUpdateConsumerAsync(stream: "orders", durableConfig);
+
+            Console.WriteLine($"Consumer Name: {consumer.Info.Name}"); // durable_processor
+            Console.WriteLine($"Consumer DurableName: {consumer.Info.Config.DurableName}"); // durable_processor
+            #endregion
+        }
+
+        {
+            #region consumer-ephemeral
+            // Create an ephemeral consumer by not setting durable name
+            var ephemeralConfig = new ConsumerConfig();
+
+            var consumer = await js.CreateOrUpdateConsumerAsync(stream: "orders", ephemeralConfig);
+
+            Console.WriteLine($"Consumer Name: {consumer.Info.Name}"); // e.g. Z8YlwrP9 (server assigned random name)
             #endregion
         }
     }

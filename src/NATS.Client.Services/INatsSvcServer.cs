@@ -1,4 +1,5 @@
 using NATS.Client.Core;
+using NATS.Client.Services.Models;
 
 namespace NATS.Client.Services;
 
@@ -39,4 +40,16 @@ public interface INatsSvcServer : IAsyncDisposable
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> may be used to cancel th call in the future.</param>
     /// <returns>A <seealso cref="ValueTask"/> representing the asynchronous operation.</returns>
     ValueTask<NatsSvcServer.Group> AddGroupAsync(string name, string? queueGroup = default, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get current stats for the service.
+    /// </summary>
+    /// <returns>Stats response object</returns>
+    StatsResponse GetStats();
+
+    /// <summary>
+    /// Get current info for the service.
+    /// </summary>
+    /// <returns>Info response object</returns>
+    InfoResponse GetInfo();
 }

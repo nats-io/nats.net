@@ -23,7 +23,7 @@ public class ObjectStoreCompat
         // Test.Log($"JSON: {json}");
         var config = json["config"];
 
-        await ob.CreateObjectStore(new NatsObjConfig(config["bucket"].GetValue<string>()));
+        await ob.CreateObjectStoreAsync(new NatsObjConfig(config["bucket"].GetValue<string>()));
         await msg.ReplyAsync();
     }
 
@@ -42,7 +42,7 @@ public class ObjectStoreCompat
         var bucket = config["bucket"].GetValue<string>();
         var numberOfReplicas = config["num_replicas"].GetValue<int>();
 
-        await ob.CreateObjectStore(new NatsObjConfig(bucket)
+        await ob.CreateObjectStoreAsync(new NatsObjConfig(bucket)
         {
             Description = description,
             MaxAge = fromSeconds,

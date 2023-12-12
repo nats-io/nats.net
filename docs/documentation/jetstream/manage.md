@@ -44,3 +44,13 @@ Unlike streams, consumers are accessed by NATS client libraries as part of messa
 
 [!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/ManagingPage.cs#consumer-create)]
 [!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/ManagingPage.cs#consumer-get)]
+
+### Ephemeral and Durable Consumers
+
+A consumer can be ephemeral or durable. It is considered durable when an explicit name is set on the
+DurableName field when creating the consumer, otherwise it is considered ephemeral. Durables and ephemeral behave
+exactly the same except that an ephemeral will be automatically cleaned up (deleted) after a period of inactivity,
+specifically when there are no subscriptions bound to the consumer.
+
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/ManagingPage.cs#consumer-durable)]
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/ManagingPage.cs#consumer-ephemeral)]

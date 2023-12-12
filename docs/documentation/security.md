@@ -24,12 +24,13 @@ You can set the TLS options to use your client certificates when connecting to a
 
 [!code-csharp[](../../tests/NATS.Net.DocsExamples/SecurityPage.cs#tls-mutual)]
 
-### Intermediate CA Certificates
-
-When connecting using intermediate CA certificates, it might noy be possible to validate the client certificate and the TLS handshake may fail.
-
-Unfortunately, for .NET client applications it isn't possible to pass additional intermediate certificates and the only
-solution is to add the certificates to the certificate store manually.
-
-See also:
-https://learn.microsoft.com/en-us/dotnet/core/extensions/sslstream-troubleshooting#intermediate-certificates-are-not-sent
+> [!TIP]
+> #### Intermediate CA Certificates
+>
+> When connecting using intermediate CA certificates, it might not be possible to validate the client certificate and
+> TLS handshake may fail.
+>
+> Unfortunately, for .NET client applications it isn't possible to pass additional intermediate certificates and the
+> only solution is to add the certificates to the certificate store manually.
+>
+> See also .NET documentation on [Troubleshooting SslStream authentication issues](https://learn.microsoft.com/en-us/dotnet/core/extensions/sslstream-troubleshooting#intermediate-certificates-are-not-sent)
