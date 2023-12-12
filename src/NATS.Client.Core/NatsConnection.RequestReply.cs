@@ -7,9 +7,6 @@ namespace NATS.Client.Core;
 
 public partial class NatsConnection
 {
-    /// <inheritdoc />
-    public string NewInbox() => NewInbox(InboxPrefix);
-
     private static readonly NatsSubOpts ReplyOptsDefault = new NatsSubOpts
     {
         MaxMsgs = 1,
@@ -21,6 +18,9 @@ public partial class NatsConnection
         StopOnEmptyMsg = true,
         ThrowIfNoResponders = true,
     };
+
+    /// <inheritdoc />
+    public string NewInbox() => NewInbox(InboxPrefix);
 
     /// <inheritdoc />
     public async ValueTask<NatsMsg<TReply>> RequestAsync<TRequest, TReply>(
