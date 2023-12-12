@@ -46,14 +46,22 @@ public sealed record NatsTlsOpts
     /// <summary>
     /// String or file path to PEM-encoded X509 Certificate
     /// </summary>
+    /// <remarks>
+    /// Must be used in conjunction with <see cref="KeyFile"/>.
+    /// </remarks>
     public string? CertFile { get; init; }
 
     /// <summary>
     /// String or file path to PEM-encoded Private Key
     /// </summary>
+    /// /// <remarks>
+    /// Must be used in conjunction with <see cref="CertFile"/>.
+    /// </remarks>
     public string? KeyFile { get; init; }
 
+    /// <summary>
     /// Callback that loads Client Certificate
+    /// </summary>
     public Func<ValueTask<X509Certificate2>>? LoadClientCert { get; init; }
 
     /// <summary>
