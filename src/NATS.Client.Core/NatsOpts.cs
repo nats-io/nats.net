@@ -1,4 +1,5 @@
 using System.Text;
+using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NATS.Client.Core.Internal;
@@ -93,6 +94,25 @@ public sealed record NatsOpts
     /// subsequent reconnect attempts if server returns the same auth error twice.
     /// </summary>
     public bool IgnoreAuthErrorAbort { get; init; } = false;
+
+    /// <summary>
+    /// This value will be used for subscriptions internal bounded message channel capacity.
+    /// The default subscriber pending message limit is 1024.
+    /// </summary>
+    public int SubPendingChannelCapacity { get; init; } = 1024;
+
+    /// <summary>
+    /// This value will be used for subscriptions internal bounded message channel <c>FullMode</c>.
+    /// The default is to drop newest message when full (<c>BoundedChannelFullMode.DropNewest</c>).
+    /// </summary>
+    /// <remarks>
+    /// If the client reaches this internal limit (bounded channel capacity), by default it will drop messages
+    /// and continue to process new messages. This is aligned with NATS at most once delivery. It is up to
+    /// the application to detect the missing messages (<seealso cref="NatsConnection.OnError"/>) and recover
+    /// from this condition or set a different default such as <c>BoundedChannelFullMode.Wait</c> in which
+    /// case it might risk server disconnecting the client as a slow consumer.
+    /// </remarks>
+    public BoundedChannelFullMode SubPendingChannelFullMode { get; init; } = BoundedChannelFullMode.DropNewest;
 
     internal NatsUri[] GetSeedUris()
     {

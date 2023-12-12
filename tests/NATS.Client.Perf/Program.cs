@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
+using System.Threading.Channels;
 using NATS.Client.Core;
 using NATS.Client.Core.Tests;
 
@@ -23,7 +24,11 @@ await using var server = NatsServer.Start();
 Console.WriteLine("\nRunning nats bench");
 var natsBenchTotalMsgs = RunNatsBench(server.ClientUrl, t);
 
-await using var nats1 = server.CreateClientConnection();
+await using var nats1 = server.CreateClientConnection(new NatsOpts
+{
+    // don't drop messages
+    SubPendingChannelFullMode = BoundedChannelFullMode.Wait,
+});
 await using var nats2 = server.CreateClientConnection();
 
 var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
