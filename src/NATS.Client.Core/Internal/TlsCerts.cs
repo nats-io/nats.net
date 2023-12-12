@@ -1,10 +1,13 @@
 using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
+using System.Text.RegularExpressions;
 
 namespace NATS.Client.Core.Internal;
 
 internal class TlsCerts
 {
+    private static readonly Regex PemRegex = new(@"^\s*-{5}BEGIN\s+([^-]+)-{5}[A-Za-z0-9=+/\s\r\n]+-{5}END\s+\1-{5}\s*$", RegexOptions.Singleline | RegexOptions.Compiled);
+
     public TlsCerts(NatsTlsOpts tlsOpts)
     {
         if (tlsOpts.Mode == TlsMode.Disable)
@@ -21,12 +24,12 @@ internal class TlsCerts
         if (tlsOpts.CaFile != default)
         {
             CaCerts = new X509Certificate2Collection();
-            CaCerts.ImportFromPemFile(tlsOpts.CaFile);
+            CaCerts.ImportFromPem(ReadPemStringOrFile(tlsOpts.CaFile));
         }
 
         if (tlsOpts.CertFile != default && tlsOpts.KeyFile != default)
         {
-            var clientCert = X509Certificate2.CreateFromPemFile(tlsOpts.CertFile, tlsOpts.KeyFile);
+            var clientCert = X509Certificate2.CreateFromPem(ReadPemStringOrFile(tlsOpts.CertFile), ReadPemStringOrFile(tlsOpts.KeyFile));
 
             // On Windows, ephemeral keys/certificates do not work with schannel. e.g. unless stored in certificate store.
             // https://github.com/dotnet/runtime/issues/66283#issuecomment-1061014225
@@ -45,4 +48,6 @@ internal class TlsCerts
     public X509Certificate2Collection? CaCerts { get; }
 
     public X509Certificate2Collection? ClientCerts { get; }
+
+    private static string ReadPemStringOrFile(string input) => (PemRegex.IsMatch(input) ? input : File.ReadAllText(input)).Trim();
 }
