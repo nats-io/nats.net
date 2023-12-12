@@ -200,7 +200,7 @@ public abstract class NatsSubBase
         {
             switch (Opts)
             {
-            case { ThrowIfNoResponders: true } when headersBuffer is { Length: >= 12 } && headersBuffer.Value.Slice(8, 4).ToArray().SequenceEqual(NoRespondersHeaderSequence):
+            case { ThrowIfNoResponders: true } when headersBuffer is { Length: >= 12 } && headersBuffer.Value.Slice(8, 4).ToSpan().SequenceEqual(NoRespondersHeaderSequence):
                 SetException(new NatsNoRespondersException());
                 return;
             case { StopOnEmptyMsg: true }:
