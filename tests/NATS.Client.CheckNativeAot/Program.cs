@@ -42,6 +42,9 @@ async Task RequestReplyTests()
         await msg.ReplyAsync<int?>(null); // sentinel
     });
 
+    // make sure the sub has started
+    await nats.PingAsync();
+
     var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
     var results = new[] { 2, 3, 4 };
     var count = 0;
