@@ -1,4 +1,4 @@
-﻿using System.Security.Cryptography;
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 
@@ -7,15 +7,14 @@ namespace NATS.Client.Core.Tests;
 public class TlsCertsTest
 {
     [Fact]
-    public void Load_ca_cert()
+    public async Task Load_ca_cert()
     {
-        var caFile = "resources/certs/ca-cert.pem";
-        var caPem = File.ReadAllText(caFile);
+        const string caFile = "resources/certs/ca-cert.pem";
 
         // CA cert from file
         {
             var opts = new NatsTlsOpts { CaFile = caFile };
-            var certs = new TlsCerts(opts);
+            var certs = await TlsCerts.FromNatsTlsOptsAsync(opts);
 
             Assert.NotNull(certs.CaCerts);
             Assert.Single(certs.CaCerts);
@@ -27,8 +26,8 @@ public class TlsCertsTest
 
         // CA cert from PEM string
         {
-            var opts = new NatsTlsOpts { CaFile = caPem };
-            var certs = new TlsCerts(opts);
+            var opts = new NatsTlsOpts { LoadCaCerts = NatsTlsOpts.LoadCaCertsFromPem(await File.ReadAllTextAsync(caFile)) };
+            var certs = await TlsCerts.FromNatsTlsOptsAsync(opts);
 
             Assert.NotNull(certs.CaCerts);
             Assert.Single(certs.CaCerts);
@@ -40,24 +39,26 @@ public class TlsCertsTest
     }
 
     [Fact]
-    public void Load_client_cert_and_key()
+    public async Task Load_client_cert_and_key()
     {
-        var clientCertFile = "resources/certs/client-cert.pem";
-        var clientKeyFile = "resources/certs/client-key.pem";
-        var clientCertPem = File.ReadAllText(clientCertFile);
-        var clientKeyPem = File.ReadAllText(clientKeyFile);
+        const string clientCertFile = "resources/certs/client-cert.pem";
+        const string clientKeyFile = "resources/certs/client-key.pem";
 
-        Validate(clientCertFile, clientKeyFile);
-        Validate(clientCertPem, clientKeyPem);
-        Validate(clientCertFile, clientKeyPem);
-        Validate(clientCertPem, clientKeyFile);
+        await ValidateAsync(new NatsTlsOpts
+        {
+            CertFile = clientCertFile,
+            KeyFile = clientKeyFile,
+        });
+        await ValidateAsync(new NatsTlsOpts
+        {
+            LoadClientCert = NatsTlsOpts.LoadClientCertFromPem(await File.ReadAllTextAsync(clientCertFile), await File.ReadAllTextAsync(clientKeyFile)),
+        });
 
         return;
 
-        static void Validate(string cert, string key)
+        static async Task ValidateAsync(NatsTlsOpts opts)
         {
-            var opts = new NatsTlsOpts { CertFile = cert, KeyFile = key };
-            var certs = new TlsCerts(opts);
+            var certs = await TlsCerts.FromNatsTlsOptsAsync(opts);
 
             Assert.NotNull(certs.ClientCerts);
             Assert.Single(certs.ClientCerts);
@@ -74,6 +75,10 @@ public class TlsCertsTest
     [Fact]
     public async Task Client_connect()
     {
+        const string caFile = "resources/certs/ca-cert.pem";
+        const string clientCertFile = "resources/certs/client-cert.pem";
+        const string clientKeyFile = "resources/certs/client-key.pem";
+
         await using var server = NatsServer.Start(
             new NullOutputHelper(),
             new NatsServerOptsBuilder()
@@ -81,31 +86,28 @@ public class TlsCertsTest
                 .Build());
 
         // Using files
-        await Validate(
-            server,
-            ca: "resources/certs/ca-cert.pem",
-            cert: "resources/certs/client-cert.pem",
-            key: "resources/certs/client-key.pem");
+        await Validate(server, new NatsTlsOpts
+        {
+            CaFile = caFile,
+            CertFile = clientCertFile,
+            KeyFile = clientKeyFile,
+        });
 
         // Using PEM strings
-        await Validate(
-            server,
-            ca: await File.ReadAllTextAsync("resources/certs/ca-cert.pem"),
-            cert: await File.ReadAllTextAsync("resources/certs/client-cert.pem"),
-            key: await File.ReadAllTextAsync("resources/certs/client-key.pem"));
+        await Validate(server, new NatsTlsOpts
+        {
+            LoadCaCerts = NatsTlsOpts.LoadCaCertsFromPem(await File.ReadAllTextAsync(caFile)),
+            LoadClientCert = NatsTlsOpts.LoadClientCertFromPem(await File.ReadAllTextAsync(clientCertFile), await File.ReadAllTextAsync(clientKeyFile)),
+        });
 
         return;
 
-        static async Task Validate(NatsServer natsServer, string ca, string cert, string key)
+        static async Task Validate(NatsServer natsServer, NatsTlsOpts opts)
         {
-            var clientOpts = natsServer.ClientOpts(NatsOpts.Default);
-
-            clientOpts = clientOpts with
+            // overwrite the entire TLS option, because NatsServer.Start comes with some defaults
+            var clientOpts = natsServer.ClientOpts(NatsOpts.Default) with
             {
-                TlsOpts = clientOpts.TlsOpts with
-                {
-                    CaFile = ca, CertFile = cert, KeyFile = key,
-                },
+                TlsOpts = opts,
             };
 
             await using var nats = new NatsConnection(clientOpts);

@@ -361,10 +361,8 @@ public class NatsServer : IAsyncDisposable
 
     public NatsOpts ClientOpts(NatsOpts opts)
     {
-        var tls = opts.TlsOpts ?? NatsTlsOpts.Default;
-
         var natsTlsOpts = Opts.EnableTls
-            ? tls with
+            ? opts.TlsOpts with
             {
                 CertFile = Opts.TlsClientCertFile,
                 KeyFile = Opts.TlsClientKeyFile,

@@ -1,3 +1,4 @@
+using System.Security.Cryptography.X509Certificates;
 using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
@@ -45,35 +46,25 @@ public sealed record NatsTlsOpts
     /// <summary>
     /// String or file path to PEM-encoded X509 Certificate
     /// </summary>
-    /// <remarks>
-    /// You can use <see cref="NatsTlsOpts"/> to load the certificate from a file
-    /// or you can pass the PEM-encoded certificate directly as string. If the value
-    /// looks like a PEM-encoded pattern (for example if it starts with "-----BEGIN CERTIFICATE-----")
-    /// it would be used as PEM-encoded string otherwise it would be treated as file path.
-    /// </remarks>
     public string? CertFile { get; init; }
 
     /// <summary>
     /// String or file path to PEM-encoded Private Key
     /// </summary>
-    /// <remarks>
-    /// You can use <see cref="NatsTlsOpts"/> to load the private key from a file
-    /// or you can pass the PEM-encoded private key directly as string. If the value
-    /// looks like a PEM-encoded pattern (for example if it starts with "-----BEGIN PRIVATE KEY-----")
-    /// it would be used as PEM-encoded string otherwise it would be treated as file path.
-    /// </remarks>
     public string? KeyFile { get; init; }
+
+    /// Callback that loads Client Certificate
+    public Func<ValueTask<X509Certificate2>>? LoadClientCert { get; init; }
 
     /// <summary>
     /// String or file path to PEM-encoded X509 CA Certificate
     /// </summary>
-    /// <remarks>
-    /// You can use <see cref="NatsTlsOpts"/> to load the certificate from a file
-    /// or you can pass the PEM-encoded certificate directly as string. If the value
-    /// looks like a PEM-encoded pattern (for example if it starts with "-----BEGIN CERTIFICATE-----")
-    /// it would be used as PEM-encoded string otherwise it would be treated as file path.
-    /// </remarks>
     public string? CaFile { get; init; }
+
+    /// <summary>
+    /// Callback that loads CA Certificates
+    /// </summary>
+    public Func<ValueTask<X509Certificate2Collection>>? LoadCaCerts { get; init; }
 
     /// <summary>When true, skip remote certificate verification and accept any server certificate</summary>
     public bool InsecureSkipVerify { get; init; }
@@ -81,11 +72,11 @@ public sealed record NatsTlsOpts
     /// <summary>TLS mode to use during connection</summary>
     public TlsMode Mode { get; init; }
 
-    internal bool HasTlsFile => CertFile != default || KeyFile != default || CaFile != default;
+    internal bool HasTlsCerts => CertFile != default || KeyFile != default || LoadClientCert != default || CaFile != default || LoadCaCerts != default;
 
     internal TlsMode EffectiveMode(NatsUri uri) => Mode switch
     {
-        TlsMode.Auto => HasTlsFile || uri.Uri.Scheme.ToLower() == "tls" ? TlsMode.Require : TlsMode.Prefer,
+        TlsMode.Auto => HasTlsCerts || uri.Uri.Scheme.ToLower() == "tls" ? TlsMode.Require : TlsMode.Prefer,
         _ => Mode,
     };
 
@@ -93,5 +84,24 @@ public sealed record NatsTlsOpts
     {
         var effectiveMode = EffectiveMode(uri);
         return effectiveMode is TlsMode.Require or TlsMode.Prefer;
+    }
+
+    /// <summary>
+    /// Helper method to load a Client Certificate from a pem-encoded string
+    /// </summary>
+    public static Func<ValueTask<X509Certificate2>> LoadClientCertFromPem(string certPem, string keyPem)
+    {
+        var clientCert = X509Certificate2.CreateFromPem(certPem, keyPem);
+        return () => ValueTask.FromResult(clientCert);
+    }
+
+    /// <summary>
+    /// Helper method to load CA Certificates from a pem-encoded string
+    /// </summary>
+    public static Func<ValueTask<X509Certificate2Collection>> LoadCaCertsFromPem(string caPem)
+    {
+        var caCerts = new X509Certificate2Collection();
+        caCerts.ImportFromPem(caPem);
+        return () => ValueTask.FromResult(caCerts);
     }
 }
