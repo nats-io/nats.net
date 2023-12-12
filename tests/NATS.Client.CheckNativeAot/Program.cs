@@ -42,7 +42,7 @@ async Task RequestReplyTests()
         await msg.ReplyAsync<int?>(null); // sentinel
     });
 
-    // make sure the sub has started
+    // make sure subs have started
     await nats.PingAsync();
 
     var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -310,6 +310,9 @@ async Task ServicesTests()
         handler: _ => ValueTask.CompletedTask,
         cancellationToken: cancellationToken);
 
+    // make sure subs have started
+    await nats.PingAsync();
+
     // Check that the endpoints are registered correctly
     {
         var info = (await nats.FindServicesAsync("$SRV.INFO.s1", 1, NatsSrvJsonSerializer<InfoResponse>.Default, cancellationToken)).First();
@@ -347,6 +350,9 @@ async Task ServicesTests()
         handler: _ => ValueTask.CompletedTask,
         metadata: new Dictionary<string, string> { { "ep-k1", "ep-v1" } },
         cancellationToken: cancellationToken);
+
+    // make sure subs have started
+    await nats.PingAsync();
 
     // Check default queue group and stats handler
     {
@@ -408,6 +414,9 @@ async Task ServicesTests2()
             await m.ReplyAsync(m.Data * m.Data, cancellationToken: cancellationToken);
         },
         cancellationToken: cancellationToken);
+
+    // make sure subs have started
+    await nats.PingAsync();
 
     var info = (await nats.FindServicesAsync("$SRV.INFO", 1, NatsSrvJsonSerializer<InfoResponse>.Default, cancellationToken)).First();
     AssertSingle(info.Endpoints);
