@@ -26,8 +26,6 @@ namespace NATS.Client.Core;
 /// <typeparam name="T">Data type of the payload</typeparam>
 public interface INatsMsg<T>
 {
-    bool IsNoRespondersError { get; }
-
     /// <summary>The destination subject to publish to.</summary>
     string Subject { get; init; }
 
