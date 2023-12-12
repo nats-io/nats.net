@@ -1,3 +1,4 @@
+using System.Security.Cryptography.X509Certificates;
 using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
@@ -42,14 +43,36 @@ public sealed record NatsTlsOpts
 {
     public static readonly NatsTlsOpts Default = new();
 
-    /// <summary>Path to PEM-encoded X509 Certificate</summary>
+    /// <summary>
+    /// String or file path to PEM-encoded X509 Certificate
+    /// </summary>
+    /// <remarks>
+    /// Must be used in conjunction with <see cref="KeyFile"/>.
+    /// </remarks>
     public string? CertFile { get; init; }
 
-    /// <summary>Path to PEM-encoded Private Key</summary>
+    /// <summary>
+    /// String or file path to PEM-encoded Private Key
+    /// </summary>
+    /// /// <remarks>
+    /// Must be used in conjunction with <see cref="CertFile"/>.
+    /// </remarks>
     public string? KeyFile { get; init; }
 
-    /// <summary>Path to PEM-encoded X509 CA Certificate</summary>
+    /// <summary>
+    /// Callback that loads Client Certificate
+    /// </summary>
+    public Func<ValueTask<X509Certificate2>>? LoadClientCert { get; init; }
+
+    /// <summary>
+    /// String or file path to PEM-encoded X509 CA Certificate
+    /// </summary>
     public string? CaFile { get; init; }
+
+    /// <summary>
+    /// Callback that loads CA Certificates
+    /// </summary>
+    public Func<ValueTask<X509Certificate2Collection>>? LoadCaCerts { get; init; }
 
     /// <summary>When true, skip remote certificate verification and accept any server certificate</summary>
     public bool InsecureSkipVerify { get; init; }
@@ -57,11 +80,11 @@ public sealed record NatsTlsOpts
     /// <summary>TLS mode to use during connection</summary>
     public TlsMode Mode { get; init; }
 
-    internal bool HasTlsFile => CertFile != default || KeyFile != default || CaFile != default;
+    internal bool HasTlsCerts => CertFile != default || KeyFile != default || LoadClientCert != default || CaFile != default || LoadCaCerts != default;
 
     internal TlsMode EffectiveMode(NatsUri uri) => Mode switch
     {
-        TlsMode.Auto => HasTlsFile || uri.Uri.Scheme.ToLower() == "tls" ? TlsMode.Require : TlsMode.Prefer,
+        TlsMode.Auto => HasTlsCerts || uri.Uri.Scheme.ToLower() == "tls" ? TlsMode.Require : TlsMode.Prefer,
         _ => Mode,
     };
 
@@ -69,5 +92,24 @@ public sealed record NatsTlsOpts
     {
         var effectiveMode = EffectiveMode(uri);
         return effectiveMode is TlsMode.Require or TlsMode.Prefer;
+    }
+
+    /// <summary>
+    /// Helper method to load a Client Certificate from a pem-encoded string
+    /// </summary>
+    public static Func<ValueTask<X509Certificate2>> LoadClientCertFromPem(string certPem, string keyPem)
+    {
+        var clientCert = X509Certificate2.CreateFromPem(certPem, keyPem);
+        return () => ValueTask.FromResult(clientCert);
+    }
+
+    /// <summary>
+    /// Helper method to load CA Certificates from a pem-encoded string
+    /// </summary>
+    public static Func<ValueTask<X509Certificate2Collection>> LoadCaCertsFromPem(string caPem)
+    {
+        var caCerts = new X509Certificate2Collection();
+        caCerts.ImportFromPem(caPem);
+        return () => ValueTask.FromResult(caCerts);
     }
 }

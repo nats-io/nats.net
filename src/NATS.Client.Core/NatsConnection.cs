@@ -288,8 +288,8 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
                 throw new NatsException($"URI {uri} requires TLS but TlsMode is set to Disable");
         }
 
-        if (Opts.TlsOpts.HasTlsFile)
-            _tlsCerts = new TlsCerts(Opts.TlsOpts);
+        if (Opts.TlsOpts.HasTlsCerts)
+            _tlsCerts = await TlsCerts.FromNatsTlsOptsAsync(Opts.TlsOpts).ConfigureAwait(false);
 
         if (!Opts.AuthOpts.IsAnonymous)
         {

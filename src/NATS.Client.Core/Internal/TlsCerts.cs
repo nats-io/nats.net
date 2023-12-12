@@ -5,29 +5,52 @@ namespace NATS.Client.Core.Internal;
 
 internal class TlsCerts
 {
-    public TlsCerts(NatsTlsOpts tlsOpts)
+    public X509Certificate2Collection? CaCerts { get; private set; }
+
+    public X509Certificate2Collection? ClientCerts { get; private set; }
+
+    public static async ValueTask<TlsCerts> FromNatsTlsOptsAsync(NatsTlsOpts tlsOpts)
     {
+        var tlsCerts = new TlsCerts();
         if (tlsOpts.Mode == TlsMode.Disable)
         {
-            return;
+            // no certs when disabled
+            return tlsCerts;
         }
 
-        if ((tlsOpts.CertFile != default && tlsOpts.KeyFile == default) ||
-            (tlsOpts.KeyFile != default && tlsOpts.CertFile == default))
+        // validation
+        switch (tlsOpts)
         {
+        case { CertFile: not null, KeyFile: null } or { KeyFile: not null, CertFile: null }:
             throw new ArgumentException("NatsTlsOpts.CertFile and NatsTlsOpts.KeyFile must both be set");
+        case { CertFile: not null, KeyFile: not null, LoadClientCert: not null }:
+            throw new ArgumentException("NatsTlsOpts.CertFile/KeyFile and NatsTlsOpts.LoadClientCert cannot both be set");
+        case { CaFile: not null, LoadCaCerts: not null }:
+            throw new ArgumentException("NatsTlsOpts.CaFile and NatsTlsOpts.LoadCaCerts cannot both be set");
         }
 
+        // ca certificates
         if (tlsOpts.CaFile != default)
         {
-            CaCerts = new X509Certificate2Collection();
-            CaCerts.ImportFromPemFile(tlsOpts.CaFile);
+            var caCerts = new X509Certificate2Collection();
+            caCerts.ImportFromPemFile(tlsOpts.CaFile);
+            tlsCerts.CaCerts = caCerts;
+        }
+        else if (tlsOpts.LoadCaCerts != default)
+        {
+            tlsCerts.CaCerts = await tlsOpts.LoadCaCerts().ConfigureAwait(false);
         }
 
-        if (tlsOpts.CertFile != default && tlsOpts.KeyFile != default)
+        // client certificates
+        var clientCert = tlsOpts switch
         {
-            var clientCert = X509Certificate2.CreateFromPemFile(tlsOpts.CertFile, tlsOpts.KeyFile);
+            { CertFile: not null, KeyFile: not null } => X509Certificate2.CreateFromPemFile(tlsOpts.CertFile, tlsOpts.KeyFile),
+            { LoadClientCert: not null } => await tlsOpts.LoadClientCert().ConfigureAwait(false),
+            _ => null,
+        };
 
+        if (clientCert != null)
+        {
             // On Windows, ephemeral keys/certificates do not work with schannel. e.g. unless stored in certificate store.
             // https://github.com/dotnet/runtime/issues/66283#issuecomment-1061014225
             // https://github.com/dotnet/runtime/blob/380a4723ea98067c28d54f30e1a652483a6a257a/src/libraries/System.Net.Security/tests/FunctionalTests/TestHelper.cs#L192-L197
@@ -38,11 +61,9 @@ internal class TlsCerts
                 ephemeral.Dispose();
             }
 
-            ClientCerts = new X509Certificate2Collection(clientCert);
+            tlsCerts.ClientCerts = new X509Certificate2Collection(clientCert);
         }
+
+        return tlsCerts;
     }
-
-    public X509Certificate2Collection? CaCerts { get; }
-
-    public X509Certificate2Collection? ClientCerts { get; }
 }
