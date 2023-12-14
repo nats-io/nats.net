@@ -135,22 +135,29 @@ public partial class NatsJSContext
                         Timeout = Connection.Opts.RequestTimeout,
 
                         // If JetStream is disabled, a no responders error will be returned
+                        // No responders error might also happen when reconnecting to cluster
                         ThrowIfNoResponders = true,
                     },
                     cancellationToken)
                 .ConfigureAwait(false);
 
-            while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+            try
             {
-                while (sub.Msgs.TryRead(out var msg))
+                while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
                 {
-                    if (msg.Data == null)
+                    while (sub.Msgs.TryRead(out var msg))
                     {
-                        throw new NatsJSException("No response data received");
-                    }
+                        if (msg.Data == null)
+                        {
+                            throw new NatsJSException("No response data received");
+                        }
 
-                    return msg.Data;
+                        return msg.Data;
+                    }
                 }
+            }
+            catch (NatsNoRespondersException)
+            {
             }
 
             if (i < retryMax)
