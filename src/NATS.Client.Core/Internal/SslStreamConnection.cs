@@ -178,6 +178,7 @@ internal sealed class SslStreamConnection : ISocketConnection
             ClientCertificates = _tlsCerts?.ClientCerts,
             LocalCertificateSelectionCallback = lcsCb,
             RemoteCertificateValidationCallback = rcsCb,
+            CertificateRevocationCheckMode = _tlsOpts.CheckCertificateRevocation ? X509RevocationMode.Online : X509RevocationMode.NoCheck,
         };
 
         return options;

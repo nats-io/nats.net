@@ -23,6 +23,25 @@ public class TlsClientTest
     }
 
     [Fact]
+    public async Task Client_connect_using_certificate_and_revocation_check()
+    {
+        await using var server = NatsServer.Start(
+            new NullOutputHelper(),
+            new NatsServerOptsBuilder()
+                .UseTransport(TransportType.Tls, tlsVerify: true)
+                .Build());
+
+        var clientOpts = server.ClientOpts(NatsOpts.Default with { Name = "tls-test-client" });
+        clientOpts = clientOpts with { TlsOpts = clientOpts.TlsOpts with { CheckCertificateRevocation = true } };
+        await using var nats = new NatsConnection(clientOpts);
+
+        // At the moment I don't know of a good way of checking if the revocation check is working
+        // except to check if the connection fails. So we are expecting an exception here.
+        var exception = await Assert.ThrowsAnyAsync<Exception>(async () => await nats.ConnectAsync());
+        Assert.Contains("remote certificate was rejected", exception.InnerException!.InnerException!.Message);
+    }
+
+    [Fact]
     public async Task Client_cannot_connect_without_certificate()
     {
         await using var server = NatsServer.Start(
