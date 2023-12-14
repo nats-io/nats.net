@@ -77,7 +77,7 @@ public sealed record NatsTlsOpts
     /// <summary>When true, skip remote certificate verification and accept any server certificate</summary>
     public bool InsecureSkipVerify { get; init; }
 
-    public bool CheckCertificateRevocation { get; init; }
+    public X509RevocationMode CertificateRevocationCheckMode { get; init; }
 
     /// <summary>TLS mode to use during connection</summary>
     public TlsMode Mode { get; init; }

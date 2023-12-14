@@ -1,3 +1,5 @@
+using System.Security.Cryptography.X509Certificates;
+
 namespace NATS.Client.Core.Tests;
 
 public class TlsClientTest
@@ -32,7 +34,7 @@ public class TlsClientTest
                 .Build());
 
         var clientOpts = server.ClientOpts(NatsOpts.Default with { Name = "tls-test-client" });
-        clientOpts = clientOpts with { TlsOpts = clientOpts.TlsOpts with { CheckCertificateRevocation = true } };
+        clientOpts = clientOpts with { TlsOpts = clientOpts.TlsOpts with { CertificateRevocationCheckMode = X509RevocationMode.Online } };
         await using var nats = new NatsConnection(clientOpts);
 
         // At the moment I don't know of a good way of checking if the revocation check is working
