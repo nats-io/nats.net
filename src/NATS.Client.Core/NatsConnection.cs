@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Diagnostics;
+using System.IO.Pipelines;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
@@ -967,7 +968,9 @@ internal sealed class WriterState
     public WriterState(NatsOpts opts)
     {
         Opts = opts;
-        BufferWriter = new FixedArrayBufferWriter();
+        var pipe = new Pipe();
+        PipeWriter = pipe.Writer;
+        PipeReader = pipe.Reader;
 
         if (opts.WriterCommandBufferLimit == null)
         {
@@ -993,7 +996,9 @@ internal sealed class WriterState
         PendingPromises = new List<IPromise>();
     }
 
-    public FixedArrayBufferWriter BufferWriter { get; }
+    public PipeWriter PipeWriter { get; }
+
+    public PipeReader PipeReader { get; }
 
     public Channel<ICommand> CommandBuffer { get; }
 

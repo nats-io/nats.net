@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO.Pipelines;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
@@ -11,9 +12,11 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
     private readonly WriterState _state;
     private readonly ObjectPool _pool;
     private readonly ConnectionStatsCounter _counter;
-    private readonly FixedArrayBufferWriter _bufferWriter;
+    private readonly PipeReader _pipeReader;
+    private readonly PipeWriter _pipeWriter;
     private readonly Channel<ICommand> _channel;
     private readonly NatsOpts _opts;
+    private Task _readLoop;
     private readonly Task _writeLoop;
     private readonly Stopwatch _stopwatch = new Stopwatch();
     private readonly CancellationTokenSource _cancellationTokenSource;
@@ -25,10 +28,12 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
         _state = state;
         _pool = pool;
         _counter = counter;
-        _bufferWriter = state.BufferWriter;
+        _pipeReader = state.PipeReader;
+        _pipeWriter = state.PipeWriter;
         _channel = state.CommandBuffer;
         _opts = state.Opts;
         _cancellationTokenSource = new CancellationTokenSource();
+        _readLoop = Task.CompletedTask;
         _writeLoop = Task.Run(WriteLoopAsync);
     }
 
@@ -42,17 +47,18 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
             await _cancellationTokenSource.CancelAsync().ConfigureAwait(false);
 #endif
             await _writeLoop.ConfigureAwait(false); // wait for drain writer
+            await _readLoop.ConfigureAwait(false); // wait for drain reader
         }
     }
 
     private async Task WriteLoopAsync()
     {
         var reader = _channel.Reader;
-        var protocolWriter = new ProtocolWriter(_bufferWriter);
+        var protocolWriter = new ProtocolWriter(_pipeWriter);
         var logger = _opts.LoggerFactory.CreateLogger<NatsPipeliningWriteProtocolProcessor>();
-        var writerBufferSize = _opts.WriterBufferSize;
         var promiseList = new List<IPromise>(100);
         var isEnabledTraceLogging = logger.IsEnabled(LogLevel.Trace);
+        var cancellationToken = _cancellationTokenSource.Token;
 
         try
         {
@@ -62,11 +68,12 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
                 if (firstCommands.Count != 0)
                 {
                     var count = firstCommands.Count;
-                    var tempBuffer = new FixedArrayBufferWriter();
-                    var tempWriter = new ProtocolWriter(tempBuffer);
+                    var tempPipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
+                    var tempWriter = new ProtocolWriter(tempPipe.Writer);
                     foreach (var command in firstCommands)
                     {
                         command.Write(tempWriter);
+                        await tempPipe.Writer.FlushAsync(cancellationToken).ConfigureAwait(false);
 
                         if (command is IPromise p)
                         {
@@ -76,23 +83,32 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
                         command.Return(_pool); // Promise does not Return but set ObjectPool here.
                     }
 
+                    await tempPipe.Writer.CompleteAsync().ConfigureAwait(false);
                     _state.PriorityCommands.Clear();
 
                     try
                     {
-                        var memory = tempBuffer.WrittenMemory;
-                        while (memory.Length > 0)
+                        while (true)
                         {
-                            _stopwatch.Restart();
-                            var sent = await _socketConnection.SendAsync(memory).ConfigureAwait(false);
-                            _stopwatch.Stop();
-                            if (isEnabledTraceLogging)
+                            var result = await tempPipe.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                            if (result.Buffer.Length > 0)
                             {
-                                logger.LogTrace("Socket.SendAsync. Size: {0} BatchSize: {1} Elapsed: {2}ms", sent, count, _stopwatch.Elapsed.TotalMilliseconds);
+                                _stopwatch.Restart();
+                                var sent = await _socketConnection.SendAsync(result.Buffer.First).ConfigureAwait(false);
+                                _stopwatch.Stop();
+                                if (isEnabledTraceLogging)
+                                {
+                                    logger.LogTrace("Socket.SendAsync. Size: {0}  Elapsed: {1}ms", sent, _stopwatch.Elapsed.TotalMilliseconds);
+                                }
+
+                                Interlocked.Add(ref _counter.SentBytes, sent);
+                                tempPipe.Reader.AdvanceTo(result.Buffer.GetPosition(sent));
                             }
 
-                            Interlocked.Add(ref _counter.SentBytes, sent);
-                            memory = memory.Slice(sent);
+                            if (result.IsCompleted || result.IsCanceled)
+                            {
+                                break;
+                            }
                         }
                     }
                     catch (Exception ex)
@@ -119,96 +135,53 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
             promiseList.AddRange(_state.PendingPromises);
             _state.PendingPromises.Clear();
 
+            // start read loop
+            _readLoop = Task.Run(ReadLoopAsync);
+
             // main writer loop
-            while ((_bufferWriter.WrittenCount != 0) || (await reader.WaitToReadAsync(_cancellationTokenSource.Token).ConfigureAwait(false)))
+            await foreach (var command in reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
             {
                 try
                 {
                     var count = 0;
-                    while (_bufferWriter.WrittenCount < writerBufferSize && reader.TryRead(out var command))
+                    Interlocked.Decrement(ref _counter.PendingMessages);
+                    if (command.IsCanceled)
                     {
-                        Interlocked.Decrement(ref _counter.PendingMessages);
-                        if (command.IsCanceled)
-                        {
-                            continue;
-                        }
-
-                        try
-                        {
-                            if (command is IBatchCommand batch)
-                            {
-                                count += batch.Write(protocolWriter);
-                            }
-                            else
-                            {
-                                command.Write(protocolWriter);
-                                count++;
-                            }
-                        }
-                        catch (Exception e)
-                        {
-                            // flag potential serialization exceptions
-                            if (command is IPromise promise)
-                            {
-                                promise.SetException(e);
-                            }
-
-                            throw;
-                        }
-
-                        if (command is IPromise p)
-                        {
-                            promiseList.Add(p);
-                        }
-
-                        command.Return(_pool); // Promise does not Return but set ObjectPool here.
+                        continue;
                     }
 
                     try
                     {
-                        // SendAsync(ReadOnlyMemory) is very efficient, internally using AwaitableAsyncSocketEventArgs
-                        // should use cancellation token?, currently no, wait for flush complete.
-                        var memory = _bufferWriter.WrittenMemory;
-                        while (memory.Length != 0)
+                        if (command is IBatchCommand batch)
                         {
-                            _stopwatch.Restart();
-                            var sent = await _socketConnection.SendAsync(memory).ConfigureAwait(false);
-                            _stopwatch.Stop();
-                            if (isEnabledTraceLogging)
-                            {
-                                logger.LogTrace("Socket.SendAsync. Size: {0} BatchSize: {1} Elapsed: {2}ms", sent, count, _stopwatch.Elapsed.TotalMilliseconds);
-                            }
-
-                            if (sent == 0)
-                            {
-                                throw new SocketClosedException(null);
-                            }
-
-                            Interlocked.Add(ref _counter.SentBytes, sent);
-
-                            memory = memory.Slice(sent);
+                            count += batch.Write(protocolWriter);
+                        }
+                        else
+                        {
+                            command.Write(protocolWriter);
+                            count++;
                         }
 
+                        await _pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
                         Interlocked.Add(ref _counter.SentMessages, count);
 
-                        _bufferWriter.Reset();
-                        foreach (var item in promiseList)
+                        if (command is IPromise promise)
                         {
-                            item.SetResult();
+                            promise.SetResult();
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        // flag potential serialization exceptions
+                        if (command is IPromise promise)
+                        {
+                            promise.SetException(e);
                         }
 
-                        promiseList.Clear();
+                        throw;
                     }
-                    catch (Exception ex)
-                    {
-                        // may receive from socket.SendAsync
 
-                        // when error, command is dequeued and written buffer is still exists in state.BufferWriter
-                        // store current pending promises to state.
-                        _state.PendingPromises.AddRange(promiseList);
-                        _socketConnection.SignalDisconnected(ex);
-                        return; // when socket closed, finish writeloop.
-                    }
+                    command.Return(_pool); // Promise does not Return but set ObjectPool here.
                 }
                 catch (Exception ex)
                 {
@@ -230,20 +203,45 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
         catch (OperationCanceledException)
         {
         }
-        finally
-        {
-            try
-            {
-                if (_bufferWriter.WrittenMemory.Length != 0)
-                {
-                    await _socketConnection.SendAsync(_bufferWriter.WrittenMemory).ConfigureAwait(false);
-                }
-            }
-            catch
-            {
-            }
-        }
 
         logger.LogDebug("WriteLoop finished.");
+    }
+
+    private async Task ReadLoopAsync()
+    {
+        var logger = _opts.LoggerFactory.CreateLogger<NatsPipeliningWriteProtocolProcessor>();
+        var isEnabledTraceLogging = logger.IsEnabled(LogLevel.Trace);
+        var cancellationToken = _cancellationTokenSource.Token;
+
+        try
+        {
+            while (true)
+            {
+                var result = await _pipeReader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                if (result.Buffer.Length > 0)
+                {
+                    _stopwatch.Restart();
+                    var sent = await _socketConnection.SendAsync(result.Buffer.First).ConfigureAwait(false);
+                    _stopwatch.Stop();
+                    if (isEnabledTraceLogging)
+                    {
+                        logger.LogTrace("Socket.SendAsync. Size: {0}  Elapsed: {1}ms", sent, _stopwatch.Elapsed.TotalMilliseconds);
+                    }
+
+                    Interlocked.Add(ref _counter.SentBytes, sent);
+                    _pipeReader.AdvanceTo(result.Buffer.GetPosition(sent));
+                }
+
+                if (result.IsCompleted || result.IsCanceled)
+                {
+                    break;
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+
+        logger.LogDebug("ReadLoopAsync finished.");
     }
 }

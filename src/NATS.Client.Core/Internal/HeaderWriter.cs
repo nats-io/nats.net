@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.IO.Pipelines;
 using System.Text;
 
 namespace NATS.Client.Core.Internal;
@@ -18,9 +19,9 @@ internal class HeaderWriter
 
     private static ReadOnlySpan<byte> ColonSpace => new[] { ByteColon, ByteSpace };
 
-    internal int Write(in FixedArrayBufferWriter bufferWriter, NatsHeaders headers)
+    internal long Write(in PipeWriter bufferWriter, NatsHeaders headers)
     {
-        var initialCount = bufferWriter.WrittenCount;
+        var initialCount = bufferWriter.UnflushedBytes;
         foreach (var kv in headers)
         {
             foreach (var value in kv.Value)
@@ -60,7 +61,7 @@ internal class HeaderWriter
         // even if there are no headers.
         bufferWriter.Write(CrLf);
 
-        return bufferWriter.WrittenCount - initialCount;
+        return bufferWriter.UnflushedBytes - initialCount;
     }
 
     // cannot contain ASCII Bytes <=32, 58, or 127

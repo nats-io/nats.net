@@ -1,23 +1,21 @@
 using System.Buffers;
 using System.Buffers.Text;
+using System.IO.Pipelines;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core.Commands;
 
 internal sealed class ProtocolWriter
 {
-    private const int MaxIntStringLength = 10; // int.MaxValue.ToString().Length
+    private const int MaxIntStringLength = 9; // https://github.com/nats-io/nats-server/blob/28a2a1000045b79927ebf6b75eecc19c1b9f1548/server/util.go#L85C8-L85C23
     private const int NewLineLength = 2; // \r\n
 
-    private readonly FixedArrayBufferWriter _writer; // where T : IBufferWriter<byte>
-    private readonly FixedArrayBufferWriter _bufferHeaders = new();
-    private readonly FixedArrayBufferWriter _bufferPayload = new();
+    private readonly PipeWriter _writer;
     private readonly HeaderWriter _headerWriter = new(Encoding.UTF8);
 
-    public ProtocolWriter(FixedArrayBufferWriter writer)
+    public ProtocolWriter(PipeWriter writer)
     {
         _writer = writer;
     }
@@ -50,14 +48,6 @@ internal sealed class ProtocolWriter
     // PUB <subject> [reply-to] <#bytes>\r\n[payload]\r\n
     public void WritePublish(string subject, string? replyTo, NatsHeaders? headers, ReadOnlySequence<byte> payload)
     {
-        // We use a separate buffer to write the headers so that we can calculate the
-        // size before we write to the output buffer '_writer'.
-        if (headers != null)
-        {
-            _bufferHeaders.Reset();
-            _headerWriter.Write(_bufferHeaders, headers);
-        }
-
         // Start writing the message to buffer:
         // PUP / HPUB
         _writer.WriteSpan(headers == null ? CommandConstants.PubWithPadding : CommandConstants.HPubWithPadding);
@@ -71,23 +61,18 @@ internal sealed class ProtocolWriter
         if (headers == null)
         {
             _writer.WriteNumber(payload.Length);
+            _writer.WriteNewLine();
         }
         else
         {
-            var headersLength = _bufferHeaders.WrittenSpan.Length;
-            _writer.WriteNumber(CommandConstants.NatsHeaders10NewLine.Length + headersLength);
+            var headersLengthSpan = _writer.AllocateNumber();
             _writer.WriteSpace();
-            var total = CommandConstants.NatsHeaders10NewLine.Length + headersLength + payload.Length;
-            _writer.WriteNumber(total);
-        }
-
-        // End of message first line
-        _writer.WriteNewLine();
-
-        if (headers != null)
-        {
+            var totalLengthSpan = _writer.AllocateNumber();
+            _writer.WriteNewLine();
             _writer.WriteSpan(CommandConstants.NatsHeaders10NewLine);
-            _writer.WriteSpan(_bufferHeaders.WrittenSpan);
+            var headersLength = _headerWriter.Write(_writer, headers);
+            headersLengthSpan.OverwriteAllocatedNumber(CommandConstants.NatsHeaders10NewLine.Length + headersLength);
+            totalLengthSpan.OverwriteAllocatedNumber(CommandConstants.NatsHeaders10NewLine.Length + headersLength + payload.Length);
         }
 
         if (payload.Length != 0)
@@ -100,18 +85,51 @@ internal sealed class ProtocolWriter
 
     public void WritePublish<T>(string subject, string? replyTo, NatsHeaders? headers, T? value, INatsSerialize<T> serializer)
     {
-        _bufferPayload.Reset();
+        // Start writing the message to buffer:
+        // PUP / HPUB
+        _writer.WriteSpan(headers == null ? CommandConstants.PubWithPadding : CommandConstants.HPubWithPadding);
+        _writer.WriteASCIIAndSpace(subject);
+
+        if (replyTo != null)
+        {
+            _writer.WriteASCIIAndSpace(replyTo);
+        }
+
+        long totalLength = 0;
+        Span<byte> totalLengthSpan;
+        if (headers == null)
+        {
+            totalLengthSpan = _writer.AllocateNumber();
+            _writer.WriteNewLine();
+        }
+        else
+        {
+            var headersLengthSpan = _writer.AllocateNumber();
+            _writer.WriteSpace();
+            totalLengthSpan = _writer.AllocateNumber();
+            _writer.WriteNewLine();
+            _writer.WriteSpan(CommandConstants.NatsHeaders10NewLine);
+            var headersLength = _headerWriter.Write(_writer, headers);
+            headersLengthSpan.OverwriteAllocatedNumber(CommandConstants.NatsHeaders10NewLine.Length + headersLength);
+            totalLength += CommandConstants.NatsHeaders10NewLine.Length + headersLength;
+        }
 
         // Consider null as empty payload. This way we are able to transmit null values as sentinels.
         // Another point is serializer behaviour. For instance JSON serializer seems to serialize null
         // as a string "null", others might throw exception.
         if (value != null)
         {
-            serializer.Serialize(_bufferPayload, value);
+            var initialCount = _writer.UnflushedBytes;
+            serializer.Serialize(_writer, value);
+            totalLength += _writer.UnflushedBytes - initialCount;
         }
 
-        var payload = new ReadOnlySequence<byte>(_bufferPayload.WrittenMemory);
-        WritePublish(subject, replyTo, headers, payload);
+        if (totalLength > 0)
+        {
+            totalLengthSpan.OverwriteAllocatedNumber(totalLength);
+        }
+
+        _writer.WriteNewLine();
     }
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#sub
