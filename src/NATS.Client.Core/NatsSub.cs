@@ -7,7 +7,7 @@ namespace NATS.Client.Core;
 
 public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
 {
-    private readonly Channel<NatsMsg<T>> _msgs;
+    private readonly SubWrappedChannel<T> _msgs;
 
     internal NatsSub(
         NatsConnection connection,
@@ -19,9 +19,11 @@ public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
         CancellationToken cancellationToken = default)
         : base(connection, manager, subject, queueGroup, opts, cancellationToken)
     {
-        _msgs = Channel.CreateBounded<NatsMsg<T>>(
-            connection.GetChannelOpts(connection.Opts, opts?.ChannelOpts),
-            msg => Connection.MessageDropped(this, _msgs?.Reader.Count ?? 0, msg));
+        _msgs = new SubWrappedChannel<T>(
+            Channel.CreateBounded<InFlightNatsMsg<T>>(
+                connection.GetChannelOpts(connection.Opts, opts?.ChannelOpts),
+                msg => Connection.MessageDropped(this, _msgs?.Reader.Count ?? 0, msg.ToNatsMsg(Connection))),
+            connection);
 
         Serializer = serializer;
     }
@@ -32,7 +34,7 @@ public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
 
     protected override async ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
     {
-        var natsMsg = NatsMsg<T>.Build(
+        var natsMsg = InFlightNatsMsg<T>.BuildInternal(
             subject,
             replyTo,
             headersBuffer,

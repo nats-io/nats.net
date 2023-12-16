@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Collections;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Primitives;
@@ -71,6 +72,8 @@ public class NatsHeaders : IDictionary<string, StringValues>
     public string MessageText { get; internal set; } = string.Empty;
 
     public Messages Message { get; internal set; } = Messages.Text;
+
+    internal string? ReplyTo { get; set; }
 
     /// <summary>
     /// Initializes a new instance of <see cref="NatsHeaders"/>.

@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using NATS.Client.Core;
+using NATS.Client.Core.Internal;
 using NATS.Client.JetStream.Internal;
 
 namespace NATS.Client.JetStream;
@@ -130,10 +131,16 @@ public interface INatsJSMsg<out T>
 public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
 {
     private readonly NatsJSContext _context;
-    private readonly NatsMsg<T> _msg;
+    private readonly InFlightNatsMsg<T> _msg;
     private readonly Lazy<NatsJSMsgMetadata?> _replyToDateTimeAndSeq;
 
     public NatsJSMsg(NatsMsg<T> msg, NatsJSContext context)
+        : this(
+            new InFlightNatsMsg<T>(msg.Subject, msg.ReplyTo, msg.Size, msg.Headers, msg.Data), context)
+    {
+    }
+
+    internal NatsJSMsg(InFlightNatsMsg<T> msg, NatsJSContext context)
     {
         _msg = msg;
         _context = context;
@@ -169,7 +176,7 @@ public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
     /// <summary>
     /// The connection messages was delivered on.
     /// </summary>
-    public INatsConnection? Connection => _msg.Connection;
+    public INatsConnection? Connection => _context.Connection;
 
     /// <summary>
     /// Additional metadata about the message.
@@ -187,7 +194,7 @@ public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous send operation.</returns>
     public ValueTask ReplyAsync(NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default) =>
-        _msg.ReplyAsync(headers, replyTo, opts, cancellationToken);
+        _msg.ToNatsMsg(_context.Connection).ReplyAsync(headers, replyTo, opts, cancellationToken);
 
     /// <summary>
     /// Acknowledges the message was completely handled.
@@ -265,7 +272,7 @@ public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
         }
         else
         {
-            await _msg.ReplyAsync(
+            await _msg.ToNatsMsg(_context.Connection).ReplyAsync(
                 data: payload,
                 opts: new NatsPubOpts
                 {

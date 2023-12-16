@@ -4,6 +4,7 @@ using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.Core.Commands;
+using NATS.Client.Core.Internal;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Internal;
@@ -228,7 +229,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         else
         {
             var msg = new NatsJSMsg<TMsg>(
-                NatsMsg<TMsg>.Build(
+                InFlightNatsMsg<TMsg>.BuildInternal(
                     subject,
                     replyTo,
                     headersBuffer,
