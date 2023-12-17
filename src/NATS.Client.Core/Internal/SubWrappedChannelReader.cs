@@ -1,13 +1,14 @@
 ﻿using System.Threading.Channels;
+using NATS.Client.Core.Commands;
 
 namespace NATS.Client.Core.Internal;
 
 public sealed class SubWrappedChannelReader<T> : ChannelReader<NatsMsg<T>>
 {
     private readonly ChannelReader<InFlightNatsMsg<T>> _channel;
-    private readonly INatsConnection _connection;
+    private readonly INatsConnection? _connection;
 
-    internal SubWrappedChannelReader(ChannelReader<InFlightNatsMsg<T>> channel, INatsConnection connection)
+    internal SubWrappedChannelReader(ChannelReader<InFlightNatsMsg<T>> channel, INatsConnection? connection)
     {
         _channel = channel;
         _connection = connection;
@@ -21,10 +22,26 @@ public sealed class SubWrappedChannelReader<T> : ChannelReader<NatsMsg<T>>
 
     public override int Count => _channel.Count;
 
-    public override async ValueTask<NatsMsg<T>> ReadAsync(CancellationToken cancellationToken = default)
+    public override ValueTask<NatsMsg<T>> ReadAsync(CancellationToken cancellationToken = default)
     {
-        var inFlight = await _channel.ReadAsync(cancellationToken).ConfigureAwait(true);
-        return inFlight.ToNatsMsg(_connection);
+        if (_channel.TryRead(out var inFlight))
+        {
+            return ValueTask.FromResult<NatsMsg<T>>(inFlight.ToNatsMsg(_connection));
+        }
+        else
+        {
+            return doReadAsync(cancellationToken);
+        }
+    }
+
+    private ValueTask<NatsMsg<T>> doReadAsync(CancellationToken token)
+    {
+        var pvts =
+            _connection is NatsConnection c
+                ? PooledValueTaskSource<T>.TryRent(c.ObjectPool)
+                : new PooledValueTaskSource<T>(default);
+
+        return pvts.Run(_channel.ReadAsync(token), _connection);
     }
 
     public override ValueTask<bool> WaitToReadAsync(CancellationToken cancellationToken = default) => _channel.WaitToReadAsync(cancellationToken);

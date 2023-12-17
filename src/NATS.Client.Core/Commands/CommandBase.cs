@@ -369,3 +369,188 @@ internal abstract class AsyncCommandBase<TSelf, TResponse> : ICommand, IAsyncCom
         self.SetCanceled();
     }
 }
+
+internal sealed class PooledValueTaskSource<TResponse> : IObjectPoolNode<PooledValueTaskSource<TResponse>>, IValueTaskSource<NatsMsg<TResponse>>
+//    where TSelf : class, IObjectPoolNode<PooledValueTaskSource<TResponse>>
+{
+    private static readonly Action<object?> CancelAction = SetCancel;
+
+    private PooledValueTaskSource<TResponse>? _next;
+    private CancellationTokenRegistration _timerRegistration;
+    private CancellationTimer? _timer;
+    private INatsConnection? _connection;
+    private ManualResetValueTaskSourceCore<NatsMsg<TResponse>> _core;
+    private ValueTask<InFlightNatsMsg<TResponse>> _source;
+    private NatsMsg<TResponse>? _response;
+    private ObjectPool? _objectPool;
+    private bool _noReturn;
+
+    public PooledValueTaskSource(ObjectPool? pool)
+    {
+        _objectPool = pool;
+        OnCompleted = () =>
+        {
+            if (_source.IsCompletedSuccessfully)
+            {
+#pragma warning disable VSTHRD002
+                SetResult(_source.Result.ToNatsMsg(_connection));
+#pragma warning restore VSTHRD002
+            }
+            else if (_source.IsFaulted)
+            {
+                try
+                {
+#pragma warning disable VSTHRD002
+                    _source.GetAwaiter().GetResult();
+#pragma warning restore VSTHRD002
+                }
+                catch (Exception e)
+                {
+                    SetException(e);
+                }
+            }
+        };
+    }
+
+    public ValueTask<NatsMsg<TResponse>> Run(ValueTask<InFlightNatsMsg<TResponse>> msg, INatsConnection? connection)
+    {
+        _connection = connection;
+        _source = msg;
+        msg.GetAwaiter().UnsafeOnCompleted(OnCompleted);
+        return AsValueTask();
+    }
+
+    public bool IsCanceled { get; private set; }
+
+    public ref PooledValueTaskSource<TResponse>? NextNode => ref _next;
+
+    protected readonly Action OnCompleted;
+
+    public ValueTask<NatsMsg<TResponse>> AsValueTask()
+    {
+        return new ValueTask<NatsMsg<TResponse>>(this, _core.Version);
+    }
+
+    public void SetResult(NatsMsg<TResponse> result)
+    {
+        _response = result;
+
+        if (IsCanceled)
+            return; // already called Canceled, it invoked SetCanceled.
+
+        _timerRegistration.Dispose();
+        _timerRegistration = default;
+
+        if (_timer != null && _objectPool != null)
+        {
+            if (!_timer.TryReturn())
+            {
+                // cancel is called. don't set result.
+                return;
+            }
+
+            _timer = null;
+        }
+
+        _core.SetResult(_response.Value);
+    }
+
+    public void SetCanceled()
+    {
+        _noReturn = true;
+
+        _timerRegistration.Dispose();
+        _timerRegistration = default;
+
+        ThreadPool.UnsafeQueueUserWorkItem(
+            state =>
+            {
+                var ex = state._timer != null
+                    ? state._timer.GetExceptionWhenCanceled()
+                    : new OperationCanceledException();
+                state._core.SetException(ex);
+            },
+            this,
+            preferLocal: false);
+    }
+
+    public void SetException(Exception exception)
+    {
+        if (_noReturn)
+            return;
+        _timerRegistration.Dispose();
+        _timerRegistration = default;
+
+        _noReturn = true;
+        ThreadPool.UnsafeQueueUserWorkItem(
+            state =>
+            {
+                state.self._core.SetException(state.exception);
+            },
+            (self: this, exception),
+            preferLocal: false);
+    }
+
+    NatsMsg<TResponse> IValueTaskSource<NatsMsg<TResponse>>.GetResult(short token)
+    {
+        try
+        {
+            return _core.GetResult(token);
+        }
+        finally
+        {
+            _core.Reset();
+            _response = default!;
+            Reset();
+            var p = _objectPool;
+            _objectPool = null;
+            _timer = null;
+            _timerRegistration = default;
+
+            // canceled object don't return pool to avoid call SetResult/Exception after await
+            if (p != null && !_noReturn)
+            {
+                p.Return(Unsafe.As<PooledValueTaskSource<TResponse>>(this));
+            }
+        }
+    }
+
+    ValueTaskSourceStatus IValueTaskSource<NatsMsg<TResponse>>.GetStatus(short token)
+    {
+        return _core.GetStatus(token);
+    }
+
+    void IValueTaskSource<NatsMsg<TResponse>>.OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags)
+    {
+        _core.OnCompleted(continuation, state, token, flags);
+    }
+
+    public void SetCancellationTimer(CancellationTimer timer)
+    {
+        _timer = timer;
+        _timerRegistration = timer.Token.UnsafeRegister(CancelAction, this);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static PooledValueTaskSource<TResponse> TryRent(ObjectPool pool)
+    {
+        if (pool.TryRent<PooledValueTaskSource<TResponse>>(out var self) == false)
+        {
+            self = new PooledValueTaskSource<TResponse>(pool);
+        }
+
+        return self;
+    }
+
+    protected void Reset()
+    {
+        _source = default;
+    }
+
+    private static void SetCancel(object? state)
+    {
+        var self = (PooledValueTaskSource<TResponse>)state!;
+        self.IsCanceled = true;
+        self.SetCanceled();
+    }
+}

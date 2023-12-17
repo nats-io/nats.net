@@ -1,8 +1,9 @@
 ﻿using System.Buffers;
+using System.Runtime.CompilerServices;
 
 namespace NATS.Client.Core.Internal;
 
-internal readonly record struct InFlightNatsMsg<T>
+internal readonly struct InFlightNatsMsg<T>
 {
     public readonly string Subject;
     private readonly object? _otherData;
@@ -18,7 +19,8 @@ internal readonly record struct InFlightNatsMsg<T>
         }
         else
         {
-            _otherData = headers.ReplyTo = replyTo;
+            headers.ReplyTo = replyTo;
+            _otherData = headers;
         }
 
         Data = data;
@@ -66,6 +68,7 @@ internal readonly record struct InFlightNatsMsg<T>
         return new InFlightNatsMsg<T>(subject, replyTo, (int)size, headers, data);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public NatsMsg<T> ToNatsMsg(INatsConnection? connection)
     {
         if (_otherData is NatsHeaders nh)

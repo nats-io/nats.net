@@ -258,7 +258,7 @@ public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
     {
         CheckPreconditions();
 
-        if (_msg == default)
+        if (_msg.Subject == null)
             throw new NatsJSException("No user message, can't acknowledge");
 
         if ((opts.DoubleAck ?? _context.Opts.AckOpts.DoubleAck) == true)
