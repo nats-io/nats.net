@@ -2,6 +2,7 @@
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 using NATS.Client.Core;
+using NATS.Client.Core.Commands;
 using NATS.Client.Core.Internal;
 
 namespace MicroBenchmark;
@@ -135,12 +136,12 @@ public class ChannelPassingBenchmarks
     {
         var maxCount = ChannelOpts.Capacity;
 
-
+        var writer = _natsMsgChannel.Writer;
         var reader = _natsMsgChannel.Reader;
         for (int i = 0; i < maxCount; i++)
         {
             var r = reader.ReadAsync(_cts.Token);
-            _natsMsgChannel.Writer.TryWrite(new NatsMsg<string>("t", default, 3, default, "foo", default));
+            writer.TryWrite(new NatsMsg<string>("t", default, 3, default, "foo", default));
             await r;
         }
     }
@@ -154,7 +155,7 @@ public class ChannelPassingBenchmarks
         var reader = _inFlightNatsMsgChannel.Reader;
         for (int i = 0; i < maxCount; i++)
         {
-            var r =  reader.ReadAsync(_cts.Token);
+            var r = reader.ReadAsync(_cts.Token);
             writer.TryWrite(new InFlightNatsMsg<string>("t", default, 3, default, "foo"));
             await r;
         }

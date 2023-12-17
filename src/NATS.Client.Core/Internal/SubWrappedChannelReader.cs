@@ -36,10 +36,7 @@ public sealed class SubWrappedChannelReader<T> : ChannelReader<NatsMsg<T>>
 
     private ValueTask<NatsMsg<T>> doReadAsync(CancellationToken token)
     {
-        var pvts =
-            _connection is NatsConnection c
-                ? PooledValueTaskSource<T>.TryRent(c.ObjectPool)
-                : new PooledValueTaskSource<T>(default);
+        var pvts = PooledValueTaskSource<T>.RentOrGet((_connection as NatsConnection)?.ObjectPool);
 
         return pvts.Run(_channel.ReadAsync(token), _connection);
     }
