@@ -24,12 +24,8 @@ await using var server = NatsServer.Start();
 Console.WriteLine("\nRunning nats bench");
 var natsBenchTotalMsgs = RunNatsBench(server.ClientUrl, t);
 
-await using var nats1 = server.CreateClientConnection(new NatsOpts
-{
-    // don't drop messages
-    SubPendingChannelFullMode = BoundedChannelFullMode.Wait,
-});
-await using var nats2 = server.CreateClientConnection();
+await using var nats1 = server.CreateClientConnection(NatsOpts.Default with { SubPendingChannelFullMode = BoundedChannelFullMode.Wait }, testLogger: false);
+await using var nats2 = server.CreateClientConnection(testLogger: false);
 
 var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 
@@ -71,9 +67,20 @@ Console.WriteLine("# Sub synced");
 var stopwatch = Stopwatch.StartNew();
 
 var payload = new ReadOnlySequence<byte>(new byte[t.Size]);
+var completed = 0;
+var awaited = 0;
 for (var i = 0; i < t.Msgs; i++)
 {
-    await nats2.PublishAsync(t.Subject, payload, cancellationToken: cts.Token);
+    var vt = nats2.PublishAsync(t.Subject, payload, cancellationToken: cts.Token);
+    if (vt.IsCompletedSuccessfully)
+    {
+        completed++;
+    }
+    else
+    {
+        awaited++;
+        await vt;
+    }
 }
 
 Console.WriteLine($"[{stopwatch.Elapsed}]");
@@ -81,6 +88,8 @@ Console.WriteLine($"[{stopwatch.Elapsed}]");
 await subReader;
 
 Console.WriteLine($"[{stopwatch.Elapsed}]");
+
+Console.WriteLine("Completed: {0}, Awaited: {1}", completed, awaited);
 
 var seconds = stopwatch.Elapsed.TotalSeconds;
 

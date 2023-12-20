@@ -65,8 +65,6 @@ public sealed record NatsOpts
 
     public TimeSpan SubscriptionCleanUpInterval { get; init; } = TimeSpan.FromMinutes(5);
 
-    public int? WriterCommandBufferLimit { get; init; } = 1_000;
-
     public Encoding HeaderEncoding { get; init; } = Encoding.ASCII;
 
     public bool WaitUntilSent { get; init; } = false;

@@ -774,40 +774,4 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         if (_isDisposed)
             throw new ObjectDisposedException(null);
     }
-
-    private async void WithConnect<T1>(T1 item1, Action<NatsConnection, T1> core)
-    {
-        try
-        {
-            await ConnectAsync().ConfigureAwait(false);
-        }
-        catch
-        {
-            // log will shown on ConnectAsync failed
-            return;
-        }
-
-        core(this, item1);
-    }
-
-    private async void WithConnect<T1, T2>(T1 item1, T2 item2, Action<NatsConnection, T1, T2> core)
-    {
-        try
-        {
-            await ConnectAsync().ConfigureAwait(false);
-        }
-        catch
-        {
-            // log will shown on ConnectAsync failed
-            return;
-        }
-
-        core(this, item1, item2);
-    }
-
-    private async ValueTask<TResult> WithConnectAsync<T1, TResult>(T1 item1, Func<NatsConnection, T1, ValueTask<TResult>> coreAsync)
-    {
-        await ConnectAsync().ConfigureAwait(false);
-        return await coreAsync(this, item1).ConfigureAwait(false);
-    }
 }

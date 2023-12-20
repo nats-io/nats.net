@@ -30,7 +30,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         _pipeWriter = pipe.Writer;
         _protocolWriter = new ProtocolWriter(_pipeWriter, opts.HeaderEncoding);
         var channel = Channel.CreateUnbounded<QueuedCommand>(new UnboundedChannelOptions { SingleWriter = true, SingleReader = true });
-        _lockCh = Channel.CreateBounded<bool>(new BoundedChannelOptions(1) { SingleWriter = true, SingleReader = false, FullMode = BoundedChannelFullMode.Wait });
+        _lockCh = Channel.CreateBounded<bool>(new BoundedChannelOptions(1) { SingleWriter = true, SingleReader = false, FullMode = BoundedChannelFullMode.Wait, AllowSynchronousContinuations = false });
         _lockCh.Writer.TryWrite(true);
         QueuedCommandsReader = channel.Reader;
         _queuedCommandsWriter = channel.Writer;
@@ -75,7 +75,6 @@ internal sealed class CommandWriter : IAsyncDisposable
         {
             _protocolWriter.WriteConnect(connectOpts);
             Interlocked.Add(ref _counter.PendingMessages, 1);
-            var size = (int)_pipeWriter.UnflushedBytes;
             _queuedCommandsWriter.TryWrite(new QueuedCommand(Size: (int)_pipeWriter.UnflushedBytes));
             await _pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -116,7 +115,6 @@ internal sealed class CommandWriter : IAsyncDisposable
         {
             _protocolWriter.WriteRaw(protocolBytes);
             Interlocked.Add(ref _counter.PendingMessages, 1);
-            var size = (int)_pipeWriter.UnflushedBytes;
             _queuedCommandsWriter.TryWrite(new QueuedCommand(Size: (int)_pipeWriter.UnflushedBytes));
             await _pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -137,7 +135,6 @@ internal sealed class CommandWriter : IAsyncDisposable
         {
             _protocolWriter.WritePing();
             Interlocked.Add(ref _counter.PendingMessages, 1);
-            var size = (int)_pipeWriter.UnflushedBytes;
             _queuedCommandsWriter.TryWrite(new QueuedCommand(Size: (int)_pipeWriter.UnflushedBytes));
             await _pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -158,7 +155,6 @@ internal sealed class CommandWriter : IAsyncDisposable
         {
             _protocolWriter.WritePong();
             Interlocked.Add(ref _counter.PendingMessages, 1);
-            var size = (int)_pipeWriter.UnflushedBytes;
             _queuedCommandsWriter.TryWrite(new QueuedCommand(Size: (int)_pipeWriter.UnflushedBytes));
             await _pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -179,7 +175,6 @@ internal sealed class CommandWriter : IAsyncDisposable
         {
             _protocolWriter.WritePublish(subject, replyTo, headers, value, serializer);
             Interlocked.Add(ref _counter.PendingMessages, 1);
-            var size = (int)_pipeWriter.UnflushedBytes;
             _queuedCommandsWriter.TryWrite(new QueuedCommand(Size: (int)_pipeWriter.UnflushedBytes));
             await _pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -200,7 +195,6 @@ internal sealed class CommandWriter : IAsyncDisposable
         {
             _protocolWriter.WritePublish(subject, replyTo, headers, payload);
             Interlocked.Add(ref _counter.PendingMessages, 1);
-            var size = (int)_pipeWriter.UnflushedBytes;
             _queuedCommandsWriter.TryWrite(new QueuedCommand(Size: (int)_pipeWriter.UnflushedBytes));
             await _pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -221,7 +215,6 @@ internal sealed class CommandWriter : IAsyncDisposable
         {
             _protocolWriter.WriteSubscribe(sid, subject, queueGroup, maxMsgs);
             Interlocked.Add(ref _counter.PendingMessages, 1);
-            var size = (int)_pipeWriter.UnflushedBytes;
             _queuedCommandsWriter.TryWrite(new QueuedCommand(Size: (int)_pipeWriter.UnflushedBytes));
             await _pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -242,7 +235,6 @@ internal sealed class CommandWriter : IAsyncDisposable
         {
             _protocolWriter.WriteUnsubscribe(sid, null);
             Interlocked.Add(ref _counter.PendingMessages, 1);
-            var size = (int)_pipeWriter.UnflushedBytes;
             _queuedCommandsWriter.TryWrite(new QueuedCommand(Size: (int)_pipeWriter.UnflushedBytes));
             await _pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
         }

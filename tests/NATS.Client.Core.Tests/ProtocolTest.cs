@@ -154,7 +154,7 @@ public class ProtocolTest
         Assert.NotNull(msg2.Headers);
         Assert.Empty(msg2.Headers!);
         var pubFrame2 = proxy.Frames.First(f => f.Message.StartsWith("HPUB foo.signal2"));
-        Assert.Equal("HPUB foo.signal2 12 12␍␊NATS/1.0␍␊␍␊", pubFrame2.Message);
+        Assert.Equal("HPUB foo.signal2 000000012 000000012␍␊NATS/1.0␍␊␍␊", pubFrame2.Message);
         var msgFrame2 = proxy.Frames.First(f => f.Message.StartsWith("HMSG foo.signal2"));
         Assert.Matches(@"^HMSG foo.signal2 \w+ 12 12␍␊NATS/1.0␍␊␍␊$", msgFrame2.Message);
 
