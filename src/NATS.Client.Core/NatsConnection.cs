@@ -167,8 +167,8 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 #endif
             }
 
-            await CommandWriter.DisposeAsync().ConfigureAwait(false);
             await SubscriptionManager.DisposeAsync().ConfigureAwait(false);
+            await CommandWriter.DisposeAsync().ConfigureAwait(false);
             _waitForOpenConnection.TrySetCanceled();
 #if NET6_0
             _disposedCancellationTokenSource.Cancel();

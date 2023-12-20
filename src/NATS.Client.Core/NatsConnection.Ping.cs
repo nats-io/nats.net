@@ -12,9 +12,9 @@ public partial class NatsConnection
             await ConnectAsync().ConfigureAwait(false);
         }
 
-        await CommandWriter.PingAsync(cancellationToken).ConfigureAwait(false);
         var pingCommand = new PingCommand();
         EnqueuePing(pingCommand);
+        await CommandWriter.PingAsync(cancellationToken).ConfigureAwait(false);
         return await pingCommand.TaskCompletionSource.Task.ConfigureAwait(false);
     }
 
@@ -26,26 +26,14 @@ public partial class NatsConnection
     /// </summary>
     /// <param name="cancellationToken">Cancels the Ping command</param>
     /// <returns><see cref="ValueTask"/> representing the asynchronous operation</returns>
-    private async ValueTask PingOnlyAsync(CancellationToken cancellationToken = default)
+    private ValueTask PingOnlyAsync(CancellationToken cancellationToken = default)
     {
-
-/* Unmerged change from project 'NATS.Client.Core(net8.0)'
-Before:
-/* Unmerged change from project 'NATS.Client.Core(net8.0)'
-After:
-/* Unmerged change from project 'NATS.Client.Core(net8.0)'
-*/
-        /* Unmerged change from project 'NATS.Client.Core(net8.0)'
-        Before:
-                if (ConnectionState == NatsConnectionState.Open) {
-        After:
-                if (ConnectionState == NatsConnectionState.Open)
-                {
-        */
         if (ConnectionState == NatsConnectionState.Open)
         {
-            await CommandWriter.PingAsync(cancellationToken).ConfigureAwait(false);
             EnqueuePing(new PingCommand());
+            return CommandWriter.PingAsync(cancellationToken);
         }
+
+        return ValueTask.CompletedTask;
     }
 }

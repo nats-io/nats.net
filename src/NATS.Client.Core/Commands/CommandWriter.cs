@@ -28,7 +28,7 @@ internal sealed class CommandWriter : ICommandWriter, IAsyncDisposable
     {
         _counter = counter;
         _opts = opts;
-        var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: opts.WriterBufferSize, resumeWriterThreshold: opts.WriterBufferSize / 2));
+        var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: opts.WriterBufferSize, resumeWriterThreshold: opts.WriterBufferSize / 2, minimumSegmentSize: 65536));
         PipeReader = pipe.Reader;
         _pipeWriter = pipe.Writer;
         _protocolWriter = new ProtocolWriter(_pipeWriter, opts.HeaderEncoding);

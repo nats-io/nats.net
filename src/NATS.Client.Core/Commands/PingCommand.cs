@@ -4,5 +4,5 @@ public class PingCommand
 {
     public DateTimeOffset WriteTime { get; } = DateTimeOffset.UtcNow;
 
-    public TaskCompletionSource<TimeSpan> TaskCompletionSource { get; } = new();
+    public TaskCompletionSource<TimeSpan> TaskCompletionSource { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 }

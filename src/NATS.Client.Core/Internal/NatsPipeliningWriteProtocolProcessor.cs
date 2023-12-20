@@ -77,7 +77,7 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
                     }
 
                     var consumed = 0;
-                    while (true)
+                    while (consumed < sent)
                     {
                         if (pending == 0)
                         {
@@ -94,7 +94,7 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
                             }
                         }
 
-                        if (pending <= sent)
+                        if (pending <= sent - consumed)
                         {
                             // pop the message previously peeked off the channel
                             // this should always return synchronously since it is the only
@@ -118,17 +118,23 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
                         {
                             // an entire command was not sent; decrement pending by
                             // the number of bytes from the command that was sent
-                            pending -= sent + consumed;
+                            pending += consumed - sent;
                             break;
                         }
                     }
 
-                    // advance the pipe reader by marking entirely sent commands as consumed,
-                    // and the number of bytes sent as examined
-                    _pipeReader.AdvanceTo(buffer.GetPosition(consumed), buffer.GetPosition(sent));
-
-                    // update examined for slicing the buffer next iteration
-                    examined += sent - consumed;
+                    if (consumed > 0)
+                    {
+                        // marking entirely sent commands as consumed
+                        _pipeReader.AdvanceTo(buffer.GetPosition(consumed), buffer.GetPosition(sent));
+                        examined = sent - consumed;
+                    }
+                    else
+                    {
+                        // no commands were consumed
+                        _pipeReader.AdvanceTo(result.Buffer.Start, buffer.GetPosition(sent));
+                        examined += sent;
+                    }
                 }
 
                 if (result.IsCompleted || result.IsCanceled)
