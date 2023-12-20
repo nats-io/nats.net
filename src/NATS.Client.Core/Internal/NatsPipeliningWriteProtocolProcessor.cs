@@ -56,15 +56,17 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
         var isEnabledTraceLogging = logger.IsEnabled(LogLevel.Trace);
         var cancellationToken = _cancellationTokenSource.Token;
         var pending = 0;
-        var examined = 0;
+        var examinedOffset = 0;
 
         try
         {
             while (true)
             {
                 var result = await _pipeReader.ReadAsync(cancellationToken).ConfigureAwait(false);
-                var buffer = result.Buffer.Slice(examined);
-                if (buffer.Length > 0)
+                var consumedPos = result.Buffer.Start;
+                var examinedPos = result.Buffer.Start;
+                var buffer = result.Buffer.Slice(examinedOffset);
+                while (buffer.Length > 0)
                 {
                     // perform send
                     _stopwatch.Restart();
@@ -125,18 +127,22 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
 
                     if (consumed > 0)
                     {
-                        // marking entirely sent commands as consumed
-                        _pipeReader.AdvanceTo(buffer.GetPosition(consumed), buffer.GetPosition(sent));
-                        examined = sent - consumed;
+                        // mark fully sent commands as consumed
+                        consumedPos = buffer.GetPosition(consumed);
+                        examinedOffset = sent - consumed;
                     }
                     else
                     {
                         // no commands were consumed
-                        _pipeReader.AdvanceTo(result.Buffer.Start, buffer.GetPosition(sent));
-                        examined += sent;
+                        examinedOffset += sent;
                     }
+
+                    // lop off sent bytes for next iteration
+                    examinedPos = buffer.GetPosition(sent);
+                    buffer = buffer.Slice(sent);
                 }
 
+                _pipeReader.AdvanceTo(consumedPos, examinedPos);
                 if (result.IsCompleted || result.IsCanceled)
                 {
                     break;

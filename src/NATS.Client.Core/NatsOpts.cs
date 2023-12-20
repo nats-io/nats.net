@@ -31,7 +31,7 @@ public sealed record NatsOpts
 
     public ILoggerFactory LoggerFactory { get; init; } = NullLoggerFactory.Instance;
 
-    public int WriterBufferSize { get; init; } = 65534;
+    public int WriterBufferSize { get; init; } = 1048576;
 
     public int ReaderBufferSize { get; init; } = 1048576;
 

@@ -28,11 +28,11 @@ internal sealed class CommandWriter : ICommandWriter, IAsyncDisposable
     {
         _counter = counter;
         _opts = opts;
-        var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: opts.WriterBufferSize, resumeWriterThreshold: opts.WriterBufferSize / 2, minimumSegmentSize: 65536));
+        var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: opts.WriterBufferSize, resumeWriterThreshold: opts.WriterBufferSize / 2, minimumSegmentSize: 16384));
         PipeReader = pipe.Reader;
         _pipeWriter = pipe.Writer;
         _protocolWriter = new ProtocolWriter(_pipeWriter, opts.HeaderEncoding);
-        var channel = Channel.CreateUnbounded<QueuedCommand>(new UnboundedChannelOptions { SingleWriter = true, SingleReader = true, });
+        var channel = Channel.CreateUnbounded<QueuedCommand>(new UnboundedChannelOptions { SingleWriter = true, SingleReader = true });
         QueuedCommandsReader = channel.Reader;
         _queuedCommandsWriter = channel.Writer;
     }
