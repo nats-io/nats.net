@@ -146,7 +146,7 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
         await _timer.DisposeAsync().ConfigureAwait(false);
     }
 
-    internal override ValueTask WriteReconnectCommandsAsync(ICommandWriter commandWriter, int sid)
+    internal override ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter, int sid)
     {
         // Override normal subscription behavior to resubscribe on reconnect
         return ValueTask.CompletedTask;

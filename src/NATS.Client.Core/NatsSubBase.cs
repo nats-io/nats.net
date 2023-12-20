@@ -249,7 +249,7 @@ public abstract class NatsSubBase
     /// <param name="commandWriter">command writer used to write reconnect commands</param>
     /// <param name="sid">SID which might be required to create subscription commands</param>
     /// <returns>ValueTask</returns>
-    internal virtual ValueTask WriteReconnectCommandsAsync(ICommandWriter commandWriter, int sid) => commandWriter.SubscribeAsync(sid, Subject, QueueGroup, PendingMsgs, CancellationToken.None);
+    internal virtual ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter, int sid) => commandWriter.SubscribeAsync(sid, Subject, QueueGroup, PendingMsgs, CancellationToken.None);
 
     /// <summary>
     /// Invoked when a MSG or HMSG arrives for the subscription.

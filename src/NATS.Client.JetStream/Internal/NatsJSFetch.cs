@@ -149,7 +149,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         }
     }
 
-    internal override async ValueTask WriteReconnectCommandsAsync(ICommandWriter commandWriter, int sid)
+    internal override async ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter, int sid)
     {
         await base.WriteReconnectCommandsAsync(commandWriter, sid);
         var request = new ConsumerGetnextRequest

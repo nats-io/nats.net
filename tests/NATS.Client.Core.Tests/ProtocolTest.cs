@@ -346,7 +346,7 @@ public class ProtocolTest
             : base(connection, connection.SubscriptionManager, subject, queueGroup: default, opts: default) =>
             _callback = callback;
 
-        internal override async ValueTask WriteReconnectCommandsAsync(ICommandWriter commandWriter, int sid)
+        internal override async ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter, int sid)
         {
             await base.WriteReconnectCommandsAsync(commandWriter, sid);
 
