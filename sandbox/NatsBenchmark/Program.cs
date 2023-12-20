@@ -340,8 +340,6 @@ namespace NatsBenchmark
                 }
             }).GetAwaiter().GetResult();
 
-            var command = new NATS.Client.Core.Commands.DirectWriteCommand(BuildCommand(testSize), batchSize);
-
             GC.Collect();
             GC.WaitForPendingFinalizers();
             GC.Collect();
@@ -351,7 +349,7 @@ namespace NatsBenchmark
             var to = testCount / batchSize;
             for (var i = 0; i < to; i++)
             {
-                pubConn.PostDirectWrite(command);
+                pubConn.DirectWriteAsync(BuildCommand(testSize), batchSize).GetAwaiter().GetResult();
             }
 
             lock (pubSubLock)

@@ -4,6 +4,7 @@ using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.Core.Commands;
+using NATS.Client.Core.Internal;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Internal;
@@ -148,11 +149,9 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         }
     }
 
-    internal override IEnumerable<ICommand> GetReconnectCommands(int sid)
+    internal override async ValueTask WriteReconnectCommandsAsync(ICommandWriter commandWriter, int sid)
     {
-        foreach (var command in base.GetReconnectCommands(sid))
-            yield return command;
-
+        await base.WriteReconnectCommandsAsync(commandWriter, sid);
         var request = new ConsumerGetnextRequest
         {
             Batch = _maxMsgs,
@@ -160,15 +159,13 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
             Expires = _expires,
         };
 
-        yield return PublishCommand<ConsumerGetnextRequest>.Create(
-            pool: Connection.ObjectPool,
+        await commandWriter.PublishAsync(
             subject: $"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
             replyTo: Subject,
             headers: default,
             value: request,
             serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
-            errorHandler: default,
-            cancellationToken: default);
+            cancellationToken: CancellationToken.None);
     }
 
     protected override async ValueTask ReceiveInternalAsync(

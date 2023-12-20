@@ -4,6 +4,7 @@ using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.Core.Commands;
+using NATS.Client.Core.Internal;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Internal;
@@ -145,10 +146,10 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
         await _timer.DisposeAsync().ConfigureAwait(false);
     }
 
-    internal override IEnumerable<ICommand> GetReconnectCommands(int sid)
+    internal override ValueTask WriteReconnectCommandsAsync(ICommandWriter commandWriter, int sid)
     {
         // Override normal subscription behavior to resubscribe on reconnect
-        yield break;
+        return ValueTask.CompletedTask;
     }
 
     protected override async ValueTask ReceiveInternalAsync(

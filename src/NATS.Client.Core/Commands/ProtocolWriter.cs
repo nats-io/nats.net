@@ -13,11 +13,12 @@ internal sealed class ProtocolWriter
     private const int NewLineLength = 2; // \r\n
 
     private readonly PipeWriter _writer;
-    private readonly HeaderWriter _headerWriter = new(Encoding.UTF8);
+    private readonly HeaderWriter _headerWriter;
 
-    public ProtocolWriter(PipeWriter writer)
+    public ProtocolWriter(PipeWriter writer, Encoding headerEncoding)
     {
         _writer = writer;
+        _headerWriter = new HeaderWriter(writer, headerEncoding);
     }
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#connect
@@ -70,7 +71,7 @@ internal sealed class ProtocolWriter
             var totalLengthSpan = _writer.AllocateNumber();
             _writer.WriteNewLine();
             _writer.WriteSpan(CommandConstants.NatsHeaders10NewLine);
-            var headersLength = _headerWriter.Write(_writer, headers);
+            var headersLength = _headerWriter.Write(headers);
             headersLengthSpan.OverwriteAllocatedNumber(CommandConstants.NatsHeaders10NewLine.Length + headersLength);
             totalLengthSpan.OverwriteAllocatedNumber(CommandConstants.NatsHeaders10NewLine.Length + headersLength + payload.Length);
         }
@@ -109,7 +110,7 @@ internal sealed class ProtocolWriter
             totalLengthSpan = _writer.AllocateNumber();
             _writer.WriteNewLine();
             _writer.WriteSpan(CommandConstants.NatsHeaders10NewLine);
-            var headersLength = _headerWriter.Write(_writer, headers);
+            var headersLength = _headerWriter.Write(headers);
             headersLengthSpan.OverwriteAllocatedNumber(CommandConstants.NatsHeaders10NewLine.Length + headersLength);
             totalLength += CommandConstants.NatsHeaders10NewLine.Length + headersLength;
         }

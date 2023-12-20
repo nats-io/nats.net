@@ -23,8 +23,11 @@ public class CancellationTest
 
         await subConnection.SubscribeCoreAsync<string>("foo");
 
-        var cmd = new SleepWriteCommand("PUB foo 5\r\naiueo", TimeSpan.FromSeconds(10));
-        pubConnection.PostDirectWrite(cmd);
+        var task = Task.Run(async () =>
+        {
+            await Task.Delay(TimeSpan.FromSeconds(10));
+            await pubConnection.DirectWriteAsync("PUB foo 5\r\naiueo");
+        });
 
         var timeoutException = await Assert.ThrowsAsync<TimeoutException>(async () =>
         {
@@ -32,38 +35,10 @@ public class CancellationTest
         });
 
         timeoutException.Message.Should().Contain("1 seconds elapsing");
+        await task;
     }
 
     // Queue-full
 
     // External Cancellation
-}
-
-// writer queue can't consume when sleeping
-internal class SleepWriteCommand : ICommand
-{
-    private readonly byte[] _protocol;
-    private readonly TimeSpan _sleepTime;
-
-    public SleepWriteCommand(string protocol, TimeSpan sleepTime)
-    {
-        _protocol = Encoding.UTF8.GetBytes(protocol + "\r\n");
-        _sleepTime = sleepTime;
-    }
-
-    public bool IsCanceled => false;
-
-    public void Return(ObjectPool pool)
-    {
-    }
-
-    public void SetCancellationTimer(CancellationTimer timer)
-    {
-    }
-
-    public void Write(ProtocolWriter writer)
-    {
-        Thread.Sleep(_sleepTime);
-        writer.WriteRaw(_protocol);
-    }
 }

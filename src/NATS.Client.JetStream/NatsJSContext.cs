@@ -199,50 +199,42 @@ public partial class NatsJSContext
             // Validator.ValidateObject(request, new ValidationContext(request));
         }
 
-        var cancellationTimer = Connection.GetCancellationTimer(cancellationToken);
-        try
+        await using var sub = await Connection.RequestSubAsync<TRequest, TResponse>(
+                subject: subject,
+                data: request,
+                headers: default,
+                replyOpts: new NatsSubOpts { Timeout = Connection.Opts.RequestTimeout },
+                requestSerializer: NatsJSJsonSerializer<TRequest>.Default,
+                replySerializer: NatsJSErrorAwareJsonSerializer<TResponse>.Default,
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        if (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            await using var sub = await Connection.RequestSubAsync<TRequest, TResponse>(
-                    subject: subject,
-                    data: request,
-                    headers: default,
-                    replyOpts: new NatsSubOpts { Timeout = Connection.Opts.RequestTimeout },
-                    requestSerializer: NatsJSJsonSerializer<TRequest>.Default,
-                    replySerializer: NatsJSErrorAwareJsonSerializer<TResponse>.Default,
-                    cancellationToken: cancellationTimer.Token)
-                .ConfigureAwait(false);
-
-            if (await sub.Msgs.WaitToReadAsync(cancellationTimer.Token).ConfigureAwait(false))
+            if (sub.Msgs.TryRead(out var msg))
             {
-                if (sub.Msgs.TryRead(out var msg))
+                if (msg.Data == null)
                 {
-                    if (msg.Data == null)
-                    {
-                        throw new NatsJSException("No response data received");
-                    }
-
-                    return new NatsJSResponse<TResponse>(msg.Data, default);
-                }
-            }
-
-            if (sub is NatsSubBase { EndReason: NatsSubEndReason.Exception, Exception: not null } sb)
-            {
-                if (sb.Exception is NatsSubException { Exception.SourceException: NatsJSApiErrorException jsError })
-                {
-                    // Clear exception here so that subscription disposal won't throw it.
-                    sb.ClearException();
-
-                    return new NatsJSResponse<TResponse>(default, jsError.Error);
+                    throw new NatsJSException("No response data received");
                 }
 
-                throw sb.Exception;
+                return new NatsJSResponse<TResponse>(msg.Data, default);
+            }
+        }
+
+        if (sub is NatsSubBase { EndReason: NatsSubEndReason.Exception, Exception: not null } sb)
+        {
+            if (sb.Exception is NatsSubException { Exception.SourceException: NatsJSApiErrorException jsError })
+            {
+                // Clear exception here so that subscription disposal won't throw it.
+                sb.ClearException();
+
+                return new NatsJSResponse<TResponse>(default, jsError.Error);
             }
 
-            throw new NatsJSApiNoResponseException();
+            throw sb.Exception;
         }
-        finally
-        {
-            cancellationTimer.TryReturn();
-        }
+
+        throw new NatsJSApiNoResponseException();
     }
 }

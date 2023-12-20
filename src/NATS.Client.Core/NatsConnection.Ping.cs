@@ -5,28 +5,17 @@ namespace NATS.Client.Core;
 public partial class NatsConnection
 {
     /// <inheritdoc />
-    public ValueTask<TimeSpan> PingAsync(CancellationToken cancellationToken = default)
+    public async ValueTask<TimeSpan> PingAsync(CancellationToken cancellationToken = default)
     {
-        if (ConnectionState == NatsConnectionState.Open)
+        if (ConnectionState != NatsConnectionState.Open)
         {
-            var command = AsyncPingCommand.Create(this, _pool, GetCancellationTimer(cancellationToken));
-            if (TryEnqueueCommand(command))
-            {
-                return command.AsValueTask();
-            }
-            else
-            {
-                return EnqueueAndAwaitCommandAsync(command);
-            }
+            await ConnectAsync().ConfigureAwait(false);
         }
-        else
-        {
-            return WithConnectAsync(cancellationToken, static (self, token) =>
-            {
-                var command = AsyncPingCommand.Create(self, self._pool, self.GetCancellationTimer(token));
-                return self.EnqueueAndAwaitCommandAsync(command);
-            });
-        }
+
+        await CommandWriter.PingAsync(cancellationToken).ConfigureAwait(false);
+        var pingCommand = new PingCommand();
+        EnqueuePing(pingCommand);
+        return await pingCommand.TaskCompletionSource.Task.ConfigureAwait(false);
     }
 
     /// <summary>
@@ -37,13 +26,26 @@ public partial class NatsConnection
     /// </summary>
     /// <param name="cancellationToken">Cancels the Ping command</param>
     /// <returns><see cref="ValueTask"/> representing the asynchronous operation</returns>
-    private ValueTask PingOnlyAsync(CancellationToken cancellationToken = default)
+    private async ValueTask PingOnlyAsync(CancellationToken cancellationToken = default)
     {
+
+/* Unmerged change from project 'NATS.Client.Core(net8.0)'
+Before:
+/* Unmerged change from project 'NATS.Client.Core(net8.0)'
+After:
+/* Unmerged change from project 'NATS.Client.Core(net8.0)'
+*/
+        /* Unmerged change from project 'NATS.Client.Core(net8.0)'
+        Before:
+                if (ConnectionState == NatsConnectionState.Open) {
+        After:
+                if (ConnectionState == NatsConnectionState.Open)
+                {
+        */
         if (ConnectionState == NatsConnectionState.Open)
         {
-            return EnqueueCommandAsync(PingCommand.Create(_pool, GetCancellationTimer(cancellationToken)));
+            await CommandWriter.PingAsync(cancellationToken).ConfigureAwait(false);
+            EnqueuePing(new PingCommand());
         }
-
-        return ValueTask.CompletedTask;
     }
 }

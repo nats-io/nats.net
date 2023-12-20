@@ -20,9 +20,9 @@ public class NatsHeaderTest
             ["a-long-header-key"] = "value",
             ["key"] = "a-long-header-value",
         };
-        var writer = new HeaderWriter(Encoding.UTF8);
         var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
-        var written = writer.Write(pipe.Writer, headers);
+        var writer = new HeaderWriter(pipe.Writer, Encoding.UTF8);
+        var written = writer.Write(headers);
 
         var text = "k1: v1\r\nk2: v2-0\r\nk2: v2-1\r\na-long-header-key: value\r\nkey: a-long-header-value\r\n\r\n";
         var expected = new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(text));

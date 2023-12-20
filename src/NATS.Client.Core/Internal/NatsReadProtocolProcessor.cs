@@ -19,7 +19,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
     private readonly TaskCompletionSource _waitForInfoSignal;
     private readonly TaskCompletionSource _waitForPongOrErrorSignal;  // wait for initial connection
     private readonly Task _infoParsed; // wait for an upgrade
-    private readonly ConcurrentQueue<AsyncPingCommand> _pingCommands; // wait for pong
+    private readonly ConcurrentQueue<PingCommand> _pingCommands; // wait for pong
     private readonly ILogger<NatsReadProtocolProcessor> _logger;
     private readonly bool _trace;
     private int _disposed;
@@ -32,12 +32,12 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         _waitForInfoSignal = waitForInfoSignal;
         _waitForPongOrErrorSignal = waitForPongOrErrorSignal;
         _infoParsed = infoParsed;
-        _pingCommands = new ConcurrentQueue<AsyncPingCommand>();
+        _pingCommands = new ConcurrentQueue<PingCommand>();
         _socketReader = new SocketReader(socketConnection, connection.Opts.ReaderBufferSize, connection.Counter, connection.Opts.LoggerFactory);
         _readLoop = Task.Run(ReadLoopAsync);
     }
 
-    public bool TryEnqueuePing(AsyncPingCommand ping)
+    public bool TryEnqueuePing(PingCommand ping)
     {
         if (_disposed != 0)
             return false;
@@ -52,7 +52,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
             await _readLoop.ConfigureAwait(false); // wait for drain buffer.
             foreach (var item in _pingCommands)
             {
-                item.SetCanceled();
+                item.TaskCompletionSource.SetCanceled();
             }
 
             _waitForInfoSignal.TrySetCanceled();
@@ -329,9 +329,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
 
             if (_pingCommands.TryDequeue(out var pingCommand))
             {
-                var start = pingCommand.WriteTime;
-                var elapsed = DateTimeOffset.UtcNow - start;
-                pingCommand.SetResult(elapsed ?? TimeSpan.Zero);
+                pingCommand.TaskCompletionSource.SetResult(DateTimeOffset.UtcNow - pingCommand.WriteTime);
             }
 
             if (length < PongSize)

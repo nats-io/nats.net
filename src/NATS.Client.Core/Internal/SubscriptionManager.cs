@@ -147,7 +147,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
     /// Commands returned form all the subscriptions will be run as a priority right after reconnection is established.
     /// </remarks>
     /// <returns>Enumerable list of commands</returns>
-    public IEnumerable<ICommand> GetReconnectCommands()
+    public async ValueTask WriteReconnectCommandsAsync(ICommandWriter commandWriter)
     {
         var subs = new List<(NatsSubBase, int)>();
         lock (_gate)
@@ -163,8 +163,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
 
         foreach (var (sub, sid) in subs)
         {
-            foreach (var command in sub.GetReconnectCommands(sid))
-                yield return command;
+            await sub.WriteReconnectCommandsAsync(commandWriter, sid).ConfigureAwait(false);
         }
     }
 
