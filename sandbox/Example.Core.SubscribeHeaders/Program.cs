@@ -1,11 +1,15 @@
 // > nats pub bar.xyz --count=10 "my_message_{{ Count }}" -H X-Foo:Baz
 
-using System.Text;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
+using NATS.Client.Serializers.Json;
 
 var subject = "bar.*";
-var options = NatsOpts.Default with { LoggerFactory = LoggerFactory.Create(builder => builder.AddConsole()) };
+var options = NatsOpts.Default with
+{
+    LoggerFactory = LoggerFactory.Create(builder => builder.AddConsole()),
+    SerializerRegistry = new NatsJsonSerializerRegistry(),
+};
 
 Print("[CON] Connecting...\n");
 
@@ -13,9 +17,9 @@ await using var connection = new NatsConnection(options);
 
 Print($"[SUB] Subscribing to subject '{subject}'...\n");
 
-await foreach (var msg in connection.SubscribeAsync<byte[]>(subject))
+await foreach (var msg in connection.SubscribeAsync<Bar>(subject))
 {
-    Print($"[RCV] {msg.Subject}: {Encoding.UTF8.GetString(msg.Data!)}\n");
+    Print($"[RCV] {msg.Subject}: {msg.Data!}\n");
     if (msg.Headers != null)
     {
         foreach (var (key, values) in msg.Headers)

@@ -1,9 +1,14 @@
 // > nats sub bar.*
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
+using NATS.Client.Serializers.Json;
 
 var subject = "bar.xyz";
-var options = NatsOpts.Default with { LoggerFactory = LoggerFactory.Create(builder => builder.AddConsole()) };
+var options = NatsOpts.Default with
+{
+    LoggerFactory = LoggerFactory.Create(builder => builder.AddConsole()),
+    SerializerRegistry = new NatsJsonSerializerRegistry(),
+};
 
 Print("[CON] Connecting...\n");
 
@@ -12,7 +17,7 @@ await using var connection = new NatsConnection(options);
 for (var i = 0; i < 10; i++)
 {
     Print($"[PUB] Publishing to subject ({i}) '{subject}'...\n");
-    await connection.PublishAsync<Bar>(
+    await connection.PublishAsync(
         subject,
         new Bar { Id = i, Name = "Baz" },
         headers: new NatsHeaders { ["XFoo"] = $"bar{i}" });
