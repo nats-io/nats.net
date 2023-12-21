@@ -6,7 +6,7 @@ using NATS.Client.Serializers.Json;
 var subject = "bar.xyz";
 var options = NatsOpts.Default with {
     LoggerFactory = LoggerFactory.Create(builder => builder.AddConsole()),
-    SerializerRegistry = new NatsJsonSerializerRegistry(),
+    SerializerRegistry = NatsJsonSerializerRegistry.Default,
 };
 
 Print("[CON] Connecting...\n");
