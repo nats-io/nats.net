@@ -7,7 +7,7 @@ using NATS.Client.Core.Tests;
 
 var t = new TestParams
 {
-    Msgs = 1_000_000,
+    Msgs = 10_000_000,
     Size = 128,
     Subject = "test",
     PubTasks = 10,
@@ -32,7 +32,7 @@ var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 await nats1.PingAsync();
 await nats2.PingAsync();
 
-var subActive = 0;
+/*var subActive = 0;
 var subReader = Task.Run(async () =>
 {
     var count = 0;
@@ -62,7 +62,7 @@ while (Interlocked.CompareExchange(ref subActive, 0, 0) == 0)
     await nats2.PublishAsync(t.Subject, 1, cancellationToken: cts.Token);
 }
 
-Console.WriteLine("# Sub synced");
+Console.WriteLine("# Sub synced");*/
 
 var stopwatch = Stopwatch.StartNew();
 
@@ -75,6 +75,7 @@ for (var i = 0; i < t.Msgs; i++)
     if (vt.IsCompletedSuccessfully)
     {
         completed++;
+        vt.GetAwaiter().GetResult();
     }
     else
     {
@@ -83,9 +84,9 @@ for (var i = 0; i < t.Msgs; i++)
     }
 }
 
-Console.WriteLine($"[{stopwatch.Elapsed}]");
+/*Console.WriteLine($"[{stopwatch.Elapsed}]");
 
-await subReader;
+await subReader;*/
 
 Console.WriteLine($"[{stopwatch.Elapsed}]");
 
@@ -95,8 +96,8 @@ var seconds = stopwatch.Elapsed.TotalSeconds;
 
 var meg = Math.Pow(2, 20);
 
-var totalMsgs = 2.0 * t.Msgs / seconds;
-var totalSizeMb = 2.0 * t.Msgs * t.Size / meg / seconds;
+var totalMsgs = t.Msgs / seconds;
+var totalSizeMb = t.Msgs * t.Size / meg / seconds;
 
 var memoryMb = Process.GetCurrentProcess().PrivateMemorySize64 / meg;
 
@@ -120,7 +121,7 @@ double RunNatsBench(string url, TestParams testParams)
         StartInfo = new ProcessStartInfo
         {
             FileName = "nats",
-            Arguments = $"bench {testParams.Subject} --pub 1 --sub 1 --size={testParams.Size} --msgs={testParams.Msgs} --no-progress",
+            Arguments = $"bench {testParams.Subject} --pub 1 --sub 0 --size={testParams.Size} --msgs={testParams.Msgs} --no-progress",
             RedirectStandardOutput = true,
             UseShellExecute = false,
             Environment = { { "NATS_URL", $"{url}" } },
@@ -129,7 +130,7 @@ double RunNatsBench(string url, TestParams testParams)
     process.Start();
     process.WaitForExit();
     var output = process.StandardOutput.ReadToEnd();
-    var match = Regex.Match(output, @"^\s*NATS Pub/Sub stats: (\S+) msgs/sec ~ (\S+) (\w+)/sec", RegexOptions.Multiline);
+    var match = Regex.Match(output, @"^\s*Pub stats: (\S+) msgs/sec ~ (\S+) (\w+)/sec", RegexOptions.Multiline);
     var total = double.Parse(match.Groups[1].Value);
 
     Console.WriteLine(output);

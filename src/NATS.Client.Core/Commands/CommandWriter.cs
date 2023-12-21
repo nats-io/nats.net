@@ -164,23 +164,48 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
     }
 
-    public async ValueTask PublishAsync<T>(string subject, string? replyTo, NatsHeaders? headers, T? value, INatsSerialize<T> serializer, CancellationToken cancellationToken)
+    public ValueTask PublishAsync<T>(string subject, string? replyTo, NatsHeaders? headers, T? value, INatsSerialize<T> serializer, CancellationToken cancellationToken)
     {
         if (!_lockCh.Reader.TryRead(out _))
         {
-            await _lockCh.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+            return AwaitLockAndPublishAsync(subject, replyTo, headers, value, serializer, cancellationToken);
         }
 
         try
         {
             _protocolWriter.WritePublish(subject, replyTo, headers, value, serializer);
-            Interlocked.Add(ref _counter.PendingMessages, 1);
-            _queuedCommandsWriter.TryWrite(new QueuedCommand(Size: (int)_pipeWriter.UnflushedBytes));
-            await _pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
-        finally
+        catch
         {
             _lockCh.Writer.TryWrite(true);
+            throw;
+        }
+
+        Interlocked.Add(ref _counter.PendingMessages, 1);
+        _queuedCommandsWriter.TryWrite(new QueuedCommand(Size: (int)_pipeWriter.UnflushedBytes));
+
+        ValueTask<FlushResult> flush;
+        try
+        {
+            flush = _pipeWriter.FlushAsync(cancellationToken);
+        }
+        catch
+        {
+            _lockCh.Writer.TryWrite(true);
+            throw;
+        }
+
+        if (flush.IsCompletedSuccessfully)
+        {
+#pragma warning disable VSTHRD103 // Call async methods when in an async method
+            flush.GetAwaiter().GetResult();
+#pragma warning restore VSTHRD103 // Call async methods when in an async method
+            _lockCh.Writer.TryWrite(true);
+            return ValueTask.CompletedTask;
+        }
+        else
+        {
+            return AwaitFlushAsync(flush);
         }
     }
 
@@ -237,6 +262,45 @@ internal sealed class CommandWriter : IAsyncDisposable
             Interlocked.Add(ref _counter.PendingMessages, 1);
             _queuedCommandsWriter.TryWrite(new QueuedCommand(Size: (int)_pipeWriter.UnflushedBytes));
             await _pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _lockCh.Writer.TryWrite(true);
+        }
+    }
+
+    private async ValueTask AwaitLockAndPublishAsync<T>(string subject, string? replyTo, NatsHeaders? headers, T? value, INatsSerialize<T> serializer, CancellationToken cancellationToken)
+    {
+        await _lockCh.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            _protocolWriter.WritePublish(subject, replyTo, headers, value, serializer);
+            Interlocked.Add(ref _counter.PendingMessages, 1);
+            _queuedCommandsWriter.TryWrite(new QueuedCommand(Size: (int)_pipeWriter.UnflushedBytes));
+            var flush = _pipeWriter.FlushAsync(cancellationToken);
+            if (flush.IsCompletedSuccessfully)
+            {
+#pragma warning disable VSTHRD103 // Call async methods when in an async method
+                flush.GetAwaiter().GetResult();
+#pragma warning restore VSTHRD103 // Call async methods when in an async method
+                return;
+            }
+            else
+            {
+                await flush.ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            _lockCh.Writer.TryWrite(true);
+        }
+    }
+
+    private async ValueTask AwaitFlushAsync(ValueTask<FlushResult> flush)
+    {
+        try
+        {
+            await flush.ConfigureAwait(false);
         }
         finally
         {

@@ -1,7 +1,6 @@
 using System.Buffers;
 using System.Buffers.Text;
 using System.Runtime.CompilerServices;
-using System.Text;
 using NATS.Client.Core.Commands;
 
 namespace NATS.Client.Core.Internal;
