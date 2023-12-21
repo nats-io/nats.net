@@ -57,6 +57,32 @@ public class SerializerTest
 
         Assert.Equal(1, result);
     }
+
+    [Fact]
+    public async Task NatsMemoryOwner_empty_payload_should_not_throw()
+    {
+        await using var server = NatsServer.Start();
+        var nats = server.CreateClientConnection();
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        await nats.ConnectAsync();
+
+        var sub = await nats.SubscribeCoreAsync<NatsMemoryOwner<byte>>("foo", cancellationToken: cancellationToken);
+        await nats.PingAsync(cancellationToken);
+        await nats.PublishAsync("foo", cancellationToken: cancellationToken);
+
+        var msg = await sub.Msgs.ReadAsync(cancellationToken);
+
+        Assert.Equal(0, msg.Data.Length);
+
+        using (msg.Data)
+        {
+            Assert.Equal(0, msg.Data.Memory.Length);
+            Assert.Equal(0, msg.Data.Span.Length);
+        }
+    }
 }
 
 public class TestSerializer<T> : INatsSerialize<T>, INatsDeserialize<T>
