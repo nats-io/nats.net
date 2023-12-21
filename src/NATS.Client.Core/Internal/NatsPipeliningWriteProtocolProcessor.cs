@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Diagnostics;
 using System.IO.Pipelines;
 using System.Threading.Channels;
@@ -58,6 +59,11 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
         var pending = 0;
         var examinedOffset = 0;
 
+        // memory segment used to consolidate multiple small memory chunks
+        // 8192 is half of minimumSegmentSize in CommandWriter
+        // it is also the default socket send buffer size
+        var consolidateMem = new Memory<byte>(new byte[8192]);
+
         try
         {
             while (true)
@@ -68,9 +74,18 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
                 var buffer = result.Buffer.Slice(examinedOffset);
                 while (buffer.Length > 0)
                 {
+                    var sendMem = buffer.First;
+                    if (buffer.Length > sendMem.Length && sendMem.Length < consolidateMem.Length)
+                    {
+                        // consolidate multiple small memory chunks into one
+                        var consolidateSize = (int)Math.Min(consolidateMem.Length, buffer.Length);
+                        buffer.Slice(0, consolidateSize).CopyTo(consolidateMem.Span);
+                        sendMem = consolidateMem.Slice(0, consolidateSize);
+                    }
+
                     // perform send
                     _stopwatch.Restart();
-                    var sent = await _socketConnection.SendAsync(buffer.First).ConfigureAwait(false);
+                    var sent = await _socketConnection.SendAsync(sendMem).ConfigureAwait(false);
                     _stopwatch.Stop();
                     Interlocked.Add(ref _counter.SentBytes, sent);
                     if (isEnabledTraceLogging)
