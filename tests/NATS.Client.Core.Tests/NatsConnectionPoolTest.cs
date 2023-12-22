@@ -17,4 +17,19 @@ public class NatsConnectionPoolTest
         var con2 = (NatsConnection) pool.GetConnection();
         con2.IsDisposed.Should().BeFalse();
     }
+
+    [Fact]
+    public async Task ConnectionsShouldBeDisposedWhenPoolIsDisposed()
+    {
+        // Arrange
+        NatsConnectionPool pool = new(1);
+
+        var con = (NatsConnection) pool.GetConnection();
+
+        // Act
+        await pool.DisposeAsync();
+
+        // Assert
+        con.IsDisposed.Should().BeTrue();
+    }
 }

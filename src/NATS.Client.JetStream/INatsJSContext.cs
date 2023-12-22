@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using NATS.Client.Core;
 using NATS.Client.JetStream.Models;
 
@@ -203,4 +204,12 @@ public interface INatsJSContext
     IAsyncEnumerable<INatsJSStream> ListStreamsAsync(
         string? subject = default,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// List stream names.
+    /// </summary>
+    /// <param name="subject">Limit the list to streams matching this subject filter.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>Async enumerable list of stream names to be used in a <c>await foreach</c> loop.</returns>
+    IAsyncEnumerable<string> ListStreamNamesAsync(string? subject = default, [EnumeratorCancellation] CancellationToken cancellationToken = default);
 }

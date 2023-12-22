@@ -56,7 +56,7 @@ public sealed class NatsConnectionPool : INatsConnectionPool
     {
         foreach (var item in _connections)
         {
-            await item.DisposeAsync().ConfigureAwait(false);
+            await item.ForceDisposeAsync().ConfigureAwait(false);
         }
     }
 }

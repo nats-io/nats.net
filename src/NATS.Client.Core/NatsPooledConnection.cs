@@ -8,4 +8,6 @@ internal class NatsPooledConnection : NatsConnection
     }
 
     public override ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+    internal ValueTask ForceDisposeAsync() => base.DisposeAsync();
 }

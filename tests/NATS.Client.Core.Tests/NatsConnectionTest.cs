@@ -359,7 +359,7 @@ public abstract partial class NatsConnectionTest
     }
 
     [Fact]
-    public async Task InterfaceShouldHaveSamePublicPropertiesEventsAndMethodAsClass()
+    public void InterfaceShouldHaveSamePublicPropertiesEventsAndMethodAsClass()
     {
         var classType = typeof(NatsConnection);
         var interfaceType = typeof(INatsConnection);
