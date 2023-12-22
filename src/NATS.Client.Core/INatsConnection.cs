@@ -15,6 +15,7 @@ public interface INatsConnection : IAsyncDisposable
     NatsOpts Opts { get; }
 
     NatsConnectionState ConnectionState { get; }
+
     NatsHeaderParser HeaderParser { get; }
 
 
