@@ -162,7 +162,7 @@ public struct NatsMemoryOwner<T> : IMemoryOwner<T>
 
             if (array is null)
             {
-                ThrowObjectDisposedException();
+                return Memory<T>.Empty;
             }
 
             return new(array!, _start, _length);
@@ -181,7 +181,7 @@ public struct NatsMemoryOwner<T> : IMemoryOwner<T>
 
             if (array is null)
             {
-                ThrowObjectDisposedException();
+                return Span<T>.Empty;
             }
 
             ref var r0 = ref array!.DangerousGetReferenceAt(_start);
