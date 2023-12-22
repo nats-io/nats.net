@@ -415,7 +415,7 @@ public class NatsKVStore : INatsKVStore
 
         opts = opts with
         {
-            IgnoreDeletes = true,
+            IgnoreDeletes = false,
             MetaOnly = true,
             UpdatesOnly = false,
         };
@@ -427,7 +427,8 @@ public class NatsKVStore : INatsKVStore
         {
             while (watcher.Entries.TryRead(out var entry))
             {
-                yield return entry.Key;
+                if (entry.Operation is NatsKVOperation.Put)
+                    yield return entry.Key;
                 if (entry.Delta == 0)
                     yield break;
             }
