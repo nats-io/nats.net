@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using NATS.Client.Core;
 using NATS.Client.JetStream.Models;
 

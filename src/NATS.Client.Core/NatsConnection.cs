@@ -15,7 +15,7 @@ public enum NatsConnectionState
     Reconnecting,
 }
 
-public partial class NatsConnection : IAsyncDisposable, INatsConnection
+public partial class NatsConnection : INatsConnection
 {
 #pragma warning disable SA1401
     /// <summary>
@@ -25,6 +25,8 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
     internal readonly ConnectionStatsCounter Counter; // allow to call from external sources
     internal ServerInfo? WritableServerInfo;
+    internal bool IsDisposed;
+
 #pragma warning restore SA1401
     private readonly object _gate = new object();
     private readonly WriterState _writerState;
@@ -36,12 +38,11 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
     private readonly string _name;
     private readonly TimeSpan _socketComponentDisposeTimeout = TimeSpan.FromSeconds(5);
     private readonly BoundedChannelOptions _defaultSubscriptionChannelOpts;
-
+    private readonly ClientOpts _clientOpts;
     private int _pongCount;
-    private bool _isDisposed;
     private int _connectionState;
 
-    // when reconnect, make new instance.
+    // when reconnected, make new instance.
     private ISocketConnection? _socket;
     private CancellationTokenSource? _pingTimerCancellationTokenSource;
     private volatile NatsUri? _currentConnectUri;
@@ -50,7 +51,6 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
     private NatsPipeliningWriteProtocolProcessor? _socketWriter;
     private TaskCompletionSource _waitForOpenConnection;
     private TlsCerts? _tlsCerts;
-    private ClientOpts _clientOpts;
     private UserCredentials? _userCredentials;
     private int _connectRetry;
     private TimeSpan _backoff = TimeSpan.Zero;
@@ -101,8 +101,8 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
     public NatsConnectionState ConnectionState
     {
-        get => (NatsConnectionState)Volatile.Read(ref _connectionState);
-        private set => Interlocked.Exchange(ref _connectionState, (int)value);
+        get => (NatsConnectionState) Volatile.Read(ref _connectionState);
+        private set => Interlocked.Exchange(ref _connectionState, (int) value);
     }
 
     public INatsServerInfo? ServerInfo => WritableServerInfo; // server info is set when received INFO
@@ -152,11 +152,11 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
     public NatsStats GetStats() => Counter.ToStats();
 
-    public async ValueTask DisposeAsync()
+    public virtual async ValueTask DisposeAsync()
     {
-        if (!_isDisposed)
+        if (!IsDisposed)
         {
-            _isDisposed = true;
+            IsDisposed = true;
             _logger.Log(LogLevel.Information, NatsLogEvents.Connection, "Disposing connection {Name}", _name);
 
             await DisposeSocketAsync(false).ConfigureAwait(false);
@@ -237,7 +237,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         catch (Exception ex)
         {
             // connection is disposed, don't need to unsubscribe command.
-            if (_isDisposed)
+            if (IsDisposed)
             {
                 return ValueTask.CompletedTask;
             }
@@ -526,9 +526,9 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
             var defaultScheme = _currentConnectUri!.Uri.Scheme;
             var urls = (Opts.NoRandomize
-                ? WritableServerInfo?.ClientConnectUrls?.Select(x => new NatsUri(x, false, defaultScheme)).Distinct().ToArray()
-                : WritableServerInfo?.ClientConnectUrls?.Select(x => new NatsUri(x, false, defaultScheme)).OrderBy(_ => Guid.NewGuid()).Distinct().ToArray())
-                    ?? Array.Empty<NatsUri>();
+                           ? WritableServerInfo?.ClientConnectUrls?.Select(x => new NatsUri(x, false, defaultScheme)).Distinct().ToArray()
+                           : WritableServerInfo?.ClientConnectUrls?.Select(x => new NatsUri(x, false, defaultScheme)).OrderBy(_ => Guid.NewGuid()).Distinct().ToArray())
+                       ?? Array.Empty<NatsUri>();
             if (urls.Length == 0)
                 urls = Opts.GetSeedUris();
 
@@ -538,7 +538,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
             _currentConnectUri = null;
             var urlEnumerator = urls.AsEnumerable().GetEnumerator();
             NatsUri? url = null;
-        CONNECT_AGAIN:
+            CONNECT_AGAIN:
             try
             {
                 if (urlEnumerator.MoveNext())
@@ -748,7 +748,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
     private async ValueTask EnqueueCommandAsync(ICommand command)
     {
-    RETRY:
+        RETRY:
         if (_commandWriter.TryWrite(command))
         {
             Interlocked.Increment(ref Counter.PendingMessages);
@@ -812,7 +812,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
     private void ThrowIfDisposed()
     {
-        if (_isDisposed)
+        if (IsDisposed)
             throw new ObjectDisposedException(null);
     }
 

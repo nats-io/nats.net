@@ -1,7 +1,23 @@
 namespace NATS.Client.Core;
 
-public interface INatsConnection
+public interface INatsConnection : IAsyncDisposable
 {
+    event EventHandler<string>? ConnectionDisconnected;
+
+    event EventHandler<string>? ConnectionOpened;
+
+    event EventHandler<string>? ReconnectFailed;
+
+    event EventHandler<INatsError>? OnError;
+
+    INatsServerInfo? ServerInfo { get; }
+
+    NatsOpts Opts { get; }
+
+    NatsConnectionState ConnectionState { get; }
+    NatsHeaderParser HeaderParser { get; }
+
+
     /// <summary>
     /// Send PING command and await PONG. Return value is similar as Round Trip Time (RTT).
     /// </summary>
@@ -154,4 +170,11 @@ public interface INatsConnection
         NatsPubOpts? requestOpts = default,
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Connect socket and write CONNECT command to nats server.
+    /// </summary>
+    ValueTask ConnectAsync();
+
+    NatsStats GetStats();
 }
