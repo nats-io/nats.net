@@ -142,7 +142,11 @@ public class ChannelPassingBenchmarks
         {
             var r = reader.ReadAsync(_cts.Token);
             writer.TryWrite(new NatsMsg<string>("t", default, 3, default, "foo", default));
-            await r;
+            var v = await r;
+            if (v.Subject == null)
+            {
+                Console.WriteLine("wat");
+            }
         }
     }
 
@@ -157,7 +161,11 @@ public class ChannelPassingBenchmarks
         {
             var r = reader.ReadAsync(_cts.Token);
             writer.TryWrite(new InFlightNatsMsg<string>("t", default, 3, default, "foo"));
-            await r;
+            var v = await r;
+            if (v.Subject == null)
+            {
+                Console.WriteLine("wat");
+            }
         }
     }
 

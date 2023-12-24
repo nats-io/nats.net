@@ -7,6 +7,8 @@ public sealed class SubWrappedChannelReader<T> : ChannelReader<NatsMsg<T>>
 {
     private readonly ChannelReader<InFlightNatsMsg<T>> _channel;
     private readonly INatsConnection? _connection;
+    internal PooledValueTaskSource<T>? _internalPooledSource;
+
 
     internal SubWrappedChannelReader(ChannelReader<InFlightNatsMsg<T>> channel, INatsConnection? connection)
     {
@@ -24,21 +26,26 @@ public sealed class SubWrappedChannelReader<T> : ChannelReader<NatsMsg<T>>
 
     public override ValueTask<NatsMsg<T>> ReadAsync(CancellationToken cancellationToken = default)
     {
-        if (_channel.TryRead(out var inFlight))
+        var read = _channel.ReadAsync(cancellationToken);
+        if (read.IsCompletedSuccessfully)
         {
-            return ValueTask.FromResult<NatsMsg<T>>(inFlight.ToNatsMsg(_connection));
+            return new ValueTask<NatsMsg<T>>(read.GetAwaiter().GetResult().ToNatsMsg(_connection));
         }
         else
         {
-            return doReadAsync(cancellationToken);
+            return doReadSlow(read);
         }
     }
 
-    private ValueTask<NatsMsg<T>> doReadAsync(CancellationToken token)
+    private ValueTask<NatsMsg<T>> doReadSlow(ValueTask<InFlightNatsMsg<T>> read)
     {
-        var pvts = PooledValueTaskSource<T>.RentOrGet((_connection as NatsConnection)?.ObjectPool);
+        PooledValueTaskSource<T>? pvts = null;
+        if ((pvts = Interlocked.Exchange(ref _internalPooledSource, null)) == null)
+        {
+            pvts = PooledValueTaskSource<T>.RentOrGet(this);
+        }
 
-        return pvts.Run(_channel.ReadAsync(token), _connection);
+        return pvts.ToValueTaskAsync(read, _connection);
     }
 
     public override ValueTask<bool> WaitToReadAsync(CancellationToken cancellationToken = default) => _channel.WaitToReadAsync(cancellationToken);
