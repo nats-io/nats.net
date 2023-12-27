@@ -101,13 +101,13 @@ public partial class NatsConnection : INatsConnection
 
     public NatsConnectionState ConnectionState
     {
-        get => (NatsConnectionState) Volatile.Read(ref _connectionState);
-        private set => Interlocked.Exchange(ref _connectionState, (int) value);
+        get => (NatsConnectionState)Volatile.Read(ref _connectionState);
+        private set => Interlocked.Exchange(ref _connectionState, (int)value);
     }
 
     public INatsServerInfo? ServerInfo => WritableServerInfo; // server info is set when received INFO
 
-    public NatsHeaderParser HeaderParser { get; }
+    internal NatsHeaderParser HeaderParser { get; }
 
     internal SubscriptionManager SubscriptionManager { get; }
 

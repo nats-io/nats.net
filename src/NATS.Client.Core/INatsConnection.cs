@@ -16,9 +16,6 @@ public interface INatsConnection : IAsyncDisposable
 
     NatsConnectionState ConnectionState { get; }
 
-    NatsHeaderParser HeaderParser { get; }
-
-
     /// <summary>
     /// Send PING command and await PONG. Return value is similar as Round Trip Time (RTT).
     /// </summary>
@@ -177,5 +174,8 @@ public interface INatsConnection : IAsyncDisposable
     /// </summary>
     ValueTask ConnectAsync();
 
+    /// <summary>
+    /// Gets the statistics for the current Nats Connection
+    /// </summary>
     NatsStats GetStats();
 }
