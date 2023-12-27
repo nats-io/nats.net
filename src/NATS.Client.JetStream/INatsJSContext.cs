@@ -211,5 +211,5 @@ public interface INatsJSContext
     /// <param name="subject">Limit the list to streams matching this subject filter.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>Async enumerable list of stream names to be used in a <c>await foreach</c> loop.</returns>
-    IAsyncEnumerable<string> ListStreamNamesAsync(string? subject = default, [EnumeratorCancellation] CancellationToken cancellationToken = default);
+    IAsyncEnumerable<string> ListStreamNamesAsync(string? subject = default, CancellationToken cancellationToken = default);
 }
