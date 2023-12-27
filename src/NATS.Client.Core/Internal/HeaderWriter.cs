@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.IO.Pipelines;
 using System.Text;
+using NATS.Client.Core.Commands;
 
 namespace NATS.Client.Core.Internal;
 
@@ -27,6 +28,8 @@ internal class HeaderWriter
     internal long Write(NatsHeaders headers)
     {
         var initialCount = _pipeWriter.UnflushedBytes;
+        _pipeWriter.WriteSpan(CommandConstants.NatsHeaders10NewLine);
+
         foreach (var kv in headers)
         {
             foreach (var value in kv.Value)

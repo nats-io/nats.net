@@ -14,11 +14,12 @@ internal sealed class ProtocolWriter
 
     private readonly PipeWriter _writer;
     private readonly HeaderWriter _headerWriter;
-    private readonly MemoryBufferWriter<byte> _ctrlBuf = new(new byte[4096]); // https://github.com/nats-io/nats-server/blob/26f0a9bd0f0574073977db069ff4cea2ecbbcac4/server/const.go#L65
+    private readonly Encoding _subjectEncoding;
 
-    public ProtocolWriter(PipeWriter writer, Encoding headerEncoding)
+    public ProtocolWriter(PipeWriter writer, Encoding subjectEncoding, Encoding headerEncoding)
     {
         _writer = writer;
+        _subjectEncoding = subjectEncoding;
         _headerWriter = new HeaderWriter(writer, headerEncoding);
     }
 
@@ -48,47 +49,81 @@ internal sealed class ProtocolWriter
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#pub
     // PUB <subject> [reply-to] <#bytes>\r\n[payload]\r\n
+    // or
+    // https://docs.nats.io/reference/reference-protocols/nats-protocol#hpub
+    // HPUB <subject> [reply-to] <#header bytes> <#total bytes>\r\n[headers]\r\n\r\n[payload]\r\n
     public void WritePublish(string subject, string? replyTo, NatsHeaders? headers, ReadOnlySequence<byte> payload)
     {
-        _ctrlBuf.Clear();
-
-        // Start writing the message to buffer:
-        // PUP / HPUB
-        _ctrlBuf.WriteSpan(headers == null ? CommandConstants.PubWithPadding : CommandConstants.HPubWithPadding);
-        _ctrlBuf.WriteASCIIAndSpace(subject);
-
-        if (replyTo != null)
-        {
-            _ctrlBuf.WriteASCIIAndSpace(replyTo);
-        }
-
+        int ctrlLen;
         if (headers == null)
         {
-            _ctrlBuf.WriteNumber(payload.Length);
-            _ctrlBuf.WriteNewLine();
-            _writer.WriteSpan(_ctrlBuf.WrittenSpan);
+            // 'PUB '   + subject                                +' '+ payload len        +'\r\n'
+            ctrlLen = 4 + _subjectEncoding.GetByteCount(subject) + 1 + MaxIntStringLength + 2;
         }
         else
         {
-            var headersLengthPos = _ctrlBuf.WrittenCount;
-            _ctrlBuf.Advance(MaxIntStringLength);
-            _ctrlBuf.WriteSpace();
+            // 'HPUB '  + subject                                +' '+ header len         +' '+ payload len        +'\r\n'
+            ctrlLen = 5 + _subjectEncoding.GetByteCount(subject) + 1 + MaxIntStringLength + 1 + MaxIntStringLength + 2;
+        }
 
-            var totalLengthPos = _ctrlBuf.WrittenCount;
-            _ctrlBuf.Advance(MaxIntStringLength);
-            _ctrlBuf.WriteNewLine();
-            _ctrlBuf.WriteSpan(CommandConstants.NatsHeaders10NewLine);
+        if (replyTo != null)
+        {
+            // len  += replyTo                                +' '
+            ctrlLen += _subjectEncoding.GetByteCount(replyTo) + 1;
+        }
 
-            var writerSpan = _writer.GetSpan(_ctrlBuf.WrittenSpan.Length);
-            _ctrlBuf.WrittenSpan.CopyTo(writerSpan);
-            _writer.Advance(_ctrlBuf.WrittenSpan.Length);
+        var span = _writer.GetSpan(ctrlLen);
+        if (headers == null)
+        {
+            span[0] = (byte)'P';
+            span[1] = (byte)'U';
+            span[2] = (byte)'B';
+            span[3] = (byte)' ';
+            span = span[4..];
+        }
+        else
+        {
+            span[0] = (byte)'H';
+            span[1] = (byte)'P';
+            span[2] = (byte)'U';
+            span[3] = (byte)'B';
+            span[4] = (byte)' ';
+            span = span[5..];
+        }
 
-            var headersLengthSpan = writerSpan.Slice(headersLengthPos, MaxIntStringLength);
-            var totalLengthSpan = writerSpan.Slice(totalLengthPos, MaxIntStringLength);
+        var written = _subjectEncoding.GetBytes(subject, span);
+        span[written] = (byte)' ';
+        span = span[(written + 1)..];
 
+        if (replyTo != null)
+        {
+            written = _subjectEncoding.GetBytes(replyTo, span);
+            span[written] = (byte)' ';
+            span = span[(written + 1)..];
+        }
+
+        Span<byte> headersLengthSpan = default;
+        if (headers != null)
+        {
+            headersLengthSpan = span[..MaxIntStringLength];
+            span[MaxIntStringLength] = (byte)' ';
+            span = span[(MaxIntStringLength + 1)..];
+        }
+
+        var totalLengthSpan = span[..MaxIntStringLength];
+        span[MaxIntStringLength] = (byte)'\r';
+        span[MaxIntStringLength + 1] = (byte)'\n';
+        _writer.Advance(ctrlLen);
+
+        if (headers == null)
+        {
+            totalLengthSpan.OverwriteAllocatedNumber(payload.Length);
+        }
+        else
+        {
             var headersLength = _headerWriter.Write(headers);
-            headersLengthSpan.OverwriteAllocatedNumber(CommandConstants.NatsHeaders10NewLine.Length + headersLength);
-            totalLengthSpan.OverwriteAllocatedNumber(CommandConstants.NatsHeaders10NewLine.Length + headersLength + payload.Length);
+            headersLengthSpan.OverwriteAllocatedNumber(headersLength);
+            totalLengthSpan.OverwriteAllocatedNumber(headersLength + payload.Length);
         }
 
         if (payload.Length != 0)
@@ -96,58 +131,86 @@ internal sealed class ProtocolWriter
             _writer.WriteSequence(payload);
         }
 
-        _writer.WriteNewLine();
+        span = _writer.GetSpan(2);
+        span[0] = (byte)'\r';
+        span[1] = (byte)'\n';
+        _writer.Advance(2);
     }
 
+    // https://docs.nats.io/reference/reference-protocols/nats-protocol#pub
+    // PUB <subject> [reply-to] <#bytes>\r\n[payload]\r\n
+    // or
+    // https://docs.nats.io/reference/reference-protocols/nats-protocol#hpub
+    // HPUB <subject> [reply-to] <#header bytes> <#total bytes>\r\n[headers]\r\n\r\n[payload]\r\n
     public void WritePublish<T>(string subject, string? replyTo, NatsHeaders? headers, T? value, INatsSerialize<T> serializer)
     {
-        _ctrlBuf.Clear();
-
-        // Start writing the message to buffer:
-        // PUP / HPUB
-        _ctrlBuf.WriteSpan(headers == null ? CommandConstants.PubWithPadding : CommandConstants.HPubWithPadding);
-        _ctrlBuf.WriteASCIIAndSpace(subject);
-
-        if (replyTo != null)
-        {
-            _ctrlBuf.WriteASCIIAndSpace(replyTo);
-        }
-
-        long totalLength = 0;
-        Span<byte> totalLengthSpan;
+        int ctrlLen;
         if (headers == null)
         {
-            var totalLengthPos = _ctrlBuf.WrittenCount;
-            _ctrlBuf.Advance(MaxIntStringLength);
-            _ctrlBuf.WriteNewLine();
-
-            var writerSpan = _writer.GetSpan(_ctrlBuf.WrittenSpan.Length);
-            _ctrlBuf.WrittenSpan.CopyTo(writerSpan);
-            _writer.Advance(_ctrlBuf.WrittenSpan.Length);
-
-            totalLengthSpan = writerSpan.Slice(totalLengthPos, MaxIntStringLength);
+            // 'PUB '   + subject                                +' '+ payload len        +'\r\n'
+            ctrlLen = 4 + _subjectEncoding.GetByteCount(subject) + 1 + MaxIntStringLength + 2;
         }
         else
         {
-            var headersLengthPos = _ctrlBuf.WrittenCount;
-            _ctrlBuf.Advance(MaxIntStringLength);
-            _ctrlBuf.WriteSpace();
+            // 'HPUB '  + subject                                +' '+ header len         +' '+ payload len        +'\r\n'
+            ctrlLen = 5 + _subjectEncoding.GetByteCount(subject) + 1 + MaxIntStringLength + 1 + MaxIntStringLength + 2;
+        }
 
-            var totalLengthPos = _ctrlBuf.WrittenCount;
-            _ctrlBuf.Advance(MaxIntStringLength);
-            _ctrlBuf.WriteNewLine();
-            _ctrlBuf.WriteSpan(CommandConstants.NatsHeaders10NewLine);
+        if (replyTo != null)
+        {
+            // len  += replyTo                                +' '
+            ctrlLen += _subjectEncoding.GetByteCount(replyTo) + 1;
+        }
 
-            var writerSpan = _writer.GetSpan(_ctrlBuf.WrittenSpan.Length);
-            _ctrlBuf.WrittenSpan.CopyTo(writerSpan);
-            _writer.Advance(_ctrlBuf.WrittenSpan.Length);
+        var span = _writer.GetSpan(ctrlLen);
+        if (headers == null)
+        {
+            span[0] = (byte)'P';
+            span[1] = (byte)'U';
+            span[2] = (byte)'B';
+            span[3] = (byte)' ';
+            span = span[4..];
+        }
+        else
+        {
+            span[0] = (byte)'H';
+            span[1] = (byte)'P';
+            span[2] = (byte)'U';
+            span[3] = (byte)'B';
+            span[4] = (byte)' ';
+            span = span[5..];
+        }
 
-            var headersLengthSpan = writerSpan.Slice(headersLengthPos, MaxIntStringLength);
-            totalLengthSpan = writerSpan.Slice(totalLengthPos, MaxIntStringLength);
+        var written = _subjectEncoding.GetBytes(subject, span);
+        span[written] = (byte)' ';
+        span = span[(written + 1)..];
 
+        if (replyTo != null)
+        {
+            written = _subjectEncoding.GetBytes(replyTo, span);
+            span[written] = (byte)' ';
+            span = span[(written + 1)..];
+        }
+
+        Span<byte> headersLengthSpan = default;
+        if (headers != null)
+        {
+            headersLengthSpan = span[..MaxIntStringLength];
+            span[MaxIntStringLength] = (byte)' ';
+            span = span[(MaxIntStringLength + 1)..];
+        }
+
+        var totalLengthSpan = span[..MaxIntStringLength];
+        span[MaxIntStringLength] = (byte)'\r';
+        span[MaxIntStringLength + 1] = (byte)'\n';
+        _writer.Advance(ctrlLen);
+
+        var totalLength = 0L;
+        if (headers != null)
+        {
             var headersLength = _headerWriter.Write(headers);
-            headersLengthSpan.OverwriteAllocatedNumber(CommandConstants.NatsHeaders10NewLine.Length + headersLength);
-            totalLength += CommandConstants.NatsHeaders10NewLine.Length + headersLength;
+            headersLengthSpan.OverwriteAllocatedNumber(headersLength);
+            totalLength += headersLength;
         }
 
         // Consider null as empty payload. This way we are able to transmit null values as sentinels.
@@ -161,7 +224,10 @@ internal sealed class ProtocolWriter
         }
 
         totalLengthSpan.OverwriteAllocatedNumber(totalLength);
-        _writer.WriteNewLine();
+        span = _writer.GetSpan(2);
+        span[0] = (byte)'\r';
+        span[1] = (byte)'\n';
+        _writer.Advance(2);
     }
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#sub

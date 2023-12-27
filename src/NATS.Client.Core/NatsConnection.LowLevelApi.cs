@@ -31,15 +31,15 @@ public partial class NatsConnection
         await CommandWriter.PublishAsync(subject, replyTo, headers, data, serializer, cancellationToken).ConfigureAwait(false);
     }
 
-    internal async ValueTask PubAsync(string subject, string? replyTo = default, ReadOnlySequence<byte> payload = default, NatsHeaders? headers = default, CancellationToken cancellationToken = default)
+    internal ValueTask PubAsync(string subject, string? replyTo = default, ReadOnlySequence<byte> payload = default, NatsHeaders? headers = default, CancellationToken cancellationToken = default)
     {
         headers?.SetReadOnly();
         if (ConnectionState != NatsConnectionState.Open)
         {
-            await ConnectAsync().ConfigureAwait(false);
+            return ConnectAndPubAsync(subject, replyTo, payload, headers, cancellationToken);
         }
 
-        await CommandWriter.PublishBytesAsync(subject, replyTo, headers, payload, cancellationToken).ConfigureAwait(false);
+        return CommandWriter.PublishBytesAsync(subject, replyTo, headers, payload, cancellationToken);
     }
 
     internal async ValueTask PubModelAsync<T>(string subject, T? data, INatsSerialize<T> serializer, string? replyTo = default, NatsHeaders? headers = default, CancellationToken cancellationToken = default)
@@ -61,5 +61,11 @@ public partial class NatsConnection
         }
 
         await SubscriptionManager.SubscribeAsync(sub, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async ValueTask ConnectAndPubAsync(string subject, string? replyTo = default, ReadOnlySequence<byte> payload = default, NatsHeaders? headers = default, CancellationToken cancellationToken = default)
+    {
+        await ConnectAsync().ConfigureAwait(false);
+        await CommandWriter.PublishBytesAsync(subject, replyTo, headers, payload, cancellationToken).ConfigureAwait(false);
     }
 }

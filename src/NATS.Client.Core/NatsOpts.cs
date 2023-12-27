@@ -67,6 +67,8 @@ public sealed record NatsOpts
 
     public Encoding HeaderEncoding { get; init; } = Encoding.ASCII;
 
+    public Encoding SubjectEncoding { get; init; } = Encoding.ASCII;
+
     public bool WaitUntilSent { get; init; } = false;
 
     /// <summary>
