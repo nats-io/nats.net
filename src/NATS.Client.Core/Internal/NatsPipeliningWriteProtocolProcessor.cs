@@ -13,6 +13,7 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
     private readonly ConnectionStatsCounter _counter;
     private readonly NatsOpts _opts;
     private readonly PipeReader _pipeReader;
+    private readonly List<QueuedCommand> _inFlightCommands;
     private readonly ChannelReader<QueuedCommand> _queuedCommandReader;
     private readonly ISocketConnection _socketConnection;
     private readonly Stopwatch _stopwatch = new Stopwatch();
@@ -22,6 +23,7 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
     {
         _cancellationTokenSource = new CancellationTokenSource();
         _counter = counter;
+        _inFlightCommands = commandWriter.InFlightCommands;
         _opts = opts;
         _pipeReader = commandWriter.PipeReader;
         _queuedCommandReader = commandWriter.QueuedCommandsReader;
@@ -57,30 +59,106 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
         var isEnabledTraceLogging = logger.IsEnabled(LogLevel.Trace);
         var cancellationToken = _cancellationTokenSource.Token;
         var pending = 0;
+        var canceled = false;
         var examinedOffset = 0;
 
         // memory segment used to consolidate multiple small memory chunks
-        // 8192 is half of minimumSegmentSize in CommandWriter
-        // it is also the default socket send buffer size
-        var consolidateMem = new Memory<byte>(new byte[8192]);
+        // should <= (minimumSegmentSize * 0.5) in CommandWriter
+        var consolidateMem = new Memory<byte>(new byte[8000]);
+
+        // add up in flight command sum
+        var inFlightSum = 0;
+        foreach (var command in _inFlightCommands)
+        {
+            inFlightSum += command.Size;
+        }
 
         try
         {
             while (true)
             {
                 var result = await _pipeReader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                while (inFlightSum < result.Buffer.Length)
+                {
+                    QueuedCommand queuedCommand;
+                    while (!_queuedCommandReader.TryRead(out queuedCommand))
+                    {
+                        await _queuedCommandReader.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
+                    }
+
+                    _inFlightCommands.Add(queuedCommand);
+                    inFlightSum += queuedCommand.Size;
+                }
+
                 var consumedPos = result.Buffer.Start;
                 var examinedPos = result.Buffer.Start;
                 var buffer = result.Buffer.Slice(examinedOffset);
+
                 while (buffer.Length > 0)
                 {
-                    var sendMem = buffer.First;
-                    if (buffer.Length > sendMem.Length && sendMem.Length < consolidateMem.Length)
+                    if (pending == 0)
                     {
-                        // consolidate multiple small memory chunks into one
-                        var consolidateSize = (int)Math.Min(consolidateMem.Length, buffer.Length);
-                        buffer.Slice(0, consolidateSize).CopyTo(consolidateMem.Span);
-                        sendMem = consolidateMem.Slice(0, consolidateSize);
+                        pending = _inFlightCommands[0].Size;
+                        canceled = _inFlightCommands[0].Canceled;
+                    }
+
+                    if (canceled)
+                    {
+                        if (pending > buffer.Length)
+                        {
+                            // command partially canceled
+                            examinedPos = buffer.GetPosition(examinedOffset);
+                            examinedOffset = (int)buffer.Length;
+                            pending -= (int)buffer.Length;
+                            break;
+                        }
+
+                        // command completely canceled
+                        inFlightSum -= _inFlightCommands[0].Size;
+                        _inFlightCommands.RemoveAt(0);
+                        consumedPos = buffer.GetPosition(pending);
+                        examinedPos = buffer.GetPosition(pending);
+                        examinedOffset = 0;
+                        buffer = buffer.Slice(pending);
+                        pending = 0;
+                        continue;
+                    }
+
+                    var sendMem = buffer.First;
+                    var maxSize = 0;
+                    var maxSizeCap = Math.Max(sendMem.Length, consolidateMem.Length);
+                    foreach (var command in _inFlightCommands)
+                    {
+                        if (maxSize == 0)
+                        {
+                            // first command; set to pending
+                            maxSize = pending;
+                            continue;
+                        }
+
+                        if (maxSize > maxSizeCap || command.Canceled)
+                        {
+                            break;
+                        }
+
+                        // next command can be sent also
+                        maxSize += command.Size;
+                    }
+
+                    if (sendMem.Length > maxSize)
+                    {
+                        sendMem = sendMem[..maxSize];
+                    }
+                    else
+                    {
+                        var bufferIter = buffer.Slice(0, Math.Min(maxSize, buffer.Length));
+                        if (bufferIter.Length > sendMem.Length && sendMem.Length < consolidateMem.Length)
+                        {
+                            // consolidate multiple small memory chunks into one
+                            var consolidateSize = (int)Math.Min(consolidateMem.Length, bufferIter.Length);
+                            bufferIter.Slice(0, consolidateSize).CopyTo(consolidateMem.Span);
+                            sendMem = consolidateMem[..consolidateSize];
+                        }
                     }
 
                     // perform send
@@ -98,34 +176,15 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
                     {
                         if (pending == 0)
                         {
-                            // peek next message size off the channel
-                            // this should always return synchronously since queued commands are
-                            // written before the buffer is flushed
-                            if (_queuedCommandReader.TryPeek(out var queuedCommand))
-                            {
-                                pending = queuedCommand.Size;
-                            }
-                            else
-                            {
-                                throw new NatsException("pipe writer flushed without sending queued command");
-                            }
+                            pending = _inFlightCommands.First().Size;
                         }
 
                         if (pending <= sent - consumed)
                         {
-                            // pop the message previously peeked off the channel
-                            // this should always return synchronously since it is the only
-                            // channel read operation and a peek has already been preformed
-                            if (_queuedCommandReader.TryRead(out _))
-                            {
-                                // increment counter
-                                Interlocked.Add(ref _counter.PendingMessages, -1);
-                                Interlocked.Add(ref _counter.SentMessages, 1);
-                            }
-                            else
-                            {
-                                throw new NatsException("channel read by someone else after peek");
-                            }
+                            inFlightSum -= _inFlightCommands[0].Size;
+                            _inFlightCommands.RemoveAt(0);
+                            Interlocked.Add(ref _counter.PendingMessages, -1);
+                            Interlocked.Add(ref _counter.SentMessages, 1);
 
                             // mark the bytes as consumed, and reset pending
                             consumed += pending;
@@ -158,7 +217,7 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
                 }
 
                 _pipeReader.AdvanceTo(consumedPos, examinedPos);
-                if (result.IsCompleted || result.IsCanceled)
+                if (result.IsCompleted)
                 {
                     break;
                 }

@@ -1,16 +1,23 @@
-using System.Buffers;
 using System.IO.Pipelines;
-using System.Text;
+using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core.Commands;
 
 // QueuedCommand is used to track commands that have been queued but not sent
-internal readonly record struct QueuedCommand(int Size)
-{
-}
+internal readonly record struct QueuedCommand(int Size, bool Canceled = false);
 
+/// <summary>
+/// Sets up a Pipe, and provides methods to write to the PipeWriter
+/// When methods complete, they have been queued for sending
+/// and further cancellation is not possible
+/// </summary>
+/// <remarks>
+/// These methods are in the hot path, and have all been
+/// optimized to eliminate allocations and make an initial attempt
+/// to run synchronously without the async state machine
+/// </remarks>
 internal sealed class CommandWriter : IAsyncDisposable
 {
     private readonly ConnectionStatsCounter _counter;
@@ -19,6 +26,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     private readonly ProtocolWriter _protocolWriter;
     private readonly ChannelWriter<QueuedCommand> _queuedCommandsWriter;
     private readonly SemaphoreSlim _sem;
+    private Task? _flushTask;
     private bool _disposed;
 
     public CommandWriter(NatsOpts opts, ConnectionStatsCounter counter)
@@ -39,229 +47,311 @@ internal sealed class CommandWriter : IAsyncDisposable
 
     public ChannelReader<QueuedCommand> QueuedCommandsReader { get; }
 
+    public List<QueuedCommand> InFlightCommands { get; } = new();
+
     public async ValueTask DisposeAsync()
     {
-        if (!_disposed)
+        await _sem.WaitAsync().ConfigureAwait(false);
+        try
         {
-            if (!_sem.Wait(0))
+            if (_disposed)
             {
-                await _sem.WaitAsync().ConfigureAwait(false);
+                return;
             }
 
-            try
-            {
-                _disposed = true;
-                _queuedCommandsWriter.Complete();
-                await _pipeWriter.CompleteAsync().ConfigureAwait(false);
-            }
-            finally
-            {
-                _sem.Release();
-            }
+            _disposed = true;
+            _queuedCommandsWriter.Complete();
+            await _pipeWriter.CompleteAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            _sem.Release();
         }
     }
 
     public NatsPipeliningWriteProtocolProcessor CreateNatsPipeliningWriteProtocolProcessor(ISocketConnection socketConnection) => new(socketConnection, this, _opts, _counter);
 
-    public async ValueTask ConnectAsync(ClientOpts connectOpts, CancellationToken cancellationToken)
+    public ValueTask ConnectAsync(ClientOpts connectOpts, CancellationToken cancellationToken)
     {
+#pragma warning disable CA2016
+#pragma warning disable VSTHRD103
         if (!_sem.Wait(0))
+#pragma warning restore VSTHRD103
+#pragma warning restore CA2016
         {
-            await _sem.WaitAsync(cancellationToken).ConfigureAwait(false);
+            return ConnectStateMachineAsync(false, connectOpts, cancellationToken);
+        }
+
+        if (_flushTask is { IsCompletedSuccessfully: false })
+        {
+            return ConnectStateMachineAsync(true, connectOpts, cancellationToken);
         }
 
         try
         {
-            _protocolWriter.WriteConnect(connectOpts);
-            Interlocked.Add(ref _counter.PendingMessages, 1);
-            _queuedCommandsWriter.TryWrite(new QueuedCommand(Size: (int)_pipeWriter.UnflushedBytes));
-            await _pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
-        }
-        finally
-        {
-            _sem.Release();
-        }
-    }
-
-    public async ValueTask DirectWriteAsync(string protocol, int repeatCount, CancellationToken cancellationToken)
-    {
-        if (repeatCount < 1)
-            throw new ArgumentException("repeatCount should >= 1, repeatCount:" + repeatCount);
-
-        byte[] protocolBytes;
-        if (repeatCount == 1)
-        {
-            protocolBytes = Encoding.UTF8.GetBytes(protocol + "\r\n");
-        }
-        else
-        {
-            var bin = Encoding.UTF8.GetBytes(protocol + "\r\n");
-            protocolBytes = new byte[bin.Length * repeatCount];
-            var span = protocolBytes.AsMemory();
-            for (var i = 0; i < repeatCount; i++)
+            if (_disposed)
             {
-                bin.CopyTo(span);
-                span = span.Slice(bin.Length);
+                throw new ObjectDisposedException(nameof(CommandWriter));
+            }
+
+            var success = false;
+            try
+            {
+                _protocolWriter.WriteConnect(connectOpts);
+                success = true;
+            }
+            finally
+            {
+                EnqueueCommand(success);
             }
         }
-
-        if (!_sem.Wait(0))
-        {
-            await _sem.WaitAsync(cancellationToken).ConfigureAwait(false);
-        }
-
-        try
-        {
-            _protocolWriter.WriteRaw(protocolBytes);
-            Interlocked.Add(ref _counter.PendingMessages, 1);
-            _queuedCommandsWriter.TryWrite(new QueuedCommand(Size: (int)_pipeWriter.UnflushedBytes));
-            await _pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
-        }
         finally
         {
             _sem.Release();
         }
+
+        return ValueTask.CompletedTask;
     }
 
-    public async ValueTask PingAsync(CancellationToken cancellationToken)
+    public ValueTask PingAsync(CancellationToken cancellationToken)
     {
+#pragma warning disable CA2016
+#pragma warning disable VSTHRD103
         if (!_sem.Wait(0))
+#pragma warning restore VSTHRD103
+#pragma warning restore CA2016
         {
-            await _sem.WaitAsync(cancellationToken).ConfigureAwait(false);
+            return PingStateMachineAsync(false, cancellationToken);
+        }
+
+        if (_flushTask is { IsCompletedSuccessfully: false })
+        {
+            return PingStateMachineAsync(true, cancellationToken);
         }
 
         try
         {
-            _protocolWriter.WritePing();
-            Interlocked.Add(ref _counter.PendingMessages, 1);
-            _queuedCommandsWriter.TryWrite(new QueuedCommand(Size: (int)_pipeWriter.UnflushedBytes));
-            await _pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(CommandWriter));
+            }
+
+            var success = false;
+            try
+            {
+                _protocolWriter.WritePing();
+                success = true;
+            }
+            finally
+            {
+                EnqueueCommand(success);
+            }
         }
         finally
         {
             _sem.Release();
         }
+
+        return ValueTask.CompletedTask;
     }
 
-    public async ValueTask PongAsync(CancellationToken cancellationToken)
+    public ValueTask PongAsync(CancellationToken cancellationToken)
     {
+#pragma warning disable CA2016
+#pragma warning disable VSTHRD103
         if (!_sem.Wait(0))
+#pragma warning restore VSTHRD103
+#pragma warning restore CA2016
         {
-            await _sem.WaitAsync(cancellationToken).ConfigureAwait(false);
+            return PongStateMachineAsync(false, cancellationToken);
+        }
+
+        if (_flushTask is { IsCompletedSuccessfully: false })
+        {
+            return PongStateMachineAsync(true, cancellationToken);
         }
 
         try
         {
-            _protocolWriter.WritePong();
-            Interlocked.Add(ref _counter.PendingMessages, 1);
-            _queuedCommandsWriter.TryWrite(new QueuedCommand(Size: (int)_pipeWriter.UnflushedBytes));
-            await _pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(CommandWriter));
+            }
+
+            var success = false;
+            try
+            {
+                _protocolWriter.WritePong();
+                success = true;
+            }
+            finally
+            {
+                EnqueueCommand(success);
+            }
         }
         finally
         {
             _sem.Release();
         }
+
+        return ValueTask.CompletedTask;
     }
 
     public ValueTask PublishAsync<T>(string subject, string? replyTo, NatsHeaders? headers, T? value, INatsSerialize<T> serializer, CancellationToken cancellationToken)
     {
+#pragma warning disable CA2016
+#pragma warning disable VSTHRD103
         if (!_sem.Wait(0))
+#pragma warning restore VSTHRD103
+#pragma warning restore CA2016
         {
-            return AwaitLockAndPublishAsync(subject, replyTo, headers, value, serializer, cancellationToken);
+            return PublishStateMachineAsync(false, subject, replyTo, headers, value, serializer, cancellationToken);
+        }
+
+        if (_flushTask is { IsCompletedSuccessfully: false })
+        {
+            return PublishStateMachineAsync(true, subject, replyTo, headers, value, serializer, cancellationToken);
         }
 
         try
         {
-            _protocolWriter.WritePublish(subject, replyTo, headers, value, serializer);
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(CommandWriter));
+            }
+
+            var success = false;
+            try
+            {
+                _protocolWriter.WritePublish(subject, replyTo, headers, value, serializer);
+                success = true;
+            }
+            finally
+            {
+                EnqueueCommand(success);
+            }
         }
-        catch
+        finally
         {
             _sem.Release();
-            throw;
         }
 
-        Interlocked.Add(ref _counter.PendingMessages, 1);
-        _queuedCommandsWriter.TryWrite(new QueuedCommand(Size: (int)_pipeWriter.UnflushedBytes));
-
-        ValueTask<FlushResult> flush;
-        try
-        {
-            flush = _pipeWriter.FlushAsync(cancellationToken);
-        }
-        catch
-        {
-            _sem.Release();
-            throw;
-        }
-
-        if (flush.IsCompletedSuccessfully)
-        {
-#pragma warning disable VSTHRD103 // Call async methods when in an async method
-            flush.GetAwaiter().GetResult();
-#pragma warning restore VSTHRD103 // Call async methods when in an async method
-            _sem.Release();
-            return ValueTask.CompletedTask;
-        }
-
-        return AwaitFlushAsync(flush);
+        return ValueTask.CompletedTask;
     }
 
-    public ValueTask PublishBytesAsync(string subject, string? replyTo, NatsHeaders? headers, ReadOnlySequence<byte> payload, CancellationToken cancellationToken)
+    public ValueTask SubscribeAsync(int sid, string subject, string? queueGroup, int? maxMsgs, CancellationToken cancellationToken)
     {
+#pragma warning disable CA2016
+#pragma warning disable VSTHRD103
         if (!_sem.Wait(0))
+#pragma warning restore VSTHRD103
+#pragma warning restore CA2016
         {
-            return AwaitLockAndPublishBytesAsync(subject, replyTo, headers, payload, cancellationToken);
+            return SubscribeStateMachineAsync(false, sid, subject, queueGroup, maxMsgs, cancellationToken);
+        }
+
+        if (_flushTask is { IsCompletedSuccessfully: false })
+        {
+            return SubscribeStateMachineAsync(true, sid, subject, queueGroup, maxMsgs, cancellationToken);
         }
 
         try
         {
-            _protocolWriter.WritePublish(subject, replyTo, headers, payload);
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(CommandWriter));
+            }
+
+            var success = false;
+            try
+            {
+                _protocolWriter.WriteSubscribe(sid, subject, queueGroup, maxMsgs);
+                success = true;
+            }
+            finally
+            {
+                EnqueueCommand(success);
+            }
         }
-        catch
+        finally
         {
             _sem.Release();
-            throw;
         }
 
-        Interlocked.Add(ref _counter.PendingMessages, 1);
-        _queuedCommandsWriter.TryWrite(new QueuedCommand(Size: (int)_pipeWriter.UnflushedBytes));
-
-        ValueTask<FlushResult> flush;
-        try
-        {
-            flush = _pipeWriter.FlushAsync(cancellationToken);
-        }
-        catch
-        {
-            _sem.Release();
-            throw;
-        }
-
-        if (flush.IsCompletedSuccessfully)
-        {
-#pragma warning disable VSTHRD103 // Call async methods when in an async method
-            flush.GetAwaiter().GetResult();
-#pragma warning restore VSTHRD103 // Call async methods when in an async method
-            _sem.Release();
-            return ValueTask.CompletedTask;
-        }
-
-        return AwaitFlushAsync(flush);
+        return ValueTask.CompletedTask;
     }
 
-    public async ValueTask SubscribeAsync(int sid, string subject, string? queueGroup, int? maxMsgs, CancellationToken cancellationToken)
+    public ValueTask UnsubscribeAsync(int sid, CancellationToken cancellationToken)
     {
+#pragma warning disable CA2016
+#pragma warning disable VSTHRD103
         if (!_sem.Wait(0))
+#pragma warning restore VSTHRD103
+#pragma warning restore CA2016
+        {
+            return UnsubscribeStateMachineAsync(false, sid, cancellationToken);
+        }
+
+        if (_flushTask is { IsCompletedSuccessfully: false })
+        {
+            return UnsubscribeStateMachineAsync(true, sid, cancellationToken);
+        }
+
+        try
+        {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(CommandWriter));
+            }
+
+            var success = false;
+            try
+            {
+                _protocolWriter.WriteUnsubscribe(sid, null);
+                success = true;
+            }
+            finally
+            {
+                EnqueueCommand(success);
+            }
+        }
+        finally
+        {
+            _sem.Release();
+        }
+
+        return ValueTask.CompletedTask;
+    }
+
+    private async ValueTask ConnectStateMachineAsync(bool lockHeld, ClientOpts connectOpts, CancellationToken cancellationToken)
+    {
+        if (!lockHeld)
         {
             await _sem.WaitAsync(cancellationToken).ConfigureAwait(false);
         }
 
         try
         {
-            _protocolWriter.WriteSubscribe(sid, subject, queueGroup, maxMsgs);
-            Interlocked.Add(ref _counter.PendingMessages, 1);
-            _queuedCommandsWriter.TryWrite(new QueuedCommand(Size: (int)_pipeWriter.UnflushedBytes));
-            await _pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(CommandWriter));
+            }
+
+            if (_flushTask is { IsCompletedSuccessfully: false })
+            {
+                await _flushTask.WaitAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            var success = false;
+            try
+            {
+                _protocolWriter.WriteConnect(connectOpts);
+                success = true;
+            }
+            finally
+            {
+                EnqueueCommand(success);
+            }
         }
         finally
         {
@@ -269,44 +359,34 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
     }
 
-    public async ValueTask UnsubscribeAsync(int sid, CancellationToken cancellationToken)
+    private async ValueTask PingStateMachineAsync(bool lockHeld, CancellationToken cancellationToken)
     {
-        if (!_sem.Wait(0))
+        if (!lockHeld)
         {
             await _sem.WaitAsync(cancellationToken).ConfigureAwait(false);
         }
 
         try
         {
-            _protocolWriter.WriteUnsubscribe(sid, null);
-            Interlocked.Add(ref _counter.PendingMessages, 1);
-            _queuedCommandsWriter.TryWrite(new QueuedCommand(Size: (int)_pipeWriter.UnflushedBytes));
-            await _pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
-        }
-        finally
-        {
-            _sem.Release();
-        }
-    }
-
-    private async ValueTask AwaitLockAndPublishAsync<T>(string subject, string? replyTo, NatsHeaders? headers, T? value, INatsSerialize<T> serializer, CancellationToken cancellationToken)
-    {
-        await _sem.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            _protocolWriter.WritePublish(subject, replyTo, headers, value, serializer);
-            Interlocked.Add(ref _counter.PendingMessages, 1);
-            _queuedCommandsWriter.TryWrite(new QueuedCommand(Size: (int)_pipeWriter.UnflushedBytes));
-            var flush = _pipeWriter.FlushAsync(cancellationToken);
-            if (flush.IsCompletedSuccessfully)
+            if (_disposed)
             {
-#pragma warning disable VSTHRD103 // Call async methods when in an async method
-                flush.GetAwaiter().GetResult();
-#pragma warning restore VSTHRD103 // Call async methods when in an async method
+                throw new ObjectDisposedException(nameof(CommandWriter));
             }
-            else
+
+            if (_flushTask is { IsCompletedSuccessfully: false })
             {
-                await flush.ConfigureAwait(false);
+                await _flushTask.WaitAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            var success = false;
+            try
+            {
+                _protocolWriter.WritePing();
+                success = true;
+            }
+            finally
+            {
+                EnqueueCommand(success);
             }
         }
         finally
@@ -315,24 +395,34 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
     }
 
-    private async ValueTask AwaitLockAndPublishBytesAsync(string subject, string? replyTo, NatsHeaders? headers, ReadOnlySequence<byte> payload, CancellationToken cancellationToken)
+    private async ValueTask PongStateMachineAsync(bool lockHeld, CancellationToken cancellationToken)
     {
-        await _sem.WaitAsync(cancellationToken).ConfigureAwait(false);
+        if (!lockHeld)
+        {
+            await _sem.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         try
         {
-            _protocolWriter.WritePublish(subject, replyTo, headers, payload);
-            Interlocked.Add(ref _counter.PendingMessages, 1);
-            _queuedCommandsWriter.TryWrite(new QueuedCommand(Size: (int)_pipeWriter.UnflushedBytes));
-            var flush = _pipeWriter.FlushAsync(cancellationToken);
-            if (flush.IsCompletedSuccessfully)
+            if (_disposed)
             {
-#pragma warning disable VSTHRD103 // Call async methods when in an async method
-                flush.GetAwaiter().GetResult();
-#pragma warning restore VSTHRD103 // Call async methods when in an async method
+                throw new ObjectDisposedException(nameof(CommandWriter));
             }
-            else
+
+            if (_flushTask is { IsCompletedSuccessfully: false })
             {
-                await flush.ConfigureAwait(false);
+                await _flushTask.WaitAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            var success = false;
+            try
+            {
+                _protocolWriter.WritePong();
+                success = true;
+            }
+            finally
+            {
+                EnqueueCommand(success);
             }
         }
         finally
@@ -341,16 +431,140 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
     }
 
-    private async ValueTask AwaitFlushAsync(ValueTask<FlushResult> flush)
+    private async ValueTask PublishStateMachineAsync<T>(bool lockHeld, string subject, string? replyTo, NatsHeaders? headers, T? value, INatsSerialize<T> serializer, CancellationToken cancellationToken)
     {
+        if (!lockHeld)
+        {
+            await _sem.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         try
         {
-            await flush.ConfigureAwait(false);
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(CommandWriter));
+            }
+
+            if (_flushTask is { IsCompletedSuccessfully: false })
+            {
+                await _flushTask.WaitAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            var success = false;
+            try
+            {
+                _protocolWriter.WritePublish(subject, replyTo, headers, value, serializer);
+                success = true;
+            }
+            finally
+            {
+                EnqueueCommand(success);
+            }
         }
         finally
         {
             _sem.Release();
         }
+    }
+
+    private async ValueTask SubscribeStateMachineAsync(bool lockHeld, int sid, string subject, string? queueGroup, int? maxMsgs, CancellationToken cancellationToken)
+    {
+        if (!lockHeld)
+        {
+            await _sem.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        try
+        {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(CommandWriter));
+            }
+
+            if (_flushTask is { IsCompletedSuccessfully: false })
+            {
+                await _flushTask.WaitAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            var success = false;
+            try
+            {
+                _protocolWriter.WriteSubscribe(sid, subject, queueGroup, maxMsgs);
+                success = true;
+            }
+            finally
+            {
+                EnqueueCommand(success);
+            }
+        }
+        finally
+        {
+            _sem.Release();
+        }
+    }
+
+    private async ValueTask UnsubscribeStateMachineAsync(bool lockHeld, int sid, CancellationToken cancellationToken)
+    {
+        if (!lockHeld)
+        {
+            await _sem.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        try
+        {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(CommandWriter));
+            }
+
+            if (_flushTask is { IsCompletedSuccessfully: false })
+            {
+                await _flushTask.WaitAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            var success = false;
+            try
+            {
+                _protocolWriter.WriteUnsubscribe(sid, null);
+                success = true;
+            }
+            finally
+            {
+                EnqueueCommand(success);
+            }
+        }
+        finally
+        {
+            _sem.Release();
+        }
+    }
+
+    /// <summary>
+    /// Enqueues a command, and kicks off a flush
+    /// </summary>
+    /// <param name="success">
+    /// Whether the command was successful
+    /// If true, it will be sent on the wire
+    /// If false, it will be thrown out
+    /// </param>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void EnqueueCommand(bool success)
+    {
+        if (_pipeWriter.UnflushedBytes == 0)
+        {
+            // no unflushed bytes means no command was produced
+            _flushTask = null;
+            return;
+        }
+
+        if (success)
+        {
+            Interlocked.Add(ref _counter.PendingMessages, 1);
+        }
+
+        _queuedCommandsWriter.TryWrite(new QueuedCommand(Size: (int)_pipeWriter.UnflushedBytes, Canceled: !success));
+        var flush = _pipeWriter.FlushAsync();
+        _flushTask = flush.IsCompletedSuccessfully ? null : flush.AsTask();
     }
 }
 

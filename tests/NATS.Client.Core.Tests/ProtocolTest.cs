@@ -351,9 +351,9 @@ public class ProtocolTest
             await base.WriteReconnectCommandsAsync(commandWriter, sid);
 
             // Any additional commands to send on reconnect
-            await commandWriter.PublishBytesAsync("bar1", default, default, default, default);
-            await commandWriter.PublishBytesAsync("bar2", default, default, default, default);
-            await commandWriter.PublishBytesAsync("bar3", default, default, default, default);
+            await commandWriter.PublishAsync("bar1", default, default, default, NatsRawSerializer<byte>.Default, default);
+            await commandWriter.PublishAsync("bar2", default, default, default, NatsRawSerializer<byte>.Default, default);
+            await commandWriter.PublishAsync("bar3", default, default, default, NatsRawSerializer<byte>.Default, default);
         }
 
         protected override ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)

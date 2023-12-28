@@ -11,7 +11,7 @@ public partial class NatsConnection
             await ConnectAsync().ConfigureAwait(false);
         }
 
-        await CommandWriter.PublishBytesAsync(subject, replyTo, headers, default, cancellationToken).ConfigureAwait(false);
+        await CommandWriter.PublishAsync(subject, replyTo, headers, default, NatsRawSerializer<byte[]>.Default, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />

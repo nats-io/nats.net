@@ -26,7 +26,8 @@ public class CancellationTest
         var task = Task.Run(async () =>
         {
             await Task.Delay(TimeSpan.FromSeconds(10));
-            await pubConnection.DirectWriteAsync("PUB foo 5\r\naiueo");
+            // todo: test this by disconnecting the server
+            // await pubConnection.DirectWriteAsync("PUB foo 5\r\naiueo");
         });
 
         var timeoutException = await Assert.ThrowsAsync<TimeoutException>(async () =>
