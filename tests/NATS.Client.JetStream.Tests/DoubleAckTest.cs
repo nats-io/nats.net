@@ -36,7 +36,7 @@ public class DoubleAckTest
             {
                 // double ack will use the same TCP stream to wait for the ACK from the server
                 // fetch must not block the socket so that the ACK can be received
-                await msg.AckAsync(new AckOpts(DoubleAck: true), cts.Token);
+                await msg.AckAsync(cancellationToken: cts.Token);
                 count++;
             }
 
@@ -58,7 +58,7 @@ public class DoubleAckTest
             {
                 // double ack will use the same TCP stream to wait for the ACK from the server
                 // fetch must not block the socket so that the ACK can be received
-                await msg.AckAsync(new AckOpts(DoubleAck: true), cts.Token);
+                await msg.AckAsync(cancellationToken: cts.Token);
                 count++;
             }
 

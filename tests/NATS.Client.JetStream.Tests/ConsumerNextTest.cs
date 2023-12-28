@@ -27,7 +27,7 @@ public class ConsumerNextTest
             var next = await consumer.NextAsync<TestData>(serializer: TestDataJsonSerializer<TestData>.Default, cancellationToken: cts.Token);
             if (next is { } msg)
             {
-                await msg.AckAsync(new AckOpts(WaitUntilSent: true), cts.Token);
+                await msg.AckAsync(cancellationToken: cts.Token);
                 Assert.Equal(i, msg.Data!.Test);
             }
         }

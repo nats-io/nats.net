@@ -31,7 +31,7 @@ public class ConsumerFetchTest
             await consumer.FetchInternalAsync<TestData>(serializer: TestDataJsonSerializer<TestData>.Default, opts: new NatsJSFetchOpts { MaxMsgs = 10 }, cancellationToken: cts.Token);
         await foreach (var msg in fc.Msgs.ReadAllAsync(cts.Token))
         {
-            await msg.AckAsync(new AckOpts(WaitUntilSent: true), cts.Token);
+            await msg.AckAsync(cancellationToken: cts.Token);
             Assert.Equal(count, msg.Data!.Test);
             count++;
         }
@@ -59,7 +59,7 @@ public class ConsumerFetchTest
         var count = 0;
         await foreach (var msg in consumer.FetchNoWaitAsync<TestData>(serializer: TestDataJsonSerializer<TestData>.Default, opts: new NatsJSFetchOpts { MaxMsgs = 10 }, cancellationToken: cts.Token))
         {
-            await msg.AckAsync(new AckOpts(WaitUntilSent: true), cts.Token);
+            await msg.AckAsync(cancellationToken: cts.Token);
             Assert.Equal(count, msg.Data!.Test);
             count++;
         }

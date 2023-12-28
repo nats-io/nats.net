@@ -45,7 +45,7 @@ public class CustomSerializerTest
             if (next is { } msg)
             {
                 Assert.Equal(new byte[] { 42 }, msg.Data);
-                await msg.AckAsync(opts: new AckOpts(DoubleAck: true), cts.Token);
+                await msg.AckAsync(cancellationToken: cts.Token);
             }
             else
             {

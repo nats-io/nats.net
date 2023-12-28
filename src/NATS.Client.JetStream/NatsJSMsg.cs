@@ -81,7 +81,7 @@ public interface INatsJSMsg<out T>
     /// <param name="opts">Ack options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the call.</param>
     /// <returns>A <see cref="ValueTask"/> representing the async call.</returns>
-    ValueTask AckAsync(AckOpts opts = default, CancellationToken cancellationToken = default);
+    ValueTask AckAsync(AckOpts? opts = default, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Signals that the message will not be processed now and processing can move onto the next message.
@@ -94,7 +94,7 @@ public interface INatsJSMsg<out T>
     /// Messages rejected using <c>-NAK</c> will be resent by the NATS JetStream server after the configured timeout
     /// or the delay parameter if it's specified.
     /// </remarks>
-    ValueTask NakAsync(AckOpts opts = default, TimeSpan delay = default, CancellationToken cancellationToken = default);
+    ValueTask NakAsync(AckOpts? opts = default, TimeSpan delay = default, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Indicates that work is ongoing and the wait period should be extended.
@@ -112,7 +112,7 @@ public interface INatsJSMsg<out T>
     /// by another amount of time equal to <c>ack_wait</c> by the NATS JetStream server.
     /// </para>
     /// </remarks>
-    ValueTask AckProgressAsync(AckOpts opts = default, CancellationToken cancellationToken = default);
+    ValueTask AckProgressAsync(AckOpts? opts = default, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Instructs the server to stop redelivery of the message without acknowledging it as successfully processed.
@@ -120,7 +120,7 @@ public interface INatsJSMsg<out T>
     /// <param name="opts">Ack options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the call.</param>
     /// <returns>A <see cref="ValueTask"/> representing the async call.</returns>
-    ValueTask AckTerminateAsync(AckOpts opts = default, CancellationToken cancellationToken = default);
+    ValueTask AckTerminateAsync(AckOpts? opts = default, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -195,7 +195,7 @@ public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
     /// <param name="opts">Ack options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the call.</param>
     /// <returns>A <see cref="ValueTask"/> representing the async call.</returns>
-    public ValueTask AckAsync(AckOpts opts = default, CancellationToken cancellationToken = default) => SendAckAsync(NatsJSConstants.Ack, opts, cancellationToken);
+    public ValueTask AckAsync(AckOpts? opts = default, CancellationToken cancellationToken = default) => SendAckAsync(NatsJSConstants.Ack, opts, cancellationToken);
 
     /// <summary>
     /// Signals that the message will not be processed now and processing can move onto the next message.
@@ -208,7 +208,7 @@ public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
     /// Messages rejected using <c>-NAK</c> will be resent by the NATS JetStream server after the configured timeout
     /// or the delay parameter if it's specified.
     /// </remarks>
-    public ValueTask NakAsync(AckOpts opts = default, TimeSpan delay = default, CancellationToken cancellationToken = default)
+    public ValueTask NakAsync(AckOpts? opts = default, TimeSpan delay = default, CancellationToken cancellationToken = default)
     {
         if (delay == default)
         {
@@ -237,7 +237,7 @@ public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
     /// by another amount of time equal to <c>ack_wait</c> by the NATS JetStream server.
     /// </para>
     /// </remarks>
-    public ValueTask AckProgressAsync(AckOpts opts = default, CancellationToken cancellationToken = default) => SendAckAsync(NatsJSConstants.AckProgress, opts, cancellationToken);
+    public ValueTask AckProgressAsync(AckOpts? opts = default, CancellationToken cancellationToken = default) => SendAckAsync(NatsJSConstants.AckProgress, opts, cancellationToken);
 
     /// <summary>
     /// Instructs the server to stop redelivery of the message without acknowledging it as successfully processed.
@@ -245,16 +245,16 @@ public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
     /// <param name="opts">Ack options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the call.</param>
     /// <returns>A <see cref="ValueTask"/> representing the async call.</returns>
-    public ValueTask AckTerminateAsync(AckOpts opts = default, CancellationToken cancellationToken = default) => SendAckAsync(NatsJSConstants.AckTerminate, opts, cancellationToken);
+    public ValueTask AckTerminateAsync(AckOpts? opts = default, CancellationToken cancellationToken = default) => SendAckAsync(NatsJSConstants.AckTerminate, opts, cancellationToken);
 
-    private async ValueTask SendAckAsync(ReadOnlySequence<byte> payload, AckOpts opts = default, CancellationToken cancellationToken = default)
+    private async ValueTask SendAckAsync(ReadOnlySequence<byte> payload, AckOpts? opts = default, CancellationToken cancellationToken = default)
     {
         CheckPreconditions();
 
         if (_msg == default)
             throw new NatsJSException("No user message, can't acknowledge");
 
-        if ((opts.DoubleAck ?? _context.Opts.AckOpts.DoubleAck) == true)
+        if (opts?.DoubleAck ?? _context.Opts.DoubleAck)
         {
             await Connection.RequestAsync<ReadOnlySequence<byte>, object?>(
                 subject: ReplyTo,
@@ -267,10 +267,6 @@ public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
         {
             await _msg.ReplyAsync(
                 data: payload,
-                opts: new NatsPubOpts
-                {
-                    WaitUntilSent = opts.WaitUntilSent ?? _context.Opts.AckOpts.WaitUntilSent,
-                },
                 serializer: NatsRawSerializer<ReadOnlySequence<byte>>.Default,
                 cancellationToken: cancellationToken);
         }
@@ -295,6 +291,10 @@ public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
 /// <summary>
 /// Options to be used when acknowledging messages received from a stream using a consumer.
 /// </summary>
-/// <param name="WaitUntilSent">Wait for the publish to be flushed down to the network.</param>
-/// <param name="DoubleAck">Ask server for an acknowledgment.</param>
-public readonly record struct AckOpts(bool? WaitUntilSent = false, bool? DoubleAck = false);
+public readonly record struct AckOpts
+{
+    /// <summary>
+    /// Ask server for an acknowledgment
+    /// </summary>
+    public bool? DoubleAck { get; init; }
+}
