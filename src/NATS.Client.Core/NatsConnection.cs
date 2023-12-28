@@ -71,7 +71,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         _cancellationTimerPool = new CancellationTimerPool(_pool, _disposedCancellationTokenSource.Token);
         _name = opts.Name;
         Counter = new ConnectionStatsCounter();
-        CommandWriter = new CommandWriter(Opts, Counter);
+        CommandWriter = new CommandWriter(Opts, Counter, EnqueuePing);
         InboxPrefix = NewInbox(opts.InboxPrefix);
         SubscriptionManager = new SubscriptionManager(this, InboxPrefix);
         _logger = opts.LoggerFactory.CreateLogger<NatsConnection>();
@@ -178,7 +178,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         }
     }
 
-    internal void EnqueuePing(PingCommand pingCommand)
+    private void EnqueuePing(PingCommand pingCommand)
     {
         // Enqueue Ping Command to current working reader.
         var reader = _socketReader;
@@ -426,11 +426,11 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
             // Authentication
             _userCredentials?.Authenticate(_clientOpts, WritableServerInfo);
 
-            await using (var priorityCommandWriter = new PriorityCommandWriter(_socket!, Opts, Counter))
+            await using (var priorityCommandWriter = new PriorityCommandWriter(_socket!, Opts, Counter, EnqueuePing))
             {
                 // add CONNECT and PING command to priority lane
                 await priorityCommandWriter.CommandWriter.ConnectAsync(_clientOpts, CancellationToken.None).ConfigureAwait(false);
-                await priorityCommandWriter.CommandWriter.PingAsync(CancellationToken.None).ConfigureAwait(false);
+                await priorityCommandWriter.CommandWriter.PingAsync(new PingCommand(), CancellationToken.None).ConfigureAwait(false);
 
                 Task? reconnectTask = null;
                 if (reconnect)

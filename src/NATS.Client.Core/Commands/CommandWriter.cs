@@ -5,7 +5,9 @@ using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core.Commands;
 
-// QueuedCommand is used to track commands that have been queued but not sent
+/// <summary>
+/// Used to track commands that have been enqueued to the PipeReader
+/// </summary>
 internal readonly record struct QueuedCommand(int Size, bool Canceled = false);
 
 /// <summary>
@@ -21,6 +23,7 @@ internal readonly record struct QueuedCommand(int Size, bool Canceled = false);
 internal sealed class CommandWriter : IAsyncDisposable
 {
     private readonly ConnectionStatsCounter _counter;
+    private readonly Action<PingCommand> _enqueuePing;
     private readonly NatsOpts _opts;
     private readonly PipeWriter _pipeWriter;
     private readonly ProtocolWriter _protocolWriter;
@@ -29,9 +32,10 @@ internal sealed class CommandWriter : IAsyncDisposable
     private Task? _flushTask;
     private bool _disposed;
 
-    public CommandWriter(NatsOpts opts, ConnectionStatsCounter counter)
+    public CommandWriter(NatsOpts opts, ConnectionStatsCounter counter, Action<PingCommand> enqueuePing)
     {
         _counter = counter;
+        _enqueuePing = enqueuePing;
         _opts = opts;
         var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: opts.WriterBufferSize, resumeWriterThreshold: opts.WriterBufferSize / 2, minimumSegmentSize: 65536, useSynchronizationContext: false));
         PipeReader = pipe.Reader;
@@ -113,7 +117,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         return ValueTask.CompletedTask;
     }
 
-    public ValueTask PingAsync(CancellationToken cancellationToken)
+    public ValueTask PingAsync(PingCommand pingCommand, CancellationToken cancellationToken)
     {
 #pragma warning disable CA2016
 #pragma warning disable VSTHRD103
@@ -121,12 +125,12 @@ internal sealed class CommandWriter : IAsyncDisposable
 #pragma warning restore VSTHRD103
 #pragma warning restore CA2016
         {
-            return PingStateMachineAsync(false, cancellationToken);
+            return PingStateMachineAsync(false, pingCommand, cancellationToken);
         }
 
         if (_flushTask is { IsCompletedSuccessfully: false })
         {
-            return PingStateMachineAsync(true, cancellationToken);
+            return PingStateMachineAsync(true, pingCommand, cancellationToken);
         }
 
         try
@@ -140,6 +144,7 @@ internal sealed class CommandWriter : IAsyncDisposable
             try
             {
                 _protocolWriter.WritePing();
+                _enqueuePing(pingCommand);
                 success = true;
             }
             finally
@@ -359,7 +364,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
     }
 
-    private async ValueTask PingStateMachineAsync(bool lockHeld, CancellationToken cancellationToken)
+    private async ValueTask PingStateMachineAsync(bool lockHeld, PingCommand pingCommand, CancellationToken cancellationToken)
     {
         if (!lockHeld)
         {
@@ -382,6 +387,7 @@ internal sealed class CommandWriter : IAsyncDisposable
             try
             {
                 _protocolWriter.WritePing();
+                _enqueuePing(pingCommand);
                 success = true;
             }
             finally
@@ -573,9 +579,9 @@ internal sealed class PriorityCommandWriter : IAsyncDisposable
     private readonly NatsPipeliningWriteProtocolProcessor _natsPipeliningWriteProtocolProcessor;
     private int _disposed;
 
-    public PriorityCommandWriter(ISocketConnection socketConnection, NatsOpts opts, ConnectionStatsCounter counter)
+    public PriorityCommandWriter(ISocketConnection socketConnection, NatsOpts opts, ConnectionStatsCounter counter, Action<PingCommand> enqueuePing)
     {
-        CommandWriter = new CommandWriter(opts, counter);
+        CommandWriter = new CommandWriter(opts, counter, enqueuePing);
         _natsPipeliningWriteProtocolProcessor = CommandWriter.CreateNatsPipeliningWriteProtocolProcessor(socketConnection);
     }
 
