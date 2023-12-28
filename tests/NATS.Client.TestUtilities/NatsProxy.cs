@@ -157,7 +157,7 @@ public class NatsProxy : IDisposable
 
         await Retry.Until(
             "flush sync frame",
-            () => AllFrames.Any(f => f.Message == $"PUB {subject} 0␍␊"));
+            () => AllFrames.Any(f => f.Message == $"PUB {subject} 000000000␍␊"));
 
         lock (_frames)
             _frames.Clear();

@@ -154,13 +154,12 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
             _logger.LogDebug(NatsJSLogEvents.PullRequest, "Sending pull request for {Origin} {Msgs}, {Bytes}", origin, request.Batch, request.MaxBytes);
         }
 
-        return Connection.PubModelAsync(
+        return Connection.PublishAsync(
             subject: $"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
             data: request,
-            serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
             replyTo: Subject,
-            headers: default,
-            cancellationToken);
+            serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
+            cancellationToken: cancellationToken);
     }
 
     public void ResetHeartbeatTimer() => _timer.Change(_hbTimeout, _hbTimeout);
@@ -195,9 +194,9 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
 
         await commandWriter.PublishAsync(
             subject: $"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
-            replyTo: Subject,
-            headers: default,
             value: request,
+            headers: default,
+            replyTo: Subject,
             serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
             cancellationToken: CancellationToken.None);
     }

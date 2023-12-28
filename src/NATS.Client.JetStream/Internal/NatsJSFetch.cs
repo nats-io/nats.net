@@ -127,13 +127,12 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
     public ChannelReader<NatsJSMsg<TMsg>> Msgs { get; }
 
     public ValueTask CallMsgNextAsync(ConsumerGetnextRequest request, CancellationToken cancellationToken = default) =>
-        Connection.PubModelAsync(
+        Connection.PublishAsync(
             subject: $"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
             data: request,
-            serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
             replyTo: Subject,
-            headers: default,
-            cancellationToken);
+            serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
+            cancellationToken: cancellationToken);
 
     public void ResetHeartbeatTimer() => _hbTimer.Change(_hbTimeout, Timeout.Infinite);
 
@@ -161,9 +160,9 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
 
         await commandWriter.PublishAsync(
             subject: $"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
-            replyTo: Subject,
-            headers: default,
             value: request,
+            headers: default,
+            replyTo: Subject,
             serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
             cancellationToken: CancellationToken.None);
     }

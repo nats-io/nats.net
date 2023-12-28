@@ -15,28 +15,23 @@ public class CancellationTest
     [Fact]
     public async Task CommandTimeoutTest()
     {
-        await using var server = NatsServer.Start(_output, TransportType.Tcp);
+        var server = NatsServer.Start(_output, TransportType.Tcp);
 
-        await using var subConnection = server.CreateClientConnection(NatsOpts.Default with { CommandTimeout = TimeSpan.FromSeconds(1) });
-        await using var pubConnection = server.CreateClientConnection(NatsOpts.Default with { CommandTimeout = TimeSpan.FromSeconds(1) });
-        await pubConnection.ConnectAsync();
+        await using var conn = server.CreateClientConnection(NatsOpts.Default with { CommandTimeout = TimeSpan.FromMilliseconds(100) });
+        await conn.ConnectAsync();
 
-        await subConnection.SubscribeCoreAsync<string>("foo");
+        // kill the server
+        await server.DisposeAsync();
 
-        var task = Task.Run(async () =>
+        // commands time out
+        await Assert.ThrowsAsync<TimeoutException>(() => conn.PingAsync().AsTask());
+        await Assert.ThrowsAsync<TimeoutException>(() => conn.PublishAsync("test").AsTask());
+        await Assert.ThrowsAsync<TimeoutException>(async () =>
         {
-            await Task.Delay(TimeSpan.FromSeconds(10));
-            // todo: test this by disconnecting the server
-            // await pubConnection.DirectWriteAsync("PUB foo 5\r\naiueo");
+            await foreach (var unused in conn.SubscribeAsync<string>("test"))
+            {
+            }
         });
-
-        var timeoutException = await Assert.ThrowsAsync<TimeoutException>(async () =>
-        {
-            await pubConnection.PublishAsync("foo", "aiueo", opts: new NatsPubOpts { WaitUntilSent = true });
-        });
-
-        timeoutException.Message.Should().Contain("1 seconds elapsing");
-        await task;
     }
 
     // Queue-full

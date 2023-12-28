@@ -178,22 +178,6 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         }
     }
 
-    private void EnqueuePing(PingCommand pingCommand)
-    {
-        // Enqueue Ping Command to current working reader.
-        var reader = _socketReader;
-        if (reader != null)
-        {
-            if (reader.TryEnqueuePing(pingCommand))
-            {
-                return;
-            }
-        }
-
-        // Can not add PING, set fail.
-        pingCommand.TaskCompletionSource.SetCanceled();
-    }
-
     internal ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
     {
         return SubscriptionManager.PublishToClientHandlersAsync(subject, replyTo, sid, headersBuffer, payloadBuffer);
@@ -204,7 +188,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         Interlocked.Exchange(ref _pongCount, 0);
     }
 
-    internal ValueTask PostPongAsync() => CommandWriter.PongAsync(CancellationToken.None);
+    internal ValueTask PongAsync() => CommandWriter.PongAsync(CancellationToken.None);
 
     // called only internally
     internal ValueTask SubscribeCoreAsync(int sid, string subject, string? queueGroup, int? maxMsgs, CancellationToken cancellationToken) => CommandWriter.SubscribeAsync(sid, subject, queueGroup, maxMsgs, cancellationToken);
@@ -711,6 +695,22 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         catch
         {
         }
+    }
+
+    private void EnqueuePing(PingCommand pingCommand)
+    {
+        // Enqueue Ping Command to current working reader.
+        var reader = _socketReader;
+        if (reader != null)
+        {
+            if (reader.TryEnqueuePing(pingCommand))
+            {
+                return;
+            }
+        }
+
+        // Can not add PING, set fail.
+        pingCommand.TaskCompletionSource.SetCanceled();
     }
 
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]

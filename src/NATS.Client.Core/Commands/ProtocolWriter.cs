@@ -52,7 +52,7 @@ internal sealed class ProtocolWriter
     // or
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#hpub
     // HPUB <subject> [reply-to] <#header bytes> <#total bytes>\r\n[headers]\r\n\r\n[payload]\r\n
-    public void WritePublish<T>(string subject, string? replyTo, NatsHeaders? headers, T? value, INatsSerialize<T> serializer)
+    public void WritePublish<T>(string subject, T? value, NatsHeaders? headers, string? replyTo, INatsSerialize<T> serializer)
     {
         int ctrlLen;
         if (headers == null)

@@ -23,6 +23,7 @@ internal readonly record struct QueuedCommand(int Size, bool Canceled = false);
 internal sealed class CommandWriter : IAsyncDisposable
 {
     private readonly ConnectionStatsCounter _counter;
+    private readonly TimeSpan _defaultCommandTimeout;
     private readonly Action<PingCommand> _enqueuePing;
     private readonly NatsOpts _opts;
     private readonly PipeWriter _pipeWriter;
@@ -32,9 +33,10 @@ internal sealed class CommandWriter : IAsyncDisposable
     private Task? _flushTask;
     private bool _disposed;
 
-    public CommandWriter(NatsOpts opts, ConnectionStatsCounter counter, Action<PingCommand> enqueuePing)
+    public CommandWriter(NatsOpts opts, ConnectionStatsCounter counter, Action<PingCommand> enqueuePing, TimeSpan? overrideCommandTimeout = default)
     {
         _counter = counter;
+        _defaultCommandTimeout = overrideCommandTimeout ?? opts.CommandTimeout;
         _enqueuePing = enqueuePing;
         _opts = opts;
         var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: opts.WriterBufferSize, resumeWriterThreshold: opts.WriterBufferSize / 2, minimumSegmentSize: 65536, useSynchronizationContext: false));
@@ -160,7 +162,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         return ValueTask.CompletedTask;
     }
 
-    public ValueTask PongAsync(CancellationToken cancellationToken)
+    public ValueTask PongAsync(CancellationToken cancellationToken = default)
     {
 #pragma warning disable CA2016
 #pragma warning disable VSTHRD103
@@ -202,7 +204,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         return ValueTask.CompletedTask;
     }
 
-    public ValueTask PublishAsync<T>(string subject, string? replyTo, NatsHeaders? headers, T? value, INatsSerialize<T> serializer, CancellationToken cancellationToken)
+    public ValueTask PublishAsync<T>(string subject, T? value, NatsHeaders? headers, string? replyTo, INatsSerialize<T> serializer, CancellationToken cancellationToken)
     {
 #pragma warning disable CA2016
 #pragma warning disable VSTHRD103
@@ -210,12 +212,12 @@ internal sealed class CommandWriter : IAsyncDisposable
 #pragma warning restore VSTHRD103
 #pragma warning restore CA2016
         {
-            return PublishStateMachineAsync(false, subject, replyTo, headers, value, serializer, cancellationToken);
+            return PublishStateMachineAsync(false, subject, value, headers, replyTo, serializer, cancellationToken);
         }
 
         if (_flushTask is { IsCompletedSuccessfully: false })
         {
-            return PublishStateMachineAsync(true, subject, replyTo, headers, value, serializer, cancellationToken);
+            return PublishStateMachineAsync(true, subject, value, headers, replyTo, serializer, cancellationToken);
         }
 
         try
@@ -228,7 +230,7 @@ internal sealed class CommandWriter : IAsyncDisposable
             var success = false;
             try
             {
-                _protocolWriter.WritePublish(subject, replyTo, headers, value, serializer);
+                _protocolWriter.WritePublish(subject, value, headers, replyTo, serializer);
                 success = true;
             }
             finally
@@ -332,7 +334,10 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         if (!lockHeld)
         {
-            await _sem.WaitAsync(cancellationToken).ConfigureAwait(false);
+            if (!await _sem.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
+            {
+                throw new TimeoutException();
+            }
         }
 
         try
@@ -344,7 +349,7 @@ internal sealed class CommandWriter : IAsyncDisposable
 
             if (_flushTask is { IsCompletedSuccessfully: false })
             {
-                await _flushTask.WaitAsync(cancellationToken).ConfigureAwait(false);
+                await _flushTask.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
             }
 
             var success = false;
@@ -368,7 +373,10 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         if (!lockHeld)
         {
-            await _sem.WaitAsync(cancellationToken).ConfigureAwait(false);
+            if (!await _sem.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
+            {
+                throw new TimeoutException();
+            }
         }
 
         try
@@ -380,7 +388,7 @@ internal sealed class CommandWriter : IAsyncDisposable
 
             if (_flushTask is { IsCompletedSuccessfully: false })
             {
-                await _flushTask.WaitAsync(cancellationToken).ConfigureAwait(false);
+                await _flushTask.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
             }
 
             var success = false;
@@ -405,7 +413,10 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         if (!lockHeld)
         {
-            await _sem.WaitAsync(cancellationToken).ConfigureAwait(false);
+            if (!await _sem.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
+            {
+                throw new TimeoutException();
+            }
         }
 
         try
@@ -417,7 +428,7 @@ internal sealed class CommandWriter : IAsyncDisposable
 
             if (_flushTask is { IsCompletedSuccessfully: false })
             {
-                await _flushTask.WaitAsync(cancellationToken).ConfigureAwait(false);
+                await _flushTask.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
             }
 
             var success = false;
@@ -437,11 +448,14 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
     }
 
-    private async ValueTask PublishStateMachineAsync<T>(bool lockHeld, string subject, string? replyTo, NatsHeaders? headers, T? value, INatsSerialize<T> serializer, CancellationToken cancellationToken)
+    private async ValueTask PublishStateMachineAsync<T>(bool lockHeld, string subject, T? value, NatsHeaders? headers, string? replyTo, INatsSerialize<T> serializer, CancellationToken cancellationToken)
     {
         if (!lockHeld)
         {
-            await _sem.WaitAsync(cancellationToken).ConfigureAwait(false);
+            if (!await _sem.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
+            {
+                throw new TimeoutException();
+            }
         }
 
         try
@@ -453,13 +467,13 @@ internal sealed class CommandWriter : IAsyncDisposable
 
             if (_flushTask is { IsCompletedSuccessfully: false })
             {
-                await _flushTask.WaitAsync(cancellationToken).ConfigureAwait(false);
+                await _flushTask.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
             }
 
             var success = false;
             try
             {
-                _protocolWriter.WritePublish(subject, replyTo, headers, value, serializer);
+                _protocolWriter.WritePublish(subject, value, headers, replyTo, serializer);
                 success = true;
             }
             finally
@@ -477,7 +491,10 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         if (!lockHeld)
         {
-            await _sem.WaitAsync(cancellationToken).ConfigureAwait(false);
+            if (!await _sem.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
+            {
+                throw new TimeoutException();
+            }
         }
 
         try
@@ -489,7 +506,7 @@ internal sealed class CommandWriter : IAsyncDisposable
 
             if (_flushTask is { IsCompletedSuccessfully: false })
             {
-                await _flushTask.WaitAsync(cancellationToken).ConfigureAwait(false);
+                await _flushTask.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
             }
 
             var success = false;
@@ -513,7 +530,10 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         if (!lockHeld)
         {
-            await _sem.WaitAsync(cancellationToken).ConfigureAwait(false);
+            if (!await _sem.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
+            {
+                throw new TimeoutException();
+            }
         }
 
         try
@@ -525,7 +545,7 @@ internal sealed class CommandWriter : IAsyncDisposable
 
             if (_flushTask is { IsCompletedSuccessfully: false })
             {
-                await _flushTask.WaitAsync(cancellationToken).ConfigureAwait(false);
+                await _flushTask.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
             }
 
             var success = false;
@@ -581,7 +601,7 @@ internal sealed class PriorityCommandWriter : IAsyncDisposable
 
     public PriorityCommandWriter(ISocketConnection socketConnection, NatsOpts opts, ConnectionStatsCounter counter, Action<PingCommand> enqueuePing)
     {
-        CommandWriter = new CommandWriter(opts, counter, enqueuePing);
+        CommandWriter = new CommandWriter(opts, counter, enqueuePing, overrideCommandTimeout: TimeSpan.MaxValue);
         _natsPipeliningWriteProtocolProcessor = CommandWriter.CreateNatsPipeliningWriteProtocolProcessor(socketConnection);
     }
 

@@ -124,13 +124,12 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
             _logger.LogDebug(NatsJSLogEvents.PullRequest, "Sending pull request for {Origin} {Msgs}, {Bytes}", origin, request.Batch, request.MaxBytes);
         }
 
-        return Connection.PubModelAsync(
+        return Connection.PublishAsync(
             subject: $"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
             data: request,
-            serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
             replyTo: Subject,
-            headers: default,
-            cancellationToken);
+            serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
+            cancellationToken: cancellationToken);
     }
 
     public void ResetHeartbeatTimer() => _timer.Change(_hbTimeout, Timeout.Infinite);

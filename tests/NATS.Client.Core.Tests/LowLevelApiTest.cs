@@ -23,15 +23,15 @@ public class LowLevelApiTest
         await Retry.Until(
             "subscription is ready",
             () => builder.IsSynced,
-            async () => await nats.PubAsync("foo.sync"));
+            async () => await nats.PublishAsync("foo.sync"));
 
         for (var i = 0; i < 10; i++)
         {
             var headers = new NatsHeaders { { "X-Test", $"value-{i}" } };
-            await nats.PubModelAsync<int>($"foo.data{i}", i, NatsDefaultSerializer<int>.Default, "bar", headers);
+            await nats.PublishAsync($"foo.data{i}", i, headers, "bar", NatsDefaultSerializer<int>.Default);
         }
 
-        await nats.PubAsync("foo.done");
+        await nats.PublishAsync("foo.done");
         await builder.Done;
 
         Assert.Equal(10, builder.Messages.Count());

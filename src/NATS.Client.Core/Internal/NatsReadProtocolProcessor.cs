@@ -309,7 +309,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         {
             const int PingSize = 6; // PING\r\n
 
-            await _connection.PostPongAsync().ConfigureAwait(false); // return pong to server
+            await _connection.PongAsync().ConfigureAwait(false); // return pong to server
 
             if (length < PingSize)
             {

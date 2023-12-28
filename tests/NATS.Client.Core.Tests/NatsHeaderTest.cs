@@ -24,7 +24,7 @@ public class NatsHeaderTest
         var writer = new HeaderWriter(pipe.Writer, Encoding.UTF8);
         var written = writer.Write(headers);
 
-        var text = "k1: v1\r\nk2: v2-0\r\nk2: v2-1\r\na-long-header-key: value\r\nkey: a-long-header-value\r\n\r\n";
+        var text = "NATS/1.0\r\nk1: v1\r\nk2: v2-0\r\nk2: v2-1\r\na-long-header-key: value\r\nkey: a-long-header-value\r\n\r\n";
         var expected = new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(text));
 
         Assert.Equal(expected.Length, written);

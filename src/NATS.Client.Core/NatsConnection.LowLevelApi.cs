@@ -1,40 +1,24 @@
-using System.Buffers;
-using NATS.Client.Core.Commands;
-
 namespace NATS.Client.Core;
 
 public partial class NatsConnection
 {
-    internal async ValueTask PubModelPostAsync<T>(string subject, T? data, INatsSerialize<T> serializer, string? replyTo = default, NatsHeaders? headers = default, Action<Exception>? errorHandler = default, CancellationToken cancellationToken = default)
+    internal ValueTask SubAsync(NatsSubBase sub, CancellationToken cancellationToken = default) =>
+        ConnectionState != NatsConnectionState.Open
+            ? ConnectAndSubAsync(sub, cancellationToken)
+            : SubscriptionManager.SubscribeAsync(sub, cancellationToken);
+
+    private async ValueTask ConnectAndSubAsync(NatsSubBase sub, CancellationToken cancellationToken = default)
     {
-        headers?.SetReadOnly();
-        if (ConnectionState != NatsConnectionState.Open)
+        var connect = ConnectAsync();
+        if (connect.IsCompletedSuccessfully)
         {
-            await ConnectAsync().ConfigureAwait(false);
+#pragma warning disable VSTHRD103
+            connect.GetAwaiter().GetResult();
+#pragma warning restore VSTHRD103
         }
-
-        await CommandWriter.PublishAsync(subject, replyTo, headers, data, serializer, cancellationToken).ConfigureAwait(false);
-    }
-
-    internal ValueTask PubAsync(string subject, string? replyTo = default, ReadOnlySequence<byte> payload = default, NatsHeaders? headers = default, CancellationToken cancellationToken = default) =>
-        PubModelAsync(subject, payload, NatsRawSerializer<ReadOnlySequence<byte>>.Default, replyTo, headers, cancellationToken);
-
-    internal async ValueTask PubModelAsync<T>(string subject, T? data, INatsSerialize<T> serializer, string? replyTo = default, NatsHeaders? headers = default, CancellationToken cancellationToken = default)
-    {
-        headers?.SetReadOnly();
-        if (ConnectionState != NatsConnectionState.Open)
+        else
         {
-            await ConnectAsync().ConfigureAwait(false);
-        }
-
-        await CommandWriter.PublishAsync(subject, replyTo, headers, data, serializer, cancellationToken).ConfigureAwait(false);
-    }
-
-    internal async ValueTask SubAsync(NatsSubBase sub, CancellationToken cancellationToken = default)
-    {
-        if (ConnectionState != NatsConnectionState.Open)
-        {
-            await ConnectAsync().ConfigureAwait(false);
+            await connect.AsTask().WaitAsync(Opts.CommandTimeout, cancellationToken).ConfigureAwait(false);
         }
 
         await SubscriptionManager.SubscribeAsync(sub, cancellationToken).ConfigureAwait(false);

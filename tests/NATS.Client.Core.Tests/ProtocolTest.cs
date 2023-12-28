@@ -143,9 +143,9 @@ public class ProtocolTest
         Assert.Equal(0, msg1.Data);
         Assert.Null(msg1.Headers);
         var pubFrame1 = proxy.Frames.First(f => f.Message.StartsWith("PUB foo.signal1"));
-        Assert.Equal("PUB foo.signal1 0␍␊", pubFrame1.Message);
+        Assert.Equal("PUB foo.signal1 000000000␍␊", pubFrame1.Message);
         var msgFrame1 = proxy.Frames.First(f => f.Message.StartsWith("MSG foo.signal1"));
-        Assert.Matches(@"^MSG foo.signal1 \w+ 0␍␊$", msgFrame1.Message);
+        Assert.Matches(@"^MSG foo.signal1 \w+ 000000000␍␊$", msgFrame1.Message);
 
         Log("HPUB notifications");
         await nats.PublishAsync("foo.signal2", headers: new NatsHeaders());
@@ -156,7 +156,7 @@ public class ProtocolTest
         var pubFrame2 = proxy.Frames.First(f => f.Message.StartsWith("HPUB foo.signal2"));
         Assert.Equal("HPUB foo.signal2 000000012 000000012␍␊NATS/1.0␍␊␍␊", pubFrame2.Message);
         var msgFrame2 = proxy.Frames.First(f => f.Message.StartsWith("HMSG foo.signal2"));
-        Assert.Matches(@"^HMSG foo.signal2 \w+ 12 12␍␊NATS/1.0␍␊␍␊$", msgFrame2.Message);
+        Assert.Matches(@"^HMSG foo.signal2 \w+ 000000012 000000012␍␊NATS/1.0␍␊␍␊$", msgFrame2.Message);
 
         await sub.DisposeAsync();
         await reg;
