@@ -1,6 +1,6 @@
 namespace NATS.Client.Core.Commands;
 
-public class PingCommand
+internal sealed class PingCommand
 {
     public DateTimeOffset WriteTime { get; } = DateTimeOffset.UtcNow;
 
