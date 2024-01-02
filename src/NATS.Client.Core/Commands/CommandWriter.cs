@@ -53,7 +53,7 @@ internal sealed class CommandWriter : IAsyncDisposable
 
     public ChannelReader<QueuedCommand> QueuedCommandsReader { get; }
 
-    public List<QueuedCommand> InFlightCommands { get; } = new();
+    public Queue<QueuedCommand> InFlightCommands { get; } = new();
 
     public async ValueTask DisposeAsync()
     {

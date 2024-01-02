@@ -13,7 +13,7 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
     private readonly ConnectionStatsCounter _counter;
     private readonly NatsOpts _opts;
     private readonly PipeReader _pipeReader;
-    private readonly List<QueuedCommand> _inFlightCommands;
+    private readonly Queue<QueuedCommand> _inFlightCommands;
     private readonly ChannelReader<QueuedCommand> _queuedCommandReader;
     private readonly ISocketConnection _socketConnection;
     private readonly Stopwatch _stopwatch = new Stopwatch();
@@ -86,7 +86,7 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
                         await _queuedCommandReader.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
                     }
 
-                    _inFlightCommands.Add(queuedCommand);
+                    _inFlightCommands.Enqueue(queuedCommand);
                     inFlightSum += queuedCommand.Size;
                 }
 
@@ -98,8 +98,9 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
                 {
                     if (pending == 0)
                     {
-                        pending = _inFlightCommands[0].Size;
-                        canceled = _inFlightCommands[0].Canceled;
+                        var peek = _inFlightCommands.Peek();
+                        pending = peek.Size;
+                        canceled = peek.Canceled;
                     }
 
                     if (canceled)
@@ -114,8 +115,7 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
                         }
 
                         // command completely canceled
-                        inFlightSum -= _inFlightCommands[0].Size;
-                        _inFlightCommands.RemoveAt(0);
+                        inFlightSum -= _inFlightCommands.Dequeue().Size;
                         consumedPos = buffer.GetPosition(pending);
                         examinedPos = buffer.GetPosition(pending);
                         examinedOffset = 0;
@@ -176,13 +176,12 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
                     {
                         if (pending == 0)
                         {
-                            pending = _inFlightCommands.First().Size;
+                            pending = _inFlightCommands.Peek().Size;
                         }
 
                         if (pending <= sent - consumed)
                         {
-                            inFlightSum -= _inFlightCommands[0].Size;
-                            _inFlightCommands.RemoveAt(0);
+                            inFlightSum -= _inFlightCommands.Dequeue().Size;
                             Interlocked.Add(ref _counter.PendingMessages, -1);
                             Interlocked.Add(ref _counter.SentMessages, 1);
 
