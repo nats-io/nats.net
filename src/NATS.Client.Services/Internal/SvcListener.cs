@@ -29,7 +29,7 @@ internal class SvcListener : IAsyncDisposable
         _cts = CancellationTokenSource.CreateLinkedTokenSource(_cancellationToken);
         _readLoop = Task.Run(async () =>
         {
-            await foreach (var msg in _nats.SubscribeAsync<NatsMemoryOwner<byte>>(_subject, _queueGroup, cancellationToken: _cts.Token))
+            await foreach (var msg in _nats.SubscribeAsync<NatsMemoryOwner<byte>>(_subject, _queueGroup, serializer: NatsRawSerializer<NatsMemoryOwner<byte>>.Default, cancellationToken: _cts.Token))
             {
                 await _channel.Writer.WriteAsync(new SvcMsg(_type, msg), _cancellationToken).ConfigureAwait(false);
             }

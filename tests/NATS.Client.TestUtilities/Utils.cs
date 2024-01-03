@@ -135,7 +135,9 @@ public static class ServiceUtils
         await Retry.Until("service is found", async () =>
         {
             var count = 0;
-            await foreach (var msg in nats.RequestManyAsync<object?, T>(subject, null, replySerializer: serializer, replyOpts: replyOpts, cancellationToken: ct).ConfigureAwait(false))
+
+            // nats cli sends an empty JSON object '{}' as the request payload so we do the same here
+            await foreach (var msg in nats.RequestManyAsync<string, T>(subject, "{}", replySerializer: serializer, replyOpts: replyOpts, cancellationToken: ct).ConfigureAwait(false))
             {
                 if (++count == limit)
                     break;
@@ -145,7 +147,7 @@ public static class ServiceUtils
         });
 
         var count = 0;
-        await foreach (var msg in nats.RequestManyAsync<object?, T>(subject, null, replySerializer: serializer, replyOpts: replyOpts, cancellationToken: ct).ConfigureAwait(false))
+        await foreach (var msg in nats.RequestManyAsync<string, T>(subject, "{}", replySerializer: serializer, replyOpts: replyOpts, cancellationToken: ct).ConfigureAwait(false))
         {
             responses.Add(msg.Data!);
             if (++count == limit)
