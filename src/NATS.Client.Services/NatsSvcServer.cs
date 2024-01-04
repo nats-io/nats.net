@@ -18,7 +18,6 @@ public class NatsSvcServer : INatsSvcServer
     private readonly string _id;
     private readonly NatsConnection _nats;
     private readonly NatsSvcConfig _config;
-    private readonly CancellationToken _cancellationToken;
     private readonly Channel<SvcMsg> _channel;
     private readonly Task _taskMsgLoop;
     private readonly List<SvcListener> _svcListeners = new();
@@ -39,7 +38,6 @@ public class NatsSvcServer : INatsSvcServer
         _nats = nats;
         _config = config;
         _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        _cancellationToken = _cts.Token;
         _channel = Channel.CreateBounded<SvcMsg>(32);
         _taskMsgLoop = Task.Run(MsgLoop);
         _started = DateTimeOffset.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffffffZ");
@@ -72,8 +70,14 @@ public class NatsSvcServer : INatsSvcServer
         _channel.Writer.TryComplete();
 
         _cts.Cancel();
-
-        await _taskMsgLoop;
+        try
+        {
+            await _taskMsgLoop;
+        }
+        catch (OperationCanceledException)
+        {
+            // intentionally canceled
+        }
     }
 
     /// <summary>
@@ -180,7 +184,7 @@ public class NatsSvcServer : INatsSvcServer
     /// </summary>
     public async ValueTask DisposeAsync()
     {
-        await StopAsync(_cancellationToken);
+        await StopAsync(_cts.Token);
         GC.SuppressFinalize(this);
     }
 
@@ -193,7 +197,7 @@ public class NatsSvcServer : INatsSvcServer
             var type = svcType.ToString().ToUpper();
             foreach (var subject in new[] { $"$SRV.{type}", $"$SRV.{type}.{name}", $"$SRV.{type}.{name}.{_id}" })
             {
-                var svcListener = new SvcListener(_nats, _channel, svcType, subject, _config.QueueGroup, _cancellationToken);
+                var svcListener = new SvcListener(_nats, _channel, svcType, subject, _config.QueueGroup, _cts.Token);
                 await svcListener.StartAsync();
                 _svcListeners.Add(svcListener);
             }
@@ -222,7 +226,7 @@ public class NatsSvcServer : INatsSvcServer
 
     private async Task MsgLoop()
     {
-        await foreach (var svcMsg in _channel.Reader.ReadAllAsync(_cancellationToken))
+        await foreach (var svcMsg in _channel.Reader.ReadAllAsync(_cts.Token))
         {
             try
             {
@@ -245,7 +249,7 @@ public class NatsSvcServer : INatsSvcServer
                             Metadata = _config.Metadata!,
                         },
                         serializer: NatsSrvJsonSerializer<PingResponse>.Default,
-                        cancellationToken: _cancellationToken);
+                        cancellationToken: _cts.Token);
                 }
                 else if (type == SvcMsgType.Info)
                 {
@@ -257,7 +261,7 @@ public class NatsSvcServer : INatsSvcServer
                     await svcMsg.Msg.ReplyAsync(
                         data: GetInfo(),
                         serializer: NatsSrvJsonSerializer<InfoResponse>.Default,
-                        cancellationToken: _cancellationToken);
+                        cancellationToken: _cts.Token);
                 }
                 else if (type == SvcMsgType.Stats)
                 {
@@ -269,7 +273,7 @@ public class NatsSvcServer : INatsSvcServer
                     await svcMsg.Msg.ReplyAsync(
                         data: GetStats(),
                         serializer: NatsSrvJsonSerializer<StatsResponse>.Default,
-                        cancellationToken: _cancellationToken);
+                        cancellationToken: _cts.Token);
                 }
             }
             catch (Exception ex)
@@ -285,7 +289,6 @@ public class NatsSvcServer : INatsSvcServer
     public class Group
     {
         private readonly NatsSvcServer _server;
-        private readonly CancellationToken _cancellationToken;
         private readonly string _dot;
 
         /// <summary>
@@ -301,7 +304,6 @@ public class NatsSvcServer : INatsSvcServer
             _server = server;
             GroupName = groupName;
             QueueGroup = queueGroup;
-            _cancellationToken = cancellationToken;
             _dot = GroupName.Length == 0 ? string.Empty : ".";
         }
 
