@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Buffers.Text;
 using System.IO.Pipelines;
 using System.Text;
@@ -52,7 +51,9 @@ internal sealed class ProtocolWriter
     // or
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#hpub
     // HPUB <subject> [reply-to] <#header bytes> <#total bytes>\r\n[headers]\r\n\r\n[payload]\r\n
-    public void WritePublish<T>(string subject, T? value, NatsHeaders? headers, string? replyTo, INatsSerialize<T> serializer)
+    //
+    // returns the number of bytes that should be skipped when writing to the wire
+    public int WritePublish<T>(string subject, T? value, NatsHeaders? headers, string? replyTo, INatsSerialize<T> serializer)
     {
         int ctrlLen;
         if (headers == null)
@@ -72,7 +73,8 @@ internal sealed class ProtocolWriter
             ctrlLen += _subjectEncoding.GetByteCount(replyTo) + 1;
         }
 
-        var span = _writer.GetSpan(ctrlLen);
+        var ctrlSpan = _writer.GetSpan(ctrlLen);
+        var span = ctrlSpan;
         if (headers == null)
         {
             span[0] = (byte)'P';
@@ -102,24 +104,29 @@ internal sealed class ProtocolWriter
             span = span[(written + 1)..];
         }
 
-        Span<byte> headersLengthSpan = default;
-        if (headers != null)
+        Span<byte> lenSpan;
+        if (headers == null)
         {
-            headersLengthSpan = span[..MaxIntStringLength];
-            span[MaxIntStringLength] = (byte)' ';
-            span = span[(MaxIntStringLength + 1)..];
+            // len =            payload len
+            lenSpan = span[..MaxIntStringLength];
+            span = span[lenSpan.Length..];
+        }
+        else
+        {
+            // len =          header len         +' '+ payload len
+            lenSpan = span[..(MaxIntStringLength + 1 + MaxIntStringLength)];
+            span = span[lenSpan.Length..];
         }
 
-        var totalLengthSpan = span[..MaxIntStringLength];
-        span[MaxIntStringLength] = (byte)'\r';
-        span[MaxIntStringLength + 1] = (byte)'\n';
+        span[0] = (byte)'\r';
+        span[1] = (byte)'\n';
         _writer.Advance(ctrlLen);
 
+        var headersLength = 0L;
         var totalLength = 0L;
         if (headers != null)
         {
-            var headersLength = _headerWriter.Write(headers);
-            headersLengthSpan.OverwriteAllocatedNumber(headersLength);
+            headersLength = _headerWriter.Write(headers);
             totalLength += headersLength;
         }
 
@@ -133,11 +140,39 @@ internal sealed class ProtocolWriter
             totalLength += _writer.UnflushedBytes - initialCount;
         }
 
-        totalLengthSpan.OverwriteAllocatedNumber(totalLength);
         span = _writer.GetSpan(2);
         span[0] = (byte)'\r';
         span[1] = (byte)'\n';
         _writer.Advance(2);
+
+        // write the length
+        var lenWritten = 0;
+        if (headers != null)
+        {
+            if (!Utf8Formatter.TryFormat(headersLength, lenSpan, out lenWritten))
+            {
+                throw new NatsException("Can not format integer.");
+            }
+
+            lenSpan[lenWritten] = (byte)' ';
+            lenWritten += 1;
+        }
+
+        if (!Utf8Formatter.TryFormat(totalLength, lenSpan[lenWritten..], out var tLen))
+        {
+            throw new NatsException("Can not format integer.");
+        }
+
+        lenWritten += tLen;
+        var trim = lenSpan.Length - lenWritten;
+        if (trim > 0)
+        {
+            // shift right
+            ctrlSpan[..(ctrlLen - trim - 2)].CopyTo(ctrlSpan[trim..]);
+            ctrlSpan[..trim].Clear();
+        }
+
+        return trim;
     }
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#sub

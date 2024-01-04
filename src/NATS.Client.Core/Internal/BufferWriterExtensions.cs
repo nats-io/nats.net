@@ -8,7 +8,6 @@ namespace NATS.Client.Core.Internal;
 internal static class BufferWriterExtensions
 {
     private const int MaxIntStringLength = 9; // https://github.com/nats-io/nats-server/blob/28a2a1000045b79927ebf6b75eecc19c1b9f1548/server/util.go#L85C8-L85C23
-    private static readonly StandardFormat MaxIntStringFormat = new('D', MaxIntStringLength);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void WriteNewLine(this IBufferWriter<byte> writer)
@@ -28,27 +27,6 @@ internal static class BufferWriterExtensions
         }
 
         writer.Advance(writtenLength);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Span<byte> AllocateNumber(this IBufferWriter<byte> writer)
-    {
-        var span = writer.GetSpan(MaxIntStringLength);
-        if (!Utf8Formatter.TryFormat(0, span, out _, MaxIntStringFormat))
-        {
-            throw new NatsException("Can not format integer.");
-        }
-
-        writer.Advance(MaxIntStringLength);
-        return span;
-    }
-
-    public static void OverwriteAllocatedNumber(this Span<byte> span, long number)
-    {
-        if (!Utf8Formatter.TryFormat(number, span, out _, MaxIntStringFormat))
-        {
-            throw new NatsException("Can not format integer.");
-        }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

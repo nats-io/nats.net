@@ -59,6 +59,7 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
         var isEnabledTraceLogging = logger.IsEnabled(LogLevel.Trace);
         var cancellationToken = _cts.Token;
         var pending = 0;
+        var trimming = 0;
         var canceled = false;
         var examinedOffset = 0;
 
@@ -108,6 +109,7 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
                         {
                             var peek = _inFlightCommands.Peek();
                             pending = peek.Size;
+                            trimming = peek.Trim;
                             canceled = peek.Canceled;
                         }
 
@@ -129,12 +131,37 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
                             examinedOffset = 0;
                             buffer = buffer.Slice(pending);
                             pending = 0;
+                            trimming = 0;
+                            continue;
+                        }
+
+                        if (trimming > 0)
+                        {
+                            if (trimming > buffer.Length)
+                            {
+                                // command partially trimmed
+                                consumedPos = buffer.GetPosition(buffer.Length);
+                                examinedPos = buffer.GetPosition(buffer.Length);
+                                examinedOffset = 0;
+                                pending -= (int)buffer.Length;
+                                trimming -= (int)buffer.Length;
+                                break;
+                            }
+
+                            // command completely trimmed
+                            consumedPos = buffer.GetPosition(trimming);
+                            examinedPos = buffer.GetPosition(trimming);
+                            examinedOffset = 0;
+                            buffer = buffer.Slice(trimming);
+                            pending -= trimming;
+                            trimming = 0;
                             continue;
                         }
 
                         var sendMem = buffer.First;
                         var maxSize = 0;
-                        var maxSizeCap = Math.Max(sendMem.Length, consolidateMem.Length);
+                        var maxSizeCap = Math.Max(buffer.First.Length, consolidateMem.Length);
+                        var doTrim = false;
                         foreach (var command in _inFlightCommands)
                         {
                             if (maxSize == 0)
@@ -151,22 +178,57 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
 
                             // next command can be sent also
                             maxSize += command.Size;
+                            if (command.Trim > 0)
+                            {
+                                doTrim = true;
+                            }
                         }
 
                         if (sendMem.Length > maxSize)
                         {
                             sendMem = sendMem[..maxSize];
                         }
-                        else
+
+                        var bufferIter = buffer.Slice(0, Math.Min(maxSize, buffer.Length));
+                        if (doTrim || (bufferIter.Length > sendMem.Length && sendMem.Length < consolidateMem.Length))
                         {
-                            var bufferIter = buffer.Slice(0, Math.Min(maxSize, buffer.Length));
-                            if (bufferIter.Length > sendMem.Length && sendMem.Length < consolidateMem.Length)
+                            var memIter = consolidateMem;
+                            var trimmedSize = 0;
+                            foreach (var command in _inFlightCommands)
                             {
-                                // consolidate multiple small memory chunks into one
-                                var consolidateSize = (int)Math.Min(consolidateMem.Length, bufferIter.Length);
-                                bufferIter.Slice(0, consolidateSize).CopyTo(consolidateMem.Span);
-                                sendMem = consolidateMem[..consolidateSize];
+                                var write = 0;
+                                if (trimmedSize == 0)
+                                {
+                                    write = pending;
+                                }
+                                else
+                                {
+                                    if (command.Trim > 0)
+                                    {
+                                        if (bufferIter.Length < command.Trim + 1)
+                                        {
+                                            // not enough bytes to start writing the next command
+                                            break;
+                                        }
+
+                                        bufferIter = bufferIter.Slice(command.Trim);
+                                        write = command.Size - command.Trim;
+                                    }
+                                }
+
+                                write = Math.Min(memIter.Length, write);
+                                write = Math.Min((int)bufferIter.Length, write);
+                                bufferIter.Slice(0, write).CopyTo(memIter.Span);
+                                memIter = memIter[write..];
+                                bufferIter = bufferIter.Slice(write);
+                                trimmedSize += write;
+                                if (bufferIter.Length == 0 || memIter.Length == 0)
+                                {
+                                    break;
+                                }
                             }
+
+                            sendMem = consolidateMem[..trimmedSize];
                         }
 
                         // perform send
@@ -180,14 +242,18 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
                         }
 
                         var consumed = 0;
-                        while (consumed < sent)
+                        var sentAndTrimmed = sent;
+                        while (consumed < sentAndTrimmed)
                         {
                             if (pending == 0)
                             {
-                                pending = _inFlightCommands.Peek().Size;
+                                var peek = _inFlightCommands.Peek();
+                                pending = peek.Size - peek.Trim;
+                                consumed += peek.Trim;
+                                sentAndTrimmed += peek.Trim;
                             }
 
-                            if (pending <= sent - consumed)
+                            if (pending <= sentAndTrimmed - consumed)
                             {
                                 inFlightSum -= _inFlightCommands.Dequeue().Size;
                                 Interlocked.Add(ref _counter.PendingMessages, -1);
@@ -201,7 +267,7 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
                             {
                                 // an entire command was not sent; decrement pending by
                                 // the number of bytes from the command that was sent
-                                pending += consumed - sent;
+                                pending += consumed - sentAndTrimmed;
                                 break;
                             }
                         }
@@ -210,17 +276,17 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
                         {
                             // mark fully sent commands as consumed
                             consumedPos = buffer.GetPosition(consumed);
-                            examinedOffset = sent - consumed;
+                            examinedOffset = sentAndTrimmed - consumed;
                         }
                         else
                         {
                             // no commands were consumed
-                            examinedOffset += sent;
+                            examinedOffset += sentAndTrimmed;
                         }
 
                         // lop off sent bytes for next iteration
-                        examinedPos = buffer.GetPosition(sent);
-                        buffer = buffer.Slice(sent);
+                        examinedPos = buffer.GetPosition(sentAndTrimmed);
+                        buffer = buffer.Slice(sentAndTrimmed);
                     }
                 }
                 finally

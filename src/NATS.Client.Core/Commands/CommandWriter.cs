@@ -8,7 +8,7 @@ namespace NATS.Client.Core.Commands;
 /// <summary>
 /// Used to track commands that have been enqueued to the PipeReader
 /// </summary>
-internal readonly record struct QueuedCommand(int Size, bool Canceled = false);
+internal readonly record struct QueuedCommand(int Size, int Trim = 0, bool Canceled = false);
 
 /// <summary>
 /// Sets up a Pipe, and provides methods to write to the PipeWriter
@@ -42,7 +42,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         var pipe = new Pipe(new PipeOptions(
             pauseWriterThreshold: opts.WriterBufferSize, // flush will block after hitting
             resumeWriterThreshold: opts.WriterBufferSize / 2,  // will start flushing again after catching up
-            minimumSegmentSize: 65536, // larger segments allow for more productive syscall for socket.send
+            minimumSegmentSize: 16384, // segment that is part of an uninterrupted payload can be sent using socket.send
             useSynchronizationContext: false));
         PipeReader = pipe.Reader;
         _pipeWriter = pipe.Writer;
@@ -231,15 +231,16 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
+            var trim = 0;
             var success = false;
             try
             {
-                _protocolWriter.WritePublish(subject, value, headers, replyTo, serializer);
+                trim = _protocolWriter.WritePublish(subject, value, headers, replyTo, serializer);
                 success = true;
             }
             finally
             {
-                EnqueueCommand(success);
+                EnqueueCommand(success, trim: trim);
             }
         }
         finally
@@ -474,15 +475,16 @@ internal sealed class CommandWriter : IAsyncDisposable
                 await _flushTask.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
             }
 
+            var trim = 0;
             var success = false;
             try
             {
-                _protocolWriter.WritePublish(subject, value, headers, replyTo, serializer);
+                trim = _protocolWriter.WritePublish(subject, value, headers, replyTo, serializer);
                 success = true;
             }
             finally
             {
-                EnqueueCommand(success);
+                EnqueueCommand(success, trim: trim);
             }
         }
         finally
@@ -577,8 +579,12 @@ internal sealed class CommandWriter : IAsyncDisposable
     /// If true, it will be sent on the wire
     /// If false, it will be thrown out
     /// </param>
+    /// <param name="trim">
+    /// Number of bytes to skip from beginning of message
+    /// when sending on the wire
+    /// </param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void EnqueueCommand(bool success)
+    private void EnqueueCommand(bool success, int trim = 0)
     {
         if (_pipeWriter.UnflushedBytes == 0)
         {
@@ -592,7 +598,7 @@ internal sealed class CommandWriter : IAsyncDisposable
             Interlocked.Add(ref _counter.PendingMessages, 1);
         }
 
-        _queuedCommandsWriter.TryWrite(new QueuedCommand(Size: (int)_pipeWriter.UnflushedBytes, Canceled: !success));
+        _queuedCommandsWriter.TryWrite(new QueuedCommand(Size: (int)_pipeWriter.UnflushedBytes, Trim: trim, Canceled: !success));
         var flush = _pipeWriter.FlushAsync();
         _flushTask = flush.IsCompletedSuccessfully ? null : flush.AsTask();
     }
