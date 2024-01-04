@@ -8,7 +8,7 @@ namespace NATS.Client.Core.Commands;
 /// <summary>
 /// Used to track commands that have been enqueued to the PipeReader
 /// </summary>
-internal readonly record struct QueuedCommand(int Size, int Trim = 0, bool Canceled = false);
+internal readonly record struct QueuedCommand(int Size, int Trim = 0);
 
 /// <summary>
 /// Sets up a Pipe, and provides methods to write to the PipeWriter
@@ -598,7 +598,8 @@ internal sealed class CommandWriter : IAsyncDisposable
             Interlocked.Add(ref _counter.PendingMessages, 1);
         }
 
-        _queuedCommandsWriter.TryWrite(new QueuedCommand(Size: (int)_pipeWriter.UnflushedBytes, Trim: trim, Canceled: !success));
+        var size = (int)_pipeWriter.UnflushedBytes;
+        _queuedCommandsWriter.TryWrite(new QueuedCommand(Size: size, Trim: success ? trim : size));
         var flush = _pipeWriter.FlushAsync();
         _flushTask = flush.IsCompletedSuccessfully ? null : flush.AsTask();
     }
