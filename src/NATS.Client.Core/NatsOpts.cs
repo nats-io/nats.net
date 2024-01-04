@@ -61,7 +61,7 @@ public sealed record NatsOpts
 
     public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromSeconds(5);
 
-    public TimeSpan CommandTimeout { get; init; } = TimeSpan.FromMinutes(1);
+    public TimeSpan CommandTimeout { get; init; } = TimeSpan.FromSeconds(5);
 
     public TimeSpan SubscriptionCleanUpInterval { get; init; } = TimeSpan.FromMinutes(5);
 

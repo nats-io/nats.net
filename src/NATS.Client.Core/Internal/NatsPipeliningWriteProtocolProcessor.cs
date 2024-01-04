@@ -9,7 +9,7 @@ namespace NATS.Client.Core.Internal;
 
 internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
 {
-    private readonly CancellationTokenSource _cancellationTokenSource;
+    private readonly CancellationTokenSource _cts;
     private readonly ConnectionStatsCounter _counter;
     private readonly NatsOpts _opts;
     private readonly PipeReader _pipeReader;
@@ -21,7 +21,7 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
 
     public NatsPipeliningWriteProtocolProcessor(ISocketConnection socketConnection, CommandWriter commandWriter, NatsOpts opts, ConnectionStatsCounter counter)
     {
-        _cancellationTokenSource = new CancellationTokenSource();
+        _cts = new CancellationTokenSource();
         _counter = counter;
         _inFlightCommands = commandWriter.InFlightCommands;
         _opts = opts;
@@ -38,9 +38,9 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
         if (Interlocked.Increment(ref _disposed) == 1)
         {
 #if NET6_0
-            _cancellationTokenSource.Cancel();
+            _cts.Cancel();
 #else
-            await _cancellationTokenSource.CancelAsync().ConfigureAwait(false);
+            await _cts.CancelAsync().ConfigureAwait(false);
 #endif
             try
             {
@@ -57,14 +57,16 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
     {
         var logger = _opts.LoggerFactory.CreateLogger<NatsPipeliningWriteProtocolProcessor>();
         var isEnabledTraceLogging = logger.IsEnabled(LogLevel.Trace);
-        var cancellationToken = _cancellationTokenSource.Token;
+        var cancellationToken = _cts.Token;
         var pending = 0;
         var canceled = false;
         var examinedOffset = 0;
 
         // memory segment used to consolidate multiple small memory chunks
         // should <= (minimumSegmentSize * 0.5) in CommandWriter
-        var consolidateMem = new Memory<byte>(new byte[8000]);
+        // 8520 should fit into 6 packets on 1500 MTU TLS connection or 1 packet on 9000 MTU TLS connection
+        // assuming 40 bytes TCP overhead + 40 bytes TLS overhead per packet
+        var consolidateMem = new Memory<byte>(new byte[8520]);
 
         // add up in flight command sum
         var inFlightSum = 0;
@@ -78,144 +80,154 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
             while (true)
             {
                 var result = await _pipeReader.ReadAsync(cancellationToken).ConfigureAwait(false);
-                while (inFlightSum < result.Buffer.Length)
+                if (result.IsCanceled)
                 {
-                    QueuedCommand queuedCommand;
-                    while (!_queuedCommandReader.TryRead(out queuedCommand))
-                    {
-                        await _queuedCommandReader.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
-                    }
-
-                    _inFlightCommands.Enqueue(queuedCommand);
-                    inFlightSum += queuedCommand.Size;
+                    break;
                 }
 
                 var consumedPos = result.Buffer.Start;
                 var examinedPos = result.Buffer.Start;
-                var buffer = result.Buffer.Slice(examinedOffset);
-
-                while (buffer.Length > 0)
+                try
                 {
-                    if (pending == 0)
+                    var buffer = result.Buffer.Slice(examinedOffset);
+                    while (inFlightSum < result.Buffer.Length)
                     {
-                        var peek = _inFlightCommands.Peek();
-                        pending = peek.Size;
-                        canceled = peek.Canceled;
-                    }
-
-                    if (canceled)
-                    {
-                        if (pending > buffer.Length)
+                        QueuedCommand queuedCommand;
+                        while (!_queuedCommandReader.TryRead(out queuedCommand))
                         {
-                            // command partially canceled
-                            examinedPos = buffer.GetPosition(examinedOffset);
-                            examinedOffset = (int)buffer.Length;
-                            pending -= (int)buffer.Length;
-                            break;
+                            await _queuedCommandReader.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
                         }
 
-                        // command completely canceled
-                        inFlightSum -= _inFlightCommands.Dequeue().Size;
-                        consumedPos = buffer.GetPosition(pending);
-                        examinedPos = buffer.GetPosition(pending);
-                        examinedOffset = 0;
-                        buffer = buffer.Slice(pending);
-                        pending = 0;
-                        continue;
+                        _inFlightCommands.Enqueue(queuedCommand);
+                        inFlightSum += queuedCommand.Size;
                     }
 
-                    var sendMem = buffer.First;
-                    var maxSize = 0;
-                    var maxSizeCap = Math.Max(sendMem.Length, consolidateMem.Length);
-                    foreach (var command in _inFlightCommands)
-                    {
-                        if (maxSize == 0)
-                        {
-                            // first command; set to pending
-                            maxSize = pending;
-                            continue;
-                        }
-
-                        if (maxSize > maxSizeCap || command.Canceled)
-                        {
-                            break;
-                        }
-
-                        // next command can be sent also
-                        maxSize += command.Size;
-                    }
-
-                    if (sendMem.Length > maxSize)
-                    {
-                        sendMem = sendMem[..maxSize];
-                    }
-                    else
-                    {
-                        var bufferIter = buffer.Slice(0, Math.Min(maxSize, buffer.Length));
-                        if (bufferIter.Length > sendMem.Length && sendMem.Length < consolidateMem.Length)
-                        {
-                            // consolidate multiple small memory chunks into one
-                            var consolidateSize = (int)Math.Min(consolidateMem.Length, bufferIter.Length);
-                            bufferIter.Slice(0, consolidateSize).CopyTo(consolidateMem.Span);
-                            sendMem = consolidateMem[..consolidateSize];
-                        }
-                    }
-
-                    // perform send
-                    _stopwatch.Restart();
-                    var sent = await _socketConnection.SendAsync(sendMem).ConfigureAwait(false);
-                    _stopwatch.Stop();
-                    Interlocked.Add(ref _counter.SentBytes, sent);
-                    if (isEnabledTraceLogging)
-                    {
-                        logger.LogTrace("Socket.SendAsync. Size: {0}  Elapsed: {1}ms", sent, _stopwatch.Elapsed.TotalMilliseconds);
-                    }
-
-                    var consumed = 0;
-                    while (consumed < sent)
+                    while (buffer.Length > 0)
                     {
                         if (pending == 0)
                         {
-                            pending = _inFlightCommands.Peek().Size;
+                            var peek = _inFlightCommands.Peek();
+                            pending = peek.Size;
+                            canceled = peek.Canceled;
                         }
 
-                        if (pending <= sent - consumed)
+                        if (canceled)
                         {
-                            inFlightSum -= _inFlightCommands.Dequeue().Size;
-                            Interlocked.Add(ref _counter.PendingMessages, -1);
-                            Interlocked.Add(ref _counter.SentMessages, 1);
+                            if (pending > buffer.Length)
+                            {
+                                // command partially canceled
+                                examinedPos = buffer.GetPosition(examinedOffset);
+                                examinedOffset = (int)buffer.Length;
+                                pending -= (int)buffer.Length;
+                                break;
+                            }
 
-                            // mark the bytes as consumed, and reset pending
-                            consumed += pending;
+                            // command completely canceled
+                            inFlightSum -= _inFlightCommands.Dequeue().Size;
+                            consumedPos = buffer.GetPosition(pending);
+                            examinedPos = buffer.GetPosition(pending);
+                            examinedOffset = 0;
+                            buffer = buffer.Slice(pending);
                             pending = 0;
+                            continue;
+                        }
+
+                        var sendMem = buffer.First;
+                        var maxSize = 0;
+                        var maxSizeCap = Math.Max(sendMem.Length, consolidateMem.Length);
+                        foreach (var command in _inFlightCommands)
+                        {
+                            if (maxSize == 0)
+                            {
+                                // first command; set to pending
+                                maxSize = pending;
+                                continue;
+                            }
+
+                            if (maxSize > maxSizeCap || command.Canceled)
+                            {
+                                break;
+                            }
+
+                            // next command can be sent also
+                            maxSize += command.Size;
+                        }
+
+                        if (sendMem.Length > maxSize)
+                        {
+                            sendMem = sendMem[..maxSize];
                         }
                         else
                         {
-                            // an entire command was not sent; decrement pending by
-                            // the number of bytes from the command that was sent
-                            pending += consumed - sent;
-                            break;
+                            var bufferIter = buffer.Slice(0, Math.Min(maxSize, buffer.Length));
+                            if (bufferIter.Length > sendMem.Length && sendMem.Length < consolidateMem.Length)
+                            {
+                                // consolidate multiple small memory chunks into one
+                                var consolidateSize = (int)Math.Min(consolidateMem.Length, bufferIter.Length);
+                                bufferIter.Slice(0, consolidateSize).CopyTo(consolidateMem.Span);
+                                sendMem = consolidateMem[..consolidateSize];
+                            }
                         }
-                    }
 
-                    if (consumed > 0)
-                    {
-                        // mark fully sent commands as consumed
-                        consumedPos = buffer.GetPosition(consumed);
-                        examinedOffset = sent - consumed;
-                    }
-                    else
-                    {
-                        // no commands were consumed
-                        examinedOffset += sent;
-                    }
+                        // perform send
+                        _stopwatch.Restart();
+                        var sent = await _socketConnection.SendAsync(sendMem).ConfigureAwait(false);
+                        _stopwatch.Stop();
+                        Interlocked.Add(ref _counter.SentBytes, sent);
+                        if (isEnabledTraceLogging)
+                        {
+                            logger.LogTrace("Socket.SendAsync. Size: {0}  Elapsed: {1}ms", sent, _stopwatch.Elapsed.TotalMilliseconds);
+                        }
 
-                    // lop off sent bytes for next iteration
-                    examinedPos = buffer.GetPosition(sent);
-                    buffer = buffer.Slice(sent);
+                        var consumed = 0;
+                        while (consumed < sent)
+                        {
+                            if (pending == 0)
+                            {
+                                pending = _inFlightCommands.Peek().Size;
+                            }
+
+                            if (pending <= sent - consumed)
+                            {
+                                inFlightSum -= _inFlightCommands.Dequeue().Size;
+                                Interlocked.Add(ref _counter.PendingMessages, -1);
+                                Interlocked.Add(ref _counter.SentMessages, 1);
+
+                                // mark the bytes as consumed, and reset pending
+                                consumed += pending;
+                                pending = 0;
+                            }
+                            else
+                            {
+                                // an entire command was not sent; decrement pending by
+                                // the number of bytes from the command that was sent
+                                pending += consumed - sent;
+                                break;
+                            }
+                        }
+
+                        if (consumed > 0)
+                        {
+                            // mark fully sent commands as consumed
+                            consumedPos = buffer.GetPosition(consumed);
+                            examinedOffset = sent - consumed;
+                        }
+                        else
+                        {
+                            // no commands were consumed
+                            examinedOffset += sent;
+                        }
+
+                        // lop off sent bytes for next iteration
+                        examinedPos = buffer.GetPosition(sent);
+                        buffer = buffer.Slice(sent);
+                    }
+                }
+                finally
+                {
+                    _pipeReader.AdvanceTo(consumedPos, examinedPos);
                 }
 
-                _pipeReader.AdvanceTo(consumedPos, examinedPos);
                 if (result.IsCompleted)
                 {
                     break;
@@ -229,6 +241,11 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
         catch (SocketClosedException)
         {
             // ignore, will be handled in read loop
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Unexpected error occured in write loop");
+            throw;
         }
 
         logger.LogDebug("WriteLoop finished.");

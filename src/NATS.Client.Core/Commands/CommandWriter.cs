@@ -29,7 +29,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     private readonly PipeWriter _pipeWriter;
     private readonly ProtocolWriter _protocolWriter;
     private readonly ChannelWriter<QueuedCommand> _queuedCommandsWriter;
-    private readonly SemaphoreSlim _sem;
+    private readonly SemaphoreSlim _semLock;
     private Task? _flushTask;
     private bool _disposed;
 
@@ -39,12 +39,16 @@ internal sealed class CommandWriter : IAsyncDisposable
         _defaultCommandTimeout = overrideCommandTimeout ?? opts.CommandTimeout;
         _enqueuePing = enqueuePing;
         _opts = opts;
-        var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: opts.WriterBufferSize, resumeWriterThreshold: opts.WriterBufferSize / 2, minimumSegmentSize: 65536, useSynchronizationContext: false));
+        var pipe = new Pipe(new PipeOptions(
+            pauseWriterThreshold: opts.WriterBufferSize, // flush will block after hitting
+            resumeWriterThreshold: opts.WriterBufferSize / 2,  // will start flushing again after catching up
+            minimumSegmentSize: 65536, // larger segments allow for more productive syscall for socket.send
+            useSynchronizationContext: false));
         PipeReader = pipe.Reader;
         _pipeWriter = pipe.Writer;
         _protocolWriter = new ProtocolWriter(_pipeWriter, opts.SubjectEncoding, opts.HeaderEncoding);
         var channel = Channel.CreateUnbounded<QueuedCommand>(new UnboundedChannelOptions { SingleWriter = true, SingleReader = true });
-        _sem = new SemaphoreSlim(1);
+        _semLock = new SemaphoreSlim(1);
         QueuedCommandsReader = channel.Reader;
         _queuedCommandsWriter = channel.Writer;
     }
@@ -57,7 +61,7 @@ internal sealed class CommandWriter : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        await _sem.WaitAsync().ConfigureAwait(false);
+        await _semLock.WaitAsync().ConfigureAwait(false);
         try
         {
             if (_disposed)
@@ -71,7 +75,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            _sem.Release();
+            _semLock.Release();
         }
     }
 
@@ -81,7 +85,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
 #pragma warning disable CA2016
 #pragma warning disable VSTHRD103
-        if (!_sem.Wait(0))
+        if (!_semLock.Wait(0))
 #pragma warning restore VSTHRD103
 #pragma warning restore CA2016
         {
@@ -113,7 +117,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            _sem.Release();
+            _semLock.Release();
         }
 
         return ValueTask.CompletedTask;
@@ -123,7 +127,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
 #pragma warning disable CA2016
 #pragma warning disable VSTHRD103
-        if (!_sem.Wait(0))
+        if (!_semLock.Wait(0))
 #pragma warning restore VSTHRD103
 #pragma warning restore CA2016
         {
@@ -156,7 +160,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            _sem.Release();
+            _semLock.Release();
         }
 
         return ValueTask.CompletedTask;
@@ -166,7 +170,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
 #pragma warning disable CA2016
 #pragma warning disable VSTHRD103
-        if (!_sem.Wait(0))
+        if (!_semLock.Wait(0))
 #pragma warning restore VSTHRD103
 #pragma warning restore CA2016
         {
@@ -198,7 +202,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            _sem.Release();
+            _semLock.Release();
         }
 
         return ValueTask.CompletedTask;
@@ -208,7 +212,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
 #pragma warning disable CA2016
 #pragma warning disable VSTHRD103
-        if (!_sem.Wait(0))
+        if (!_semLock.Wait(0))
 #pragma warning restore VSTHRD103
 #pragma warning restore CA2016
         {
@@ -240,7 +244,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            _sem.Release();
+            _semLock.Release();
         }
 
         return ValueTask.CompletedTask;
@@ -250,7 +254,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
 #pragma warning disable CA2016
 #pragma warning disable VSTHRD103
-        if (!_sem.Wait(0))
+        if (!_semLock.Wait(0))
 #pragma warning restore VSTHRD103
 #pragma warning restore CA2016
         {
@@ -282,7 +286,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            _sem.Release();
+            _semLock.Release();
         }
 
         return ValueTask.CompletedTask;
@@ -292,7 +296,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
 #pragma warning disable CA2016
 #pragma warning disable VSTHRD103
-        if (!_sem.Wait(0))
+        if (!_semLock.Wait(0))
 #pragma warning restore VSTHRD103
 #pragma warning restore CA2016
         {
@@ -324,7 +328,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            _sem.Release();
+            _semLock.Release();
         }
 
         return ValueTask.CompletedTask;
@@ -334,7 +338,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         if (!lockHeld)
         {
-            if (!await _sem.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
+            if (!await _semLock.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
             {
                 throw new TimeoutException();
             }
@@ -365,7 +369,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            _sem.Release();
+            _semLock.Release();
         }
     }
 
@@ -373,7 +377,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         if (!lockHeld)
         {
-            if (!await _sem.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
+            if (!await _semLock.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
             {
                 throw new TimeoutException();
             }
@@ -405,7 +409,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            _sem.Release();
+            _semLock.Release();
         }
     }
 
@@ -413,7 +417,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         if (!lockHeld)
         {
-            if (!await _sem.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
+            if (!await _semLock.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
             {
                 throw new TimeoutException();
             }
@@ -444,7 +448,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            _sem.Release();
+            _semLock.Release();
         }
     }
 
@@ -452,7 +456,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         if (!lockHeld)
         {
-            if (!await _sem.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
+            if (!await _semLock.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
             {
                 throw new TimeoutException();
             }
@@ -483,7 +487,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            _sem.Release();
+            _semLock.Release();
         }
     }
 
@@ -491,7 +495,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         if (!lockHeld)
         {
-            if (!await _sem.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
+            if (!await _semLock.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
             {
                 throw new TimeoutException();
             }
@@ -522,7 +526,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            _sem.Release();
+            _semLock.Release();
         }
     }
 
@@ -530,7 +534,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         if (!lockHeld)
         {
-            if (!await _sem.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
+            if (!await _semLock.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
             {
                 throw new TimeoutException();
             }
@@ -561,7 +565,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            _sem.Release();
+            _semLock.Release();
         }
     }
 

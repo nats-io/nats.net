@@ -25,12 +25,12 @@ internal class SvcListener : IAsyncDisposable
 
     public async ValueTask StartAsync()
     {
-        var sub = await _nats.SubscribeCoreAsync<NatsMemoryOwner<byte>>(_subject, _queueGroup, cancellationToken: _cts.Token);
+        var sub = await _nats.SubscribeCoreAsync(_subject, _queueGroup, serializer: NatsRawSerializer<NatsMemoryOwner<byte>>.Default, cancellationToken: _cts.Token);
         _readLoop = Task.Run(async () =>
         {
             await using (sub)
             {
-                await foreach (var msg in _nats.SubscribeAsync<NatsMemoryOwner<byte>>(_subject, _queueGroup, serializer: NatsRawSerializer<NatsMemoryOwner<byte>>.Default, cancellationToken: _cts.Token))
+                await foreach (var msg in sub.Msgs.ReadAllAsync())
                 {
                     await _channel.Writer.WriteAsync(new SvcMsg(_type, msg), _cts.Token).ConfigureAwait(false);
                 }
