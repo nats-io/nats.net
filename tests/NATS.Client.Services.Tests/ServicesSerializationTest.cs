@@ -1,4 +1,3 @@
-﻿using System.Buffers;
 using NATS.Client.Core.Tests;
 using NATS.Client.Serializers.Json;
 using NATS.Client.Services.Internal;
