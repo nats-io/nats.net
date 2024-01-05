@@ -1,5 +1,3 @@
-using System.Text;
-
 namespace NATS.Client.Core.Tests;
 
 public class CancellationTest
@@ -17,18 +15,27 @@ public class CancellationTest
     {
         var server = NatsServer.Start(_output, TransportType.Tcp);
 
-        await using var conn = server.CreateClientConnection(NatsOpts.Default with { CommandTimeout = TimeSpan.FromMilliseconds(100) });
+        await using var conn = server.CreateClientConnection(NatsOpts.Default with { CommandTimeout = TimeSpan.FromMilliseconds(1) });
         await conn.ConnectAsync();
 
         // kill the server
         await server.DisposeAsync();
 
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        // wait for reconnect loop to kick in
+        while (conn.ConnectionState != NatsConnectionState.Reconnecting)
+        {
+            await Task.Delay(1, cancellationToken);
+        }
+
         // commands time out
-        await Assert.ThrowsAsync<TimeoutException>(() => conn.PingAsync().AsTask());
-        await Assert.ThrowsAsync<TimeoutException>(() => conn.PublishAsync("test").AsTask());
+        await Assert.ThrowsAsync<TimeoutException>(() => conn.PingAsync(cancellationToken).AsTask());
+        await Assert.ThrowsAsync<TimeoutException>(() => conn.PublishAsync("test", cancellationToken: cancellationToken).AsTask());
         await Assert.ThrowsAsync<TimeoutException>(async () =>
         {
-            await foreach (var unused in conn.SubscribeAsync<string>("test"))
+            await foreach (var unused in conn.SubscribeAsync<string>("test", cancellationToken: cancellationToken))
             {
             }
         });

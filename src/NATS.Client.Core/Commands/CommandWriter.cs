@@ -586,7 +586,8 @@ internal sealed class CommandWriter : IAsyncDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void EnqueueCommand(bool success, int trim = 0)
     {
-        if (_pipeWriter.UnflushedBytes == 0)
+        var size = (int)_pipeWriter.UnflushedBytes;
+        if (size == 0)
         {
             // no unflushed bytes means no command was produced
             _flushTask = null;
@@ -598,7 +599,6 @@ internal sealed class CommandWriter : IAsyncDisposable
             Interlocked.Add(ref _counter.PendingMessages, 1);
         }
 
-        var size = (int)_pipeWriter.UnflushedBytes;
         _queuedCommandsWriter.TryWrite(new QueuedCommand(Size: size, Trim: success ? trim : size));
         var flush = _pipeWriter.FlushAsync();
         _flushTask = flush.IsCompletedSuccessfully ? null : flush.AsTask();

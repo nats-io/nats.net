@@ -113,31 +113,20 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
 
                         if (trimming > 0)
                         {
-                            if (trimming > buffer.Length)
-                            {
-                                // trim partially processed
-                                consumedPos = buffer.GetPosition(buffer.Length);
-                                examinedPos = buffer.GetPosition(buffer.Length);
-                                examinedOffset = 0;
-                                pending -= (int) buffer.Length;
-                                trimming -= (int) buffer.Length;
-                                break;
-                            }
-
-                            // trim completely processed
-                            consumedPos = buffer.GetPosition(trimming);
-                            examinedPos = buffer.GetPosition(trimming);
+                            var trimmed = Math.Min(trimming, (int)buffer.Length);
+                            consumedPos = buffer.GetPosition(trimmed);
+                            examinedPos = buffer.GetPosition(trimmed);
                             examinedOffset = 0;
-                            buffer = buffer.Slice(trimming);
-                            pending -= trimming;
-                            trimming = 0;
-
+                            buffer = buffer.Slice(trimmed);
+                            pending -= trimmed;
+                            trimming -= trimmed;
                             if (pending == 0)
                             {
                                 // the entire command was trimmed (canceled)
                                 inFlightSum -= _inFlightCommands.Dequeue().Size;
-                                continue;
                             }
+
+                            continue;
                         }
 
                         var sendMem = buffer.First;
@@ -181,36 +170,44 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
                             var trimmedSize = 0;
                             foreach (var command in _inFlightCommands)
                             {
-                                var write = 0;
-                                if (trimmedSize == 0)
-                                {
-                                    write = pending;
-                                }
-                                else
-                                {
-                                    if (command.Trim > 0)
-                                    {
-                                        if (bufferIter.Length < command.Trim + 1)
-                                        {
-                                            // not enough bytes to start writing the next command
-                                            break;
-                                        }
-
-                                        bufferIter = bufferIter.Slice(command.Trim);
-                                        write = command.Size - command.Trim;
-                                    }
-                                }
-
-                                write = Math.Min(memIter.Length, write);
-                                write = Math.Min((int) bufferIter.Length, write);
-                                bufferIter.Slice(0, write).CopyTo(memIter.Span);
-                                memIter = memIter[write..];
-                                bufferIter = bufferIter.Slice(write);
-                                trimmedSize += write;
                                 if (bufferIter.Length == 0 || memIter.Length == 0)
                                 {
                                     break;
                                 }
+
+                                int write;
+                                if (trimmedSize == 0)
+                                {
+                                    // first command, only write pending data
+                                    write = pending;
+                                }
+                                else if (command.Trim == 0)
+                                {
+                                    write = command.Size;
+                                }
+                                else
+                                {
+                                    if (bufferIter.Length < command.Trim + 1)
+                                    {
+                                        // not enough bytes to start writing the next command
+                                        break;
+                                    }
+
+                                    bufferIter = bufferIter.Slice(command.Trim);
+                                    write = command.Size - command.Trim;
+                                    if (write == 0)
+                                    {
+                                        // the entire command was trimmed (canceled)
+                                        continue;
+                                    }
+                                }
+
+                                write = Math.Min(memIter.Length, write);
+                                write = Math.Min((int)bufferIter.Length, write);
+                                bufferIter.Slice(0, write).CopyTo(memIter.Span);
+                                memIter = memIter[write..];
+                                bufferIter = bufferIter.Slice(write);
+                                trimmedSize += write;
                             }
 
                             sendMem = consolidateMem[..trimmedSize];
