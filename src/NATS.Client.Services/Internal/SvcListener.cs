@@ -9,12 +9,12 @@ internal class SvcListener : IAsyncDisposable
     private readonly Channel<SvcMsg> _channel;
     private readonly SvcMsgType _type;
     private readonly string _subject;
-    private readonly string _queueGroup;
+    private readonly string? _queueGroup;
     private readonly CancellationToken _cancellationToken;
     private Task? _readLoop;
     private CancellationTokenSource? _cts;
 
-    public SvcListener(NatsConnection nats, Channel<SvcMsg> channel, SvcMsgType type, string subject, string queueGroup, CancellationToken cancellationToken)
+    public SvcListener(NatsConnection nats, Channel<SvcMsg> channel, SvcMsgType type, string subject, string? queueGroup, CancellationToken cancellationToken)
     {
         _nats = nats;
         _channel = channel;
