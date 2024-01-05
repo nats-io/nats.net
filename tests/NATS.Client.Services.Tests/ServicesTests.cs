@@ -231,4 +231,37 @@ public class ServicesTests
             Assert.Equal("s2baz", eps.Data["ep_name"]?.GetValue<string>());
         }
     }
+
+    [Fact]
+    public async Task Add_multiple_service_listeners_ping_info_and_stats()
+    {
+        await using var server = NatsServer.Start();
+        await using var nats = server.CreateClientConnection();
+        var svc = new NatsSvcContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        await using var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
+        await using var s2 = await svc.AddServiceAsync("s2", "2.0.0", cancellationToken: cancellationToken);
+
+        var pingsTask = nats.FindServicesAsync("$SRV.PING", 2, NatsSrvJsonSerializer<PingResponse>.Default, cancellationToken);
+        var infosTask = nats.FindServicesAsync("$SRV.INFO", 2, NatsSrvJsonSerializer<InfoResponse>.Default, cancellationToken);
+        var statsTask = nats.FindServicesAsync("$SRV.STATS", 2, NatsSrvJsonSerializer<StatsResponse>.Default, cancellationToken);
+
+        var pings = await pingsTask;
+        Assert.Equal(2, pings.Count);
+        Assert.Equal("1.0.0", pings.First(s => s.Name == "s1").Version);
+        Assert.Equal("2.0.0", pings.First(s => s.Name == "s2").Version);
+
+        var infos = await infosTask;
+        Assert.Equal(2, infos.Count);
+        Assert.Equal("1.0.0", infos.First(s => s.Name == "s1").Version);
+        Assert.Equal("2.0.0", infos.First(s => s.Name == "s2").Version);
+
+        var stats = await statsTask;
+        Assert.Equal(2, stats.Count);
+        Assert.Equal("1.0.0", stats.First(s => s.Name == "s1").Version);
+        Assert.Equal("2.0.0", stats.First(s => s.Name == "s2").Version);
+    }
 }
