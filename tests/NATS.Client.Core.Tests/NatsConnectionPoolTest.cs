@@ -14,7 +14,7 @@ public class NatsConnectionPoolTest
         }
 
         // Assert
-        var con2 = (NatsConnection) pool.GetConnection();
+        var con2 = (NatsConnection)pool.GetConnection();
         con2.IsDisposed.Should().BeFalse();
     }
 
@@ -24,7 +24,7 @@ public class NatsConnectionPoolTest
         // Arrange
         NatsConnectionPool pool = new(1);
 
-        var con = (NatsConnection) pool.GetConnection();
+        var con = (NatsConnection)pool.GetConnection();
 
         // Act
         await pool.DisposeAsync();

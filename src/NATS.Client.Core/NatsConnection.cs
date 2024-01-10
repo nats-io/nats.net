@@ -150,8 +150,6 @@ public partial class NatsConnection : INatsConnection
         }
     }
 
-    internal NatsStats GetStats() => Counter.ToStats();
-
     public virtual async ValueTask DisposeAsync()
     {
         if (!IsDisposed)
@@ -183,6 +181,8 @@ public partial class NatsConnection : INatsConnection
 #endif
         }
     }
+
+    internal NatsStats GetStats() => Counter.ToStats();
 
     internal void EnqueuePing(AsyncPingCommand pingCommand)
     {
@@ -538,7 +538,7 @@ public partial class NatsConnection : INatsConnection
             _currentConnectUri = null;
             var urlEnumerator = urls.AsEnumerable().GetEnumerator();
             NatsUri? url = null;
-            CONNECT_AGAIN:
+        CONNECT_AGAIN:
             try
             {
                 if (urlEnumerator.MoveNext())
@@ -748,7 +748,7 @@ public partial class NatsConnection : INatsConnection
 
     private async ValueTask EnqueueCommandAsync(ICommand command)
     {
-        RETRY:
+    RETRY:
         if (_commandWriter.TryWrite(command))
         {
             Interlocked.Increment(ref Counter.PendingMessages);
