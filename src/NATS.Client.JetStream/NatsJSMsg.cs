@@ -66,6 +66,11 @@ public interface INatsJSMsg<out T>
     NatsJSMsgMetadata? Metadata { get; }
 
     /// <summary>
+    /// The reply subject that subscribers can use to send a response back to the publisher/requester.
+    /// </summary>
+    public string? ReplyTo { get; }
+
+    /// <summary>
     /// Reply with an empty message.
     /// </summary>
     /// <param name="headers">Optional message headers.</param>
@@ -176,7 +181,10 @@ public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
     /// </summary>
     public NatsJSMsgMetadata? Metadata => _replyToDateTimeAndSeq.Value;
 
-    private string? ReplyTo => _msg.ReplyTo;
+    /// <summary>
+    /// The reply subject that subscribers can use to send a response back to the publisher/requester.
+    /// </summary>
+    public string? ReplyTo => _msg.ReplyTo;
 
     /// <summary>
     /// Reply with an empty message.

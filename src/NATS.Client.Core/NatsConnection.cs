@@ -16,7 +16,7 @@ public enum NatsConnectionState
     Reconnecting,
 }
 
-public partial class NatsConnection : IAsyncDisposable, INatsConnection
+public partial class NatsConnection : INatsConnection
 {
 #pragma warning disable SA1401
     /// <summary>
@@ -26,6 +26,8 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
     internal readonly ConnectionStatsCounter Counter; // allow to call from external sources
     internal ServerInfo? WritableServerInfo;
+    internal bool IsDisposed;
+
 #pragma warning restore SA1401
     private readonly object _gate = new object();
     private readonly ILogger<NatsConnection> _logger;
@@ -35,12 +37,11 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
     private readonly string _name;
     private readonly TimeSpan _socketComponentDisposeTimeout = TimeSpan.FromSeconds(5);
     private readonly BoundedChannelOptions _defaultSubscriptionChannelOpts;
-
+    private readonly ClientOpts _clientOpts;
     private int _pongCount;
-    private bool _isDisposed;
     private int _connectionState;
 
-    // when reconnect, make new instance.
+    // when reconnected, make new instance.
     private ISocketConnection? _socket;
     private CancellationTokenSource? _pingTimerCancellationTokenSource;
     private volatile NatsUri? _currentConnectUri;
@@ -49,7 +50,6 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
     private NatsPipeliningWriteProtocolProcessor? _socketWriter;
     private TaskCompletionSource _waitForOpenConnection;
     private TlsCerts? _tlsCerts;
-    private ClientOpts _clientOpts;
     private UserCredentials? _userCredentials;
     private int _connectRetry;
     private TimeSpan _backoff = TimeSpan.Zero;
@@ -105,7 +105,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
     public INatsServerInfo? ServerInfo => WritableServerInfo; // server info is set when received INFO
 
-    public NatsHeaderParser HeaderParser { get; }
+    internal NatsHeaderParser HeaderParser { get; }
 
     internal SubscriptionManager SubscriptionManager { get; }
 
@@ -148,13 +148,11 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         await InitialConnectAsync().ConfigureAwait(false);
     }
 
-    public NatsStats GetStats() => Counter.ToStats();
-
-    public async ValueTask DisposeAsync()
+    public virtual async ValueTask DisposeAsync()
     {
-        if (!_isDisposed)
+        if (!IsDisposed)
         {
-            _isDisposed = true;
+            IsDisposed = true;
             _logger.Log(LogLevel.Information, NatsLogEvents.Connection, "Disposing connection {Name}", _name);
 
             await DisposeSocketAsync(false).ConfigureAwait(false);
@@ -177,6 +175,8 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 #endif
         }
     }
+
+    internal NatsStats GetStats() => Counter.ToStats();
 
     internal ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
     {
@@ -202,7 +202,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         catch (Exception ex)
         {
             // connection is disposed, don't need to unsubscribe command.
-            if (_isDisposed)
+            if (IsDisposed)
             {
                 return ValueTask.CompletedTask;
             }
@@ -771,7 +771,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
     private void ThrowIfDisposed()
     {
-        if (_isDisposed)
+        if (IsDisposed)
             throw new ObjectDisposedException(null);
     }
 }
