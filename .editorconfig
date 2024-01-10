@@ -3,7 +3,7 @@
 [*]
 charset = utf-8
 indent_style = space
-indent_size = 2
+indent_size = 4
 trim_trailing_whitespace = true
 insert_final_newline = true
 end_of_line = lf
@@ -16,7 +16,7 @@ indent_size = 4
 max_line_length = 300
 
 # changes from VS2019 defaults
-csharp_style_namespace_declarations = file_scoped
+csharp_style_namespace_declarations = file_scoped:silent
 
 # changes from VS2017 defaults
 csharp_style_expression_bodied_methods = true:suggestion
@@ -24,7 +24,7 @@ csharp_style_expression_bodied_constructors = true:suggestion
 csharp_style_expression_bodied_operators = true:suggestion
 csharp_prefer_braces = false:none
 csharp_indent_switch_labels = false
-csharp_space_after_cast = true
+csharp_space_after_cast = false
 csharp_preserve_single_line_statements = false
 
 # use VS2017 defaults, but make them warnings (instead of none)
@@ -52,7 +52,7 @@ csharp_style_pattern_matching_over_is_with_cast_check = true
 csharp_style_pattern_matching_over_as_with_null_check = true
 csharp_style_inlined_variable_declaration = true
 csharp_prefer_simple_default_expression = true
-csharp_style_throw_expression = true
+csharp_style_throw_expression = true:suggestion
 csharp_style_conditional_delegate_call = true
 dotnet_sort_system_directives_first = true
 csharp_new_line_before_open_brace = all
@@ -281,3 +281,77 @@ dotnet_diagnostic.VSTHRD100.severity = none  # Avoid async void
 dotnet_diagnostic.VSTHRD101.severity = none  # Avoid unsupported async delegates
 dotnet_diagnostic.VSTHRD003.severity = none  # Avoid awaiting foreign Tasks
 dotnet_diagnostic.VSTHRD111.severity = error # Use ConfigureAwait(bool)
+csharp_using_directive_placement = outside_namespace:silent
+csharp_prefer_simple_using_statement = true:suggestion
+csharp_style_prefer_method_group_conversion = true:silent
+csharp_style_prefer_top_level_statements = true:silent
+csharp_style_prefer_primary_constructors = true:suggestion
+csharp_style_expression_bodied_lambdas = true:silent
+csharp_style_expression_bodied_local_functions = false:silent
+csharp_space_around_binary_operators = before_and_after
+
+[*.{cs,vb}]
+#### Naming styles ####
+
+# Naming rules
+
+dotnet_naming_rule.interface_should_be_begins_with_i.severity = suggestion
+dotnet_naming_rule.interface_should_be_begins_with_i.symbols = interface
+dotnet_naming_rule.interface_should_be_begins_with_i.style = begins_with_i
+
+dotnet_naming_rule.types_should_be_pascal_case.severity = suggestion
+dotnet_naming_rule.types_should_be_pascal_case.symbols = types
+dotnet_naming_rule.types_should_be_pascal_case.style = pascal_case
+
+dotnet_naming_rule.non_field_members_should_be_pascal_case.severity = suggestion
+dotnet_naming_rule.non_field_members_should_be_pascal_case.symbols = non_field_members
+dotnet_naming_rule.non_field_members_should_be_pascal_case.style = pascal_case
+
+# Symbol specifications
+
+dotnet_naming_symbols.interface.applicable_kinds = interface
+dotnet_naming_symbols.interface.applicable_accessibilities = public, internal, private, protected, protected_internal, private_protected
+dotnet_naming_symbols.interface.required_modifiers = 
+
+dotnet_naming_symbols.types.applicable_kinds = class, struct, interface, enum
+dotnet_naming_symbols.types.applicable_accessibilities = public, internal, private, protected, protected_internal, private_protected
+dotnet_naming_symbols.types.required_modifiers = 
+
+dotnet_naming_symbols.non_field_members.applicable_kinds = property, event, method
+dotnet_naming_symbols.non_field_members.applicable_accessibilities = public, internal, private, protected, protected_internal, private_protected
+dotnet_naming_symbols.non_field_members.required_modifiers = 
+
+# Naming styles
+
+dotnet_naming_style.begins_with_i.required_prefix = I
+dotnet_naming_style.begins_with_i.required_suffix = 
+dotnet_naming_style.begins_with_i.word_separator = 
+dotnet_naming_style.begins_with_i.capitalization = pascal_case
+
+dotnet_naming_style.pascal_case.required_prefix = 
+dotnet_naming_style.pascal_case.required_suffix = 
+dotnet_naming_style.pascal_case.word_separator = 
+dotnet_naming_style.pascal_case.capitalization = pascal_case
+
+dotnet_naming_style.pascal_case.required_prefix = 
+dotnet_naming_style.pascal_case.required_suffix = 
+dotnet_naming_style.pascal_case.word_separator = 
+dotnet_naming_style.pascal_case.capitalization = pascal_case
+dotnet_style_coalesce_expression = true:warning
+dotnet_style_null_propagation = true:suggestion
+dotnet_style_prefer_is_null_check_over_reference_equality_method = true:suggestion
+dotnet_style_prefer_auto_properties = true:silent
+dotnet_style_object_initializer = true:suggestion
+dotnet_style_prefer_collection_expression = true:suggestion
+dotnet_style_collection_initializer = true:suggestion
+dotnet_style_prefer_simplified_boolean_expressions = true:suggestion
+dotnet_style_prefer_conditional_expression_over_assignment = true:silent
+dotnet_style_prefer_conditional_expression_over_return = true:silent
+dotnet_style_explicit_tuple_names = true:warning
+dotnet_style_prefer_inferred_tuple_names = true:suggestion
+dotnet_style_prefer_inferred_anonymous_type_member_names = true:suggestion
+dotnet_style_prefer_compound_assignment = true:suggestion
+dotnet_style_prefer_simplified_interpolation = true:suggestion
+dotnet_style_namespace_match_folder = true:suggestion
+dotnet_style_operator_placement_when_wrapping = beginning_of_line
+tab_width = 4
