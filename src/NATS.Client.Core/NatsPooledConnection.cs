@@ -1,6 +1,6 @@
 namespace NATS.Client.Core;
 
-internal class NatsPooledConnection : NatsConnection
+internal sealed class NatsPooledConnection : NatsConnection
 {
     public NatsPooledConnection(NatsOpts opts)
         : base(opts)

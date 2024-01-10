@@ -2,14 +2,6 @@ namespace NATS.Client.Core;
 
 public interface INatsConnection : IAsyncDisposable
 {
-    event EventHandler<string>? ConnectionDisconnected;
-
-    event EventHandler<string>? ConnectionOpened;
-
-    event EventHandler<string>? ReconnectFailed;
-
-    event EventHandler<INatsError>? OnError;
-
     INatsServerInfo? ServerInfo { get; }
 
     NatsOpts Opts { get; }
@@ -173,9 +165,4 @@ public interface INatsConnection : IAsyncDisposable
     /// Connect socket and write CONNECT command to nats server.
     /// </summary>
     ValueTask ConnectAsync();
-
-    /// <summary>
-    /// Gets the statistics for the current Nats Connection
-    /// </summary>
-    NatsStats GetStats();
 }

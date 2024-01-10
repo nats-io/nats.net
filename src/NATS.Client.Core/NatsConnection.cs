@@ -150,7 +150,7 @@ public partial class NatsConnection : INatsConnection
         }
     }
 
-    public NatsStats GetStats() => Counter.ToStats();
+    internal NatsStats GetStats() => Counter.ToStats();
 
     public virtual async ValueTask DisposeAsync()
     {
