@@ -335,6 +335,26 @@ internal sealed class CommandWriter : IAsyncDisposable
         return ValueTask.CompletedTask;
     }
 
+    // only used for internal testing
+    internal async Task TestStallFlushAsync(TimeSpan timeSpan)
+    {
+        await _semLock.WaitAsync().ConfigureAwait(false);
+
+        try
+        {
+            if (_flushTask is { IsCompletedSuccessfully: false })
+            {
+                await _flushTask.ConfigureAwait(false);
+            }
+
+            _flushTask = Task.Delay(timeSpan);
+        }
+        finally
+        {
+            _semLock.Release();
+        }
+    }
+
     private async ValueTask ConnectStateMachineAsync(bool lockHeld, ClientOpts connectOpts, CancellationToken cancellationToken)
     {
         if (!lockHeld)

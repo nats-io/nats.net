@@ -27,18 +27,7 @@ public partial class NatsConnection
 
     private async ValueTask ConnectAndPublishAsync<T>(string subject, T? data, NatsHeaders? headers, string? replyTo, INatsSerialize<T> serializer, CancellationToken cancellationToken)
     {
-        var connect = ConnectAsync();
-        if (connect.IsCompletedSuccessfully)
-        {
-#pragma warning disable VSTHRD103
-            connect.GetAwaiter().GetResult();
-#pragma warning restore VSTHRD103
-        }
-        else
-        {
-            await connect.AsTask().WaitAsync(Opts.CommandTimeout, cancellationToken).ConfigureAwait(false);
-        }
-
+        await ConnectAsync().AsTask().WaitAsync(cancellationToken).ConfigureAwait(false);
         await CommandWriter.PublishAsync(subject, data, headers, replyTo, serializer, cancellationToken).ConfigureAwait(false);
     }
 }

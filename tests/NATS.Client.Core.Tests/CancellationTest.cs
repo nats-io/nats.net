@@ -6,16 +6,36 @@ public class CancellationTest
 
     public CancellationTest(ITestOutputHelper output) => _output = output;
 
-    // should check
-    // timeout via command-timeout(request-timeout)
-    // timeout via connection dispose
-    // cancel manually
+    // check CommandTimeout
     [Fact]
     public async Task CommandTimeoutTest()
     {
         var server = NatsServer.Start(_output, TransportType.Tcp);
 
         await using var conn = server.CreateClientConnection(NatsOpts.Default with { CommandTimeout = TimeSpan.FromMilliseconds(1) });
+        await conn.ConnectAsync();
+
+        // stall the flush task
+        await conn.CommandWriter.TestStallFlushAsync(TimeSpan.FromSeconds(5));
+
+        // commands that call ConnectAsync throw OperationCanceledException
+        await Assert.ThrowsAsync<TimeoutException>(() => conn.PingAsync().AsTask());
+        await Assert.ThrowsAsync<TimeoutException>(() => conn.PublishAsync("test").AsTask());
+        await Assert.ThrowsAsync<TimeoutException>(async () =>
+        {
+            await foreach (var unused in conn.SubscribeAsync<string>("test"))
+            {
+            }
+        });
+    }
+
+    // check that cancellation works on commands that call ConnectAsync
+    [Fact]
+    public async Task CommandConnectCancellationTest()
+    {
+        var server = NatsServer.Start(_output, TransportType.Tcp);
+
+        await using var conn = server.CreateClientConnection();
         await conn.ConnectAsync();
 
         // kill the server
@@ -30,18 +50,18 @@ public class CancellationTest
             await Task.Delay(1, cancellationToken);
         }
 
-        // commands time out
-        await Assert.ThrowsAsync<TimeoutException>(() => conn.PingAsync(cancellationToken).AsTask());
-        await Assert.ThrowsAsync<TimeoutException>(() => conn.PublishAsync("test", cancellationToken: cancellationToken).AsTask());
-        await Assert.ThrowsAsync<TimeoutException>(async () =>
+        // cancel cts
+        cts.Cancel();
+
+        // commands that call ConnectAsync throw TaskCanceledException
+        await Assert.ThrowsAsync<TaskCanceledException>(() => conn.PingAsync(cancellationToken).AsTask());
+        await Assert.ThrowsAsync<TaskCanceledException>(() => conn.PublishAsync("test", cancellationToken: cancellationToken).AsTask());
+        // todo: fix exception in NatsSubBase when a canceled cancellationToken is passed
+        await Assert.ThrowsAsync<TaskCanceledException>(async () =>
         {
             await foreach (var unused in conn.SubscribeAsync<string>("test", cancellationToken: cancellationToken))
             {
             }
         });
     }
-
-    // Queue-full
-
-    // External Cancellation
 }
