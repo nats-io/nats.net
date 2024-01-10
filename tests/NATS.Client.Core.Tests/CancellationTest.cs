@@ -21,14 +21,12 @@ public class CancellationTest
         // commands that call ConnectAsync throw OperationCanceledException
         await Assert.ThrowsAsync<TimeoutException>(() => conn.PingAsync().AsTask());
         await Assert.ThrowsAsync<TimeoutException>(() => conn.PublishAsync("test").AsTask());
-
-        // todo: https://github.com/nats-io/nats.net.v2/issues/323
-        // await Assert.ThrowsAsync<TimeoutException>(async () =>
-        // {
-        //     await foreach (var unused in conn.SubscribeAsync<string>("test"))
-        //     {
-        //     }
-        // });
+        await Assert.ThrowsAsync<TimeoutException>(async () =>
+        {
+            await foreach (var unused in conn.SubscribeAsync<string>("test"))
+            {
+            }
+        });
     }
 
     // check that cancellation works on commands that call ConnectAsync
@@ -59,12 +57,12 @@ public class CancellationTest
         await Assert.ThrowsAsync<TaskCanceledException>(() => conn.PingAsync(cancellationToken).AsTask());
         await Assert.ThrowsAsync<TaskCanceledException>(() => conn.PublishAsync("test", cancellationToken: cancellationToken).AsTask());
 
-        // todo: fix exception in NatsSubBase when a canceled cancellationToken is passed
-        await Assert.ThrowsAsync<TaskCanceledException>(async () =>
-        {
-            await foreach (var unused in conn.SubscribeAsync<string>("test", cancellationToken: cancellationToken))
-            {
-            }
-        });
+        // todo: https://github.com/nats-io/nats.net.v2/issues/323
+        // await Assert.ThrowsAsync<TaskCanceledException>(async () =>
+        // {
+        //     await foreach (var unused in conn.SubscribeAsync<string>("test", cancellationToken: cancellationToken))
+        //     {
+        //     }
+        // });
     }
 }
