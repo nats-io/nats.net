@@ -56,6 +56,7 @@ public class CancellationTest
         // commands that call ConnectAsync throw TaskCanceledException
         await Assert.ThrowsAsync<TaskCanceledException>(() => conn.PingAsync(cancellationToken).AsTask());
         await Assert.ThrowsAsync<TaskCanceledException>(() => conn.PublishAsync("test", cancellationToken: cancellationToken).AsTask());
+
         // todo: fix exception in NatsSubBase when a canceled cancellationToken is passed
         await Assert.ThrowsAsync<TaskCanceledException>(async () =>
         {
