@@ -1,5 +1,3 @@
-using System.Text;
-
 namespace NATS.Client.Core.Tests;
 
 public class CancellationTest
@@ -8,66 +6,63 @@ public class CancellationTest
 
     public CancellationTest(ITestOutputHelper output) => _output = output;
 
-    // should check
-    // timeout via command-timeout(request-timeout)
-    // timeout via connection dispose
-    // cancel manually
+    // check CommandTimeout
     [Fact]
     public async Task CommandTimeoutTest()
     {
-        await using var server = NatsServer.Start(_output, TransportType.Tcp);
+        var server = NatsServer.Start(_output, TransportType.Tcp);
 
-        await using var subConnection = server.CreateClientConnection(NatsOpts.Default with { CommandTimeout = TimeSpan.FromSeconds(1) });
-        await using var pubConnection = server.CreateClientConnection(NatsOpts.Default with { CommandTimeout = TimeSpan.FromSeconds(1) });
+        await using var conn = server.CreateClientConnection(NatsOpts.Default with { CommandTimeout = TimeSpan.FromMilliseconds(1) });
+        await conn.ConnectAsync();
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        // stall the flush task
+        await conn.CommandWriter.TestStallFlushAsync(TimeSpan.FromSeconds(5));
+
+        // commands that call ConnectAsync throw OperationCanceledException
+        await Assert.ThrowsAsync<TimeoutException>(() => conn.PingAsync().AsTask());
+        await Assert.ThrowsAsync<TimeoutException>(() => conn.PublishAsync("test").AsTask());
+        await Assert.ThrowsAsync<TimeoutException>(async () =>
+        {
+            await foreach (var unused in conn.SubscribeAsync<string>("test"))
+            {
+            }
+        });
+    }
+
+    // check that cancellation works on commands that call ConnectAsync
+    [Fact]
+    public async Task CommandConnectCancellationTest()
+    {
+        var server = NatsServer.Start(_output, TransportType.Tcp);
+
+        await using var conn = server.CreateClientConnection();
+        await conn.ConnectAsync();
+
+        // kill the server
+        await server.DisposeAsync();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await pubConnection.ConnectAsync();
-
-        await subConnection.SubscribeCoreAsync<string>("foo", cancellationToken: cancellationToken);
-
-        var cmd = new SleepWriteCommand("PUB foo 5\r\naiueo", TimeSpan.FromSeconds(10));
-        pubConnection.PostDirectWrite(cmd);
-
-        var timeoutException = await Assert.ThrowsAsync<TimeoutException>(async () =>
+        // wait for reconnect loop to kick in
+        while (conn.ConnectionState != NatsConnectionState.Reconnecting)
         {
-            await pubConnection.PublishAsync("foo", "aiueo", opts: new NatsPubOpts { WaitUntilSent = true }, cancellationToken: cancellationToken);
-        });
+            await Task.Delay(1, cancellationToken);
+        }
 
-        timeoutException.Message.Should().Contain("1 seconds elapsing");
-    }
+        // cancel cts
+        cts.Cancel();
 
-    // Queue-full
+        // commands that call ConnectAsync throw TaskCanceledException
+        await Assert.ThrowsAsync<TaskCanceledException>(() => conn.PingAsync(cancellationToken).AsTask());
+        await Assert.ThrowsAsync<TaskCanceledException>(() => conn.PublishAsync("test", cancellationToken: cancellationToken).AsTask());
 
-    // External Cancellation
-}
-
-// writer queue can't consume when sleeping
-internal class SleepWriteCommand : ICommand
-{
-    private readonly byte[] _protocol;
-    private readonly TimeSpan _sleepTime;
-
-    public SleepWriteCommand(string protocol, TimeSpan sleepTime)
-    {
-        _protocol = Encoding.UTF8.GetBytes(protocol + "\r\n");
-        _sleepTime = sleepTime;
-    }
-
-    public bool IsCanceled => false;
-
-    public void Return(ObjectPool pool)
-    {
-    }
-
-    public void SetCancellationTimer(CancellationTimer timer)
-    {
-    }
-
-    public void Write(ProtocolWriter writer)
-    {
-        Thread.Sleep(_sleepTime);
-        writer.WriteRaw(_protocol);
+        // todo: https://github.com/nats-io/nats.net.v2/issues/323
+        // await Assert.ThrowsAsync<TaskCanceledException>(async () =>
+        // {
+        //     await foreach (var unused in conn.SubscribeAsync<string>("test", cancellationToken: cancellationToken))
+        //     {
+        //     }
+        // });
     }
 }

@@ -14,36 +14,11 @@ public class SerializerTest
         await using var server = NatsServer.Start();
         await using var nats = server.CreateClientConnection();
 
-        await Assert.ThrowsAsync<TestSerializerException>(async () =>
-        {
-            var signal = new WaitSignal<Exception>();
-
-            var opts = new NatsPubOpts
-            {
-                WaitUntilSent = false,
-                ErrorHandler = e =>
-                {
-                    signal.Pulse(e);
-                },
-            };
-
-            await nats.PublishAsync(
+        await Assert.ThrowsAsync<TestSerializerException>(() =>
+            nats.PublishAsync(
                 "foo",
                 0,
-                serializer: new TestSerializer<int>(),
-                opts: opts);
-
-            throw await signal;
-        });
-
-        await Assert.ThrowsAsync<TestSerializerException>(async () =>
-        {
-            await nats.PublishAsync(
-                "foo",
-                0,
-                serializer: new TestSerializer<int>(),
-                opts: new NatsPubOpts { WaitUntilSent = true });
-        });
+                serializer: new TestSerializer<int>()).AsTask());
 
         // Check that our connection isn't affected by the exceptions
         await using var sub = await nats.SubscribeCoreAsync<int>("foo");

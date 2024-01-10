@@ -318,13 +318,13 @@ public class NatsServer : IAsyncDisposable
         return (client, proxy);
     }
 
-    public NatsConnection CreateClientConnection(NatsOpts? options = default, int reTryCount = 10, bool ignoreAuthorizationException = false)
+    public NatsConnection CreateClientConnection(NatsOpts? options = default, int reTryCount = 10, bool ignoreAuthorizationException = false, bool testLogger = true)
     {
         for (var i = 0; i < reTryCount; i++)
         {
             try
             {
-                var nats = new NatsConnection(ClientOpts(options ?? NatsOpts.Default));
+                var nats = new NatsConnection(ClientOpts(options ?? NatsOpts.Default, testLogger: testLogger));
 
                 try
                 {
@@ -359,7 +359,7 @@ public class NatsServer : IAsyncDisposable
         return new NatsConnectionPool(4, ClientOpts(opts));
     }
 
-    public NatsOpts ClientOpts(NatsOpts opts)
+    public NatsOpts ClientOpts(NatsOpts opts, bool testLogger = true)
     {
         var natsTlsOpts = Opts.EnableTls
             ? opts.TlsOpts with
@@ -373,11 +373,7 @@ public class NatsServer : IAsyncDisposable
 
         return opts with
         {
-            LoggerFactory = _loggerFactory,
-
-            // ConnectTimeout = TimeSpan.FromSeconds(1),
-            // ReconnectWait = TimeSpan.Zero,
-            // ReconnectJitter = TimeSpan.Zero,
+            LoggerFactory = testLogger ? _loggerFactory : opts.LoggerFactory,
             TlsOpts = natsTlsOpts,
             Url = ClientUrl,
         };

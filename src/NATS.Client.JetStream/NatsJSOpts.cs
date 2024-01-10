@@ -16,7 +16,6 @@ public record NatsJSOpts
         }
 
         ApiPrefix = apiPrefix ?? "$JS.API";
-        AckOpts = ackOpts ?? new AckOpts(opts.WaitUntilSent);
         Domain = domain;
     }
 
@@ -36,12 +35,12 @@ public record NatsJSOpts
     public string? Domain { get; }
 
     /// <summary>
-    /// Message ACK options <see cref="AckOpts"/>.
+    /// Ask server for an acknowledgment.
     /// </summary>
     /// <remarks>
-    /// These options are used as the defaults when acknowledging messages received from a stream using a consumer.
+    /// Defaults to false.
     /// </remarks>
-    public AckOpts AckOpts { get; init; }
+    public bool DoubleAck { get; init; } = false;
 
     /// <summary>
     /// Default consume options to be used in consume calls in this context.

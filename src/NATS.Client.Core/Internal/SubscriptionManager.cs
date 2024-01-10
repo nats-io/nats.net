@@ -47,7 +47,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
 
     internal InboxSubBuilder InboxSubBuilder { get; }
 
-    public async ValueTask SubscribeAsync(NatsSubBase sub, CancellationToken cancellationToken)
+    public ValueTask SubscribeAsync(NatsSubBase sub, CancellationToken cancellationToken)
     {
         if (IsInboxSubject(sub.Subject))
         {
@@ -56,12 +56,10 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
                 throw new NatsException("Inbox subscriptions don't support queue groups");
             }
 
-            await SubscribeInboxAsync(sub, cancellationToken).ConfigureAwait(false);
+            return SubscribeInboxAsync(sub, cancellationToken);
         }
-        else
-        {
-            await SubscribeInternalAsync(sub.Subject, sub.QueueGroup, sub.Opts, sub, cancellationToken).ConfigureAwait(false);
-        }
+
+        return SubscribeInternalAsync(sub.Subject, sub.QueueGroup, sub.Opts, sub, cancellationToken);
     }
 
     public ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
@@ -128,7 +126,9 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
     {
         if (!_bySub.TryGetValue(sub, out var subMetadata))
         {
-            throw new NatsException("subscription is not registered with the manager");
+            // this can happen when a call to SubscribeAsync is canceled or timed out before subscribing
+            // in that case, return as there is nothing to unsubscribe
+            return ValueTask.CompletedTask;
         }
 
         lock (_gate)
@@ -147,7 +147,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
     /// Commands returned form all the subscriptions will be run as a priority right after reconnection is established.
     /// </remarks>
     /// <returns>Enumerable list of commands</returns>
-    public IEnumerable<ICommand> GetReconnectCommands()
+    public async ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter)
     {
         var subs = new List<(NatsSubBase, int)>();
         lock (_gate)
@@ -163,8 +163,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
 
         foreach (var (sub, sid) in subs)
         {
-            foreach (var command in sub.GetReconnectCommands(sid))
-                yield return command;
+            await sub.WriteReconnectCommandsAsync(commandWriter, sid).ConfigureAwait(false);
         }
     }
 
@@ -219,8 +218,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
 
         try
         {
-            await _connection.SubscribeCoreAsync(sid, subject, queueGroup, opts?.MaxMsgs, cancellationToken)
-                .ConfigureAwait(false);
+            await _connection.SubscribeCoreAsync(sid, subject, queueGroup, opts?.MaxMsgs, cancellationToken).ConfigureAwait(false);
             await sub.ReadyAsync().ConfigureAwait(false);
         }
         catch

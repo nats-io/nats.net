@@ -135,7 +135,7 @@ async Task JetStreamTests()
             // Only ACK one message so we can consume again
             if (messages.Count == 1)
             {
-                await msg.AckAsync(new AckOpts(WaitUntilSent: true), cancellationToken: cts2.Token);
+                await msg.AckAsync(cancellationToken: cts2.Token);
             }
 
             if (messages.Count == 2)

@@ -19,15 +19,7 @@ public partial class NatsConnection
         await SubAsync(sub, cancellationToken).ConfigureAwait(false);
 
         requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
-
-        if (requestOpts?.WaitUntilSent == true)
-        {
-            await PubModelAsync(subject, data, requestSerializer, replyTo, headers, cancellationToken).ConfigureAwait(false);
-        }
-        else
-        {
-            await PubModelPostAsync(subject, data, requestSerializer, replyTo, headers, requestOpts?.ErrorHandler, cancellationToken).ConfigureAwait(false);
-        }
+        await PublishAsync(subject, data, headers, replyTo, requestSerializer, requestOpts, cancellationToken).ConfigureAwait(false);
 
         return sub;
     }

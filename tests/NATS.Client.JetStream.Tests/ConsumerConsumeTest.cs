@@ -40,7 +40,7 @@ public class ConsumerConsumeTest
         await using var cc = await consumer.ConsumeInternalAsync<TestData>(serializer: TestDataJsonSerializer<TestData>.Default, consumerOpts, cancellationToken: cts.Token);
         await foreach (var msg in cc.Msgs.ReadAllAsync(cts.Token))
         {
-            await msg.AckAsync(new AckOpts(true), cts.Token);
+            await msg.AckAsync(cancellationToken: cts.Token);
             Assert.Equal(count, msg.Data!.Test);
             count++;
             if (count == 30)
@@ -113,7 +113,7 @@ public class ConsumerConsumeTest
         var cc = await consumer.ConsumeInternalAsync<TestData>(serializer: TestDataJsonSerializer<TestData>.Default, consumerOpts, cancellationToken: cts.Token);
         await foreach (var msg in cc.Msgs.ReadAllAsync(cts.Token))
         {
-            await msg.AckAsync(new AckOpts(WaitUntilSent: true), cts.Token);
+            await msg.AckAsync(cancellationToken: cts.Token);
             Assert.Equal(count, msg.Data!.Test);
             await signal;
             break;
@@ -183,7 +183,7 @@ public class ConsumerConsumeTest
             var count = 0;
             await foreach (var msg in cc.Msgs.ReadAllAsync(cts.Token))
             {
-                await msg.AckAsync(new AckOpts(WaitUntilSent: true), cts.Token);
+                await msg.AckAsync(cancellationToken: cts.Token);
                 Assert.Equal(count, msg.Data!.Test);
                 count++;
 

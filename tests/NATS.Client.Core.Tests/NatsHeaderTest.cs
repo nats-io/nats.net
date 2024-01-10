@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.IO.Pipelines;
 using System.Text;
 
 namespace NATS.Client.Core.Tests;
@@ -10,7 +11,7 @@ public class NatsHeaderTest
     public NatsHeaderTest(ITestOutputHelper output) => _output = output;
 
     [Fact]
-    public void WriterTests()
+    public async Task WriterTests()
     {
         var headers = new NatsHeaders
         {
@@ -19,16 +20,19 @@ public class NatsHeaderTest
             ["a-long-header-key"] = "value",
             ["key"] = "a-long-header-value",
         };
-        var writer = new HeaderWriter(Encoding.UTF8);
-        var buffer = new FixedArrayBufferWriter();
-        var written = writer.Write(buffer, headers);
+        var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
+        var writer = new HeaderWriter(pipe.Writer, Encoding.UTF8);
+        var written = writer.Write(headers);
 
-        var text = "k1: v1\r\nk2: v2-0\r\nk2: v2-1\r\na-long-header-key: value\r\nkey: a-long-header-value\r\n\r\n";
-        var expected = new Span<byte>(Encoding.UTF8.GetBytes(text));
+        var text = "NATS/1.0\r\nk1: v1\r\nk2: v2-0\r\nk2: v2-1\r\na-long-header-key: value\r\nkey: a-long-header-value\r\n\r\n";
+        var expected = new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(text));
 
         Assert.Equal(expected.Length, written);
-        Assert.True(expected.SequenceEqual(buffer.WrittenSpan));
-        _output.WriteLine($"Buffer:\n{buffer.WrittenSpan.Dump()}");
+        await pipe.Writer.FlushAsync();
+        var result = await pipe.Reader.ReadAtLeastAsync((int)written);
+
+        Assert.True(expected.ToSpan().SequenceEqual(result.Buffer.ToSpan()));
+        _output.WriteLine($"Buffer:\n{result.Buffer.FirstSpan.Dump()}");
     }
 
     [Fact]
