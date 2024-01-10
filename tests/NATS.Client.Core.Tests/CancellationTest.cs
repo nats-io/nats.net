@@ -19,16 +19,20 @@ public class CancellationTest
 
         await using var subConnection = server.CreateClientConnection(NatsOpts.Default with { CommandTimeout = TimeSpan.FromSeconds(1) });
         await using var pubConnection = server.CreateClientConnection(NatsOpts.Default with { CommandTimeout = TimeSpan.FromSeconds(1) });
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
         await pubConnection.ConnectAsync();
 
-        await subConnection.SubscribeCoreAsync<string>("foo");
+        await subConnection.SubscribeCoreAsync<string>("foo", cancellationToken: cancellationToken);
 
         var cmd = new SleepWriteCommand("PUB foo 5\r\naiueo", TimeSpan.FromSeconds(10));
         pubConnection.PostDirectWrite(cmd);
 
         var timeoutException = await Assert.ThrowsAsync<TimeoutException>(async () =>
         {
-            await pubConnection.PublishAsync("foo", "aiueo", opts: new NatsPubOpts { WaitUntilSent = true });
+            await pubConnection.PublishAsync("foo", "aiueo", opts: new NatsPubOpts { WaitUntilSent = true }, cancellationToken: cancellationToken);
         });
 
         timeoutException.Message.Should().Contain("1 seconds elapsing");
