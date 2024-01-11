@@ -57,12 +57,22 @@ public class CancellationTest
         await Assert.ThrowsAsync<TaskCanceledException>(() => conn.PingAsync(cancellationToken).AsTask());
         await Assert.ThrowsAsync<TaskCanceledException>(() => conn.PublishAsync("test", cancellationToken: cancellationToken).AsTask());
 
-        // todo: https://github.com/nats-io/nats.net.v2/issues/323
-        // await Assert.ThrowsAsync<TaskCanceledException>(async () =>
-        // {
-        //     await foreach (var unused in conn.SubscribeAsync<string>("test", cancellationToken: cancellationToken))
-        //     {
-        //     }
-        // });
+        // Because of a race condition minimization / workaround, the following test will throw an OperationCanceledException
+        // rather than a TaskCanceledException.
+        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+        {
+            await foreach (var unused in conn.SubscribeAsync<string>("test", cancellationToken: cancellationToken))
+            {
+            }
+        });
+
+        await Assert.ThrowsAsync<TaskCanceledException>(async () =>
+        {
+            // Give NatsSubBase class a good chance to complete its constructors
+            var cts2 = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+            await foreach (var unused in conn.SubscribeAsync<string>("test", cancellationToken: cts2.Token))
+            {
+            }
+        });
     }
 }
