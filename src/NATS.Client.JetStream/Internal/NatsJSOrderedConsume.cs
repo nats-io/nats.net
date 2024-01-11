@@ -319,10 +319,11 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
         _userMsgs.Writer.TryComplete();
     }
 
-    private void ConnectionOnConnectionDisconnected(object? sender, string e)
+    private Task ConnectionOnConnectionDisconnected(object? sender, string e)
     {
         _logger.LogWarning(NatsJSLogEvents.Connection, "Disconnected {Reason}", e);
         _userMsgs.Writer.TryComplete(new NatsJSConnectionException(e));
+        return Task.CompletedTask;
     }
 
     private void ResetPending()

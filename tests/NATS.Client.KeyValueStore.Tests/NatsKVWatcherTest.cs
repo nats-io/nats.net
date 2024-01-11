@@ -56,7 +56,11 @@ public class NatsKVWatcherTest
         }
 
         var signal = new WaitSignal();
-        nats2.ConnectionDisconnected += (_, _) => signal.Pulse();
+        nats2.ConnectionDisconnected += (_, _) =>
+        {
+            signal.Pulse();
+            return Task.CompletedTask;
+        };
 
         proxy.Reset();
 

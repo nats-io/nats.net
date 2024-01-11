@@ -11,6 +11,7 @@ public static class WaitSignalExtensions
         connection.ConnectionDisconnected += (sender, e) =>
         {
             signal.Pulse();
+            return Task.CompletedTask;
         };
         return signal.Task.WaitAsync(signal.Timeout);
     }
@@ -21,6 +22,7 @@ public static class WaitSignalExtensions
         connection.ConnectionOpened += (sender, e) =>
         {
             signal.Pulse();
+            return Task.CompletedTask;
         };
         return signal.Task.WaitAsync(signal.Timeout);
     }
@@ -31,6 +33,7 @@ public static class WaitSignalExtensions
         connection.ReconnectFailed += (sender, e) =>
         {
             signal.Pulse();
+            return Task.CompletedTask;
         };
         return signal.Task.WaitAsync(signal.Timeout);
     }

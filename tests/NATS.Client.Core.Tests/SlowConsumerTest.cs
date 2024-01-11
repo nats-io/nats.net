@@ -20,6 +20,8 @@ public class SlowConsumerTest
                 Interlocked.Increment(ref lost);
                 _output.WriteLine($"LOST {dropped.Data}");
             }
+
+            return Task.CompletedTask;
         };
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));

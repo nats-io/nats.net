@@ -163,7 +163,11 @@ internal class NatsJSOrderedPushConsumer<T>
         _msgChannel.Writer.TryComplete();
     }
 
-    private void OnDisconnected(object? sender, string e) => StopHeartbeatTimer();
+    private Task OnDisconnected(object? sender, string e)
+    {
+        StopHeartbeatTimer();
+        return Task.CompletedTask;
+    }
 
     private async Task CommandLoop()
     {
@@ -446,6 +450,9 @@ internal class NatsJSOrderedPushConsumerSub<T> : NatsSubBase
     {
     }
 
-    private void OnConnectionOpened(object? sender, string e) =>
-        _commands.TryWrite(new NatsJSOrderedPushConsumerMsg<T> { Command = NatsJSOrderedPushConsumerCommand.Ready });
+    private Task<bool> OnConnectionOpened(object? sender, string e)
+    {
+        var result = _commands.TryWrite(new NatsJSOrderedPushConsumerMsg<T> { Command = NatsJSOrderedPushConsumerCommand.Ready });
+        return Task.FromResult(result);
+    }
 }
