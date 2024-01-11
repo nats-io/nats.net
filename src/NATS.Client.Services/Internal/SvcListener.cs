@@ -9,39 +9,48 @@ internal class SvcListener : IAsyncDisposable
     private readonly Channel<SvcMsg> _channel;
     private readonly SvcMsgType _type;
     private readonly string _subject;
-    private readonly string _queueGroup;
-    private readonly CancellationToken _cancellationToken;
+    private readonly string? _queueGroup;
+    private readonly CancellationTokenSource _cts;
     private Task? _readLoop;
-    private CancellationTokenSource? _cts;
 
-    public SvcListener(NatsConnection nats, Channel<SvcMsg> channel, SvcMsgType type, string subject, string queueGroup, CancellationToken cancellationToken)
+    public SvcListener(NatsConnection nats, Channel<SvcMsg> channel, SvcMsgType type, string subject, string? queueGroup, CancellationToken cancellationToken)
     {
         _nats = nats;
         _channel = channel;
         _type = type;
         _subject = subject;
         _queueGroup = queueGroup;
-        _cancellationToken = cancellationToken;
+        _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
     }
 
-    public ValueTask StartAsync()
+    public async ValueTask StartAsync()
     {
-        _cts = CancellationTokenSource.CreateLinkedTokenSource(_cancellationToken);
+        var sub = await _nats.SubscribeCoreAsync(_subject, _queueGroup, serializer: NatsRawSerializer<NatsMemoryOwner<byte>>.Default, cancellationToken: _cts.Token);
         _readLoop = Task.Run(async () =>
         {
-            await foreach (var msg in _nats.SubscribeAsync<NatsMemoryOwner<byte>>(_subject, _queueGroup, cancellationToken: _cts.Token))
+            await using (sub)
             {
-                await _channel.Writer.WriteAsync(new SvcMsg(_type, msg), _cancellationToken).ConfigureAwait(false);
+                await foreach (var msg in sub.Msgs.ReadAllAsync())
+                {
+                    await _channel.Writer.WriteAsync(new SvcMsg(_type, msg), _cts.Token).ConfigureAwait(false);
+                }
             }
         });
-        return ValueTask.CompletedTask;
     }
 
     public async ValueTask DisposeAsync()
     {
-        _cts?.Cancel();
-
+        _cts.Cancel();
         if (_readLoop != null)
-            await _readLoop;
+        {
+            try
+            {
+                await _readLoop;
+            }
+            catch (OperationCanceledException)
+            {
+                // intentionally canceled
+            }
+        }
     }
 }

@@ -34,15 +34,11 @@ public class JsonSerializerTests
         // Default serializer won't work with random types
         await using var nats1 = server.CreateClientConnection();
 
-        var signal = new WaitSignal<Exception>();
-
-        await nats1.PublishAsync(
+        var exception = await Assert.ThrowsAsync<NatsException>(() => nats1.PublishAsync(
             subject: "would.not.work",
             data: new SomeTestData { Name = "won't work" },
-            opts: new NatsPubOpts { ErrorHandler = e => signal.Pulse(e) },
-            cancellationToken: cancellationToken);
+            cancellationToken: cancellationToken).AsTask());
 
-        var exception = await signal;
         Assert.Matches(@"Can't serialize .*SomeTestData", exception.Message);
     }
 

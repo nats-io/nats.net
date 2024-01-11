@@ -1,4 +1,6 @@
+using System.Buffers;
 using System.Diagnostics;
+using System.IO.Pipelines;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
@@ -7,241 +9,299 @@ namespace NATS.Client.Core.Internal;
 
 internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
 {
-    private readonly ISocketConnection _socketConnection;
-    private readonly WriterState _state;
-    private readonly ObjectPool _pool;
+    private readonly CancellationTokenSource _cts;
     private readonly ConnectionStatsCounter _counter;
-    private readonly FixedArrayBufferWriter _bufferWriter;
-    private readonly Channel<ICommand> _channel;
     private readonly NatsOpts _opts;
-    private readonly Task _writeLoop;
+    private readonly PipeReader _pipeReader;
+    private readonly Queue<QueuedCommand> _inFlightCommands;
+    private readonly ChannelReader<QueuedCommand> _queuedCommandReader;
+    private readonly ISocketConnection _socketConnection;
     private readonly Stopwatch _stopwatch = new Stopwatch();
-    private readonly CancellationTokenSource _cancellationTokenSource;
     private int _disposed;
 
-    public NatsPipeliningWriteProtocolProcessor(ISocketConnection socketConnection, WriterState state, ObjectPool pool, ConnectionStatsCounter counter)
+    public NatsPipeliningWriteProtocolProcessor(ISocketConnection socketConnection, CommandWriter commandWriter, NatsOpts opts, ConnectionStatsCounter counter)
     {
-        _socketConnection = socketConnection;
-        _state = state;
-        _pool = pool;
+        _cts = new CancellationTokenSource();
         _counter = counter;
-        _bufferWriter = state.BufferWriter;
-        _channel = state.CommandBuffer;
-        _opts = state.Opts;
-        _cancellationTokenSource = new CancellationTokenSource();
-        _writeLoop = Task.Run(WriteLoopAsync);
+        _inFlightCommands = commandWriter.InFlightCommands;
+        _opts = opts;
+        _pipeReader = commandWriter.PipeReader;
+        _queuedCommandReader = commandWriter.QueuedCommandsReader;
+        _socketConnection = socketConnection;
+        WriteLoop = Task.Run(WriteLoopAsync);
     }
+
+    public Task WriteLoop { get; }
 
     public async ValueTask DisposeAsync()
     {
         if (Interlocked.Increment(ref _disposed) == 1)
         {
 #if NET6_0
-            _cancellationTokenSource.Cancel();
+            _cts.Cancel();
 #else
-            await _cancellationTokenSource.CancelAsync().ConfigureAwait(false);
+            await _cts.CancelAsync().ConfigureAwait(false);
 #endif
-            await _writeLoop.ConfigureAwait(false); // wait for drain writer
+            try
+            {
+                await WriteLoop.ConfigureAwait(false); // wait to drain writer
+            }
+            catch
+            {
+                // ignore
+            }
         }
     }
 
     private async Task WriteLoopAsync()
     {
-        var reader = _channel.Reader;
-        var protocolWriter = new ProtocolWriter(_bufferWriter);
         var logger = _opts.LoggerFactory.CreateLogger<NatsPipeliningWriteProtocolProcessor>();
-        var writerBufferSize = _opts.WriterBufferSize;
-        var promiseList = new List<IPromise>(100);
         var isEnabledTraceLogging = logger.IsEnabled(LogLevel.Trace);
+        var cancellationToken = _cts.Token;
+        var pending = 0;
+        var trimming = 0;
+        var examinedOffset = 0;
+
+        // memory segment used to consolidate multiple small memory chunks
+        // should <= (minimumSegmentSize * 0.5) in CommandWriter
+        // 8520 should fit into 6 packets on 1500 MTU TLS connection or 1 packet on 9000 MTU TLS connection
+        // assuming 40 bytes TCP overhead + 40 bytes TLS overhead per packet
+        var consolidateMem = new Memory<byte>(new byte[8520]);
+
+        // add up in flight command sum
+        var inFlightSum = 0;
+        foreach (var command in _inFlightCommands)
+        {
+            inFlightSum += command.Size;
+        }
 
         try
         {
-            // at first, send priority lane(initial command).
+            while (true)
             {
-                var firstCommands = _state.PriorityCommands;
-                if (firstCommands.Count != 0)
+                var result = await _pipeReader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                if (result.IsCanceled)
                 {
-                    var count = firstCommands.Count;
-                    var tempBuffer = new FixedArrayBufferWriter();
-                    var tempWriter = new ProtocolWriter(tempBuffer);
-                    foreach (var command in firstCommands)
-                    {
-                        command.Write(tempWriter);
-
-                        if (command is IPromise p)
-                        {
-                            promiseList.Add(p);
-                        }
-
-                        command.Return(_pool); // Promise does not Return but set ObjectPool here.
-                    }
-
-                    _state.PriorityCommands.Clear();
-
-                    try
-                    {
-                        var memory = tempBuffer.WrittenMemory;
-                        while (memory.Length > 0)
-                        {
-                            _stopwatch.Restart();
-                            var sent = await _socketConnection.SendAsync(memory).ConfigureAwait(false);
-                            _stopwatch.Stop();
-                            if (isEnabledTraceLogging)
-                            {
-                                logger.LogTrace("Socket.SendAsync. Size: {0} BatchSize: {1} Elapsed: {2}ms", sent, count, _stopwatch.Elapsed.TotalMilliseconds);
-                            }
-
-                            Interlocked.Add(ref _counter.SentBytes, sent);
-                            memory = memory.Slice(sent);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _socketConnection.SignalDisconnected(ex);
-                        foreach (var item in promiseList)
-                        {
-                            item.SetException(ex); // signal failed
-                        }
-
-                        return; // when socket closed, finish writeloop.
-                    }
-
-                    foreach (var item in promiseList)
-                    {
-                        item.SetResult();
-                    }
-
-                    promiseList.Clear();
+                    break;
                 }
-            }
 
-            // restore promise(command is exist in bufferWriter) when enter from reconnecting.
-            promiseList.AddRange(_state.PendingPromises);
-            _state.PendingPromises.Clear();
-
-            // main writer loop
-            while ((_bufferWriter.WrittenCount != 0) || (await reader.WaitToReadAsync(_cancellationTokenSource.Token).ConfigureAwait(false)))
-            {
+                var consumedPos = result.Buffer.Start;
+                var examinedPos = result.Buffer.Start;
                 try
                 {
-                    var count = 0;
-                    while (_bufferWriter.WrittenCount < writerBufferSize && reader.TryRead(out var command))
+                    var buffer = result.Buffer.Slice(examinedOffset);
+                    while (inFlightSum < result.Buffer.Length)
                     {
-                        Interlocked.Decrement(ref _counter.PendingMessages);
-                        if (command.IsCanceled)
+                        QueuedCommand queuedCommand;
+                        while (!_queuedCommandReader.TryRead(out queuedCommand))
                         {
+                            await _queuedCommandReader.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
+                        }
+
+                        _inFlightCommands.Enqueue(queuedCommand);
+                        inFlightSum += queuedCommand.Size;
+                    }
+
+                    while (buffer.Length > 0)
+                    {
+                        if (pending == 0)
+                        {
+                            var peek = _inFlightCommands.Peek();
+                            pending = peek.Size;
+                            trimming = peek.Trim;
+                        }
+
+                        if (trimming > 0)
+                        {
+                            var trimmed = Math.Min(trimming, (int)buffer.Length);
+                            consumedPos = buffer.GetPosition(trimmed);
+                            examinedPos = buffer.GetPosition(trimmed);
+                            examinedOffset = 0;
+                            buffer = buffer.Slice(trimmed);
+                            pending -= trimmed;
+                            trimming -= trimmed;
+                            if (pending == 0)
+                            {
+                                // the entire command was trimmed (canceled)
+                                inFlightSum -= _inFlightCommands.Dequeue().Size;
+                            }
+
                             continue;
                         }
 
-                        try
+                        var sendMem = buffer.First;
+                        var maxSize = 0;
+                        var maxSizeCap = Math.Max(sendMem.Length, consolidateMem.Length);
+                        var doTrim = false;
+                        foreach (var command in _inFlightCommands)
                         {
-                            if (command is IBatchCommand batch)
+                            if (maxSize == 0)
                             {
-                                count += batch.Write(protocolWriter);
+                                // first command; set to pending
+                                maxSize = pending;
+                                continue;
+                            }
+
+                            if (maxSize > maxSizeCap)
+                            {
+                                // over cap
+                                break;
+                            }
+
+                            if (command.Trim > 0)
+                            {
+                                // will have to trim
+                                doTrim = true;
+                                break;
+                            }
+
+                            maxSize += command.Size;
+                        }
+
+                        if (sendMem.Length > maxSize)
+                        {
+                            sendMem = sendMem[..maxSize];
+                        }
+
+                        var bufferIter = buffer;
+                        if (doTrim || (bufferIter.Length > sendMem.Length && sendMem.Length < consolidateMem.Length))
+                        {
+                            var memIter = consolidateMem;
+                            var trimmedSize = 0;
+                            foreach (var command in _inFlightCommands)
+                            {
+                                if (bufferIter.Length == 0 || memIter.Length == 0)
+                                {
+                                    break;
+                                }
+
+                                int write;
+                                if (trimmedSize == 0)
+                                {
+                                    // first command, only write pending data
+                                    write = pending;
+                                }
+                                else if (command.Trim == 0)
+                                {
+                                    write = command.Size;
+                                }
+                                else
+                                {
+                                    if (bufferIter.Length < command.Trim + 1)
+                                    {
+                                        // not enough bytes to start writing the next command
+                                        break;
+                                    }
+
+                                    bufferIter = bufferIter.Slice(command.Trim);
+                                    write = command.Size - command.Trim;
+                                    if (write == 0)
+                                    {
+                                        // the entire command was trimmed (canceled)
+                                        continue;
+                                    }
+                                }
+
+                                write = Math.Min(memIter.Length, write);
+                                write = Math.Min((int)bufferIter.Length, write);
+                                bufferIter.Slice(0, write).CopyTo(memIter.Span);
+                                memIter = memIter[write..];
+                                bufferIter = bufferIter.Slice(write);
+                                trimmedSize += write;
+                            }
+
+                            sendMem = consolidateMem[..trimmedSize];
+                        }
+
+                        // perform send
+                        _stopwatch.Restart();
+                        var sent = await _socketConnection.SendAsync(sendMem).ConfigureAwait(false);
+                        _stopwatch.Stop();
+                        Interlocked.Add(ref _counter.SentBytes, sent);
+                        if (isEnabledTraceLogging)
+                        {
+                            logger.LogTrace("Socket.SendAsync. Size: {0}  Elapsed: {1}ms", sent, _stopwatch.Elapsed.TotalMilliseconds);
+                        }
+
+                        var consumed = 0;
+                        var sentAndTrimmed = sent;
+                        while (consumed < sentAndTrimmed)
+                        {
+                            if (pending == 0)
+                            {
+                                var peek = _inFlightCommands.Peek();
+                                pending = peek.Size - peek.Trim;
+                                consumed += peek.Trim;
+                                sentAndTrimmed += peek.Trim;
+
+                                if (pending == 0)
+                                {
+                                    // the entire command was trimmed (canceled)
+                                    inFlightSum -= _inFlightCommands.Dequeue().Size;
+                                    continue;
+                                }
+                            }
+
+                            if (pending <= sentAndTrimmed - consumed)
+                            {
+                                // the entire command was sent
+                                inFlightSum -= _inFlightCommands.Dequeue().Size;
+                                Interlocked.Add(ref _counter.PendingMessages, -1);
+                                Interlocked.Add(ref _counter.SentMessages, 1);
+
+                                // mark the bytes as consumed, and reset pending
+                                consumed += pending;
+                                pending = 0;
                             }
                             else
                             {
-                                command.Write(protocolWriter);
-                                count++;
+                                // the entire command was not sent; decrement pending by
+                                // the number of bytes from the command that was sent
+                                pending += consumed - sentAndTrimmed;
+                                break;
                             }
                         }
-                        catch (Exception e)
-                        {
-                            // flag potential serialization exceptions
-                            if (command is IPromise promise)
-                            {
-                                promise.SetException(e);
-                            }
 
-                            throw;
+                        if (consumed > 0)
+                        {
+                            // mark fully sent commands as consumed
+                            consumedPos = buffer.GetPosition(consumed);
+                            examinedOffset = sentAndTrimmed - consumed;
+                        }
+                        else
+                        {
+                            // no commands were consumed
+                            examinedOffset += sentAndTrimmed;
                         }
 
-                        if (command is IPromise p)
-                        {
-                            promiseList.Add(p);
-                        }
-
-                        command.Return(_pool); // Promise does not Return but set ObjectPool here.
-                    }
-
-                    try
-                    {
-                        // SendAsync(ReadOnlyMemory) is very efficient, internally using AwaitableAsyncSocketEventArgs
-                        // should use cancellation token?, currently no, wait for flush complete.
-                        var memory = _bufferWriter.WrittenMemory;
-                        while (memory.Length != 0)
-                        {
-                            _stopwatch.Restart();
-                            var sent = await _socketConnection.SendAsync(memory).ConfigureAwait(false);
-                            _stopwatch.Stop();
-                            if (isEnabledTraceLogging)
-                            {
-                                logger.LogTrace("Socket.SendAsync. Size: {0} BatchSize: {1} Elapsed: {2}ms", sent, count, _stopwatch.Elapsed.TotalMilliseconds);
-                            }
-
-                            if (sent == 0)
-                            {
-                                throw new SocketClosedException(null);
-                            }
-
-                            Interlocked.Add(ref _counter.SentBytes, sent);
-
-                            memory = memory.Slice(sent);
-                        }
-
-                        Interlocked.Add(ref _counter.SentMessages, count);
-
-                        _bufferWriter.Reset();
-                        foreach (var item in promiseList)
-                        {
-                            item.SetResult();
-                        }
-
-                        promiseList.Clear();
-                    }
-                    catch (Exception ex)
-                    {
-                        // may receive from socket.SendAsync
-
-                        // when error, command is dequeued and written buffer is still exists in state.BufferWriter
-                        // store current pending promises to state.
-                        _state.PendingPromises.AddRange(promiseList);
-                        _socketConnection.SignalDisconnected(ex);
-                        return; // when socket closed, finish writeloop.
+                        // lop off sent bytes for next iteration
+                        examinedPos = buffer.GetPosition(sentAndTrimmed);
+                        buffer = buffer.Slice(sentAndTrimmed);
                     }
                 }
-                catch (Exception ex)
+                finally
                 {
-                    if (ex is SocketClosedException)
-                    {
-                        return;
-                    }
+                    _pipeReader.AdvanceTo(consumedPos, examinedPos);
+                }
 
-                    try
-                    {
-                        logger.LogError(ex, "Internal error occured on WriteLoop.");
-                    }
-                    catch
-                    {
-                    }
+                if (result.IsCompleted)
+                {
+                    break;
                 }
             }
         }
         catch (OperationCanceledException)
         {
+            // ignore, intentionally disposed
         }
-        finally
+        catch (SocketClosedException)
         {
-            try
-            {
-                if (_bufferWriter.WrittenMemory.Length != 0)
-                {
-                    await _socketConnection.SendAsync(_bufferWriter.WrittenMemory).ConfigureAwait(false);
-                }
-            }
-            catch
-            {
-            }
+            // ignore, will be handled in read loop
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Unexpected error occured in write loop");
+            throw;
         }
 
         logger.LogDebug("WriteLoop finished.");

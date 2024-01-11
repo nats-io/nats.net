@@ -5,28 +5,16 @@ namespace NATS.Client.Core;
 public partial class NatsConnection
 {
     /// <inheritdoc />
-    public ValueTask<TimeSpan> PingAsync(CancellationToken cancellationToken = default)
+    public async ValueTask<TimeSpan> PingAsync(CancellationToken cancellationToken = default)
     {
-        if (ConnectionState == NatsConnectionState.Open)
+        if (ConnectionState != NatsConnectionState.Open)
         {
-            var command = AsyncPingCommand.Create(this, _pool, GetCancellationTimer(cancellationToken));
-            if (TryEnqueueCommand(command))
-            {
-                return command.AsValueTask();
-            }
-            else
-            {
-                return EnqueueAndAwaitCommandAsync(command);
-            }
+            await ConnectAsync().AsTask().WaitAsync(cancellationToken).ConfigureAwait(false);
         }
-        else
-        {
-            return WithConnectAsync(cancellationToken, static (self, token) =>
-            {
-                var command = AsyncPingCommand.Create(self, self._pool, self.GetCancellationTimer(token));
-                return self.EnqueueAndAwaitCommandAsync(command);
-            });
-        }
+
+        var pingCommand = new PingCommand();
+        await CommandWriter.PingAsync(pingCommand, cancellationToken).ConfigureAwait(false);
+        return await pingCommand.TaskCompletionSource.Task.ConfigureAwait(false);
     }
 
     /// <summary>
@@ -37,13 +25,8 @@ public partial class NatsConnection
     /// </summary>
     /// <param name="cancellationToken">Cancels the Ping command</param>
     /// <returns><see cref="ValueTask"/> representing the asynchronous operation</returns>
-    private ValueTask PingOnlyAsync(CancellationToken cancellationToken = default)
-    {
-        if (ConnectionState == NatsConnectionState.Open)
-        {
-            return EnqueueCommandAsync(PingCommand.Create(_pool, GetCancellationTimer(cancellationToken)));
-        }
-
-        return ValueTask.CompletedTask;
-    }
+    private ValueTask PingOnlyAsync(CancellationToken cancellationToken = default) =>
+        ConnectionState == NatsConnectionState.Open
+            ? CommandWriter.PingAsync(new PingCommand(), cancellationToken)
+            : ValueTask.CompletedTask;
 }

@@ -31,7 +31,7 @@ public sealed class NatsJsonSerializer<T> : INatsSerialize<T>, INatsDeserialize<
     /// </summary>
     public static NatsJsonSerializer<T> Default { get; } = new(new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
 
-    /// <inheritdoc />
+    /// <inheritdoc />flush
     public void Serialize(IBufferWriter<byte> bufferWriter, T? value)
     {
         Utf8JsonWriter writer;

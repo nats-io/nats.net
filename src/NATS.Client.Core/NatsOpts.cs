@@ -31,7 +31,7 @@ public sealed record NatsOpts
 
     public ILoggerFactory LoggerFactory { get; init; } = NullLoggerFactory.Instance;
 
-    public int WriterBufferSize { get; init; } = 65534;
+    public int WriterBufferSize { get; init; } = 1048576;
 
     public int ReaderBufferSize { get; init; } = 1048576;
 
@@ -61,13 +61,13 @@ public sealed record NatsOpts
 
     public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromSeconds(5);
 
-    public TimeSpan CommandTimeout { get; init; } = TimeSpan.FromMinutes(1);
+    public TimeSpan CommandTimeout { get; init; } = TimeSpan.FromSeconds(5);
 
     public TimeSpan SubscriptionCleanUpInterval { get; init; } = TimeSpan.FromMinutes(5);
 
-    public int? WriterCommandBufferLimit { get; init; } = 1_000;
-
     public Encoding HeaderEncoding { get; init; } = Encoding.ASCII;
+
+    public Encoding SubjectEncoding { get; init; } = Encoding.ASCII;
 
     public bool WaitUntilSent { get; init; } = false;
 

@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Diagnostics;
+using System.IO.Pipelines;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
@@ -23,7 +24,7 @@ internal enum NatsEvent
     Error,
 }
 
-public partial class NatsConnection : IAsyncDisposable, INatsConnection
+public partial class NatsConnection : INatsConnection
 {
 #pragma warning disable SA1401
     /// <summary>
@@ -33,10 +34,10 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
     internal readonly ConnectionStatsCounter Counter; // allow to call from external sources
     internal ServerInfo? WritableServerInfo;
+    internal bool IsDisposed;
+
 #pragma warning restore SA1401
     private readonly object _gate = new object();
-    private readonly WriterState _writerState;
-    private readonly ChannelWriter<ICommand> _commandWriter;
     private readonly ILogger<NatsConnection> _logger;
     private readonly ObjectPool _pool;
     private readonly CancellationTimerPool _cancellationTimerPool;
@@ -45,12 +46,12 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
     private readonly TimeSpan _socketComponentDisposeTimeout = TimeSpan.FromSeconds(5);
     private readonly BoundedChannelOptions _defaultSubscriptionChannelOpts;
     private readonly Channel<(NatsEvent, object)> _eventChannel;
+    private readonly ClientOpts _clientOpts;
 
     private int _pongCount;
-    private bool _isDisposed;
     private int _connectionState;
 
-    // when reconnect, make new instance.
+    // when reconnected, make new instance.
     private ISocketConnection? _socket;
     private CancellationTokenSource? _pingTimerCancellationTokenSource;
     private volatile NatsUri? _currentConnectUri;
@@ -59,7 +60,6 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
     private NatsPipeliningWriteProtocolProcessor? _socketWriter;
     private TaskCompletionSource _waitForOpenConnection;
     private TlsCerts? _tlsCerts;
-    private ClientOpts _clientOpts;
     private UserCredentials? _userCredentials;
     private int _connectRetry;
     private TimeSpan _backoff = TimeSpan.Zero;
@@ -81,8 +81,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         _cancellationTimerPool = new CancellationTimerPool(_pool, _disposedCancellationTokenSource.Token);
         _name = opts.Name;
         Counter = new ConnectionStatsCounter();
-        _writerState = new WriterState(opts);
-        _commandWriter = _writerState.CommandBuffer.Writer;
+        CommandWriter = new CommandWriter(Opts, Counter, EnqueuePing);
         InboxPrefix = NewInbox(opts.InboxPrefix);
         SubscriptionManager = new SubscriptionManager(this, InboxPrefix);
         _logger = opts.LoggerFactory.CreateLogger<NatsConnection>();
@@ -125,9 +124,11 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
     public INatsServerInfo? ServerInfo => WritableServerInfo; // server info is set when received INFO
 
-    public NatsHeaderParser HeaderParser { get; }
+    internal NatsHeaderParser HeaderParser { get; }
 
     internal SubscriptionManager SubscriptionManager { get; }
+
+    internal CommandWriter CommandWriter { get; }
 
     internal string InboxPrefix { get; }
 
@@ -161,20 +162,16 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
             await waiter.Task.ConfigureAwait(false);
             return;
         }
-        else
-        {
-            // Only Closed(initial) state, can run initial connect.
-            await InitialConnectAsync().ConfigureAwait(false);
-        }
+
+        // Only Closed(initial) state, can run initial connect.
+        await InitialConnectAsync().ConfigureAwait(false);
     }
 
-    public NatsStats GetStats() => Counter.ToStats();
-
-    public async ValueTask DisposeAsync()
+    public virtual async ValueTask DisposeAsync()
     {
-        if (!_isDisposed)
+        if (!IsDisposed)
         {
-            _isDisposed = true;
+            IsDisposed = true;
             _logger.Log(LogLevel.Information, NatsLogEvents.Connection, "Disposing connection {Name}", _name);
 
             await DisposeSocketAsync(false).ConfigureAwait(false);
@@ -187,12 +184,8 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 #endif
             }
 
-            foreach (var item in _writerState.PendingPromises)
-            {
-                item.SetCanceled();
-            }
-
             await SubscriptionManager.DisposeAsync().ConfigureAwait(false);
+            await CommandWriter.DisposeAsync().ConfigureAwait(false);
             _waitForOpenConnection.TrySetCanceled();
 #if NET6_0
             _disposedCancellationTokenSource.Cancel();
@@ -202,21 +195,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         }
     }
 
-    internal void EnqueuePing(AsyncPingCommand pingCommand)
-    {
-        // Enqueue Ping Command to current working reader.
-        var reader = _socketReader;
-        if (reader != null)
-        {
-            if (reader.TryEnqueuePing(pingCommand))
-            {
-                return;
-            }
-        }
-
-        // Can not add PING, set fail.
-        pingCommand.SetCanceled();
-    }
+    internal NatsStats GetStats() => Counter.ToStats();
 
     internal ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
     {
@@ -228,34 +207,21 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         Interlocked.Exchange(ref _pongCount, 0);
     }
 
-    internal async ValueTask<T> EnqueueAndAwaitCommandAsync<T>(IAsyncCommand<T> command)
-    {
-        await EnqueueCommandAsync(command).ConfigureAwait(false);
-        return await command.AsValueTask().ConfigureAwait(false);
-    }
-
-    internal ValueTask PostPongAsync()
-    {
-        return EnqueueCommandAsync(PongCommand.Create(_pool, GetCancellationTimer(CancellationToken.None)));
-    }
+    internal ValueTask PongAsync() => CommandWriter.PongAsync(CancellationToken.None);
 
     // called only internally
-    internal ValueTask SubscribeCoreAsync(int sid, string subject, string? queueGroup, int? maxMsgs, CancellationToken cancellationToken)
-    {
-        var command = AsyncSubscribeCommand.Create(_pool, GetCancellationTimer(cancellationToken), sid, subject, queueGroup, maxMsgs);
-        return EnqueueAndAwaitCommandAsync(command);
-    }
+    internal ValueTask SubscribeCoreAsync(int sid, string subject, string? queueGroup, int? maxMsgs, CancellationToken cancellationToken) => CommandWriter.SubscribeAsync(sid, subject, queueGroup, maxMsgs, cancellationToken);
 
     internal ValueTask UnsubscribeAsync(int sid)
     {
         try
         {
-            return EnqueueCommandAsync(UnsubscribeCommand.Create(_pool, sid));
+            return CommandWriter.UnsubscribeAsync(sid, CancellationToken.None);
         }
         catch (Exception ex)
         {
             // connection is disposed, don't need to unsubscribe command.
-            if (_isDisposed)
+            if (IsDisposed)
             {
                 return ValueTask.CompletedTask;
             }
@@ -463,26 +429,31 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
             // Authentication
             _userCredentials?.Authenticate(_clientOpts, WritableServerInfo);
 
-            // add CONNECT and PING command to priority lane
-            _writerState.PriorityCommands.Clear();
-            var connectCommand = AsyncConnectCommand.Create(_pool, _clientOpts, GetCancellationTimer(CancellationToken.None));
-            _writerState.PriorityCommands.Add(connectCommand);
-            _writerState.PriorityCommands.Add(PingCommand.Create(_pool, GetCancellationTimer(CancellationToken.None)));
-
-            if (reconnect)
+            await using (var priorityCommandWriter = new PriorityCommandWriter(_socket!, Opts, Counter, EnqueuePing))
             {
-                // Reestablish subscriptions and consumers
-                _writerState.PriorityCommands.AddRange(SubscriptionManager.GetReconnectCommands());
+                // add CONNECT and PING command to priority lane
+                await priorityCommandWriter.CommandWriter.ConnectAsync(_clientOpts, CancellationToken.None).ConfigureAwait(false);
+                await priorityCommandWriter.CommandWriter.PingAsync(new PingCommand(), CancellationToken.None).ConfigureAwait(false);
+
+                Task? reconnectTask = null;
+                if (reconnect)
+                {
+                    // Reestablish subscriptions and consumers
+                    reconnectTask = SubscriptionManager.WriteReconnectCommandsAsync(priorityCommandWriter.CommandWriter).AsTask();
+                }
+
+                // receive COMMAND response (PONG or ERROR)
+                await waitForPongOrErrorSignal.Task.ConfigureAwait(false);
+
+                if (reconnectTask != null)
+                {
+                    // wait for reconnect commands to complete
+                    await reconnectTask.ConfigureAwait(false);
+                }
             }
 
             // create the socket writer
-            _socketWriter = new NatsPipeliningWriteProtocolProcessor(_socket!, _writerState, _pool, Counter);
-
-            // wait for COMMAND to send
-            await connectCommand.AsValueTask().ConfigureAwait(false);
-
-            // receive COMMAND response (PONG or ERROR)
-            await waitForPongOrErrorSignal.Task.ConfigureAwait(false);
+            _socketWriter = CommandWriter.CreateNatsPipeliningWriteProtocolProcessor(_socket!);
 
             lock (_gate)
             {
@@ -544,9 +515,9 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
             var defaultScheme = _currentConnectUri!.Uri.Scheme;
             var urls = (Opts.NoRandomize
-                ? WritableServerInfo?.ClientConnectUrls?.Select(x => new NatsUri(x, false, defaultScheme)).Distinct().ToArray()
-                : WritableServerInfo?.ClientConnectUrls?.Select(x => new NatsUri(x, false, defaultScheme)).OrderBy(_ => Guid.NewGuid()).Distinct().ToArray())
-                    ?? Array.Empty<NatsUri>();
+                           ? WritableServerInfo?.ClientConnectUrls?.Select(x => new NatsUri(x, false, defaultScheme)).Distinct().ToArray()
+                           : WritableServerInfo?.ClientConnectUrls?.Select(x => new NatsUri(x, false, defaultScheme)).OrderBy(_ => Guid.NewGuid()).Distinct().ToArray())
+                       ?? Array.Empty<NatsUri>();
             if (urls.Length == 0)
                 urls = Opts.GetSeedUris();
 
@@ -781,37 +752,26 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
         }
     }
 
+    private void EnqueuePing(PingCommand pingCommand)
+    {
+        // Enqueue Ping Command to current working reader.
+        var reader = _socketReader;
+        if (reader != null)
+        {
+            if (reader.TryEnqueuePing(pingCommand))
+            {
+                return;
+            }
+        }
+
+        // Can not add PING, set fail.
+        pingCommand.TaskCompletionSource.SetCanceled();
+    }
+
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
     private CancellationTimer GetRequestCommandTimer(CancellationToken cancellationToken)
     {
         return _cancellationTimerPool.Start(Opts.RequestTimeout, cancellationToken);
-    }
-
-    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-    private void EnqueueCommandSync(ICommand command)
-    {
-        if (_commandWriter.TryWrite(command))
-        {
-            Interlocked.Increment(ref Counter.PendingMessages);
-        }
-        else
-        {
-            throw new NatsException("Can't write to command channel");
-        }
-    }
-
-    private async ValueTask EnqueueCommandAsync(ICommand command)
-    {
-    RETRY:
-        if (_commandWriter.TryWrite(command))
-        {
-            Interlocked.Increment(ref Counter.PendingMessages);
-        }
-        else
-        {
-            await _commandWriter.WaitToWriteAsync(_disposedCancellationTokenSource.Token).ConfigureAwait(false);
-            goto RETRY;
-        }
     }
 
     // catch and log all exceptions, enforcing the socketComponentDisposeTimeout
@@ -866,194 +826,7 @@ public partial class NatsConnection : IAsyncDisposable, INatsConnection
 
     private void ThrowIfDisposed()
     {
-        if (_isDisposed)
+        if (IsDisposed)
             throw new ObjectDisposedException(null);
     }
-
-    private async void WithConnect(Action<NatsConnection> core)
-    {
-        try
-        {
-            await ConnectAsync().ConfigureAwait(false);
-        }
-        catch
-        {
-            // log will shown on ConnectAsync failed
-            return;
-        }
-
-        core(this);
-    }
-
-    private async void WithConnect<T1>(T1 item1, Action<NatsConnection, T1> core)
-    {
-        try
-        {
-            await ConnectAsync().ConfigureAwait(false);
-        }
-        catch
-        {
-            // log will shown on ConnectAsync failed
-            return;
-        }
-
-        core(this, item1);
-    }
-
-    private async void WithConnect<T1, T2>(T1 item1, T2 item2, Action<NatsConnection, T1, T2> core)
-    {
-        try
-        {
-            await ConnectAsync().ConfigureAwait(false);
-        }
-        catch
-        {
-            // log will shown on ConnectAsync failed
-            return;
-        }
-
-        core(this, item1, item2);
-    }
-
-    private async void WithConnect<T1, T2, T3>(T1 item1, T2 item2, T3 item3, Action<NatsConnection, T1, T2, T3> core)
-    {
-        try
-        {
-            await ConnectAsync().ConfigureAwait(false);
-        }
-        catch
-        {
-            // log will shown on ConnectAsync failed
-            return;
-        }
-
-        core(this, item1, item2, item3);
-    }
-
-    private async ValueTask WithConnectAsync(Func<NatsConnection, ValueTask> coreAsync)
-    {
-        await ConnectAsync().ConfigureAwait(false);
-        await coreAsync(this).ConfigureAwait(false);
-    }
-
-    private async ValueTask WithConnectAsync<T1>(T1 item1, Func<NatsConnection, T1, ValueTask> coreAsync)
-    {
-        await ConnectAsync().ConfigureAwait(false);
-        await coreAsync(this, item1).ConfigureAwait(false);
-    }
-
-    private async ValueTask WithConnectAsync<T1, T2>(T1 item1, T2 item2, Func<NatsConnection, T1, T2, ValueTask> coreAsync)
-    {
-        await ConnectAsync().ConfigureAwait(false);
-        await coreAsync(this, item1, item2).ConfigureAwait(false);
-    }
-
-    private async ValueTask WithConnectAsync<T1, T2, T3>(T1 item1, T2 item2, T3 item3, Func<NatsConnection, T1, T2, T3, ValueTask> coreAsync)
-    {
-        await ConnectAsync().ConfigureAwait(false);
-        await coreAsync(this, item1, item2, item3).ConfigureAwait(false);
-    }
-
-    private async ValueTask WithConnectAsync<T1, T2, T3, T4>(T1 item1, T2 item2, T3 item3, T4 item4, Func<NatsConnection, T1, T2, T3, T4, ValueTask> coreAsync)
-    {
-        await ConnectAsync().ConfigureAwait(false);
-        await coreAsync(this, item1, item2, item3, item4).ConfigureAwait(false);
-    }
-
-    private async ValueTask WithConnectAsync<T1, T2, T3, T4, T5>(T1 item1, T2 item2, T3 item3, T4 item4, T5 item5, Func<NatsConnection, T1, T2, T3, T4, T5, ValueTask> coreAsync)
-    {
-        await ConnectAsync().ConfigureAwait(false);
-        await coreAsync(this, item1, item2, item3, item4, item5).ConfigureAwait(false);
-    }
-
-    private async ValueTask WithConnectAsync<T1, T2, T3, T4, T5, T6>(T1 item1, T2 item2, T3 item3, T4 item4, T5 item5, T6 item6, Func<NatsConnection, T1, T2, T3, T4, T5, T6, ValueTask> coreAsync)
-    {
-        await ConnectAsync().ConfigureAwait(false);
-        await coreAsync(this, item1, item2, item3, item4, item5, item6).ConfigureAwait(false);
-    }
-
-    private async ValueTask WithConnectAsync<T1, T2, T3, T4, T5, T6, T7>(T1 item1, T2 item2, T3 item3, T4 item4, T5 item5, T6 item6, T7 item7, Func<NatsConnection, T1, T2, T3, T4, T5, T6, T7, ValueTask> coreAsync)
-    {
-        await ConnectAsync().ConfigureAwait(false);
-        await coreAsync(this, item1, item2, item3, item4, item5, item6, item7).ConfigureAwait(false);
-    }
-
-    private async ValueTask<T> WithConnectAsync<T>(Func<NatsConnection, ValueTask<T>> coreAsync)
-    {
-        await ConnectAsync().ConfigureAwait(false);
-        return await coreAsync(this).ConfigureAwait(false);
-    }
-
-    private async ValueTask<TResult> WithConnectAsync<T1, TResult>(T1 item1, Func<NatsConnection, T1, ValueTask<TResult>> coreAsync)
-    {
-        await ConnectAsync().ConfigureAwait(false);
-        return await coreAsync(this, item1).ConfigureAwait(false);
-    }
-
-    private async ValueTask<TResult> WithConnectAsync<T1, T2, TResult>(T1 item1, T2 item2, Func<NatsConnection, T1, T2, ValueTask<TResult>> coreAsync)
-    {
-        await ConnectAsync().ConfigureAwait(false);
-        return await coreAsync(this, item1, item2).ConfigureAwait(false);
-    }
-
-    private async ValueTask<TResult> WithConnectAsync<T1, T2, T3, TResult>(T1 item1, T2 item2, T3 item3, Func<NatsConnection, T1, T2, T3, ValueTask<TResult>> coreAsync)
-    {
-        await ConnectAsync().ConfigureAwait(false);
-        return await coreAsync(this, item1, item2, item3).ConfigureAwait(false);
-    }
-
-    private async ValueTask<TResult> WithConnectAsync<T1, T2, T3, T4, TResult>(T1 item1, T2 item2, T3 item3, T4 item4, Func<NatsConnection, T1, T2, T3, T4, ValueTask<TResult>> coreAsync)
-    {
-        await ConnectAsync().ConfigureAwait(false);
-        return await coreAsync(this, item1, item2, item3, item4).ConfigureAwait(false);
-    }
-
-    private async ValueTask<TResult> WithConnectAsync<T1, T2, T3, T4, T5, TResult>(T1 item1, T2 item2, T3 item3, T4 item4, T5 item5, Func<NatsConnection, T1, T2, T3, T4, T5, ValueTask<TResult>> coreAsync)
-    {
-        await ConnectAsync().ConfigureAwait(false);
-        return await coreAsync(this, item1, item2, item3, item4, item5).ConfigureAwait(false);
-    }
-}
-
-// This writer state is reused when reconnecting.
-internal sealed class WriterState
-{
-    public WriterState(NatsOpts opts)
-    {
-        Opts = opts;
-        BufferWriter = new FixedArrayBufferWriter();
-
-        if (opts.WriterCommandBufferLimit == null)
-        {
-            CommandBuffer = Channel.CreateUnbounded<ICommand>(new UnboundedChannelOptions
-            {
-                AllowSynchronousContinuations = false, // always should be in async loop.
-                SingleWriter = false,
-                SingleReader = true,
-            });
-        }
-        else
-        {
-            CommandBuffer = Channel.CreateBounded<ICommand>(new BoundedChannelOptions(opts.WriterCommandBufferLimit.Value)
-            {
-                FullMode = BoundedChannelFullMode.Wait,
-                AllowSynchronousContinuations = false, // always should be in async loop.
-                SingleWriter = false,
-                SingleReader = true,
-            });
-        }
-
-        PriorityCommands = new List<ICommand>();
-        PendingPromises = new List<IPromise>();
-    }
-
-    public FixedArrayBufferWriter BufferWriter { get; }
-
-    public Channel<ICommand> CommandBuffer { get; }
-
-    public NatsOpts Opts { get; }
-
-    public List<ICommand> PriorityCommands { get; }
-
-    public List<IPromise> PendingPromises { get; }
 }

@@ -10,8 +10,6 @@ namespace MicroBenchmark;
 public class SerializationBuffersBench
 {
     private static readonly string Data = new('0', 126);
-    private static readonly NatsPubOpts OptsWaitUntilSentTrue = new() { WaitUntilSent = true };
-    private static readonly NatsPubOpts OptsWaitUntilSentFalse = new() { WaitUntilSent = false };
 
     private NatsConnection _nats;
 
@@ -22,22 +20,11 @@ public class SerializationBuffersBench
     public void Setup() => _nats = new NatsConnection();
 
     [Benchmark]
-    public async ValueTask<TimeSpan> WaitUntilSentTrue()
+    public async ValueTask<TimeSpan> PublishAsync()
     {
         for (var i = 0; i < Iter; i++)
         {
-            await _nats.PublishAsync("foo", Data, opts: OptsWaitUntilSentTrue);
-        }
-
-        return await _nats.PingAsync();
-    }
-
-    [Benchmark]
-    public async ValueTask<TimeSpan> WaitUntilSentFalse()
-    {
-        for (var i = 0; i < Iter; i++)
-        {
-            await _nats.PublishAsync("foo", Data, opts: OptsWaitUntilSentFalse);
+            await _nats.PublishAsync("foo", Data);
         }
 
         return await _nats.PingAsync();

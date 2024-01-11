@@ -5,33 +5,29 @@ public partial class NatsConnection
     /// <inheritdoc />
     public ValueTask PublishAsync(string subject, NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
-        if (opts?.WaitUntilSent ?? false)
-        {
-            return PubAsync(subject, replyTo, payload: default, headers, cancellationToken);
-        }
-        else
-        {
-            return PubPostAsync(subject, replyTo, payload: default, headers, cancellationToken);
-        }
+        headers?.SetReadOnly();
+        return ConnectionState != NatsConnectionState.Open
+            ? ConnectAndPublishAsync(subject, default, headers, replyTo, NatsRawSerializer<byte[]>.Default, cancellationToken)
+            : CommandWriter.PublishAsync(subject, default, headers, replyTo, NatsRawSerializer<byte[]>.Default, cancellationToken);
     }
 
     /// <inheritdoc />
     public ValueTask PublishAsync<T>(string subject, T? data, NatsHeaders? headers = default, string? replyTo = default, INatsSerialize<T>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         serializer ??= Opts.SerializerRegistry.GetSerializer<T>();
-        if (opts?.WaitUntilSent ?? false)
-        {
-            return PubModelAsync<T>(subject, data, serializer, replyTo, headers, cancellationToken);
-        }
-        else
-        {
-            return PubModelPostAsync<T>(subject, data, serializer, replyTo, headers, opts?.ErrorHandler, cancellationToken);
-        }
+        headers?.SetReadOnly();
+        return ConnectionState != NatsConnectionState.Open
+            ? ConnectAndPublishAsync(subject, data, headers, replyTo, serializer, cancellationToken)
+            : CommandWriter.PublishAsync(subject, data, headers, replyTo, serializer, cancellationToken);
     }
 
     /// <inheritdoc />
-    public ValueTask PublishAsync<T>(in NatsMsg<T> msg, INatsSerialize<T>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
+    public ValueTask PublishAsync<T>(in NatsMsg<T> msg, INatsSerialize<T>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default) =>
+        PublishAsync(msg.Subject, msg.Data, msg.Headers, msg.ReplyTo, serializer, opts, cancellationToken);
+
+    private async ValueTask ConnectAndPublishAsync<T>(string subject, T? data, NatsHeaders? headers, string? replyTo, INatsSerialize<T> serializer, CancellationToken cancellationToken)
     {
-        return PublishAsync<T>(msg.Subject, msg.Data, msg.Headers, msg.ReplyTo, serializer, opts, cancellationToken);
+        await ConnectAsync().AsTask().WaitAsync(cancellationToken).ConfigureAwait(false);
+        await CommandWriter.PublishAsync(subject, data, headers, replyTo, serializer, cancellationToken).ConfigureAwait(false);
     }
 }

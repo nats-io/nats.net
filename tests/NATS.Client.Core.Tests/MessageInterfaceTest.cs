@@ -34,13 +34,13 @@ public class MessageInterfaceTest
         await Retry.Until(
             reason: "subscription is ready",
             condition: () => Volatile.Read(ref sync) > 0,
-            action: async () => await nats.PubAsync("foo.sync"),
+            action: async () => await nats.PublishAsync("foo.sync"),
             retryDelay: TimeSpan.FromSeconds(1));
 
         for (var i = 0; i < 10; i++)
             await nats.PublishAsync(subject: $"foo.{i}", data: $"test_msg_{i}");
 
-        await nats.PubAsync("foo.end");
+        await nats.PublishAsync("foo.end");
 
         await sub;
     }

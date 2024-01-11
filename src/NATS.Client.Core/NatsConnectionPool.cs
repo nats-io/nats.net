@@ -2,7 +2,7 @@ namespace NATS.Client.Core;
 
 public sealed class NatsConnectionPool : INatsConnectionPool
 {
-    private readonly NatsConnection[] _connections;
+    private readonly NatsPooledConnection[] _connections;
     private int _index = -1;
 
     public NatsConnectionPool()
@@ -28,11 +28,11 @@ public sealed class NatsConnectionPool : INatsConnectionPool
     public NatsConnectionPool(int poolSize, NatsOpts opts, Action<NatsConnection> configureConnection)
     {
         poolSize = Math.Max(1, poolSize);
-        _connections = new NatsConnection[poolSize];
+        _connections = new NatsPooledConnection[poolSize];
         for (var i = 0; i < _connections.Length; i++)
         {
-            var name = (opts.Name == null) ? $"#{i}" : $"{opts.Name}#{i}";
-            var conn = new NatsConnection(opts with { Name = name });
+            var name = opts.Name == null ? $"#{i}" : $"{opts.Name}#{i}";
+            var conn = new NatsPooledConnection(opts with { Name = name });
             configureConnection(conn);
             _connections[i] = conn;
         }
@@ -56,7 +56,7 @@ public sealed class NatsConnectionPool : INatsConnectionPool
     {
         foreach (var item in _connections)
         {
-            await item.DisposeAsync().ConfigureAwait(false);
+            await item.ForceDisposeAsync().ConfigureAwait(false);
         }
     }
 }

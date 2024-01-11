@@ -1,6 +1,8 @@
 using System.Diagnostics;
+using System.Reflection;
 using System.Text;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using System.Threading.Channels;
 using Xunit.Sdk;
 
@@ -284,9 +286,9 @@ public abstract partial class NatsConnectionTest
         _output.WriteLine("Server1 ClientConnectUrls:" +
                           string.Join(", ", connection1.ServerInfo?.ClientConnectUrls ?? Array.Empty<string>()));
         _output.WriteLine("Server2 ClientConnectUrls:" +
-                         string.Join(", ", connection2.ServerInfo?.ClientConnectUrls ?? Array.Empty<string>()));
+                          string.Join(", ", connection2.ServerInfo?.ClientConnectUrls ?? Array.Empty<string>()));
         _output.WriteLine("Server3 ClientConnectUrls:" +
-                         string.Join(", ", connection3.ServerInfo?.ClientConnectUrls ?? Array.Empty<string>()));
+                          string.Join(", ", connection3.ServerInfo?.ClientConnectUrls ?? Array.Empty<string>()));
 
         connection1.ServerInfo!.ClientConnectUrls!.Select(x => new NatsUri(x, true).Port).Distinct().Count().ShouldBe(3);
         connection2.ServerInfo!.ClientConnectUrls!.Select(x => new NatsUri(x, true).Port).Distinct().Count().ShouldBe(3);
@@ -355,6 +357,35 @@ public abstract partial class NatsConnectionTest
         await reg;
 
         list.ShouldEqual(100, 200, 300, 400, 500);
+    }
+
+    [Fact]
+    public void InterfaceShouldHaveSamePublicPropertiesEventsAndMethodAsClass()
+    {
+        var classType = typeof(NatsConnection);
+        var interfaceType = typeof(INatsConnection);
+        var ignoredMethods = new List<string>
+        {
+            "GetType",
+            "ToString",
+            "Equals",
+            "GetHashCode",
+        };
+
+        var classMethods = classType.GetMethods(BindingFlags.Public | BindingFlags.Instance).Where(m => !ignoredMethods.Contains(m.Name)).ToList();
+        var interfaceMethods = interfaceType.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy)
+            .Concat(interfaceType.GetInterfaces().SelectMany(i => i.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy))).ToList();
+
+        foreach (var classInfo in classMethods)
+        {
+            var name = classInfo.Name;
+
+            // TODO: enable this check when we have events pulled up to the interface
+            if (Regex.IsMatch(name, @"add_|remove_"))
+                continue;
+
+            interfaceMethods.Select(m => m.Name).Should().Contain(name);
+        }
     }
 }
 

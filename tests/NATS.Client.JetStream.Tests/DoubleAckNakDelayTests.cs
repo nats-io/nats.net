@@ -27,7 +27,7 @@ public class DoubleAckNakDelayTests
         var next = await consumer.NextAsync<int>(cancellationToken: cts.Token);
         if (next is { } msg)
         {
-            await msg.AckAsync(new AckOpts(DoubleAck: true), cts.Token);
+            await msg.AckAsync(cancellationToken: cts.Token);
             Assert.Equal(42, msg.Data);
 
             await Retry.Until("seen ACK", () => proxy.Frames.Any(f => f.Message.StartsWith("PUB $JS.ACK")));

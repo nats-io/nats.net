@@ -3,17 +3,18 @@ namespace NATS.Client.Core;
 public record NatsPubOpts
 {
     /// <summary>
-    /// When set to true, calls to PublishAsync will complete after data has been written to socket
-    /// Default value is false, and calls to PublishAsync will complete after the publish command has been written to the Command Channel
+    /// Obsolete option historically used to control when PublishAsync returned
+    /// No longer has any effect
+    /// This option method will be removed in a future release
     /// </summary>
+    [Obsolete("No longer has any effect")]
     public bool? WaitUntilSent { get; init; }
 
     /// <summary>
-    /// Optional callback to handle serialization exceptions.
+    /// Obsolete callback historically used for handling serialization errors
+    /// All errors are now thrown as exceptions in PublishAsync
+    /// This option method will be removed in a future release
     /// </summary>
-    /// <remarks>
-    /// When <c>WaitUntilSent</c> is set to <c>false</c> serialization exceptions won't propagate
-    /// to the caller but this callback will be called with the exception thrown by the serializer.
-    /// </remarks>
+    [Obsolete("All errors are now thrown as exceptions in PublishAsync")]
     public Action<Exception>? ErrorHandler { get; init; }
 }

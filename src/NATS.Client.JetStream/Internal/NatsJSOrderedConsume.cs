@@ -4,6 +4,7 @@ using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.Core.Commands;
+using NATS.Client.Core.Internal;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Internal;
@@ -123,13 +124,12 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
             _logger.LogDebug(NatsJSLogEvents.PullRequest, "Sending pull request for {Origin} {Msgs}, {Bytes}", origin, request.Batch, request.MaxBytes);
         }
 
-        return Connection.PubModelAsync(
+        return Connection.PublishAsync(
             subject: $"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
             data: request,
-            serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
             replyTo: Subject,
-            headers: default,
-            cancellationToken);
+            serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
+            cancellationToken: cancellationToken);
     }
 
     public void ResetHeartbeatTimer() => _timer.Change(_hbTimeout, Timeout.Infinite);
@@ -145,10 +145,10 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
         await _timer.DisposeAsync().ConfigureAwait(false);
     }
 
-    internal override IEnumerable<ICommand> GetReconnectCommands(int sid)
+    internal override ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter, int sid)
     {
         // Override normal subscription behavior to resubscribe on reconnect
-        yield break;
+        return ValueTask.CompletedTask;
     }
 
     protected override async ValueTask ReceiveInternalAsync(
