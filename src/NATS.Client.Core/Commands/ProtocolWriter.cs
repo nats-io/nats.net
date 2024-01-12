@@ -16,8 +16,8 @@ internal sealed class ProtocolWriter
     private const int SubSpaceLength = 4; // "SUB "
     private const int ConnectSpaceLength = 8;  // "CONNECT "
     private const int HpubSpaceLength = 5;  // "HPUB "
-    private const int PingNewLineLength = 6;  // "PING "
-    private const int PongNewLineLength = 6;  // "PONG "
+    private const int PingNewLineLength = 6;  // "PING\r\n"
+    private const int PongNewLineLength = 6;  // "PONG\r\n"
     private const int UnsubSpaceLength = 6;  // "UNSUB "
     private const int UInt16Length = 2;
     private const int UInt64Length = 8;
