@@ -108,6 +108,17 @@ public class ObjectStoreTest
             var value = await store.GetBytesAsync(anyNameIsFine, cancellationToken);
             Assert.Single(value);
             Assert.Equal(42, value[0]);
+
+            // can't be empty
+            {
+                var exception = await Assert.ThrowsAsync<NatsObjException>(async () => await store.PutAsync(string.Empty, new byte[] { 42 }, cancellationToken: cancellationToken));
+                Assert.Matches("Object name can't be empty", exception.Message);
+            }
+
+            {
+                var exception = await Assert.ThrowsAsync<NatsObjException>(async () => await store.PutAsync(null!, new byte[] { 42 }, cancellationToken: cancellationToken));
+                Assert.Matches("Object name can't be empty", exception.Message);
+            }
         }
     }
 
