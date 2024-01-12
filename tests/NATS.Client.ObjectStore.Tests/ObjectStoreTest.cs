@@ -100,6 +100,15 @@ public class ObjectStoreTest
             Assert.Equal(chunks, data.Chunks);
             Assert.Equal(size, data.Size);
         }
+
+        // Object name checks
+        {
+            var anyNameIsFine = "any name is fine '~#!$()*/\\,.?<>|{}[]`'\"";
+            await store.PutAsync(anyNameIsFine, new byte[] { 42 }, cancellationToken: cancellationToken);
+            var value = await store.GetBytesAsync(anyNameIsFine, cancellationToken);
+            Assert.Single(value);
+            Assert.Equal(42, value[0]);
+        }
     }
 
     [Fact]
