@@ -1,5 +1,7 @@
+using System.Buffers.Binary;
 using System.Buffers.Text;
 using System.IO.Pipelines;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using NATS.Client.Core.Internal;
@@ -9,7 +11,30 @@ namespace NATS.Client.Core.Commands;
 internal sealed class ProtocolWriter
 {
     private const int MaxIntStringLength = 9; // https://github.com/nats-io/nats-server/blob/28a2a1000045b79927ebf6b75eecc19c1b9f1548/server/util.go#L85C8-L85C23
-    private const int NewLineLength = 2; // \r\n
+    private const int NewLineLength = 2; // "\r\n"
+    private const int PubSpaceLength = 4; // "PUB "
+    private const int SubSpaceLength = 4; // "SUB "
+    private const int ConnectSpaceLength = 8;  // "CONNECT "
+    private const int HpubSpaceLength = 5;  // "HPUB "
+    private const int PingNewLineLength = 6;  // "PING "
+    private const int PongNewLineLength = 6;  // "PONG "
+    private const int UnsubSpaceLength = 6;  // "UNSUB "
+    private const int UInt16Length = 2;
+    private const int UInt64Length = 8;
+
+    // 2 bytes, make sure string length is 2
+    private static readonly ushort NewLine = BinaryPrimitives.ReadUInt16LittleEndian("\r\n"u8);
+
+    // 4 bytes, make sure string length is 4
+    private static readonly uint PubSpace = BinaryPrimitives.ReadUInt32LittleEndian("PUB "u8);
+    private static readonly uint SubSpace = BinaryPrimitives.ReadUInt32LittleEndian("SUB "u8);
+
+    // 8 bytes, make sure string length is 8
+    private static readonly ulong ConnectSpace = BinaryPrimitives.ReadUInt64LittleEndian("CONNECT "u8);
+    private static readonly ulong HpubSpace = BinaryPrimitives.ReadUInt64LittleEndian("HPUB    "u8);
+    private static readonly ulong PingNewLine = BinaryPrimitives.ReadUInt64LittleEndian("PING\r\n  "u8);
+    private static readonly ulong PongNewLine = BinaryPrimitives.ReadUInt64LittleEndian("PONG\r\n  "u8);
+    private static readonly ulong UnsubSpace = BinaryPrimitives.ReadUInt64LittleEndian("UNSUB   "u8);
 
     private readonly PipeWriter _writer;
     private readonly HeaderWriter _headerWriter;
@@ -26,24 +51,32 @@ internal sealed class ProtocolWriter
     // CONNECT {["option_name":option_value],...}
     public void WriteConnect(ClientOpts opts)
     {
-        WriteConstant(CommandConstants.ConnectWithPadding);
+        var span = _writer.GetSpan(UInt64Length);
+        BinaryPrimitives.WriteUInt64LittleEndian(span, ConnectSpace);
+        _writer.Advance(ConnectSpaceLength);
 
         var jsonWriter = new Utf8JsonWriter(_writer);
         JsonSerializer.Serialize(jsonWriter, opts, JsonContext.Default.ClientOpts);
 
-        WriteConstant(CommandConstants.NewLine);
+        span = _writer.GetSpan(UInt16Length);
+        BinaryPrimitives.WriteUInt16LittleEndian(span, NewLine);
+        _writer.Advance(NewLineLength);
     }
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#ping-pong
     public void WritePing()
     {
-        WriteConstant(CommandConstants.PingNewLine);
+        var span = _writer.GetSpan(UInt64Length);
+        BinaryPrimitives.WriteUInt64LittleEndian(span, PingNewLine);
+        _writer.Advance(PingNewLineLength);
     }
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#ping-pong
     public void WritePong()
     {
-        WriteConstant(CommandConstants.PongNewLine);
+        var span = _writer.GetSpan(UInt64Length);
+        BinaryPrimitives.WriteUInt64LittleEndian(span, PongNewLine);
+        _writer.Advance(PongNewLineLength);
     }
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#pub
@@ -59,12 +92,12 @@ internal sealed class ProtocolWriter
         if (headers == null)
         {
             // 'PUB '   + subject                                +' '+ payload len        +'\r\n'
-            ctrlLen = 4 + _subjectEncoding.GetByteCount(subject) + 1 + MaxIntStringLength + 2;
+            ctrlLen = PubSpaceLength + _subjectEncoding.GetByteCount(subject) + 1 + MaxIntStringLength + NewLineLength;
         }
         else
         {
             // 'HPUB '  + subject                                +' '+ header len         +' '+ payload len        +'\r\n'
-            ctrlLen = 5 + _subjectEncoding.GetByteCount(subject) + 1 + MaxIntStringLength + 1 + MaxIntStringLength + 2;
+            ctrlLen = HpubSpaceLength + _subjectEncoding.GetByteCount(subject) + 1 + MaxIntStringLength + 1 + MaxIntStringLength + NewLineLength;
         }
 
         if (replyTo != null)
@@ -77,20 +110,13 @@ internal sealed class ProtocolWriter
         var span = ctrlSpan;
         if (headers == null)
         {
-            span[0] = (byte)'P';
-            span[1] = (byte)'U';
-            span[2] = (byte)'B';
-            span[3] = (byte)' ';
-            span = span[4..];
+            BinaryPrimitives.WriteUInt32LittleEndian(span, PubSpace);
+            span = span[PubSpaceLength..];
         }
         else
         {
-            span[0] = (byte)'H';
-            span[1] = (byte)'P';
-            span[2] = (byte)'U';
-            span[3] = (byte)'B';
-            span[4] = (byte)' ';
-            span = span[5..];
+            BinaryPrimitives.WriteUInt64LittleEndian(span, HpubSpace);
+            span = span[HpubSpaceLength..];
         }
 
         var written = _subjectEncoding.GetBytes(subject, span);
@@ -118,8 +144,7 @@ internal sealed class ProtocolWriter
             span = span[lenSpan.Length..];
         }
 
-        span[0] = (byte)'\r';
-        span[1] = (byte)'\n';
+        BinaryPrimitives.WriteUInt16LittleEndian(span, NewLine);
         _writer.Advance(ctrlLen);
 
         var headersLength = 0L;
@@ -140,10 +165,9 @@ internal sealed class ProtocolWriter
             totalLength += _writer.UnflushedBytes - initialCount;
         }
 
-        span = _writer.GetSpan(2);
-        span[0] = (byte)'\r';
-        span[1] = (byte)'\n';
-        _writer.Advance(2);
+        span = _writer.GetSpan(UInt16Length);
+        BinaryPrimitives.WriteUInt16LittleEndian(span, NewLine);
+        _writer.Advance(NewLineLength);
 
         // write the length
         var lenWritten = 0;
@@ -151,7 +175,7 @@ internal sealed class ProtocolWriter
         {
             if (!Utf8Formatter.TryFormat(headersLength, lenSpan, out lenWritten))
             {
-                throw new NatsException("Can not format integer.");
+                ThrowOnUtf8FormatFail();
             }
 
             lenSpan[lenWritten] = (byte)' ';
@@ -160,7 +184,7 @@ internal sealed class ProtocolWriter
 
         if (!Utf8Formatter.TryFormat(totalLength, lenSpan[lenWritten..], out var tLen))
         {
-            throw new NatsException("Can not format integer.");
+            ThrowOnUtf8FormatFail();
         }
 
         lenWritten += tLen;
@@ -168,7 +192,7 @@ internal sealed class ProtocolWriter
         if (trim > 0)
         {
             // shift right
-            ctrlSpan[..(ctrlLen - trim - 2)].CopyTo(ctrlSpan[trim..]);
+            ctrlSpan[..(ctrlLen - trim - NewLineLength)].CopyTo(ctrlSpan[trim..]);
             ctrlSpan[..trim].Clear();
         }
 
@@ -179,42 +203,45 @@ internal sealed class ProtocolWriter
     // SUB <subject> [queue group] <sid>
     public void WriteSubscribe(int sid, string subject, string? queueGroup, int? maxMsgs)
     {
-        var offset = 0;
-
-        var maxLength = CommandConstants.SubWithPadding.Length
-            + subject.Length + 1
-            + (queueGroup == null ? 0 : queueGroup.Length + 1)
-            + MaxIntStringLength
-            + NewLineLength; // newline
-
-        var writableSpan = _writer.GetSpan(maxLength);
-        CommandConstants.SubWithPadding.CopyTo(writableSpan);
-        offset += CommandConstants.SubWithPadding.Length;
-
-        subject.WriteASCIIBytes(writableSpan.Slice(offset));
-        offset += subject.Length;
-        writableSpan.Slice(offset)[0] = (byte)' ';
-        offset += 1;
+        // 'SUB '                       + subject                                +' '+ sid                +'\r\n'
+        var ctrlLen = SubSpaceLength + _subjectEncoding.GetByteCount(subject) + 1 + MaxIntStringLength + NewLineLength;
 
         if (queueGroup != null)
         {
-            queueGroup.WriteASCIIBytes(writableSpan.Slice(offset));
-            offset += queueGroup.Length;
-            writableSpan.Slice(offset)[0] = (byte)' ';
-            offset += 1;
+            // len  += queueGroup                                +' '
+            ctrlLen += _subjectEncoding.GetByteCount(queueGroup) + 1;
         }
 
-        if (!Utf8Formatter.TryFormat(sid, writableSpan.Slice(offset), out var written))
+        var span = _writer.GetSpan(ctrlLen);
+        BinaryPrimitives.WriteUInt32LittleEndian(span, SubSpace);
+        var size = SubSpaceLength;
+        span = span[SubSpaceLength..];
+
+        var written = _subjectEncoding.GetBytes(subject, span);
+        span[written] = (byte)' ';
+        size += written + 1;
+        span = span[(written + 1)..];
+
+        if (queueGroup != null)
         {
-            throw new NatsException("Can not format integer.");
+            written = _subjectEncoding.GetBytes(subject, span);
+            span[written] = (byte)' ';
+            size += written + 1;
+            span = span[(written + 1)..];
         }
 
-        offset += written;
+        if (!Utf8Formatter.TryFormat(sid, span, out written))
+        {
+            ThrowOnUtf8FormatFail();
+        }
 
-        CommandConstants.NewLine.CopyTo(writableSpan.Slice(offset));
-        offset += CommandConstants.NewLine.Length;
+        size += written;
+        span = span[written..];
 
-        _writer.Advance(offset);
+        BinaryPrimitives.WriteUInt16LittleEndian(span, NewLine);
+        size += NewLineLength;
+
+        _writer.Advance(size);
 
         // Immediately send UNSUB <sid> <max-msgs> to minimize the risk of
         // receiving more messages than <max-msgs> in case they are published
@@ -229,52 +256,45 @@ internal sealed class ProtocolWriter
     // UNSUB <sid> [max_msgs]
     public void WriteUnsubscribe(int sid, int? maxMessages)
     {
-        var offset = 0;
-        var maxLength = CommandConstants.UnsubWithPadding.Length
-            + MaxIntStringLength
-            + ((maxMessages != null) ? (1 + MaxIntStringLength) : 0)
-            + NewLineLength;
-
-        var writableSpan = _writer.GetSpan(maxLength);
-        CommandConstants.UnsubWithPadding.CopyTo(writableSpan);
-        offset += CommandConstants.UnsubWithPadding.Length;
-
-        if (!Utf8Formatter.TryFormat(sid, writableSpan.Slice(offset), out var written))
-        {
-            throw new NatsException("Can not format integer.");
-        }
-
-        offset += written;
-
+        // 'UNSUB '                       + sid                +'\r\n'
+        var ctrlLen = UnsubSpaceLength + MaxIntStringLength + NewLineLength;
         if (maxMessages != null)
         {
-            writableSpan.Slice(offset)[0] = (byte)' ';
-            offset += 1;
-            if (!Utf8Formatter.TryFormat(maxMessages.Value, writableSpan.Slice(offset), out written))
-            {
-                throw new NatsException("Can not format integer.");
-            }
-
-            offset += written;
+            // len  +=' '+ max_msgs
+            ctrlLen += 1 + MaxIntStringLength;
         }
 
-        CommandConstants.NewLine.CopyTo(writableSpan.Slice(offset));
-        offset += CommandConstants.NewLine.Length;
+        var span = _writer.GetSpan(ctrlLen);
+        BinaryPrimitives.WriteUInt64LittleEndian(span, UnsubSpace);
+        var size = UnsubSpaceLength;
+        span = span[UnsubSpaceLength..];
 
-        _writer.Advance(offset);
+        if (!Utf8Formatter.TryFormat(sid, span, out var written))
+        {
+            ThrowOnUtf8FormatFail();
+        }
+
+        size += written;
+        span = span[written..];
+        if (maxMessages != null)
+        {
+            span[0] = (byte)' ';
+            if (!Utf8Formatter.TryFormat(maxMessages.Value, span[1..], out written))
+            {
+                ThrowOnUtf8FormatFail();
+            }
+
+            size += written + 1;
+            span = span[(written + 1)..];
+        }
+
+        BinaryPrimitives.WriteUInt16LittleEndian(span, NewLine);
+        size += NewLineLength;
+
+        _writer.Advance(size);
     }
 
-    internal void WriteRaw(byte[] protocol)
-    {
-        var span = _writer.GetSpan(protocol.Length);
-        protocol.CopyTo(span);
-        _writer.Advance(protocol.Length);
-    }
-
-    private void WriteConstant(ReadOnlySpan<byte> constant)
-    {
-        var writableSpan = _writer.GetSpan(constant.Length);
-        constant.CopyTo(writableSpan);
-        _writer.Advance(constant.Length);
-    }
+    // optimization detailed here: https://github.com/nats-io/nats.net.v2/issues/320#issuecomment-1886165748
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void ThrowOnUtf8FormatFail() => throw new NatsException("Can not format integer.");
 }
