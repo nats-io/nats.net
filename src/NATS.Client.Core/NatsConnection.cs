@@ -1,6 +1,5 @@
 using System.Buffers;
 using System.Diagnostics;
-using System.IO.Pipelines;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
@@ -619,8 +618,8 @@ public partial class NatsConnection : INatsConnection
         {
             while (!_disposedCancellationTokenSource.IsCancellationRequested)
             {
-                await _eventChannel.Reader.WaitToReadAsync().ConfigureAwait(false);
-                if (_eventChannel.Reader.TryRead(out var eventData))
+                var hasData = await _eventChannel.Reader.WaitToReadAsync(_disposedCancellationTokenSource.Token).ConfigureAwait(false);
+                if (hasData && _eventChannel.Reader.TryRead(out var eventData))
                 {
                     var (natsEvent, args) = eventData;
                     switch (natsEvent)
