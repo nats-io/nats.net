@@ -32,18 +32,30 @@ public class CommandConstantsBench
     [Benchmark]
     public void PubCopy()
     {
-#pragma warning disable CS8509 // The switch expression does not handle all possible values of its input type (it is not exhaustive).
-        var src = Size switch
-#pragma warning restore CS8509 // The switch expression does not handle all possible values of its input type (it is not exhaustive).
-        {
-            2 => NewLine,
-            4 => PubSpace,
-            8 => ConnectSpace,
-        };
         var dest = Bytes.AsSpan();
-        for (var i = 0; i < Iter; i++)
+        switch (Size)
         {
-            PubSpace.CopyTo(dest);
+        case 2:
+            for (var i = 0; i < Iter; i++)
+            {
+                NewLine.CopyTo(dest);
+            }
+
+            break;
+        case 4:
+            for (var i = 0; i < Iter; i++)
+            {
+                PubSpace.CopyTo(dest);
+            }
+
+            break;
+        case 8:
+            for (var i = 0; i < Iter; i++)
+            {
+                ConnectSpace.CopyTo(dest);
+            }
+
+            break;
         }
     }
 
