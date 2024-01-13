@@ -24,8 +24,6 @@ public class NatsObjStore : INatsObjStore
 
     private static readonly NatsHeaders NatsRollupHeaders = new() { { NatsRollup, RollupSubject } };
 
-    private static readonly Regex ValidObjectRegex = new(pattern: @"\A[-/_=\.a-zA-Z0-9]+\z", RegexOptions.Compiled);
-
     private readonly NatsObjContext _objContext;
     private readonly NatsJSContext _context;
     private readonly INatsJSStream _stream;
@@ -657,11 +655,6 @@ public class NatsObjStore : INatsObjStore
         if (string.IsNullOrWhiteSpace(name))
         {
             throw new NatsObjException("Object name can't be empty");
-        }
-
-        if (!ValidObjectRegex.IsMatch(name))
-        {
-            throw new NatsObjException("Object name can only contain alphanumeric characters, dashes, underscores, forward slash, equals sign, and periods");
         }
     }
 }

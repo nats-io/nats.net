@@ -27,6 +27,7 @@ public abstract class NatsSubBase
 {
     private static readonly byte[] NoRespondersHeaderSequence = { (byte)' ', (byte)'5', (byte)'0', (byte)'3' };
     private readonly ILogger _logger;
+    private readonly object _gate = new();
     private readonly bool _debug;
     private readonly ISubscriptionManager _manager;
     private readonly Timer? _timeoutTimer;
@@ -65,6 +66,13 @@ public abstract class NatsSubBase
         Subject = subject;
         QueueGroup = queueGroup;
         Opts = opts;
+
+        // If cancellation token is already cancelled we don't need to register however there is still
+        // a chance that cancellation token is cancelled after this check but before we register or
+        // the derived class constructor is completed. In that case we might be calling subclass
+        // methods through EndSubscription() on potentially not a fully initialized instance which
+        // might be a problem. This should reduce the impact of that problem.
+        cancellationToken.ThrowIfCancellationRequested();
 
         _tokenRegistration = cancellationToken.UnsafeRegister(
             state =>
@@ -144,7 +152,7 @@ public abstract class NatsSubBase
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous server UNSUB operation.</returns>
     public ValueTask UnsubscribeAsync()
     {
-        lock (this)
+        lock (_gate)
         {
             if (_unsubscribed)
                 return ValueTask.CompletedTask;
@@ -154,14 +162,27 @@ public abstract class NatsSubBase
         _timeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
         _idleTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
         _startUpTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-        TryComplete();
+
+        try
+        {
+            TryComplete();
+        }
+        catch (Exception e)
+        {
+            // Ignore any exceptions thrown by the derived class since we're already in the process of unsubscribing.
+            // We don't want to throw here and prevent the unsubscribe call from completing.
+            // This is also required to workaround a potential race condition between the derived class and the base
+            // class when cancellation token is cancelled before the instance creation is fully finished in its
+            // constructor hence TryComplete() method might be dealing with uninitialized state.
+            _logger.LogWarning(NatsLogEvents.Subscription, e, "Error while completing subscription");
+        }
 
         return _manager.RemoveAsync(this);
     }
 
     public virtual ValueTask DisposeAsync()
     {
-        lock (this)
+        lock (_gate)
         {
             if (_disposed)
                 return ValueTask.CompletedTask;
@@ -294,6 +315,11 @@ public abstract class NatsSubBase
     /// <summary>
     /// Invoked to signal end of the subscription.
     /// </summary>
+    /// <remarks>
+    /// Do not implement complex logic in this method. It should only be used to complete the channel writers.
+    /// The reason is that this method might be invoked while instance is being created in constructors and
+    /// the cancellation token might be cancelled before the members are fully initialized.
+    /// </remarks>
     protected abstract void TryComplete();
 
     protected void EndSubscription(NatsSubEndReason reason)
@@ -301,7 +327,7 @@ public abstract class NatsSubBase
         if (_debug)
             _logger.LogDebug(NatsLogEvents.Subscription, "End subscription {Reason}", reason);
 
-        lock (this)
+        lock (_gate)
         {
             if (_endSubscription)
                 return;
