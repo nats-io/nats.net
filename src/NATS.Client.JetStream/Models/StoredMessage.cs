@@ -8,7 +8,11 @@ public record StoredMessage
     [System.Text.Json.Serialization.JsonPropertyName("subject")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required]
+#if NET6_0
     public string Subject { get; set; } = default!;
+#else
+    public required string Subject { get; set; }
+#endif
 
     /// <summary>
     /// The sequence number of the message in the Stream
@@ -16,7 +20,7 @@ public record StoredMessage
     [System.Text.Json.Serialization.JsonPropertyName("seq")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Range(0D, 18446744073709552000D)]
-    public ulong Seq { get; set; } = default!;
+    public ulong Seq { get; set; }
 
     /// <summary>
     /// The base64 encoded payload of the message body
@@ -24,7 +28,7 @@ public record StoredMessage
     [System.Text.Json.Serialization.JsonPropertyName("data")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     [System.ComponentModel.DataAnnotations.StringLength(int.MaxValue)]
-    public string Data { get; set; } = default!;
+    public string? Data { get; set; }
 
     /// <summary>
     /// The time the message was received
@@ -32,12 +36,16 @@ public record StoredMessage
     [System.Text.Json.Serialization.JsonPropertyName("time")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+#if NET6_0
     public string Time { get; set; } = default!;
+#else
+    public required string Time { get; set; }
+#endif
 
     /// <summary>
     /// Base64 encoded headers for the message
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("hdrs")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public string Hdrs { get; set; } = default!;
+    public string? Hdrs { get; set; }
 }

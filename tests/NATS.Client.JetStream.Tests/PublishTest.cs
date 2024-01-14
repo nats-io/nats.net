@@ -74,9 +74,9 @@ public class PublishTest
                 data: 2,
                 opts: new NatsJSPubOpts { ExpectedStream = "non-existent-stream" },
                 cancellationToken: cts.Token);
-            Assert.Equal(400, ack2.Error.Code);
-            Assert.Equal(10060, ack2.Error.ErrCode);
-            Assert.Equal("expected stream does not match", ack2.Error.Description);
+            Assert.Equal(400, ack2.Error?.Code);
+            Assert.Equal(10060, ack2.Error?.ErrCode);
+            Assert.Equal("expected stream does not match", ack2.Error?.Description);
         }
 
         // ExpectedLastSequence
@@ -99,9 +99,9 @@ public class PublishTest
                 data: 3,
                 opts: new NatsJSPubOpts { ExpectedLastSequence = ack1.Seq },
                 cancellationToken: cts.Token);
-            Assert.Equal(400, ack3.Error.Code);
-            Assert.Equal(10071, ack3.Error.ErrCode);
-            Assert.Matches(@"wrong last sequence: \d+", ack3.Error.Description);
+            Assert.Equal(400, ack3.Error?.Code);
+            Assert.Equal(10071, ack3.Error?.ErrCode);
+            Assert.Matches(@"wrong last sequence: \d+", ack3.Error?.Description);
         }
 
         // ExpectedLastSubjectSequence
@@ -124,9 +124,9 @@ public class PublishTest
                 data: 3,
                 opts: new NatsJSPubOpts { ExpectedLastSubjectSequence = ack1.Seq },
                 cancellationToken: cts.Token);
-            Assert.Equal(400, ack3.Error.Code);
-            Assert.Equal(10071, ack3.Error.ErrCode);
-            Assert.Matches(@"wrong last sequence: \d+", ack3.Error.Description);
+            Assert.Equal(400, ack3.Error?.Code);
+            Assert.Equal(10071, ack3.Error?.ErrCode);
+            Assert.Matches(@"wrong last sequence: \d+", ack3.Error?.Description);
         }
 
         // ExpectedLastMsgId
@@ -150,9 +150,9 @@ public class PublishTest
                 data: 3,
                 opts: new NatsJSPubOpts { MsgId = "ExpectedLastMsgId-3", ExpectedLastMsgId = "unexpected-msg-id" },
                 cancellationToken: cts.Token);
-            Assert.Equal(400, ack3.Error.Code);
-            Assert.Equal(10070, ack3.Error.ErrCode);
-            Assert.Equal("wrong last msg ID: ExpectedLastMsgId-2", ack3.Error.Description);
+            Assert.Equal(400, ack3.Error?.Code);
+            Assert.Equal(10070, ack3.Error?.ErrCode);
+            Assert.Equal("wrong last msg ID: ExpectedLastMsgId-2", ack3.Error?.Description);
         }
     }
 

@@ -8,7 +8,7 @@ public record AccountLimits
     [System.Text.Json.Serialization.JsonPropertyName("max_memory")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Range(-1, int.MaxValue)]
-    public int MaxMemory { get; set; } = default!;
+    public int MaxMemory { get; set; }
 
     /// <summary>
     /// The maximum amount of File storage Stream Messages may consume
@@ -16,7 +16,7 @@ public record AccountLimits
     [System.Text.Json.Serialization.JsonPropertyName("max_storage")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Range(-1, int.MaxValue)]
-    public int MaxStorage { get; set; } = default!;
+    public int MaxStorage { get; set; }
 
     /// <summary>
     /// The maximum number of Streams an account can create
@@ -24,7 +24,7 @@ public record AccountLimits
     [System.Text.Json.Serialization.JsonPropertyName("max_streams")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Range(-1, int.MaxValue)]
-    public int MaxStreams { get; set; } = default!;
+    public int MaxStreams { get; set; }
 
     /// <summary>
     /// The maximum number of Consumer an account can create
@@ -32,21 +32,21 @@ public record AccountLimits
     [System.Text.Json.Serialization.JsonPropertyName("max_consumers")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Range(-1, int.MaxValue)]
-    public int MaxConsumers { get; set; } = default!;
+    public int MaxConsumers { get; set; }
 
     /// <summary>
     /// Indicates if Streams created in this account requires the max_bytes property set
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("max_bytes_required")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public bool MaxBytesRequired { get; set; } = false;
+    public bool MaxBytesRequired { get; set; }
 
     /// <summary>
     /// The maximum number of outstanding ACKs any consumer may configure
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("max_ack_pending")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public int MaxAckPending { get; set; } = default!;
+    public int MaxAckPending { get; set; }
 
     /// <summary>
     /// The maximum size any single memory stream may be

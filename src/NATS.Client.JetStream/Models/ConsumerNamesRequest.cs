@@ -11,5 +11,5 @@ public record ConsumerNamesRequest : IterableRequest
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("subject")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public string Subject { get; set; } = default!;
+    public string? Subject { get; set; }
 }

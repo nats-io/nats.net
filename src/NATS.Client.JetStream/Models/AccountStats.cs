@@ -8,7 +8,7 @@ public record AccountStats
     [System.Text.Json.Serialization.JsonPropertyName("memory")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Range(0, int.MaxValue)]
-    public int Memory { get; set; } = default!;
+    public int Memory { get; set; }
 
     /// <summary>
     /// File Storage being used for Stream Message storage
@@ -16,7 +16,7 @@ public record AccountStats
     [System.Text.Json.Serialization.JsonPropertyName("storage")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Range(0, int.MaxValue)]
-    public int Storage { get; set; } = default!;
+    public int Storage { get; set; }
 
     /// <summary>
     /// Number of active Streams
@@ -24,7 +24,7 @@ public record AccountStats
     [System.Text.Json.Serialization.JsonPropertyName("streams")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Range(0, int.MaxValue)]
-    public int Streams { get; set; } = default!;
+    public int Streams { get; set; }
 
     /// <summary>
     /// Number of active Consumers
@@ -32,14 +32,14 @@ public record AccountStats
     [System.Text.Json.Serialization.JsonPropertyName("consumers")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Range(0, int.MaxValue)]
-    public int Consumers { get; set; } = default!;
+    public int Consumers { get; set; }
 
     /// <summary>
     /// The JetStream domain this account is in
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("domain")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public string Domain { get; set; } = default!;
+    public string? Domain { get; set; }
 
     [System.Text.Json.Serialization.JsonPropertyName("limits")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
@@ -48,7 +48,7 @@ public record AccountStats
 
     [System.Text.Json.Serialization.JsonPropertyName("tiers")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public System.Collections.Generic.IDictionary<string, object> Tiers { get; set; } = default!;
+    public IDictionary<string, object>? Tiers { get; set; }
 
     [System.Text.Json.Serialization.JsonPropertyName("api")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]

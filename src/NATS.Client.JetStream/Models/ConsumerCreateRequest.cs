@@ -12,12 +12,16 @@ internal record ConsumerCreateRequest
     [System.Text.Json.Serialization.JsonPropertyName("stream_name")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+#if NET6_0
     public string StreamName { get; set; } = default!;
+#else
+    public required string StreamName { get; set; }
+#endif
 
     /// <summary>
     /// The consumer configuration
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("config")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
-    public ConsumerConfig Config { get; set; } = default!;
+    public ConsumerConfig? Config { get; set; }
 }

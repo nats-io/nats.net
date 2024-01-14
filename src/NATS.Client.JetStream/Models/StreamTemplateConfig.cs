@@ -14,7 +14,11 @@ public record StreamTemplateConfig
     [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
     [System.ComponentModel.DataAnnotations.StringLength(int.MaxValue, MinimumLength = 1)]
     [System.ComponentModel.DataAnnotations.RegularExpression(@"^[^.*>]+$")]
+#if NET6_0
     public string Name { get; set; } = default!;
+#else
+    public required string Name { get; set; }
+#endif
 
     /// <summary>
     /// The maximum number of Streams this Template can create, -1 for unlimited.
@@ -22,7 +26,7 @@ public record StreamTemplateConfig
     [System.Text.Json.Serialization.JsonPropertyName("max_streams")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Range(-2147483648, 2147483647)]
-    public int MaxStreams { get; set; } = default!;
+    public int MaxStreams { get; set; }
 
     [System.Text.Json.Serialization.JsonPropertyName("config")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]

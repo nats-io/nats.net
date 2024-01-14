@@ -11,7 +11,7 @@ public record SubjectTransform
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("src")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public string Src { get; set; } = default!;
+    public string? Src { get; set; }
 
     /// <summary>
     /// The subject transform destination
@@ -19,5 +19,9 @@ public record SubjectTransform
     [System.Text.Json.Serialization.JsonPropertyName("dest")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+#if NET6_0
     public string Dest { get; set; } = default!;
+#else
+    public required string Dest { get; set; }
+#endif
 }

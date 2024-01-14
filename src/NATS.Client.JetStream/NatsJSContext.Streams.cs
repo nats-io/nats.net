@@ -17,6 +17,7 @@ public partial class NatsJSContext
         StreamConfig config,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(nameof(config.Name));
         var response = await JSRequestResponseAsync<StreamConfig, StreamInfo>(
             subject: $"{Opts.Prefix}.STREAM.CREATE.{config.Name}",
             config,
@@ -118,6 +119,7 @@ public partial class NatsJSContext
         StreamConfig request,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(nameof(request.Name));
         var response = await JSRequestResponseAsync<StreamConfig, StreamUpdateResponse>(
             subject: $"{Opts.Prefix}.STREAM.UPDATE.{request.Name}",
             request: request,

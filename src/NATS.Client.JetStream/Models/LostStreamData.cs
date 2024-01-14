@@ -11,7 +11,7 @@ public record LostStreamData
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("msgs")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public System.Collections.Generic.ICollection<long>? Msgs { get; set; } = default!;
+    public ICollection<long>? Msgs { get; set; }
 
     /// <summary>
     /// The number of bytes that were lost
@@ -19,5 +19,5 @@ public record LostStreamData
     [System.Text.Json.Serialization.JsonPropertyName("bytes")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     [System.ComponentModel.DataAnnotations.Range(0D, 18446744073709552000D)]
-    public long Bytes { get; set; } = default!;
+    public long Bytes { get; set; }
 }

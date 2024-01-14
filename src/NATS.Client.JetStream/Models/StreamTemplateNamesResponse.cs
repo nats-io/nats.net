@@ -8,5 +8,5 @@ public record StreamTemplateNamesResponse : IterableResponse
 {
     [System.Text.Json.Serialization.JsonPropertyName("consumers")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public System.Collections.Generic.ICollection<string> Consumers { get; set; } = default!;
+    public ICollection<string>? Consumers { get; set; }
 }

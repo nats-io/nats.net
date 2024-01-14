@@ -38,16 +38,16 @@ public record ConsumerConfig
 #if NET6_0
     [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonStringEnumConverter<ConsumerConfigDeliverPolicy>))]
 #endif
-    public ConsumerConfigDeliverPolicy DeliverPolicy { get; set; } = default!;
+    public ConsumerConfigDeliverPolicy DeliverPolicy { get; set; } = ConsumerConfigDeliverPolicy.All;
 
     [System.Text.Json.Serialization.JsonPropertyName("opt_start_seq")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     [System.ComponentModel.DataAnnotations.Range(0D, 18446744073709552000D)]
-    public ulong OptStartSeq { get; set; } = default!;
+    public ulong OptStartSeq { get; set; }
 
     [System.Text.Json.Serialization.JsonPropertyName("opt_start_time")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public System.DateTimeOffset OptStartTime { get; set; } = default!;
+    public DateTimeOffset OptStartTime { get; set; }
 
     /// <summary>
     /// A unique name for a durable consumer
@@ -56,7 +56,7 @@ public record ConsumerConfig
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     [System.ComponentModel.DataAnnotations.StringLength(int.MaxValue, MinimumLength = 1)]
     [System.ComponentModel.DataAnnotations.RegularExpression(@"^[^.*>]+$")]
-    public string DurableName { get; set; } = default!;
+    public string? DurableName { get; set; }
 
     /// <summary>
     /// A unique name for a consumer
@@ -65,7 +65,7 @@ public record ConsumerConfig
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     [System.ComponentModel.DataAnnotations.StringLength(int.MaxValue, MinimumLength = 1)]
     [System.ComponentModel.DataAnnotations.RegularExpression(@"^[^.*>]+$")]
-    public string Name { get; set; } = default!;
+    public string? Name { get; set; }
 
     /// <summary>
     /// A short description of the purpose of this consumer
@@ -73,12 +73,12 @@ public record ConsumerConfig
     [System.Text.Json.Serialization.JsonPropertyName("description")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     [System.ComponentModel.DataAnnotations.StringLength(4096)]
-    public string Description { get; set; } = default!;
+    public string? Description { get; set; }
 
     [System.Text.Json.Serialization.JsonPropertyName("deliver_subject")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     [System.ComponentModel.DataAnnotations.StringLength(int.MaxValue, MinimumLength = 1)]
-    public string DeliverSubject { get; set; } = default!;
+    public string? DeliverSubject { get; set; }
 
     [System.Text.Json.Serialization.JsonPropertyName("ack_policy")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
@@ -102,21 +102,21 @@ public record ConsumerConfig
     [System.Text.Json.Serialization.JsonPropertyName("max_deliver")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
-    public long MaxDeliver { get; set; } = default!;
+    public long MaxDeliver { get; set; }
 
     /// <summary>
     /// Filter the stream by a single subjects
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("filter_subject")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public string FilterSubject { get; set; } = default!;
+    public string? FilterSubject { get; set; }
 
     /// <summary>
     /// Filter the stream by multiple subjects
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("filter_subjects")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public System.Collections.Generic.ICollection<string> FilterSubjects { get; set; } = default!;
+    public ICollection<string>? FilterSubjects { get; set; }
 
     [System.Text.Json.Serialization.JsonPropertyName("replay_policy")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
@@ -124,11 +124,11 @@ public record ConsumerConfig
 #if NET6_0
     [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonStringEnumConverter<ConsumerConfigReplayPolicy>))]
 #endif
-    public ConsumerConfigReplayPolicy ReplayPolicy { get; set; } = NATS.Client.JetStream.Models.ConsumerConfigReplayPolicy.Instant;
+    public ConsumerConfigReplayPolicy ReplayPolicy { get; set; } = ConsumerConfigReplayPolicy.Instant;
 
     [System.Text.Json.Serialization.JsonPropertyName("sample_freq")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public string SampleFreq { get; set; } = default!;
+    public string? SampleFreq { get; set; }
 
     /// <summary>
     /// The rate at which messages will be delivered to clients, expressed in bit per second
@@ -136,7 +136,7 @@ public record ConsumerConfig
     [System.Text.Json.Serialization.JsonPropertyName("rate_limit_bps")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     [System.ComponentModel.DataAnnotations.Range(0D, 18446744073709552000D)]
-    public long RateLimitBps { get; set; } = default!;
+    public long RateLimitBps { get; set; }
 
     /// <summary>
     /// The maximum number of messages without acknowledgement that can be outstanding, once this limit is reached message delivery will be suspended
@@ -144,7 +144,7 @@ public record ConsumerConfig
     [System.Text.Json.Serialization.JsonPropertyName("max_ack_pending")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
-    public long MaxAckPending { get; set; } = default!;
+    public long MaxAckPending { get; set; }
 
     /// <summary>
     /// If the Consumer is idle for more than this many nano seconds a empty message with Status header 100 will be sent indicating the consumer is still alive
@@ -159,7 +159,7 @@ public record ConsumerConfig
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("flow_control")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public bool FlowControl { get; set; } = default!;
+    public bool FlowControl { get; set; }
 
     /// <summary>
     /// The number of pulls that can be outstanding on a pull consumer, pulls received after this is reached are ignored
@@ -167,28 +167,28 @@ public record ConsumerConfig
     [System.Text.Json.Serialization.JsonPropertyName("max_waiting")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
-    public long MaxWaiting { get; set; } = default!;
+    public long MaxWaiting { get; set; }
 
     /// <summary>
     /// Creates a special consumer that does not touch the Raft layers, not for general use by clients, internal use only
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("direct")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public bool Direct { get; set; } = false;
+    public bool Direct { get; set; }
 
     /// <summary>
     /// Delivers only the headers of messages in the stream and not the bodies. Additionally adds Nats-Msg-Size header to indicate the size of the removed payload
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("headers_only")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public bool HeadersOnly { get; set; } = false;
+    public bool HeadersOnly { get; set; }
 
     /// <summary>
     /// The largest batch property that may be specified when doing a pull on a Pull Consumer
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("max_batch")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public int MaxBatch { get; set; } = 0;
+    public int MaxBatch { get; set; }
 
     /// <summary>
     /// The maximum expires value that may be set when doing a pull on a Pull Consumer
@@ -204,7 +204,7 @@ public record ConsumerConfig
     [System.Text.Json.Serialization.JsonPropertyName("max_bytes")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
-    public long MaxBytes { get; set; } = default!;
+    public long MaxBytes { get; set; }
 
     /// <summary>
     /// Duration that instructs the server to cleanup ephemeral consumers that are inactive for that long
@@ -219,7 +219,7 @@ public record ConsumerConfig
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("backoff")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public System.Collections.Generic.ICollection<long> Backoff { get; set; } = default!;
+    public ICollection<long>? Backoff { get; set; }
 
     /// <summary>
     /// When set do not inherit the replica count from the stream but specifically set it to this amount
@@ -227,19 +227,19 @@ public record ConsumerConfig
     [System.Text.Json.Serialization.JsonPropertyName("num_replicas")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
-    public long NumReplicas { get; set; } = default!;
+    public long NumReplicas { get; set; }
 
     /// <summary>
     /// Force the consumer state to be kept in memory rather than inherit the setting from the stream
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("mem_storage")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public bool MemStorage { get; set; } = false;
+    public bool MemStorage { get; set; }
 
     /// <summary>
     /// Additional metadata for the Consumer
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("metadata")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public System.Collections.Generic.IDictionary<string, string> Metadata { get; set; } = default!;
+    public IDictionary<string, string>? Metadata { get; set; }
 }
