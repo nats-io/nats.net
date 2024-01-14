@@ -15,6 +15,8 @@ public record StreamRestoreResponse
 #if NET6_0
     public string DeliverSubject { get; set; } = default!;
 #else
+#pragma warning disable SA1206
     public required string DeliverSubject { get; set; }
+#pragma warning restore SA1206
 #endif
 }

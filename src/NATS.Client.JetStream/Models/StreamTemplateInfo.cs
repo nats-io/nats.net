@@ -8,7 +8,9 @@ public record StreamTemplateInfo
 #if NET6_0
     public StreamTemplateConfig Config { get; set; } = default!;
 #else
+#pragma warning disable SA1206
     public required StreamTemplateConfig Config { get; set; }
+#pragma warning restore SA1206
 #endif
 
     /// <summary>

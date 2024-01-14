@@ -15,7 +15,9 @@ public record Republish
 #if NET6_0
     public string Src { get; set; } = default!;
 #else
+#pragma warning disable SA1206
     public required string Src { get; set; }
+#pragma warning restore SA1206
 #endif
 
     /// <summary>
@@ -27,7 +29,9 @@ public record Republish
 #if NET6_0
     public string Dest { get; set; } = default!;
 #else
+#pragma warning disable SA1206
     public required string Dest { get; set; }
+#pragma warning restore SA1206
 #endif
 
     /// <summary>

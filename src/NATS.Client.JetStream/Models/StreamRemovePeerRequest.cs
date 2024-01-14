@@ -15,6 +15,8 @@ public record StreamRemovePeerRequest
 #if NET6_0
     public string Peer { get; set; } = default!;
 #else
+#pragma warning disable SA1206
     public required string Peer { get; set; }
+#pragma warning restore SA1206
 #endif
 }
