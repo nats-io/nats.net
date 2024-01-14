@@ -18,7 +18,7 @@ public class NatsJSStream : INatsJSStream
 #endif
     internal NatsJSStream(NatsJSContext context, StreamInfo info)
     {
-        ArgumentNullException.ThrowIfNull(nameof(info.Config.Name));
+        ArgumentNullException.ThrowIfNull(info.Config.Name, nameof(info.Config.Name));
         _context = context;
         Info = info;
         _name = info.Config.Name!;
