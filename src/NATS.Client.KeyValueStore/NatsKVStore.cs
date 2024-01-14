@@ -270,7 +270,7 @@ public class NatsKVStore : INatsKVStore
             var bytes = ArrayPool<byte>.Shared.Rent(_context.Connection.Opts.ReaderBufferSize);
             try
             {
-                if (Convert.TryFromBase64String(response.Message.Data, bytes, out var written))
+                if (response.Message.Data != null && Convert.TryFromBase64String(response.Message.Data, bytes, out var written))
                 {
                     var buffer = new ReadOnlySequence<byte>(bytes.AsMemory(0, written));
                     data = serializer.Deserialize(buffer);

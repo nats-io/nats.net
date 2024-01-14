@@ -11,14 +11,14 @@ public record StreamInfoRequest
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("deleted_details")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public bool DeletedDetails { get; set; } = default!;
+    public bool DeletedDetails { get; set; }
 
     /// <summary>
     /// When set will return a list of subjects and how many messages they hold for all matching subjects. Filter is a standard NATS subject wildcard pattern.
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("subjects_filter")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public string SubjectsFilter { get; set; } = default!;
+    public string? SubjectsFilter { get; set; }
 
     /// <summary>
     /// Paging offset when retrieving pages of subjet details
@@ -26,5 +26,5 @@ public record StreamInfoRequest
     [System.Text.Json.Serialization.JsonPropertyName("offset")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     [System.ComponentModel.DataAnnotations.Range(0, int.MaxValue)]
-    public int Offset { get; set; } = default!;
+    public int Offset { get; set; }
 }

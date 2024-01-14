@@ -35,7 +35,11 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
 
         // For ordered consumer we start with an empty consumer info object
         // since consumers are created and updated during fetch and consume.
-        Info = new ConsumerInfo();
+        Info = new ConsumerInfo()
+        {
+            Name = string.Empty,
+            StreamName = string.Empty,
+        };
     }
 
     /// <summary>

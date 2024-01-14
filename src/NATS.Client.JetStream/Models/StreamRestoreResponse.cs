@@ -12,5 +12,9 @@ public record StreamRestoreResponse
     [System.Text.Json.Serialization.JsonPropertyName("deliver_subject")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required]
+#if NET6_0
     public string DeliverSubject { get; set; } = default!;
+#else
+    public required string DeliverSubject { get; set; }
+#endif
 }

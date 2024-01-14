@@ -22,7 +22,7 @@ public record ConsumerGetnextRequest
     [System.Text.Json.Serialization.JsonPropertyName("batch")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
-    public long Batch { get; set; } = default!;
+    public long Batch { get; set; }
 
     /// <summary>
     /// Sends at most this many bytes to the requestor, limited by consumer configuration max_bytes
@@ -30,14 +30,14 @@ public record ConsumerGetnextRequest
     [System.Text.Json.Serialization.JsonPropertyName("max_bytes")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
-    public long MaxBytes { get; set; } = default!;
+    public long MaxBytes { get; set; }
 
     /// <summary>
     /// When true a response with a 404 status header will be returned when no messages are available
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("no_wait")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public bool NoWait { get; set; } = default!;
+    public bool NoWait { get; set; }
 
     /// <summary>
     /// When not 0 idle heartbeats will be sent on this interval

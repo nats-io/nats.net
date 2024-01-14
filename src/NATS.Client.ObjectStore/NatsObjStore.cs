@@ -2,7 +2,6 @@ using System.Buffers;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using NATS.Client.Core;
 using NATS.Client.Core.Internal;
 using NATS.Client.JetStream;
@@ -73,6 +72,11 @@ public class NatsObjStore : INatsObjStore
         {
             var store = await _objContext.GetObjectStoreAsync(link.Bucket, cancellationToken).ConfigureAwait(false);
             return await store.GetAsync(link.Name, stream, leaveOpen, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (info.Nuid is null)
+        {
+            throw new NatsObjException("Object-store meta information invalid");
         }
 
         await using var pushConsumer = new NatsJSOrderedPushConsumer<NatsMemoryOwner<byte>>(
@@ -272,7 +276,7 @@ public class NatsObjStore : INatsObjStore
         await PublishMeta(meta, cancellationToken);
 
         // Delete the old object
-        if (info != null && info.Nuid != nuid)
+        if (info?.Nuid != null && info.Nuid != nuid)
         {
             try
             {
@@ -356,6 +360,11 @@ public class NatsObjStore : INatsObjStore
         if (target.Deleted)
         {
             throw new NatsObjException("Can't link to a deleted object");
+        }
+
+        if (target.Bucket is null)
+        {
+            throw new NatsObjException("Can't link to a target without bucket");
         }
 
         if (target.Options?.Link is not null)
@@ -484,6 +493,11 @@ public class NatsObjStore : INatsObjStore
         try
         {
             var response = await _stream.GetAsync(request, cancellationToken);
+
+            if (response.Message.Data == null)
+            {
+                throw new NatsObjException("Can't decode data message value");
+            }
 
             var base64String = Convert.FromBase64String(response.Message.Data);
             var data = NatsObjJsonSerializer<ObjectMetadata>.Default.Deserialize(new ReadOnlySequence<byte>(base64String)) ?? throw new NatsObjException("Can't deserialize object metadata");

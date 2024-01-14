@@ -8,5 +8,5 @@ public record MetaLeaderStepdownRequest
 {
     [System.Text.Json.Serialization.JsonPropertyName("placement")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public Placement Placement { get; set; } = default!;
+    public Placement? Placement { get; set; }
 }

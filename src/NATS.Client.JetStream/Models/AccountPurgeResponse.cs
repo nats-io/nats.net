@@ -7,9 +7,9 @@ namespace NATS.Client.JetStream.Models;
 public record AccountPurgeResponse
 {
     /// <summary>
-    /// If the purge operation was succesfully started
+    /// If the purge operation was successfully started
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("initiated")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public bool Initiated { get; set; } = false;
+    public bool Initiated { get; set; }
 }

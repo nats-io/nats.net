@@ -145,7 +145,8 @@ public class ObjectStoreCompat
         var list = new List<string>();
         await foreach (var info in store.WatchAsync())
         {
-            list.Add(info.Digest);
+            if (info.Digest is not null)
+                list.Add(info.Digest);
             if (list.Count == 2)
                 break;
         }
