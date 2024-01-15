@@ -11,7 +11,9 @@ public record StoredMessage
 #if NET6_0
     public string Subject { get; set; } = default!;
 #else
+#pragma warning disable SA1206
     public required string Subject { get; set; }
+#pragma warning restore SA1206
 #endif
 
     /// <summary>
@@ -39,7 +41,9 @@ public record StoredMessage
 #if NET6_0
     public string Time { get; set; } = default!;
 #else
+#pragma warning disable SA1206
     public required string Time { get; set; }
+#pragma warning restore SA1206
 #endif
 
     /// <summary>

@@ -15,7 +15,9 @@ public record StreamAlternate
 #if NET6_0
     public string Name { get; set; } = default!;
 #else
+#pragma warning disable SA1206
     public required string Name { get; set; }
+#pragma warning restore SA1206
 #endif
 
     /// <summary>
@@ -27,7 +29,9 @@ public record StreamAlternate
 #if NET6_0
     public string Cluster { get; set; } = default!;
 #else
+#pragma warning disable SA1206
     public required string Cluster { get; set; }
+#pragma warning restore SA1206
 #endif
 
     /// <summary>

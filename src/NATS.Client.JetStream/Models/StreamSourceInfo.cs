@@ -17,7 +17,9 @@ public record StreamSourceInfo
 #if NET6_0
     public string Name { get; set; } = default!;
 #else
+#pragma warning disable SA1206
     public required string Name { get; set; }
+#pragma warning restore SA1206
 #endif
 
     /// <summary>
