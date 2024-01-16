@@ -1,0 +1,117 @@
+using NATS.Client.Core.Tests;
+using NATS.Client.JetStream.Models;
+
+namespace NATS.Client.JetStream.Tests;
+
+public class NatsJSContextFactoryTest
+{
+    private readonly ITestOutputHelper _output;
+
+    public NatsJSContextFactoryTest(ITestOutputHelper output) => _output = output;
+
+    [Fact]
+    public async Task Create_Context_Test()
+    {
+        // Arrange
+        await using var server = NatsServer.Start(
+            outputHelper: _output,
+            opts: new NatsServerOptsBuilder()
+                .UseTransport(TransportType.Tcp)
+                .Trace()
+                .UseJetStream()
+                .Build());
+        await using var connection = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
+        var factory = new NatsJSContextFactory();
+
+        // Act
+        var context = factory.CreateContext(connection);
+
+        // Assert
+        context.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task Create_Context_WithOpts_Test()
+    {
+        // Arrange
+        await using var server = NatsServer.Start(
+            outputHelper: _output,
+            opts: new NatsServerOptsBuilder()
+                .UseTransport(TransportType.Tcp)
+                .Trace()
+                .UseJetStream()
+                .Build());
+        await using var connection = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
+        var factory = new NatsJSContextFactory();
+        var opts = new NatsJSOpts(connection.Opts);
+
+        // Act
+        var context = factory.CreateContext(connection, opts);
+
+        // Assert
+        context.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Create_Context_WithOptsAndMockConnection_Test()
+    {
+        // Arrange
+        var connection = new MockConnection();
+        var factory = new NatsJSContextFactory();
+        var opts = new NatsJSOpts(connection.Opts);
+
+        // Act
+        var context = () => factory.CreateContext(connection, opts);
+
+        // Assert
+        context.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void Create_Context_WithMockConnection_Test()
+    {
+        // Arrange
+        var connection = new MockConnection();
+        var factory = new NatsJSContextFactory();
+
+        // Act
+        var context = () => factory.CreateContext(connection);
+
+        // Assert
+        context.Should().Throw<ArgumentException>();
+    }
+
+    public class MockConnection : INatsConnection
+    {
+        public INatsServerInfo? ServerInfo { get; } = null;
+
+        public NatsOpts Opts { get; } = new();
+
+        public NatsConnectionState ConnectionState { get; } = NatsConnectionState.Closed;
+
+        public ValueTask<TimeSpan> PingAsync(CancellationToken cancellationToken = default) => throw new NotImplementedException();
+
+        public ValueTask PublishAsync<T>(string subject, T data, NatsHeaders? headers = default, string? replyTo = default, INatsSerialize<T>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+
+        public ValueTask PublishAsync(string subject, NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+
+        public ValueTask PublishAsync<T>(in NatsMsg<T> msg, INatsSerialize<T>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+
+        public IAsyncEnumerable<NatsMsg<T>> SubscribeAsync<T>(string subject, string? queueGroup = default, INatsDeserialize<T>? serializer = default, NatsSubOpts? opts = default, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+
+        public ValueTask<INatsSub<T>> SubscribeCoreAsync<T>(string subject, string? queueGroup = default, INatsDeserialize<T>? serializer = default, NatsSubOpts? opts = default, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+
+        public string NewInbox() => throw new NotImplementedException();
+
+        public ValueTask<NatsMsg<TReply>> RequestAsync<TRequest, TReply>(string subject, TRequest? data, NatsHeaders? headers = default, INatsSerialize<TRequest>? requestSerializer = default, INatsDeserialize<TReply>? replySerializer = default, NatsPubOpts? requestOpts = default,
+            NatsSubOpts? replyOpts = default, CancellationToken cancellationToken = default) =>
+            throw new NotImplementedException();
+
+        public IAsyncEnumerable<NatsMsg<TReply>> RequestManyAsync<TRequest, TReply>(string subject, TRequest? data, NatsHeaders? headers = default, INatsSerialize<TRequest>? requestSerializer = default, INatsDeserialize<TReply>? replySerializer = default, NatsPubOpts? requestOpts = default,
+            NatsSubOpts? replyOpts = default, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+
+        public ValueTask ConnectAsync() => throw new NotImplementedException();
+
+        public ValueTask DisposeAsync() => throw new NotImplementedException();
+    }
+}
