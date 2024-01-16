@@ -82,13 +82,3 @@ public class NatsObjContextFactoryTest
         public IAsyncEnumerable<string> ListStreamNamesAsync(string? subject = default, CancellationToken cancellationToken = default) => throw new NotImplementedException();
     }
 }
-
-public class NatsObjContextFactory : INatsObjContextFactory
-{
-    public INatsObjContext CreateContext(INatsJSContext jsContext)
-    {
-        var context = jsContext as NatsJSContext ?? throw new ArgumentException("Connection must be a NatsConnection");
-
-        return new NatsObjContext(context);
-    }
-}
