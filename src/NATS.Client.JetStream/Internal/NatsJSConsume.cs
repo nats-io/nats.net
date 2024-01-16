@@ -323,7 +323,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         else
         {
             var msg = new NatsJSMsg<TMsg>(
-                NatsMsg<TMsg>.Build(
+                InFlightNatsMsg<TMsg>.BuildInternal(
                     subject,
                     replyTo,
                     headersBuffer,

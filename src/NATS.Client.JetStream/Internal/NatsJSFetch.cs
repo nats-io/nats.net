@@ -224,7 +224,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         else
         {
             var msg = new NatsJSMsg<TMsg>(
-                NatsMsg<TMsg>.Build(
+                InFlightNatsMsg<TMsg>.BuildInternal(
                     subject,
                     replyTo,
                     headersBuffer,

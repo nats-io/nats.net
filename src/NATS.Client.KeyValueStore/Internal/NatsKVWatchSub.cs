@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Threading.Channels;
 using NATS.Client.Core;
+using NATS.Client.Core.Internal;
 using NATS.Client.JetStream;
 
 namespace NATS.Client.KeyValueStore.Internal;
@@ -54,7 +55,7 @@ internal class NatsKVWatchSub<T> : NatsSubBase
         ReadOnlySequence<byte>? headersBuffer,
         ReadOnlySequence<byte> payloadBuffer)
     {
-        var msg = new NatsJSMsg<T>(NatsMsg<T>.Build(subject, replyTo, headersBuffer, payloadBuffer, _nats, _headerParser, _serializer), _context);
+        var msg = new NatsJSMsg<T>(InFlightNatsMsg<T>.BuildInternal(subject, replyTo, headersBuffer, payloadBuffer, _nats, _headerParser, _serializer), _context);
         await _commands.WriteAsync(new NatsKVWatchCommandMsg<T> { Command = NatsKVWatchCommand.Msg, Msg = msg }, _cancellationToken).ConfigureAwait(false);
     }
 
