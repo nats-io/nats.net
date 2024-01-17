@@ -1,0 +1,27 @@
+﻿name: Format
+
+on:
+  pull_request: {}
+
+jobs:
+  check:
+    name: check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup dotnet
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.x'
+
+      - name: Check formatting
+        run: |
+          if dotnet format --verify-no-changes; then
+            echo "formatting passed"
+          else
+            rc="$?"
+            echo "formatting failed; run 'dotnet format'" >&2
+            exit "$rc"
+          fi
