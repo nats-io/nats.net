@@ -32,7 +32,6 @@ public class NatsObjContextFactoryTest
         context.Should().NotBeNull();
     }
 
-
     [Fact]
     public void Create_Context_WithMockConnection_Test()
     {

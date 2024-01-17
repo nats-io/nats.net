@@ -186,6 +186,8 @@ public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
     /// </summary>
     public string? ReplyTo => _msg.ReplyTo;
 
+    internal NatsMsg<T> Msg => _msg;
+
     /// <summary>
     /// Reply with an empty message.
     /// </summary>
