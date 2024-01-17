@@ -619,7 +619,7 @@ public partial class NatsConnection : INatsConnection
             while (!_disposedCancellationTokenSource.IsCancellationRequested)
             {
                 var hasData = await _eventChannel.Reader.WaitToReadAsync(_disposedCancellationTokenSource.Token).ConfigureAwait(false);
-                if (hasData && _eventChannel.Reader.TryRead(out var eventArgs))
+                while (hasData && _eventChannel.Reader.TryRead(out var eventArgs))
                 {
                     var (natsEvent, args) = eventArgs;
                     switch (natsEvent)
