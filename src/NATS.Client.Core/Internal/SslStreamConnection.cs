@@ -94,11 +94,19 @@ internal sealed class SslStreamConnection : ISocketConnection
             var task = await Task.WhenAny(taskSsl, taskTimeout).ConfigureAwait(false);
             if (task == taskTimeout)
             {
+#if NET6_0
                 ctsAuth.Cancel();
+#else
+                await ctsAuth.CancelAsync().ConfigureAwait(false);
+#endif
                 throw new NatsException("TLS authentication timed out");
             }
 
+#if NET6_0
             ctsTimer.Cancel();
+#else
+            await ctsTimer.CancelAsync().ConfigureAwait(false);
+#endif
             await taskSsl.ConfigureAwait(true);
         }
         catch (AuthenticationException ex)
