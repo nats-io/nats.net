@@ -121,7 +121,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
 
                             var canRead = cc.Msgs.TryRead(out msg);
                             if (!canRead)
-                                    break;
+                                break;
 
                             if (msg.Metadata is not { } metadata)
                                 continue;
