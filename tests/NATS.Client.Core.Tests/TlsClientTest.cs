@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
+using System.Text;
 
 namespace NATS.Client.Core.Tests;
 
@@ -82,10 +83,11 @@ public class TlsClientTest
 
             var stream = client.GetStream();
 
-            var sw = new StreamWriter(stream);
-            await sw.WriteLineAsync("INFO {\"tls_required\":true}");
+            var sw = new StreamWriter(stream, Encoding.ASCII);
+            await sw.WriteAsync("INFO {\"tls_required\":true}\r\n");
             await sw.FlushAsync();
 
+            // Wait for the client TLS auth to timeout
             await signal;
         });
 
