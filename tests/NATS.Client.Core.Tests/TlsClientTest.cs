@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
 
 namespace NATS.Client.Core.Tests;
@@ -63,5 +65,46 @@ public class TlsClientTest
         // which is causing the connection to hang. So if the serer is configured to verify the client
         // and the client does not provide a certificate, the connection will hang on Linux.
         await Task.WhenAny(exceptionTask, Task.Delay(3000));
+    }
+
+    [Fact]
+    public async Task Client_timeout_during_tls_auth()
+    {
+        var server = new TcpListener(IPAddress.Parse("127.0.0.1"), 0);
+        server.Start();
+
+        var port = ((IPEndPoint)server.LocalEndpoint).Port;
+
+        var signal = new WaitSignal();
+        var serverTask = Task.Run(async () =>
+        {
+            var client = await server.AcceptTcpClientAsync();
+
+            var stream = client.GetStream();
+
+            var sw = new StreamWriter(stream);
+            await sw.WriteLineAsync("INFO {\"tls_required\":true}");
+            await sw.FlushAsync();
+
+            await signal;
+        });
+
+        await using var nats = new NatsConnection(new NatsOpts
+        {
+            Url = $"127.0.0.1:{port}",
+            ConnectTimeout = TimeSpan.FromSeconds(3),
+            TlsOpts = new NatsTlsOpts
+            {
+                CaFile = @"resources\certs\ca-cert.pem",
+                CertFile = @"resources\certs\client-cert.pem",
+                KeyFile = @"resources\certs\client-key.pem",
+            },
+        });
+
+        var exception = await Assert.ThrowsAsync<NatsException>(async () => await nats.ConnectAsync());
+        Assert.Equal("TLS authentication timed out", exception.InnerException!.Message);
+
+        signal.Pulse();
+        await serverTask;
     }
 }

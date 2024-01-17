@@ -289,7 +289,7 @@ public partial class NatsConnection : INatsConnection
                     {
                         // upgrade TcpConnection to SslConnection
                         var sslConnection = conn.UpgradeToSslStreamConnection(Opts.TlsOpts, _tlsCerts);
-                        await sslConnection.AuthenticateAsClientAsync(uri).ConfigureAwait(false);
+                        await sslConnection.AuthenticateAsClientAsync(uri, Opts.ConnectTimeout).ConfigureAwait(false);
                         _socket = sslConnection;
                     }
                 }
@@ -394,7 +394,7 @@ public partial class NatsConnection : INatsConnection
 
                     // upgrade TcpConnection to SslConnection
                     var sslConnection = tcpConnection.UpgradeToSslStreamConnection(Opts.TlsOpts, _tlsCerts);
-                    await sslConnection.AuthenticateAsClientAsync(targetUri).ConfigureAwait(false);
+                    await sslConnection.AuthenticateAsClientAsync(targetUri, Opts.ConnectTimeout).ConfigureAwait(false);
                     _socket = sslConnection;
 
                     // create new socket reader
@@ -544,7 +544,7 @@ public partial class NatsConnection : INatsConnection
                         {
                             // upgrade TcpConnection to SslConnection
                             var sslConnection = conn.UpgradeToSslStreamConnection(Opts.TlsOpts, _tlsCerts);
-                            await sslConnection.AuthenticateAsClientAsync(FixTlsHost(url)).ConfigureAwait(false);
+                            await sslConnection.AuthenticateAsClientAsync(FixTlsHost(url), Opts.ConnectTimeout).ConfigureAwait(false);
                             _socket = sslConnection;
                         }
                     }
