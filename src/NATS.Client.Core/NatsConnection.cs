@@ -213,7 +213,7 @@ public partial class NatsConnection : INatsConnection
         return ValueTask.CompletedTask;
     }
 
-    internal void MessageDropped<T>(NatsSub<T> natsSub, int pending, NatsMsg<T> msg)
+    internal void MessageDropped<T>(NatsSubBase natsSub, int pending, NatsMsg<T> msg)
     {
         var subject = msg.Subject;
         _logger.LogWarning("Dropped message from {Subject} with {Pending} pending messages", subject, pending);
