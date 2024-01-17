@@ -97,9 +97,9 @@ public class TlsClientTest
             ConnectTimeout = TimeSpan.FromSeconds(3),
             TlsOpts = new NatsTlsOpts
             {
-                CaFile = @"resources\certs\ca-cert.pem",
-                CertFile = @"resources\certs\client-cert.pem",
-                KeyFile = @"resources\certs\client-key.pem",
+                CaFile = "resources/certs/ca-cert.pem",
+                CertFile = "resources/certs/client-cert.pem",
+                KeyFile = "resources/certs/client-key.pem",
             },
         });
 
