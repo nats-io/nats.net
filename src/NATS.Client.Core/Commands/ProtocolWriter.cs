@@ -1,6 +1,6 @@
+using System.Buffers;
 using System.Buffers.Binary;
 using System.Buffers.Text;
-using System.IO.Pipelines;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
@@ -36,47 +36,40 @@ internal sealed class ProtocolWriter
     private static readonly ulong PongNewLine = BinaryPrimitives.ReadUInt64LittleEndian("PONG\r\n  "u8);
     private static readonly ulong UnsubSpace = BinaryPrimitives.ReadUInt64LittleEndian("UNSUB   "u8);
 
-    private readonly PipeWriter _writer;
-    private readonly HeaderWriter _headerWriter;
-    private readonly Encoding _subjectEncoding;
+    private readonly Encoding _encoding;
 
-    public ProtocolWriter(PipeWriter writer, Encoding subjectEncoding, Encoding headerEncoding)
-    {
-        _writer = writer;
-        _subjectEncoding = subjectEncoding;
-        _headerWriter = new HeaderWriter(writer, headerEncoding);
-    }
+    public ProtocolWriter(Encoding encoding) => _encoding = encoding;
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#connect
     // CONNECT {["option_name":option_value],...}
-    public void WriteConnect(ClientOpts opts)
+    public void WriteConnect(IBufferWriter<byte> writer, ClientOpts opts)
     {
-        var span = _writer.GetSpan(UInt64Length);
+        var span = writer.GetSpan(UInt64Length);
         BinaryPrimitives.WriteUInt64LittleEndian(span, ConnectSpace);
-        _writer.Advance(ConnectSpaceLength);
+        writer.Advance(ConnectSpaceLength);
 
-        var jsonWriter = new Utf8JsonWriter(_writer);
+        var jsonWriter = new Utf8JsonWriter(writer);
         JsonSerializer.Serialize(jsonWriter, opts, JsonContext.Default.ClientOpts);
 
-        span = _writer.GetSpan(UInt16Length);
+        span = writer.GetSpan(UInt16Length);
         BinaryPrimitives.WriteUInt16LittleEndian(span, NewLine);
-        _writer.Advance(NewLineLength);
+        writer.Advance(NewLineLength);
     }
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#ping-pong
-    public void WritePing()
+    public void WritePing(IBufferWriter<byte> writer)
     {
-        var span = _writer.GetSpan(UInt64Length);
+        var span = writer.GetSpan(UInt64Length);
         BinaryPrimitives.WriteUInt64LittleEndian(span, PingNewLine);
-        _writer.Advance(PingNewLineLength);
+        writer.Advance(PingNewLineLength);
     }
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#ping-pong
-    public void WritePong()
+    public void WritePong(IBufferWriter<byte> writer)
     {
-        var span = _writer.GetSpan(UInt64Length);
+        var span = writer.GetSpan(UInt64Length);
         BinaryPrimitives.WriteUInt64LittleEndian(span, PongNewLine);
-        _writer.Advance(PongNewLineLength);
+        writer.Advance(PongNewLineLength);
     }
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#pub
@@ -84,147 +77,120 @@ internal sealed class ProtocolWriter
     // or
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#hpub
     // HPUB <subject> [reply-to] <#header bytes> <#total bytes>\r\n[headers]\r\n\r\n[payload]\r\n
-    //
-    // returns the number of bytes that should be skipped when writing to the wire
-    public int WritePublish<T>(string subject, T? value, NatsHeaders? headers, string? replyTo, INatsSerialize<T> serializer)
+    public void WritePublish(IBufferWriter<byte> writer, string subject, string? replyTo, ReadOnlyMemory<byte>? headers, ReadOnlyMemory<byte> payload)
     {
-        int ctrlLen;
         if (headers == null)
         {
-            // 'PUB '   + subject                                +' '+ payload len        +'\r\n'
-            ctrlLen = PubSpaceLength + _subjectEncoding.GetByteCount(subject) + 1 + MaxIntStringLength + NewLineLength;
-        }
-        else
-        {
-            // 'HPUB '  + subject                                +' '+ header len         +' '+ payload len        +'\r\n'
-            ctrlLen = HpubSpaceLength + _subjectEncoding.GetByteCount(subject) + 1 + MaxIntStringLength + 1 + MaxIntStringLength + NewLineLength;
-        }
-
-        if (replyTo != null)
-        {
-            // len  += replyTo                                +' '
-            ctrlLen += _subjectEncoding.GetByteCount(replyTo) + 1;
-        }
-
-        var ctrlSpan = _writer.GetSpan(ctrlLen);
-        var span = ctrlSpan;
-        if (headers == null)
-        {
+            var span = writer.GetSpan(PubSpaceLength);
             BinaryPrimitives.WriteUInt32LittleEndian(span, PubSpace);
-            span = span[PubSpaceLength..];
+            writer.Advance(PubSpaceLength);
         }
         else
         {
+            var span = writer.GetSpan(HpubSpaceLength);
             BinaryPrimitives.WriteUInt64LittleEndian(span, HpubSpace);
-            span = span[HpubSpaceLength..];
+            writer.Advance(HpubSpaceLength);
         }
-
-        var written = _subjectEncoding.GetBytes(subject, span);
-        span[written] = (byte)' ';
-        span = span[(written + 1)..];
-
-        if (replyTo != null)
-        {
-            written = _subjectEncoding.GetBytes(replyTo, span);
-            span[written] = (byte)' ';
-            span = span[(written + 1)..];
-        }
-
-        Span<byte> lenSpan;
-        if (headers == null)
-        {
-            // len =            payload len
-            lenSpan = span[..MaxIntStringLength];
-            span = span[lenSpan.Length..];
-        }
-        else
-        {
-            // len =          header len         +' '+ payload len
-            lenSpan = span[..(MaxIntStringLength + 1 + MaxIntStringLength)];
-            span = span[lenSpan.Length..];
-        }
-
-        BinaryPrimitives.WriteUInt16LittleEndian(span, NewLine);
-        _writer.Advance(ctrlLen);
 
         var headersLength = 0L;
         var totalLength = 0L;
         if (headers != null)
         {
-            headersLength = _headerWriter.Write(headers);
+            headersLength = headers.Value.Length;
             totalLength += headersLength;
         }
 
-        // Consider null as empty payload. This way we are able to transmit null values as sentinels.
-        // Another point is serializer behaviour. For instance JSON serializer seems to serialize null
-        // as a string "null", others might throw exception.
-        if (value != null)
+        totalLength += payload.Length;
+
+        // subject
         {
-            var initialCount = _writer.UnflushedBytes;
-            serializer.Serialize(_writer, value);
-            totalLength += _writer.UnflushedBytes - initialCount;
+            var len = _encoding.GetByteCount(subject) + 1;
+            var span = writer.GetSpan(len);
+            var written = _encoding.GetBytes(subject, span);
+            span[written] = (byte)' ';
+            writer.Advance(len);
         }
 
-        span = _writer.GetSpan(UInt16Length);
-        BinaryPrimitives.WriteUInt16LittleEndian(span, NewLine);
-        _writer.Advance(NewLineLength);
+        if (replyTo != null)
+        {
+            var len = _encoding.GetByteCount(replyTo) + 1;
+            var span = writer.GetSpan(len);
+            var written = _encoding.GetBytes(replyTo, span);
+            span[written] = (byte)' ';
+            writer.Advance(len);
+        }
 
-        // write the length
-        var lenWritten = 0;
         if (headers != null)
         {
-            if (!Utf8Formatter.TryFormat(headersLength, lenSpan, out lenWritten))
+            var span = writer.GetSpan(MaxIntStringLength + 1);
+            if (!Utf8Formatter.TryFormat(headersLength, span, out var written))
             {
                 ThrowOnUtf8FormatFail();
             }
 
-            lenSpan[lenWritten] = (byte)' ';
-            lenWritten += 1;
+            span[written] = (byte)' ';
+            writer.Advance(written + 1);
         }
 
-        if (!Utf8Formatter.TryFormat(totalLength, lenSpan[lenWritten..], out var tLen))
+        // payload length
         {
-            ThrowOnUtf8FormatFail();
+            var span = writer.GetSpan(MaxIntStringLength);
+            if (!Utf8Formatter.TryFormat(totalLength, span, out var written))
+            {
+                ThrowOnUtf8FormatFail();
+            }
+
+            writer.Advance(written);
         }
 
-        lenWritten += tLen;
-        var trim = lenSpan.Length - lenWritten;
-        if (trim > 0)
+        // CRLF
         {
-            // shift right
-            ctrlSpan[..(ctrlLen - trim - NewLineLength)].CopyTo(ctrlSpan[trim..]);
-            ctrlSpan[..trim].Clear();
+            var span = writer.GetSpan(UInt16Length);
+            BinaryPrimitives.WriteUInt16LittleEndian(span, NewLine);
+            writer.Advance(NewLineLength);
         }
 
-        return trim;
+        if (headers != null)
+        {
+            writer.Write(headers.Value.Span);
+        }
+
+        writer.Write(payload.Span);
+
+        // CRLF
+        {
+            var span = writer.GetSpan(UInt16Length);
+            BinaryPrimitives.WriteUInt16LittleEndian(span, NewLine);
+            writer.Advance(NewLineLength);
+        }
     }
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#sub
     // SUB <subject> [queue group] <sid>
-    public void WriteSubscribe(int sid, string subject, string? queueGroup, int? maxMsgs)
+    public void WriteSubscribe(IBufferWriter<byte> writer, int sid, string subject, string? queueGroup, int? maxMsgs)
     {
         // 'SUB '                       + subject                                +' '+ sid                +'\r\n'
-        var ctrlLen = SubSpaceLength + _subjectEncoding.GetByteCount(subject) + 1 + MaxIntStringLength + NewLineLength;
+        var ctrlLen = SubSpaceLength + _encoding.GetByteCount(subject) + 1 + MaxIntStringLength + NewLineLength;
 
         if (queueGroup != null)
         {
             // len  += queueGroup                                +' '
-            ctrlLen += _subjectEncoding.GetByteCount(queueGroup) + 1;
+            ctrlLen += _encoding.GetByteCount(queueGroup) + 1;
         }
 
-        var span = _writer.GetSpan(ctrlLen);
+        var span = writer.GetSpan(ctrlLen);
         BinaryPrimitives.WriteUInt32LittleEndian(span, SubSpace);
         var size = SubSpaceLength;
         span = span[SubSpaceLength..];
 
-        var written = _subjectEncoding.GetBytes(subject, span);
+        var written = _encoding.GetBytes(subject, span);
         span[written] = (byte)' ';
         size += written + 1;
         span = span[(written + 1)..];
 
         if (queueGroup != null)
         {
-            written = _subjectEncoding.GetBytes(subject, span);
+            written = _encoding.GetBytes(subject, span);
             span[written] = (byte)' ';
             size += written + 1;
             span = span[(written + 1)..];
@@ -241,20 +207,20 @@ internal sealed class ProtocolWriter
         BinaryPrimitives.WriteUInt16LittleEndian(span, NewLine);
         size += NewLineLength;
 
-        _writer.Advance(size);
+        writer.Advance(size);
 
         // Immediately send UNSUB <sid> <max-msgs> to minimize the risk of
         // receiving more messages than <max-msgs> in case they are published
         // between our SUB and UNSUB calls.
         if (maxMsgs != null)
         {
-            WriteUnsubscribe(sid, maxMsgs);
+            WriteUnsubscribe(writer, sid, maxMsgs);
         }
     }
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#unsub
     // UNSUB <sid> [max_msgs]
-    public void WriteUnsubscribe(int sid, int? maxMessages)
+    public void WriteUnsubscribe(IBufferWriter<byte> writer, int sid, int? maxMessages)
     {
         // 'UNSUB '                       + sid                +'\r\n'
         var ctrlLen = UnsubSpaceLength + MaxIntStringLength + NewLineLength;
@@ -264,7 +230,7 @@ internal sealed class ProtocolWriter
             ctrlLen += 1 + MaxIntStringLength;
         }
 
-        var span = _writer.GetSpan(ctrlLen);
+        var span = writer.GetSpan(ctrlLen);
         BinaryPrimitives.WriteUInt64LittleEndian(span, UnsubSpace);
         var size = UnsubSpaceLength;
         span = span[UnsubSpaceLength..];
@@ -291,7 +257,7 @@ internal sealed class ProtocolWriter
         BinaryPrimitives.WriteUInt16LittleEndian(span, NewLine);
         size += NewLineLength;
 
-        _writer.Advance(size);
+        writer.Advance(size);
     }
 
     // optimization detailed here: https://github.com/nats-io/nats.net.v2/issues/320#issuecomment-1886165748

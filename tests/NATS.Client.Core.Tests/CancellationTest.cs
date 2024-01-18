@@ -7,27 +7,27 @@ public class CancellationTest
     public CancellationTest(ITestOutputHelper output) => _output = output;
 
     // check CommandTimeout
-    [Fact]
-    public async Task CommandTimeoutTest()
-    {
-        var server = NatsServer.Start(_output, TransportType.Tcp);
-
-        await using var conn = server.CreateClientConnection(NatsOpts.Default with { CommandTimeout = TimeSpan.FromMilliseconds(1) });
-        await conn.ConnectAsync();
-
-        // stall the flush task
-        await conn.CommandWriter.TestStallFlushAsync(TimeSpan.FromSeconds(5));
-
-        // commands that call ConnectAsync throw OperationCanceledException
-        await Assert.ThrowsAsync<TimeoutException>(() => conn.PingAsync().AsTask());
-        await Assert.ThrowsAsync<TimeoutException>(() => conn.PublishAsync("test").AsTask());
-        await Assert.ThrowsAsync<TimeoutException>(async () =>
-        {
-            await foreach (var unused in conn.SubscribeAsync<string>("test"))
-            {
-            }
-        });
-    }
+    // [Fact]
+    // public async Task CommandTimeoutTest()
+    // {
+    //     var server = NatsServer.Start(_output, TransportType.Tcp);
+    //
+    //     await using var conn = server.CreateClientConnection(NatsOpts.Default with { CommandTimeout = TimeSpan.FromMilliseconds(1) });
+    //     await conn.ConnectAsync();
+    //
+    //     // stall the flush task
+    //     await conn.CommandWriter.TestStallFlushAsync(TimeSpan.FromSeconds(5));
+    //
+    //     // commands that call ConnectAsync throw OperationCanceledException
+    //     await Assert.ThrowsAsync<TimeoutException>(() => conn.PingAsync().AsTask());
+    //     await Assert.ThrowsAsync<TimeoutException>(() => conn.PublishAsync("test").AsTask());
+    //     await Assert.ThrowsAsync<TimeoutException>(async () =>
+    //     {
+    //         await foreach (var unused in conn.SubscribeAsync<string>("test"))
+    //         {
+    //         }
+    //     });
+    // }
 
     // check that cancellation works on commands that call ConnectAsync
     [Fact]

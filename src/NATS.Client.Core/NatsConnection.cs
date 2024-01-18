@@ -47,7 +47,7 @@ public partial class NatsConnection : INatsConnection
     private volatile NatsUri? _currentConnectUri;
     private volatile NatsUri? _lastSeedConnectUri;
     private NatsReadProtocolProcessor? _socketReader;
-    private NatsPipeliningWriteProtocolProcessor? _socketWriter;
+    // private NatsPipeliningWriteProtocolProcessor? _socketWriter;
     private TaskCompletionSource _waitForOpenConnection;
     private TlsCerts? _tlsCerts;
     private UserCredentials? _userCredentials;
@@ -197,7 +197,7 @@ public partial class NatsConnection : INatsConnection
     {
         try
         {
-            return CommandWriter.UnsubscribeAsync(sid, CancellationToken.None);
+            return CommandWriter.UnsubscribeAsync(sid, null, CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -433,8 +433,7 @@ public partial class NatsConnection : INatsConnection
                 }
             }
 
-            // create the socket writer
-            _socketWriter = CommandWriter.CreateNatsPipeliningWriteProtocolProcessor(_socket!);
+            CommandWriter.Reset(_socket!);
 
             lock (_gate)
             {
@@ -740,11 +739,6 @@ public partial class NatsConnection : INatsConnection
     private async ValueTask DisposeSocketAsync(bool asyncReaderDispose)
     {
         // writer's internal buffer/channel is not thread-safe, must wait until complete.
-        if (_socketWriter != null)
-        {
-            await DisposeSocketComponentAsync(_socketWriter, "socket writer").ConfigureAwait(false);
-            _socketWriter = null;
-        }
 
         if (_socket != null)
         {
