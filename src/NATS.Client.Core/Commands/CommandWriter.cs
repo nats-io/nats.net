@@ -60,7 +60,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         _enqueuePing = enqueuePing;
         _opts = opts;
         _protocolWriter = new ProtocolWriter(opts.SubjectEncoding);
-        var channel = Channel.CreateUnbounded<QueuedCommand>(new UnboundedChannelOptions { SingleReader = true });
+        var channel = Channel.CreateBounded<QueuedCommand>(new BoundedChannelOptions(128) { SingleReader = true });
         _writer = channel.Writer;
         _reader = channel.Reader;
         _writerLoopTask = Task.Run(WriterLoopAsync);
@@ -73,53 +73,60 @@ internal sealed class CommandWriter : IAsyncDisposable
         {
             while (true)
             {
-                ISocketConnection connection;
-                PipeReader pipeReader;
-
-                lock (_lock)
-                {
-                    connection = _socketConnection;
-                    pipeReader = _pipeReader;
-                }
-
-                if (connection == null || pipeReader == null)
-                {
-                    await Task.Delay(10).ConfigureAwait(false);
-                    continue;
-                }
-
-                var result = await pipeReader.ReadAsync().ConfigureAwait(false);
-                var buffer = result.Buffer;
                 try
                 {
-                    if (!buffer.IsEmpty)
-                    {
-                        // Console.WriteLine($">>> READER: {buffer.Length}");
-                        var bytes = ArrayPool<byte>.Shared.Rent((int)buffer.Length);
-                        buffer.CopyTo(bytes);
-                        var memory = bytes.AsMemory(0, (int)buffer.Length);
-                        // Console.WriteLine($"            memory: {new ReadOnlySequence<byte>(memory).Dump()}");
-                        try
-                        {
-                            await connection.SendAsync(memory).ConfigureAwait(false);
-                        }
-                        catch (Exception e)
-                        {
-                            connection.SignalDisconnected(e);
-                        }
+                    ISocketConnection connection;
+                    PipeReader pipeReader;
 
-                        ArrayPool<byte>.Shared.Return(bytes);
+                    lock (_lock)
+                    {
+                        connection = _socketConnection;
+                        pipeReader = _pipeReader;
+                    }
+
+                    if (connection == null || pipeReader == null)
+                    {
+                        await Task.Delay(10).ConfigureAwait(false);
+                        continue;
+                    }
+
+                    var result = await pipeReader.ReadAsync().ConfigureAwait(false);
+                    var buffer = result.Buffer;
+                    try
+                    {
+                        if (!buffer.IsEmpty)
+                        {
+                            // Console.WriteLine($">>> READER: {buffer.Length}");
+                            var bytes = ArrayPool<byte>.Shared.Rent((int)buffer.Length);
+                            buffer.CopyTo(bytes);
+                            var memory = bytes.AsMemory(0, (int)buffer.Length);
+                            // Console.WriteLine($"            memory: {new ReadOnlySequence<byte>(memory).Dump()}");
+                            try
+                            {
+                                await connection.SendAsync(memory).ConfigureAwait(false);
+                            }
+                            catch (Exception e)
+                            {
+                                connection.SignalDisconnected(e);
+                            }
+
+                            ArrayPool<byte>.Shared.Return(bytes);
+                        }
+                    }
+                    finally
+                    {
+                        pipeReader.AdvanceTo(buffer.End);
                     }
                 }
-                finally
+                catch (Exception e)
                 {
-                    pipeReader.AdvanceTo(buffer.End);
+                    Console.WriteLine($">>> ERROR READER LOOP: {e}");
                 }
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($">>> ERROR READER LOOP: {ex}");
+            Console.WriteLine($">>> ERROR READER OUTER LOOP: {ex}");
         }
         finally
         {
@@ -130,8 +137,10 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         lock (_lock)
         {
+            _pipeWriter?.Complete();
+            _pipeReader?.Complete();
             _socketConnection = socketConnection;
-            var pipe = new Pipe();
+            var pipe = new Pipe(new PipeOptions(useSynchronizationContext: false));
             _pipeReader = pipe.Reader;
             _pipeWriter = pipe.Writer;
         }
@@ -146,53 +155,59 @@ internal sealed class CommandWriter : IAsyncDisposable
                 while (_reader.TryRead(out var cmd))
                 {
                     // Console.WriteLine($">>> COMMAND: {cmd.command}");
+                    try
+                    {
+                        PipeWriter bw;
+                        lock (_lock)
+                        {
+                            bw = _pipeWriter;
+                        }
 
-                    PipeWriter bw;
-                    lock (_lock)
-                    {
-                        bw = _pipeWriter;
-                    }
+                        if (cmd.command == Command.Connect)
+                        {
+                            _protocolWriter.WriteConnect(bw, cmd.connectOpts!);
+                        }
+                        else if (cmd.command == Command.Ping)
+                        {
+                            _protocolWriter.WritePing(bw);
+                        }
+                        else if (cmd.command == Command.Pong)
+                        {
+                            _protocolWriter.WritePong(bw);
+                        }
+                        else if (cmd.command == Command.Publish)
+                        {
+                            var payload = cmd.payload!.WrittenMemory;
+                            var headers = cmd.headers?.WrittenMemory;
+                            _protocolWriter.WritePublish(bw, cmd.subject!, cmd.replyTo, headers, payload);
+                            cmd.headers?.Dispose();
+                            cmd.payload!.Dispose();
+                        }
+                        else if (cmd.command == Command.Subscribe)
+                        {
+                            _protocolWriter.WriteSubscribe(bw, cmd.sid!.Value, cmd.subject!, cmd.queueGroup, cmd.maxMsgs);
+                        }
+                        else if (cmd.command == Command.Unsubscribe)
+                        {
+                            _protocolWriter.WriteUnsubscribe(bw, cmd.sid!.Value, cmd.maxMsgs);
+                        }
+                        else
+                        {
+                            throw new ArgumentOutOfRangeException(nameof(cmd.command));
+                        }
 
-                    if (cmd.command == Command.Connect)
-                    {
-                        _protocolWriter.WriteConnect(bw, cmd.connectOpts!);
+                        await bw.FlushAsync().ConfigureAwait(false);
                     }
-                    else if (cmd.command == Command.Ping)
+                    catch (Exception e)
                     {
-                        _protocolWriter.WritePing(bw);
+                        Console.WriteLine($">>> ERROR WRITER LOOP: {e}");
                     }
-                    else if (cmd.command == Command.Pong)
-                    {
-                        _protocolWriter.WritePong(bw);
-                    }
-                    else if (cmd.command == Command.Publish)
-                    {
-                        var payload = cmd.payload!.WrittenMemory;
-                        var headers = cmd.headers?.WrittenMemory;
-                        _protocolWriter.WritePublish(bw, cmd.subject!, cmd.replyTo, headers, payload);
-                        cmd.headers?.Dispose();
-                        cmd.payload!.Dispose();
-                    }
-                    else if (cmd.command == Command.Subscribe)
-                    {
-                        _protocolWriter.WriteSubscribe(bw, cmd.sid!.Value, cmd.subject!, cmd.queueGroup, cmd.maxMsgs);
-                    }
-                    else if (cmd.command == Command.Unsubscribe)
-                    {
-                        _protocolWriter.WriteUnsubscribe(bw, cmd.sid!.Value, cmd.maxMsgs);
-                    }
-                    else
-                    {
-                        throw new ArgumentOutOfRangeException(nameof(cmd.command));
-                    }
-
-                    await bw.FlushAsync().ConfigureAwait(false);
                 }
             }
         }
         catch (Exception ex)
         {
-           Console.WriteLine($">>> ERROR WRITER LOOP: {ex}");
+           Console.WriteLine($">>> ERROR WRITER OUTER LOOP: {ex}");
         }
         finally
         {
