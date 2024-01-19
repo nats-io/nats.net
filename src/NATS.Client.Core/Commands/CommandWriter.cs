@@ -66,11 +66,12 @@ internal sealed class CommandWriter : IAsyncDisposable
         _enqueuePing = enqueuePing;
         _opts = opts;
         _protocolWriter = new ProtocolWriter(opts.SubjectEncoding);
-        var channel = Channel.CreateBounded<QueuedCommand>(new BoundedChannelOptions(8192) { SingleReader = true });
+        var capacity = 32;
+        var channel = Channel.CreateBounded<QueuedCommand>(new BoundedChannelOptions(capacity) { SingleReader = true });
         _writer = channel.Writer;
         _reader = channel.Reader;
-        _pool = new ObjectPool2<QueuedCommand>(() => new QueuedCommand());
-        _pool2 = new ObjectPool2<NatsBufferWriter<byte>>(() => new NatsBufferWriter<byte>());
+        _pool = new ObjectPool2<QueuedCommand>(() => new QueuedCommand(), capacity);
+        _pool2 = new ObjectPool2<NatsBufferWriter<byte>>(() => new NatsBufferWriter<byte>(), capacity * 2);
         _headerWriter = new HeaderWriter(_opts.HeaderEncoding);
         _writerLoopTask = Task.Run(WriterLoopAsync);
         _readerLoopTask = Task.Run(ReaderLoopAsync);
@@ -203,7 +204,6 @@ internal sealed class CommandWriter : IAsyncDisposable
                             var payload = cmd.payload!.WrittenMemory;
                             var headers = cmd.headers?.WrittenMemory;
                             _protocolWriter.WritePublish(bw, cmd.subject!, cmd.replyTo, headers, payload);
-                            cmd.headers?.Dispose();
                             cmd.headers?.Reset();
                             cmd.payload!.Reset();
                             if (cmd.headers != null)
