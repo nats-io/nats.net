@@ -55,8 +55,8 @@ internal sealed class CommandWriter : IAsyncDisposable
     private PipeWriter _pipeWriter;
     private readonly object _lock = new();
     private readonly Task _readerLoopTask;
-    private readonly ObjectPool<QueuedCommand> _pool;
-    private readonly ObjectPool<NatsBufferWriter<byte>> _pool2;
+    private readonly ObjectPool2<QueuedCommand> _pool;
+    private readonly ObjectPool2<NatsBufferWriter<byte>> _pool2;
     private readonly HeaderWriter _headerWriter;
 
     public CommandWriter(NatsOpts opts, ConnectionStatsCounter counter, Action<PingCommand> enqueuePing, TimeSpan? overrideCommandTimeout = default)
@@ -69,8 +69,8 @@ internal sealed class CommandWriter : IAsyncDisposable
         var channel = Channel.CreateBounded<QueuedCommand>(new BoundedChannelOptions(8192) { SingleReader = true });
         _writer = channel.Writer;
         _reader = channel.Reader;
-        _pool = new ObjectPool<QueuedCommand>(() => new QueuedCommand());
-        _pool2 = new ObjectPool<NatsBufferWriter<byte>>(() => new NatsBufferWriter<byte>());
+        _pool = new ObjectPool2<QueuedCommand>(() => new QueuedCommand());
+        _pool2 = new ObjectPool2<NatsBufferWriter<byte>>(() => new NatsBufferWriter<byte>());
         _headerWriter = new HeaderWriter(_opts.HeaderEncoding);
         _writerLoopTask = Task.Run(WriterLoopAsync);
         _readerLoopTask = Task.Run(ReaderLoopAsync);
@@ -365,3 +365,95 @@ public class ObjectPool<T>
 
     public void Return(T item) => _objects.Add(item);
 }
+
+internal sealed class ObjectPool2<T> where T : class
+    {
+        // https://github.com/dotnet/runtime/blob/2939fde09e594070205f8bda036485c7b398241c/src/libraries/System.Reflection.Metadata/src/System/Reflection/Internal/Utilities/ObjectPool%601.cs
+        private struct Element
+        {
+            internal T? Value;
+        }
+
+        // storage for the pool objects.
+        private readonly Element[] _items;
+
+        // factory is stored for the lifetime of the pool. We will call this only when pool needs to
+        // expand. compared to "new T()", Func gives more flexibility to implementers and faster
+        // than "new T()".
+        private readonly Func<T> _factory;
+
+
+        internal ObjectPool2(Func<T> factory)
+            : this(factory, Environment.ProcessorCount * 2)
+        { }
+
+        internal ObjectPool2(Func<T> factory, int size)
+        {
+            _factory = factory;
+            _items = new Element[size];
+        }
+
+        private T CreateInstance()
+        {
+            var inst = _factory();
+            return inst;
+        }
+
+        /// <summary>
+        /// Produces an instance.
+        /// </summary>
+        /// <remarks>
+        /// Search strategy is a simple linear probing which is chosen for it cache-friendliness.
+        /// Note that Free will try to store recycled objects close to the start thus statistically
+        /// reducing how far we will typically search.
+        /// </remarks>
+        internal T Get()
+        {
+            var items = _items;
+            T? inst;
+
+            for (int i = 0; i < items.Length; i++)
+            {
+                // Note that the read is optimistically not synchronized. That is intentional.
+                // We will interlock only when we have a candidate. in a worst case we may miss some
+                // recently returned objects. Not a big deal.
+                inst = items[i].Value;
+                if (inst != null)
+                {
+                    if (inst == Interlocked.CompareExchange(ref items[i].Value, null, inst))
+                    {
+                        goto gotInstance;
+                    }
+                }
+            }
+
+            inst = CreateInstance();
+        gotInstance:
+
+            return inst;
+        }
+
+        /// <summary>
+        /// Returns objects to the pool.
+        /// </summary>
+        /// <remarks>
+        /// Search strategy is a simple linear probing which is chosen for it cache-friendliness.
+        /// Note that Free will try to store recycled objects close to the start thus statistically
+        /// reducing how far we will typically search in Allocate.
+        /// </remarks>
+        internal void Return(T obj)
+        {
+            var items = _items;
+            for (int i = 0; i < items.Length; i++)
+            {
+                if (items[i].Value == null)
+                {
+                    // Intentionally not using interlocked here.
+                    // In a worst case scenario two objects may be stored into same slot.
+                    // It is very unlikely to happen and will only mean that one of the objects will get collected.
+                    items[i].Value = obj;
+                    break;
+                }
+            }
+        }
+    }
