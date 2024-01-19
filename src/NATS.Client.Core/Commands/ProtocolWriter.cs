@@ -79,6 +79,310 @@ internal sealed class ProtocolWriter
     // HPUB <subject> [reply-to] <#header bytes> <#total bytes>\r\n[headers]\r\n\r\n[payload]\r\n
     public void WritePublish(IBufferWriter<byte> writer, string subject, string? replyTo, ReadOnlyMemory<byte>? headers, ReadOnlyMemory<byte> payload)
     {
+        // WritePubHpub(writer, subject, replyTo, headers, payload);
+        WritePub(writer, subject, replyTo, payload);
+
+        // if (headers == null)
+        // {
+        //     WritePub(writer, subject, replyTo, payload);
+        // }
+        // else
+        // {
+        //     WriteHpub(writer, subject, replyTo, headers, payload);
+        // }
+
+        // if (headers == null)
+        // {
+        //     var span = writer.GetSpan(PubSpaceLength);
+        //     BinaryPrimitives.WriteUInt32LittleEndian(span, PubSpace);
+        //     writer.Advance(PubSpaceLength);
+        // }
+        // else
+        // {
+        //     var span = writer.GetSpan(HpubSpaceLength);
+        //     BinaryPrimitives.WriteUInt64LittleEndian(span, HpubSpace);
+        //     writer.Advance(HpubSpaceLength);
+        // }
+        //
+        // var headersLength = 0L;
+        // var totalLength = 0L;
+        // if (headers != null)
+        // {
+        //     headersLength = headers.Value.Length;
+        //     totalLength += headersLength;
+        // }
+        //
+        // totalLength += payload.Length;
+        //
+        // // subject
+        // {
+        //     var len = _encoding.GetByteCount(subject) + 1;
+        //     var span = writer.GetSpan(len);
+        //     var written = _encoding.GetBytes(subject, span);
+        //     span[written] = (byte)' ';
+        //     writer.Advance(len);
+        // }
+        //
+        // if (replyTo != null)
+        // {
+        //     var len = _encoding.GetByteCount(replyTo) + 1;
+        //     var span = writer.GetSpan(len);
+        //     var written = _encoding.GetBytes(replyTo, span);
+        //     span[written] = (byte)' ';
+        //     writer.Advance(len);
+        // }
+        //
+        // if (headers != null)
+        // {
+        //     var span = writer.GetSpan(MaxIntStringLength + 1);
+        //     if (!Utf8Formatter.TryFormat(headersLength, span, out var written))
+        //     {
+        //         ThrowOnUtf8FormatFail();
+        //     }
+        //
+        //     span[written] = (byte)' ';
+        //     writer.Advance(written + 1);
+        // }
+        //
+        // // payload length
+        // {
+        //     var span = writer.GetSpan(MaxIntStringLength);
+        //     if (!Utf8Formatter.TryFormat(totalLength, span, out var written))
+        //     {
+        //         ThrowOnUtf8FormatFail();
+        //     }
+        //
+        //     writer.Advance(written);
+        // }
+        //
+        // // CRLF
+        // {
+        //     var span = writer.GetSpan(UInt16Length);
+        //     BinaryPrimitives.WriteUInt16LittleEndian(span, NewLine);
+        //     writer.Advance(NewLineLength);
+        // }
+        //
+        // if (headers != null)
+        // {
+        //     writer.Write(headers.Value.Span);
+        // }
+        //
+        // writer.Write(payload.Span);
+        //
+        // // CRLF
+        // {
+        //     var span = writer.GetSpan(UInt16Length);
+        //     BinaryPrimitives.WriteUInt16LittleEndian(span, NewLine);
+        //     writer.Advance(NewLineLength);
+        // }
+    }
+
+     public void WritePubHpub(IBufferWriter<byte> writer, string subject, string? replyTo, ReadOnlyMemory<byte>? headers, ReadOnlyMemory<byte> payload)
+    {
+        if (headers == null)
+        {
+            var span = writer.GetSpan(PubSpaceLength);
+            BinaryPrimitives.WriteUInt32LittleEndian(span, PubSpace);
+            writer.Advance(PubSpaceLength);
+        }
+        else
+        {
+            var span = writer.GetSpan(HpubSpaceLength);
+            BinaryPrimitives.WriteUInt64LittleEndian(span, HpubSpace);
+            writer.Advance(HpubSpaceLength);
+        }
+
+        var headersLength = 0L;
+        var totalLength = 0L;
+        if (headers != null)
+        {
+            headersLength = headers.Value.Length;
+            totalLength += headersLength;
+        }
+
+        totalLength += payload.Length;
+
+        // subject
+        {
+            var len = _encoding.GetByteCount(subject) + 1;
+            var span = writer.GetSpan(len);
+            var written = _encoding.GetBytes(subject, span);
+            span[written] = (byte)' ';
+            writer.Advance(len);
+        }
+
+        if (replyTo != null)
+        {
+            var len = _encoding.GetByteCount(replyTo) + 1;
+            var span = writer.GetSpan(len);
+            var written = _encoding.GetBytes(replyTo, span);
+            span[written] = (byte)' ';
+            writer.Advance(len);
+        }
+
+        if (headers != null)
+        {
+            var span = writer.GetSpan(MaxIntStringLength + 1);
+            if (!Utf8Formatter.TryFormat(headersLength, span, out var written))
+            {
+                ThrowOnUtf8FormatFail();
+            }
+
+            span[written] = (byte)' ';
+            writer.Advance(written + 1);
+        }
+
+        // payload length
+        {
+            var span = writer.GetSpan(MaxIntStringLength);
+            if (!Utf8Formatter.TryFormat(totalLength, span, out var written))
+            {
+                ThrowOnUtf8FormatFail();
+            }
+
+            writer.Advance(written);
+        }
+
+        // CRLF
+        {
+            var span = writer.GetSpan(UInt16Length);
+            BinaryPrimitives.WriteUInt16LittleEndian(span, NewLine);
+            writer.Advance(NewLineLength);
+        }
+
+        if (headers != null)
+        {
+            writer.Write(headers.Value.Span);
+        }
+
+        writer.Write(payload.Span);
+
+        // CRLF
+        {
+            var span = writer.GetSpan(UInt16Length);
+            BinaryPrimitives.WriteUInt16LittleEndian(span, NewLine);
+            writer.Advance(NewLineLength);
+        }
+    }
+
+    public void WritePub(IBufferWriter<byte> writer, string subject, string? replyTo, ReadOnlyMemory<byte> payload)
+    {
+        // PUB <subject> [reply-to] <#bytes>\r\n[payload]\r\n
+
+        Span<byte> span1 = stackalloc byte[MaxIntStringLength];
+        {
+            if (!Utf8Formatter.TryFormat(payload.Length, span1, out var written))
+            {
+                ThrowOnUtf8FormatFail();
+            }
+
+            span1 = span1.Slice(0, written);
+        }
+
+        var total = PubSpaceLength;
+
+        var subjectSpaceLength = _encoding.GetByteCount(subject) + 1;
+        total += subjectSpaceLength;
+
+        var replyToLengthSpace = 0;
+        if (replyTo != null)
+        {
+            replyToLengthSpace = _encoding.GetByteCount(replyTo) + 1;
+            total += replyToLengthSpace;
+        }
+
+        total += span1.Length + NewLineLength + payload.Length + NewLineLength;
+
+        var span = writer.GetSpan(total);
+
+        BinaryPrimitives.WriteUInt32LittleEndian(span, PubSpace);
+        span = span.Slice(PubSpaceLength);
+
+        _encoding.GetBytes(subject, span);
+        span[subjectSpaceLength - 1] = (byte)' ';
+        span = span.Slice(subjectSpaceLength);
+
+        if (replyTo != null)
+        {
+            _encoding.GetBytes(replyTo, span);
+            span[replyToLengthSpace - 1] = (byte)' ';
+            span = span.Slice(replyToLengthSpace);
+        }
+
+        span1.CopyTo(span);
+        span = span.Slice(span1.Length);
+
+        BinaryPrimitives.WriteUInt16LittleEndian(span, NewLine);
+        span = span.Slice(NewLineLength);
+
+        payload.Span.CopyTo(span);
+        span = span.Slice(payload.Length);
+
+        BinaryPrimitives.WriteUInt16LittleEndian(span, NewLine);
+
+        writer.Advance(total);
+
+        /*
+        {
+            var span2 = writer.GetSpan(PubSpaceLength);
+            BinaryPrimitives.WriteUInt32LittleEndian(span2, PubSpace);
+            writer.Advance(PubSpaceLength);
+        }
+
+        var headersLength = 0L;
+        var totalLength = 0L;
+
+        totalLength += payload.Length;
+
+        // subject
+        {
+            var len = _encoding.GetByteCount(subject) + 1;
+            var span2 = writer.GetSpan(len);
+            var written = _encoding.GetBytes(subject, span2);
+            span[written] = (byte)' ';
+            writer.Advance(len);
+        }
+
+        if (replyTo != null)
+        {
+            var len = _encoding.GetByteCount(replyTo) + 1;
+            var span2 = writer.GetSpan(len);
+            var written = _encoding.GetBytes(replyTo, span2);
+            span[written] = (byte)' ';
+            writer.Advance(len);
+        }
+
+        // payload length
+        {
+            var span2 = writer.GetSpan(MaxIntStringLength);
+            if (!Utf8Formatter.TryFormat(totalLength, span2, out var written))
+            {
+                ThrowOnUtf8FormatFail();
+            }
+
+            writer.Advance(written);
+        }
+
+        // CRLF
+        {
+            var span2 = writer.GetSpan(UInt16Length);
+            BinaryPrimitives.WriteUInt16LittleEndian(span2, NewLine);
+            writer.Advance(NewLineLength);
+        }
+
+        writer.Write(payload.Span);
+
+        // CRLF
+        {
+            var span2 = writer.GetSpan(UInt16Length);
+            BinaryPrimitives.WriteUInt16LittleEndian(span2, NewLine);
+            writer.Advance(NewLineLength);
+        }
+        */
+    }
+
+    public void WriteHpub(IBufferWriter<byte> writer, string subject, string? replyTo, ReadOnlyMemory<byte>? headers, ReadOnlyMemory<byte> payload)
+    {
         if (headers == null)
         {
             var span = writer.GetSpan(PubSpaceLength);

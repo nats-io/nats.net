@@ -81,21 +81,16 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         // 8520 should fit into 6 packets on 1500 MTU TLS connection or 1 packet on 9000 MTU TLS connection
         // assuming 40 bytes TCP overhead + 40 bytes TLS overhead per packet
-        var consolidateMem = new Memory<byte>(new byte[8520]);
+        var consolidateMemLength = 8520;
+        var consolidateMem = new Memory<byte>(new byte[consolidateMemLength]);
         try
         {
             while (true)
             {
                 try
                 {
-                    ISocketConnection connection;
-                    PipeReader pipeReader;
-
-                    lock (_lock)
-                    {
-                        connection = _socketConnection;
-                        pipeReader = _pipeReader;
-                    }
+                    var connection = _socketConnection;
+                    var pipeReader = _pipeReader;
 
                     if (connection == null || pipeReader == null)
                     {
@@ -110,12 +105,17 @@ internal sealed class CommandWriter : IAsyncDisposable
                         if (!buffer.IsEmpty)
                         {
                             // Console.WriteLine($">>> READER: {buffer.Length}");
-                            var length = Math.Min((int)buffer.Length, consolidateMem.Length);
+                            var bufferLength = (int)buffer.Length;
+                            var length = Math.Min(bufferLength, consolidateMemLength);
                             // var bytes = ArrayPool<byte>.Shared.Rent(length);
+
                             var memory = consolidateMem.Slice(0, length);
-                            if (length != (int)buffer.Length)
+
+                            if (length != bufferLength)
                                 buffer = buffer.Slice(0, buffer.GetPosition(length));
+
                             buffer.CopyTo(memory.Span);
+
                             //var memory = bytes.AsMemory(0, length);
                             // Console.WriteLine($"            memory: {new ReadOnlySequence<byte>(memory).Dump()}");
                             try
@@ -133,6 +133,11 @@ internal sealed class CommandWriter : IAsyncDisposable
                     finally
                     {
                         pipeReader.AdvanceTo(buffer.End);
+                    }
+
+                    if (result.IsCompleted)
+                    {
+                        break;
                     }
                 }
                 catch (Exception e)
@@ -181,11 +186,7 @@ internal sealed class CommandWriter : IAsyncDisposable
                     // Console.WriteLine($">>> COMMAND: {cmd.command}");
                     try
                     {
-                        PipeWriter bw;
-                        lock (_lock)
-                        {
-                            bw = _pipeWriter;
-                        }
+                        var bw = _pipeWriter;
 
                         if (cmd.command == Command.Connect)
                         {
