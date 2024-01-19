@@ -21,19 +21,19 @@ public class SerializationBuffersBench
     [GlobalSetup]
     public void Setup() => _nats = new NatsConnection();
 
-    [Benchmark]
-    public async ValueTask<TimeSpan> WaitUntilSentTrue()
-    {
-        for (var i = 0; i < Iter; i++)
-        {
-            await _nats.PublishAsync("foo", Data, opts: OptsWaitUntilSentTrue);
-        }
+    // [Benchmark]
+    // public async ValueTask<TimeSpan> WaitUntilSentTrue()
+    // {
+    //     for (var i = 0; i < Iter; i++)
+    //     {
+    //         await _nats.PublishAsync("foo", Data, opts: OptsWaitUntilSentTrue);
+    //     }
+    //
+    //     return await _nats.PingAsync();
+    // }
 
-        return await _nats.PingAsync();
-    }
-
     [Benchmark]
-    public async ValueTask<TimeSpan> WaitUntilSentFalse()
+    public async ValueTask<TimeSpan> PublishAsync()
     {
         for (var i = 0; i < Iter; i++)
         {
