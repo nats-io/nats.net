@@ -83,8 +83,8 @@ internal sealed class CommandWriter : IAsyncDisposable
         // assuming 40 bytes TCP overhead + 40 bytes TLS overhead per packet
         var consolidateMemLength = 8520;
         var consolidateMem = new Memory<byte>(new byte[consolidateMemLength]);
-        try
-        {
+        // try
+        // {
             while (true)
             {
                 try
@@ -134,22 +134,17 @@ internal sealed class CommandWriter : IAsyncDisposable
                     {
                         pipeReader.AdvanceTo(buffer.End);
                     }
-
-                    if (result.IsCompleted)
-                    {
-                        break;
-                    }
                 }
                 catch (Exception e)
                 {
                     Console.WriteLine($">>> ERROR READER LOOP: {e}");
                 }
             }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($">>> ERROR READER OUTER LOOP: {ex}");
-        }
+        // }
+        // catch (Exception ex)
+        // {
+        //     Console.WriteLine($">>> ERROR READER OUTER LOOP: {ex}");
+        // }
     }
 
     public void Reset(ISocketConnection socketConnection)
@@ -174,8 +169,8 @@ internal sealed class CommandWriter : IAsyncDisposable
 
     private async Task WriterLoopAsync()
     {
-        try
-        {
+        // try
+        // {
             while (await _reader.WaitToReadAsync().ConfigureAwait(false))
             {
                 while (_reader.TryRead(out var cmd))
@@ -230,14 +225,11 @@ internal sealed class CommandWriter : IAsyncDisposable
                     }
                 }
             }
-        }
-        catch (Exception ex)
-        {
-           Console.WriteLine($">>> ERROR WRITER OUTER LOOP: {ex}");
-        }
-        finally
-        {
-        }
+        // }
+        // catch (Exception ex)
+        // {
+        //    Console.WriteLine($">>> ERROR WRITER OUTER LOOP: {ex}");
+        // }
     }
 
     public ValueTask DisposeAsync()

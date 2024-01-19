@@ -473,11 +473,13 @@ public partial class NatsConnection : INatsConnection
 
     private async void ReconnectLoop()
     {
+        Console.WriteLine($"{DateTime.Now:HH:mm:ss} Reconnect loop started");
         try
         {
             // If dispose this client, WaitForClosed throws OperationCanceledException so stop reconnect-loop correctly.
             await _socket!.WaitForClosed.ConfigureAwait(false);
 
+            Console.WriteLine($"{DateTime.Now:HH:mm:ss} Disconnected");
             _logger.LogTrace(NatsLogEvents.Connection, "Connection {Name} is closed. Will cleanup and reconnect", _name);
             lock (_gate)
             {
@@ -526,6 +528,8 @@ public partial class NatsConnection : INatsConnection
                         }
                     }
 
+                    Console.WriteLine($"{DateTime.Now:HH:mm:ss} Connecting to {url}...");
+
                     _logger.LogInformation(NatsLogEvents.Connection, "Tried to connect NATS {Url}", url);
                     if (url.IsWebSocket)
                     {
@@ -558,9 +562,11 @@ public partial class NatsConnection : INatsConnection
                 }
 
                 await SetupReaderWriterAsync(true).ConfigureAwait(false);
+                Console.WriteLine($"{DateTime.Now:HH:mm:ss} Connected to {url}");
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"{DateTime.Now:HH:mm:ss} Failed connecting to {url}: {ex.Message}");
                 if (url != null)
                 {
                     _logger.LogError(NatsLogEvents.Connection, ex, "Failed to connect NATS {Url}", url);
