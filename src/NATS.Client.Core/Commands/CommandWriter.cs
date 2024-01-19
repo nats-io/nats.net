@@ -66,7 +66,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         _enqueuePing = enqueuePing;
         _opts = opts;
         _protocolWriter = new ProtocolWriter(opts.SubjectEncoding);
-        var capacity = 32;
+        var capacity = 512;
         var channel = Channel.CreateBounded<QueuedCommand>(new BoundedChannelOptions(capacity) { SingleReader = true });
         _writer = channel.Writer;
         _reader = channel.Reader;
@@ -105,19 +105,19 @@ internal sealed class CommandWriter : IAsyncDisposable
                         if (!buffer.IsEmpty)
                         {
                             // Console.WriteLine($">>> READER: {buffer.Length}");
+
                             var bufferLength = (int)buffer.Length;
                             var length = Math.Min(bufferLength, consolidateMemLength);
-                            // var bytes = ArrayPool<byte>.Shared.Rent(length);
-
                             var memory = consolidateMem.Slice(0, length);
-
                             if (length != bufferLength)
                                 buffer = buffer.Slice(0, buffer.GetPosition(length));
-
                             buffer.CopyTo(memory.Span);
 
-                            //var memory = bytes.AsMemory(0, length);
-                            // Console.WriteLine($"            memory: {new ReadOnlySequence<byte>(memory).Dump()}");
+                            // var length = (int)buffer.Length;
+                            // var bytes = ArrayPool<byte>.Shared.Rent(length);
+                            // var memory = bytes.AsMemory().Slice(0, length);
+                            // buffer.CopyTo(memory.Span);
+
                             try
                             {
                                 await connection.SendAsync(memory).ConfigureAwait(false);
@@ -149,9 +149,6 @@ internal sealed class CommandWriter : IAsyncDisposable
         catch (Exception ex)
         {
             Console.WriteLine($">>> ERROR READER OUTER LOOP: {ex}");
-        }
-        finally
-        {
         }
     }
 
