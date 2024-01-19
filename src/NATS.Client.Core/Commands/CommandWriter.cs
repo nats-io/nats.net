@@ -66,7 +66,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         _enqueuePing = enqueuePing;
         _opts = opts;
         _protocolWriter = new ProtocolWriter(opts.SubjectEncoding);
-        var channel = Channel.CreateBounded<QueuedCommand>(new BoundedChannelOptions(128) { SingleReader = true });
+        var channel = Channel.CreateBounded<QueuedCommand>(new BoundedChannelOptions(8192) { SingleReader = true });
         _writer = channel.Writer;
         _reader = channel.Reader;
         _pool = new ObjectPool<QueuedCommand>(() => new QueuedCommand());
@@ -151,12 +151,23 @@ internal sealed class CommandWriter : IAsyncDisposable
 
     public void Reset(ISocketConnection socketConnection)
     {
+        // var pipe = new Pipe(new PipeOptions(
+        //     pauseWriterThreshold: _opts.WriterBufferSize, // flush will block after hitting
+        //     resumeWriterThreshold: _opts.WriterBufferSize / 2,
+        //     useSynchronizationContext: false,
+        //     minimumSegmentSize: 16384));
+
+        var pipe = new Pipe(new PipeOptions(
+            pauseWriterThreshold: 1024 * 1024 * 32,
+            resumeWriterThreshold: 1024 * 1024 * 16,
+            minimumSegmentSize: 1024 * 64,
+            useSynchronizationContext: false));
+
         lock (_lock)
         {
             _pipeWriter?.Complete();
             _pipeReader?.Complete();
             _socketConnection = socketConnection;
-            var pipe = new Pipe(new PipeOptions(useSynchronizationContext: false));
             _pipeReader = pipe.Reader;
             _pipeWriter = pipe.Writer;
         }
