@@ -157,11 +157,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         //     useSynchronizationContext: false,
         //     minimumSegmentSize: 16384));
 
-        var pipe = new Pipe(new PipeOptions(
-            pauseWriterThreshold: 1024 * 1024 * 32,
-            resumeWriterThreshold: 1024 * 1024 * 16,
-            minimumSegmentSize: 1024 * 64,
-            useSynchronizationContext: false));
+        var pipe = new Pipe(new PipeOptions(useSynchronizationContext: false));
 
         lock (_lock)
         {
