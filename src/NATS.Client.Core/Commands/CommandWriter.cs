@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Collections.Concurrent;
 using System.IO.Pipelines;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
@@ -16,16 +17,18 @@ internal enum Command
     Unsubscribe,
 }
 
-internal sealed record class QueuedCommand(
-    Command command,
-    string? subject = default,
-    int? sid = default,
-    int? maxMsgs = default,
-    string? replyTo = default,
-    string? queueGroup = default,
-    ClientOpts? connectOpts = default,
-    NatsBufferWriter<byte>? payload = default,
-    NatsBufferWriter<byte>? headers = default);
+internal sealed class QueuedCommand
+{
+    public Command command { get; set; }
+    public string? subject { get; set; }
+    public int? sid { get; set; }
+    public int? maxMsgs { get; set; }
+    public string? replyTo { get; set; }
+    public string? queueGroup { get; set; }
+    public ClientOpts? connectOpts { get; set; }
+    public NatsBufferWriter<byte>? payload { get; set; }
+    public NatsBufferWriter<byte>? headers { get; set; }
+}
 
 /// <summary>
 /// Sets up a Pipe, and provides methods to write to the PipeWriter
@@ -52,6 +55,9 @@ internal sealed class CommandWriter : IAsyncDisposable
     private PipeWriter _pipeWriter;
     private readonly object _lock = new();
     private readonly Task _readerLoopTask;
+    private readonly ObjectPool<QueuedCommand> _pool;
+    private readonly ObjectPool<NatsBufferWriter<byte>> _pool2;
+    private readonly HeaderWriter _headerWriter;
 
     public CommandWriter(NatsOpts opts, ConnectionStatsCounter counter, Action<PingCommand> enqueuePing, TimeSpan? overrideCommandTimeout = default)
     {
@@ -63,6 +69,9 @@ internal sealed class CommandWriter : IAsyncDisposable
         var channel = Channel.CreateBounded<QueuedCommand>(new BoundedChannelOptions(128) { SingleReader = true });
         _writer = channel.Writer;
         _reader = channel.Reader;
+        _pool = new ObjectPool<QueuedCommand>(() => new QueuedCommand());
+        _pool2 = new ObjectPool<NatsBufferWriter<byte>>(() => new NatsBufferWriter<byte>());
+        _headerWriter = new HeaderWriter(_opts.HeaderEncoding);
         _writerLoopTask = Task.Run(WriterLoopAsync);
         _readerLoopTask = Task.Run(ReaderLoopAsync);
     }
@@ -181,7 +190,11 @@ internal sealed class CommandWriter : IAsyncDisposable
                             var headers = cmd.headers?.WrittenMemory;
                             _protocolWriter.WritePublish(bw, cmd.subject!, cmd.replyTo, headers, payload);
                             cmd.headers?.Dispose();
-                            cmd.payload!.Dispose();
+                            cmd.headers?.Reset();
+                            cmd.payload!.Reset();
+                            if (cmd.headers != null)
+                                _pool2.Return(cmd.headers);
+                            _pool2.Return(cmd.payload);
                         }
                         else if (cmd.command == Command.Subscribe)
                         {
@@ -196,6 +209,7 @@ internal sealed class CommandWriter : IAsyncDisposable
                             throw new ArgumentOutOfRangeException(nameof(cmd.command));
                         }
 
+                        _pool.Return(cmd);
                         await bw.FlushAsync().ConfigureAwait(false);
                     }
                     catch (Exception e)
@@ -224,20 +238,24 @@ internal sealed class CommandWriter : IAsyncDisposable
 
     public ValueTask ConnectAsync(ClientOpts connectOpts, CancellationToken cancellationToken)
     {
-        var cmd = new QueuedCommand(Command.Connect, connectOpts: connectOpts);
+        var cmd = _pool.Get();
+        cmd.command = Command.Connect;
+        cmd.connectOpts = connectOpts;
         return _writer.WriteAsync(cmd, cancellationToken);
     }
 
     public ValueTask PingAsync(PingCommand pingCommand, CancellationToken cancellationToken)
     {
         _enqueuePing(pingCommand);
-        var cmd = new QueuedCommand(Command.Ping);
+        var cmd = _pool.Get();
+        cmd.command = Command.Ping;
         return _writer.WriteAsync(cmd, cancellationToken);
     }
 
     public ValueTask PongAsync(CancellationToken cancellationToken = default)
     {
-        var cmd = new QueuedCommand(Command.Pong);
+        var cmd = _pool.Get();
+        cmd.command = Command.Pong;
         return _writer.WriteAsync(cmd, cancellationToken);
     }
 
@@ -246,36 +264,43 @@ internal sealed class CommandWriter : IAsyncDisposable
         NatsBufferWriter<byte>? headersBuffer = null;
         if (headers != null)
         {
-            headersBuffer = new NatsBufferWriter<byte>();
-            new HeaderWriter(_opts.HeaderEncoding).Write(headersBuffer, headers);
+            headersBuffer = _pool2.Get();
+            _headerWriter.Write(headersBuffer, headers);
         }
 
-        var payloadBuffer = new NatsBufferWriter<byte>();
+        var payloadBuffer = _pool2.Get();
         if (value != null)
             serializer.Serialize(payloadBuffer, value);
 
-        var cmd = new QueuedCommand(
-            Command.Publish,
-            subject: subject,
-            replyTo: replyTo,
-            headers: headersBuffer,
-            payload: payloadBuffer);
+        var cmd = _pool.Get();
+        cmd.command = Command.Publish;
+        cmd.subject = subject;
+        cmd.replyTo = replyTo;
+        cmd.headers = headersBuffer;
+        cmd.payload = payloadBuffer;
 
         return _writer.WriteAsync(cmd, cancellationToken);
     }
 
     public ValueTask SubscribeAsync(int sid, string subject, string? queueGroup, int? maxMsgs, CancellationToken cancellationToken)
     {
-        var cmd = new QueuedCommand(Command.Subscribe, sid: sid, subject: subject, queueGroup: queueGroup, maxMsgs: maxMsgs);
+        var cmd = _pool.Get();
+        cmd.command = Command.Subscribe;
+        cmd.sid = sid;
+        cmd.subject = subject;
+        cmd.queueGroup = queueGroup;
+        cmd.maxMsgs = maxMsgs;
         return _writer.WriteAsync(cmd, cancellationToken);
     }
 
     public ValueTask UnsubscribeAsync(int sid, int? maxMsgs, CancellationToken cancellationToken)
     {
-        var cmd = new QueuedCommand(Command.Unsubscribe, sid: sid, maxMsgs: maxMsgs);
+        var cmd = _pool.Get();
+        cmd.command = Command.Unsubscribe;
+        cmd.sid = sid;
+        cmd.maxMsgs = maxMsgs;
         return _writer.WriteAsync(cmd, cancellationToken);
     }
-
 }
 
 internal sealed class PriorityCommandWriter : IAsyncDisposable
@@ -309,4 +334,20 @@ internal sealed class PriorityCommandWriter : IAsyncDisposable
             }
         }
     }
+}
+
+public class ObjectPool<T>
+{
+    private readonly ConcurrentBag<T> _objects;
+    private readonly Func<T> _objectGenerator;
+
+    public ObjectPool(Func<T> objectGenerator)
+    {
+        _objectGenerator = objectGenerator ?? throw new ArgumentNullException(nameof(objectGenerator));
+        _objects = new ConcurrentBag<T>();
+    }
+
+    public T Get() => _objects.TryTake(out T item) ? item : _objectGenerator();
+
+    public void Return(T item) => _objects.Add(item);
 }
