@@ -78,6 +78,9 @@ internal sealed class CommandWriter : IAsyncDisposable
 
     private async Task ReaderLoopAsync()
     {
+        // 8520 should fit into 6 packets on 1500 MTU TLS connection or 1 packet on 9000 MTU TLS connection
+        // assuming 40 bytes TCP overhead + 40 bytes TLS overhead per packet
+        var consolidateMem = new Memory<byte>(new byte[8520]);
         try
         {
             while (true)
@@ -106,9 +109,13 @@ internal sealed class CommandWriter : IAsyncDisposable
                         if (!buffer.IsEmpty)
                         {
                             // Console.WriteLine($">>> READER: {buffer.Length}");
-                            var bytes = ArrayPool<byte>.Shared.Rent((int)buffer.Length);
-                            buffer.CopyTo(bytes);
-                            var memory = bytes.AsMemory(0, (int)buffer.Length);
+                            var length = Math.Min((int)buffer.Length, consolidateMem.Length);
+                            // var bytes = ArrayPool<byte>.Shared.Rent(length);
+                            var memory = consolidateMem.Slice(0, length);
+                            if (length != (int)buffer.Length)
+                                buffer = buffer.Slice(0, buffer.GetPosition(length));
+                            buffer.CopyTo(memory.Span);
+                            //var memory = bytes.AsMemory(0, length);
                             // Console.WriteLine($"            memory: {new ReadOnlySequence<byte>(memory).Dump()}");
                             try
                             {
@@ -119,7 +126,7 @@ internal sealed class CommandWriter : IAsyncDisposable
                                 connection.SignalDisconnected(e);
                             }
 
-                            ArrayPool<byte>.Shared.Return(bytes);
+                            // ArrayPool<byte>.Shared.Return(bytes);
                         }
                     }
                     finally

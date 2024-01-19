@@ -101,6 +101,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Net.DocsExamples", "te
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.Hosting.Tests", "tests\NATS.Client.Hosting.Tests\NATS.Client.Hosting.Tests.csproj", "{766C2486-34C3-4DD1-B31C-540C17C044B0}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleApp8", "ConsoleApp8\ConsoleApp8.csproj", "{3718CCA8-BC45-42C8-B9FA-DBBD40303E23}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -267,6 +269,10 @@ Global
 		{766C2486-34C3-4DD1-B31C-540C17C044B0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{766C2486-34C3-4DD1-B31C-540C17C044B0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{766C2486-34C3-4DD1-B31C-540C17C044B0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3718CCA8-BC45-42C8-B9FA-DBBD40303E23}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3718CCA8-BC45-42C8-B9FA-DBBD40303E23}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3718CCA8-BC45-42C8-B9FA-DBBD40303E23}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3718CCA8-BC45-42C8-B9FA-DBBD40303E23}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
