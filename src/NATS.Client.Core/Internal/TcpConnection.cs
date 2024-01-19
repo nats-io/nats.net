@@ -31,12 +31,8 @@ internal sealed class TcpConnection : ISocketConnection
         }
 
         _socket.NoDelay = true;
-
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
-            _socket.SendBufferSize = 0;
-            _socket.ReceiveBufferSize = 0;
-        }
+        _socket.SendBufferSize = 8192;
+        _socket.ReceiveBufferSize = 8192;
     }
 
     public Task<Exception> WaitForClosed => _waitForClosedSource.Task;
