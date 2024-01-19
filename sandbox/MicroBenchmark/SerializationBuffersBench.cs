@@ -19,7 +19,10 @@ public class SerializationBuffersBench
     public int Iter { get; set; }
 
     [GlobalSetup]
-    public void Setup() => _nats = new NatsConnection();
+    public void Setup() => _nats = new NatsConnection(new NatsOpts
+    {
+        Url = Environment.GetEnvironmentVariable("NATS_URL") ?? "127.0.0.1",
+    });
 
     // [Benchmark]
     // public async ValueTask<TimeSpan> WaitUntilSentTrue()
