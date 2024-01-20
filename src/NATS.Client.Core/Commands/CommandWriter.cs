@@ -187,8 +187,8 @@ internal sealed class CommandWriter : IAsyncDisposable
             {
                 while (_reader.TryRead(out var cmd))
                 {
-                    //await _semLock.WaitAsync().ConfigureAwait(false);
-                    await _chan.Writer.WriteAsync(1).ConfigureAwait(false);
+                    await _semLock.WaitAsync().ConfigureAwait(false);
+                    // await _chan.Writer.WriteAsync(1).ConfigureAwait(false);
                     // Console.WriteLine($">>> COMMAND: {cmd.command}");
                     try
                     {
@@ -239,8 +239,8 @@ internal sealed class CommandWriter : IAsyncDisposable
                     }
                     finally
                     {
-                        await _chan.Reader.ReadAsync().ConfigureAwait(true);
-                        // _semLock.Release();
+                        // await _chan.Reader.ReadAsync().ConfigureAwait(true);
+                        _semLock.Release();
                     }
                 }
             }
@@ -284,8 +284,8 @@ internal sealed class CommandWriter : IAsyncDisposable
 
     public async ValueTask PublishAsync<T>(string subject, T? value, NatsHeaders? headers, string? replyTo, INatsSerialize<T> serializer, CancellationToken cancellationToken)
     {
-        await _chan.Writer.WriteAsync(1).ConfigureAwait(false);
-        // await _semLock.WaitAsync().ConfigureAwait(false);
+        // await _chan.Writer.WriteAsync(1).ConfigureAwait(false);
+        await _semLock.WaitAsync().ConfigureAwait(false);
         try
         {
             NatsBufferWriter<byte>? headersBuffer = null;
@@ -312,8 +312,8 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            await _chan.Reader.ReadAsync().ConfigureAwait(true);
-            // _semLock.Release();
+            // await _chan.Reader.ReadAsync().ConfigureAwait(true);
+            _semLock.Release();
         }
 
         // var cmd = _pool.Get();
