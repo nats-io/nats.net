@@ -217,7 +217,7 @@ internal sealed class CommandWriter : IAsyncDisposable
                         }
 
                         _pool.Return(cmd);
-                        await bw.FlushAsync().ConfigureAwait(false);
+                        var flushResult = await bw.FlushAsync().ConfigureAwait(false);
                     }
                     catch (Exception e)
                     {
@@ -263,7 +263,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         return _writer.WriteAsync(cmd, cancellationToken);
     }
 
-    public ValueTask PublishAsync<T>(string subject, T? value, NatsHeaders? headers, string? replyTo, INatsSerialize<T> serializer, CancellationToken cancellationToken)
+    public ValueTask<FlushResult> PublishAsync<T>(string subject, T? value, NatsHeaders? headers, string? replyTo, INatsSerialize<T> serializer, CancellationToken cancellationToken)
     {
         NatsBufferWriter<byte>? headersBuffer = null;
         if (headers != null)
@@ -276,14 +276,27 @@ internal sealed class CommandWriter : IAsyncDisposable
         if (value != null)
             serializer.Serialize(payloadBuffer, value);
 
-        var cmd = _pool.Get();
-        cmd.command = Command.Publish;
-        cmd.subject = subject;
-        cmd.replyTo = replyTo;
-        cmd.headers = headersBuffer;
-        cmd.payload = payloadBuffer;
+        lock (this)
+        {
+            var bw = _pipeWriter;
+            var payload = payloadBuffer!.WrittenMemory;
+            var headers2 = headersBuffer?.WrittenMemory;
+            _protocolWriter.WritePublish(bw, subject!, replyTo, headers2, payload);
+            headersBuffer?.Reset();
+            payloadBuffer!.Reset();
+            if (headersBuffer != null)
+                _pool2.Return(headersBuffer);
+            _pool2.Return(payloadBuffer);
+            return bw.FlushAsync(cancellationToken);
+        }
 
-        return _writer.WriteAsync(cmd, cancellationToken);
+        // var cmd = _pool.Get();
+        // cmd.command = Command.Publish;
+        // cmd.subject = subject;
+        // cmd.replyTo = replyTo;
+        // cmd.headers = headersBuffer;
+        // cmd.payload = payloadBuffer;
+        // return _writer.WriteAsync(cmd, cancellationToken);
     }
 
     public ValueTask SubscribeAsync(int sid, string subject, string? queueGroup, int? maxMsgs, CancellationToken cancellationToken)

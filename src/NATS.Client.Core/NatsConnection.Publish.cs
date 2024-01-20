@@ -3,22 +3,24 @@ namespace NATS.Client.Core;
 public partial class NatsConnection
 {
     /// <inheritdoc />
-    public ValueTask PublishAsync(string subject, NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
+    public async ValueTask PublishAsync(string subject, NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         headers?.SetReadOnly();
-        return ConnectionState != NatsConnectionState.Open
-            ? ConnectAndPublishAsync(subject, default, headers, replyTo, NatsRawSerializer<byte[]>.Default, cancellationToken)
-            : CommandWriter.PublishAsync(subject, default, headers, replyTo, NatsRawSerializer<byte[]>.Default, cancellationToken);
+        if (ConnectionState != NatsConnectionState.Open)
+            await ConnectAndPublishAsync(subject, default, headers, replyTo, NatsRawSerializer<byte[]>.Default, cancellationToken).ConfigureAwait(false);
+        else
+            await CommandWriter.PublishAsync(subject, default, headers, replyTo, NatsRawSerializer<byte[]>.Default, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public ValueTask PublishAsync<T>(string subject, T? data, NatsHeaders? headers = default, string? replyTo = default, INatsSerialize<T>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
+    public async ValueTask PublishAsync<T>(string subject, T? data, NatsHeaders? headers = default, string? replyTo = default, INatsSerialize<T>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         serializer ??= Opts.SerializerRegistry.GetSerializer<T>();
         headers?.SetReadOnly();
-        return ConnectionState != NatsConnectionState.Open
-            ? ConnectAndPublishAsync(subject, data, headers, replyTo, serializer, cancellationToken)
-            : CommandWriter.PublishAsync(subject, data, headers, replyTo, serializer, cancellationToken);
+        if (ConnectionState != NatsConnectionState.Open)
+            await ConnectAndPublishAsync(subject, data, headers, replyTo, serializer, cancellationToken).ConfigureAwait(false);
+        else
+            await CommandWriter.PublishAsync(subject, data, headers, replyTo, serializer, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
