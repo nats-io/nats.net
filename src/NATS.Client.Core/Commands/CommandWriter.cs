@@ -284,7 +284,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         return _writer.WriteAsync(cmd, cancellationToken);
     }
 
-    public async ValueTask PublishAsync<T>(string subject, T? value, NatsHeaders? headers, string? replyTo, INatsSerialize<T> serializer, CancellationToken cancellationToken)
+    public ValueTask PublishAsync<T>(string subject, T? value, NatsHeaders? headers, string? replyTo, INatsSerialize<T> serializer, CancellationToken cancellationToken)
     {
         NatsBufferWriter<byte>? headersBuffer = null;
         if (headers != null)
@@ -297,13 +297,25 @@ internal sealed class CommandWriter : IAsyncDisposable
         if (value != null)
             serializer.Serialize(payloadBuffer, value);
 
-        var payload = payloadBuffer!.WrittenMemory;
-        var headers2 = headersBuffer?.WrittenMemory;
+        return PublishLockedAsync(subject, replyTo, payloadBuffer, headersBuffer, cancellationToken);
 
+        // var cmd = _pool.Get();
+        // cmd.command = Command.Publish;
+        // cmd.subject = subject;
+        // cmd.replyTo = replyTo;
+        // cmd.headers = headersBuffer;
+        // cmd.payload = payloadBuffer;
+        // return _writer.WriteAsync(cmd, cancellationToken);
+    }
+
+    private async ValueTask PublishLockedAsync(string subject, string? replyTo,  NatsBufferWriter<byte> payloadBuffer, NatsBufferWriter<byte>? headersBuffer, CancellationToken cancellationToken)
+    {
         // await _chan.Writer.WriteAsync(1).ConfigureAwait(false);
         await _semLock.WaitAsync().ConfigureAwait(false);
         try
         {
+            var payload = payloadBuffer!.WrittenMemory;
+            var headers2 = headersBuffer?.WrittenMemory;
 
             var bw = _pipeWriter;
 
@@ -332,14 +344,6 @@ internal sealed class CommandWriter : IAsyncDisposable
             // await _chan.Reader.ReadAsync().ConfigureAwait(true);
             _semLock.Release();
         }
-
-        // var cmd = _pool.Get();
-        // cmd.command = Command.Publish;
-        // cmd.subject = subject;
-        // cmd.replyTo = replyTo;
-        // cmd.headers = headersBuffer;
-        // cmd.payload = payloadBuffer;
-        // return _writer.WriteAsync(cmd, cancellationToken);
     }
 
     public ValueTask SubscribeAsync(int sid, string subject, string? queueGroup, int? maxMsgs, CancellationToken cancellationToken)
