@@ -67,7 +67,10 @@ internal sealed class CommandWriter : IAsyncDisposable
         _semLock = new SemaphoreSlim(1);
         _chan = Channel.CreateBounded<int>(new BoundedChannelOptions(1)
         {
-            FullMode = BoundedChannelFullMode.Wait, SingleReader = false, SingleWriter = false, AllowSynchronousContinuations = false,
+            FullMode = BoundedChannelFullMode.Wait,
+            SingleReader = false,
+            SingleWriter = false,
+            AllowSynchronousContinuations = false,
         });
 
         _counter = counter;
@@ -184,7 +187,8 @@ internal sealed class CommandWriter : IAsyncDisposable
             {
                 while (_reader.TryRead(out var cmd))
                 {
-                    await _semLock.WaitAsync().ConfigureAwait(false);
+                    //await _semLock.WaitAsync().ConfigureAwait(false);
+                    await _chan.Writer.WriteAsync(1).ConfigureAwait(false);
                     // Console.WriteLine($">>> COMMAND: {cmd.command}");
                     try
                     {
@@ -235,7 +239,8 @@ internal sealed class CommandWriter : IAsyncDisposable
                     }
                     finally
                     {
-                        _semLock.Release();
+                        await _chan.Reader.ReadAsync().ConfigureAwait(true);
+                        // _semLock.Release();
                     }
                 }
             }
