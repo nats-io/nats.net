@@ -79,6 +79,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         _opts = opts;
         _protocolWriter = new ProtocolWriter(opts.SubjectEncoding);
         var capacity = 512;
+        // var capacity = _opts.WriterBufferSize / 128;
         var channel = Channel.CreateBounded<QueuedCommand>(new BoundedChannelOptions(capacity) { SingleReader = true });
         _writer = channel.Writer;
         _reader = channel.Reader;
@@ -285,16 +286,24 @@ internal sealed class CommandWriter : IAsyncDisposable
 
     public async ValueTask PublishAsync<T>(string subject, T? value, NatsHeaders? headers, string? replyTo, INatsSerialize<T> serializer, CancellationToken cancellationToken)
     {
+        NatsBufferWriter<byte>? headersBuffer = null;
+        if (headers != null)
+        {
+            headersBuffer = _pool2.Get();
+            _headerWriter.Write(headersBuffer, headers);
+        }
+
+        var payloadBuffer = _pool2.Get();
+        if (value != null)
+            serializer.Serialize(payloadBuffer, value);
+
+        var payload = payloadBuffer!.WrittenMemory;
+        var headers2 = headersBuffer?.WrittenMemory;
+
         // await _chan.Writer.WriteAsync(1).ConfigureAwait(false);
         await _semLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            NatsBufferWriter<byte>? headersBuffer = null;
-            if (headers != null)
-            {
-                headersBuffer = _pool2.Get();
-                _headerWriter.Write(headersBuffer, headers);
-            }
 
             var bw = _pipeWriter;
 
@@ -308,12 +317,6 @@ internal sealed class CommandWriter : IAsyncDisposable
             // }
             // else
             {
-                var payloadBuffer = _pool2.Get();
-                if (value != null)
-                    serializer.Serialize(payloadBuffer, value);
-
-                var payload = payloadBuffer!.WrittenMemory;
-                var headers2 = headersBuffer?.WrittenMemory;
                 _protocolWriter.WritePublish(bw, subject!, replyTo, headers2, payload);
                 headersBuffer?.Reset();
                 payloadBuffer!.Reset();
