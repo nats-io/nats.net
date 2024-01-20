@@ -42,6 +42,8 @@ internal sealed class QueuedCommand
 /// </remarks>
 internal sealed class CommandWriter : IAsyncDisposable
 {
+    private readonly SemaphoreSlim _semLock;
+
     private readonly ConnectionStatsCounter _counter;
     private readonly TimeSpan _defaultCommandTimeout;
     private readonly Action<PingCommand> _enqueuePing;
@@ -61,6 +63,8 @@ internal sealed class CommandWriter : IAsyncDisposable
 
     public CommandWriter(NatsOpts opts, ConnectionStatsCounter counter, Action<PingCommand> enqueuePing, TimeSpan? overrideCommandTimeout = default)
     {
+        _semLock = new SemaphoreSlim(1);
+
         _counter = counter;
         _defaultCommandTimeout = overrideCommandTimeout ?? opts.CommandTimeout;
         _enqueuePing = enqueuePing;
@@ -175,6 +179,7 @@ internal sealed class CommandWriter : IAsyncDisposable
             {
                 while (_reader.TryRead(out var cmd))
                 {
+                    await _semLock.WaitAsync().ConfigureAwait(false);
                     // Console.WriteLine($">>> COMMAND: {cmd.command}");
                     try
                     {
@@ -223,6 +228,10 @@ internal sealed class CommandWriter : IAsyncDisposable
                     {
                         Console.WriteLine($">>> ERROR WRITER LOOP: {e}");
                     }
+                    finally
+                    {
+                        _semLock.Release();
+                    }
                 }
             }
         // }
@@ -263,21 +272,22 @@ internal sealed class CommandWriter : IAsyncDisposable
         return _writer.WriteAsync(cmd, cancellationToken);
     }
 
-    public ValueTask<FlushResult> PublishAsync<T>(string subject, T? value, NatsHeaders? headers, string? replyTo, INatsSerialize<T> serializer, CancellationToken cancellationToken)
+    public async ValueTask PublishAsync<T>(string subject, T? value, NatsHeaders? headers, string? replyTo, INatsSerialize<T> serializer, CancellationToken cancellationToken)
     {
-        NatsBufferWriter<byte>? headersBuffer = null;
-        if (headers != null)
+        await _semLock.WaitAsync().ConfigureAwait(false);
+        try
         {
-            headersBuffer = _pool2.Get();
-            _headerWriter.Write(headersBuffer, headers);
-        }
+            NatsBufferWriter<byte>? headersBuffer = null;
+            if (headers != null)
+            {
+                headersBuffer = _pool2.Get();
+                _headerWriter.Write(headersBuffer, headers);
+            }
 
-        var payloadBuffer = _pool2.Get();
-        if (value != null)
-            serializer.Serialize(payloadBuffer, value);
+            var payloadBuffer = _pool2.Get();
+            if (value != null)
+                serializer.Serialize(payloadBuffer, value);
 
-        lock (this)
-        {
             var bw = _pipeWriter;
             var payload = payloadBuffer!.WrittenMemory;
             var headers2 = headersBuffer?.WrittenMemory;
@@ -287,7 +297,11 @@ internal sealed class CommandWriter : IAsyncDisposable
             if (headersBuffer != null)
                 _pool2.Return(headersBuffer);
             _pool2.Return(payloadBuffer);
-            return bw.FlushAsync(cancellationToken);
+            await bw.FlushAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _semLock.Release();
         }
 
         // var cmd = _pool.Get();
