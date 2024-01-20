@@ -295,19 +295,32 @@ internal sealed class CommandWriter : IAsyncDisposable
                 _headerWriter.Write(headersBuffer, headers);
             }
 
-            var payloadBuffer = _pool2.Get();
-            if (value != null)
-                serializer.Serialize(payloadBuffer, value);
-
             var bw = _pipeWriter;
-            var payload = payloadBuffer!.WrittenMemory;
-            var headers2 = headersBuffer?.WrittenMemory;
-            _protocolWriter.WritePublish(bw, subject!, replyTo, headers2, payload);
-            headersBuffer?.Reset();
-            payloadBuffer!.Reset();
-            if (headersBuffer != null)
-                _pool2.Return(headersBuffer);
-            _pool2.Return(payloadBuffer);
+
+            if (value is byte[] bytes)
+            {
+                var headers2 = headersBuffer?.WrittenMemory;
+                _protocolWriter.WritePublish(bw, subject!, replyTo, headers2, bytes);
+                headersBuffer?.Reset();
+                if (headersBuffer != null)
+                    _pool2.Return(headersBuffer);
+            }
+            else
+            {
+                var payloadBuffer = _pool2.Get();
+                if (value != null)
+                    serializer.Serialize(payloadBuffer, value);
+
+                var payload = payloadBuffer!.WrittenMemory;
+                var headers2 = headersBuffer?.WrittenMemory;
+                _protocolWriter.WritePublish(bw, subject!, replyTo, headers2, payload);
+                headersBuffer?.Reset();
+                payloadBuffer!.Reset();
+                if (headersBuffer != null)
+                    _pool2.Return(headersBuffer);
+                _pool2.Return(payloadBuffer);
+            }
+
             await bw.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
