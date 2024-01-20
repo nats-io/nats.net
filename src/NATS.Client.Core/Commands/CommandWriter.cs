@@ -161,13 +161,14 @@ internal sealed class CommandWriter : IAsyncDisposable
 
     public void Reset(ISocketConnection socketConnection)
     {
-        // var pipe = new Pipe(new PipeOptions(
-        //     pauseWriterThreshold: _opts.WriterBufferSize, // flush will block after hitting
-        //     resumeWriterThreshold: _opts.WriterBufferSize / 2,
-        //     useSynchronizationContext: false,
-        //     minimumSegmentSize: 16384));
+        var pipe = new Pipe(new PipeOptions(
+        pauseWriterThreshold: _opts.WriterBufferSize, // flush will block after hitting
+        resumeWriterThreshold: _opts.WriterBufferSize / 2,
+        // minimumSegmentSize: 16384,
+        useSynchronizationContext: false
+        ));
 
-        var pipe = new Pipe(new PipeOptions(useSynchronizationContext: false));
+        // var pipe = new Pipe(new PipeOptions(useSynchronizationContext: false));
 
         lock (_lock)
         {
