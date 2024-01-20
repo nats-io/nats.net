@@ -60,10 +60,15 @@ internal sealed class CommandWriter : IAsyncDisposable
     private readonly ObjectPool2<QueuedCommand> _pool;
     private readonly ObjectPool2<NatsBufferWriter<byte>> _pool2;
     private readonly HeaderWriter _headerWriter;
+    private readonly Channel<int> _chan;
 
     public CommandWriter(NatsOpts opts, ConnectionStatsCounter counter, Action<PingCommand> enqueuePing, TimeSpan? overrideCommandTimeout = default)
     {
         _semLock = new SemaphoreSlim(1);
+        _chan = Channel.CreateBounded<int>(new BoundedChannelOptions(1)
+        {
+            FullMode = BoundedChannelFullMode.Wait, SingleReader = false, SingleWriter = false, AllowSynchronousContinuations = false,
+        });
 
         _counter = counter;
         _defaultCommandTimeout = overrideCommandTimeout ?? opts.CommandTimeout;
@@ -274,7 +279,8 @@ internal sealed class CommandWriter : IAsyncDisposable
 
     public async ValueTask PublishAsync<T>(string subject, T? value, NatsHeaders? headers, string? replyTo, INatsSerialize<T> serializer, CancellationToken cancellationToken)
     {
-        await _semLock.WaitAsync().ConfigureAwait(false);
+        await _chan.Writer.WriteAsync(1).ConfigureAwait(false);
+        // await _semLock.WaitAsync().ConfigureAwait(false);
         try
         {
             NatsBufferWriter<byte>? headersBuffer = null;
@@ -301,7 +307,8 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            _semLock.Release();
+            await _chan.Reader.ReadAsync().ConfigureAwait(true);
+            // _semLock.Release();
         }
 
         // var cmd = _pool.Get();
