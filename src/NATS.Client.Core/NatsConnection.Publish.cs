@@ -13,14 +13,14 @@ public partial class NatsConnection
     }
 
     /// <inheritdoc />
-    public async ValueTask PublishAsync<T>(string subject, T? data, NatsHeaders? headers = default, string? replyTo = default, INatsSerialize<T>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
+    public ValueTask PublishAsync<T>(string subject, T? data, NatsHeaders? headers = default, string? replyTo = default, INatsSerialize<T>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         serializer ??= Opts.SerializerRegistry.GetSerializer<T>();
         headers?.SetReadOnly();
         if (ConnectionState != NatsConnectionState.Open)
-            await ConnectAndPublishAsync(subject, data, headers, replyTo, serializer, cancellationToken).ConfigureAwait(false);
+            return ConnectAndPublishAsync(subject, data, headers, replyTo, serializer, cancellationToken);
         else
-            await CommandWriter.PublishAsync(subject, data, headers, replyTo, serializer, cancellationToken).ConfigureAwait(false);
+            return CommandWriter.PublishAsync(subject, data, headers, replyTo, serializer, cancellationToken);
     }
 
     /// <inheritdoc />

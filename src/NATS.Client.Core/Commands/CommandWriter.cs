@@ -161,13 +161,13 @@ internal sealed class CommandWriter : IAsyncDisposable
 
     public void Reset(ISocketConnection socketConnection)
     {
-        // var pipe = new Pipe(new PipeOptions(
-        //     pauseWriterThreshold: _opts.WriterBufferSize, // flush will block after hitting
-        //     resumeWriterThreshold: _opts.WriterBufferSize / 2,
-        //     useSynchronizationContext: false,
-        //     minimumSegmentSize: 16384));
+        var pipe = new Pipe(new PipeOptions(
+            pauseWriterThreshold: _opts.WriterBufferSize, // flush will block after hitting
+            resumeWriterThreshold: _opts.WriterBufferSize / 2,
+            useSynchronizationContext: false,
+            minimumSegmentSize: 16384));
 
-        var pipe = new Pipe(new PipeOptions(useSynchronizationContext: false));
+        // var pipe = new Pipe(new PipeOptions(useSynchronizationContext: false));
 
         lock (_lock)
         {
@@ -297,15 +297,15 @@ internal sealed class CommandWriter : IAsyncDisposable
 
             var bw = _pipeWriter;
 
-            if (value is byte[] bytes)
-            {
-                var headers2 = headersBuffer?.WrittenMemory;
-                _protocolWriter.WritePublish(bw, subject!, replyTo, headers2, bytes);
-                headersBuffer?.Reset();
-                if (headersBuffer != null)
-                    _pool2.Return(headersBuffer);
-            }
-            else
+            // if (value is byte[] bytes)
+            // {
+            //     var headers2 = headersBuffer?.WrittenMemory;
+            //     _protocolWriter.WritePublish(bw, subject!, replyTo, headers2, bytes);
+            //     headersBuffer?.Reset();
+            //     if (headersBuffer != null)
+            //         _pool2.Return(headersBuffer);
+            // }
+            // else
             {
                 var payloadBuffer = _pool2.Get();
                 if (value != null)
