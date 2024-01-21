@@ -320,7 +320,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         // return _writer.WriteAsync(cmd, cancellationToken);
     }
 
-    // [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
+    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
     private async ValueTask PublishLockedAsync(string subject, string? replyTo,  NatsPooledBufferWriter<byte> payloadBuffer, NatsPooledBufferWriter<byte>? headersBuffer, CancellationToken cancellationToken)
     {
         // await _chan.Writer.WriteAsync(1).ConfigureAwait(false);
