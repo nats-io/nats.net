@@ -23,13 +23,14 @@ public class SerializationBuffersBench
     });
 
     [Benchmark]
-    public async ValueTask<TimeSpan> PublishAsync()
+    public async ValueTask PublishAsync()
+    // public async ValueTask<TimeSpan> PublishAsync()
     {
         for (var i = 0; i < Iter; i++)
         {
             await _nats.PublishAsync("foo", Data);
         }
 
-        return await _nats.PingAsync();
+        // return await _nats.PingAsync();
     }
 }

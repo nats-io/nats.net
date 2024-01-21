@@ -71,7 +71,7 @@ public partial class NatsConnection : INatsConnection
         _cancellationTimerPool = new CancellationTimerPool(_pool, _disposedCancellationTokenSource.Token);
         _name = opts.Name;
         Counter = new ConnectionStatsCounter();
-        CommandWriter = new CommandWriter(Opts, Counter, EnqueuePing);
+        CommandWriter = new CommandWriter(_pool, Opts, Counter, EnqueuePing);
         InboxPrefix = NewInbox(opts.InboxPrefix);
         SubscriptionManager = new SubscriptionManager(this, InboxPrefix);
         _logger = opts.LoggerFactory.CreateLogger<NatsConnection>();
@@ -410,7 +410,7 @@ public partial class NatsConnection : INatsConnection
             // Authentication
             _userCredentials?.Authenticate(_clientOpts, WritableServerInfo);
 
-            await using (var priorityCommandWriter = new PriorityCommandWriter(_socket!, Opts, Counter, EnqueuePing))
+            await using (var priorityCommandWriter = new PriorityCommandWriter(_pool, _socket!, Opts, Counter, EnqueuePing))
             {
                 // add CONNECT and PING command to priority lane
                 await priorityCommandWriter.CommandWriter.ConnectAsync(_clientOpts, CancellationToken.None).ConfigureAwait(false);

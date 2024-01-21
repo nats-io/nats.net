@@ -61,11 +61,12 @@ internal sealed class CommandWriter : IAsyncDisposable
     private readonly object _lock = new();
     private readonly Task _readerLoopTask;
     private readonly ObjectPool2<QueuedCommand> _pool;
-    private readonly ObjectPool2<NatsPooledBufferWriter<byte>> _pool2;
+    private readonly ObjectPool _pool0;
+    // private readonly ObjectPool2<NatsPooledBufferWriter<byte>> _pool2;
     private readonly HeaderWriter _headerWriter;
     private readonly Channel<int> _chan;
 
-    public CommandWriter(NatsOpts opts, ConnectionStatsCounter counter, Action<PingCommand> enqueuePing, TimeSpan? overrideCommandTimeout = default)
+    public CommandWriter(ObjectPool pool, NatsOpts opts, ConnectionStatsCounter counter, Action<PingCommand> enqueuePing, TimeSpan? overrideCommandTimeout = default)
     {
         _semLock = new SemaphoreSlim(1);
         _chan = Channel.CreateBounded<int>(new BoundedChannelOptions(1)
@@ -86,8 +87,9 @@ internal sealed class CommandWriter : IAsyncDisposable
         var channel = Channel.CreateBounded<QueuedCommand>(new BoundedChannelOptions(capacity) { SingleReader = true });
         _writer = channel.Writer;
         _reader = channel.Reader;
+        _pool0 = pool;//new ObjectPool(capacity * 2);
         _pool = new ObjectPool2<QueuedCommand>(() => new QueuedCommand(), capacity);
-        _pool2 = new ObjectPool2<NatsPooledBufferWriter<byte>>(() => new NatsPooledBufferWriter<byte>(), capacity * 2);
+        // _pool2 = new ObjectPool2<NatsPooledBufferWriter<byte>>(() => new NatsPooledBufferWriter<byte>(), capacity * 2);
         _headerWriter = new HeaderWriter(_opts.HeaderEncoding);
         _writerLoopTask = Task.Run(WriterLoopAsync);
         _readerLoopTask = Task.Run(ReaderLoopAsync);
@@ -219,8 +221,10 @@ internal sealed class CommandWriter : IAsyncDisposable
                             cmd.headers?.Reset();
                             cmd.payload!.Reset();
                             if (cmd.headers != null)
-                                _pool2.Return(cmd.headers);
-                            _pool2.Return(cmd.payload);
+                                _pool0.Return(cmd.headers);
+                                // _pool2.Return(cmd.headers);
+                            _pool0.Return(cmd.payload);
+                            // _pool2.Return(cmd.payload);
                         }
                         else if (cmd.command == Command.Subscribe)
                         {
@@ -292,11 +296,16 @@ internal sealed class CommandWriter : IAsyncDisposable
         NatsPooledBufferWriter<byte>? headersBuffer = null;
         if (headers != null)
         {
-            headersBuffer = _pool2.Get();
+            if (!_pool0.TryRent(out headersBuffer))
+                headersBuffer = new NatsPooledBufferWriter<byte>();
+            // headersBuffer = _pool2.Get();
             _headerWriter.Write(headersBuffer, headers);
         }
 
-        var payloadBuffer = _pool2.Get();
+        NatsPooledBufferWriter<byte> payloadBuffer;
+        if (!_pool0.TryRent(out payloadBuffer!))
+            payloadBuffer = new NatsPooledBufferWriter<byte>();
+        // var payloadBuffer = _pool2.Get();
         if (value != null)
             serializer.Serialize(payloadBuffer, value);
 
@@ -336,8 +345,10 @@ internal sealed class CommandWriter : IAsyncDisposable
                 headersBuffer?.Reset();
                 payloadBuffer!.Reset();
                 if (headersBuffer != null)
-                    _pool2.Return(headersBuffer);
-                _pool2.Return(payloadBuffer);
+                    _pool0.Return(headersBuffer);
+                    // _pool2.Return(headersBuffer);
+                _pool0.Return(payloadBuffer);
+                // _pool2.Return(payloadBuffer);
             }
 
             await bw.FlushAsync(cancellationToken).ConfigureAwait(false);
@@ -375,9 +386,9 @@ internal sealed class PriorityCommandWriter : IAsyncDisposable
     // private readonly NatsPipeliningWriteProtocolProcessor _natsPipeliningWriteProtocolProcessor;
     private int _disposed;
 
-    public PriorityCommandWriter(ISocketConnection socketConnection, NatsOpts opts, ConnectionStatsCounter counter, Action<PingCommand> enqueuePing)
+    public PriorityCommandWriter(ObjectPool pool, ISocketConnection socketConnection, NatsOpts opts, ConnectionStatsCounter counter, Action<PingCommand> enqueuePing)
     {
-        CommandWriter = new CommandWriter(opts, counter, enqueuePing, overrideCommandTimeout: TimeSpan.MaxValue);
+        CommandWriter = new CommandWriter(pool, opts, counter, enqueuePing, overrideCommandTimeout: TimeSpan.MaxValue);
         CommandWriter.Reset(socketConnection);
         // _natsPipeliningWriteProtocolProcessor = CommandWriter.CreateNatsPipeliningWriteProtocolProcessor(socketConnection);
     }
@@ -401,22 +412,6 @@ internal sealed class PriorityCommandWriter : IAsyncDisposable
             }
         }
     }
-}
-
-public class ObjectPool<T>
-{
-    private readonly ConcurrentBag<T> _objects;
-    private readonly Func<T> _objectGenerator;
-
-    public ObjectPool(Func<T> objectGenerator)
-    {
-        _objectGenerator = objectGenerator ?? throw new ArgumentNullException(nameof(objectGenerator));
-        _objects = new ConcurrentBag<T>();
-    }
-
-    public T Get() => _objects.TryTake(out T item) ? item : _objectGenerator();
-
-    public void Return(T item) => _objects.Add(item);
 }
 
 internal sealed class ObjectPool2<T> where T : class
@@ -511,8 +506,12 @@ internal sealed class ObjectPool2<T> where T : class
     }
 }
 
-internal sealed class NatsPooledBufferWriter<T> : IBufferWriter<T>
+internal sealed class NatsPooledBufferWriter<T> : IBufferWriter<T>, IObjectPoolNode<NatsPooledBufferWriter<T>>
 {
+    private NatsPooledBufferWriter<T>? _next;
+
+    public ref NatsPooledBufferWriter<T>? NextNode => ref _next;
+
     private const int DefaultInitialBufferSize = 256;
     private readonly ArrayPool<T> _pool;
     private T[]? _array;
