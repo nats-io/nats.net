@@ -20,17 +20,18 @@ public class SerializationBuffersBench
     public void Setup() => _nats = new NatsConnection(new NatsOpts
     {
         Url = Environment.GetEnvironmentVariable("NATS_URL") ?? "127.0.0.1",
+        ObjectPoolSize = 1024,
     });
 
     [Benchmark]
-    public async ValueTask PublishAsync()
-    // public async ValueTask<TimeSpan> PublishAsync()
+    // public async ValueTask PublishAsync()
+    public async ValueTask<TimeSpan> PublishAsync()
     {
         for (var i = 0; i < Iter; i++)
         {
             await _nats.PublishAsync("foo", Data);
         }
 
-        // return await _nats.PingAsync();
+        return await _nats.PingAsync();
     }
 }

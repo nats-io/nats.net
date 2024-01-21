@@ -88,8 +88,8 @@ internal sealed class CommandWriter : IAsyncDisposable
         _writer = channel.Writer;
         _reader = channel.Reader;
         _pool0 = pool;//new ObjectPool(capacity * 2);
-        _pool = new ObjectPool2<QueuedCommand>(() => new QueuedCommand(), capacity);
         // _pool2 = new ObjectPool2<NatsPooledBufferWriter<byte>>(() => new NatsPooledBufferWriter<byte>(), capacity * 2);
+        _pool = new ObjectPool2<QueuedCommand>(() => new QueuedCommand(), capacity);
         _headerWriter = new HeaderWriter(_opts.HeaderEncoding);
         _writerLoopTask = Task.Run(WriterLoopAsync);
         _readerLoopTask = Task.Run(ReaderLoopAsync);
@@ -320,6 +320,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         // return _writer.WriteAsync(cmd, cancellationToken);
     }
 
+    // [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
     private async ValueTask PublishLockedAsync(string subject, string? replyTo,  NatsPooledBufferWriter<byte> payloadBuffer, NatsPooledBufferWriter<byte>? headersBuffer, CancellationToken cancellationToken)
     {
         // await _chan.Writer.WriteAsync(1).ConfigureAwait(false);
