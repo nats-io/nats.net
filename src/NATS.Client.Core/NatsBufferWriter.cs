@@ -82,14 +82,6 @@ public sealed class NatsBufferWriter<T> : IBufferWriter<T>, IMemoryOwner<T>
         _index = 0;
     }
 
-    public void Reset()
-    {
-        if (_array != null)
-            _pool.Return(_array);
-        _array = _pool.Rent(DefaultInitialBufferSize);
-        _index = 0;
-    }
-
     /// <inheritdoc/>
     Memory<T> IMemoryOwner<T>.Memory
     {
