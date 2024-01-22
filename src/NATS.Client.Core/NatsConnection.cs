@@ -414,7 +414,7 @@ public partial class NatsConnection : INatsConnection
             {
                 // add CONNECT and PING command to priority lane
                 await priorityCommandWriter.CommandWriter.ConnectAsync(_clientOpts, CancellationToken.None).ConfigureAwait(false);
-                await priorityCommandWriter.CommandWriter.PingAsync(new PingCommand(), CancellationToken.None).ConfigureAwait(false);
+                await priorityCommandWriter.CommandWriter.PingAsync(new PingCommand(_pool), CancellationToken.None).ConfigureAwait(false);
 
                 Task? reconnectTask = null;
                 if (reconnect)

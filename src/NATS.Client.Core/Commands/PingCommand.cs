@@ -10,7 +10,7 @@ internal class PingCommand : IValueTaskSource<TimeSpan>, IObjectPoolNode<PingCom
     private ManualResetValueTaskSourceCore<TimeSpan> _core;
     private PingCommand? _next;
 
-    public PingCommand(ObjectPool? pool = null)
+    public PingCommand(ObjectPool? pool)
     {
         _pool = pool;
         _core = new ManualResetValueTaskSourceCore<TimeSpan>

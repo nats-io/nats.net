@@ -107,8 +107,13 @@ internal sealed class CommandWriter : IAsyncDisposable
             {
                 try
                 {
-                    var connection = _socketConnection;
-                    var pipeReader = _pipeReader;
+                    ISocketConnection? connection;
+                    PipeReader? pipeReader;
+                    lock (_lock)
+                    {
+                        connection = _socketConnection;
+                        pipeReader = _pipeReader;
+                    }
 
                     if (connection == null || pipeReader == null)
                     {
@@ -199,7 +204,11 @@ internal sealed class CommandWriter : IAsyncDisposable
                     // Console.WriteLine($">>> COMMAND: {cmd.command}");
                     try
                     {
-                        var bw = _pipeWriter;
+                        PipeWriter bw;
+                        lock (_lock)
+                        {
+                            bw = _pipeWriter;
+                        }
 
                         if (cmd.command == Command.Connect)
                         {
@@ -282,7 +291,12 @@ internal sealed class CommandWriter : IAsyncDisposable
         await _semLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            var bw = _pipeWriter;
+            PipeWriter bw;
+            lock (_lock)
+            {
+                bw = _pipeWriter;
+            }
+
             _protocolWriter.WritePing(bw);
             await bw.FlushAsync().ConfigureAwait(false);
         }
@@ -302,7 +316,11 @@ internal sealed class CommandWriter : IAsyncDisposable
         await _semLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            var bw = _pipeWriter;
+            PipeWriter bw;
+            lock (_lock)
+            {
+                bw = _pipeWriter;
+            }
             _protocolWriter.WritePong(bw);
             await bw.FlushAsync().ConfigureAwait(false);
         }
@@ -352,7 +370,11 @@ internal sealed class CommandWriter : IAsyncDisposable
             var payload = payloadBuffer!.WrittenMemory;
             var headers2 = headersBuffer?.WrittenMemory;
 
-            var bw = _pipeWriter;
+            PipeWriter bw;
+            lock (_lock)
+            {
+                bw = _pipeWriter;
+            }
 
             // if (value is byte[] bytes)
             // {

@@ -36,6 +36,6 @@ public partial class NatsConnection
     /// <returns><see cref="ValueTask"/> representing the asynchronous operation</returns>
     private ValueTask PingOnlyAsync(CancellationToken cancellationToken = default) =>
         ConnectionState == NatsConnectionState.Open
-            ? CommandWriter.PingAsync(new PingCommand(), cancellationToken)
+            ? CommandWriter.PingAsync(new PingCommand(_pool), cancellationToken)
             : ValueTask.CompletedTask;
 }
