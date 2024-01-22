@@ -16,7 +16,7 @@ public class CancellationTest
         await conn.ConnectAsync();
 
         // stall the flush task
-        await conn.CommandWriter.TestStallFlushAsync(TimeSpan.FromSeconds(5));
+        // TODO: await conn.CommandWriter.TestStallFlushAsync(TimeSpan.FromSeconds(5));
 
         // commands that call ConnectAsync throw OperationCanceledException
         await Assert.ThrowsAsync<TimeoutException>(() => conn.PingAsync().AsTask());

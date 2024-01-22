@@ -11,4 +11,5 @@ public static class NatsLogEvents
     public static readonly EventId Protocol = new(1005, nameof(Protocol));
     public static readonly EventId TcpSocket = new(1006, nameof(TcpSocket));
     public static readonly EventId Internal = new(1006, nameof(Internal));
+    public static readonly EventId Buffer = new(1007, nameof(Buffer));
 }

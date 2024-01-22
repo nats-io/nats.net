@@ -1,6 +1,5 @@
 using System.Buffers;
 using System.Diagnostics;
-using System.IO.Pipelines;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
@@ -47,7 +46,6 @@ public partial class NatsConnection : INatsConnection
     private volatile NatsUri? _currentConnectUri;
     private volatile NatsUri? _lastSeedConnectUri;
     private NatsReadProtocolProcessor? _socketReader;
-    private NatsPipeliningWriteProtocolProcessor? _socketWriter;
     private TaskCompletionSource _waitForOpenConnection;
     private TlsCerts? _tlsCerts;
     private UserCredentials? _userCredentials;
@@ -71,7 +69,7 @@ public partial class NatsConnection : INatsConnection
         _cancellationTimerPool = new CancellationTimerPool(_pool, _disposedCancellationTokenSource.Token);
         _name = opts.Name;
         Counter = new ConnectionStatsCounter();
-        CommandWriter = new CommandWriter(Opts, Counter, EnqueuePing);
+        CommandWriter = new CommandWriter(_pool, Opts, Counter, EnqueuePing);
         InboxPrefix = NewInbox(opts.InboxPrefix);
         SubscriptionManager = new SubscriptionManager(this, InboxPrefix);
         _logger = opts.LoggerFactory.CreateLogger<NatsConnection>();
@@ -197,7 +195,8 @@ public partial class NatsConnection : INatsConnection
     {
         try
         {
-            return CommandWriter.UnsubscribeAsync(sid, CancellationToken.None);
+            // TODO: use maxMsgs in INatsSub<T> to unsubscribe.
+            return CommandWriter.UnsubscribeAsync(sid, null, CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -410,11 +409,11 @@ public partial class NatsConnection : INatsConnection
             // Authentication
             _userCredentials?.Authenticate(_clientOpts, WritableServerInfo);
 
-            await using (var priorityCommandWriter = new PriorityCommandWriter(_socket!, Opts, Counter, EnqueuePing))
+            await using (var priorityCommandWriter = new PriorityCommandWriter(_pool, _socket!, Opts, Counter, EnqueuePing))
             {
                 // add CONNECT and PING command to priority lane
                 await priorityCommandWriter.CommandWriter.ConnectAsync(_clientOpts, CancellationToken.None).ConfigureAwait(false);
-                await priorityCommandWriter.CommandWriter.PingAsync(new PingCommand(), CancellationToken.None).ConfigureAwait(false);
+                await priorityCommandWriter.CommandWriter.PingAsync(new PingCommand(_pool), CancellationToken.None).ConfigureAwait(false);
 
                 Task? reconnectTask = null;
                 if (reconnect)
@@ -434,7 +433,7 @@ public partial class NatsConnection : INatsConnection
             }
 
             // create the socket writer
-            _socketWriter = CommandWriter.CreateNatsPipeliningWriteProtocolProcessor(_socket!);
+            CommandWriter.Reset(_socket!);
 
             lock (_gate)
             {
@@ -710,7 +709,7 @@ public partial class NatsConnection : INatsConnection
         }
 
         // Can not add PING, set fail.
-        pingCommand.TaskCompletionSource.SetCanceled();
+        pingCommand.SetCanceled();
     }
 
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
@@ -740,11 +739,7 @@ public partial class NatsConnection : INatsConnection
     private async ValueTask DisposeSocketAsync(bool asyncReaderDispose)
     {
         // writer's internal buffer/channel is not thread-safe, must wait until complete.
-        if (_socketWriter != null)
-        {
-            await DisposeSocketComponentAsync(_socketWriter, "socket writer").ConfigureAwait(false);
-            _socketWriter = null;
-        }
+        await CommandWriter.DisposeAsync().ConfigureAwait(false);
 
         if (_socket != null)
         {
