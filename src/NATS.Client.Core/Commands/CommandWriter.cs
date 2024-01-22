@@ -288,6 +288,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     public async ValueTask PingAsync(PingCommand pingCommand, CancellationToken cancellationToken)
     {
         _enqueuePing(pingCommand);
+        // await _chan.Writer.WriteAsync(1).ConfigureAwait(false);
         await _semLock.WaitAsync().ConfigureAwait(false);
         try
         {
@@ -313,6 +314,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         // cmd.command = Command.Pong;
         // return _writer.WriteAsync(cmd, cancellationToken);
 
+        // await _chan.Writer.WriteAsync(1).ConfigureAwait(false);
         await _semLock.WaitAsync().ConfigureAwait(false);
         try
         {
