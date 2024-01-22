@@ -4,7 +4,6 @@ using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.Core.Commands;
-using NATS.Client.Core.Internal;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Internal;
@@ -319,11 +318,11 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
         _userMsgs.Writer.TryComplete();
     }
 
-    private Task ConnectionOnConnectionDisconnected(object? sender, NatsEventArgs args)
+    private ValueTask ConnectionOnConnectionDisconnected(object? sender, NatsEventArgs args)
     {
         _logger.LogWarning(NatsJSLogEvents.Connection, "Disconnected {Reason}", args.Message);
         _userMsgs.Writer.TryComplete(new NatsJSConnectionException(args.Message));
-        return Task.CompletedTask;
+        return default;
     }
 
     private void ResetPending()

@@ -142,10 +142,10 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
         return CreatePushConsumer("init");
     }
 
-    private Task OnDisconnected(object? sender, NatsEventArgs args)
+    private ValueTask OnDisconnected(object? sender, NatsEventArgs args)
     {
         StopHeartbeatTimer();
-        return Task.CompletedTask;
+        return default;
     }
 
     private async Task CommandLoop()

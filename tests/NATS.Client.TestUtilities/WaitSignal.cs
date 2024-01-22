@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using NATS.Client.Core;
 
 namespace NATS.Client.Core.Tests;
 
@@ -8,10 +7,10 @@ public static class WaitSignalExtensions
     public static Task ConnectionDisconnectedAsAwaitable(this NatsConnection connection)
     {
         var signal = new WaitSignal();
-        connection.ConnectionDisconnected += (sender, e) =>
+        connection.ConnectionDisconnected += (_, _) =>
         {
             signal.Pulse();
-            return Task.CompletedTask;
+            return default;
         };
         return signal.Task.WaitAsync(signal.Timeout);
     }
@@ -19,10 +18,10 @@ public static class WaitSignalExtensions
     public static Task ConnectionOpenedAsAwaitable(this NatsConnection connection)
     {
         var signal = new WaitSignal();
-        connection.ConnectionOpened += (sender, e) =>
+        connection.ConnectionOpened += (_, _) =>
         {
             signal.Pulse();
-            return Task.CompletedTask;
+            return default;
         };
         return signal.Task.WaitAsync(signal.Timeout);
     }
@@ -30,10 +29,10 @@ public static class WaitSignalExtensions
     public static Task ReconnectFailedAsAwaitable(this NatsConnection connection)
     {
         var signal = new WaitSignal();
-        connection.ReconnectFailed += (sender, e) =>
+        connection.ReconnectFailed += (_, _) =>
         {
             signal.Pulse();
-            return Task.CompletedTask;
+            return default;
         };
         return signal.Task.WaitAsync(signal.Timeout);
     }

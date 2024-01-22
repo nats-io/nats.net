@@ -62,6 +62,10 @@ internal class NatsKVWatchSub<T> : NatsSubBase
     {
     }
 
-    private Task<bool> OnConnectionOpened(object? sender, NatsEventArgs args)
-        => Task.FromResult(_commands.TryWrite(new NatsKVWatchCommandMsg<T> { Command = NatsKVWatchCommand.Ready }));
+    private ValueTask OnConnectionOpened(object? sender, NatsEventArgs args)
+    {
+        // result is discarded, so this code is assumed to not be failing
+        _ = _commands.TryWrite(new NatsKVWatchCommandMsg<T> { Command = NatsKVWatchCommand.Ready });
+        return default;
+    }
 }

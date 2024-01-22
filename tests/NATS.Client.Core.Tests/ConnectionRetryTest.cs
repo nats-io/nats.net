@@ -21,7 +21,7 @@ public class ConnectionRetryTest
         nats.ReconnectFailed += (_, _) =>
         {
             signal.Pulse();
-            return Task.CompletedTask;
+            return default;
         };
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -48,7 +48,7 @@ public class ConnectionRetryTest
         nats.ReconnectFailed += (_, _) =>
         {
             signal.Pulse();
-            return Task.CompletedTask;
+            return default;
         };
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));

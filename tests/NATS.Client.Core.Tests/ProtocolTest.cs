@@ -316,7 +316,7 @@ public class ProtocolTest
         nats.ConnectionDisconnected += (_, _) =>
         {
             disconnected.Pulse();
-            return Task.CompletedTask;
+            return default;
         };
 
         proxy.Reset();

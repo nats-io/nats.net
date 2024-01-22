@@ -21,7 +21,7 @@ public class SlowConsumerTest
                 _output.WriteLine($"LOST {dropped.Data}");
             }
 
-            return Task.CompletedTask;
+            return default;
         };
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
