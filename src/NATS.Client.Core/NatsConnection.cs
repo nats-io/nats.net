@@ -715,7 +715,7 @@ public partial class NatsConnection : INatsConnection
         }
 
         // Can not add PING, set fail.
-        pingCommand.TaskCompletionSource.SetCanceled();
+        pingCommand.SetCanceled();
     }
 
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]

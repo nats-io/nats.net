@@ -276,19 +276,41 @@ internal sealed class CommandWriter : IAsyncDisposable
         return _writer.WriteAsync(cmd, cancellationToken);
     }
 
-    public ValueTask PingAsync(PingCommand pingCommand, CancellationToken cancellationToken)
+    public async ValueTask PingAsync(PingCommand pingCommand, CancellationToken cancellationToken)
     {
         _enqueuePing(pingCommand);
-        var cmd = _pool.Get();
-        cmd.command = Command.Ping;
-        return _writer.WriteAsync(cmd, cancellationToken);
+        await _semLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            var bw = _pipeWriter;
+            _protocolWriter.WritePing(bw);
+            await bw.FlushAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            // await _chan.Reader.ReadAsync().ConfigureAwait(true);
+            _semLock.Release();
+        }
     }
 
-    public ValueTask PongAsync(CancellationToken cancellationToken = default)
+    public async ValueTask PongAsync(CancellationToken cancellationToken = default)
     {
-        var cmd = _pool.Get();
-        cmd.command = Command.Pong;
-        return _writer.WriteAsync(cmd, cancellationToken);
+        // var cmd = _pool.Get();
+        // cmd.command = Command.Pong;
+        // return _writer.WriteAsync(cmd, cancellationToken);
+
+        await _semLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            var bw = _pipeWriter;
+            _protocolWriter.WritePong(bw);
+            await bw.FlushAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            // await _chan.Reader.ReadAsync().ConfigureAwait(true);
+            _semLock.Release();
+        }
     }
 
     public ValueTask PublishAsync<T>(string subject, T? value, NatsHeaders? headers, string? replyTo, INatsSerialize<T> serializer, CancellationToken cancellationToken)

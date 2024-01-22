@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using NATS.Client.Core.Commands;
 
 namespace NATS.Client.Core;
@@ -5,6 +6,7 @@ namespace NATS.Client.Core;
 public partial class NatsConnection
 {
     /// <inheritdoc />
+    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
     public async ValueTask<TimeSpan> PingAsync(CancellationToken cancellationToken = default)
     {
         if (ConnectionState != NatsConnectionState.Open)
@@ -12,9 +14,16 @@ public partial class NatsConnection
             await ConnectAsync().AsTask().WaitAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        var pingCommand = new PingCommand();
+        PingCommand pingCommand;
+        if (!_pool.TryRent(out pingCommand!))
+        {
+            pingCommand = new PingCommand(_pool);
+        }
+
+        pingCommand.Start();
+
         await CommandWriter.PingAsync(pingCommand, cancellationToken).ConfigureAwait(false);
-        return await pingCommand.TaskCompletionSource.Task.ConfigureAwait(false);
+        return await pingCommand.RunAsync().ConfigureAwait(false);
     }
 
     /// <summary>
