@@ -91,12 +91,12 @@ internal sealed class ProtocolWriter
         int ctrlLen;
         if (headers == null)
         {
-            // 'PUB '   + subject                                +' '+ payload len        +'\r\n'
+            // 'PUB '   + subject                                             +' '+ payload len        +'\r\n'
             ctrlLen = PubSpaceLength + _subjectEncoding.GetByteCount(subject) + 1 + MaxIntStringLength + NewLineLength;
         }
         else
         {
-            // 'HPUB '  + subject                                +' '+ header len         +' '+ payload len        +'\r\n'
+            // 'HPUB '  + subject                                              +' '+ header len         +' '+ payload len        +'\r\n'
             ctrlLen = HpubSpaceLength + _subjectEncoding.GetByteCount(subject) + 1 + MaxIntStringLength + 1 + MaxIntStringLength + NewLineLength;
         }
 
