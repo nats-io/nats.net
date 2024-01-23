@@ -1,5 +1,7 @@
 using System.Buffers;
 using System.Text;
+using Microsoft.Extensions.Logging;
+using NATS.Client.TestUtilities;
 
 namespace NATS.Client.Core.Tests;
 
@@ -336,6 +338,52 @@ public class ProtocolTest
         Assert.StartsWith("PUB foo", frames[4]);
 
         await nats.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task Protocol_parser_under_load()
+    {
+        await using var server = NatsServer.Start();
+        var logger = new InMemoryTestLoggerFactory(LogLevel.Error);
+        var opts = server.ClientOpts(NatsOpts.Default) with { LoggerFactory = logger };
+        var nats = new NatsConnection(opts);
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var signal = new WaitSignal();
+
+        _ = Task.Run(
+            async () =>
+            {
+                var count = 0;
+                await foreach (var unused in nats.SubscribeAsync<string>("x", cancellationToken: cts.Token))
+                {
+                    if (++count > 10_000)
+                        signal.Pulse();
+                }
+            },
+            cts.Token);
+
+        _ = Task.Run(
+            async () =>
+            {
+                while (!cts.Token.IsCancellationRequested)
+                    await nats.PublishAsync("x", "x", cancellationToken: cts.Token);
+            },
+            cts.Token);
+
+        await signal;
+
+        for (var i = 0; i < 3; i++)
+        {
+            await Task.Delay(1_000, cts.Token);
+            await server.RestartAsync();
+        }
+
+        foreach (var log in logger.Logs.Where(x => x.EventId == NatsLogEvents.Protocol && x.LogLevel == LogLevel.Error))
+        {
+            Assert.DoesNotContain("Unknown Protocol Operation", log.Message);
+        }
     }
 
     private sealed class NatsSubReconnectTest : NatsSubBase
