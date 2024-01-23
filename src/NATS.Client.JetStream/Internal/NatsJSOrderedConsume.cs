@@ -96,7 +96,7 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
         // This channel is used to pass messages to the user from the subscription.
         _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg>>(
             Connection.GetChannelOpts(Connection.Opts, opts?.ChannelOpts),
-            msg => Connection.MessageDropped(this, _userMsgs?.Reader.Count ?? 0, msg.Msg));
+            msg => Connection.OnMessageDropped(this, _userMsgs?.Reader.Count ?? 0, msg.Msg));
         Msgs = _userMsgs.Reader;
 
         // Pull request channel is set as unbounded because we don't want to drop
