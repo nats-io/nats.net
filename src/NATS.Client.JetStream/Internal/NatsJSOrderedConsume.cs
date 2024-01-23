@@ -4,7 +4,6 @@ using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.Core.Commands;
-using NATS.Client.Core.Internal;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Internal;
@@ -97,7 +96,7 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
         // This channel is used to pass messages to the user from the subscription.
         _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg>>(
             Connection.GetChannelOpts(Connection.Opts, opts?.ChannelOpts),
-            msg => Connection.MessageDropped(this, _userMsgs?.Reader.Count ?? 0, msg.Msg));
+            msg => Connection.OnMessageDropped(this, _userMsgs?.Reader.Count ?? 0, msg.Msg));
         Msgs = _userMsgs.Reader;
 
         // Pull request channel is set as unbounded because we don't want to drop
@@ -317,10 +316,11 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
         _userMsgs.Writer.TryComplete();
     }
 
-    private void ConnectionOnConnectionDisconnected(object? sender, string e)
+    private ValueTask ConnectionOnConnectionDisconnected(object? sender, NatsEventArgs args)
     {
-        _logger.LogWarning(NatsJSLogEvents.Connection, "Disconnected {Reason}", e);
-        _userMsgs.Writer.TryComplete(new NatsJSConnectionException(e));
+        _logger.LogWarning(NatsJSLogEvents.Connection, "Disconnected {Reason}", args.Message);
+        _userMsgs.Writer.TryComplete(new NatsJSConnectionException(args.Message));
+        return default;
     }
 
     private void ResetPending()

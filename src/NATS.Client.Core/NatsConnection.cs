@@ -1,6 +1,5 @@
 using System.Buffers;
 using System.Diagnostics;
-using System.IO.Pipelines;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
@@ -14,6 +13,14 @@ public enum NatsConnectionState
     Open,
     Connecting,
     Reconnecting,
+}
+
+internal enum NatsEvent
+{
+    ConnectionOpened,
+    ConnectionDisconnected,
+    ReconnectFailed,
+    MessageDropped,
 }
 
 public partial class NatsConnection : INatsConnection
@@ -37,7 +44,9 @@ public partial class NatsConnection : INatsConnection
     private readonly string _name;
     private readonly TimeSpan _socketComponentDisposeTimeout = TimeSpan.FromSeconds(5);
     private readonly BoundedChannelOptions _defaultSubscriptionChannelOpts;
+    private readonly Channel<(NatsEvent, NatsEventArgs)> _eventChannel;
     private readonly ClientOpts _clientOpts;
+
     private int _pongCount;
     private int _connectionState;
 
@@ -84,16 +93,25 @@ public partial class NatsConnection : INatsConnection
             SingleReader = false,
             AllowSynchronousContinuations = false,
         };
+
+        // push consumer events to a channel so handlers can be awaited (also prevents user code from blocking us)
+        _eventChannel = Channel.CreateUnbounded<(NatsEvent, NatsEventArgs)>(new UnboundedChannelOptions
+        {
+            AllowSynchronousContinuations = false,
+            SingleWriter = false,
+            SingleReader = true,
+        });
+        _ = Task.Run(PublishEventsAsync, _disposedCancellationTokenSource.Token);
     }
 
     // events
-    public event EventHandler<string>? ConnectionDisconnected;
+    public event AsyncEventHandler<NatsEventArgs>? ConnectionDisconnected;
 
-    public event EventHandler<string>? ConnectionOpened;
+    public event AsyncEventHandler<NatsEventArgs>? ConnectionOpened;
 
-    public event EventHandler<string>? ReconnectFailed;
+    public event AsyncEventHandler<NatsEventArgs>? ReconnectFailed;
 
-    public event EventHandler<INatsError>? OnError;
+    public event AsyncEventHandler<NatsMessageDroppedEventArgs>? MessageDropped;
 
     public NatsOpts Opts { get; }
 
@@ -213,11 +231,11 @@ public partial class NatsConnection : INatsConnection
         return ValueTask.CompletedTask;
     }
 
-    internal void MessageDropped<T>(NatsSubBase natsSub, int pending, NatsMsg<T> msg)
+    internal void OnMessageDropped<T>(NatsSubBase natsSub, int pending, NatsMsg<T> msg)
     {
         var subject = msg.Subject;
         _logger.LogWarning("Dropped message from {Subject} with {Pending} pending messages", subject, pending);
-        OnError?.Invoke(this, new MessageDroppedError(natsSub, pending, subject, msg.ReplyTo, msg.Headers, msg.Data));
+        _eventChannel.Writer.TryWrite((NatsEvent.MessageDropped, new NatsMessageDroppedEventArgs(natsSub, pending, subject, msg.ReplyTo, msg.Headers, msg.Data)));
     }
 
     internal BoundedChannelOptions GetChannelOpts(NatsOpts connectionOpts, NatsSubChannelOpts? subChannelOpts)
@@ -345,7 +363,7 @@ public partial class NatsConnection : INatsConnection
             StartPingTimer(_pingTimerCancellationTokenSource.Token);
             _waitForOpenConnection.TrySetResult();
             _ = Task.Run(ReconnectLoop);
-            ConnectionOpened?.Invoke(this, url?.ToString() ?? string.Empty);
+            _eventChannel.Writer.TryWrite((NatsEvent.ConnectionOpened, new NatsEventArgs(url?.ToString() ?? string.Empty)));
         }
     }
 
@@ -488,8 +506,8 @@ public partial class NatsConnection : INatsConnection
                 _pingTimerCancellationTokenSource?.Cancel();
             }
 
-            // Invoke after state changed
-            ConnectionDisconnected?.Invoke(this, _currentConnectUri?.ToString() ?? string.Empty);
+            // Invoke event after state changed
+            _eventChannel.Writer.TryWrite((NatsEvent.ConnectionDisconnected, new NatsEventArgs(_currentConnectUri?.ToString() ?? string.Empty)));
 
             // Cleanup current socket
             await DisposeSocketAsync(true).ConfigureAwait(false);
@@ -567,7 +585,7 @@ public partial class NatsConnection : INatsConnection
                     _logger.LogWarning(NatsLogEvents.Connection, ex, "Failed to connect NATS {Url}", url);
                 }
 
-                ReconnectFailed?.Invoke(this, url?.ToString() ?? string.Empty);
+                _eventChannel.Writer.TryWrite((NatsEvent.ReconnectFailed, new NatsEventArgs(url?.ToString() ?? string.Empty)));
                 await WaitWithJitterAsync().ConfigureAwait(false);
                 goto CONNECT_AGAIN;
             }
@@ -582,7 +600,7 @@ public partial class NatsConnection : INatsConnection
                 StartPingTimer(_pingTimerCancellationTokenSource.Token);
                 _waitForOpenConnection.TrySetResult();
                 _ = Task.Run(ReconnectLoop);
-                ConnectionOpened?.Invoke(this, url?.ToString() ?? string.Empty);
+                _eventChannel.Writer.TryWrite((NatsEvent.ConnectionOpened, new NatsEventArgs(url.ToString())));
             }
         }
         catch (Exception ex)
@@ -591,6 +609,42 @@ public partial class NatsConnection : INatsConnection
                 return;
             _waitForOpenConnection.TrySetException(ex);
             _logger.LogError(NatsLogEvents.Connection, ex, "Retry loop stopped and connection state is invalid");
+        }
+    }
+
+    private async Task PublishEventsAsync()
+    {
+        try
+        {
+            while (!_disposedCancellationTokenSource.IsCancellationRequested)
+            {
+                var hasData = await _eventChannel.Reader.WaitToReadAsync(_disposedCancellationTokenSource.Token).ConfigureAwait(false);
+                while (hasData && _eventChannel.Reader.TryRead(out var eventArgs))
+                {
+                    var (natsEvent, args) = eventArgs;
+                    switch (natsEvent)
+                    {
+                    case NatsEvent.ConnectionOpened when ConnectionOpened != null:
+                        await ConnectionOpened.InvokeAsync(this, args).ConfigureAwait(false);
+                        break;
+                    case NatsEvent.ConnectionDisconnected when ConnectionDisconnected != null:
+                        await ConnectionDisconnected.InvokeAsync(this, args).ConfigureAwait(false);
+                        break;
+                    case NatsEvent.ReconnectFailed when ReconnectFailed != null:
+                        await ReconnectFailed.InvokeAsync(this, args).ConfigureAwait(false);
+                        break;
+                    case NatsEvent.MessageDropped when MessageDropped != null && args is NatsMessageDroppedEventArgs error:
+                        await MessageDropped.InvokeAsync(this, error).ConfigureAwait(false);
+                        break;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(NatsLogEvents.Connection, ex, "Error occured when publishing events");
+            if (!_disposedCancellationTokenSource.IsCancellationRequested)
+                _ = Task.Run(PublishEventsAsync, _disposedCancellationTokenSource.Token);
         }
     }
 
