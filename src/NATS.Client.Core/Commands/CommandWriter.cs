@@ -44,12 +44,6 @@ internal sealed class CommandWriter : IAsyncDisposable
         _defaultCommandTimeout = overrideCommandTimeout ?? opts.CommandTimeout;
         _enqueuePing = enqueuePing;
         _opts = opts;
-        var pipe = new Pipe(new PipeOptions(
-            pauseWriterThreshold: opts.WriterBufferSize, // flush will block after hitting
-            resumeWriterThreshold: opts.WriterBufferSize / 2,  // will start flushing again after catching up
-            minimumSegmentSize: 16384, // segment that is part of an uninterrupted payload can be sent using socket.send
-            useSynchronizationContext: false));
-        _pipeWriter = pipe.Writer;
         _protocolWriter = new ProtocolWriter(opts.SubjectEncoding);
         _semLock = new SemaphoreSlim(1);
         _headerWriter = new HeaderWriter(_opts.HeaderEncoding);
@@ -276,17 +270,17 @@ internal sealed class CommandWriter : IAsyncDisposable
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
     private async ValueTask PublishLockedAsync(string subject, string? replyTo,  NatsPooledBufferWriter<byte> payloadBuffer, NatsPooledBufferWriter<byte>? headersBuffer, CancellationToken cancellationToken)
     {
-        // Interlocked.Add(ref _counter.PendingMessages, 1);
+        Interlocked.Add(ref _counter.PendingMessages, 1);
         await _semLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             var payload = payloadBuffer.WrittenMemory;
             var headers = headersBuffer?.WrittenMemory;
 
-            // if (_disposed)
-            // {
-            //     throw new ObjectDisposedException(nameof(CommandWriter));
-            // }
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(CommandWriter));
+            }
 
             PipeWriter bw;
             lock (_lock)
@@ -312,7 +306,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         finally
         {
             _semLock.Release();
-            // Interlocked.Add(ref _counter.PendingMessages, -1);
+            Interlocked.Add(ref _counter.PendingMessages, -1);
         }
     }
 
