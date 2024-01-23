@@ -739,7 +739,7 @@ public partial class NatsConnection : INatsConnection
     private async ValueTask DisposeSocketAsync(bool asyncReaderDispose)
     {
         // writer's internal buffer/channel is not thread-safe, must wait until complete.
-        await CommandWriter.DisposeAsync().ConfigureAwait(false);
+        CommandWriter.Reset(_socket);
 
         if (_socket != null)
         {

@@ -51,7 +51,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         _readerLoopTask = Task.Run(ReaderLoopAsync);
     }
 
-    public void Reset(ISocketConnection socketConnection)
+    public void Reset(ISocketConnection? socketConnection)
     {
         var pipe = new Pipe(new PipeOptions(
             pauseWriterThreshold: _opts.WriterBufferSize, // flush will block after hitting

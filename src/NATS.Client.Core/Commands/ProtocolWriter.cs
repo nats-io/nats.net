@@ -247,7 +247,7 @@ internal sealed class ProtocolWriter
     private void WriteHpub(IBufferWriter<byte> writer, string subject, string? replyTo, ReadOnlyMemory<byte> headers, ReadOnlyMemory<byte> payload)
     {
         Span<byte> spanPayloadLength = stackalloc byte[MaxIntStringLength];
-        if (!Utf8Formatter.TryFormat(payload.Length, spanPayloadLength, out var payloadLengthWritten))
+        if (!Utf8Formatter.TryFormat(payload.Length + headers.Length, spanPayloadLength, out var payloadLengthWritten))
         {
             ThrowOnUtf8FormatFail();
         }
@@ -275,7 +275,7 @@ internal sealed class ProtocolWriter
             total += replyToLengthSpace;
         }
 
-        total += spanHeadersLength.Length + spanPayloadLength.Length + NewLineLength + payload.Length + NewLineLength;
+        total += spanHeadersLength.Length + spanPayloadLength.Length + NewLineLength + headers.Length + payload.Length + NewLineLength;
 
         var span = writer.GetSpan(total);
 
@@ -301,6 +301,9 @@ internal sealed class ProtocolWriter
 
         BinaryPrimitives.WriteUInt16LittleEndian(span, NewLine);
         span = span.Slice(NewLineLength);
+
+        headers.Span.CopyTo(span);
+        span = span.Slice(headers.Length);
 
         payload.Span.CopyTo(span);
         span = span.Slice(payload.Length);
