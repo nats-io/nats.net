@@ -110,7 +110,7 @@ public sealed record NatsOpts
     /// <remarks>
     /// If the client reaches this internal limit (bounded channel capacity), by default it will drop messages
     /// and continue to process new messages. This is aligned with NATS at most once delivery. It is up to
-    /// the application to detect the missing messages (<seealso cref="NatsConnection.OnError"/>) and recover
+    /// the application to detect the missing messages (<seealso cref="NatsConnection.MessageDropped"/>) and recover
     /// from this condition or set a different default such as <c>BoundedChannelFullMode.Wait</c> in which
     /// case it might risk server disconnecting the client as a slow consumer.
     /// </remarks>

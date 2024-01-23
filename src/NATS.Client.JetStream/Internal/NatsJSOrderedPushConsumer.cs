@@ -163,7 +163,11 @@ internal class NatsJSOrderedPushConsumer<T>
         _msgChannel.Writer.TryComplete();
     }
 
-    private void OnDisconnected(object? sender, string e) => StopHeartbeatTimer();
+    private ValueTask OnDisconnected(object? sender, NatsEventArgs args)
+    {
+        StopHeartbeatTimer();
+        return default;
+    }
 
     private async Task CommandLoop()
     {
@@ -446,6 +450,10 @@ internal class NatsJSOrderedPushConsumerSub<T> : NatsSubBase
     {
     }
 
-    private void OnConnectionOpened(object? sender, string e) =>
-        _commands.TryWrite(new NatsJSOrderedPushConsumerMsg<T> { Command = NatsJSOrderedPushConsumerCommand.Ready });
+    private ValueTask OnConnectionOpened(object? sender, NatsEventArgs args)
+    {
+        // result is discarded, so this code is assumed to not be failing
+        _ = _commands.TryWrite(new NatsJSOrderedPushConsumerMsg<T> { Command = NatsJSOrderedPushConsumerCommand.Ready });
+        return default;
+    }
 }

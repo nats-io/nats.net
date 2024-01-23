@@ -315,7 +315,11 @@ public class ProtocolTest
             async () => await nats.PublishAsync(subject, 1));
 
         var disconnected = new WaitSignal();
-        nats.ConnectionDisconnected += (_, _) => disconnected.Pulse();
+        nats.ConnectionDisconnected += (_, _) =>
+        {
+            disconnected.Pulse();
+            return default;
+        };
 
         proxy.Reset();
 

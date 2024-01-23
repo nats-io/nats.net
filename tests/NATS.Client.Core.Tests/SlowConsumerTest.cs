@@ -13,13 +13,15 @@ public class SlowConsumerTest
         var nats = server.CreateClientConnection(new NatsOpts { SubPendingChannelCapacity = 3 });
 
         var lost = 0;
-        nats.OnError += (_, e) =>
+        nats.MessageDropped += (_, e) =>
         {
-            if (e is MessageDroppedError dropped)
+            if (e is { } dropped)
             {
                 Interlocked.Increment(ref lost);
                 _output.WriteLine($"LOST {dropped.Data}");
             }
+
+            return default;
         };
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
