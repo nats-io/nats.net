@@ -3,6 +3,7 @@ using System.IO.Pipelines;
 using System.Net.Sockets;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Internal;
 
@@ -28,9 +29,9 @@ internal sealed class CommandWriter : IAsyncDisposable
     private readonly Action<PingCommand> _enqueuePing;
     private readonly NatsOpts _opts;
     private readonly ProtocolWriter _protocolWriter;
-    private readonly SemaphoreSlim _semLock;
     private readonly Task _readerLoopTask;
     private readonly HeaderWriter _headerWriter;
+    private readonly Channel<int> _channelLock;
     private ISocketConnection? _socketConnection;
     private PipeReader? _pipeReader;
     private PipeWriter? _pipeWriter;
@@ -45,7 +46,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         _enqueuePing = enqueuePing;
         _opts = opts;
         _protocolWriter = new ProtocolWriter(opts.SubjectEncoding);
-        _semLock = new SemaphoreSlim(1);
+        _channelLock = Channel.CreateBounded<int>(1);
         _headerWriter = new HeaderWriter(_opts.HeaderEncoding);
         _cts = new CancellationTokenSource();
         _readerLoopTask = Task.Run(ReaderLoopAsync);
@@ -76,7 +77,11 @@ internal sealed class CommandWriter : IAsyncDisposable
         await _cts.CancelAsync().ConfigureAwait(false);
 #endif
 
-        await _semLock.WaitAsync().ConfigureAwait(false);
+        while (!_channelLock.Writer.TryWrite(1))
+        {
+            await _channelLock.Writer.WaitToWriteAsync().ConfigureAwait(false);
+        }
+
         try
         {
             if (_disposed)
@@ -95,14 +100,22 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            _semLock.Release();
+            while (!_channelLock.Reader.TryRead(out _))
+            {
+                await _channelLock.Reader.WaitToReadAsync().ConfigureAwait(false);
+            }
         }
     }
 
     public async ValueTask ConnectAsync(ClientOpts connectOpts, CancellationToken cancellationToken)
     {
-        Interlocked.Add(ref _counter.PendingMessages, 1);
-        await _semLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        Interlocked.Increment(ref _counter.PendingMessages);
+
+        while (!_channelLock.Writer.TryWrite(1))
+        {
+            await _channelLock.Writer.WaitToWriteAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         try
         {
             if (_disposed)
@@ -118,20 +131,29 @@ internal sealed class CommandWriter : IAsyncDisposable
                 bw = _pipeWriter!;
             }
 
-            _protocolWriter.WriteConnect(bw, connectOpts!);
+            _protocolWriter.WriteConnect(bw, connectOpts);
             await bw.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
-            _semLock.Release();
-            Interlocked.Add(ref _counter.PendingMessages, -1);
+            while (!_channelLock.Reader.TryRead(out _))
+            {
+                await _channelLock.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            Interlocked.Decrement(ref _counter.PendingMessages);
         }
     }
 
     public async ValueTask PingAsync(PingCommand pingCommand, CancellationToken cancellationToken)
     {
-        Interlocked.Add(ref _counter.PendingMessages, 1);
-        await _semLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        Interlocked.Increment(ref _counter.PendingMessages);
+
+        while (!_channelLock.Writer.TryWrite(1))
+        {
+            await _channelLock.Writer.WaitToWriteAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         try
         {
             if (_disposed)
@@ -154,15 +176,24 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            _semLock.Release();
-            Interlocked.Add(ref _counter.PendingMessages, -1);
+            while (!_channelLock.Reader.TryRead(out _))
+            {
+                await _channelLock.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            Interlocked.Decrement(ref _counter.PendingMessages);
         }
     }
 
     public async ValueTask PongAsync(CancellationToken cancellationToken = default)
     {
-        Interlocked.Add(ref _counter.PendingMessages, 1);
-        await _semLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        Interlocked.Increment(ref _counter.PendingMessages);
+
+        while (!_channelLock.Writer.TryWrite(1))
+        {
+            await _channelLock.Writer.WaitToWriteAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         try
         {
             if (_disposed)
@@ -183,7 +214,12 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            _semLock.Release();
+            while (!_channelLock.Reader.TryRead(out _))
+            {
+                await _channelLock.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            Interlocked.Decrement(ref _counter.PendingMessages);
         }
     }
 
@@ -208,8 +244,13 @@ internal sealed class CommandWriter : IAsyncDisposable
 
     public async ValueTask SubscribeAsync(int sid, string subject, string? queueGroup, int? maxMsgs, CancellationToken cancellationToken)
     {
-        Interlocked.Add(ref _counter.PendingMessages, 1);
-        await _semLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        Interlocked.Increment(ref _counter.PendingMessages);
+
+        while (!_channelLock.Writer.TryWrite(1))
+        {
+            await _channelLock.Writer.WaitToWriteAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         try
         {
             if (_disposed)
@@ -230,15 +271,24 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            _semLock.Release();
-            Interlocked.Add(ref _counter.PendingMessages, -1);
+            while (!_channelLock.Reader.TryRead(out _))
+            {
+                await _channelLock.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            Interlocked.Decrement(ref _counter.PendingMessages);
         }
     }
 
     public async ValueTask UnsubscribeAsync(int sid, int? maxMsgs, CancellationToken cancellationToken)
     {
-        Interlocked.Add(ref _counter.PendingMessages, 1);
-        await _semLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        Interlocked.Increment(ref _counter.PendingMessages);
+
+        while (!_channelLock.Writer.TryWrite(1))
+        {
+            await _channelLock.Writer.WaitToWriteAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         try
         {
             if (_disposed)
@@ -259,8 +309,12 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            _semLock.Release();
-            Interlocked.Add(ref _counter.PendingMessages, -1);
+            while (!_channelLock.Reader.TryRead(out _))
+            {
+                await _channelLock.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            Interlocked.Decrement(ref _counter.PendingMessages);
         }
     }
 
@@ -270,8 +324,13 @@ internal sealed class CommandWriter : IAsyncDisposable
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
     private async ValueTask PublishLockedAsync(string subject, string? replyTo,  NatsPooledBufferWriter<byte> payloadBuffer, NatsPooledBufferWriter<byte>? headersBuffer, CancellationToken cancellationToken)
     {
-        Interlocked.Add(ref _counter.PendingMessages, 1);
-        await _semLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        Interlocked.Increment(ref _counter.PendingMessages);
+
+        while (!_channelLock.Writer.TryWrite(1))
+        {
+            await _channelLock.Writer.WaitToWriteAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         try
         {
             var payload = payloadBuffer.WrittenMemory;
@@ -305,8 +364,12 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            _semLock.Release();
-            Interlocked.Add(ref _counter.PendingMessages, -1);
+            while (!_channelLock.Reader.TryRead(out _))
+            {
+                await _channelLock.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            Interlocked.Decrement(ref _counter.PendingMessages);
         }
     }
 
