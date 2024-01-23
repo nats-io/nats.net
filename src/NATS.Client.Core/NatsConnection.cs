@@ -624,18 +624,18 @@ public partial class NatsConnection : INatsConnection
                     var (natsEvent, args) = eventArgs;
                     switch (natsEvent)
                     {
-                        case NatsEvent.ConnectionOpened when ConnectionOpened != null:
-                            await ConnectionOpened.InvokeAsync(this, args).ConfigureAwait(false);
-                            break;
-                        case NatsEvent.ConnectionDisconnected when ConnectionDisconnected != null:
-                            await ConnectionDisconnected.InvokeAsync(this, args).ConfigureAwait(false);
-                            break;
-                        case NatsEvent.ReconnectFailed when ReconnectFailed != null:
-                            await ReconnectFailed.InvokeAsync(this, args).ConfigureAwait(false);
-                            break;
-                        case NatsEvent.MessageDropped when MessageDropped != null && args is NatsMessageDroppedEventArgs error:
-                            await MessageDropped.InvokeAsync(this, error).ConfigureAwait(false);
-                            break;
+                    case NatsEvent.ConnectionOpened when ConnectionOpened != null:
+                        await ConnectionOpened.InvokeAsync(this, args).ConfigureAwait(false);
+                        break;
+                    case NatsEvent.ConnectionDisconnected when ConnectionDisconnected != null:
+                        await ConnectionDisconnected.InvokeAsync(this, args).ConfigureAwait(false);
+                        break;
+                    case NatsEvent.ReconnectFailed when ReconnectFailed != null:
+                        await ReconnectFailed.InvokeAsync(this, args).ConfigureAwait(false);
+                        break;
+                    case NatsEvent.MessageDropped when MessageDropped != null && args is NatsMessageDroppedEventArgs error:
+                        await MessageDropped.InvokeAsync(this, error).ConfigureAwait(false);
+                        break;
                     }
                 }
             }
