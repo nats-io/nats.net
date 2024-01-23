@@ -10,14 +10,20 @@ public record PeerInfo
     [System.Text.Json.Serialization.JsonPropertyName("name")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+#if NET6_0
     public string Name { get; set; } = default!;
+#else
+#pragma warning disable SA1206
+    public required string Name { get; set; }
+#pragma warning restore SA1206
+#endif
 
     /// <summary>
     /// Indicates if the server is up to date and synchronised
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("current")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
-    public bool Current { get; set; } = false;
+    public bool Current { get; set; }
 
     /// <summary>
     /// Nanoseconds since this peer was last seen
@@ -32,7 +38,7 @@ public record PeerInfo
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("offline")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public bool Offline { get; set; } = false;
+    public bool Offline { get; set; }
 
     /// <summary>
     /// How many uncommitted operations this peer is behind the leader
@@ -40,5 +46,5 @@ public record PeerInfo
     [System.Text.Json.Serialization.JsonPropertyName("lag")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     [System.ComponentModel.DataAnnotations.Range(0, int.MaxValue)]
-    public int Lag { get; set; } = default!;
+    public int Lag { get; set; }
 }

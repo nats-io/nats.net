@@ -1,7 +1,3 @@
-using System.Text.Json;
-using NATS.Client.Core;
-using NATS.Client.Core.Internal;
-
 namespace NATS.Client.JetStream.Models;
 
 /// <summary>

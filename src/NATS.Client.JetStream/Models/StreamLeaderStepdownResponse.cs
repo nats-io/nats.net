@@ -11,5 +11,5 @@ public record StreamLeaderStepdownResponse
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("success")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
-    public bool Success { get; set; } = false;
+    public bool Success { get; set; }
 }

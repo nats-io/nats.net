@@ -35,7 +35,11 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
 
         // For ordered consumer we start with an empty consumer info object
         // since consumers are created and updated during fetch and consume.
-        Info = new ConsumerInfo();
+        Info = new ConsumerInfo()
+        {
+            Name = string.Empty,
+            StreamName = string.Empty,
+        };
     }
 
     /// <summary>
@@ -115,32 +119,9 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
                         {
                             NatsJSMsg<T> msg;
 
-                            try
-                            {
-                                var canRead = cc.Msgs.TryRead(out msg);
-                                if (!canRead)
-                                    break;
-                            }
-                            catch (OperationCanceledException)
-                            {
+                            var canRead = cc.Msgs.TryRead(out msg);
+                            if (!canRead)
                                 break;
-                            }
-                            catch (NatsJSProtocolException pe)
-                            {
-                                protocolException = pe;
-                                goto CONSUME_LOOP;
-                            }
-                            catch (NatsJSConnectionException e)
-                            {
-                                _logger.LogWarning(NatsJSLogEvents.Retry, "{Error}. Retrying...", e.Message);
-                                goto CONSUME_LOOP;
-                            }
-                            catch (NatsJSTimeoutException e)
-                            {
-                                notificationHandler?.Invoke(new NatsJSTimeoutNotification(), cancellationToken);
-                                _logger.LogWarning(NatsJSLogEvents.Retry, "{Error}. Retrying...", e.Message);
-                                goto CONSUME_LOOP;
-                            }
 
                             if (msg.Metadata is not { } metadata)
                                 continue;

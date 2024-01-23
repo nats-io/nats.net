@@ -8,7 +8,7 @@ public record Tier
     [System.Text.Json.Serialization.JsonPropertyName("memory")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Range(0, int.MaxValue)]
-    public int Memory { get; set; } = default!;
+    public int Memory { get; set; }
 
     /// <summary>
     /// File Storage being used for Stream Message storage
@@ -16,7 +16,7 @@ public record Tier
     [System.Text.Json.Serialization.JsonPropertyName("storage")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Range(0, int.MaxValue)]
-    public int Storage { get; set; } = default!;
+    public int Storage { get; set; }
 
     /// <summary>
     /// Number of active Streams
@@ -24,7 +24,7 @@ public record Tier
     [System.Text.Json.Serialization.JsonPropertyName("streams")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Range(0, int.MaxValue)]
-    public int Streams { get; set; } = default!;
+    public int Streams { get; set; }
 
     /// <summary>
     /// Number of active Consumers
@@ -32,7 +32,7 @@ public record Tier
     [System.Text.Json.Serialization.JsonPropertyName("consumers")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Range(0, int.MaxValue)]
-    public int Consumers { get; set; } = default!;
+    public int Consumers { get; set; }
 
     [System.Text.Json.Serialization.JsonPropertyName("limits")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]

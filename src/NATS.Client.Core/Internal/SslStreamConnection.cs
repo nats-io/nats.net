@@ -80,12 +80,17 @@ internal sealed class SslStreamConnection : ISocketConnection
         _waitForClosedSource.TrySetResult(exception);
     }
 
-    public async Task AuthenticateAsClientAsync(NatsUri uri)
+    public async Task AuthenticateAsClientAsync(NatsUri uri, TimeSpan timeout)
     {
         var options = SslClientAuthenticationOptions(uri);
         try
         {
-            await _sslStream.AuthenticateAsClientAsync(options).ConfigureAwait(false);
+            using var cts = new CancellationTokenSource(timeout);
+            await _sslStream.AuthenticateAsClientAsync(options, cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw new NatsException("TLS authentication timed out");
         }
         catch (AuthenticationException ex)
         {

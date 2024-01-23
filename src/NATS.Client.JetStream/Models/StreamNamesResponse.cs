@@ -8,5 +8,5 @@ public record StreamNamesResponse : IterableResponse
 {
     [System.Text.Json.Serialization.JsonPropertyName("streams")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public System.Collections.Generic.ICollection<string>? Streams { get; set; }
+    public ICollection<string>? Streams { get; set; }
 }

@@ -11,19 +11,19 @@ public record StreamMsgGetRequest
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("seq")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public ulong Seq { get; set; } = default!;
+    public ulong Seq { get; set; }
 
     /// <summary>
     /// Retrieves the last message for a given subject, cannot be combined with seq
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("last_by_subj")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public string LastBySubj { get; set; } = default!;
+    public string? LastBySubj { get; set; }
 
     /// <summary>
     /// Combined with sequence gets the next message for a subject with the given sequence or higher
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("next_by_subj")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public string NextBySubj { get; set; } = default!;
+    public string? NextBySubj { get; set; }
 }

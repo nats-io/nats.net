@@ -8,7 +8,13 @@ public record ConsumerInfo
     [System.Text.Json.Serialization.JsonPropertyName("stream_name")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+#if NET6_0
     public string StreamName { get; set; } = default!;
+#else
+#pragma warning disable SA1206
+    public required string StreamName { get; set; }
+#pragma warning restore SA1206
+#endif
 
     /// <summary>
     /// A unique name for the consumer, either machine generated or the durable name
@@ -16,18 +22,24 @@ public record ConsumerInfo
     [System.Text.Json.Serialization.JsonPropertyName("name")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+#if NET6_0
     public string Name { get; set; } = default!;
+#else
+#pragma warning disable SA1206
+    public required string Name { get; set; }
+#pragma warning restore SA1206
+#endif
 
     /// <summary>
     /// The server time the consumer info was created
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("ts")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public System.DateTimeOffset Ts { get; set; } = default!;
+    public DateTimeOffset Ts { get; set; }
 
     [System.Text.Json.Serialization.JsonPropertyName("config")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
-    public ConsumerConfig Config { get; set; } = default!;
+    public ConsumerConfig Config { get; set; } = new ConsumerConfig();
 
     /// <summary>
     /// The time the Consumer was created
@@ -35,7 +47,7 @@ public record ConsumerInfo
     [System.Text.Json.Serialization.JsonPropertyName("created")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-    public System.DateTimeOffset Created { get; set; } = default!;
+    public DateTimeOffset Created { get; set; }
 
     /// <summary>
     /// The last message delivered from this Consumer
@@ -59,7 +71,7 @@ public record ConsumerInfo
     [System.Text.Json.Serialization.JsonPropertyName("num_ack_pending")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
-    public long NumAckPending { get; set; } = default!;
+    public long NumAckPending { get; set; }
 
     /// <summary>
     /// The number of redeliveries that have been performed
@@ -67,7 +79,7 @@ public record ConsumerInfo
     [System.Text.Json.Serialization.JsonPropertyName("num_redelivered")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
-    public long NumRedelivered { get; set; } = default!;
+    public long NumRedelivered { get; set; }
 
     /// <summary>
     /// The number of pull consumers waiting for messages
@@ -75,7 +87,7 @@ public record ConsumerInfo
     [System.Text.Json.Serialization.JsonPropertyName("num_waiting")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
-    public long NumWaiting { get; set; } = default!;
+    public long NumWaiting { get; set; }
 
     /// <summary>
     /// The number of messages left unconsumed in this Consumer
@@ -83,16 +95,16 @@ public record ConsumerInfo
     [System.Text.Json.Serialization.JsonPropertyName("num_pending")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Range(0D, 18446744073709552000D)]
-    public long NumPending { get; set; } = default!;
+    public long NumPending { get; set; }
 
     [System.Text.Json.Serialization.JsonPropertyName("cluster")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public ClusterInfo Cluster { get; set; } = default!;
+    public ClusterInfo? Cluster { get; set; }
 
     /// <summary>
     /// Indicates if any client is connected and receiving messages from a push consumer
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("push_bound")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public bool PushBound { get; set; } = default!;
+    public bool PushBound { get; set; }
 }

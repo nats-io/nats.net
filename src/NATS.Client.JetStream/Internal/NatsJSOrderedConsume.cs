@@ -93,17 +93,15 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
             Timeout.Infinite,
             Timeout.Infinite);
 
-        // Keep user channel small to avoid blocking the user code
-        // when disposed otherwise channel reader will continue delivering messages
-        // if there are messages queued up already. This channel is used to pass messages
-        // to the user from the subscription channel (which should be set to a
-        // sufficiently large value to avoid blocking socket reads in the
-        // NATS connection).
-        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg>>(1);
+        // This channel is used to pass messages to the user from the subscription.
+        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg>>(
+            Connection.GetChannelOpts(Connection.Opts, opts?.ChannelOpts),
+            msg => Connection.MessageDropped(this, _userMsgs?.Reader.Count ?? 0, msg.Msg));
         Msgs = _userMsgs.Reader;
 
-        // Capacity as 1 is enough here since it's used for signaling only.
-        _pullRequests = Channel.CreateBounded<PullRequest>(1);
+        // Pull request channel is set as unbounded because we don't want to drop
+        // them and minimize potential lock contention.
+        _pullRequests = Channel.CreateUnbounded<PullRequest>();
         _pullTask = Task.Run(PullLoop);
 
         ResetPending();

@@ -83,7 +83,7 @@ public class NatsJSApiException : NatsJSException
     /// </summary>
     /// <param name="error">Error response received from the server.</param>
     public NatsJSApiException(ApiError error)
-        : base(error.Description) =>
+        : base(error.Description ?? string.Empty) =>
         Error = error;
 
     /// <summary>

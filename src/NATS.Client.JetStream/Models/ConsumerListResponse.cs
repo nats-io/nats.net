@@ -12,5 +12,5 @@ public record ConsumerListResponse : IterableResponse
     [System.Text.Json.Serialization.JsonPropertyName("consumers")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required]
-    public System.Collections.Generic.ICollection<ConsumerInfo> Consumers { get; set; } = new System.Collections.ObjectModel.Collection<ConsumerInfo>();
+    public ICollection<ConsumerInfo> Consumers { get; set; } = new System.Collections.ObjectModel.Collection<ConsumerInfo>();
 }

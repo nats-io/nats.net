@@ -61,6 +61,7 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
         var pending = 0;
         var trimming = 0;
         var examinedOffset = 0;
+        var sent = 0;
 
         // memory segment used to consolidate multiple small memory chunks
         // should <= (minimumSegmentSize * 0.5) in CommandWriter
@@ -79,9 +80,11 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
         {
             while (true)
             {
+                // read data from pipe reader
                 var result = await _pipeReader.ReadAsync(cancellationToken).ConfigureAwait(false);
                 if (result.IsCanceled)
                 {
+                    // if the pipe has been canceled, break
                     break;
                 }
 
@@ -89,7 +92,8 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
                 var examinedPos = result.Buffer.Start;
                 try
                 {
-                    var buffer = result.Buffer.Slice(examinedOffset);
+                    // move from _queuedCommandReader to _inFlightCommands until the total size
+                    // of all _inFlightCommands is >= result.Buffer.Length
                     while (inFlightSum < result.Buffer.Length)
                     {
                         QueuedCommand queuedCommand;
@@ -102,8 +106,15 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
                         inFlightSum += queuedCommand.Size;
                     }
 
+                    // examinedOffset was processed last iteration, so slice it off the buffer
+                    var buffer = result.Buffer.Slice(examinedOffset);
+
+                    // iterate until buffer is empty
+                    // any time buffer sliced and re-assigned, continue should be called
+                    // so that this conditional is checked
                     while (buffer.Length > 0)
                     {
+                        // if there are no pending bytes to send, set to next command
                         if (pending == 0)
                         {
                             var peek = _inFlightCommands.Peek();
@@ -111,24 +122,73 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
                             trimming = peek.Trim;
                         }
 
+                        // from this point forward, pending != 0
+                        // any operation that decrements pending should check if it is 0,
+                        // and dequeue from _inFlightCommands if it is
+
+                        // trim any bytes that should not be sent
                         if (trimming > 0)
                         {
                             var trimmed = Math.Min(trimming, (int)buffer.Length);
-                            consumedPos = buffer.GetPosition(trimmed);
-                            examinedPos = buffer.GetPosition(trimmed);
-                            examinedOffset = 0;
-                            buffer = buffer.Slice(trimmed);
                             pending -= trimmed;
                             trimming -= trimmed;
                             if (pending == 0)
                             {
                                 // the entire command was trimmed (canceled)
                                 inFlightSum -= _inFlightCommands.Dequeue().Size;
+                                consumedPos = buffer.GetPosition(trimmed);
+                                examinedPos = consumedPos;
+                                examinedOffset = 0;
+                                buffer = buffer.Slice(trimmed);
+
+                                // iterate in case buffer is now empty
+                                continue;
                             }
 
+                            // the command was partially trimmed
+                            examinedPos = buffer.GetPosition(trimmed);
+                            examinedOffset += trimmed;
+                            buffer = buffer.Slice(trimmed);
+
+                            // iterate in case buffer is now empty
                             continue;
                         }
 
+                        if (sent > 0)
+                        {
+                            if (pending <= sent)
+                            {
+                                // the entire command was sent
+                                inFlightSum -= _inFlightCommands.Dequeue().Size;
+                                Interlocked.Add(ref _counter.PendingMessages, -1);
+                                Interlocked.Add(ref _counter.SentMessages, 1);
+
+                                // mark the bytes as consumed, and reset pending
+                                sent -= pending;
+                                consumedPos = buffer.GetPosition(pending);
+                                examinedPos = consumedPos;
+                                examinedOffset = 0;
+                                buffer = buffer.Slice(pending);
+                                pending = 0;
+
+                                // iterate in case buffer is now empty
+                                continue;
+                            }
+
+                            // the command was partially sent
+                            // decrement pending by the number of bytes that were sent
+                            pending -= sent;
+                            examinedPos = buffer.GetPosition(sent);
+                            examinedOffset += sent;
+                            buffer = buffer.Slice(sent);
+                            sent = 0;
+
+                            // iterate in case buffer is now empty
+                            continue;
+                        }
+
+                        // loop through _inFlightCommands to determine whether any commands
+                        // in the first memory segment need trimming
                         var sendMem = buffer.First;
                         var maxSize = 0;
                         var maxSizeCap = Math.Max(sendMem.Length, consolidateMem.Length);
@@ -158,14 +218,17 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
                             maxSize += command.Size;
                         }
 
+                        // adjust the first memory segment to end on a command boundary
                         if (sendMem.Length > maxSize)
                         {
                             sendMem = sendMem[..maxSize];
                         }
 
-                        var bufferIter = buffer;
-                        if (doTrim || (bufferIter.Length > sendMem.Length && sendMem.Length < consolidateMem.Length))
+                        // if trimming is required or the first memory segment is smaller than consolidateMem
+                        // consolidate bytes that need to be sent into consolidateMem
+                        if (doTrim || (buffer.Length > sendMem.Length && sendMem.Length < consolidateMem.Length))
                         {
+                            var bufferIter = buffer;
                             var memIter = consolidateMem;
                             var trimmedSize = 0;
                             foreach (var command in _inFlightCommands)
@@ -215,77 +278,25 @@ internal sealed class NatsPipeliningWriteProtocolProcessor : IAsyncDisposable
 
                         // perform send
                         _stopwatch.Restart();
-                        var sent = await _socketConnection.SendAsync(sendMem).ConfigureAwait(false);
+                        sent = await _socketConnection.SendAsync(sendMem).ConfigureAwait(false);
                         _stopwatch.Stop();
                         Interlocked.Add(ref _counter.SentBytes, sent);
                         if (isEnabledTraceLogging)
                         {
                             logger.LogTrace("Socket.SendAsync. Size: {0}  Elapsed: {1}ms", sent, _stopwatch.Elapsed.TotalMilliseconds);
                         }
-
-                        var consumed = 0;
-                        var sentAndTrimmed = sent;
-                        while (consumed < sentAndTrimmed)
-                        {
-                            if (pending == 0)
-                            {
-                                var peek = _inFlightCommands.Peek();
-                                pending = peek.Size - peek.Trim;
-                                consumed += peek.Trim;
-                                sentAndTrimmed += peek.Trim;
-
-                                if (pending == 0)
-                                {
-                                    // the entire command was trimmed (canceled)
-                                    inFlightSum -= _inFlightCommands.Dequeue().Size;
-                                    continue;
-                                }
-                            }
-
-                            if (pending <= sentAndTrimmed - consumed)
-                            {
-                                // the entire command was sent
-                                inFlightSum -= _inFlightCommands.Dequeue().Size;
-                                Interlocked.Add(ref _counter.PendingMessages, -1);
-                                Interlocked.Add(ref _counter.SentMessages, 1);
-
-                                // mark the bytes as consumed, and reset pending
-                                consumed += pending;
-                                pending = 0;
-                            }
-                            else
-                            {
-                                // the entire command was not sent; decrement pending by
-                                // the number of bytes from the command that was sent
-                                pending += consumed - sentAndTrimmed;
-                                break;
-                            }
-                        }
-
-                        if (consumed > 0)
-                        {
-                            // mark fully sent commands as consumed
-                            consumedPos = buffer.GetPosition(consumed);
-                            examinedOffset = sentAndTrimmed - consumed;
-                        }
-                        else
-                        {
-                            // no commands were consumed
-                            examinedOffset += sentAndTrimmed;
-                        }
-
-                        // lop off sent bytes for next iteration
-                        examinedPos = buffer.GetPosition(sentAndTrimmed);
-                        buffer = buffer.Slice(sentAndTrimmed);
                     }
                 }
                 finally
                 {
+                    // _pipeReader.AdvanceTo must be called exactly once for every
+                    // _pipeReader.ReadAsync, which is why it is in the finally block
                     _pipeReader.AdvanceTo(consumedPos, examinedPos);
                 }
 
                 if (result.IsCompleted)
                 {
+                    // if the pipe has been completed, break
                     break;
                 }
             }

@@ -231,7 +231,7 @@ public partial class NatsConnection : INatsConnection
         return ValueTask.CompletedTask;
     }
 
-    internal void OnMessageDropped<T>(NatsSub<T> natsSub, int pending, NatsMsg<T> msg)
+    internal void OnMessageDropped<T>(NatsSubBase natsSub, int pending, NatsMsg<T> msg)
     {
         var subject = msg.Subject;
         _logger.LogWarning("Dropped message from {Subject} with {Pending} pending messages", subject, pending);
@@ -307,7 +307,7 @@ public partial class NatsConnection : INatsConnection
                     {
                         // upgrade TcpConnection to SslConnection
                         var sslConnection = conn.UpgradeToSslStreamConnection(Opts.TlsOpts, _tlsCerts);
-                        await sslConnection.AuthenticateAsClientAsync(uri).ConfigureAwait(false);
+                        await sslConnection.AuthenticateAsClientAsync(uri, Opts.ConnectTimeout).ConfigureAwait(false);
                         _socket = sslConnection;
                     }
                 }
@@ -412,7 +412,7 @@ public partial class NatsConnection : INatsConnection
 
                     // upgrade TcpConnection to SslConnection
                     var sslConnection = tcpConnection.UpgradeToSslStreamConnection(Opts.TlsOpts, _tlsCerts);
-                    await sslConnection.AuthenticateAsClientAsync(targetUri).ConfigureAwait(false);
+                    await sslConnection.AuthenticateAsClientAsync(targetUri, Opts.ConnectTimeout).ConfigureAwait(false);
                     _socket = sslConnection;
 
                     // create new socket reader
@@ -562,7 +562,7 @@ public partial class NatsConnection : INatsConnection
                         {
                             // upgrade TcpConnection to SslConnection
                             var sslConnection = conn.UpgradeToSslStreamConnection(Opts.TlsOpts, _tlsCerts);
-                            await sslConnection.AuthenticateAsClientAsync(FixTlsHost(url)).ConfigureAwait(false);
+                            await sslConnection.AuthenticateAsClientAsync(FixTlsHost(url), Opts.ConnectTimeout).ConfigureAwait(false);
                             _socket = sslConnection;
                         }
                     }
@@ -582,7 +582,7 @@ public partial class NatsConnection : INatsConnection
             {
                 if (url != null)
                 {
-                    _logger.LogError(NatsLogEvents.Connection, ex, "Failed to connect NATS {Url}", url);
+                    _logger.LogWarning(NatsLogEvents.Connection, ex, "Failed to connect NATS {Url}", url);
                 }
 
                 _eventChannel.Writer.TryWrite((NatsEvent.ReconnectFailed, new NatsEventArgs(url?.ToString() ?? string.Empty)));

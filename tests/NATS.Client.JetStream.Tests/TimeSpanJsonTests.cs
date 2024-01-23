@@ -137,7 +137,7 @@ public class TimeSpanJsonTests
         var serializer = NatsJSJsonSerializer<PeerInfo>.Default;
 
         var bw = new NatsBufferWriter<byte>();
-        serializer.Serialize(bw, new PeerInfo { Active = time });
+        serializer.Serialize(bw, new PeerInfo { Name = "test", Active = time });
 
         var json = Encoding.UTF8.GetString(bw.WrittenSpan);
         Assert.Matches(expected, json);
@@ -197,7 +197,7 @@ public class TimeSpanJsonTests
         var serializer = NatsJSJsonSerializer<StreamSourceInfo>.Default;
 
         var bw = new NatsBufferWriter<byte>();
-        serializer.Serialize(bw, new StreamSourceInfo { Active = time });
+        serializer.Serialize(bw, new StreamSourceInfo { Name = "test", Active = time });
 
         var json = Encoding.UTF8.GetString(bw.WrittenSpan);
         Assert.Matches(expected, json);

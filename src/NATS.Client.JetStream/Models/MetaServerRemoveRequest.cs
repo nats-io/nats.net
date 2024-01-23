@@ -11,12 +11,12 @@ public record MetaServerRemoveRequest
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("peer")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public string Peer { get; set; } = default!;
+    public string? Peer { get; set; }
 
     /// <summary>
     /// Peer ID of the peer to be removed. If specified this is used instead of the server name
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("peer_id")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public string PeerId { get; set; } = default!;
+    public string? PeerId { get; set; }
 }
