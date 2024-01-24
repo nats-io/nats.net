@@ -2,6 +2,14 @@ namespace NATS.Client.Core;
 
 public interface INatsConnection : IAsyncDisposable
 {
+    event AsyncEventHandler<NatsEventArgs>? ConnectionDisconnected;
+
+    event AsyncEventHandler<NatsEventArgs>? ConnectionOpened;
+
+    event AsyncEventHandler<NatsEventArgs>? ReconnectFailed;
+
+    event AsyncEventHandler<NatsMessageDroppedEventArgs>? MessageDropped;
+
     INatsServerInfo? ServerInfo { get; }
 
     NatsOpts Opts { get; }
