@@ -640,6 +640,10 @@ public partial class NatsConnection : INatsConnection
                 }
             }
         }
+        catch (OperationCanceledException)
+        {
+            // Ignore, we're disposing the connection
+        }
         catch (Exception ex)
         {
             _logger.LogError(NatsLogEvents.Connection, ex, "Error occured when publishing events");
