@@ -1,5 +1,4 @@
 using NATS.Client.Core.Tests;
-using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Tests;
 
