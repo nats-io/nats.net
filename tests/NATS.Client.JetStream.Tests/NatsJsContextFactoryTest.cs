@@ -83,6 +83,14 @@ public class NatsJSContextFactoryTest
 
     public class MockConnection : INatsConnection
     {
+        public event AsyncEventHandler<NatsEventArgs>? ConnectionDisconnected;
+
+        public event AsyncEventHandler<NatsEventArgs>? ConnectionOpened;
+
+        public event AsyncEventHandler<NatsEventArgs>? ReconnectFailed;
+
+        public event AsyncEventHandler<NatsMessageDroppedEventArgs>? MessageDropped;
+
         public INatsServerInfo? ServerInfo { get; } = null;
 
         public NatsOpts Opts { get; } = new();
@@ -103,10 +111,12 @@ public class NatsJSContextFactoryTest
 
         public string NewInbox() => throw new NotImplementedException();
 
-        public ValueTask<NatsMsg<TReply>> RequestAsync<TRequest, TReply>(string subject, TRequest? data, NatsHeaders? headers = default, INatsSerialize<TRequest>? requestSerializer = default, INatsDeserialize<TReply>? replySerializer = default, NatsPubOpts? requestOpts = default, NatsSubOpts? replyOpts = default, CancellationToken cancellationToken = default)
+        public ValueTask<NatsMsg<TReply>> RequestAsync<TRequest, TReply>(string subject, TRequest? data, NatsHeaders? headers = default, INatsSerialize<TRequest>? requestSerializer = default, INatsDeserialize<TReply>? replySerializer = default, NatsPubOpts? requestOpts = default,
+            NatsSubOpts? replyOpts = default, CancellationToken cancellationToken = default)
             => throw new NotImplementedException();
 
-        public IAsyncEnumerable<NatsMsg<TReply>> RequestManyAsync<TRequest, TReply>(string subject, TRequest? data, NatsHeaders? headers = default, INatsSerialize<TRequest>? requestSerializer = default, INatsDeserialize<TReply>? replySerializer = default, NatsPubOpts? requestOpts = default, NatsSubOpts? replyOpts = default, CancellationToken cancellationToken = default)
+        public IAsyncEnumerable<NatsMsg<TReply>> RequestManyAsync<TRequest, TReply>(string subject, TRequest? data, NatsHeaders? headers = default, INatsSerialize<TRequest>? requestSerializer = default, INatsDeserialize<TReply>? replySerializer = default, NatsPubOpts? requestOpts = default,
+            NatsSubOpts? replyOpts = default, CancellationToken cancellationToken = default)
             => throw new NotImplementedException();
 
         public ValueTask ConnectAsync() => throw new NotImplementedException();
