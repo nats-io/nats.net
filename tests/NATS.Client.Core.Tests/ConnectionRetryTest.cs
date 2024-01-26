@@ -64,4 +64,81 @@ public class ConnectionRetryTest
         var rtt = await nats.PingAsync(cts.Token);
         Assert.True(rtt > TimeSpan.Zero);
     }
+
+    [Fact]
+    public async Task Reconnect_doesnt_drop_partially_sent_msgs()
+    {
+        await using var server = NatsServer.Start();
+
+        await using var pubConn = server.CreateClientConnection();
+        await pubConn.ConnectAsync();
+
+        var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var stopCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+        var received = 0;
+        var subActive = 0;
+        var subTask = Task.Run(async () =>
+        {
+            await using var subConn = server.CreateClientConnection();
+            await using var sub = await subConn.SubscribeCoreAsync<NatsMemoryOwner<byte>>("test", cancellationToken: timeoutCts.Token);
+            await foreach (var msg in sub.Msgs.ReadAllAsync(timeoutCts.Token))
+            {
+                using (msg.Data)
+                {
+                    if (msg.Data.Length == 1)
+                    {
+                        Interlocked.Increment(ref subActive);
+                    }
+                    else if (msg.Data.Length == 2)
+                    {
+                        break;
+                    }
+                    else
+                    {
+                        Interlocked.Increment(ref received);
+                    }
+                }
+            }
+        });
+
+        while (Interlocked.CompareExchange(ref subActive, 0, 0) == 0)
+        {
+            await pubConn.PublishAsync("test", new byte[1], cancellationToken: timeoutCts.Token);
+            await Task.Delay(50, timeoutCts.Token);
+        }
+
+        var sent = 0;
+        var data = new byte[1048576]; // 1MiB
+        var sendTask = Task.Run(async () =>
+        {
+            while (!stopCts.IsCancellationRequested)
+            {
+                await pubConn.PublishAsync("test", data, cancellationToken: timeoutCts.Token);
+                Interlocked.Increment(ref sent);
+            }
+
+            await pubConn.PublishAsync("test", new byte[2], cancellationToken: timeoutCts.Token);
+        });
+
+        var reconnects = 0;
+        var restartTask = Task.Run(async () =>
+        {
+            while (!stopCts.IsCancellationRequested)
+            {
+                if (pubConn is { ConnectionState: NatsConnectionState.Open, TestSocket.WaitForClosed.IsCanceled: false })
+                {
+                    await pubConn.TestSocket.AbortConnectionAsync(timeoutCts.Token);
+                    Interlocked.Increment(ref reconnects);
+                }
+
+                // give it some time to send more
+                await Task.Delay(100, timeoutCts.Token);
+            }
+        });
+
+        await Task.WhenAll(subTask, sendTask, restartTask);
+        Assert.True(reconnects > 0, "connection did not reconnect");
+        Assert.Equal(sent, received);
+    }
 }
