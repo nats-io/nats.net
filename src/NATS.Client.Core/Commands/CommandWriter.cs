@@ -31,8 +31,8 @@ internal sealed class CommandWriter : IAsyncDisposable
     private readonly Task _readerLoopTask;
     private readonly HeaderWriter _headerWriter;
     private readonly Channel<int> _channelLock;
-    private readonly PipeReader _pipeReader;
-    private readonly PipeWriter _pipeWriter;
+    private PipeReader? _pipeReader;
+    private PipeWriter? _pipeWriter;
     private ISocketConnection? _socketConnection;
     private volatile bool _disposed;
 
@@ -48,19 +48,22 @@ internal sealed class CommandWriter : IAsyncDisposable
         _channelLock = Channel.CreateBounded<int>(1);
         _headerWriter = new HeaderWriter(_opts.HeaderEncoding);
         _cts = new CancellationTokenSource();
-        var pipe = new Pipe(new PipeOptions(
-            pauseWriterThreshold: _opts.WriterBufferSize, // flush will block after hitting
-            resumeWriterThreshold: _opts.WriterBufferSize / 2,
-            useSynchronizationContext: false));
-        _pipeReader = pipe.Reader;
-        _pipeWriter = pipe.Writer;
         _readerLoopTask = Task.Run(ReaderLoopAsync);
     }
 
     public void Reset(ISocketConnection? socketConnection)
     {
+        var pipe = new Pipe(new PipeOptions(
+            pauseWriterThreshold: _opts.WriterBufferSize, // flush will block after hitting
+            resumeWriterThreshold: _opts.WriterBufferSize / 2,
+            useSynchronizationContext: false));
+
         lock (_lock)
         {
+            _pipeReader?.Complete();
+            _pipeWriter?.Complete();
+            _pipeReader = pipe.Reader;
+            _pipeWriter = pipe.Writer;
             _socketConnection = socketConnection;
         }
     }
@@ -83,8 +86,11 @@ internal sealed class CommandWriter : IAsyncDisposable
         await _channelLock.Writer.WriteAsync(1).ConfigureAwait(false);
         _channelLock.Writer.TryComplete();
 
-        await _pipeWriter.CompleteAsync().ConfigureAwait(false);
-        await _pipeReader.CompleteAsync().ConfigureAwait(false);
+        if (_pipeWriter != null)
+            await _pipeWriter.CompleteAsync().ConfigureAwait(false);
+
+        if (_pipeReader != null)
+            await _pipeReader.CompleteAsync().ConfigureAwait(false);
 
         await _readerLoopTask.ConfigureAwait(false);
     }
@@ -113,8 +119,9 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
-            _protocolWriter.WriteConnect(_pipeWriter, connectOpts);
-            await _pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
+            var bw = GetWriter();
+            _protocolWriter.WriteConnect(bw, connectOpts);
+            await bw.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -143,8 +150,9 @@ internal sealed class CommandWriter : IAsyncDisposable
 
             _enqueuePing(pingCommand);
 
-            _protocolWriter.WritePing(_pipeWriter);
-            await _pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
+            var bw = GetWriter();
+            _protocolWriter.WritePing(bw);
+            await bw.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -166,8 +174,9 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
-            _protocolWriter.WritePong(_pipeWriter);
-            await _pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
+            var bw = GetWriter();
+            _protocolWriter.WritePong(bw);
+            await bw.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -208,8 +217,9 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
-            _protocolWriter.WriteSubscribe(_pipeWriter, sid, subject, queueGroup, maxMsgs);
-            await _pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
+            var bw = GetWriter();
+            _protocolWriter.WriteSubscribe(bw, sid, subject, queueGroup, maxMsgs);
+            await bw.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -231,12 +241,26 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
-            _protocolWriter.WriteUnsubscribe(_pipeWriter, sid, maxMsgs);
-            await _pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
+            var bw = GetWriter();
+            _protocolWriter.WriteUnsubscribe(bw, sid, maxMsgs);
+            await bw.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
             await UnLockAsync(cancellationToken).ConfigureAwait(true);
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void ThrowOnDisconnected() => throw new NatsException("Connection hasn't been established yet.");
+
+    private PipeWriter GetWriter()
+    {
+        lock (_lock)
+        {
+            if (_pipeWriter == null)
+                ThrowOnDisconnected();
+            return _pipeWriter!;
         }
     }
 
@@ -258,7 +282,8 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
-            _protocolWriter.WritePublish(_pipeWriter, subject, replyTo, headers, payload);
+            var bw = GetWriter();
+            _protocolWriter.WritePublish(bw, subject, replyTo, headers, payload);
 
             payloadBuffer.Reset();
             _pool.Return(payloadBuffer);
@@ -269,7 +294,7 @@ internal sealed class CommandWriter : IAsyncDisposable
                 _pool.Return(headersBuffer);
             }
 
-            await _pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
+            await bw.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -322,18 +347,20 @@ internal sealed class CommandWriter : IAsyncDisposable
             try
             {
                 ISocketConnection? connection;
+                PipeReader? pipeReader;
                 lock (_lock)
                 {
                     connection = _socketConnection;
+                    pipeReader = _pipeReader;
                 }
 
-                if (connection == null)
+                if (connection == null || pipeReader == null)
                 {
                     await Task.Delay(10, cancellationToken).ConfigureAwait(false);
                     continue;
                 }
 
-                var result = await _pipeReader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                var result = await pipeReader.ReadAsync(cancellationToken).ConfigureAwait(false);
 
                 if (result.IsCanceled)
                 {
@@ -352,8 +379,8 @@ internal sealed class CommandWriter : IAsyncDisposable
 
                         try
                         {
-                            await connection.SendAsync(memory).ConfigureAwait(false);
-                            completed = buffer.End;
+                            var sent = await connection.SendAsync(memory).ConfigureAwait(false);
+                            completed = buffer.GetPosition(sent);
                         }
                         catch (SocketException e)
                         {
@@ -373,17 +400,16 @@ internal sealed class CommandWriter : IAsyncDisposable
                 }
                 finally
                 {
-                    _pipeReader.AdvanceTo(completed);
-                }
-
-                if (result.IsCompleted)
-                {
-                    break;
+                    pipeReader.AdvanceTo(completed);
                 }
             }
             catch (OperationCanceledException)
             {
                 // Expected during shutdown
+            }
+            catch (InvalidOperationException)
+            {
+                // We might still be using the previous pipe reader which might be completed already
             }
             catch (Exception e)
             {

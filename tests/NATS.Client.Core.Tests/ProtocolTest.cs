@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Collections.Concurrent;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using NATS.Client.TestUtilities;
@@ -344,8 +345,11 @@ public class ProtocolTest
         await nats.DisposeAsync();
     }
 
-    [Fact]
-    public async Task Protocol_parser_under_load()
+    [Theory]
+    [InlineData(1)]
+    [InlineData(1024)]
+    [InlineData(1024 * 1024)]
+    public async Task Protocol_parser_under_load(int size)
     {
         await using var server = NatsServer.Start();
         var logger = new InMemoryTestLoggerFactory(LogLevel.Error);
@@ -355,24 +359,27 @@ public class ProtocolTest
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         var signal = new WaitSignal();
-
+        var counts = new ConcurrentDictionary<string, int>();
         _ = Task.Run(
             async () =>
             {
                 var count = 0;
-                await foreach (var unused in nats.SubscribeAsync<string>("x", cancellationToken: cts.Token))
+                await foreach (var msg in nats.SubscribeAsync<byte[]>("x.*", cancellationToken: cts.Token))
                 {
-                    if (++count > 10_000)
+                    if (++count > 100)
                         signal.Pulse();
+                    counts.AddOrUpdate(msg.Subject, 1, (_, c) => c + 1);
                 }
             },
             cts.Token);
 
+        var payload = new byte[size];
+        var r = 0;
         _ = Task.Run(
             async () =>
             {
                 while (!cts.Token.IsCancellationRequested)
-                    await nats.PublishAsync("x", "x", cancellationToken: cts.Token);
+                    await nats.PublishAsync($"x.{Volatile.Read(ref r)}", payload, cancellationToken: cts.Token);
             },
             cts.Token);
 
@@ -382,12 +389,21 @@ public class ProtocolTest
         {
             await Task.Delay(1_000, cts.Token);
             await server.RestartAsync();
+            Interlocked.Increment(ref r);
+            await Task.Delay(1_000, cts.Token);
         }
 
         foreach (var log in logger.Logs.Where(x => x.EventId == NatsLogEvents.Protocol && x.LogLevel == LogLevel.Error))
         {
             Assert.DoesNotContain("Unknown Protocol Operation", log.Message);
         }
+
+        foreach (var (key, value) in counts)
+        {
+            _output.WriteLine($"{key} {value}");
+        }
+
+        counts.Count.Should().BeGreaterOrEqualTo(3);
     }
 
     private sealed class NatsSubReconnectTest : NatsSubBase
