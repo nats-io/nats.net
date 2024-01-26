@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using NATS.Client.Core.Commands;
 
 namespace NATS.Client.Core;
@@ -5,6 +6,7 @@ namespace NATS.Client.Core;
 public partial class NatsConnection
 {
     /// <inheritdoc />
+    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
     public async ValueTask<TimeSpan> PingAsync(CancellationToken cancellationToken = default)
     {
         if (ConnectionState != NatsConnectionState.Open)
