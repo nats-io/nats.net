@@ -380,10 +380,6 @@ public abstract partial class NatsConnectionTest
         {
             var name = classInfo.Name;
 
-            // TODO: enable this check when we have events pulled up to the interface
-            if (Regex.IsMatch(name, @"add_|remove_"))
-                continue;
-
             interfaceMethods.Select(m => m.Name).Should().Contain(name);
         }
     }
