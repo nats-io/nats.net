@@ -52,7 +52,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
             await _readLoop.ConfigureAwait(false); // wait for drain buffer.
             foreach (var item in _pingCommands)
             {
-                item.TaskCompletionSource.SetCanceled();
+                item.SetCanceled();
             }
 
             _waitForInfoSignal.TrySetCanceled();
@@ -329,7 +329,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
 
             if (_pingCommands.TryDequeue(out var pingCommand))
             {
-                pingCommand.TaskCompletionSource.SetResult(DateTimeOffset.UtcNow - pingCommand.WriteTime);
+                pingCommand.SetResult();
             }
 
             if (length < PongSize)

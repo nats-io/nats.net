@@ -13,9 +13,9 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - branch: release/v2.9.23
-          - branch: latest
-          - branch: main
+          - branch: 'v2.9.22'
+          - branch: 'v2.10.9'
+          - branch: 'main'
     runs-on: ubuntu-latest
     env:
       DOTNET_CLI_TELEMETRY_OPTOUT: 1
@@ -86,9 +86,9 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - branch: release/v2.9.23
-          - branch: latest
-          - branch: main
+          - branch: 'v2.9.22'
+          - branch: 'v2.10.9'
+          - branch: 'main'
     runs-on: windows-latest
     env:
       DOTNET_CLI_TELEMETRY_OPTOUT: 1
