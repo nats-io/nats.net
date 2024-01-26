@@ -82,6 +82,7 @@ public class NatsJSContextFactoryTest
 
     public class MockConnection : INatsConnection
     {
+#pragma warning disable CS0067
         public event AsyncEventHandler<NatsEventArgs>? ConnectionDisconnected;
 
         public event AsyncEventHandler<NatsEventArgs>? ConnectionOpened;
