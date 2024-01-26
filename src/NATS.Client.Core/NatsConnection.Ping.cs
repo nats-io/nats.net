@@ -12,17 +12,9 @@ public partial class NatsConnection
             await ConnectAsync().AsTask().WaitAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        PingCommand pingCommand;
-        if (!_pool.TryRent(out pingCommand!))
-        {
-            pingCommand = new PingCommand(_pool);
-        }
-
-        pingCommand.Start();
-
+        var pingCommand = new PingCommand();
         await CommandWriter.PingAsync(pingCommand, cancellationToken).ConfigureAwait(false);
-
-        return await pingCommand.RunAsync().ConfigureAwait(false);
+        return await pingCommand.TaskCompletionSource.Task.ConfigureAwait(false);
     }
 
     /// <summary>
@@ -35,6 +27,6 @@ public partial class NatsConnection
     /// <returns><see cref="ValueTask"/> representing the asynchronous operation</returns>
     private ValueTask PingOnlyAsync(CancellationToken cancellationToken = default) =>
         ConnectionState == NatsConnectionState.Open
-            ? CommandWriter.PingAsync(new PingCommand(_pool), cancellationToken)
+            ? CommandWriter.PingAsync(new PingCommand(), cancellationToken)
             : ValueTask.CompletedTask;
 }
