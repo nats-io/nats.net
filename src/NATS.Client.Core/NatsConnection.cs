@@ -134,7 +134,7 @@ public partial class NatsConnection : INatsConnection
     internal ObjectPool ObjectPool => _pool;
 
     // only used for internal testing
-    internal ISocketConnection TestSocket => _socket;
+    internal ISocketConnection? TestSocket => _socket;
 
     /// <summary>
     /// Connect socket and write CONNECT command to nats server.
