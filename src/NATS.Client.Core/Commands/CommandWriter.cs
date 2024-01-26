@@ -32,9 +32,9 @@ internal sealed class CommandWriter : IAsyncDisposable
     private readonly Task _readerLoopTask;
     private readonly HeaderWriter _headerWriter;
     private readonly Channel<int> _channelLock;
+    private readonly PipeReader _pipeReader;
+    private readonly PipeWriter _pipeWriter;
     private ISocketConnection? _socketConnection;
-    private PipeReader? _pipeReader;
-    private PipeWriter? _pipeWriter;
     private bool _disposed;
 
     public CommandWriter(ObjectPool pool, NatsOpts opts, ConnectionStatsCounter counter, Action<PingCommand> enqueuePing, TimeSpan? overrideCommandTimeout = default)
@@ -49,23 +49,20 @@ internal sealed class CommandWriter : IAsyncDisposable
         _channelLock = Channel.CreateBounded<int>(1);
         _headerWriter = new HeaderWriter(_opts.HeaderEncoding);
         _cts = new CancellationTokenSource();
+        var pipe = new Pipe(new PipeOptions(
+            pauseWriterThreshold: _opts.WriterBufferSize, // flush will block after hitting
+            resumeWriterThreshold: _opts.WriterBufferSize / 2,
+            useSynchronizationContext: false));
+        _pipeReader = pipe.Reader;
+        _pipeWriter = pipe.Writer;
         _readerLoopTask = Task.Run(ReaderLoopAsync);
     }
 
     public void Reset(ISocketConnection? socketConnection)
     {
-        var pipe = new Pipe(new PipeOptions(
-            pauseWriterThreshold: _opts.WriterBufferSize, // flush will block after hitting
-            resumeWriterThreshold: _opts.WriterBufferSize / 2,
-            useSynchronizationContext: false));
-
         lock (_lock)
         {
-            _pipeWriter?.Complete();
-            _pipeReader?.Complete();
             _socketConnection = socketConnection;
-            _pipeReader = pipe.Reader;
-            _pipeWriter = pipe.Writer;
         }
     }
 
@@ -91,10 +88,8 @@ internal sealed class CommandWriter : IAsyncDisposable
 
             _disposed = true;
 
-            if (_pipeWriter != null)
-                await _pipeWriter.CompleteAsync().ConfigureAwait(false);
-            if (_pipeReader != null)
-                await _pipeReader.CompleteAsync().ConfigureAwait(false);
+            await _pipeWriter.CompleteAsync().ConfigureAwait(false);
+            await _pipeReader.CompleteAsync().ConfigureAwait(false);
 
             await _readerLoopTask.ConfigureAwait(false);
         }
@@ -111,9 +106,17 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         Interlocked.Increment(ref _counter.PendingMessages);
 
-        while (!_channelLock.Writer.TryWrite(1))
+        try
         {
-            await _channelLock.Writer.WaitToWriteAsync(cancellationToken).ConfigureAwait(false);
+            await _channelLock.Writer.WriteAsync(1, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (ChannelClosedException)
+        {
+            return;
         }
 
         try
@@ -123,16 +126,8 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
-            PipeWriter bw;
-            lock (_lock)
-            {
-                if (_pipeWriter == null)
-                    ThrowOnDisconnected();
-                bw = _pipeWriter!;
-            }
-
-            _protocolWriter.WriteConnect(bw, connectOpts);
-            await bw.FlushAsync(cancellationToken).ConfigureAwait(false);
+            _protocolWriter.WriteConnect(_pipeWriter, connectOpts);
+            await _pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -149,10 +144,19 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         Interlocked.Increment(ref _counter.PendingMessages);
 
-        while (!_channelLock.Writer.TryWrite(1))
+        try
         {
-            await _channelLock.Writer.WaitToWriteAsync(cancellationToken).ConfigureAwait(false);
+            await _channelLock.Writer.WriteAsync(1, cancellationToken).ConfigureAwait(false);
         }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (ChannelClosedException)
+        {
+            return;
+        }
+
 
         try
         {
@@ -161,18 +165,10 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
-            PipeWriter bw;
-            lock (_lock)
-            {
-                if (_pipeWriter == null)
-                    ThrowOnDisconnected();
-                bw = _pipeWriter!;
-            }
-
             _enqueuePing(pingCommand);
 
-            _protocolWriter.WritePing(bw);
-            await bw.FlushAsync(cancellationToken).ConfigureAwait(false);
+            _protocolWriter.WritePing(_pipeWriter);
+            await _pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -189,10 +185,19 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         Interlocked.Increment(ref _counter.PendingMessages);
 
-        while (!_channelLock.Writer.TryWrite(1))
+        try
         {
-            await _channelLock.Writer.WaitToWriteAsync(cancellationToken).ConfigureAwait(false);
+            await _channelLock.Writer.WriteAsync(1, cancellationToken).ConfigureAwait(false);
         }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (ChannelClosedException)
+        {
+            return;
+        }
+
 
         try
         {
@@ -201,16 +206,8 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
-            PipeWriter bw;
-            lock (_lock)
-            {
-                if (_pipeWriter == null)
-                    ThrowOnDisconnected();
-                bw = _pipeWriter!;
-            }
-
-            _protocolWriter.WritePong(bw);
-            await bw.FlushAsync(cancellationToken).ConfigureAwait(false);
+            _protocolWriter.WritePong(_pipeWriter);
+            await _pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -246,10 +243,19 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         Interlocked.Increment(ref _counter.PendingMessages);
 
-        while (!_channelLock.Writer.TryWrite(1))
+        try
         {
-            await _channelLock.Writer.WaitToWriteAsync(cancellationToken).ConfigureAwait(false);
+            await _channelLock.Writer.WriteAsync(1, cancellationToken).ConfigureAwait(false);
         }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (ChannelClosedException)
+        {
+            return;
+        }
+
 
         try
         {
@@ -258,16 +264,8 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
-            PipeWriter bw;
-            lock (_lock)
-            {
-                if (_pipeWriter == null)
-                    ThrowOnDisconnected();
-                bw = _pipeWriter!;
-            }
-
-            _protocolWriter.WriteSubscribe(bw, sid, subject, queueGroup, maxMsgs);
-            await bw.FlushAsync(cancellationToken).ConfigureAwait(false);
+            _protocolWriter.WriteSubscribe(_pipeWriter, sid, subject, queueGroup, maxMsgs);
+            await _pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -284,9 +282,17 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         Interlocked.Increment(ref _counter.PendingMessages);
 
-        while (!_channelLock.Writer.TryWrite(1))
+        try
         {
-            await _channelLock.Writer.WaitToWriteAsync(cancellationToken).ConfigureAwait(false);
+            await _channelLock.Writer.WriteAsync(1, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (ChannelClosedException)
+        {
+            return;
         }
 
         try
@@ -296,16 +302,8 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
-            PipeWriter bw;
-            lock (_lock)
-            {
-                if (_pipeWriter == null)
-                    ThrowOnDisconnected();
-                bw = _pipeWriter!;
-            }
-
-            _protocolWriter.WriteUnsubscribe(bw, sid, maxMsgs);
-            await bw.FlushAsync(cancellationToken).ConfigureAwait(false);
+            _protocolWriter.WriteUnsubscribe(_pipeWriter, sid, maxMsgs);
+            await _pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -326,10 +324,19 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         Interlocked.Increment(ref _counter.PendingMessages);
 
-        while (!_channelLock.Writer.TryWrite(1))
+        try
         {
-            await _channelLock.Writer.WaitToWriteAsync(cancellationToken).ConfigureAwait(false);
+            await _channelLock.Writer.WriteAsync(1, cancellationToken).ConfigureAwait(false);
         }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (ChannelClosedException)
+        {
+            return;
+        }
+
 
         try
         {
@@ -341,15 +348,7 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
-            PipeWriter bw;
-            lock (_lock)
-            {
-                if (_pipeWriter == null)
-                    ThrowOnDisconnected();
-                bw = _pipeWriter!;
-            }
-
-            _protocolWriter.WritePublish(bw, subject, replyTo, headers, payload);
+            _protocolWriter.WritePublish(_pipeWriter, subject, replyTo, headers, payload);
 
             payloadBuffer.Reset();
             _pool.Return(payloadBuffer);
@@ -360,7 +359,7 @@ internal sealed class CommandWriter : IAsyncDisposable
                 _pool.Return(headersBuffer);
             }
 
-            await bw.FlushAsync(cancellationToken).ConfigureAwait(false);
+            await _pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -375,55 +374,44 @@ internal sealed class CommandWriter : IAsyncDisposable
 
     private async Task ReaderLoopAsync()
     {
-        // 8520 should fit into 6 packets on 1500 MTU TLS connection or 1 packet on 9000 MTU TLS connection
-        // assuming 40 bytes TCP overhead + 40 bytes TLS overhead per packet
-        const int maxSendMemoryLength = 8520;
-        var sendMemory = new Memory<byte>(new byte[maxSendMemoryLength]);
-
         var cancellationToken = _cts.Token;
         while (cancellationToken.IsCancellationRequested == false)
         {
             try
             {
                 ISocketConnection? connection;
-                PipeReader? pipeReader;
                 lock (_lock)
                 {
                     connection = _socketConnection;
-                    pipeReader = _pipeReader;
                 }
 
-                if (connection == null || pipeReader == null)
+                if (connection == null)
                 {
                     await Task.Delay(10, cancellationToken).ConfigureAwait(false);
                     continue;
                 }
 
-                var result = await pipeReader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                var result = await _pipeReader.ReadAsync(cancellationToken).ConfigureAwait(false);
+
+                if (result.IsCanceled)
+                {
+                    break;
+                }
+
                 var buffer = result.Buffer;
+                var completed = buffer.Start;
                 try
                 {
                     if (!buffer.IsEmpty)
                     {
-                        Memory<byte> memory;
-                        var length = (int)buffer.Length;
-
-                        if (length > maxSendMemoryLength)
-                        {
-                            length = maxSendMemoryLength;
-                            buffer = buffer.Slice(0, buffer.GetPosition(length));
-                            memory = sendMemory;
-                        }
-                        else
-                        {
-                            memory = sendMemory.Slice(0, length);
-                        }
-
-                        buffer.CopyTo(memory.Span);
+                        var bytes = ArrayPool<byte>.Shared.Rent((int)buffer.Length);
+                        buffer.CopyTo(bytes);
+                        var memory = bytes.AsMemory(0, (int)buffer.Length);
 
                         try
                         {
                             await connection.SendAsync(memory).ConfigureAwait(false);
+                            completed = buffer.End;
                         }
                         catch (SocketException e)
                         {
@@ -435,16 +423,21 @@ internal sealed class CommandWriter : IAsyncDisposable
                             connection.SignalDisconnected(e);
                             _logger.LogError(NatsLogEvents.TcpSocket, e, "Unexpected error while sending data");
                         }
+                        finally
+                        {
+                            ArrayPool<byte>.Shared.Return(bytes);
+                        }
                     }
                 }
                 finally
                 {
-                    pipeReader.AdvanceTo(buffer.End);
+                    _pipeReader.AdvanceTo(completed);
                 }
-            }
-            catch (InvalidOperationException)
-            {
-                // We might still be using the previous pipe reader which might be completed already
+
+                if (result.IsCompleted)
+                {
+                    break;
+                }
             }
             catch (OperationCanceledException)
             {
