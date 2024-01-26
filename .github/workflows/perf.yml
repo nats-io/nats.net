@@ -13,8 +13,8 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - branch: release/v2.9.23
-          - branch: latest
+          - branch: 2.9
+          - branch: 2.10
           - branch: main
     runs-on: ubuntu-latest
     env:
