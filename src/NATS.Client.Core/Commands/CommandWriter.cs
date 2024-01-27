@@ -3,6 +3,7 @@ using System.IO.Pipelines;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
+using DotNext.Threading;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Internal;
 
@@ -30,7 +31,8 @@ internal sealed class CommandWriter : IAsyncDisposable
     private readonly ProtocolWriter _protocolWriter;
     private readonly Task _readerLoopTask;
     private readonly HeaderWriter _headerWriter;
-    private readonly Channel<int> _channelLock;
+    private readonly Channel<int> _channelLock = Channel.CreateBounded<int>(1);
+    // private readonly AsyncExclusiveLock _gate = new();
     private PipeReader? _pipeReader;
     private PipeWriter? _pipeWriter;
     private ISocketConnection? _socketConnection;
@@ -45,7 +47,6 @@ internal sealed class CommandWriter : IAsyncDisposable
         _enqueuePing = enqueuePing;
         _opts = opts;
         _protocolWriter = new ProtocolWriter(opts.SubjectEncoding);
-        _channelLock = Channel.CreateBounded<int>(1);
         _headerWriter = new HeaderWriter(_opts.HeaderEncoding);
         _cts = new CancellationTokenSource();
         _readerLoopTask = Task.Run(ReaderLoopAsync);
@@ -83,14 +84,16 @@ internal sealed class CommandWriter : IAsyncDisposable
         await _cts.CancelAsync().ConfigureAwait(false);
 #endif
 
-        await _channelLock.Writer.WriteAsync(1).ConfigureAwait(false);
-        _channelLock.Writer.TryComplete();
-
-        if (_pipeWriter != null)
-            await _pipeWriter.CompleteAsync().ConfigureAwait(false);
-
-        if (_pipeReader != null)
-            await _pipeReader.CompleteAsync().ConfigureAwait(false);
+        lock (_lock)
+        {
+#pragma warning disable VSTHRD103
+            _pipeReader?.Complete();
+            _pipeWriter?.Complete();
+#pragma warning restore VSTHRD103
+            _pipeReader = null;
+            _pipeWriter = null;
+            _socketConnection = null;
+        }
 
         await _readerLoopTask.ConfigureAwait(false);
     }
@@ -99,18 +102,8 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         Interlocked.Increment(ref _counter.PendingMessages);
 
-        try
-        {
-            await _channelLock.Writer.WriteAsync(1, cancellationToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            return;
-        }
-        catch (ChannelClosedException)
-        {
-            return;
-        }
+        await _channelLock.Writer.WriteAsync(1, cancellationToken).ConfigureAwait(false);
+        // using var holder = await _gate.AcquireLockAsync(cancellationToken).ConfigureAwait(false);
 
         try
         {
@@ -125,21 +118,17 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            while (!_channelLock.Reader.TryRead(out _))
-            {
-                await _channelLock.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
-            }
-
+            await _channelLock.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
             Interlocked.Decrement(ref _counter.PendingMessages);
         }
     }
 
     public async ValueTask PingAsync(PingCommand pingCommand, CancellationToken cancellationToken)
     {
-        if (!await LockAsync(cancellationToken).ConfigureAwait(false))
-        {
-            return;
-        }
+        Interlocked.Increment(ref _counter.PendingMessages);
+
+        await _channelLock.Writer.WriteAsync(1, cancellationToken).ConfigureAwait(false);
+        // using var holder = await _gate.AcquireLockAsync(cancellationToken).ConfigureAwait(false);
 
         try
         {
@@ -156,16 +145,16 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            await UnLockAsync(cancellationToken).ConfigureAwait(true);
+            await _channelLock.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+            Interlocked.Decrement(ref _counter.PendingMessages);
         }
     }
 
     public async ValueTask PongAsync(CancellationToken cancellationToken = default)
     {
-        if (!await LockAsync(cancellationToken).ConfigureAwait(false))
-        {
-            return;
-        }
+        Interlocked.Increment(ref _counter.PendingMessages);
+        await _channelLock.Writer.WriteAsync(1, cancellationToken).ConfigureAwait(false);
+        // using var holder = await _gate.AcquireLockAsync(cancellationToken).ConfigureAwait(false);
 
         try
         {
@@ -180,7 +169,8 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            await UnLockAsync(cancellationToken).ConfigureAwait(true);
+            Interlocked.Decrement(ref _counter.PendingMessages);
+            await _channelLock.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -205,10 +195,9 @@ internal sealed class CommandWriter : IAsyncDisposable
 
     public async ValueTask SubscribeAsync(int sid, string subject, string? queueGroup, int? maxMsgs, CancellationToken cancellationToken)
     {
-        if (!await LockAsync(cancellationToken).ConfigureAwait(false))
-        {
-            return;
-        }
+        Interlocked.Increment(ref _counter.PendingMessages);
+        await _channelLock.Writer.WriteAsync(1, cancellationToken).ConfigureAwait(false);
+        // using var holder = await _gate.AcquireLockAsync(cancellationToken).ConfigureAwait(false);
 
         try
         {
@@ -223,16 +212,16 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            await UnLockAsync(cancellationToken).ConfigureAwait(true);
+            Interlocked.Decrement(ref _counter.PendingMessages);
+            await _channelLock.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
         }
     }
 
     public async ValueTask UnsubscribeAsync(int sid, int? maxMsgs, CancellationToken cancellationToken)
     {
-        if (!await LockAsync(cancellationToken).ConfigureAwait(false))
-        {
-            return;
-        }
+        Interlocked.Increment(ref _counter.PendingMessages);
+        await _channelLock.Writer.WriteAsync(1, cancellationToken).ConfigureAwait(false);
+        // using var holder = await _gate.AcquireLockAsync(cancellationToken).ConfigureAwait(false);
 
         try
         {
@@ -247,7 +236,8 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            await UnLockAsync(cancellationToken).ConfigureAwait(true);
+            Interlocked.Decrement(ref _counter.PendingMessages);
+            await _channelLock.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -267,10 +257,9 @@ internal sealed class CommandWriter : IAsyncDisposable
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
     private async ValueTask PublishLockedAsync(string subject, string? replyTo,  NatsPooledBufferWriter<byte> payloadBuffer, NatsPooledBufferWriter<byte>? headersBuffer, CancellationToken cancellationToken)
     {
-        if (!await LockAsync(cancellationToken).ConfigureAwait(false))
-        {
-            return;
-        }
+        Interlocked.Increment(ref _counter.PendingMessages);
+        await _channelLock.Writer.WriteAsync(1, cancellationToken).ConfigureAwait(false);
+        // using var holder = await _gate.AcquireLockAsync(cancellationToken).ConfigureAwait(false);
 
         try
         {
@@ -298,45 +287,9 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            await UnLockAsync(cancellationToken).ConfigureAwait(true);
+            Interlocked.Decrement(ref _counter.PendingMessages);
+            await _channelLock.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
         }
-    }
-
-    private async Task UnLockAsync(CancellationToken cancellationToken)
-    {
-        while (!_channelLock.Reader.TryRead(out _))
-        {
-            try
-            {
-                await _channelLock.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-        }
-
-        Interlocked.Decrement(ref _counter.PendingMessages);
-    }
-
-    private async Task<bool> LockAsync(CancellationToken cancellationToken)
-    {
-        Interlocked.Increment(ref _counter.PendingMessages);
-
-        try
-        {
-            await _channelLock.Writer.WriteAsync(1, cancellationToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            return false;
-        }
-        catch (ChannelClosedException)
-        {
-            return false;
-        }
-
-        return true;
     }
 
     private async Task ReaderLoopAsync()
