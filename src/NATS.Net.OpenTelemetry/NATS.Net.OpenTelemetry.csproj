@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <IsTrimmable>true</IsTrimmable>
+
+        <!-- NuGet Packaging -->
+        <PackageTags>pubsub;messaging;opentelemetry</PackageTags>
+        <Description>NATS client OpenTelemetry extensions.</Description>
+
+        <!-- don't push to nuget just yet -->
+        <IsPackable>false</IsPackable>
+
+    </PropertyGroup>
+
+</Project>
