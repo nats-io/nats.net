@@ -82,6 +82,7 @@ public class NatsJSContextFactoryTest
 
     public class MockConnection : INatsConnection
     {
+#pragma warning disable CS0067
         public event AsyncEventHandler<NatsEventArgs>? ConnectionDisconnected;
 
         public event AsyncEventHandler<NatsEventArgs>? ConnectionOpened;
@@ -89,6 +90,7 @@ public class NatsJSContextFactoryTest
         public event AsyncEventHandler<NatsEventArgs>? ReconnectFailed;
 
         public event AsyncEventHandler<NatsMessageDroppedEventArgs>? MessageDropped;
+#pragma warning restore CS0067
 
         public INatsServerInfo? ServerInfo { get; } = null;
 
