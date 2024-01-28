@@ -136,10 +136,7 @@ internal sealed class CommandWriter : IAsyncDisposable
 
     public async ValueTask PingAsync(PingCommand pingCommand, CancellationToken cancellationToken)
     {
-        if (!await LockAsync(cancellationToken).ConfigureAwait(false))
-        {
-            return;
-        }
+        await LockAsync(cancellationToken).ConfigureAwait(false);
 
         try
         {
@@ -162,10 +159,7 @@ internal sealed class CommandWriter : IAsyncDisposable
 
     public async ValueTask PongAsync(CancellationToken cancellationToken = default)
     {
-        if (!await LockAsync(cancellationToken).ConfigureAwait(false))
-        {
-            return;
-        }
+        await LockAsync(cancellationToken).ConfigureAwait(false);
 
         try
         {
@@ -205,10 +199,7 @@ internal sealed class CommandWriter : IAsyncDisposable
 
     public async ValueTask SubscribeAsync(int sid, string subject, string? queueGroup, int? maxMsgs, CancellationToken cancellationToken)
     {
-        if (!await LockAsync(cancellationToken).ConfigureAwait(false))
-        {
-            return;
-        }
+        await LockAsync(cancellationToken).ConfigureAwait(false);
 
         try
         {
@@ -229,10 +220,7 @@ internal sealed class CommandWriter : IAsyncDisposable
 
     public async ValueTask UnsubscribeAsync(int sid, int? maxMsgs, CancellationToken cancellationToken)
     {
-        if (!await LockAsync(cancellationToken).ConfigureAwait(false))
-        {
-            return;
-        }
+        await LockAsync(cancellationToken).ConfigureAwait(false);
 
         try
         {
@@ -267,10 +255,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
     private async ValueTask PublishLockedAsync(string subject, string? replyTo,  NatsPooledBufferWriter<byte> payloadBuffer, NatsPooledBufferWriter<byte>? headersBuffer, CancellationToken cancellationToken)
     {
-        if (!await LockAsync(cancellationToken).ConfigureAwait(false))
-        {
-            return;
-        }
+        await LockAsync(cancellationToken).ConfigureAwait(false);
 
         try
         {
@@ -302,41 +287,16 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
     }
 
-    private async Task UnLockAsync(CancellationToken cancellationToken)
+    private ValueTask<int> UnLockAsync(CancellationToken cancellationToken)
     {
-        while (!_channelLock.Reader.TryRead(out _))
-        {
-            try
-            {
-                await _channelLock.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-        }
-
         Interlocked.Decrement(ref _counter.PendingMessages);
+        return _channelLock.Reader.ReadAsync(cancellationToken);
     }
 
-    private async Task<bool> LockAsync(CancellationToken cancellationToken)
+    private ValueTask LockAsync(CancellationToken cancellationToken)
     {
         Interlocked.Increment(ref _counter.PendingMessages);
-
-        try
-        {
-            await _channelLock.Writer.WriteAsync(1, cancellationToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            return false;
-        }
-        catch (ChannelClosedException)
-        {
-            return false;
-        }
-
-        return true;
+        return _channelLock.Writer.WriteAsync(1, cancellationToken);
     }
 
     private async Task ReaderLoopAsync()
