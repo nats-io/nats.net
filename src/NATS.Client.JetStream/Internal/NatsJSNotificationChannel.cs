@@ -25,7 +25,7 @@ internal class NatsJSNotificationChannel : IAsyncDisposable
             SingleWriter = false,
             FullMode = BoundedChannelFullMode.DropOldest,
         });
-        _loop = Task.Run(NotificationLoop);
+        _loop = Task.Run(NotificationLoop, CancellationToken.None);
     }
 
     public void Notify(INatsJSNotification notification) => _channel.Writer.TryWrite(notification);

@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Diagnostics;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
@@ -113,21 +114,18 @@ internal class NatsJSOrderedPushConsumer<T>
         // where it's not enough due to performance for example.
         _commandChannel = Channel.CreateBounded<NatsJSOrderedPushConsumerMsg<T>>(1);
         _msgChannel = Channel.CreateBounded<NatsJSMsg<T>>(1);
+        Msgs = new ActivityEndingJSMsgReader<T>(_msgChannel.Reader);
 
         // A single request to create the consumer is enough because we don't want to create a new consumer
         // back to back in case the consumer is being recreated due to a timeout and a mismatch in consumer
         // sequence for example; creating the consumer once would solve both the issues.
-        _consumerCreateChannel = Channel.CreateBounded<string>(new BoundedChannelOptions(1)
-        {
-            AllowSynchronousContinuations = false,
-            FullMode = BoundedChannelFullMode.DropOldest,
-        });
+        _consumerCreateChannel = Channel.CreateBounded<string>(new BoundedChannelOptions(1) { AllowSynchronousContinuations = false, FullMode = BoundedChannelFullMode.DropOldest, });
 
         _consumerCreateTask = Task.Run(ConsumerCreateLoop);
         _commandTask = Task.Run(CommandLoop);
     }
 
-    public ChannelReader<NatsJSMsg<T>> Msgs => _msgChannel.Reader;
+    public ChannelReader<NatsJSMsg<T>> Msgs { get; }
 
     public bool IsDone => Volatile.Read(ref _done) > 0;
 
@@ -148,7 +146,7 @@ internal class NatsJSOrderedPushConsumer<T>
         await _consumerCreateTask;
         await _commandTask;
 
-        await _context.DeleteConsumerAsync(_stream, Consumer, _cancellationToken);
+        await _context.DeleteConsumerAsync(Telemetry.NatsInternalActivities, _stream, Consumer, _cancellationToken);
     }
 
     internal void Init()
@@ -198,7 +196,7 @@ internal class NatsJSOrderedPushConsumer<T>
                                 {
                                     if (headers.TryGetValue("Nats-Consumer-Stalled", out var flowControlReplyTo))
                                     {
-                                        await _nats.PublishAsync(flowControlReplyTo, cancellationToken: _cancellationToken);
+                                        await _nats.PublishNoneAsync(Telemetry.NatsInternalActivities, subject: flowControlReplyTo, cancellationToken: _cancellationToken);
                                     }
 
                                     if (headers is { Code: 100, MessageText: "FlowControl Request" })
@@ -442,7 +440,19 @@ internal class NatsJSOrderedPushConsumerSub<T> : NatsSubBase
         ReadOnlySequence<byte>? headersBuffer,
         ReadOnlySequence<byte> payloadBuffer)
     {
-        var msg = new NatsJSMsg<T>(NatsMsg<T>.Build(subject, replyTo, headersBuffer, payloadBuffer, _nats, _headerParser, _serializer), _context);
+        var msg = new NatsJSMsg<T>(
+            ParseMsg(
+                activitySource: Telemetry.NatsInternalActivities,
+                activityName: "js_receive",
+                subject: subject,
+                replyTo: replyTo,
+                headersBuffer,
+                in payloadBuffer,
+                Connection,
+                Connection.HeaderParser,
+                serializer: _serializer),
+            _context);
+
         await _commands.WriteAsync(new NatsJSOrderedPushConsumerMsg<T> { Command = NatsJSOrderedPushConsumerCommand.Msg, Msg = msg }, _cancellationToken).ConfigureAwait(false);
     }
 

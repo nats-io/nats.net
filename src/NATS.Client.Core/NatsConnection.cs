@@ -133,6 +133,8 @@ public partial class NatsConnection : INatsConnection
 
     internal ObjectPool ObjectPool => _pool;
 
+    internal bool SocketIsWebSocket => _socket is WebSocketConnection;
+
     /// <summary>
     /// Connect socket and write CONNECT command to nats server.
     /// </summary>
@@ -526,7 +528,7 @@ public partial class NatsConnection : INatsConnection
             _currentConnectUri = null;
             var urlEnumerator = urls.AsEnumerable().GetEnumerator();
             NatsUri? url = null;
-        CONNECT_AGAIN:
+            CONNECT_AGAIN:
             try
             {
                 if (urlEnumerator.MoveNext())

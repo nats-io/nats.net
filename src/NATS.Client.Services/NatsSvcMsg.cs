@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using NATS.Client.Core;
 
 namespace NATS.Client.Services;
@@ -23,6 +24,12 @@ public readonly struct NatsSvcMsg<T>
         _msg = msg;
         _endPoint = endPoint;
     }
+
+    /// <summary>
+    /// Activity used to trace the receiving of the this message. It can be used to create child activities under this context.
+    /// </summary>
+    /// <seealso cref="NatsSvcMsgTelemetryExtensions.StartChildActivity{T}"/>
+    public Activity? Activity => _msg.Activity;
 
     /// <summary>
     /// Optional exception if there were any errors.

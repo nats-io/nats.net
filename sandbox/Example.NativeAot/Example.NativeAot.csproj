@@ -12,6 +12,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\..\src\NATS.Net\NATS.Net.csproj" />
+      <ProjectReference Include="..\Example.Core\Example.Core.csproj" />
       <ProjectReference Include="..\Example.ProtoBufMessages\Example.ProtoBufMessages.csproj" />
     </ItemGroup>
 

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using NATS.Client.Core;
@@ -282,6 +283,7 @@ public class NatsJSConsumer : INatsJSConsumer
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     public async ValueTask RefreshAsync(CancellationToken cancellationToken = default) =>
         Info = await _context.JSRequestResponseAsync<object, ConsumerInfo>(
+            Telemetry.NatsActivities,
             subject: $"{_context.Opts.Prefix}.CONSUMER.INFO.{_stream}.{_consumer}",
             request: null,
             cancellationToken).ConfigureAwait(false);

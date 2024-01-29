@@ -7,23 +7,28 @@ namespace NATS.Client.Core;
 
 public partial class NatsConnection
 {
-    private static readonly NatsSubOpts ReplyOptsDefault = new NatsSubOpts
-    {
-        MaxMsgs = 1,
-        ThrowIfNoResponders = true,
-    };
+    private static readonly NatsSubOpts ReplyOptsDefault = new NatsSubOpts { MaxMsgs = 1, ThrowIfNoResponders = true, };
 
-    private static readonly NatsSubOpts ReplyManyOptsDefault = new NatsSubOpts
-    {
-        StopOnEmptyMsg = true,
-        ThrowIfNoResponders = true,
-    };
+    private static readonly NatsSubOpts ReplyManyOptsDefault = new NatsSubOpts { StopOnEmptyMsg = true, ThrowIfNoResponders = true, };
 
     /// <inheritdoc />
     public string NewInbox() => NewInbox(InboxPrefix);
 
     /// <inheritdoc />
-    public async ValueTask<NatsMsg<TReply>> RequestAsync<TRequest, TReply>(
+    public ValueTask<NatsMsg<TReply>> RequestAsync<TRequest, TReply>(
+        string subject,
+        TRequest? data,
+        NatsHeaders? headers = default,
+        INatsSerialize<TRequest>? requestSerializer = default,
+        INatsDeserialize<TReply>? replySerializer = default,
+        NatsPubOpts? requestOpts = default,
+        NatsSubOpts? replyOpts = default,
+        CancellationToken cancellationToken = default)
+        => RequestAsync<TRequest, TReply>(
+            Telemetry.NatsActivities, subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken);
+
+    internal async ValueTask<NatsMsg<TReply>> RequestAsync<TRequest, TReply>(
+        ActivitySource activitySource,
         string subject,
         TRequest? data,
         NatsHeaders? headers = default,
@@ -34,7 +39,7 @@ public partial class NatsConnection
         CancellationToken cancellationToken = default)
     {
         replyOpts = SetReplyOptsDefaults(replyOpts);
-        await using var sub = await RequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
+        await using var sub = await RequestSubAsync<TRequest, TReply>(activitySource, subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
             .ConfigureAwait(false);
 
         if (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
@@ -49,6 +54,7 @@ public partial class NatsConnection
     }
 
     /// <inheritdoc />
+    [SuppressMessage("StyleCop.CSharp.OrderingRules", "SA1202:Elements should be ordered by access", Justification = "Internal is wrapped by public")]
     public async IAsyncEnumerable<NatsMsg<TReply>> RequestManyAsync<TRequest, TReply>(
         string subject,
         TRequest? data,
@@ -60,7 +66,7 @@ public partial class NatsConnection
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         replyOpts = SetReplyManyOptsDefaults(replyOpts);
-        await using var sub = await RequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
+        await using var sub = await RequestSubAsync<TRequest, TReply>(Telemetry.NatsActivities, subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
             .ConfigureAwait(false);
 
         while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
@@ -73,6 +79,7 @@ public partial class NatsConnection
     }
 
     [SkipLocalsInit]
+    [SuppressMessage("StyleCop.CSharp.OrderingRules", "SA1204:Static elements should appear before instance elements", Justification = "This is a helper method")]
     internal static string NewInbox(ReadOnlySpan<char> prefix)
     {
         Span<char> buffer = stackalloc char[64];
@@ -80,7 +87,7 @@ public partial class NatsConnection
         var totalLength = (uint)prefix.Length + (uint)NuidWriter.NuidLength + separatorLength;
         if (totalLength <= buffer.Length)
         {
-            buffer = buffer.Slice(0, (int)totalLength);
+            buffer = buffer[..(int)totalLength];
         }
         else
         {
@@ -92,7 +99,7 @@ public partial class NatsConnection
         {
             prefix.CopyTo(buffer);
             buffer[prefix.Length] = '.';
-            var remaining = buffer.Slice((int)totalPrefixLength);
+            var remaining = buffer[(int)totalPrefixLength..];
             var didWrite = NuidWriter.TryWriteNuid(remaining);
             Debug.Assert(didWrite, "didWrite");
             return new string(buffer);

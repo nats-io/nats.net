@@ -253,7 +253,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
 
                     try
                     {
-                        await _context.DeleteConsumerAsync(_stream, consumer, cancellationToken);
+                        await _context.DeleteConsumerAsync(Telemetry.NatsInternalActivities, _stream, consumer, cancellationToken);
                         break;
                     }
                     catch (NatsJSApiNoResponseException)
@@ -302,7 +302,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
     {
         try
         {
-            return await _context.DeleteConsumerAsync(_stream, consumerName, cancellationToken);
+            return await _context.DeleteConsumerAsync(Telemetry.NatsInternalActivities, _stream, consumerName, cancellationToken);
         }
         catch
         {

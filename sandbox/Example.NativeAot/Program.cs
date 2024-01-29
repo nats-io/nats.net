@@ -1,10 +1,13 @@
 using System.Buffers;
 using System.Text;
 using System.Text.Json.Serialization;
+using Example.Core;
 using Google.Protobuf;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Models;
+
+using var tracer = TracingSetup.RunSandboxTracing();
 
 // string
 {

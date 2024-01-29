@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Diagnostics;
 using System.Text;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
@@ -73,7 +74,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         // sufficiently large value to avoid blocking socket reads in the
         // NATS connection).
         _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg>>(1000);
-        Msgs = _userMsgs.Reader;
+        Msgs = new ActivityEndingJSMsgReader<TMsg>(_userMsgs.Reader);
 
         if (_debug)
         {
@@ -128,6 +129,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
 
     public ValueTask CallMsgNextAsync(ConsumerGetnextRequest request, CancellationToken cancellationToken = default) =>
         Connection.PublishAsync(
+            Telemetry.NatsInternalActivities,
             subject: $"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
             data: request,
             replyTo: Subject,
@@ -224,14 +226,16 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         else
         {
             var msg = new NatsJSMsg<TMsg>(
-                NatsMsg<TMsg>.Build(
-                    subject,
-                    replyTo,
+                ParseMsg(
+                    Telemetry.NatsActivities,
+                    activityName: "js_receive",
+                    subject: subject,
+                    replyTo: replyTo,
                     headersBuffer,
-                    payloadBuffer,
+                    in payloadBuffer,
                     Connection,
                     Connection.HeaderParser,
-                    _serializer),
+                    serializer: _serializer),
                 _context);
 
             _pendingMsgs--;

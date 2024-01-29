@@ -1,8 +1,11 @@
 using System.Security.Cryptography;
+using Example.Core;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.ObjectStore;
+
+using var tracer = TracingSetup.RunSandboxTracing();
 
 var opts = NatsOpts.Default with { LoggerFactory = LoggerFactory.Create(builder => builder.AddConsole()) };
 

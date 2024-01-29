@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Diagnostics;
 using System.Text;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
@@ -133,7 +134,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         // sufficiently large value to avoid blocking socket reads in the
         // NATS connection).
         _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg>>(1000);
-        Msgs = _userMsgs.Reader;
+        Msgs = new ActivityEndingJSMsgReader<TMsg>(_userMsgs.Reader);
 
         // Capacity as 1 is enough here since it's used for signaling only.
         _pullRequests = Channel.CreateBounded<PullRequest>(1);
@@ -155,6 +156,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         }
 
         return Connection.PublishAsync(
+            Telemetry.NatsInternalActivities,
             subject: $"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
             data: request,
             replyTo: Subject,
@@ -323,14 +325,16 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         else
         {
             var msg = new NatsJSMsg<TMsg>(
-                NatsMsg<TMsg>.Build(
-                    subject,
-                    replyTo,
+                ParseMsg(
+                    Telemetry.NatsActivities,
+                    activityName: "js_receive",
+                    subject: subject,
+                    replyTo: replyTo,
                     headersBuffer,
-                    payloadBuffer,
+                    in payloadBuffer,
                     Connection,
                     Connection.HeaderParser,
-                    _serializer),
+                    serializer: _serializer),
                 _context);
 
             lock (_pendingGate)
@@ -357,7 +361,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                 // We can't pass cancellation token here because we need to hand
                 // the message to the user to be processed. Writer will be completed
                 // when the user calls Stop() or when the subscription is closed.
-                await _userMsgs.Writer.WriteAsync(msg).ConfigureAwait(false);
+                await _userMsgs.Writer.WriteAsync(msg, CancellationToken.None).ConfigureAwait(false);
             }
         }
 
@@ -437,7 +441,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         await foreach (var pr in _pullRequests.Reader.ReadAllAsync().ConfigureAwait(false))
         {
             var origin = $"pull-loop({pr.Origin})";
-            await CallMsgNextAsync(origin, pr.Request).ConfigureAwait(false);
+            await CallMsgNextAsync(origin, pr.Request, CancellationToken.None).ConfigureAwait(false);
             if (_debug)
             {
                 _logger.LogDebug(NatsJSLogEvents.PullRequest, "Pull request issued for {Origin} {Batch}, {MaxBytes}", origin, pr.Request.Batch, pr.Request.MaxBytes);

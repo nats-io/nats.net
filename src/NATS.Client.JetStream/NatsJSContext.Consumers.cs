@@ -1,6 +1,8 @@
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using NATS.Client.Core;
 using NATS.Client.Core.Internal;
-using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
@@ -24,7 +26,14 @@ public partial class NatsJSContext : INatsJSContext
     }
 
     /// <inheritdoc />>
-    public async ValueTask<INatsJSConsumer> CreateOrUpdateConsumerAsync(
+    public ValueTask<INatsJSConsumer> CreateOrUpdateConsumerAsync(
+        string stream,
+        ConsumerConfig config,
+        CancellationToken cancellationToken = default)
+        => CreateOrUpdateConsumerAsync(Telemetry.NatsActivities, stream, config, cancellationToken);
+
+    internal async ValueTask<INatsJSConsumer> CreateOrUpdateConsumerAsync(
+        ActivitySource activitySource,
         string stream,
         ConsumerConfig config,
         CancellationToken cancellationToken = default)
@@ -44,6 +53,7 @@ public partial class NatsJSContext : INatsJSContext
         }
 
         var response = await JSRequestResponseAsync<ConsumerCreateRequest, ConsumerInfo>(
+            activitySource,
             subject: subject,
             new ConsumerCreateRequest
             {
@@ -64,9 +74,11 @@ public partial class NatsJSContext : INatsJSContext
     /// <returns>The NATS JetStream consumer object which can be used retrieving data from the stream.</returns>
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    [SuppressMessage("StyleCop.CSharp.OrderingRules", "SA1202:Elements should be ordered by access", Justification = "Internal is wrapped by public method.")]
     public async ValueTask<INatsJSConsumer> GetConsumerAsync(string stream, string consumer, CancellationToken cancellationToken = default)
     {
         var response = await JSRequestResponseAsync<object, ConsumerInfo>(
+            Telemetry.NatsActivities,
             subject: $"{Opts.Prefix}.CONSUMER.INFO.{stream}.{consumer}",
             request: null,
             cancellationToken);
@@ -82,6 +94,7 @@ public partial class NatsJSContext : INatsJSContext
         while (!cancellationToken.IsCancellationRequested)
         {
             var response = await JSRequestResponseAsync<ConsumerListRequest, ConsumerListResponse>(
+                Telemetry.NatsActivities,
                 subject: $"{Opts.Prefix}.CONSUMER.LIST.{stream}",
                 new ConsumerListRequest { Offset = offset },
                 cancellationToken);
@@ -107,6 +120,7 @@ public partial class NatsJSContext : INatsJSContext
         while (!cancellationToken.IsCancellationRequested)
         {
             var response = await JSRequestResponseAsync<ConsumerNamesRequest, ConsumerNamesResponse>(
+                Telemetry.NatsActivities,
                 subject: $"{Opts.Prefix}.CONSUMER.NAMES.{stream}",
                 new ConsumerNamesRequest { Offset = offset },
                 cancellationToken);
@@ -130,9 +144,13 @@ public partial class NatsJSContext : INatsJSContext
     /// <returns>Whether the deletion was successful.</returns>
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
-    public async ValueTask<bool> DeleteConsumerAsync(string stream, string consumer, CancellationToken cancellationToken = default)
+    public ValueTask<bool> DeleteConsumerAsync(string stream, string consumer, CancellationToken cancellationToken = default)
+        => DeleteConsumerAsync(Telemetry.NatsActivities, stream, consumer, cancellationToken);
+
+    public async ValueTask<bool> DeleteConsumerAsync(ActivitySource activitySource, string stream, string consumer, CancellationToken cancellationToken = default)
     {
         var response = await JSRequestResponseAsync<object, ConsumerDeleteResponse>(
+            activitySource,
             subject: $"{Opts.Prefix}.CONSUMER.DELETE.{stream}.{consumer}",
             request: null,
             cancellationToken);
@@ -182,6 +200,7 @@ public partial class NatsJSContext : INatsJSContext
         var subject = $"{Opts.Prefix}.CONSUMER.CREATE.{stream}.{name}";
 
         return JSRequestResponseAsync<ConsumerCreateRequest, ConsumerInfo>(
+            activitySource: Telemetry.NatsInternalActivities,
             subject: subject,
             request,
             cancellationToken);

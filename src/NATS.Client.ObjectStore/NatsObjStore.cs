@@ -254,7 +254,7 @@ public class NatsObjStore : INatsObjStore
                     var buffer = memoryOwner.Slice(0, currentChunkSize);
 
                     // Chunks
-                    var ack = await _context.PublishAsync(GetChunkSubject(nuid), buffer, cancellationToken: cancellationToken);
+                    var ack = await _context.PublishAsync(Telemetry.NatsInternalActivities, GetChunkSubject(nuid), buffer, cancellationToken: cancellationToken);
                     ack.EnsureSuccess();
 
                     if (eof)
@@ -281,6 +281,7 @@ public class NatsObjStore : INatsObjStore
             try
             {
                 await _context.JSRequestResponseAsync<StreamPurgeRequest, StreamPurgeResponse>(
+                    activitySource: Telemetry.NatsInternalActivities,
                     subject: $"{_context.Opts.Prefix}.STREAM.PURGE.OBJ_{Bucket}",
                     request: new StreamPurgeRequest
                     {
@@ -456,6 +457,7 @@ public class NatsObjStore : INatsObjStore
     public async ValueTask SealAsync(CancellationToken cancellationToken = default)
     {
         var info = await _context.JSRequestResponseAsync<object, StreamInfoResponse>(
+            activitySource: Telemetry.NatsActivities,
             subject: $"{_context.Opts.Prefix}.STREAM.INFO.{_stream.Info.Config.Name}",
             request: null,
             cancellationToken).ConfigureAwait(false);
@@ -464,6 +466,7 @@ public class NatsObjStore : INatsObjStore
         config.Sealed = true;
 
         var response = await _context.JSRequestResponseAsync<StreamConfig, StreamUpdateResponse>(
+            activitySource: Telemetry.NatsActivities,
             subject: $"{_context.Opts.Prefix}.STREAM.UPDATE.{_stream.Info.Config.Name}",
             request: config,
             cancellationToken);
@@ -645,7 +648,7 @@ public class NatsObjStore : INatsObjStore
 
     private async ValueTask PublishMeta(ObjectMetadata meta, CancellationToken cancellationToken)
     {
-        var ack = await _context.PublishAsync(GetMetaSubject(meta.Name), meta, serializer: NatsObjJsonSerializer<ObjectMetadata>.Default, headers: NatsRollupHeaders, cancellationToken: cancellationToken);
+        var ack = await _context.PublishAsync(Telemetry.NatsInternalActivities, GetMetaSubject(meta.Name), meta, serializer: NatsObjJsonSerializer<ObjectMetadata>.Default, headers: NatsRollupHeaders, cancellationToken: cancellationToken);
         ack.EnsureSuccess();
     }
 

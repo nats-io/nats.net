@@ -163,6 +163,7 @@ public class NatsJSStream : INatsJSStream
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     public async ValueTask RefreshAsync(CancellationToken cancellationToken = default) =>
         Info = await _context.JSRequestResponseAsync<object, StreamInfoResponse>(
+            Telemetry.NatsActivities,
             subject: $"{_context.Opts.Prefix}.STREAM.INFO.{_name}",
             request: null,
             cancellationToken).ConfigureAwait(false);
@@ -170,6 +171,7 @@ public class NatsJSStream : INatsJSStream
     public ValueTask<NatsMsg<T>> GetDirectAsync<T>(StreamMsgGetRequest request, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
         return _context.Connection.RequestAsync<StreamMsgGetRequest, T>(
+            Telemetry.NatsActivities,
             subject: $"{_context.Opts.Prefix}.DIRECT.GET.{_name}",
             data: request,
             requestSerializer: NatsJSJsonSerializer<StreamMsgGetRequest>.Default,
@@ -179,6 +181,7 @@ public class NatsJSStream : INatsJSStream
 
     public ValueTask<StreamMsgGetResponse> GetAsync(StreamMsgGetRequest request, CancellationToken cancellationToken = default) =>
         _context.JSRequestResponseAsync<StreamMsgGetRequest, StreamMsgGetResponse>(
+            Telemetry.NatsActivities,
             subject: $"{_context.Opts.Prefix}.STREAM.MSG.GET.{_name}",
             request: request,
             cancellationToken);

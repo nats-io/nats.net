@@ -10,9 +10,12 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="6.0.4" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.6.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.6.0" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Example.Core\Example.Core.csproj" />
     <ProjectReference Include="..\Client\BlazorWasm.Client.csproj" />
     <ProjectReference Include="..\Shared\BlazorWasm.Shared.csproj" />
   </ItemGroup>

@@ -1,7 +1,17 @@
+using Example.Core;
 using NATS.Client.Core;
 using NATS.Client.Hosting;
+using OpenTelemetry.Trace;
+
+TracingSetup.SetSandboxEnv();
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddOpenTelemetry()
+    .WithTracing(o => o
+        .AddAspNetCoreInstrumentation()
+        .AddNatsInstrumentation()
+        .AddOtlpExporter());
 
 // Register NatsConnectionPool, NatsConnection, INatsCommand to ServiceCollection
 builder.Services.AddNats();
