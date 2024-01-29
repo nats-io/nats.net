@@ -16,4 +16,12 @@
 
     </PropertyGroup>
 
+    <ItemGroup>
+        <PackageReference Include="OpenTelemetry" Version="1.6.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\NATS.Client.Core\NATS.Client.Core.csproj" />
+    </ItemGroup>
+
 </Project>
