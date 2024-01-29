@@ -242,6 +242,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void ThrowOnDisconnected() => throw new NatsException("Connection hasn't been established yet.");
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private PipeWriter GetWriter()
     {
         lock (_lock)
@@ -287,12 +288,14 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private ValueTask<int> UnLockAsync(CancellationToken cancellationToken)
     {
         Interlocked.Decrement(ref _counter.PendingMessages);
         return _channelLock.Reader.ReadAsync(cancellationToken);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private ValueTask LockAsync(CancellationToken cancellationToken)
     {
         Interlocked.Increment(ref _counter.PendingMessages);
