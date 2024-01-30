@@ -66,7 +66,11 @@ internal sealed class CancellationTimer : IObjectPoolNode<CancellationTimer>
         }
 
         self._timeout = timeout;
-        self._cancellationTokenSource.CancelAfter(timeout);
+        if (timeout != TimeSpan.MaxValue)
+        {
+            self._cancellationTokenSource.CancelAfter(timeout);
+        }
+
         return self;
     }
 

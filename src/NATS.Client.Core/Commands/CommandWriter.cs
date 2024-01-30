@@ -31,6 +31,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     private readonly Task _readerLoopTask;
     private readonly HeaderWriter _headerWriter;
     private readonly Channel<int> _channelLock;
+    private readonly CancellationTimerPool _ctPool;
     private PipeReader? _pipeReader;
     private PipeWriter? _pipeWriter;
     private ISocketConnection? _socketConnection;
@@ -49,6 +50,9 @@ internal sealed class CommandWriter : IAsyncDisposable
         _headerWriter = new HeaderWriter(_opts.HeaderEncoding);
         _cts = new CancellationTokenSource();
         _readerLoopTask = Task.Run(ReaderLoopAsync);
+
+        // _ctPool = new CancellationTimerPool(_pool, _cts.Token);
+        _ctPool = new CancellationTimerPool(_pool, CancellationToken.None);
     }
 
     public void Reset(ISocketConnection? socketConnection)
@@ -97,11 +101,12 @@ internal sealed class CommandWriter : IAsyncDisposable
 
     public async ValueTask ConnectAsync(ClientOpts connectOpts, CancellationToken cancellationToken)
     {
+        var cancellationTimer = _ctPool.Start(_defaultCommandTimeout, cancellationToken);
         Interlocked.Increment(ref _counter.PendingMessages);
 
         try
         {
-            await _channelLock.Writer.WriteAsync(1, cancellationToken).ConfigureAwait(false);
+            await _channelLock.Writer.WriteAsync(1, cancellationTimer.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -121,7 +126,7 @@ internal sealed class CommandWriter : IAsyncDisposable
 
             var bw = GetWriter();
             _protocolWriter.WriteConnect(bw, connectOpts);
-            await bw.FlushAsync(cancellationToken).ConfigureAwait(false);
+            await bw.FlushAsync(cancellationTimer.Token).ConfigureAwait(false);
         }
         finally
         {
@@ -131,6 +136,7 @@ internal sealed class CommandWriter : IAsyncDisposable
             }
 
             Interlocked.Decrement(ref _counter.PendingMessages);
+            cancellationTimer.TryReturn();
         }
     }
 
@@ -153,7 +159,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            await UnLockAsync(cancellationToken).ConfigureAwait(true);
+            await UnLockAsync(cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -174,7 +180,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            await UnLockAsync(cancellationToken).ConfigureAwait(true);
+            await UnLockAsync(cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -214,7 +220,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            await UnLockAsync(cancellationToken).ConfigureAwait(true);
+            await UnLockAsync(cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -235,7 +241,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            await UnLockAsync(cancellationToken).ConfigureAwait(true);
+            await UnLockAsync(cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -256,7 +262,8 @@ internal sealed class CommandWriter : IAsyncDisposable
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
     private async ValueTask PublishLockedAsync(string subject, string? replyTo,  NatsPooledBufferWriter<byte> payloadBuffer, NatsPooledBufferWriter<byte>? headersBuffer, CancellationToken cancellationToken)
     {
-        await LockAsync(cancellationToken).ConfigureAwait(false);
+        var cancellationTimer = _ctPool.Start(_defaultCommandTimeout, cancellationToken);
+        await LockAsync(cancellationTimer.Token).ConfigureAwait(false);
 
         try
         {
@@ -280,11 +287,12 @@ internal sealed class CommandWriter : IAsyncDisposable
                 _pool.Return(headersBuffer);
             }
 
-            await bw.FlushAsync(cancellationToken).ConfigureAwait(false);
+            await bw.FlushAsync(cancellationTimer.Token).ConfigureAwait(false);
         }
         finally
         {
-            await UnLockAsync(cancellationToken).ConfigureAwait(true);
+            await UnLockAsync(cancellationTimer.Token).ConfigureAwait(false);
+            cancellationTimer.TryReturn();
         }
     }
 
