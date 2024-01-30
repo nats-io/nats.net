@@ -10,12 +10,7 @@ public class ConnectionRetryTest
     public async Task Max_retry_reached_after_disconnect()
     {
         await using var server = NatsServer.Start();
-        await using var nats = server.CreateClientConnection(new NatsOpts
-        {
-            MaxReconnectRetry = 2,
-            ReconnectWaitMax = TimeSpan.Zero,
-            ReconnectWaitMin = TimeSpan.FromSeconds(.1),
-        });
+        await using var nats = server.CreateClientConnection(new NatsOpts { MaxReconnectRetry = 2, ReconnectWaitMax = TimeSpan.Zero, ReconnectWaitMin = TimeSpan.FromSeconds(.1), });
 
         var signal = new WaitSignal();
         nats.ReconnectFailed += (_, _) =>
@@ -37,12 +32,7 @@ public class ConnectionRetryTest
     public async Task Retry_and_connect_after_disconnected()
     {
         await using var server = NatsServer.Start();
-        await using var nats = server.CreateClientConnection(new NatsOpts
-        {
-            MaxReconnectRetry = 10,
-            ReconnectWaitMax = TimeSpan.Zero,
-            ReconnectWaitMin = TimeSpan.FromSeconds(2),
-        });
+        await using var nats = server.CreateClientConnection(new NatsOpts { MaxReconnectRetry = 10, ReconnectWaitMax = TimeSpan.Zero, ReconnectWaitMin = TimeSpan.FromSeconds(2), });
 
         var signal = new WaitSignal();
         nats.ReconnectFailed += (_, _) =>
@@ -139,6 +129,12 @@ public class ConnectionRetryTest
 
         await Task.WhenAll(subTask, sendTask, restartTask);
         Assert.True(reconnects > 0, "connection did not reconnect");
-        Assert.Equal(sent, received);
+        Assert.True(received <= sent, $"duplicate messages sent on wire- {sent} sent, {received} received");
+
+        // some messages may still be lost, as socket could have been disconnected
+        // after socket.WriteAsync returned, but before OS sent
+        // check to ensure that the loss was < 1%
+        var loss = 100.0 - (100.0 * received / sent);
+        Assert.True(loss <= 1.0, $"message loss of {loss:F}% was above 1% - {sent} sent, {received} received");
     }
 }
