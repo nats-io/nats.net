@@ -264,7 +264,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     private static void ThrowOnDisconnected() => throw new NatsException("Connection hasn't been established yet.");
 
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
-    private async ValueTask PublishLockedAsync(string subject, string? replyTo,  NatsPooledBufferWriter<byte> payloadBuffer, NatsPooledBufferWriter<byte>? headersBuffer, CancellationToken cancellationToken)
+    private async ValueTask PublishLockedAsync(string subject, string? replyTo, NatsPooledBufferWriter<byte> payloadBuffer, NatsPooledBufferWriter<byte>? headersBuffer, CancellationToken cancellationToken)
     {
         var cancellationTimer = _ctPool.Start(_defaultCommandTimeout, cancellationToken);
         await LockAsync(cancellationTimer.Token).ConfigureAwait(false);

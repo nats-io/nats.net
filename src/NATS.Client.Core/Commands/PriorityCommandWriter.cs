@@ -1,4 +1,4 @@
-﻿using NATS.Client.Core.Internal;
+using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core.Commands;
 

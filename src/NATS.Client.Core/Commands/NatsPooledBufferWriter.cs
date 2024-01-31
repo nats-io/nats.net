@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using NATS.Client.Core.Internal;
