@@ -11,7 +11,7 @@ namespace MicroBenchmark;
 [PlainExporter]
 public class PublishParallelBench
 {
-    public const int TotalMsgs = 100_000;
+    public const int TotalMsgs = 1_000_000;
 
     private static readonly PublishParallelObj Data = new PublishParallelObj
     {
