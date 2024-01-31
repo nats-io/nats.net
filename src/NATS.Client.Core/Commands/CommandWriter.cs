@@ -97,7 +97,6 @@ internal sealed class CommandWriter : IAsyncDisposable
         await _cts.CancelAsync().ConfigureAwait(false);
 #endif
 
-        await _channelLock.Writer.WriteAsync(1).ConfigureAwait(false);
         _channelLock.Writer.TryComplete();
 
         if (_pipeWriter != null)
@@ -259,6 +258,9 @@ internal sealed class CommandWriter : IAsyncDisposable
             cancellationTimer.TryReturn();
         }
     }
+
+    // only used for internal testing
+    internal bool TestStallFlush() => _channelLock.Writer.TryWrite(1);
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void ThrowOnDisconnected() => throw new NatsException("Connection hasn't been established yet.");

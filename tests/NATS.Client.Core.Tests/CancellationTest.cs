@@ -15,15 +15,18 @@ public class CancellationTest
         await using var conn = server.CreateClientConnection(NatsOpts.Default with { CommandTimeout = TimeSpan.FromMilliseconds(1) });
         await conn.ConnectAsync();
 
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
         // stall the flush task
-        // TODO: await conn.CommandWriter.TestStallFlushAsync(TimeSpan.FromSeconds(5));
+        Assert.True(conn.CommandWriter.TestStallFlush());
 
         // commands that call ConnectAsync throw OperationCanceledException
-        await Assert.ThrowsAsync<TimeoutException>(() => conn.PingAsync().AsTask());
-        await Assert.ThrowsAsync<TimeoutException>(() => conn.PublishAsync("test").AsTask());
-        await Assert.ThrowsAsync<TimeoutException>(async () =>
+        await Assert.ThrowsAsync<OperationCanceledException>(() => conn.PingAsync(cancellationToken).AsTask());
+        await Assert.ThrowsAsync<OperationCanceledException>(() => conn.PublishAsync("test", cancellationToken: cancellationToken).AsTask());
+        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
         {
-            await foreach (var unused in conn.SubscribeAsync<string>("test"))
+            await foreach (var unused in conn.SubscribeAsync<string>("test", cancellationToken: cancellationToken))
             {
             }
         });
