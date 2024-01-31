@@ -8,17 +8,30 @@ namespace NATS.Client.Core.Commands;
 // adapted from https://github.com/CommunityToolkit/dotnet/blob/v8.2.2/src/CommunityToolkit.HighPerformance/Buffers/ArrayPoolBufferWriter%7BT%7D.cs
 internal sealed class NatsPooledBufferWriter<T> : IBufferWriter<T>, IObjectPoolNode<NatsPooledBufferWriter<T>>
 {
-    private const int DefaultInitialBufferSize = 256;
+    private const int DefaultInitialMinBufferSize = 256;
+    private const int DefaultInitialMaxBufferSize = 65536;
 
     private readonly ArrayPool<T> _pool;
+    private readonly int _size;
     private T[]? _array;
     private int _index;
     private NatsPooledBufferWriter<T>? _next;
 
-    public NatsPooledBufferWriter()
+    public NatsPooledBufferWriter(int size)
     {
+        if (size < DefaultInitialMinBufferSize)
+        {
+            size = DefaultInitialMinBufferSize;
+        }
+
+        if (size > DefaultInitialMaxBufferSize)
+        {
+            size = DefaultInitialMaxBufferSize;
+        }
+
+        _size = size;
         _pool = ArrayPool<T>.Shared;
-        _array = _pool.Rent(DefaultInitialBufferSize);
+        _array = _pool.Rent(size);
         _index = 0;
     }
 
@@ -111,7 +124,7 @@ internal sealed class NatsPooledBufferWriter<T> : IBufferWriter<T>, IObjectPoolN
     {
         if (_array != null)
             _pool.Return(_array);
-        _array = _pool.Rent(DefaultInitialBufferSize);
+        _array = _pool.Rent(_size);
         _index = 0;
     }
 

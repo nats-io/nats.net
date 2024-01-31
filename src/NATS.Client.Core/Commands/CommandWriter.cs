@@ -21,6 +21,7 @@ internal sealed class CommandWriter : IAsyncDisposable
 {
     private readonly ILogger<CommandWriter> _logger;
     private readonly ObjectPool _pool;
+    private readonly int _arrayPoolInitialSize;
     private readonly object _lock = new();
     private readonly CancellationTokenSource _cts;
     private readonly ConnectionStatsCounter _counter;
@@ -41,6 +42,11 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         _logger = opts.LoggerFactory.CreateLogger<CommandWriter>();
         _pool = pool;
+
+        // Derive ArrayPool rent size from buffer size to
+        // avoid defining another option.
+        _arrayPoolInitialSize = opts.WriterBufferSize / 256;
+
         _counter = counter;
         _defaultCommandTimeout = overrideCommandTimeout ?? opts.CommandTimeout;
         _enqueuePing = enqueuePing;
@@ -189,13 +195,13 @@ internal sealed class CommandWriter : IAsyncDisposable
         if (headers != null)
         {
             if (!_pool.TryRent(out headersBuffer))
-                headersBuffer = new NatsPooledBufferWriter<byte>();
+                headersBuffer = new NatsPooledBufferWriter<byte>(_arrayPoolInitialSize);
             _headerWriter.Write(headersBuffer, headers);
         }
 
         NatsPooledBufferWriter<byte> payloadBuffer;
         if (!_pool.TryRent(out payloadBuffer!))
-            payloadBuffer = new NatsPooledBufferWriter<byte>();
+            payloadBuffer = new NatsPooledBufferWriter<byte>(_arrayPoolInitialSize);
         if (value != null)
             serializer.Serialize(payloadBuffer, value);
 
