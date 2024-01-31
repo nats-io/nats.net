@@ -7,7 +7,7 @@ namespace MicroBenchmark;
 [MemoryDiagnoser]
 [ShortRunJob]
 [PlainExporter]
-public class SerializationBuffersBench
+public class PublishSerialBench
 {
     private static readonly string Data = new('0', 126);
 
@@ -17,16 +17,20 @@ public class SerializationBuffersBench
     public int Iter { get; set; }
 
     [GlobalSetup]
-    public void Setup() => _nats = new NatsConnection();
+    public async Task SetupAsync()
+    {
+        _nats = new NatsConnection();
+        await _nats.ConnectAsync();
+    }
 
     [Benchmark]
-    public async ValueTask<TimeSpan> PublishAsync()
+    public async Task PublishAsync()
     {
         for (var i = 0; i < Iter; i++)
         {
             await _nats.PublishAsync("foo", Data);
         }
 
-        return await _nats.PingAsync();
+        await _nats.PingAsync();
     }
 }

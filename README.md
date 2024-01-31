@@ -35,6 +35,8 @@ Check out the [documentation](https://nats-io.github.io/nats.net.v2/) for guides
 
 Find us on [slack.nats.io dotnet channel](https://natsio.slack.com/channels/dotnet)
 
+Please also check out the [Contributor Guide](CONTRIBUTING.md) and [Code of Conduct](CODE-OF-CONDUCT.md).
+
 ## Attribution
 
 This library is based on the excellent work in [Cysharp/AlterNats](https://github.com/Cysharp/AlterNats)

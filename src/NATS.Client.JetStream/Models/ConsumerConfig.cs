@@ -80,6 +80,11 @@ public record ConsumerConfig
     [System.ComponentModel.DataAnnotations.StringLength(int.MaxValue, MinimumLength = 1)]
     public string? DeliverSubject { get; set; }
 
+    [System.Text.Json.Serialization.JsonPropertyName("deliver_group")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [System.ComponentModel.DataAnnotations.StringLength(int.MaxValue, MinimumLength = 1)]
+    public string? DeliverGroup { get; set; }
+
     [System.Text.Json.Serialization.JsonPropertyName("ack_policy")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
