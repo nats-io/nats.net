@@ -336,6 +336,12 @@ public class ProtocolTest
             () => proxy.ClientFrames.Any(f => f.Message.StartsWith("PUB foo")));
 
         var frames = proxy.ClientFrames.Select(f => f.Message).ToList();
+
+        foreach (var frame in frames)
+        {
+            _output.WriteLine($"frame: {frame}");
+        }
+
         Assert.StartsWith("SUB foo", frames[0]);
         Assert.StartsWith("PUB bar1", frames[1]);
         Assert.StartsWith("PUB bar2", frames[2]);
