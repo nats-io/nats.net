@@ -51,8 +51,12 @@ internal sealed class CommandWriter : IAsyncDisposable
         _cts = new CancellationTokenSource();
         _readerLoopTask = Task.Run(ReaderLoopAsync);
 
-        // _ctPool = new CancellationTimerPool(_pool, _cts.Token);
-        _ctPool = new CancellationTimerPool(_pool, CancellationToken.None);
+        // We need a new ObjectPool here because of the root token (_cts.Token).
+        // When the root token is cancelled as this object is disposed, cancellation
+        // objects in the pooled CancellationTimer should not be reused since the
+        // root token would already be cancelled which means CancellationTimer tokens
+        // would always be in a cancelled state.
+        _ctPool = new CancellationTimerPool(new ObjectPool(opts.ObjectPoolSize), _cts.Token);
     }
 
     public void Reset(ISocketConnection? socketConnection)
@@ -102,21 +106,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     public async ValueTask ConnectAsync(ClientOpts connectOpts, CancellationToken cancellationToken)
     {
         var cancellationTimer = _ctPool.Start(_defaultCommandTimeout, cancellationToken);
-        Interlocked.Increment(ref _counter.PendingMessages);
-
-        try
-        {
-            await _channelLock.Writer.WriteAsync(1, cancellationTimer.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            return;
-        }
-        catch (ChannelClosedException)
-        {
-            return;
-        }
-
+        await LockAsync(cancellationTimer.Token).ConfigureAwait(false);
         try
         {
             if (_disposed)
@@ -126,24 +116,23 @@ internal sealed class CommandWriter : IAsyncDisposable
 
             var bw = GetWriter();
             _protocolWriter.WriteConnect(bw, connectOpts);
-            await bw.FlushAsync(cancellationTimer.Token).ConfigureAwait(false);
+            var result = await bw.FlushAsync(cancellationTimer.Token).ConfigureAwait(false);
+            if (result.IsCanceled)
+            {
+                throw new OperationCanceledException();
+            }
         }
         finally
         {
-            while (!_channelLock.Reader.TryRead(out _))
-            {
-                await _channelLock.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
-            }
-
-            Interlocked.Decrement(ref _counter.PendingMessages);
+            await UnLockAsync().ConfigureAwait(false);
             cancellationTimer.TryReturn();
         }
     }
 
     public async ValueTask PingAsync(PingCommand pingCommand, CancellationToken cancellationToken)
     {
-        await LockAsync(cancellationToken).ConfigureAwait(false);
-
+        var cancellationTimer = _ctPool.Start(_defaultCommandTimeout, cancellationToken);
+        await LockAsync(cancellationTimer.Token).ConfigureAwait(false);
         try
         {
             if (_disposed)
@@ -155,18 +144,23 @@ internal sealed class CommandWriter : IAsyncDisposable
 
             var bw = GetWriter();
             _protocolWriter.WritePing(bw);
-            await bw.FlushAsync(cancellationToken).ConfigureAwait(false);
+            var result = await bw.FlushAsync(cancellationTimer.Token).ConfigureAwait(false);
+            if (result.IsCanceled)
+            {
+                throw new OperationCanceledException();
+            }
         }
         finally
         {
-            await UnLockAsync(cancellationToken).ConfigureAwait(false);
+            await UnLockAsync().ConfigureAwait(false);
+            cancellationTimer.TryReturn();
         }
     }
 
     public async ValueTask PongAsync(CancellationToken cancellationToken = default)
     {
-        await LockAsync(cancellationToken).ConfigureAwait(false);
-
+        var cancellationTimer = _ctPool.Start(_defaultCommandTimeout, cancellationToken);
+        await LockAsync(cancellationTimer.Token).ConfigureAwait(false);
         try
         {
             if (_disposed)
@@ -176,11 +170,16 @@ internal sealed class CommandWriter : IAsyncDisposable
 
             var bw = GetWriter();
             _protocolWriter.WritePong(bw);
-            await bw.FlushAsync(cancellationToken).ConfigureAwait(false);
+            var result = await bw.FlushAsync(cancellationTimer.Token).ConfigureAwait(false);
+            if (result.IsCanceled)
+            {
+                throw new OperationCanceledException();
+            }
         }
         finally
         {
-            await UnLockAsync(cancellationToken).ConfigureAwait(false);
+            await UnLockAsync().ConfigureAwait(false);
+            cancellationTimer.TryReturn();
         }
     }
 
@@ -205,8 +204,8 @@ internal sealed class CommandWriter : IAsyncDisposable
 
     public async ValueTask SubscribeAsync(int sid, string subject, string? queueGroup, int? maxMsgs, CancellationToken cancellationToken)
     {
-        await LockAsync(cancellationToken).ConfigureAwait(false);
-
+        var cancellationTimer = _ctPool.Start(_defaultCommandTimeout, cancellationToken);
+        await LockAsync(cancellationTimer.Token).ConfigureAwait(false);
         try
         {
             if (_disposed)
@@ -216,18 +215,23 @@ internal sealed class CommandWriter : IAsyncDisposable
 
             var bw = GetWriter();
             _protocolWriter.WriteSubscribe(bw, sid, subject, queueGroup, maxMsgs);
-            await bw.FlushAsync(cancellationToken).ConfigureAwait(false);
+            var result = await bw.FlushAsync(cancellationTimer.Token).ConfigureAwait(false);
+            if (result.IsCanceled)
+            {
+                throw new OperationCanceledException();
+            }
         }
         finally
         {
-            await UnLockAsync(cancellationToken).ConfigureAwait(false);
+            await UnLockAsync().ConfigureAwait(false);
+            cancellationTimer.TryReturn();
         }
     }
 
     public async ValueTask UnsubscribeAsync(int sid, int? maxMsgs, CancellationToken cancellationToken)
     {
-        await LockAsync(cancellationToken).ConfigureAwait(false);
-
+        var cancellationTimer = _ctPool.Start(_defaultCommandTimeout, cancellationToken);
+        await LockAsync(cancellationTimer.Token).ConfigureAwait(false);
         try
         {
             if (_disposed)
@@ -237,34 +241,27 @@ internal sealed class CommandWriter : IAsyncDisposable
 
             var bw = GetWriter();
             _protocolWriter.WriteUnsubscribe(bw, sid, maxMsgs);
-            await bw.FlushAsync(cancellationToken).ConfigureAwait(false);
+            var result = await bw.FlushAsync(cancellationTimer.Token).ConfigureAwait(false);
+            if (result.IsCanceled)
+            {
+                throw new OperationCanceledException();
+            }
         }
         finally
         {
-            await UnLockAsync(cancellationToken).ConfigureAwait(false);
+            await UnLockAsync().ConfigureAwait(false);
+            cancellationTimer.TryReturn();
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void ThrowOnDisconnected() => throw new NatsException("Connection hasn't been established yet.");
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private PipeWriter GetWriter()
-    {
-        lock (_lock)
-        {
-            if (_pipeWriter == null)
-                ThrowOnDisconnected();
-            return _pipeWriter!;
-        }
-    }
-
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
     private async ValueTask PublishLockedAsync(string subject, string? replyTo,  NatsPooledBufferWriter<byte> payloadBuffer, NatsPooledBufferWriter<byte>? headersBuffer, CancellationToken cancellationToken)
     {
         var cancellationTimer = _ctPool.Start(_defaultCommandTimeout, cancellationToken);
         await LockAsync(cancellationTimer.Token).ConfigureAwait(false);
-
         try
         {
             var payload = payloadBuffer.WrittenMemory;
@@ -287,27 +284,53 @@ internal sealed class CommandWriter : IAsyncDisposable
                 _pool.Return(headersBuffer);
             }
 
-            await bw.FlushAsync(cancellationTimer.Token).ConfigureAwait(false);
+            var result = await bw.FlushAsync(cancellationTimer.Token).ConfigureAwait(false);
+            if (result.IsCanceled)
+            {
+                throw new OperationCanceledException();
+            }
         }
         finally
         {
-            await UnLockAsync(cancellationTimer.Token).ConfigureAwait(false);
+            await UnLockAsync().ConfigureAwait(false);
             cancellationTimer.TryReturn();
         }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private ValueTask<int> UnLockAsync(CancellationToken cancellationToken)
+    private async ValueTask LockAsync(CancellationToken cancellationToken)
     {
-        Interlocked.Decrement(ref _counter.PendingMessages);
-        return _channelLock.Reader.ReadAsync(cancellationToken);
+        Interlocked.Increment(ref _counter.PendingMessages);
+        try
+        {
+            await _channelLock.Writer.WriteAsync(1, cancellationToken).ConfigureAwait(false);
+        }
+        catch (TaskCanceledException)
+        {
+            throw new OperationCanceledException();
+        }
+        catch (ChannelClosedException)
+        {
+            throw new OperationCanceledException();
+        }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private ValueTask LockAsync(CancellationToken cancellationToken)
+    private ValueTask<int> UnLockAsync()
     {
-        Interlocked.Increment(ref _counter.PendingMessages);
-        return _channelLock.Writer.WriteAsync(1, cancellationToken);
+        Interlocked.Decrement(ref _counter.PendingMessages);
+        return _channelLock.Reader.ReadAsync(_cts.Token);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private PipeWriter GetWriter()
+    {
+        lock (_lock)
+        {
+            if (_pipeWriter == null)
+                ThrowOnDisconnected();
+            return _pipeWriter!;
+        }
     }
 
     private async Task ReaderLoopAsync()
