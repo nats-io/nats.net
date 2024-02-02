@@ -18,7 +18,6 @@ internal sealed class PriorityCommandWriter : IAsyncDisposable
     {
         if (Interlocked.Increment(ref _disposed) == 1)
         {
-            await CommandWriter.FlushAsync().ConfigureAwait(false);
             // disposing command writer marks pipe writer as complete
             await CommandWriter.DisposeAsync().ConfigureAwait(false);
         }

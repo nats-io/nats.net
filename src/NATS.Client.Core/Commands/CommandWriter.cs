@@ -76,7 +76,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         lock (_lock)
         {
             _socketConnection = socketConnection;
-            _ctsReader = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
+            _ctsReader = new CancellationTokenSource();
 
             _readerLoopTask = Task.Run(async () =>
             {
@@ -85,7 +85,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
     }
 
-    public async Task FlushAsync()
+    public async Task CancelReaderLoopAsync()
     {
         CancellationTokenSource? cts;
         Task? readerTask;
@@ -126,6 +126,16 @@ internal sealed class CommandWriter : IAsyncDisposable
         _channelLock.Writer.TryComplete();
         _channelSize.Writer.TryComplete();
         await _pipeWriter.CompleteAsync().ConfigureAwait(false);
+
+        Task? readerTask;
+        lock (_lock)
+        {
+            readerTask = _readerLoopTask;
+        }
+
+        if (readerTask != null)
+            await readerTask.ConfigureAwait(false);
+
     }
 
     public async ValueTask ConnectAsync(ClientOpts connectOpts, CancellationToken cancellationToken)

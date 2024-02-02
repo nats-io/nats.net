@@ -343,10 +343,13 @@ public class ProtocolTest
         }
 
         Assert.StartsWith("SUB foo", frames[0]);
-        Assert.StartsWith("PUB bar1", frames[1]);
-        Assert.StartsWith("PUB bar2", frames[2]);
-        Assert.StartsWith("PUB bar3", frames[3]);
-        Assert.StartsWith("PUB foo", frames[4]);
+
+        for (var i = 0; i < 100; i++)
+        {
+            Assert.StartsWith($"PUB bar{i}", frames[i + 1]);
+        }
+
+        Assert.StartsWith("PUB foo", frames[101]);
 
         await nats.DisposeAsync();
     }
@@ -425,9 +428,10 @@ public class ProtocolTest
             await base.WriteReconnectCommandsAsync(commandWriter, sid);
 
             // Any additional commands to send on reconnect
-            await commandWriter.PublishAsync("bar1", default, default, default, NatsRawSerializer<byte>.Default, default);
-            await commandWriter.PublishAsync("bar2", default, default, default, NatsRawSerializer<byte>.Default, default);
-            await commandWriter.PublishAsync("bar3", default, default, default, NatsRawSerializer<byte>.Default, default);
+            for (var i = 0; i < 100; i++)
+            {
+                await commandWriter.PublishAsync($"bar{i}", default, default, default, NatsRawSerializer<byte>.Default, default);
+            }
         }
 
         protected override ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
