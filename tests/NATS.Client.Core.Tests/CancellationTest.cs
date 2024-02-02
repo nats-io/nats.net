@@ -15,15 +15,18 @@ public class CancellationTest
         await using var conn = server.CreateClientConnection(NatsOpts.Default with { CommandTimeout = TimeSpan.FromMilliseconds(1) });
         await conn.ConnectAsync();
 
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
         // stall the flush task
-        await conn.CommandWriter.TestStallFlushAsync(TimeSpan.FromSeconds(5));
+        Assert.True(conn.CommandWriter.TestStallFlush());
 
         // commands that call ConnectAsync throw OperationCanceledException
-        await Assert.ThrowsAsync<TimeoutException>(() => conn.PingAsync().AsTask());
-        await Assert.ThrowsAsync<TimeoutException>(() => conn.PublishAsync("test").AsTask());
-        await Assert.ThrowsAsync<TimeoutException>(async () =>
+        await Assert.ThrowsAsync<OperationCanceledException>(() => conn.PingAsync(cancellationToken).AsTask());
+        await Assert.ThrowsAsync<OperationCanceledException>(() => conn.PublishAsync("test", cancellationToken: cancellationToken).AsTask());
+        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
         {
-            await foreach (var unused in conn.SubscribeAsync<string>("test"))
+            await foreach (var unused in conn.SubscribeAsync<string>("test", cancellationToken: cancellationToken))
             {
             }
         });
@@ -74,5 +77,23 @@ public class CancellationTest
             {
             }
         });
+    }
+
+    [Fact]
+    public async Task Cancellation_timer()
+    {
+        var objectPool = new ObjectPool(10);
+        var cancellationTimerPool = new CancellationTimerPool(objectPool, CancellationToken.None);
+        var cancellationTimer = cancellationTimerPool.Start(TimeSpan.FromSeconds(2), CancellationToken.None);
+
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(4), cancellationTimer.Token);
+            _output.WriteLine($"delayed 4 seconds");
+        }
+        catch (Exception e)
+        {
+            _output.WriteLine($"Exception: {e.GetType().Name}");
+        }
     }
 }

@@ -1,102 +1,150 @@
+using System.Buffers;
 using System.IO.Pipelines;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
+using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core.Commands;
 
 /// <summary>
-/// Used to track commands that have been enqueued to the PipeReader
-/// </summary>
-internal readonly record struct QueuedCommand(int Size, int Trim = 0);
-
-/// <summary>
-/// Sets up a Pipe, and provides methods to write to the PipeWriter
+/// Sets up a buffer (Pipe), and provides methods to write protocol messages to the buffer
 /// When methods complete, they have been queued for sending
 /// and further cancellation is not possible
 /// </summary>
 /// <remarks>
 /// These methods are in the hot path, and have all been
-/// optimized to eliminate allocations and make an initial attempt
-/// to run synchronously without the async state machine
+/// optimized to eliminate allocations and minimize copying
 /// </remarks>
 internal sealed class CommandWriter : IAsyncDisposable
 {
+    // set to a reasonable socket write mem size
+    private const int MaxSendSize = 16384;
+
+    private readonly ILogger<CommandWriter> _logger;
+    private readonly ObjectPool _pool;
+    private readonly int _arrayPoolInitialSize;
+    private readonly object _lock = new();
+    private readonly CancellationTokenSource _cts;
     private readonly ConnectionStatsCounter _counter;
     private readonly TimeSpan _defaultCommandTimeout;
     private readonly Action<PingCommand> _enqueuePing;
-    private readonly NatsOpts _opts;
-    private readonly PipeWriter _pipeWriter;
     private readonly ProtocolWriter _protocolWriter;
-    private readonly ChannelWriter<QueuedCommand> _queuedCommandsWriter;
-    private readonly SemaphoreSlim _semLock;
+    private readonly HeaderWriter _headerWriter;
+    private readonly Channel<int> _channelLock;
+    private readonly Channel<int> _channelSize;
+    private readonly CancellationTimerPool _ctPool;
+    private readonly PipeReader _pipeReader;
+    private readonly PipeWriter _pipeWriter;
+    private ISocketConnection? _socketConnection;
     private Task? _flushTask;
-    private bool _disposed;
+    private Task? _readerLoopTask;
+    private CancellationTokenSource? _ctsReader;
+    private volatile bool _disposed;
 
-    public CommandWriter(NatsOpts opts, ConnectionStatsCounter counter, Action<PingCommand> enqueuePing, TimeSpan? overrideCommandTimeout = default)
+    public CommandWriter(ObjectPool pool, NatsOpts opts, ConnectionStatsCounter counter, Action<PingCommand> enqueuePing, TimeSpan? overrideCommandTimeout = default)
     {
+        _logger = opts.LoggerFactory.CreateLogger<CommandWriter>();
+        _pool = pool;
+
+        // Derive ArrayPool rent size from buffer size to
+        // avoid defining another option.
+        _arrayPoolInitialSize = opts.WriterBufferSize / 256;
+
         _counter = counter;
         _defaultCommandTimeout = overrideCommandTimeout ?? opts.CommandTimeout;
         _enqueuePing = enqueuePing;
-        _opts = opts;
+        _protocolWriter = new ProtocolWriter(opts.SubjectEncoding);
+        _channelLock = Channel.CreateBounded<int>(1);
+        _channelSize = Channel.CreateUnbounded<int>(new UnboundedChannelOptions { SingleWriter = true, SingleReader = true });
+        _headerWriter = new HeaderWriter(opts.HeaderEncoding);
+        _cts = new CancellationTokenSource();
+
         var pipe = new Pipe(new PipeOptions(
             pauseWriterThreshold: opts.WriterBufferSize, // flush will block after hitting
-            resumeWriterThreshold: opts.WriterBufferSize / 2,  // will start flushing again after catching up
-            minimumSegmentSize: 16384, // segment that is part of an uninterrupted payload can be sent using socket.send
+            resumeWriterThreshold: opts.WriterBufferSize / 2,
             useSynchronizationContext: false));
-        PipeReader = pipe.Reader;
+        _pipeReader = pipe.Reader;
         _pipeWriter = pipe.Writer;
-        _protocolWriter = new ProtocolWriter(_pipeWriter, opts.SubjectEncoding, opts.HeaderEncoding);
-        var channel = Channel.CreateUnbounded<QueuedCommand>(new UnboundedChannelOptions { SingleWriter = true, SingleReader = true });
-        _semLock = new SemaphoreSlim(1);
-        QueuedCommandsReader = channel.Reader;
-        _queuedCommandsWriter = channel.Writer;
+
+        // We need a new ObjectPool here because of the root token (_cts.Token).
+        // When the root token is cancelled as this object is disposed, cancellation
+        // objects in the pooled CancellationTimer should not be reused since the
+        // root token would already be cancelled which means CancellationTimer tokens
+        // would always be in a cancelled state.
+        _ctPool = new CancellationTimerPool(new ObjectPool(opts.ObjectPoolSize), _cts.Token);
     }
 
-    public PipeReader PipeReader { get; }
+    public void Reset(ISocketConnection socketConnection)
+    {
+        lock (_lock)
+        {
+            _socketConnection = socketConnection;
+            _ctsReader = new CancellationTokenSource();
 
-    public ChannelReader<QueuedCommand> QueuedCommandsReader { get; }
+            _readerLoopTask = Task.Run(async () =>
+            {
+                await ReaderLoopAsync(_logger, _socketConnection, _pipeReader, _channelSize, _ctsReader.Token).ConfigureAwait(false);
+            });
+        }
+    }
 
-    public Queue<QueuedCommand> InFlightCommands { get; } = new();
+    public async Task CancelReaderLoopAsync()
+    {
+        CancellationTokenSource? cts;
+        Task? readerTask;
+        lock (_lock)
+        {
+            cts = _ctsReader;
+            readerTask = _readerLoopTask;
+        }
+
+        if (cts != null)
+        {
+#if NET6_0
+            cts.Cancel();
+#else
+            await cts.CancelAsync().ConfigureAwait(false);
+#endif
+        }
+
+        if (readerTask != null)
+            await readerTask.WaitAsync(TimeSpan.FromSeconds(3), _cts.Token).ConfigureAwait(false);
+    }
 
     public async ValueTask DisposeAsync()
     {
-        await _semLock.WaitAsync().ConfigureAwait(false);
-        try
+        if (_disposed)
         {
-            if (_disposed)
-            {
-                return;
-            }
+            return;
+        }
 
-            _disposed = true;
-            _queuedCommandsWriter.Complete();
-            await _pipeWriter.CompleteAsync().ConfigureAwait(false);
-        }
-        finally
+        _disposed = true;
+
+#if NET6_0
+        _cts.Cancel();
+#else
+        await _cts.CancelAsync().ConfigureAwait(false);
+#endif
+
+        _channelLock.Writer.TryComplete();
+        _channelSize.Writer.TryComplete();
+        await _pipeWriter.CompleteAsync().ConfigureAwait(false);
+
+        Task? readerTask;
+        lock (_lock)
         {
-            _semLock.Release();
+            readerTask = _readerLoopTask;
         }
+
+        if (readerTask != null)
+            await readerTask.ConfigureAwait(false);
     }
 
-    public NatsPipeliningWriteProtocolProcessor CreateNatsPipeliningWriteProtocolProcessor(ISocketConnection socketConnection) => new(socketConnection, this, _opts, _counter);
-
-    public ValueTask ConnectAsync(ClientOpts connectOpts, CancellationToken cancellationToken)
+    public async ValueTask ConnectAsync(ClientOpts connectOpts, CancellationToken cancellationToken)
     {
-#pragma warning disable CA2016
-#pragma warning disable VSTHRD103
-        if (!_semLock.Wait(0))
-#pragma warning restore VSTHRD103
-#pragma warning restore CA2016
-        {
-            return ConnectStateMachineAsync(false, connectOpts, cancellationToken);
-        }
-
-        if (_flushTask is { IsCompletedSuccessfully: false })
-        {
-            return ConnectStateMachineAsync(true, connectOpts, cancellationToken);
-        }
-
+        var cancellationTimer = _ctPool.Start(_defaultCommandTimeout, cancellationToken);
+        await LockAsync(cancellationTimer.Token).ConfigureAwait(false);
         try
         {
             if (_disposed)
@@ -104,41 +152,28 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
-            var success = false;
-            try
+            if (_flushTask is { IsCompletedSuccessfully: false })
             {
-                _protocolWriter.WriteConnect(connectOpts);
-                success = true;
+                await _flushTask.WaitAsync(cancellationTimer.Token).ConfigureAwait(false);
             }
-            finally
-            {
-                EnqueueCommand(success);
-            }
+
+            _protocolWriter.WriteConnect(_pipeWriter, connectOpts);
+
+            _channelSize.Writer.TryWrite((int)_pipeWriter.UnflushedBytes);
+            var flush = _pipeWriter.FlushAsync(CancellationToken.None);
+            _flushTask = flush.IsCompletedSuccessfully ? null : flush.AsTask();
         }
         finally
         {
-            _semLock.Release();
+            await UnLockAsync().ConfigureAwait(false);
+            cancellationTimer.TryReturn();
         }
-
-        return ValueTask.CompletedTask;
     }
 
-    public ValueTask PingAsync(PingCommand pingCommand, CancellationToken cancellationToken)
+    public async ValueTask PingAsync(PingCommand pingCommand, CancellationToken cancellationToken)
     {
-#pragma warning disable CA2016
-#pragma warning disable VSTHRD103
-        if (!_semLock.Wait(0))
-#pragma warning restore VSTHRD103
-#pragma warning restore CA2016
-        {
-            return PingStateMachineAsync(false, pingCommand, cancellationToken);
-        }
-
-        if (_flushTask is { IsCompletedSuccessfully: false })
-        {
-            return PingStateMachineAsync(true, pingCommand, cancellationToken);
-        }
-
+        var cancellationTimer = _ctPool.Start(_defaultCommandTimeout, cancellationToken);
+        await LockAsync(cancellationTimer.Token).ConfigureAwait(false);
         try
         {
             if (_disposed)
@@ -146,42 +181,29 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
-            var success = false;
-            try
+            if (_flushTask is { IsCompletedSuccessfully: false })
             {
-                _protocolWriter.WritePing();
-                _enqueuePing(pingCommand);
-                success = true;
+                await _flushTask.WaitAsync(cancellationTimer.Token).ConfigureAwait(false);
             }
-            finally
-            {
-                EnqueueCommand(success);
-            }
+
+            _enqueuePing(pingCommand);
+            _protocolWriter.WritePing(_pipeWriter);
+
+            _channelSize.Writer.TryWrite((int)_pipeWriter.UnflushedBytes);
+            var flush = _pipeWriter.FlushAsync(CancellationToken.None);
+            _flushTask = flush.IsCompletedSuccessfully ? null : flush.AsTask();
         }
         finally
         {
-            _semLock.Release();
+            await UnLockAsync().ConfigureAwait(false);
+            cancellationTimer.TryReturn();
         }
-
-        return ValueTask.CompletedTask;
     }
 
-    public ValueTask PongAsync(CancellationToken cancellationToken = default)
+    public async ValueTask PongAsync(CancellationToken cancellationToken = default)
     {
-#pragma warning disable CA2016
-#pragma warning disable VSTHRD103
-        if (!_semLock.Wait(0))
-#pragma warning restore VSTHRD103
-#pragma warning restore CA2016
-        {
-            return PongStateMachineAsync(false, cancellationToken);
-        }
-
-        if (_flushTask is { IsCompletedSuccessfully: false })
-        {
-            return PongStateMachineAsync(true, cancellationToken);
-        }
-
+        var cancellationTimer = _ctPool.Start(_defaultCommandTimeout, cancellationToken);
+        await LockAsync(cancellationTimer.Token).ConfigureAwait(false);
         try
         {
             if (_disposed)
@@ -189,84 +211,47 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
-            var success = false;
-            try
+            if (_flushTask is { IsCompletedSuccessfully: false })
             {
-                _protocolWriter.WritePong();
-                success = true;
+                await _flushTask.WaitAsync(cancellationTimer.Token).ConfigureAwait(false);
             }
-            finally
-            {
-                EnqueueCommand(success);
-            }
+
+            _protocolWriter.WritePong(_pipeWriter);
+
+            _channelSize.Writer.TryWrite((int)_pipeWriter.UnflushedBytes);
+            var flush = _pipeWriter.FlushAsync(CancellationToken.None);
+            _flushTask = flush.IsCompletedSuccessfully ? null : flush.AsTask();
         }
         finally
         {
-            _semLock.Release();
+            await UnLockAsync().ConfigureAwait(false);
+            cancellationTimer.TryReturn();
         }
-
-        return ValueTask.CompletedTask;
     }
 
     public ValueTask PublishAsync<T>(string subject, T? value, NatsHeaders? headers, string? replyTo, INatsSerialize<T> serializer, CancellationToken cancellationToken)
     {
-#pragma warning disable CA2016
-#pragma warning disable VSTHRD103
-        if (!_semLock.Wait(0))
-#pragma warning restore VSTHRD103
-#pragma warning restore CA2016
+        NatsPooledBufferWriter<byte>? headersBuffer = null;
+        if (headers != null)
         {
-            return PublishStateMachineAsync(false, subject, value, headers, replyTo, serializer, cancellationToken);
+            if (!_pool.TryRent(out headersBuffer))
+                headersBuffer = new NatsPooledBufferWriter<byte>(_arrayPoolInitialSize);
+            _headerWriter.Write(headersBuffer, headers);
         }
 
-        if (_flushTask is { IsCompletedSuccessfully: false })
-        {
-            return PublishStateMachineAsync(true, subject, value, headers, replyTo, serializer, cancellationToken);
-        }
+        NatsPooledBufferWriter<byte> payloadBuffer;
+        if (!_pool.TryRent(out payloadBuffer!))
+            payloadBuffer = new NatsPooledBufferWriter<byte>(_arrayPoolInitialSize);
+        if (value != null)
+            serializer.Serialize(payloadBuffer, value);
 
-        try
-        {
-            if (_disposed)
-            {
-                throw new ObjectDisposedException(nameof(CommandWriter));
-            }
-
-            var trim = 0;
-            var success = false;
-            try
-            {
-                trim = _protocolWriter.WritePublish(subject, value, headers, replyTo, serializer);
-                success = true;
-            }
-            finally
-            {
-                EnqueueCommand(success, trim: trim);
-            }
-        }
-        finally
-        {
-            _semLock.Release();
-        }
-
-        return ValueTask.CompletedTask;
+        return PublishLockedAsync(subject, replyTo, payloadBuffer, headersBuffer, cancellationToken);
     }
 
-    public ValueTask SubscribeAsync(int sid, string subject, string? queueGroup, int? maxMsgs, CancellationToken cancellationToken)
+    public async ValueTask SubscribeAsync(int sid, string subject, string? queueGroup, int? maxMsgs, CancellationToken cancellationToken)
     {
-#pragma warning disable CA2016
-#pragma warning disable VSTHRD103
-        if (!_semLock.Wait(0))
-#pragma warning restore VSTHRD103
-#pragma warning restore CA2016
-        {
-            return SubscribeStateMachineAsync(false, sid, subject, queueGroup, maxMsgs, cancellationToken);
-        }
-
-        if (_flushTask is { IsCompletedSuccessfully: false })
-        {
-            return SubscribeStateMachineAsync(true, sid, subject, queueGroup, maxMsgs, cancellationToken);
-        }
-
+        var cancellationTimer = _ctPool.Start(_defaultCommandTimeout, cancellationToken);
+        await LockAsync(cancellationTimer.Token).ConfigureAwait(false);
         try
         {
             if (_disposed)
@@ -274,41 +259,28 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
-            var success = false;
-            try
+            if (_flushTask is { IsCompletedSuccessfully: false })
             {
-                _protocolWriter.WriteSubscribe(sid, subject, queueGroup, maxMsgs);
-                success = true;
+                await _flushTask.WaitAsync(cancellationTimer.Token).ConfigureAwait(false);
             }
-            finally
-            {
-                EnqueueCommand(success);
-            }
+
+            _protocolWriter.WriteSubscribe(_pipeWriter, sid, subject, queueGroup, maxMsgs);
+
+            _channelSize.Writer.TryWrite((int)_pipeWriter.UnflushedBytes);
+            var flush = _pipeWriter.FlushAsync(CancellationToken.None);
+            _flushTask = flush.IsCompletedSuccessfully ? null : flush.AsTask();
         }
         finally
         {
-            _semLock.Release();
+            await UnLockAsync().ConfigureAwait(false);
+            cancellationTimer.TryReturn();
         }
-
-        return ValueTask.CompletedTask;
     }
 
-    public ValueTask UnsubscribeAsync(int sid, CancellationToken cancellationToken)
+    public async ValueTask UnsubscribeAsync(int sid, int? maxMsgs, CancellationToken cancellationToken)
     {
-#pragma warning disable CA2016
-#pragma warning disable VSTHRD103
-        if (!_semLock.Wait(0))
-#pragma warning restore VSTHRD103
-#pragma warning restore CA2016
-        {
-            return UnsubscribeStateMachineAsync(false, sid, cancellationToken);
-        }
-
-        if (_flushTask is { IsCompletedSuccessfully: false })
-        {
-            return UnsubscribeStateMachineAsync(true, sid, cancellationToken);
-        }
-
+        var cancellationTimer = _ctPool.Start(_defaultCommandTimeout, cancellationToken);
+        await LockAsync(cancellationTimer.Token).ConfigureAwait(false);
         try
         {
             if (_disposed)
@@ -316,343 +288,221 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
-            var success = false;
-            try
+            if (_flushTask is { IsCompletedSuccessfully: false })
             {
-                _protocolWriter.WriteUnsubscribe(sid, null);
-                success = true;
+                await _flushTask.WaitAsync(cancellationTimer.Token).ConfigureAwait(false);
             }
-            finally
-            {
-                EnqueueCommand(success);
-            }
+
+            _protocolWriter.WriteUnsubscribe(_pipeWriter, sid, maxMsgs);
+
+            _channelSize.Writer.TryWrite((int)_pipeWriter.UnflushedBytes);
+            var flush = _pipeWriter.FlushAsync(CancellationToken.None);
+            _flushTask = flush.IsCompletedSuccessfully ? null : flush.AsTask();
         }
         finally
         {
-            _semLock.Release();
+            await UnLockAsync().ConfigureAwait(false);
+            cancellationTimer.TryReturn();
         }
-
-        return ValueTask.CompletedTask;
     }
 
     // only used for internal testing
-    internal async Task TestStallFlushAsync(TimeSpan timeSpan)
-    {
-        await _semLock.WaitAsync().ConfigureAwait(false);
+    internal bool TestStallFlush() => _channelLock.Writer.TryWrite(1);
 
+    private static async Task ReaderLoopAsync(ILogger<CommandWriter> logger, ISocketConnection connection, PipeReader pipeReader, Channel<int> channelSize, CancellationToken cancellationToken)
+    {
         try
         {
-            if (_flushTask is { IsCompletedSuccessfully: false })
+            var examinedOffset = 0;
+            while (true)
             {
-                await _flushTask.ConfigureAwait(false);
-            }
+                var result = await pipeReader.ReadAsync(cancellationToken).ConfigureAwait(false);
 
-            _flushTask = Task.Delay(timeSpan);
+                if (result.IsCanceled)
+                {
+                    break;
+                }
+
+                var buffer = result.Buffer;
+                var consumed = buffer.Start;
+                var examined = buffer.GetPosition(examinedOffset);
+                var readBuffer = buffer.Slice(examinedOffset);
+
+                try
+                {
+                    if (!buffer.IsEmpty && !readBuffer.IsEmpty)
+                    {
+                        var bufferLength = (int)readBuffer.Length;
+
+                        var bytes = ArrayPool<byte>.Shared.Rent(bufferLength);
+                        readBuffer.CopyTo(bytes);
+                        var memory = bytes.AsMemory(0, bufferLength);
+
+                        try
+                        {
+                            var totalSent = 0;
+                            var totalSize = 0;
+                            while (totalSent < bufferLength)
+                            {
+                                var sendMemory = memory;
+                                if (sendMemory.Length > MaxSendSize)
+                                {
+                                    // cap the send size, the OS can only handle so much in a send buffer at a time
+                                    // also if the send fails, we have to throw this many bytes away
+                                    sendMemory = memory[..MaxSendSize];
+                                }
+
+                                int sent;
+                                Exception? sendEx = null;
+                                try
+                                {
+                                    sent = await connection.SendAsync(sendMemory).ConfigureAwait(false);
+                                }
+                                catch (Exception ex)
+                                {
+                                    // we have no idea how many bytes were actually sent, so we have to assume they all were
+                                    // this could result in message loss, but is consistent with at-most once delivery
+                                    sendEx = ex;
+                                    sent = sendMemory.Length;
+                                }
+
+                                totalSent += sent;
+                                memory = memory[sent..];
+
+                                while (totalSize < totalSent)
+                                {
+                                    int peek;
+                                    while (!channelSize.Reader.TryPeek(out peek))
+                                    {
+                                        // should never happen; channel sizes are written before flush is called
+                                        await channelSize.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
+                                    }
+
+                                    // Don't just mark the message as complete if we have more data to send
+                                    if (totalSize + peek > totalSent)
+                                    {
+                                        break;
+                                    }
+
+                                    int size;
+                                    while (!channelSize.Reader.TryRead(out size))
+                                    {
+                                        // should never happen; channel sizes are written before flush is called (plus we just peeked)
+                                        await channelSize.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
+                                    }
+
+                                    totalSize += size;
+                                    examinedOffset = 0;
+                                }
+
+                                // make sure to mark the buffer only at message boundaries.
+                                consumed = buffer.GetPosition(totalSize);
+                                examined = buffer.GetPosition(totalSent);
+                                examinedOffset += totalSent - totalSize;
+
+                                // throw if there was a send failure
+                                if (sendEx != null)
+                                {
+                                    throw sendEx;
+                                }
+                            }
+                        }
+                        finally
+                        {
+                            ArrayPool<byte>.Shared.Return(bytes);
+                        }
+                    }
+                }
+                finally
+                {
+                    // Always examine to the end to potentially unblock writer
+                    pipeReader.AdvanceTo(consumed, examined);
+                }
+
+                if (result.IsCompleted)
+                {
+                    break;
+                }
+            }
         }
-        finally
+        catch (OperationCanceledException)
         {
-            _semLock.Release();
+            // Expected during shutdown
+        }
+        catch (InvalidOperationException)
+        {
+            // We might still be using the previous pipe reader which might be completed already
+        }
+        catch (Exception e)
+        {
+            logger.LogError(NatsLogEvents.Buffer, e, "Unexpected error in send buffer reader loop");
         }
     }
 
-    private async ValueTask ConnectStateMachineAsync(bool lockHeld, ClientOpts connectOpts, CancellationToken cancellationToken)
+    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
+    private async ValueTask PublishLockedAsync(string subject, string? replyTo, NatsPooledBufferWriter<byte> payloadBuffer, NatsPooledBufferWriter<byte>? headersBuffer, CancellationToken cancellationToken)
     {
-        if (!lockHeld)
-        {
-            if (!await _semLock.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
-            {
-                throw new TimeoutException();
-            }
-        }
-
+        var cancellationTimer = _ctPool.Start(_defaultCommandTimeout, cancellationToken);
+        await LockAsync(cancellationTimer.Token).ConfigureAwait(false);
         try
         {
+            var payload = payloadBuffer.WrittenMemory;
+            var headers = headersBuffer?.WrittenMemory;
+
             if (_disposed)
             {
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
-            if (_flushTask is { IsCompletedSuccessfully: false })
+            _protocolWriter.WritePublish(_pipeWriter, subject, replyTo, headers, payload);
+
+            payloadBuffer.Reset();
+            _pool.Return(payloadBuffer);
+
+            if (headersBuffer != null)
             {
-                await _flushTask.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
+                headersBuffer.Reset();
+                _pool.Return(headersBuffer);
             }
 
-            var success = false;
-            try
+            var size = (int)_pipeWriter.UnflushedBytes;
+            _channelSize.Writer.TryWrite(size);
+
+            var result = await _pipeWriter.FlushAsync(cancellationTimer.Token).ConfigureAwait(false);
+            if (result.IsCanceled)
             {
-                _protocolWriter.WriteConnect(connectOpts);
-                success = true;
-            }
-            finally
-            {
-                EnqueueCommand(success);
+                throw new OperationCanceledException();
             }
         }
         finally
         {
-            _semLock.Release();
+            await UnLockAsync().ConfigureAwait(false);
+            cancellationTimer.TryReturn();
         }
     }
 
-    private async ValueTask PingStateMachineAsync(bool lockHeld, PingCommand pingCommand, CancellationToken cancellationToken)
-    {
-        if (!lockHeld)
-        {
-            if (!await _semLock.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
-            {
-                throw new TimeoutException();
-            }
-        }
-
-        try
-        {
-            if (_disposed)
-            {
-                throw new ObjectDisposedException(nameof(CommandWriter));
-            }
-
-            if (_flushTask is { IsCompletedSuccessfully: false })
-            {
-                await _flushTask.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
-            }
-
-            var success = false;
-            try
-            {
-                _protocolWriter.WritePing();
-                _enqueuePing(pingCommand);
-                success = true;
-            }
-            finally
-            {
-                EnqueueCommand(success);
-            }
-        }
-        finally
-        {
-            _semLock.Release();
-        }
-    }
-
-    private async ValueTask PongStateMachineAsync(bool lockHeld, CancellationToken cancellationToken)
-    {
-        if (!lockHeld)
-        {
-            if (!await _semLock.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
-            {
-                throw new TimeoutException();
-            }
-        }
-
-        try
-        {
-            if (_disposed)
-            {
-                throw new ObjectDisposedException(nameof(CommandWriter));
-            }
-
-            if (_flushTask is { IsCompletedSuccessfully: false })
-            {
-                await _flushTask.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
-            }
-
-            var success = false;
-            try
-            {
-                _protocolWriter.WritePong();
-                success = true;
-            }
-            finally
-            {
-                EnqueueCommand(success);
-            }
-        }
-        finally
-        {
-            _semLock.Release();
-        }
-    }
-
-    private async ValueTask PublishStateMachineAsync<T>(bool lockHeld, string subject, T? value, NatsHeaders? headers, string? replyTo, INatsSerialize<T> serializer, CancellationToken cancellationToken)
-    {
-        if (!lockHeld)
-        {
-            if (!await _semLock.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
-            {
-                throw new TimeoutException();
-            }
-        }
-
-        try
-        {
-            if (_disposed)
-            {
-                throw new ObjectDisposedException(nameof(CommandWriter));
-            }
-
-            if (_flushTask is { IsCompletedSuccessfully: false })
-            {
-                await _flushTask.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
-            }
-
-            var trim = 0;
-            var success = false;
-            try
-            {
-                trim = _protocolWriter.WritePublish(subject, value, headers, replyTo, serializer);
-                success = true;
-            }
-            finally
-            {
-                EnqueueCommand(success, trim: trim);
-            }
-        }
-        finally
-        {
-            _semLock.Release();
-        }
-    }
-
-    private async ValueTask SubscribeStateMachineAsync(bool lockHeld, int sid, string subject, string? queueGroup, int? maxMsgs, CancellationToken cancellationToken)
-    {
-        if (!lockHeld)
-        {
-            if (!await _semLock.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
-            {
-                throw new TimeoutException();
-            }
-        }
-
-        try
-        {
-            if (_disposed)
-            {
-                throw new ObjectDisposedException(nameof(CommandWriter));
-            }
-
-            if (_flushTask is { IsCompletedSuccessfully: false })
-            {
-                await _flushTask.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
-            }
-
-            var success = false;
-            try
-            {
-                _protocolWriter.WriteSubscribe(sid, subject, queueGroup, maxMsgs);
-                success = true;
-            }
-            finally
-            {
-                EnqueueCommand(success);
-            }
-        }
-        finally
-        {
-            _semLock.Release();
-        }
-    }
-
-    private async ValueTask UnsubscribeStateMachineAsync(bool lockHeld, int sid, CancellationToken cancellationToken)
-    {
-        if (!lockHeld)
-        {
-            if (!await _semLock.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
-            {
-                throw new TimeoutException();
-            }
-        }
-
-        try
-        {
-            if (_disposed)
-            {
-                throw new ObjectDisposedException(nameof(CommandWriter));
-            }
-
-            if (_flushTask is { IsCompletedSuccessfully: false })
-            {
-                await _flushTask.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
-            }
-
-            var success = false;
-            try
-            {
-                _protocolWriter.WriteUnsubscribe(sid, null);
-                success = true;
-            }
-            finally
-            {
-                EnqueueCommand(success);
-            }
-        }
-        finally
-        {
-            _semLock.Release();
-        }
-    }
-
-    /// <summary>
-    /// Enqueues a command, and kicks off a flush
-    /// </summary>
-    /// <param name="success">
-    /// Whether the command was successful
-    /// If true, it will be sent on the wire
-    /// If false, it will be thrown out
-    /// </param>
-    /// <param name="trim">
-    /// Number of bytes to skip from beginning of message
-    /// when sending on the wire
-    /// </param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void EnqueueCommand(bool success, int trim = 0)
+    private async ValueTask LockAsync(CancellationToken cancellationToken)
     {
-        var size = (int)_pipeWriter.UnflushedBytes;
-        if (size == 0)
+        Interlocked.Increment(ref _counter.PendingMessages);
+        try
         {
-            // no unflushed bytes means no command was produced
-            _flushTask = null;
-            return;
+            await _channelLock.Writer.WriteAsync(1, cancellationToken).ConfigureAwait(false);
         }
-
-        if (success)
+        catch (TaskCanceledException)
         {
-            Interlocked.Add(ref _counter.PendingMessages, 1);
+            throw new OperationCanceledException();
         }
-
-        _queuedCommandsWriter.TryWrite(new QueuedCommand(Size: size, Trim: success ? trim : size));
-        var flush = _pipeWriter.FlushAsync();
-        _flushTask = flush.IsCompletedSuccessfully ? null : flush.AsTask();
-    }
-}
-
-internal sealed class PriorityCommandWriter : IAsyncDisposable
-{
-    private readonly NatsPipeliningWriteProtocolProcessor _natsPipeliningWriteProtocolProcessor;
-    private int _disposed;
-
-    public PriorityCommandWriter(ISocketConnection socketConnection, NatsOpts opts, ConnectionStatsCounter counter, Action<PingCommand> enqueuePing)
-    {
-        CommandWriter = new CommandWriter(opts, counter, enqueuePing, overrideCommandTimeout: TimeSpan.MaxValue);
-        _natsPipeliningWriteProtocolProcessor = CommandWriter.CreateNatsPipeliningWriteProtocolProcessor(socketConnection);
+        catch (ChannelClosedException)
+        {
+            throw new OperationCanceledException();
+        }
     }
 
-    public CommandWriter CommandWriter { get; }
-
-    public async ValueTask DisposeAsync()
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private ValueTask<int> UnLockAsync()
     {
-        if (Interlocked.Increment(ref _disposed) == 1)
-        {
-            // disposing command writer marks pipe writer as complete
-            await CommandWriter.DisposeAsync().ConfigureAwait(false);
-            try
-            {
-                // write loop will complete once pipe reader completes
-                await _natsPipeliningWriteProtocolProcessor.WriteLoop.ConfigureAwait(false);
-            }
-            finally
-            {
-                await _natsPipeliningWriteProtocolProcessor.DisposeAsync().ConfigureAwait(false);
-            }
-        }
+        Interlocked.Decrement(ref _counter.PendingMessages);
+        return _channelLock.Reader.ReadAsync(_cts.Token);
     }
 }

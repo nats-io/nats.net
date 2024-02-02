@@ -12,23 +12,19 @@ internal class HeaderWriter
     private const byte ByteColon = (byte)':';
     private const byte ByteSpace = (byte)' ';
     private const byte ByteDel = 127;
-    private readonly PipeWriter _pipeWriter;
+
     private readonly Encoding _encoding;
 
-    public HeaderWriter(PipeWriter pipeWriter, Encoding encoding)
-    {
-        _pipeWriter = pipeWriter;
-        _encoding = encoding;
-    }
+    public HeaderWriter(Encoding encoding) => _encoding = encoding;
 
     private static ReadOnlySpan<byte> CrLf => new[] { ByteCr, ByteLf };
 
     private static ReadOnlySpan<byte> ColonSpace => new[] { ByteColon, ByteSpace };
 
-    internal long Write(NatsHeaders headers)
+    internal long Write(IBufferWriter<byte> bufferWriter, NatsHeaders headers)
     {
-        var initialCount = _pipeWriter.UnflushedBytes;
-        _pipeWriter.WriteSpan(CommandConstants.NatsHeaders10NewLine);
+        bufferWriter.WriteSpan(CommandConstants.NatsHeaders10NewLine);
+        var len = CommandConstants.NatsHeaders10NewLine.Length;
 
         foreach (var kv in headers)
         {
@@ -38,7 +34,7 @@ internal class HeaderWriter
                 {
                     // write key
                     var keyLength = _encoding.GetByteCount(kv.Key);
-                    var keySpan = _pipeWriter.GetSpan(keyLength);
+                    var keySpan = bufferWriter.GetSpan(keyLength);
                     _encoding.GetBytes(kv.Key, keySpan);
                     if (!ValidateKey(keySpan.Slice(0, keyLength)))
                     {
@@ -46,20 +42,26 @@ internal class HeaderWriter
                             $"Invalid header key '{kv.Key}': contains colon, space, or other non-printable ASCII characters");
                     }
 
-                    _pipeWriter.Advance(keyLength);
-                    _pipeWriter.Write(ColonSpace);
+                    bufferWriter.Advance(keyLength);
+                    len += keyLength;
+
+                    bufferWriter.Write(ColonSpace);
+                    len += ColonSpace.Length;
 
                     // write values
                     var valueLength = _encoding.GetByteCount(value);
-                    var valueSpan = _pipeWriter.GetSpan(valueLength);
+                    var valueSpan = bufferWriter.GetSpan(valueLength);
                     _encoding.GetBytes(value, valueSpan);
                     if (!ValidateValue(valueSpan.Slice(0, valueLength)))
                     {
                         throw new NatsException($"Invalid header value for key '{kv.Key}': contains CRLF");
                     }
 
-                    _pipeWriter.Advance(valueLength);
-                    _pipeWriter.Write(CrLf);
+                    bufferWriter.Advance(valueLength);
+                    len += valueLength;
+
+                    bufferWriter.Write(CrLf);
+                    len += CrLf.Length;
                 }
             }
         }
@@ -67,9 +69,10 @@ internal class HeaderWriter
         // Even empty header needs to terminate.
         // We will send NATS/1.0 version line
         // even if there are no headers.
-        _pipeWriter.Write(CrLf);
+        bufferWriter.Write(CrLf);
+        len += CrLf.Length;
 
-        return _pipeWriter.UnflushedBytes - initialCount;
+        return len;
     }
 
     // cannot contain ASCII Bytes <=32, 58, or 127
