@@ -322,19 +322,18 @@ internal sealed class CommandWriter : IAsyncDisposable
 
                 var buffer = result.Buffer;
                 var consumed = buffer.Start;
-
-                buffer = buffer.Slice(examinedOffset);
-                var examined = buffer.Start;
+                var examined = buffer.GetPosition(examinedOffset);
 
                 try
                 {
                     if (!buffer.IsEmpty)
                     {
-                        var bufferLength = (int)buffer.Length;
+                        var readBuffer = buffer.Slice(examinedOffset);
+                        var bufferLength = (int)readBuffer.Length;
 
                         var bytes = ArrayPool<byte>.Shared.Rent(bufferLength);
-                        buffer.CopyTo(bytes);
-                        var memory = bytes.AsMemory(0, (int)buffer.Length);
+                        readBuffer.CopyTo(bytes);
+                        var memory = bytes.AsMemory(0, bufferLength);
 
                         try
                         {
