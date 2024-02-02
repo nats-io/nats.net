@@ -58,6 +58,7 @@ public class ConnectionRetryTest
     [Fact]
     public async Task Reconnect_doesnt_drop_partially_sent_msgs()
     {
+        const int msgSize = 1048576; // 1MiB
         await using var server = NatsServer.Start();
 
         await using var pubConn = server.CreateClientConnection();
@@ -86,6 +87,7 @@ public class ConnectionRetryTest
                     }
                     else
                     {
+                        Assert.Equal(msgSize, msg.Data.Length);
                         Interlocked.Increment(ref received);
                     }
                 }
@@ -99,7 +101,7 @@ public class ConnectionRetryTest
         }
 
         var sent = 0;
-        var data = new byte[1048576]; // 1MiB
+        var data = new byte[msgSize];
         var sendTask = Task.Run(async () =>
         {
             while (!stopCts.IsCancellationRequested)
