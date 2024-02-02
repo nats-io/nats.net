@@ -311,6 +311,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         try
         {
+            var examinedOffset = 0;
             while (true)
             {
                 var result = await pipeReader.ReadAsync(cancellationToken).ConfigureAwait(false);
@@ -321,7 +322,11 @@ internal sealed class CommandWriter : IAsyncDisposable
                 }
 
                 var buffer = result.Buffer;
-                var completed = buffer.Start;
+                var consumed = buffer.Start;
+
+                buffer = buffer.Slice(examinedOffset);
+                var examined = buffer.Start;
+
                 try
                 {
                     if (!buffer.IsEmpty)
@@ -334,7 +339,6 @@ internal sealed class CommandWriter : IAsyncDisposable
 
                         try
                         {
-                            completed = buffer.Start;
                             var totalSent = 0;
                             var totalSize = 0;
                             while (totalSent < bufferLength)
@@ -346,20 +350,28 @@ internal sealed class CommandWriter : IAsyncDisposable
 
                                 while (totalSize < totalSent)
                                 {
-                                    int size;
-                                    while (!channelSize.Reader.TryRead(out size))
+                                    int peek;
+                                    while (!channelSize.Reader.TryPeek(out peek))
                                     {
                                         await channelSize.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
                                     }
 
+                                    // Don't just mark the message as complete if we have more data to send
+                                    if (totalSize + peek > totalSent)
+                                    {
+                                        break;
+                                    }
+
+                                    var size = await channelSize.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+
                                     totalSize += size;
+                                    examinedOffset = 0;
                                 }
 
                                 // make sure to mark the buffer only at message boundaries.
-                                // if there was a message sent only partially, we consider it sent even if it might not be
-                                // due to a socket error in following socket send iteration. this is to avoid re-sending
-                                // the same message again, ensuring at-most-once delivery.
-                                completed = buffer.GetPosition(totalSize);
+                                consumed = buffer.GetPosition(totalSize);
+                                examined = buffer.GetPosition(totalSent);
+                                examinedOffset += totalSent - totalSize;
                             }
                         }
                         finally
@@ -371,7 +383,7 @@ internal sealed class CommandWriter : IAsyncDisposable
                 finally
                 {
                     // Always examine to the end to potentially unblock writer
-                    pipeReader.AdvanceTo(completed, buffer.End);
+                    pipeReader.AdvanceTo(consumed, examined);
                 }
 
                 if (result.IsCompleted)

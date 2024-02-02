@@ -131,6 +131,8 @@ public class ConnectionRetryTest
         Assert.True(reconnects > 0, "connection did not reconnect");
         Assert.True(received <= sent, $"duplicate messages sent on wire- {sent} sent, {received} received");
 
+        _output.WriteLine($"reconnects: {reconnects}, sent: {sent}, received: {received}");
+
         // some messages may still be lost, as socket could have been disconnected
         // after socket.WriteAsync returned, but before OS sent
         // check to ensure that the loss was < 1%
