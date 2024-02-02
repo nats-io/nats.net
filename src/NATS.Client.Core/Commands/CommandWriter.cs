@@ -1,5 +1,7 @@
 using System.Buffers;
 using System.IO.Pipelines;
+using System.Linq.Expressions;
+using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
@@ -323,12 +325,12 @@ internal sealed class CommandWriter : IAsyncDisposable
                 var buffer = result.Buffer;
                 var consumed = buffer.Start;
                 var examined = buffer.GetPosition(examinedOffset);
+                var readBuffer = buffer.Slice(examinedOffset);
 
                 try
                 {
-                    if (!buffer.IsEmpty)
+                    if (!buffer.IsEmpty && !readBuffer.IsEmpty)
                     {
-                        var readBuffer = buffer.Slice(examinedOffset);
                         var bufferLength = (int)readBuffer.Length;
 
                         var bytes = ArrayPool<byte>.Shared.Rent(bufferLength);
@@ -341,7 +343,15 @@ internal sealed class CommandWriter : IAsyncDisposable
                             var totalSize = 0;
                             while (totalSent < bufferLength)
                             {
-                                var sent = await connection.SendAsync(memory).ConfigureAwait(false);
+                                int sent;
+                                try
+                                {
+                                    sent = await connection.SendAsync(memory).ConfigureAwait(false);
+                                }
+                                catch (SocketException)
+                                {
+                                    break;
+                                }
 
                                 totalSent += sent;
                                 memory = memory[sent..];
