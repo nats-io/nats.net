@@ -500,6 +500,8 @@ public partial class NatsConnection : INatsConnection
             // If dispose this client, WaitForClosed throws OperationCanceledException so stop reconnect-loop correctly.
             await _socket!.WaitForClosed.ConfigureAwait(false);
 
+            await CommandWriter.FlushAsync().ConfigureAwait(false);
+
             _logger.LogTrace(NatsLogEvents.Connection, "Connection {Name} is closed. Will cleanup and reconnect", _name);
             lock (_gate)
             {
@@ -801,7 +803,7 @@ public partial class NatsConnection : INatsConnection
     private async ValueTask DisposeSocketAsync(bool asyncReaderDispose)
     {
         // writer's internal buffer/channel is not thread-safe, must wait until complete.
-        CommandWriter.Reset(_socket);
+        await CommandWriter.FlushAsync().ConfigureAwait(false);
 
         if (_socket != null)
         {
