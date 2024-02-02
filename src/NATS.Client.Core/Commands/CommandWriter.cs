@@ -1,7 +1,5 @@
 using System.Buffers;
 using System.IO.Pipelines;
-using System.Linq.Expressions;
-using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
@@ -20,6 +18,9 @@ namespace NATS.Client.Core.Commands;
 /// </remarks>
 internal sealed class CommandWriter : IAsyncDisposable
 {
+    // set to a reasonable socket write mem size
+    private const int MaxSendSize = 16384;
+
     private readonly ILogger<CommandWriter> _logger;
     private readonly ObjectPool _pool;
     private readonly int _arrayPoolInitialSize;
@@ -36,6 +37,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     private readonly PipeReader _pipeReader;
     private readonly PipeWriter _pipeWriter;
     private ISocketConnection? _socketConnection;
+    private Task? _flushTask;
     private Task? _readerLoopTask;
     private CancellationTokenSource? _ctsReader;
     private volatile bool _disposed;
@@ -150,16 +152,16 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
+            if (_flushTask is { IsCompletedSuccessfully: false })
+            {
+                await _flushTask.WaitAsync(cancellationTimer.Token).ConfigureAwait(false);
+            }
+
             _protocolWriter.WriteConnect(_pipeWriter, connectOpts);
 
-            var size = (int)_pipeWriter.UnflushedBytes;
-            _channelSize.Writer.TryWrite(size);
-
-            var result = await _pipeWriter.FlushAsync(cancellationTimer.Token).ConfigureAwait(false);
-            if (result.IsCanceled)
-            {
-                throw new OperationCanceledException();
-            }
+            _channelSize.Writer.TryWrite((int)_pipeWriter.UnflushedBytes);
+            var flush = _pipeWriter.FlushAsync(CancellationToken.None);
+            _flushTask = flush.IsCompletedSuccessfully ? null : flush.AsTask();
         }
         finally
         {
@@ -179,18 +181,17 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
-            _enqueuePing(pingCommand);
+            if (_flushTask is { IsCompletedSuccessfully: false })
+            {
+                await _flushTask.WaitAsync(cancellationTimer.Token).ConfigureAwait(false);
+            }
 
+            _enqueuePing(pingCommand);
             _protocolWriter.WritePing(_pipeWriter);
 
-            var size = (int)_pipeWriter.UnflushedBytes;
-            _channelSize.Writer.TryWrite(size);
-
-            var result = await _pipeWriter.FlushAsync(cancellationTimer.Token).ConfigureAwait(false);
-            if (result.IsCanceled)
-            {
-                throw new OperationCanceledException();
-            }
+            _channelSize.Writer.TryWrite((int)_pipeWriter.UnflushedBytes);
+            var flush = _pipeWriter.FlushAsync(CancellationToken.None);
+            _flushTask = flush.IsCompletedSuccessfully ? null : flush.AsTask();
         }
         finally
         {
@@ -210,16 +211,16 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
+            if (_flushTask is { IsCompletedSuccessfully: false })
+            {
+                await _flushTask.WaitAsync(cancellationTimer.Token).ConfigureAwait(false);
+            }
+
             _protocolWriter.WritePong(_pipeWriter);
 
-            var size = (int)_pipeWriter.UnflushedBytes;
-            _channelSize.Writer.TryWrite(size);
-
-            var result = await _pipeWriter.FlushAsync(cancellationTimer.Token).ConfigureAwait(false);
-            if (result.IsCanceled)
-            {
-                throw new OperationCanceledException();
-            }
+            _channelSize.Writer.TryWrite((int)_pipeWriter.UnflushedBytes);
+            var flush = _pipeWriter.FlushAsync(CancellationToken.None);
+            _flushTask = flush.IsCompletedSuccessfully ? null : flush.AsTask();
         }
         finally
         {
@@ -258,16 +259,16 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
+            if (_flushTask is { IsCompletedSuccessfully: false })
+            {
+                await _flushTask.WaitAsync(cancellationTimer.Token).ConfigureAwait(false);
+            }
+
             _protocolWriter.WriteSubscribe(_pipeWriter, sid, subject, queueGroup, maxMsgs);
 
-            var size = (int)_pipeWriter.UnflushedBytes;
-            _channelSize.Writer.TryWrite(size);
-
-            var result = await _pipeWriter.FlushAsync(cancellationTimer.Token).ConfigureAwait(false);
-            if (result.IsCanceled)
-            {
-                throw new OperationCanceledException();
-            }
+            _channelSize.Writer.TryWrite((int)_pipeWriter.UnflushedBytes);
+            var flush = _pipeWriter.FlushAsync(CancellationToken.None);
+            _flushTask = flush.IsCompletedSuccessfully ? null : flush.AsTask();
         }
         finally
         {
@@ -287,16 +288,16 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
+            if (_flushTask is { IsCompletedSuccessfully: false })
+            {
+                await _flushTask.WaitAsync(cancellationTimer.Token).ConfigureAwait(false);
+            }
+
             _protocolWriter.WriteUnsubscribe(_pipeWriter, sid, maxMsgs);
 
-            var size = (int)_pipeWriter.UnflushedBytes;
-            _channelSize.Writer.TryWrite(size);
-
-            var result = await _pipeWriter.FlushAsync(cancellationTimer.Token).ConfigureAwait(false);
-            if (result.IsCanceled)
-            {
-                throw new OperationCanceledException();
-            }
+            _channelSize.Writer.TryWrite((int)_pipeWriter.UnflushedBytes);
+            var flush = _pipeWriter.FlushAsync(CancellationToken.None);
+            _flushTask = flush.IsCompletedSuccessfully ? null : flush.AsTask();
         }
         finally
         {
@@ -343,14 +344,26 @@ internal sealed class CommandWriter : IAsyncDisposable
                             var totalSize = 0;
                             while (totalSent < bufferLength)
                             {
+                                var sendMemory = memory;
+                                if (sendMemory.Length > MaxSendSize)
+                                {
+                                    // cap the send size, the OS can only handle so much in a send buffer at a time
+                                    // also if the send fails, we have to throw this many bytes away
+                                    sendMemory = memory[..MaxSendSize];
+                                }
+
                                 int sent;
+                                Exception? sendEx = null;
                                 try
                                 {
-                                    sent = await connection.SendAsync(memory).ConfigureAwait(false);
+                                    sent = await connection.SendAsync(sendMemory).ConfigureAwait(false);
                                 }
-                                catch (SocketException)
+                                catch (Exception ex)
                                 {
-                                    break;
+                                    // we have no idea how many bytes were actually sent, so we have to assume they all were
+                                    // this could result in message loss, but is consistent with at-most once delivery
+                                    sendEx = ex;
+                                    sent = sendMemory.Length;
                                 }
 
                                 totalSent += sent;
@@ -361,6 +374,7 @@ internal sealed class CommandWriter : IAsyncDisposable
                                     int peek;
                                     while (!channelSize.Reader.TryPeek(out peek))
                                     {
+                                        // should never happen; channel sizes are written before flush is called
                                         await channelSize.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
                                     }
 
@@ -370,7 +384,12 @@ internal sealed class CommandWriter : IAsyncDisposable
                                         break;
                                     }
 
-                                    var size = await channelSize.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                                    int size;
+                                    while (!channelSize.Reader.TryRead(out size))
+                                    {
+                                        // should never happen; channel sizes are written before flush is called (plus we just peeked)
+                                        await channelSize.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
+                                    }
 
                                     totalSize += size;
                                     examinedOffset = 0;
@@ -380,6 +399,12 @@ internal sealed class CommandWriter : IAsyncDisposable
                                 consumed = buffer.GetPosition(totalSize);
                                 examined = buffer.GetPosition(totalSent);
                                 examinedOffset += totalSent - totalSize;
+
+                                // throw if there was a send failure
+                                if (sendEx != null)
+                                {
+                                    throw sendEx;
+                                }
                             }
                         }
                         finally
