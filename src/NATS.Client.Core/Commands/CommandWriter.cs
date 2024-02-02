@@ -135,7 +135,6 @@ internal sealed class CommandWriter : IAsyncDisposable
 
         if (readerTask != null)
             await readerTask.ConfigureAwait(false);
-
     }
 
     public async ValueTask ConnectAsync(ClientOpts connectOpts, CancellationToken cancellationToken)
