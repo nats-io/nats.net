@@ -196,7 +196,10 @@ public class ServicesTests
         await using var s2 = await svc.AddServiceAsync(
             new NatsSvcConfig("s2", "2.0.0")
             {
-                Description = "es-two", QueueGroup = "q2", Metadata = new Dictionary<string, string> { { "k1", "v1" }, { "k2", "v2" }, }, StatsHandler = ep => JsonNode.Parse($"{{\"stat-k1\":\"stat-v1\",\"stat-k2\":\"stat-v2\",\"ep_name\": \"{ep.Name}\"}}")!,
+                Description = "es-two",
+                QueueGroup = "q2",
+                Metadata = new Dictionary<string, string> { { "k1", "v1" }, { "k2", "v2" }, },
+                StatsHandler = ep => JsonNode.Parse($"{{\"stat-k1\":\"stat-v1\",\"stat-k2\":\"stat-v2\",\"ep_name\": \"{ep.Name}\"}}")!,
             },
             cancellationToken: cancellationToken);
 
