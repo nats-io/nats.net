@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using NATS.Client.Core.Tests;
 using NATS.Client.Services.Internal;
 using NATS.Client.Services.Models;
@@ -321,5 +322,32 @@ public class ServicesTests
         response = await nats.RequestAsync<int, int>("e1", 999, cancellationToken: cancellationToken);
         Assert.Equal("999", response.Headers?["Nats-Service-Error-Code"]);
         Assert.Equal("Missing 'foo' header", response.Headers?["Nats-Service-Error"]);
+    }
+
+    [Fact]
+    public async Task Service_started_time()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(200));
+        var cancellationToken = cts.Token;
+
+        await using var server = NatsServer.Start();
+        await using var nats = server.CreateClientConnection();
+        var svc = new NatsSvcContext(nats);
+
+        await using var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
+
+        await s1.AddEndpointAsync<int>(
+            name: "e1",
+            handler: async m =>
+            {
+                await m.ReplyAsync(m.Data, cancellationToken: cancellationToken);
+            },
+            cancellationToken: cancellationToken);
+
+        var stats = s1.GetStats();
+
+        // Match: 2021-09-01T12:34:56.1234567Z
+        var formatRegex = new Regex(@"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{7}Z$");
+        Assert.Matches(formatRegex, stats.Started);
     }
 }
