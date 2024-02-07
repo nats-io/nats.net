@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using NATS.Client.JetStream.Models;
 
@@ -209,32 +208,4 @@ public partial class NatsJSContext
             offset += response.Streams.Count;
         }
     }
-
-    internal static void ThrowIfInvalidStreamName([NotNull] string? name, [CallerArgumentExpression("name")] string? paramName = null)
-    {
-#if NET8_0_OR_GREATER
-        ArgumentNullException.ThrowIfNullOrEmpty(name);
-#else
-        ArgumentNullException.ThrowIfNull(name, paramName);
-
-        if (name.Length == 0)
-        {
-            ThrowEmptyException(paramName);
-        }
-#endif
-
-        var nameSpan = name.AsSpan();
-        if (nameSpan.IndexOfAny(" .") >= 0)
-        {
-            ThrowInvalidStreamNameException(paramName);
-        }
-    }
-
-    [DoesNotReturn]
-    private static void ThrowInvalidStreamNameException(string? paramName) =>
-        throw new ArgumentException("Stream name cannot contain '', or '.'.", paramName);
-
-    [DoesNotReturn]
-    private static void ThrowEmptyException(string? paramName) =>
-        throw new ArgumentException("The value cannot be an empty string.", paramName);
 }
