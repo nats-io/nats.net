@@ -9,17 +9,11 @@ public class JetStreamTest
 
     public JetStreamTest(ITestOutputHelper output) => _output = output;
 
-    [Fact]
-    public void Invalid_stream_validation_test()
-    {
-        Assert.Throws<ArgumentNullException>(() => NatsJSContext.ThrowIfInvalidStreamName(null!));
-        Assert.Throws<ArgumentException>(() => NatsJSContext.ThrowIfInvalidStreamName("Invalid.DotName"));
-        Assert.Throws<ArgumentException>(() => NatsJSContext.ThrowIfInvalidStreamName("Invalid SpaceName"));
-    }
-
     [Theory]
     [InlineData("Invalid.DotName")]
     [InlineData("Invalid SpaceName")]
+    [InlineData("Invalid*StarName")]
+    [InlineData("Invalid>WildcardName")]
     [InlineData(null)]
     public async Task Stream_invalid_name_test(string? streamName)
     {
