@@ -29,7 +29,7 @@ public class MockServer : IAsyncDisposable
                 var stream = client.GetStream();
 
                 var sw = new StreamWriter(stream, Encoding.ASCII);
-                await sw.WriteAsync("INFO {}\r\n");
+                await sw.WriteAsync("INFO {\"max_payload\":1048576}\r\n");
                 await sw.FlushAsync();
 
                 var sr = new StreamReader(stream, Encoding.ASCII);

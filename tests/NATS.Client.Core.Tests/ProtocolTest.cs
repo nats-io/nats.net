@@ -415,6 +415,80 @@ public class ProtocolTest
         counts.Count.Should().BeGreaterOrEqualTo(3);
     }
 
+    [Fact]
+    public async Task Proactively_reject_payloads_over_the_threshold_set_by_server()
+    {
+        await using var server = NatsServer.Start();
+        await using var nats = server.CreateClientConnection();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        var sync = 0;
+        var count = 0;
+        var signal1 = new WaitSignal<NatsMsg<byte[]>>();
+        var signal2 = new WaitSignal<NatsMsg<byte[]>>();
+        var subTask = Task.Run(
+            async () =>
+            {
+                await foreach (var m in nats.SubscribeAsync<byte[]>("foo.*", cancellationToken: cts.Token))
+                {
+                    if (m.Subject == "foo.sync")
+                    {
+                        Interlocked.Exchange(ref sync, 1);
+                        continue;
+                    }
+
+                    Interlocked.Increment(ref count);
+
+                    if (m.Subject == "foo.signal1")
+                    {
+                        signal1.Pulse(m);
+                    }
+                    else if (m.Subject == "foo.signal2")
+                    {
+                        signal2.Pulse(m);
+                    }
+                    else if (m.Subject == "foo.end")
+                    {
+                        break;
+                    }
+                }
+            },
+            cancellationToken: cts.Token);
+
+        await Retry.Until(
+            reason: "subscription is active",
+            condition: () => Volatile.Read(ref sync) == 1,
+            action: async () => await nats.PublishAsync("foo.sync", cancellationToken: cts.Token),
+            retryDelay: TimeSpan.FromSeconds(.3));
+        {
+            var payload = new byte[nats.ServerInfo!.MaxPayload];
+            await nats.PublishAsync("foo.signal1", payload, cancellationToken: cts.Token);
+            var msg1 = await signal1;
+            Assert.Equal(payload.Length, msg1.Data!.Length);
+        }
+
+        {
+            var payload = new byte[nats.ServerInfo!.MaxPayload + 1];
+            var exception = await Assert.ThrowsAsync<NatsException>(async () =>
+                await nats.PublishAsync("foo.none", payload, cancellationToken: cts.Token));
+            Assert.Matches(@"Payload size \d+ exceeds server's maximum payload size \d+", exception.Message);
+        }
+
+        {
+            var payload = new byte[123];
+            await nats.PublishAsync("foo.signal2", payload, cancellationToken: cts.Token);
+            var msg1 = await signal2;
+            Assert.Equal(payload.Length, msg1.Data!.Length);
+        }
+
+        await nats.PublishAsync("foo.end", cancellationToken: cts.Token);
+
+        await subTask;
+
+        Assert.Equal(3, Volatile.Read(ref count));
+    }
+
     private sealed class NatsSubReconnectTest : NatsSubBase
     {
         private readonly Action<int> _callback;
