@@ -33,7 +33,7 @@ public class ConsumerConsumeTest
         // List consumers
         await Assert.ThrowsAnyAsync<ArgumentException>(async () =>
         {
-            await foreach (var _ in jsmContext.ListConsumersAsync(streamName!, CancellationToken.None))
+            await foreach (var unused in jsmContext.ListConsumersAsync(streamName!, CancellationToken.None))
             {
             }
         });
@@ -41,7 +41,7 @@ public class ConsumerConsumeTest
         // List consumer names
         await Assert.ThrowsAnyAsync<ArgumentException>(async () =>
         {
-            await foreach (var _ in jsmContext.ListConsumerNamesAsync(streamName!, CancellationToken.None))
+            await foreach (var unused in jsmContext.ListConsumerNamesAsync(streamName!, CancellationToken.None))
             {
             }
         });
