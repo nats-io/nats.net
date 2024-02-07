@@ -21,7 +21,7 @@ public class JetStreamTest
     [InlineData("Invalid.DotName")]
     [InlineData("Invalid SpaceName")]
     [InlineData(null)]
-    public async Task Invalid_stream_invalid_name_test(string? streamName)
+    public async Task Stream_invalid_name_test(string? streamName)
     {
         var jsmContext = new NatsJSContext(new NatsConnection());
 
