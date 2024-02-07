@@ -32,7 +32,7 @@ public partial class NatsConnection : INatsConnection
     public Func<(string Host, int Port), ValueTask<(string Host, int Port)>>? OnConnectingAsync;
 
     internal readonly ConnectionStatsCounter Counter; // allow to call from external sources
-    internal ServerInfo? WritableServerInfo;
+    internal volatile ServerInfo? WritableServerInfo;
     internal bool IsDisposed;
 
 #pragma warning restore SA1401
@@ -79,7 +79,7 @@ public partial class NatsConnection : INatsConnection
         _cancellationTimerPool = new CancellationTimerPool(_pool, _disposedCancellationTokenSource.Token);
         _name = opts.Name;
         Counter = new ConnectionStatsCounter();
-        CommandWriter = new CommandWriter(_pool, Opts, Counter, EnqueuePing);
+        CommandWriter = new CommandWriter(this, _pool, Opts, Counter, EnqueuePing);
         InboxPrefix = NewInbox(opts.InboxPrefix);
         SubscriptionManager = new SubscriptionManager(this, InboxPrefix);
         _logger = opts.LoggerFactory.CreateLogger<NatsConnection>();
@@ -431,7 +431,7 @@ public partial class NatsConnection : INatsConnection
             // Authentication
             _userCredentials?.Authenticate(_clientOpts, WritableServerInfo);
 
-            await using (var priorityCommandWriter = new PriorityCommandWriter(_pool, _socket!, Opts, Counter, EnqueuePing))
+            await using (var priorityCommandWriter = new PriorityCommandWriter(this, _pool, _socket!, Opts, Counter, EnqueuePing))
             {
                 // add CONNECT and PING command to priority lane
                 await priorityCommandWriter.CommandWriter.ConnectAsync(_clientOpts, CancellationToken.None).ConfigureAwait(false);

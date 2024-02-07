@@ -22,6 +22,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     private const int MaxSendSize = 16384;
 
     private readonly ILogger<CommandWriter> _logger;
+    private readonly NatsConnection _connection;
     private readonly ObjectPool _pool;
     private readonly int _arrayPoolInitialSize;
     private readonly object _lock = new();
@@ -42,9 +43,10 @@ internal sealed class CommandWriter : IAsyncDisposable
     private CancellationTokenSource? _ctsReader;
     private volatile bool _disposed;
 
-    public CommandWriter(ObjectPool pool, NatsOpts opts, ConnectionStatsCounter counter, Action<PingCommand> enqueuePing, TimeSpan? overrideCommandTimeout = default)
+    public CommandWriter(NatsConnection connection, ObjectPool pool, NatsOpts opts, ConnectionStatsCounter counter, Action<PingCommand> enqueuePing, TimeSpan? overrideCommandTimeout = default)
     {
         _logger = opts.LoggerFactory.CreateLogger<CommandWriter>();
+        _connection = connection;
         _pool = pool;
 
         // Derive ArrayPool rent size from buffer size to
@@ -245,6 +247,12 @@ internal sealed class CommandWriter : IAsyncDisposable
         if (value != null)
             serializer.Serialize(payloadBuffer, value);
 
+        var size = payloadBuffer.WrittenMemory.Length + (headersBuffer?.WrittenMemory.Length ?? 0);
+        if (_connection.ServerInfo is { } info && size > info.MaxPayload)
+        {
+            ThrowOnMaxPayload(size, info.MaxPayload);
+        }
+
         return PublishLockedAsync(subject, replyTo, payloadBuffer, headersBuffer, cancellationToken);
     }
 
@@ -308,6 +316,9 @@ internal sealed class CommandWriter : IAsyncDisposable
 
     // only used for internal testing
     internal bool TestStallFlush() => _channelLock.Writer.TryWrite(1);
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void ThrowOnMaxPayload(int size, int max) => throw new NatsException($"Payload size {size} exceeds server's maximum payload size {max}");
 
     private static async Task ReaderLoopAsync(ILogger<CommandWriter> logger, ISocketConnection connection, PipeReader pipeReader, Channel<int> channelSize, CancellationToken cancellationToken)
     {
