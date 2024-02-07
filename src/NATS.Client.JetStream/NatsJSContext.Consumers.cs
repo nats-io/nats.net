@@ -14,11 +14,14 @@ public partial class NatsJSContext : INatsJSContext
     /// <param name="opts">Ordered consumer options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>The NATS JetStream consumer object which can be used retrieving ordered data from the stream.</returns>
+    /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
+    /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
     public ValueTask<INatsJSConsumer> CreateOrderedConsumerAsync(
         string stream,
         NatsJSOrderedConsumerOpts? opts = default,
         CancellationToken cancellationToken = default)
     {
+        ThrowIfInvalidStreamName(stream);
         opts ??= NatsJSOrderedConsumerOpts.Default;
         return new ValueTask<INatsJSConsumer>(new NatsJSOrderedConsumer(stream, this, opts, cancellationToken));
     }
@@ -29,6 +32,8 @@ public partial class NatsJSContext : INatsJSContext
         ConsumerConfig config,
         CancellationToken cancellationToken = default)
     {
+        ThrowIfInvalidStreamName(stream);
+
         // TODO: Adjust API subject according to server version and filter subject
         var subject = $"{Opts.Prefix}.CONSUMER.CREATE.{stream}";
 
@@ -64,8 +69,11 @@ public partial class NatsJSContext : INatsJSContext
     /// <returns>The NATS JetStream consumer object which can be used retrieving data from the stream.</returns>
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
+    /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
     public async ValueTask<INatsJSConsumer> GetConsumerAsync(string stream, string consumer, CancellationToken cancellationToken = default)
     {
+        ThrowIfInvalidStreamName(stream);
         var response = await JSRequestResponseAsync<object, ConsumerInfo>(
             subject: $"{Opts.Prefix}.CONSUMER.INFO.{stream}.{consumer}",
             request: null,
@@ -78,6 +86,7 @@ public partial class NatsJSContext : INatsJSContext
         string stream,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        ThrowIfInvalidStreamName(stream);
         var offset = 0;
         while (!cancellationToken.IsCancellationRequested)
         {
@@ -103,6 +112,7 @@ public partial class NatsJSContext : INatsJSContext
         string stream,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        ThrowIfInvalidStreamName(stream);
         var offset = 0;
         while (!cancellationToken.IsCancellationRequested)
         {
@@ -130,8 +140,11 @@ public partial class NatsJSContext : INatsJSContext
     /// <returns>Whether the deletion was successful.</returns>
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
+    /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
     public async ValueTask<bool> DeleteConsumerAsync(string stream, string consumer, CancellationToken cancellationToken = default)
     {
+        ThrowIfInvalidStreamName(stream);
         var response = await JSRequestResponseAsync<object, ConsumerDeleteResponse>(
             subject: $"{Opts.Prefix}.CONSUMER.DELETE.{stream}.{consumer}",
             request: null,
