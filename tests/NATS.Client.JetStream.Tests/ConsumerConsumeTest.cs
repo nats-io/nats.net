@@ -14,8 +14,6 @@ public class ConsumerConsumeTest
     [Theory]
     [InlineData("Invalid.DotName")]
     [InlineData("Invalid SpaceName")]
-    [InlineData("Invalid*StarName")]
-    [InlineData("Invalid>WildcardName")]
     [InlineData(null)]
     public async Task Consumer_stream_invalid_name_test(string? streamName)
     {

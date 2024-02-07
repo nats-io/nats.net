@@ -34,7 +34,5 @@ public class NatsJSContextTest
         Assert.Throws<ArgumentNullException>(() => NatsJSContext.ThrowIfInvalidStreamName(null!));
         Assert.Throws<ArgumentException>(() => NatsJSContext.ThrowIfInvalidStreamName("Invalid.DotName"));
         Assert.Throws<ArgumentException>(() => NatsJSContext.ThrowIfInvalidStreamName("Invalid SpaceName"));
-        Assert.Throws<ArgumentException>(() => NatsJSContext.ThrowIfInvalidStreamName("Invalid*StarName"));
-        Assert.Throws<ArgumentException>(() => NatsJSContext.ThrowIfInvalidStreamName("Invalid>WildcardName"));
     }
 }

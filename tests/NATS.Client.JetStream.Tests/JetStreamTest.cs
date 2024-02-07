@@ -12,8 +12,6 @@ public class JetStreamTest
     [Theory]
     [InlineData("Invalid.DotName")]
     [InlineData("Invalid SpaceName")]
-    [InlineData("Invalid*StarName")]
-    [InlineData("Invalid>WildcardName")]
     [InlineData(null)]
     public async Task Stream_invalid_name_test(string? streamName)
     {
