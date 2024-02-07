@@ -187,7 +187,7 @@ public partial class NatsJSContext
 #endif
 
         var nameSpan = name.AsSpan();
-        if (nameSpan.IndexOfAny(" .*>") >= 0)
+        if (nameSpan.IndexOfAny(" .") >= 0)
         {
             ThrowInvalidStreamNameException(paramName);
         }
@@ -261,7 +261,7 @@ public partial class NatsJSContext
 
     [DoesNotReturn]
     private static void ThrowInvalidStreamNameException(string? paramName) =>
-        throw new ArgumentException("Stream name cannot contain ' ', '.', '*' or '>'", paramName);
+        throw new ArgumentException("Stream name cannot contain ' ', '.'", paramName);
 
     [DoesNotReturn]
     private static void ThrowEmptyException(string? paramName) =>
