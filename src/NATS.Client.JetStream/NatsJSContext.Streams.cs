@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using NATS.Client.JetStream.Models;
 
@@ -13,11 +14,13 @@ public partial class NatsJSContext
     /// <returns>The NATS JetStream stream object which can be used to manage the stream.</returns>
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <exception cref="ArgumentException">The stream name in <paramref name="config"/> is invalid.</exception>
+    /// <exception cref="ArgumentNullException">The name in <paramref name="config"/> is <c>null</c>.</exception>
     public async ValueTask<INatsJSStream> CreateStreamAsync(
         StreamConfig config,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(config.Name, nameof(config.Name));
+        ThrowIfInvalidStreamName(config.Name, nameof(config.Name));
         var response = await JSRequestResponseAsync<StreamConfig, StreamInfo>(
             subject: $"{Opts.Prefix}.STREAM.CREATE.{config.Name}",
             config,
@@ -33,10 +36,13 @@ public partial class NatsJSContext
     /// <returns>Whether delete was successful or not.</returns>
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
+    /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
     public async ValueTask<bool> DeleteStreamAsync(
         string stream,
         CancellationToken cancellationToken = default)
     {
+        ThrowIfInvalidStreamName(stream);
         var response = await JSRequestResponseAsync<object, StreamMsgDeleteResponse>(
             subject: $"{Opts.Prefix}.STREAM.DELETE.{stream}",
             request: null,
@@ -53,11 +59,14 @@ public partial class NatsJSContext
     /// <returns>Purge response</returns>
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
+    /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
     public async ValueTask<StreamPurgeResponse> PurgeStreamAsync(
         string stream,
         StreamPurgeRequest request,
         CancellationToken cancellationToken = default)
     {
+        ThrowIfInvalidStreamName(stream);
         var response = await JSRequestResponseAsync<StreamPurgeRequest, StreamPurgeResponse>(
             subject: $"{Opts.Prefix}.STREAM.PURGE.{stream}",
             request: request,
@@ -74,11 +83,14 @@ public partial class NatsJSContext
     /// <returns>Delete message response</returns>
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
+    /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
     public async ValueTask<StreamMsgDeleteResponse> DeleteMessageAsync(
         string stream,
         StreamMsgDeleteRequest request,
         CancellationToken cancellationToken = default)
     {
+        ThrowIfInvalidStreamName(stream);
         var response = await JSRequestResponseAsync<StreamMsgDeleteRequest, StreamMsgDeleteResponse>(
             subject: $"{Opts.Prefix}.STREAM.MSG.DELETE.{stream}",
             request: request,
@@ -95,11 +107,14 @@ public partial class NatsJSContext
     /// <returns>The NATS JetStream stream object which can be used to manage the stream.</returns>
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
+    /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
     public async ValueTask<INatsJSStream> GetStreamAsync(
         string stream,
         StreamInfoRequest? request = null,
         CancellationToken cancellationToken = default)
     {
+        ThrowIfInvalidStreamName(stream);
         var response = await JSRequestResponseAsync<StreamInfoRequest, StreamInfoResponse>(
             subject: $"{Opts.Prefix}.STREAM.INFO.{stream}",
             request: request,
@@ -115,11 +130,13 @@ public partial class NatsJSContext
     /// <returns>The updated NATS JetStream stream object.</returns>
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <exception cref="ArgumentException">The stream name in <paramref name="request"/> is invalid.</exception>
+    /// <exception cref="ArgumentNullException">The name in <paramref name="request"/> is <c>null</c>.</exception>
     public async ValueTask<NatsJSStream> UpdateStreamAsync(
         StreamConfig request,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(request.Name, nameof(request.Name));
+        ThrowIfInvalidStreamName(request.Name, nameof(request.Name));
         var response = await JSRequestResponseAsync<StreamConfig, StreamUpdateResponse>(
             subject: $"{Opts.Prefix}.STREAM.UPDATE.{request.Name}",
             request: request,
@@ -192,4 +209,32 @@ public partial class NatsJSContext
             offset += response.Streams.Count;
         }
     }
+
+    internal static void ThrowIfInvalidStreamName([NotNull] string? name, [CallerArgumentExpression("name")] string? paramName = null)
+    {
+#if NET8_0_OR_GREATER
+        ArgumentNullException.ThrowIfNullOrEmpty(name);
+#else
+        ArgumentNullException.ThrowIfNull(name, paramName);
+
+        if (name.Length == 0)
+        {
+            ThrowEmptyException(paramName);
+        }
+#endif
+
+        var nameSpan = name.AsSpan();
+        if (nameSpan.IndexOfAny(" .") >= 0)
+        {
+            ThrowInvalidStreamNameException(paramName);
+        }
+    }
+
+    [DoesNotReturn]
+    private static void ThrowInvalidStreamNameException(string? paramName) =>
+        throw new ArgumentException("Stream name cannot contain '', or '.'.", paramName);
+
+    [DoesNotReturn]
+    private static void ThrowEmptyException(string? paramName) =>
+        throw new ArgumentException("The value cannot be an empty string.", paramName);
 }
