@@ -461,7 +461,6 @@ public class ProtocolTest
             condition: () => Volatile.Read(ref sync) == 1,
             action: async () => await nats.PublishAsync("foo.sync", cancellationToken: cts.Token),
             retryDelay: TimeSpan.FromSeconds(.3));
-
         {
             var payload = new byte[nats.ServerInfo!.MaxPayload];
             await nats.PublishAsync("foo.signal1", payload, cancellationToken: cts.Token);
