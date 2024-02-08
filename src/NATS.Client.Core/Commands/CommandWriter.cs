@@ -43,7 +43,6 @@ internal sealed class CommandWriter : IAsyncDisposable
     private readonly PipeReader _pipeReader;
     private readonly PipeWriter _pipeWriter;
     private readonly SemaphoreSlim _semLock = new(1);
-    private readonly PartialSendFailureCounter _partialSendFailureCounter = new();
     private ISocketConnection? _socketConnection;
     private Task? _flushTask;
     private Task? _readerLoopTask;
@@ -93,7 +92,6 @@ internal sealed class CommandWriter : IAsyncDisposable
                     _pipeReader,
                     _channelSize,
                     _consolidateMem,
-                    _partialSendFailureCounter,
                     _ctsReader.Token)
                 .ConfigureAwait(false);
             });
@@ -431,7 +429,6 @@ internal sealed class CommandWriter : IAsyncDisposable
         PipeReader pipeReader,
         Channel<int> channelSize,
         Memory<byte> consolidateMem,
-        PartialSendFailureCounter partialSendFailureCounter,
         CancellationToken cancellationToken)
     {
         try
@@ -468,29 +465,23 @@ internal sealed class CommandWriter : IAsyncDisposable
                             sendMem = consolidateMem[..consolidateLen];
                         }
 
-                        Exception? sendEx = null;
                         int sent;
                         try
                         {
                             sent = await connection.SendAsync(sendMem).ConfigureAwait(false);
                         }
-                        catch (Exception ex)
+                        catch
                         {
                             // we have no idea how many bytes were actually sent, so we have to assume they all were
                             // this could result in message loss, but is consistent with at-most once delivery
-                            sendEx = ex;
-                            sent = sendMem.Length;
-                            if (partialSendFailureCounter.ShouldFail())
+                            if (pending > 0 && buffer.Length >= pending)
                             {
-                                if (pending > 0 && buffer.Length >= pending)
-                                {
-                                    // throw away the rest of a partially sent command
-                                    consumed = buffer.GetPosition(pending);
-                                    examined = buffer.GetPosition(pending);
-                                }
-
-                                throw;
+                                // throw away the rest of a partially sent command
+                                consumed = buffer.GetPosition(pending);
+                                examined = buffer.GetPosition(pending);
                             }
+
+                            throw;
                         }
 
                         var totalSize = 0;
@@ -534,12 +525,6 @@ internal sealed class CommandWriter : IAsyncDisposable
 
                         // slice the buffer for next iteration
                         buffer = buffer.Slice(sent);
-
-                        // throw if there was a send failure
-                        if (sendEx != null)
-                        {
-                            throw sendEx;
-                        }
                     }
                 }
                 finally
@@ -819,24 +804,6 @@ internal sealed class CommandWriter : IAsyncDisposable
         finally
         {
             _semLock.Release();
-        }
-    }
-
-    private class PartialSendFailureCounter
-    {
-        private const int MaxRetry = 2;
-        private readonly object _gate = new();
-        private int _count;
-
-        public bool ShouldFail()
-        {
-            lock (_gate)
-            {
-                if (++_count < MaxRetry)
-                    return false;
-                _count = 0;
-                return true;
-            }
         }
     }
 }
