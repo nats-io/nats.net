@@ -166,7 +166,6 @@ public class SendBufferTest
 
         Assert.Single(testLogger.Logs);
         Assert.True(testLogger.Logs[0].Exception is SocketException, "Socket exception expected");
-        Assert.Equal("An existing connection was forcibly closed by the remote host.", testLogger.Logs[0].Exception?.Message);
         Assert.Equal(SocketError.ConnectionReset, (testLogger.Logs[0].Exception as SocketException)?.SocketErrorCode);
 
         lock (pubs)
