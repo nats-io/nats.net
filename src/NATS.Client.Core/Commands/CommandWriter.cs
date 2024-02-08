@@ -500,11 +500,18 @@ internal sealed class CommandWriter : IAsyncDisposable
                             }
 
                             // don't mark the message as complete if we have more data to send
-                            if (totalSize + pending > sent)
+                            //if (sendEx == null)
                             {
-                                pending += totalSize - sent;
-                                break;
+                                if (totalSize + pending > sent)
+                                {
+                                    pending += totalSize - sent;
+                                    break;
+                                }
                             }
+                            // else
+                            // {
+                                // sent = totalSize + pending;
+                            // }
 
                             while (!channelSize.Reader.TryRead(out _))
                             {
@@ -552,10 +559,6 @@ internal sealed class CommandWriter : IAsyncDisposable
         catch (OperationCanceledException)
         {
             // Expected during shutdown
-        }
-        catch (InvalidOperationException)
-        {
-            // We might still be using the previous pipe reader which might be completed already
         }
         catch (Exception e)
         {
