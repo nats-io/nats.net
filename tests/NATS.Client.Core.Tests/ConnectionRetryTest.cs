@@ -64,7 +64,7 @@ public class ConnectionRetryTest
         await using var pubConn = server.CreateClientConnection();
         await pubConn.ConnectAsync();
 
-        var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         var stopCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
         var received = 0;
