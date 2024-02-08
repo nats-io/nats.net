@@ -328,6 +328,8 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
+            _semLock.Release();
+
             payloadBuffer.Reset();
             _pool.Return(payloadBuffer);
 
@@ -336,8 +338,6 @@ internal sealed class CommandWriter : IAsyncDisposable
                 headersBuffer.Reset();
                 _pool.Return(headersBuffer);
             }
-
-            _semLock.Release();
         }
 
         return ValueTask.CompletedTask;
