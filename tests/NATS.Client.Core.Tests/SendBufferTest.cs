@@ -164,17 +164,22 @@ public class SendBufferTest
         Log($"[C] flush...");
         await nats.PingAsync(cts.Token);
 
-        Assert.Single(testLogger.Logs);
-        Assert.True(testLogger.Logs[0].Exception is SocketException, "Socket exception expected");
-        var socketErrorCode = (testLogger.Logs[0].Exception as SocketException)!.SocketErrorCode;
-        Assert.True(socketErrorCode is SocketError.ConnectionReset or SocketError.Shutdown, "Socket error code");
+        // because of partial fail counter we would have two failed sends
+        Assert.Equal(2, testLogger.Logs.Count);
+        foreach (var log in testLogger.Logs)
+        {
+            Assert.True(log.Exception is SocketException, "Socket exception expected");
+            var socketErrorCode = (log.Exception as SocketException)!.SocketErrorCode;
+            Assert.True(socketErrorCode is SocketError.ConnectionReset or SocketError.Shutdown, "Socket error code");
+        }
 
         lock (pubs)
         {
-            Assert.Equal(3, pubs.Count);
+            Assert.Equal(4, pubs.Count);
             Assert.Equal("PUB x1", pubs[0]);
             Assert.Equal("PUB close", pubs[1]);
-            Assert.Equal("PUB x2", pubs[2]);
+            Assert.Equal("PUB close", pubs[2]);
+            Assert.Equal("PUB x2", pubs[3]);
         }
     }
 }
