@@ -514,7 +514,11 @@ internal sealed class CommandWriter : IAsyncDisposable
                         // only mark bytes as consumed if a full command was sent
                         if (totalSize > 0)
                         {
+                            // mark totalSize bytes as consumed
                             consumed = buffer.GetPosition(totalSize);
+
+                            // reset the partialSendFailureCounter, since a full command was consumed
+                            partialSendFailureCounter.Reset();
                         }
 
                         // mark sent bytes as examined
@@ -527,18 +531,32 @@ internal sealed class CommandWriter : IAsyncDisposable
                         // throw if there was a send failure
                         if (sendEx != null)
                         {
-                            if (partialSendFailureCounter.ShouldFail())
+                            if (pending > 0)
                             {
-                                if (pending > 0 && buffer.Length >= pending)
+                                // there was a partially sent command
+                                // if this command is re-sent and fails again, it most likely means
+                                // that the command is malformed and the nats-server is closing
+                                // the connection with an error.  we want to throw this command
+                                // away if partialSendFailureCounter.Failed() returns true
+                                if (partialSendFailureCounter.Failed())
                                 {
-                                    // throw away the rest of a partially sent command
-                                    consumed = buffer.GetPosition(pending);
-                                    examined = buffer.GetPosition(pending);
-                                    while (!channelSize.Reader.TryRead(out _))
+                                    // throw away the rest of the partially sent command if it's in the buffer
+                                    if (buffer.Length >= pending)
                                     {
-                                        // should never happen; channel sizes are written before flush is called
-                                        await channelSize.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
+                                        consumed = buffer.GetPosition(pending);
+                                        examined = buffer.GetPosition(pending);
+                                        partialSendFailureCounter.Reset();
+                                        while (!channelSize.Reader.TryRead(out _))
+                                        {
+                                            // should never happen; channel sizes are written before flush is called
+                                            await channelSize.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
+                                        }
                                     }
+                                }
+                                else
+                                {
+                                    // increment the counter
+                                    partialSendFailureCounter.Increment();
                                 }
                             }
 
@@ -828,18 +846,31 @@ internal sealed class CommandWriter : IAsyncDisposable
 
     private class PartialSendFailureCounter
     {
-        private const int MaxRetry = 2;
+        private const int MaxRetry = 1;
         private readonly object _gate = new();
         private int _count;
 
-        public bool ShouldFail()
+        public bool Failed()
         {
             lock (_gate)
             {
-                if (++_count < MaxRetry)
-                    return false;
+                return _count >= MaxRetry;
+            }
+        }
+
+        public void Increment()
+        {
+            lock (_gate)
+            {
+                _count++;
+            }
+        }
+
+        public void Reset()
+        {
+            lock (_gate)
+            {
                 _count = 0;
-                return true;
             }
         }
     }
