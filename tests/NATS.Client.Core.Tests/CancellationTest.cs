@@ -19,7 +19,7 @@ public class CancellationTest
         var cancellationToken = cts.Token;
 
         // stall the flush task
-        Assert.True(conn.CommandWriter.TestStallFlush());
+        var stallTask = conn.CommandWriter.TestStallFlushAsync(TimeSpan.FromSeconds(1));
 
         // commands that call ConnectAsync throw OperationCanceledException
         await Assert.ThrowsAsync<OperationCanceledException>(() => conn.PingAsync(cancellationToken).AsTask());
@@ -30,6 +30,8 @@ public class CancellationTest
             {
             }
         });
+
+        await stallTask;
     }
 
     // check that cancellation works on commands that call ConnectAsync

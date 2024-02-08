@@ -31,9 +31,7 @@ public sealed record NatsOpts
 
     public ILoggerFactory LoggerFactory { get; init; } = NullLoggerFactory.Instance;
 
-    // Same as default pipelines pause writer size
-    // Performing better compared to nats bench on localhost
-    public int WriterBufferSize { get; init; } = 65536;
+    public int WriterBufferSize { get; init; } = 1048576;
 
     public int ReaderBufferSize { get; init; } = 1048576;
 
