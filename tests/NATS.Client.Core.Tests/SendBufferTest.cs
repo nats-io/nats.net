@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net.Sockets;
 using Microsoft.Extensions.Logging;
 using NATS.Client.TestUtilities;
 
@@ -83,25 +84,29 @@ public class SendBufferTest
     [Fact]
     public async Task Send_recover_half_sent()
     {
-        void Log(string m) => TmpFileLogger.Log(m);
-        // void Log(string m)
-        // {
-        // }
+        // void Log(string m) => TmpFileLogger.Log(m);
+        void Log(string m)
+        {
+        }
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
+        List<string> pubs = new();
         await using var server = new MockServer(
-            handler: async (client, cmd) =>
+            handler: (client, cmd) =>
             {
                 if (cmd.Name == "PUB")
                 {
-                    _output.WriteLine($">> PUB {cmd.Subject}");
+                    lock (pubs)
+                        pubs.Add($"PUB {cmd.Subject}");
                 }
 
                 if (cmd is { Name: "PUB", Subject: "close" })
                 {
                     client.Close();
                 }
+
+                return Task.CompletedTask;
             },
             Log,
             info: $"{{\"max_payload\":{1024 * 1024 * 8}}}",
@@ -112,9 +117,10 @@ public class SendBufferTest
         var testLogger = new InMemoryTestLoggerFactory(LogLevel.Error, m =>
         {
             Log($"[NC] {m.Message}");
-            if (m.Exception != null)
+            if (m.Exception is not SocketException)
                 _output.WriteLine($"ERROR: {m.Exception}");
         });
+
         await using var nats = new NatsConnection(new NatsOpts
         {
             Url = server.Url,
@@ -128,23 +134,19 @@ public class SendBufferTest
         var rtt = await nats.PingAsync(cts.Token);
         Log($"[C] ping rtt={rtt}");
 
-        Log($"[C] publishing x...");
-        Log($">>>>>>>>>>>>>>>>>>> 1");
+        Log($"[C] publishing x1...");
         await nats.PublishAsync("x1", "x", cancellationToken: cts.Token);
 
-        Log($"[C] publishing 1M...");
-        Log($">>>>>>>>>>>>>>>>>>> 2");
+        // we will close the connection in mock server when we receive subject "close"
+        Log($"[C] publishing close (8MB)...");
         var pubTask = nats.PublishAsync("close", new byte[1024 * 1024 * 8], cancellationToken: cts.Token).AsTask();
 
-        Log($">>>>>>>>>>>>>>>>>>> 3");
         await pubTask.WaitAsync(cts.Token);
 
-        Log($">>>>>>>>>>>>>>>>>>> 4");
         for (var i = 1; i <= 10; i++)
         {
             try
             {
-                Log($">>>>>>>>>>>>>>>>>>> 5 ({i})");
                 await nats.PingAsync(cts.Token);
                 break;
             }
@@ -156,13 +158,23 @@ public class SendBufferTest
             }
         }
 
+        Log($"[C] publishing x2...");
         await nats.PublishAsync("x2", "x", cancellationToken: cts.Token);
 
+        Log($"[C] flush...");
         await nats.PingAsync(cts.Token);
 
-        foreach (var log in testLogger.Logs)
+        Assert.Single(testLogger.Logs);
+        Assert.True(testLogger.Logs[0].Exception is SocketException, "Socket exception expected");
+        Assert.Equal("An existing connection was forcibly closed by the remote host.", testLogger.Logs[0].Exception?.Message);
+        Assert.Equal(SocketError.ConnectionReset, (testLogger.Logs[0].Exception as SocketException)?.SocketErrorCode);
+
+        lock (pubs)
         {
-            _output.WriteLine($"ERROR: {log.Exception?.Message}");
+            Assert.Equal(3, pubs.Count);
+            Assert.Equal("PUB x1", pubs[0]);
+            Assert.Equal("PUB close", pubs[1]);
+            Assert.Equal("PUB x2", pubs[2]);
         }
     }
 }

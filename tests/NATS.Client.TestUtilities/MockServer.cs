@@ -85,7 +85,6 @@ public class MockServer : IAsyncDisposable
                                 }
 
                                 // Log($"[S] RCV PUB payload: {new string(buffer)}");
-
                                 await sr.ReadLineAsync();
                             }
                             else

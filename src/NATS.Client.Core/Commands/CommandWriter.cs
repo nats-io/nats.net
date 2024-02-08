@@ -500,7 +500,7 @@ internal sealed class CommandWriter : IAsyncDisposable
                             }
 
                             // don't mark the message as complete if we have more data to send
-                            //if (sendEx == null)
+                            if (sendEx == null)
                             {
                                 if (totalSize + pending > sent)
                                 {
@@ -508,10 +508,11 @@ internal sealed class CommandWriter : IAsyncDisposable
                                     break;
                                 }
                             }
-                            // else
-                            // {
-                                // sent = totalSize + pending;
-                            // }
+                            else
+                            {
+                                // if there was a send failure, we have to assume the message was sent
+                                sent = totalSize + pending;
+                            }
 
                             while (!channelSize.Reader.TryRead(out _))
                             {
