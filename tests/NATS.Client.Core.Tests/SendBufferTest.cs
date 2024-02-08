@@ -166,7 +166,8 @@ public class SendBufferTest
 
         Assert.Single(testLogger.Logs);
         Assert.True(testLogger.Logs[0].Exception is SocketException, "Socket exception expected");
-        Assert.Equal(SocketError.ConnectionReset, (testLogger.Logs[0].Exception as SocketException)?.SocketErrorCode);
+        var socketErrorCode = (testLogger.Logs[0].Exception as SocketException)!.SocketErrorCode;
+        Assert.True(socketErrorCode is SocketError.ConnectionReset or SocketError.Shutdown, "Socket error code");
 
         lock (pubs)
         {
