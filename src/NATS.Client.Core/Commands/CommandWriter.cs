@@ -40,7 +40,6 @@ internal sealed class CommandWriter : IAsyncDisposable
     private readonly HeaderWriter _headerWriter;
     private readonly Channel<int> _channelLock;
     private readonly Channel<int> _channelSize;
-    private readonly CancellationTimerPool _ctPool;
     private readonly PipeReader _pipeReader;
     private readonly PipeWriter _pipeWriter;
     private readonly SemaphoreSlim _semLock = new(1);
@@ -76,13 +75,6 @@ internal sealed class CommandWriter : IAsyncDisposable
             useSynchronizationContext: false));
         _pipeReader = pipe.Reader;
         _pipeWriter = pipe.Writer;
-
-        // We need a new ObjectPool here because of the root token (_cts.Token).
-        // When the root token is cancelled as this object is disposed, cancellation
-        // objects in the pooled CancellationTimer should not be reused since the
-        // root token would already be cancelled which means CancellationTimer tokens
-        // would always be in a cancelled state.
-        _ctPool = new CancellationTimerPool(new ObjectPool(opts.ObjectPoolSize), _cts.Token);
     }
 
     public void Reset(ISocketConnection socketConnection)
@@ -474,17 +466,21 @@ internal sealed class CommandWriter : IAsyncDisposable
                         }
 
                         int sent;
-                        Exception? sendEx = null;
                         try
                         {
                             sent = await connection.SendAsync(sendMem).ConfigureAwait(false);
                         }
-                        catch (Exception ex)
+                        catch
                         {
                             // we have no idea how many bytes were actually sent, so we have to assume they all were
                             // this could result in message loss, but is consistent with at-most once delivery
-                            sendEx = ex;
-                            sent = sendMem.Length;
+                            if (pending > 0 && buffer.Length >= pending) {
+                                // throw away the rest of a partially sent command
+                                consumed = buffer.GetPosition(pending);
+                                examined = buffer.GetPosition(pending);
+                            }
+
+                            throw;
                         }
 
                         var totalSize = 0;
@@ -499,19 +495,10 @@ internal sealed class CommandWriter : IAsyncDisposable
                                 }
                             }
 
-                            // don't mark the message as complete if we have more data to send
-                            if (sendEx == null)
+                            if (totalSize + pending > sent)
                             {
-                                if (totalSize + pending > sent)
-                                {
-                                    pending += totalSize - sent;
-                                    break;
-                                }
-                            }
-                            else
-                            {
-                                // if there was a send failure, we have to assume the message was sent
-                                sent = totalSize + pending;
+                                pending += totalSize - sent;
+                                break;
                             }
 
                             while (!channelSize.Reader.TryRead(out _))
@@ -537,12 +524,6 @@ internal sealed class CommandWriter : IAsyncDisposable
 
                         // slice the buffer for next iteration
                         buffer = buffer.Slice(sent);
-
-                        // throw if there was a send failure
-                        if (sendEx != null)
-                        {
-                            throw sendEx;
-                        }
                     }
                 }
                 finally
