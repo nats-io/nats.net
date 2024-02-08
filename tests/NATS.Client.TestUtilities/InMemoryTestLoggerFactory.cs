@@ -2,7 +2,7 @@ using Microsoft.Extensions.Logging;
 
 namespace NATS.Client.TestUtilities;
 
-public class InMemoryTestLoggerFactory(LogLevel level) : ILoggerFactory
+public class InMemoryTestLoggerFactory(LogLevel level, Action<InMemoryTestLoggerFactory.LogMessage>? logger = null) : ILoggerFactory
 {
     private readonly List<LogMessage> _messages = new();
 
@@ -28,7 +28,11 @@ public class InMemoryTestLoggerFactory(LogLevel level) : ILoggerFactory
     private void Log(string categoryName, LogLevel logLevel, EventId eventId, Exception? exception, string message)
     {
         lock (_messages)
-            _messages.Add(new LogMessage(categoryName, logLevel, eventId, exception, message));
+        {
+            var logMessage = new LogMessage(categoryName, logLevel, eventId, exception, message);
+            _messages.Add(logMessage);
+            logger?.Invoke(logMessage);
+        }
     }
 
     public record LogMessage(string Category, LogLevel LogLevel, EventId EventId, Exception? Exception, string Message);

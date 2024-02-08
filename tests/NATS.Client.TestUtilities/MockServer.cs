@@ -9,76 +9,90 @@ public class MockServer : IAsyncDisposable
 {
     private readonly Action<string> _logger;
     private readonly TcpListener _server;
+    private readonly List<Task> _clients = new();
     private readonly Task _accept;
+    private readonly CancellationTokenSource _cts;
 
     public MockServer(
-        Func<MockServer, Cmd, Task> handler,
+        Func<Client, Cmd, Task> handler,
         Action<string> logger,
-        CancellationToken cancellationToken)
+        string info = "{\"max_payload\":1048576}",
+        CancellationToken cancellationToken = default)
     {
         _logger = logger;
+        _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cancellationToken = _cts.Token;
         _server = new TcpListener(IPAddress.Parse("127.0.0.1"), 0);
-        _server.Start();
+        _server.Start(10);
         Port = ((IPEndPoint)_server.LocalEndpoint).Port;
 
         _accept = Task.Run(
             async () =>
             {
-                var client = await _server.AcceptTcpClientAsync();
-
-                var stream = client.GetStream();
-
-                var sw = new StreamWriter(stream, Encoding.ASCII);
-                await sw.WriteAsync("INFO {\"max_payload\":1048576}\r\n");
-                await sw.FlushAsync();
-
-                var sr = new StreamReader(stream, Encoding.ASCII);
-
+                var n = 0;
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    Log($"[S] >>> READ LINE");
-                    var line = (await sr.ReadLineAsync())!;
+                    var tcpClient = await _server.AcceptTcpClientAsync(cancellationToken);
+                    var client = new Client(this, tcpClient);
+                    n++;
+                    Log($"[S] [{n}] New client connected");
+                    var stream = tcpClient.GetStream();
 
-                    if (line.StartsWith("CONNECT"))
+                    var sw = new StreamWriter(stream, Encoding.ASCII);
+                    await sw.WriteAsync($"INFO {info}\r\n");
+                    await sw.FlushAsync();
+
+                    var sr = new StreamReader(stream, Encoding.ASCII);
+
+                    _clients.Add(Task.Run(async () =>
                     {
-                        Log($"[S] RCV CONNECT");
-                    }
-                    else if (line.StartsWith("PING"))
-                    {
-                        Log($"[S] RCV PING");
-                        await sw.WriteAsync("PONG\r\n");
-                        await sw.FlushAsync();
-                        Log($"[S] SND PONG");
-                    }
-                    else if (line.StartsWith("SUB"))
-                    {
-                        var m = Regex.Match(line, @"^SUB\s+(?<subject>\S+)");
-                        var subject = m.Groups["subject"].Value;
-                        Log($"[S] RCV SUB {subject}");
-                        await handler(this, new Cmd("SUB", subject, 0));
-                    }
-                    else if (line.StartsWith("PUB") || line.StartsWith("HPUB"))
-                    {
-                        var m = Regex.Match(line, @"^(H?PUB)\s+(?<subject>\S+).*?(?<size>\d+)$");
-                        var size = int.Parse(m.Groups["size"].Value);
-                        var subject = m.Groups["subject"].Value;
-                        Log($"[S] RCV PUB {subject} {size}");
-                        var read = 0;
-                        var buffer = new byte[size];
-                        while (read < size)
+                        while (!cancellationToken.IsCancellationRequested)
                         {
-                            var received = await stream.ReadAsync(buffer, read, size - read);
-                            read += received;
-                            Log($"[S] RCV {received} bytes (size={size} read={read})");
-                        }
+                            var line = (await sr.ReadLineAsync())!;
 
-                        await handler(this, new Cmd("PUB", subject, size));
-                        await sr.ReadLineAsync();
-                    }
-                    else
-                    {
-                        Log($"[S] RCV LINE: {line}");
-                    }
+                            if (line.StartsWith("CONNECT"))
+                            {
+                                Log($"[S] [{n}] RCV CONNECT");
+                            }
+                            else if (line.StartsWith("PING"))
+                            {
+                                Log($"[S] [{n}] RCV PING");
+                                await sw.WriteAsync("PONG\r\n");
+                                await sw.FlushAsync();
+                                Log($"[S] [{n}] SND PONG");
+                            }
+                            else if (line.StartsWith("SUB"))
+                            {
+                                var m = Regex.Match(line, @"^SUB\s+(?<subject>\S+)");
+                                var subject = m.Groups["subject"].Value;
+                                Log($"[S] [{n}] RCV SUB {subject}");
+                                await handler(client, new Cmd("SUB", subject, 0));
+                            }
+                            else if (line.StartsWith("PUB") || line.StartsWith("HPUB"))
+                            {
+                                var m = Regex.Match(line, @"^(H?PUB)\s+(?<subject>\S+).*?(?<size>\d+)$");
+                                var size = int.Parse(m.Groups["size"].Value);
+                                var subject = m.Groups["subject"].Value;
+                                Log($"[S] [{n}] RCV PUB {subject} {size}");
+                                await handler(client, new Cmd("PUB", subject, size));
+                                var read = 0;
+                                var buffer = new char[size];
+                                while (read < size)
+                                {
+                                    var received = await sr.ReadAsync(buffer, read, size - read);
+                                    read += received;
+                                    Log($"[S] [{n}] RCV {received} bytes (size={size} read={read})");
+                                }
+
+                                // Log($"[S] RCV PUB payload: {new string(buffer)}");
+                                await sr.ReadLineAsync();
+                            }
+                            else
+                            {
+                                Log($"[S] [{n}] RCV LINE: {line}");
+                            }
+                        }
+                    }));
                 }
             },
             cancellationToken);
@@ -90,7 +104,28 @@ public class MockServer : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        _cts.Cancel();
         _server.Stop();
+        foreach (var client in _clients)
+        {
+            try
+            {
+                await client;
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (SocketException)
+            {
+            }
+            catch (IOException)
+            {
+            }
+        }
+
         try
         {
             await _accept;
@@ -109,4 +144,20 @@ public class MockServer : IAsyncDisposable
     public void Log(string m) => _logger(m);
 
     public record Cmd(string Name, string Subject, int Size);
+
+    public class Client
+    {
+        private readonly MockServer _server;
+        private readonly TcpClient _tcpClient;
+
+        public Client(MockServer server, TcpClient tcpClient)
+        {
+            _server = server;
+            _tcpClient = tcpClient;
+        }
+
+        public void Log(string m) => _server.Log(m);
+
+        public void Close() => _tcpClient.Close();
+    }
 }
