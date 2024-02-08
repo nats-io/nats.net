@@ -397,9 +397,11 @@ public class ProtocolTest
         for (var i = 0; i < 3; i++)
         {
             await Task.Delay(1_000, cts.Token);
+            var subjectCount = counts.Count;
             await server.RestartAsync();
             Interlocked.Increment(ref r);
-            await Task.Delay(1_000, cts.Token);
+
+            await Retry.Until("subject count goes up", () => counts.Count > subjectCount);
         }
 
         foreach (var log in logger.Logs.Where(x => x.EventId == NatsLogEvents.Protocol && x.LogLevel == LogLevel.Error))

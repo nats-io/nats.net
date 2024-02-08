@@ -164,7 +164,7 @@ public class SendBufferTest
         Log($"[C] flush...");
         await nats.PingAsync(cts.Token);
 
-        Assert.Equal(1, testLogger.Logs.Count);
+        Assert.Equal(2, testLogger.Logs.Count);
         foreach (var log in testLogger.Logs)
         {
             Assert.True(log.Exception is SocketException, "Socket exception expected");
@@ -174,10 +174,11 @@ public class SendBufferTest
 
         lock (pubs)
         {
-            Assert.Equal(3, pubs.Count);
+            Assert.Equal(4, pubs.Count);
             Assert.Equal("PUB x1", pubs[0]);
             Assert.Equal("PUB close", pubs[1]);
-            Assert.Equal("PUB x2", pubs[2]);
+            Assert.Equal("PUB close", pubs[2]);
+            Assert.Equal("PUB x2", pubs[3]);
         }
     }
 }
