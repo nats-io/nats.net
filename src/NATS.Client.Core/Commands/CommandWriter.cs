@@ -425,7 +425,8 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
     }
 
-    private static async Task ReaderLoopAsync(ILogger<CommandWriter> logger,
+    private static async Task ReaderLoopAsync(
+        ILogger<CommandWriter> logger,
         ISocketConnection connection,
         PipeReader pipeReader,
         Channel<int> channelSize,
