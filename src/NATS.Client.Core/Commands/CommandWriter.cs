@@ -40,10 +40,10 @@ internal sealed class CommandWriter : IAsyncDisposable
     private readonly HeaderWriter _headerWriter;
     private readonly Channel<int> _channelLock;
     private readonly Channel<int> _channelSize;
-    private readonly CancellationTimerPool _ctPool;
     private readonly PipeReader _pipeReader;
     private readonly PipeWriter _pipeWriter;
     private readonly SemaphoreSlim _semLock = new(1);
+    private readonly PartialSendFailureCounter _partialSendFailureCounter = new();
     private ISocketConnection? _socketConnection;
     private Task? _flushTask;
     private Task? _readerLoopTask;
@@ -76,13 +76,6 @@ internal sealed class CommandWriter : IAsyncDisposable
             useSynchronizationContext: false));
         _pipeReader = pipe.Reader;
         _pipeWriter = pipe.Writer;
-
-        // We need a new ObjectPool here because of the root token (_cts.Token).
-        // When the root token is cancelled as this object is disposed, cancellation
-        // objects in the pooled CancellationTimer should not be reused since the
-        // root token would already be cancelled which means CancellationTimer tokens
-        // would always be in a cancelled state.
-        _ctPool = new CancellationTimerPool(new ObjectPool(opts.ObjectPoolSize), _cts.Token);
     }
 
     public void Reset(ISocketConnection socketConnection)
@@ -100,6 +93,7 @@ internal sealed class CommandWriter : IAsyncDisposable
                     _pipeReader,
                     _channelSize,
                     _consolidateMem,
+                    _partialSendFailureCounter,
                     _ctsReader.Token)
                 .ConfigureAwait(false);
             });
@@ -437,6 +431,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         PipeReader pipeReader,
         Channel<int> channelSize,
         Memory<byte> consolidateMem,
+        PartialSendFailureCounter partialSendFailureCounter,
         CancellationToken cancellationToken)
     {
         try
@@ -520,7 +515,11 @@ internal sealed class CommandWriter : IAsyncDisposable
                         // only mark bytes as consumed if a full command was sent
                         if (totalSize > 0)
                         {
+                            // mark totalSize bytes as consumed
                             consumed = buffer.GetPosition(totalSize);
+
+                            // reset the partialSendFailureCounter, since a full command was consumed
+                            partialSendFailureCounter.Reset();
                         }
 
                         // mark sent bytes as examined
@@ -533,6 +532,35 @@ internal sealed class CommandWriter : IAsyncDisposable
                         // throw if there was a send failure
                         if (sendEx != null)
                         {
+                            if (pending > 0)
+                            {
+                                // there was a partially sent command
+                                // if this command is re-sent and fails again, it most likely means
+                                // that the command is malformed and the nats-server is closing
+                                // the connection with an error.  we want to throw this command
+                                // away if partialSendFailureCounter.Failed() returns true
+                                if (partialSendFailureCounter.Failed())
+                                {
+                                    // throw away the rest of the partially sent command if it's in the buffer
+                                    if (buffer.Length >= pending)
+                                    {
+                                        consumed = buffer.GetPosition(pending);
+                                        examined = buffer.GetPosition(pending);
+                                        partialSendFailureCounter.Reset();
+                                        while (!channelSize.Reader.TryRead(out _))
+                                        {
+                                            // should never happen; channel sizes are written before flush is called
+                                            await channelSize.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
+                                        }
+                                    }
+                                }
+                                else
+                                {
+                                    // increment the counter
+                                    partialSendFailureCounter.Increment();
+                                }
+                            }
+
                             throw sendEx;
                         }
                     }
@@ -552,10 +580,6 @@ internal sealed class CommandWriter : IAsyncDisposable
         catch (OperationCanceledException)
         {
             // Expected during shutdown
-        }
-        catch (InvalidOperationException)
-        {
-            // We might still be using the previous pipe reader which might be completed already
         }
         catch (Exception e)
         {
@@ -818,6 +842,37 @@ internal sealed class CommandWriter : IAsyncDisposable
         finally
         {
             _semLock.Release();
+        }
+    }
+
+    private class PartialSendFailureCounter
+    {
+        private const int MaxRetry = 1;
+        private readonly object _gate = new();
+        private int _count;
+
+        public bool Failed()
+        {
+            lock (_gate)
+            {
+                return _count >= MaxRetry;
+            }
+        }
+
+        public void Increment()
+        {
+            lock (_gate)
+            {
+                _count++;
+            }
+        }
+
+        public void Reset()
+        {
+            lock (_gate)
+            {
+                _count = 0;
+            }
         }
     }
 }
