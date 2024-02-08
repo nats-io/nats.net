@@ -468,8 +468,8 @@ internal sealed class CommandWriter : IAsyncDisposable
                             sendMem = consolidateMem[..consolidateLen];
                         }
 
-                        Exception? sendEx = null;
                         int sent;
+                        Exception? sendEx = null;
                         try
                         {
                             sent = await connection.SendAsync(sendMem).ConfigureAwait(false);
@@ -494,6 +494,7 @@ internal sealed class CommandWriter : IAsyncDisposable
                                 }
                             }
 
+                            // don't mark the message as complete if we have more data to send
                             if (totalSize + pending > sent)
                             {
                                 pending += totalSize - sent;
