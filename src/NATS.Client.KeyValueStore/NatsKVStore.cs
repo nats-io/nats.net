@@ -267,22 +267,29 @@ public class NatsKVStore : INatsKVStore
                 throw new NatsKVException("Can't parse timestamp message value");
 
             T? data;
-            var bytes = ArrayPool<byte>.Shared.Rent(_context.Connection.Opts.ReaderBufferSize);
-            try
+            if (response.Message.Data != null)
             {
-                if (response.Message.Data != null && Convert.TryFromBase64String(response.Message.Data, bytes, out var written))
+                var bytes = ArrayPool<byte>.Shared.Rent(response.Message.Data.Length);
+                try
                 {
-                    var buffer = new ReadOnlySequence<byte>(bytes.AsMemory(0, written));
-                    data = serializer.Deserialize(buffer);
+                    if (Convert.TryFromBase64String(response.Message.Data, bytes, out var written))
+                    {
+                        var buffer = new ReadOnlySequence<byte>(bytes.AsMemory(0, written));
+                        data = serializer.Deserialize(buffer);
+                    }
+                    else
+                    {
+                        throw new NatsKVException("Can't decode data message value");
+                    }
                 }
-                else
+                finally
                 {
-                    throw new NatsKVException("Can't decode data message value");
+                    ArrayPool<byte>.Shared.Return(bytes);
                 }
             }
-            finally
+            else
             {
-                ArrayPool<byte>.Shared.Return(bytes);
+                data = default;
             }
 
             return new NatsKVEntry<T>(Bucket, key)
