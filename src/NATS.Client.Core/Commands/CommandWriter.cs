@@ -23,9 +23,6 @@ internal sealed class CommandWriter : IAsyncDisposable
     // assuming 40 bytes TCP overhead + 40 bytes TLS overhead per packet
     private const int SendMemSize = 8520;
 
-    // set to a reasonable socket write mem size
-    private const int MinSegmentSize = 65536;
-
     private readonly ILogger<CommandWriter> _logger;
     private readonly NatsConnection _connection;
     private readonly ObjectPool _pool;
@@ -72,7 +69,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         var pipe = new Pipe(new PipeOptions(
             pauseWriterThreshold: opts.WriterBufferSize, // flush will block after hitting
             resumeWriterThreshold: opts.WriterBufferSize / 2,
-            minimumSegmentSize: MinSegmentSize,
+            minimumSegmentSize: opts.WriterBufferSize / 16,
             useSynchronizationContext: false));
         _pipeReader = pipe.Reader;
         _pipeWriter = pipe.Writer;
@@ -720,6 +717,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
     }
 
+    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
     private async ValueTask PublishStateMachineAsync(bool lockHeld, string subject, string? replyTo, NatsPooledBufferWriter<byte>? headersBuffer, NatsPooledBufferWriter<byte> payloadBuffer, CancellationToken cancellationToken)
     {
         try
