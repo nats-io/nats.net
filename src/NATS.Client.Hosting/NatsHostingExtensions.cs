@@ -21,11 +21,11 @@ public static class NatsHostingExtensions
         Func<NatsOpts, NatsOpts>? configureOpts = null,
         Action<NatsConnection>? configureConnection = null
 #if NET8_0_OR_GREATER
-        , string? key = null // This parameter is only available in .NET 8 or greater
+        , object? key = null // This parameter is only available in .NET 8 or greater
 #endif
     )
     {
-        string? diKey = null;
+        object? diKey = null;
 #if NET8_0_OR_GREATER
         diKey = key;
 #endif
@@ -34,40 +34,64 @@ public static class NatsHostingExtensions
 
         if (poolSize != 1)
         {
-            services.TryAddSingleton<NatsConnectionPool>(provider =>
+            NatsConnectionPool PoolFactory(IServiceProvider provider)
             {
-                var options = NatsOpts.Default with { LoggerFactory = provider.GetRequiredService<ILoggerFactory>() };
+                var options = NatsOpts.Default with
+                {
+                    LoggerFactory = provider.GetRequiredService<ILoggerFactory>(),
+                };
                 if (configureOpts != null)
                 {
                     options = configureOpts(options);
                 }
 
                 return new NatsConnectionPool(poolSize, options, configureConnection ?? (_ => { }));
-            });
+            }
 
-            services.TryAddSingleton<INatsConnectionPool>(static provider => provider.GetRequiredService<NatsConnectionPool>());
-            services.TryAddTransient<NatsConnection>(static provider =>
+            static NatsConnection ConnectionFactory(IServiceProvider provider, object? key)
             {
+#if NET8_0_OR_GREATER
+                if (key == null)
+                {
+                    var pool = provider.GetRequiredService<NatsConnectionPool>();
+                    return (pool.GetConnection() as NatsConnection)!;
+                }
+                else
+                {
+                    var pool = provider.GetRequiredKeyedService<NatsConnectionPool>(key);
+                    return (pool.GetConnection() as NatsConnection)!;
+                }
+#else
                 var pool = provider.GetRequiredService<NatsConnectionPool>();
                 return (pool.GetConnection() as NatsConnection)!;
-            });
+#endif
+            }
 
-            if (string.IsNullOrEmpty(diKey))
+            if (diKey == null)
             {
+                services.TryAddSingleton(PoolFactory);
+                services.TryAddSingleton<INatsConnectionPool>(static provider => provider.GetRequiredService<NatsConnectionPool>());
+                services.TryAddTransient<NatsConnection>(static provider => ConnectionFactory(provider, null));
                 services.TryAddTransient<INatsConnection>(static provider => provider.GetRequiredService<NatsConnection>());
             }
             else
             {
 #if NET8_0_OR_GREATER
-                services.AddKeyedTransient<INatsConnection>(diKey, static (provider, _) => provider.GetRequiredService<NatsConnection>());
+                services.TryAddKeyedSingleton(diKey, (provider, _) => PoolFactory(provider));
+                services.TryAddKeyedSingleton<INatsConnectionPool>(diKey, static (provider, key) => provider.GetRequiredKeyedService<NatsConnectionPool>(key));
+                services.TryAddKeyedTransient<NatsConnection>(diKey, static (provider, key) => ConnectionFactory(provider, key));
+                services.TryAddKeyedTransient<INatsConnection>(diKey, static (provider, key) => provider.GetRequiredKeyedService<NatsConnection>(key));
 #endif
             }
         }
         else
         {
-            services.TryAddSingleton<NatsConnection>(provider =>
+            NatsConnection Factory(IServiceProvider provider)
             {
-                var options = NatsOpts.Default with { LoggerFactory = provider.GetRequiredService<ILoggerFactory>() };
+                var options = NatsOpts.Default with
+                {
+                    LoggerFactory = provider.GetRequiredService<ILoggerFactory>(),
+                };
                 if (configureOpts != null)
                 {
                     options = configureOpts(options);
@@ -80,16 +104,18 @@ public static class NatsHostingExtensions
                 }
 
                 return conn;
-            });
+            }
 
-            if (string.IsNullOrEmpty(diKey))
+            if (diKey == null)
             {
+                services.TryAddSingleton(Factory);
                 services.TryAddSingleton<INatsConnection>(static provider => provider.GetRequiredService<NatsConnection>());
             }
             else
             {
 #if NET8_0_OR_GREATER
-                services.AddKeyedSingleton<INatsConnection>(diKey, static (provider, _) => provider.GetRequiredService<NatsConnection>());
+                services.TryAddKeyedSingleton<NatsConnection>(diKey, (provider, _) => Factory(provider));
+                services.TryAddKeyedSingleton<INatsConnection>(diKey, static (provider, key) => provider.GetRequiredKeyedService<NatsConnection>(key));
 #endif
             }
         }
