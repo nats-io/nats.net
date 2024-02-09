@@ -24,7 +24,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     private const int SendMemSize = 8520;
 
     // set to a reasonable socket write mem size
-    private const int MinSegmentSize = 65536;
+    private const int MinSegmentSize = 4096;
 
     private readonly ILogger<CommandWriter> _logger;
     private readonly NatsConnection _connection;
