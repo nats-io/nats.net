@@ -23,7 +23,8 @@ internal sealed class CommandWriter : IAsyncDisposable
     // assuming 40 bytes TCP overhead + 40 bytes TLS overhead per packet
     private const int SendMemSize = 8520;
 
-    // set to a reasonable socket write mem size
+    // should be more than SendMemSize
+    // https://github.com/nats-io/nats.net.v2/pull/383#discussion_r1484344102
     private const int MinSegmentSize = 16384;
 
     private readonly ILogger<CommandWriter> _logger;
