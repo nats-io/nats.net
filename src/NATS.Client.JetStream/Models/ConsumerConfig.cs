@@ -42,7 +42,7 @@ public record ConsumerConfig
 
     [System.Text.Json.Serialization.JsonPropertyName("opt_start_seq")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    [System.ComponentModel.DataAnnotations.Range(0D, 18446744073709552000D)]
+    [System.ComponentModel.DataAnnotations.Range(ulong.MinValue, ulong.MaxValue)]
     public ulong OptStartSeq { get; set; }
 
     [System.Text.Json.Serialization.JsonPropertyName("opt_start_time")]
@@ -106,7 +106,7 @@ public record ConsumerConfig
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("max_deliver")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
+    [System.ComponentModel.DataAnnotations.Range(long.MinValue, long.MaxValue)]
     public long MaxDeliver { get; set; }
 
     /// <summary>
@@ -140,7 +140,7 @@ public record ConsumerConfig
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("rate_limit_bps")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    [System.ComponentModel.DataAnnotations.Range(0D, 18446744073709552000D)]
+    [System.ComponentModel.DataAnnotations.Range(0L, long.MaxValue)]
     public long RateLimitBps { get; set; }
 
     /// <summary>
@@ -148,7 +148,7 @@ public record ConsumerConfig
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("max_ack_pending")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
+    [System.ComponentModel.DataAnnotations.Range(long.MinValue, long.MaxValue)]
     public long MaxAckPending { get; set; }
 
     /// <summary>
@@ -171,7 +171,7 @@ public record ConsumerConfig
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("max_waiting")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
+    [System.ComponentModel.DataAnnotations.Range(long.MinValue, long.MaxValue)]
     public long MaxWaiting { get; set; }
 
     /// <summary>
@@ -208,7 +208,7 @@ public record ConsumerConfig
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("max_bytes")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
+    [System.ComponentModel.DataAnnotations.Range(long.MinValue, long.MaxValue)]
     public long MaxBytes { get; set; }
 
     /// <summary>
@@ -231,7 +231,7 @@ public record ConsumerConfig
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("num_replicas")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
+    [System.ComponentModel.DataAnnotations.Range(long.MinValue, long.MaxValue)]
     public long NumReplicas { get; set; }
 
     /// <summary>

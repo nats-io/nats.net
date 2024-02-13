@@ -70,32 +70,32 @@ public record ConsumerInfo
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("num_ack_pending")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
-    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
-    public long NumAckPending { get; set; }
+    [System.ComponentModel.DataAnnotations.Range(int.MinValue, int.MaxValue)]
+    public int NumAckPending { get; set; }
 
     /// <summary>
     /// The number of redeliveries that have been performed
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("num_redelivered")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
-    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
-    public long NumRedelivered { get; set; }
+    [System.ComponentModel.DataAnnotations.Range(int.MinValue, int.MaxValue)]
+    public int NumRedelivered { get; set; }
 
     /// <summary>
     /// The number of pull consumers waiting for messages
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("num_waiting")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
-    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
-    public long NumWaiting { get; set; }
+    [System.ComponentModel.DataAnnotations.Range(int.MinValue, int.MaxValue)]
+    public int NumWaiting { get; set; }
 
     /// <summary>
     /// The number of messages left unconsumed in this Consumer
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("num_pending")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
-    [System.ComponentModel.DataAnnotations.Range(0D, 18446744073709552000D)]
-    public long NumPending { get; set; }
+    [System.ComponentModel.DataAnnotations.Range(ulong.MinValue, ulong.MaxValue)]
+    public ulong NumPending { get; set; }
 
     [System.Text.Json.Serialization.JsonPropertyName("cluster")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]

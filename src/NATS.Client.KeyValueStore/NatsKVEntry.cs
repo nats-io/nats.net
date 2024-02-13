@@ -31,7 +31,7 @@ public readonly record struct NatsKVEntry<T>(string Bucket, string Key)
     /// <summary>
     /// Distance from the latest value.
     /// </summary>
-    public long Delta { get; init; } = default;
+    public ulong Delta { get; init; } = default;
 
     /// <summary>
     /// The time the data was put in the bucket.

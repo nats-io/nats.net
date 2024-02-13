@@ -21,7 +21,7 @@ public record ConsumerGetnextRequest
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("batch")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
+    [System.ComponentModel.DataAnnotations.Range(long.MinValue, long.MaxValue)]
     public long Batch { get; set; }
 
     /// <summary>
@@ -29,7 +29,7 @@ public record ConsumerGetnextRequest
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("max_bytes")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
+    [System.ComponentModel.DataAnnotations.Range(long.MinValue, long.MaxValue)]
     public long MaxBytes { get; set; }
 
     /// <summary>
