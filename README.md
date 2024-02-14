@@ -1,3 +1,6 @@
+[![License Apache 2.0](https://img.shields.io/badge/License-Apache2-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+[![NuGet](https://img.shields.io/nuget/v/NATS.Net.svg?cacheSeconds=3600)](https://www.nuget.org/packages/NATS.Net)
+
 # NATS.Net
 
 [NATS](https://nats.io) client for modern [.NET](https://dot.net/).
