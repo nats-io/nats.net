@@ -74,7 +74,7 @@ namespace NATS.Client.Core.NaCl.Internal.Ed25519Ref10
             if (GroupOperations.ge_frombytes_negate_vartime(out A, pk, pkoffset) != 0)
                 return false;
 
-            var hasher = new Sha512();
+            using var hasher = new Sha512();
             hasher.Update(sig, sigoffset, 32);
             hasher.Update(pk, pkoffset, 32);
             hasher.Update(m, moffset, mlen);

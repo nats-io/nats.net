@@ -10,16 +10,13 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-// Borrowed from https://github.com/CryptoManiac/Ed25519
-
 using System;
 using System.Security.Cryptography;
 using NATS.Client.Core.NaCl.Internal;
 
 namespace NATS.Client.Core.NaCl
 {
-    internal sealed class Sha512
+    internal sealed class Sha512: IDisposable
     {
         /// <summary>
         /// Allocation and initialization of the new SHA-512 object.
@@ -73,5 +70,8 @@ namespace NATS.Client.Core.NaCl
             ReadOnlySpan<byte> dataSpan = data;
             return SHA512.HashData(dataSpan.Slice(index, length));
         }
+
+        /// <inheritdoc/>
+        public void Dispose() => _sha512Inner?.Dispose();
     }
 }
