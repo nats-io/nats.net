@@ -430,6 +430,9 @@ public class NatsKVStore : INatsKVStore
         // Type doesn't matter here, we're just using the watcher to get the keys
         await using var watcher = await WatchInternalAsync<int>(">", serializer: default, opts, cancellationToken);
 
+        if (watcher.InitialConsumer.Info.NumPending == 0)
+            yield break;
+
         while (await watcher.Entries.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
             while (watcher.Entries.TryRead(out var entry))
