@@ -129,5 +129,5 @@ public interface INatsJSConsumer
     IAsyncEnumerable<NatsJSMsg<T>> FetchNoWaitAsync<T>(
         NatsJSFetchOpts opts,
         INatsDeserialize<T>? serializer = default,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default);
 }
