@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using NATS.Client.Core;
 using NATS.Client.JetStream.Models;
 
@@ -79,4 +80,54 @@ public interface INatsJSConsumer
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     ValueTask RefreshAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Consume a set number of messages from the stream using this consumer.
+    /// Returns immediately if no messages are available.
+    /// </summary>
+    /// <param name="serializer">Serializer to use for the message type.</param>
+    /// <param name="opts">Fetch options. (default: <c>MaxMsgs</c> 1,000 and timeout is ignored)</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the call.</param>
+    /// <typeparam name="T">Message type to deserialize.</typeparam>
+    /// <returns>Async enumerable of messages which can be used in a <c>await foreach</c> loop.</returns>
+    /// <exception cref="NatsJSProtocolException">Consumer is deleted, it's push based or request sent to server is invalid.</exception>
+    /// <exception cref="NatsJSException">There is an error sending the message or this consumer object isn't valid anymore because it was deleted earlier.</exception>
+    /// <remarks>
+    /// <para>
+    /// This method will return immediately if no messages are available.
+    /// </para>
+    /// <para>
+    /// Using this method is discouraged because it might create an unnecessary load on your cluster.
+    /// Use <c>Consume</c> or <c>Fetch</c> instead.
+    /// </para>
+    /// </remarks>
+    /// <example>
+    /// <para>
+    /// However, there are scenarios where this method is useful. For example if your application is
+    /// processing messages in batches infrequently (for example every 5 minutes) you might want to
+    /// consider <c>FetchNoWait</c>. You must make sure to count your messages and stop fetching
+    /// if you received all of them in one call, meaning when <c>count &lt; MaxMsgs</c>.
+    /// </para>
+    /// <code>
+    /// const int max = 10;
+    /// var count = 0;
+    ///
+    /// await foreach (var msg in consumer.FetchAllNoWaitAsync&lt;int&gt;(new NatsJSFetchOpts { MaxMsgs = max }))
+    /// {
+    ///     count++;
+    ///     Process(msg);
+    ///     await msg.AckAsync();
+    /// }
+    ///
+    /// if (count &lt; max)
+    /// {
+    ///     // No more messages. Pause for more.
+    ///     await Task.Delay(TimeSpan.FromMinutes(5));
+    /// }
+    /// </code>
+    /// </example>
+    IAsyncEnumerable<NatsJSMsg<T>> FetchNoWaitAsync<T>(
+        NatsJSFetchOpts opts,
+        INatsDeserialize<T>? serializer = default,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default);
 }

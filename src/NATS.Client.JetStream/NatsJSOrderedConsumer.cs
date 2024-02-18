@@ -199,6 +199,32 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
             _fetchConsumerName = string.Empty;
     }
 
+    /// <inheritdoc />
+    public async IAsyncEnumerable<NatsJSMsg<T>> FetchNoWaitAsync<T>(
+        NatsJSFetchOpts opts,
+        INatsDeserialize<T>? serializer = default,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        cancellationToken = CancellationTokenSource.CreateLinkedTokenSource(_cancellationToken, cancellationToken).Token;
+
+        var consumer = await RecreateConsumer(_fetchConsumerName, _fetchSeq, cancellationToken);
+        _fetchConsumerName = consumer.Info.Name;
+
+        await foreach (var msg in consumer.FetchNoWaitAsync(opts, serializer, cancellationToken))
+        {
+            if (msg.Metadata is not { } metadata)
+                continue;
+
+            _fetchSeq = metadata.Sequence.Stream;
+            yield return msg;
+        }
+
+        var deleted = await TryDeleteConsumer(_fetchConsumerName, cancellationToken);
+
+        if (deleted)
+            _fetchConsumerName = string.Empty;
+    }
+
     /// <summary>
     /// Get the next message from the stream in order.
     /// </summary>
