@@ -4,6 +4,7 @@ using NATS.Client.Core.Tests;
 using NATS.Client.JetStream.Models;
 using NATS.Client.ObjectStore.Internal;
 using NATS.Client.ObjectStore.Models;
+using NATS.Client.Serializers.Json;
 
 namespace NATS.Client.ObjectStore.Tests;
 
@@ -414,5 +415,30 @@ public class ObjectStoreTest
         Assert.Equal("b2", status2.Bucket);
         Assert.Equal("OBJ_b2", status2.Info.Config.Name);
         Assert.Equal(StreamConfigCompression.S2, status2.Info.Config.Compression);
+    }
+
+    [Fact]
+    public async Task Put_get_serialization_when_default_serializer_is_not_used()
+    {
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection(options: new NatsOpts
+        {
+            SerializerRegistry = NatsJsonSerializerRegistry.Default,
+        });
+        var js = new NatsJSContext(nats);
+        var ob = new NatsObjContext(js);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        var store = await ob.CreateObjectStoreAsync(new NatsObjConfig("b1"), cancellationToken);
+
+        await store.PutAsync("k1", new byte[] { 42 }, cancellationToken: cancellationToken);
+
+        var bytes = await store.GetBytesAsync("k1", cancellationToken);
+        Assert.Equal(new byte[] { 42 }, bytes);
+
+        var info = await store.GetInfoAsync("k1", cancellationToken: cancellationToken);
+        Assert.Equal("k1", info.Name);
     }
 }
