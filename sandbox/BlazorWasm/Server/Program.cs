@@ -1,13 +1,19 @@
 using BlazorWasm.Server.NatsServices;
 using NATS.Client.Core;
 using NATS.Client.Hosting;
+using NATS.Client.Serializers.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
-builder.Services.AddNats(configureOpts: opt => opt with { Url = "localhost:4222", Name = "BlazorServer" });
+builder.Services.AddNats(configureOpts: opt => opt with
+{
+    SerializerRegistry = NatsJsonSerializerRegistry.Default,
+    Url = "localhost:4222",
+    Name = "BlazorServer",
+});
 builder.Services.AddHostedService<WeatherForecastService>();
 
 var app = builder.Build();

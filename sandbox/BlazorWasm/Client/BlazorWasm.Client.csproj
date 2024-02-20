@@ -14,6 +14,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\NATS.Client.Hosting\NATS.Client.Hosting.csproj" />
+    <ProjectReference Include="..\..\..\src\NATS.Client.Serializers.Json\NATS.Client.Serializers.Json.csproj" />
     <ProjectReference Include="..\Shared\BlazorWasm.Shared.csproj" />
   </ItemGroup>
 
