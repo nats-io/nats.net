@@ -11,6 +11,45 @@ public class ConsumerConsumeTest
 
     public ConsumerConsumeTest(ITestOutputHelper output) => _output = output;
 
+    [Theory]
+    [InlineData("Invalid.DotName")]
+    [InlineData("Invalid SpaceName")]
+    [InlineData(null)]
+    public async Task Consumer_stream_invalid_name_test(string? streamName)
+    {
+        var jsmContext = new NatsJSContext(new NatsConnection());
+
+        var consumerConfig = new ConsumerConfig("aconsumer");
+
+        // Create ordered consumer
+        await Assert.ThrowsAnyAsync<ArgumentException>(async () => await jsmContext.CreateOrderedConsumerAsync(streamName!, cancellationToken: CancellationToken.None));
+
+        // Create or update consumer
+        await Assert.ThrowsAnyAsync<ArgumentException>(async () => await jsmContext.CreateOrUpdateConsumerAsync(streamName!, consumerConfig));
+
+        // Get consumer
+        await Assert.ThrowsAnyAsync<ArgumentException>(async () => await jsmContext.GetConsumerAsync(streamName!, "aconsumer"));
+
+        // List consumers
+        await Assert.ThrowsAnyAsync<ArgumentException>(async () =>
+        {
+            await foreach (var unused in jsmContext.ListConsumersAsync(streamName!, CancellationToken.None))
+            {
+            }
+        });
+
+        // List consumer names
+        await Assert.ThrowsAnyAsync<ArgumentException>(async () =>
+        {
+            await foreach (var unused in jsmContext.ListConsumerNamesAsync(streamName!, CancellationToken.None))
+            {
+            }
+        });
+
+        // Delete consumer
+        await Assert.ThrowsAnyAsync<ArgumentException>(async () => await jsmContext.DeleteConsumerAsync(streamName!, "aconsumer"));
+    }
+
     [Fact]
     public async Task Consume_msgs_test()
     {

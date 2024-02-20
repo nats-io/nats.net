@@ -13,6 +13,8 @@ public interface INatsJSContext
     /// <param name="opts">Ordered consumer options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>The NATS JetStream consumer object which can be used retrieving ordered data from the stream.</returns>
+    /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
+    /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
     ValueTask<INatsJSConsumer> CreateOrderedConsumerAsync(
         string stream,
         NatsJSOrderedConsumerOpts? opts = default,
@@ -27,6 +29,8 @@ public interface INatsJSContext
     /// <returns>The NATS JetStream consumer object which can be used retrieving data from the stream.</returns>
     /// <exception cref="NatsJSException">Ack policy is set to <c>none</c> or there was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
+    /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
     ValueTask<INatsJSConsumer> CreateOrUpdateConsumerAsync(
         string stream,
         ConsumerConfig config,
@@ -41,6 +45,8 @@ public interface INatsJSContext
     /// <returns>The NATS JetStream consumer object which can be used retrieving data from the stream.</returns>
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
+    /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
     ValueTask<INatsJSConsumer> GetConsumerAsync(string stream, string consumer, CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -51,6 +57,8 @@ public interface INatsJSContext
     /// <returns>Async enumerable of consumer info objects. Can be used in a <c>await foreach</c> loop.</returns>
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
+    /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
     IAsyncEnumerable<INatsJSConsumer> ListConsumersAsync(
         string stream,
         CancellationToken cancellationToken = default);
@@ -63,6 +71,8 @@ public interface INatsJSContext
     /// <returns>Async enumerable of consumer info objects. Can be used in a <c>await foreach</c> loop.</returns>
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
+    /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
     IAsyncEnumerable<string> ListConsumerNamesAsync(
         string stream,
         CancellationToken cancellationToken = default);
@@ -76,6 +86,8 @@ public interface INatsJSContext
     /// <returns>Whether the deletion was successful.</returns>
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
+    /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
     ValueTask<bool> DeleteConsumerAsync(string stream, string consumer, CancellationToken cancellationToken = default);
 
     /// <summary>

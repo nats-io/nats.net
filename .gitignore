@@ -117,3 +117,5 @@ nuget/*.unitypackage
 # NuGet package
 /dist
 
+# MacOS folder attributes
+.DS_Store
