@@ -254,7 +254,7 @@ public class NatsObjStore : INatsObjStore
                     var buffer = memoryOwner.Slice(0, currentChunkSize);
 
                     // Chunks
-                    var ack = await _context.PublishAsync(GetChunkSubject(nuid), buffer, cancellationToken: cancellationToken);
+                    var ack = await _context.PublishAsync(GetChunkSubject(nuid), buffer, serializer: NatsRawSerializer<NatsMemoryOwner<byte>>.Default, cancellationToken: cancellationToken);
                     ack.EnsureSuccess();
 
                     if (eof)
