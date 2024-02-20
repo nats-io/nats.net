@@ -209,20 +209,24 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
 
         var consumer = await RecreateConsumer(_fetchConsumerName, _fetchSeq, cancellationToken);
         _fetchConsumerName = consumer.Info.Name;
-
-        await foreach (var msg in consumer.FetchNoWaitAsync(opts, serializer, cancellationToken))
+        try
         {
-            if (msg.Metadata is not { } metadata)
-                continue;
+            await foreach (var msg in consumer.FetchNoWaitAsync(opts, serializer, cancellationToken))
+            {
+                if (msg.Metadata is not { } metadata)
+                    continue;
 
-            _fetchSeq = metadata.Sequence.Stream;
-            yield return msg;
+                _fetchSeq = metadata.Sequence.Stream;
+                yield return msg;
+            }
         }
+        finally
+        {
+            var deleted = await TryDeleteConsumer(_fetchConsumerName, cancellationToken);
 
-        var deleted = await TryDeleteConsumer(_fetchConsumerName, cancellationToken);
-
-        if (deleted)
-            _fetchConsumerName = string.Empty;
+            if (deleted)
+                _fetchConsumerName = string.Empty;
+        }
     }
 
     /// <summary>
