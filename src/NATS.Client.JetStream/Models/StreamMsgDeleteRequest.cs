@@ -11,8 +11,8 @@ public record StreamMsgDeleteRequest
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("seq")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
-    [System.ComponentModel.DataAnnotations.Range(0D, 18446744073709552000D)]
-    public long Seq { get; set; }
+    [System.ComponentModel.DataAnnotations.Range(ulong.MinValue, ulong.MaxValue)]
+    public ulong Seq { get; set; }
 
     /// <summary>
     /// Default will securely remove a message and rewrite the data with random data, set this to true to only remove the message

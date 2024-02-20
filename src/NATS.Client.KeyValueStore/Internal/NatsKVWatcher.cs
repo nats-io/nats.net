@@ -47,7 +47,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
     private readonly Task _commandTask;
 
     private ulong _sequenceStream;
-    private long _sequenceConsumer;
+    private ulong _sequenceConsumer;
     private string _consumer;
     private volatile NatsKVWatchSub<T>? _sub;
 
@@ -219,7 +219,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
 
                                     var sequence = Interlocked.Increment(ref _sequenceConsumer);
 
-                                    if (sequence != (long)metadata.Sequence.Consumer)
+                                    if (sequence != metadata.Sequence.Consumer)
                                     {
                                         CreateSub("sequence-mismatch");
                                         _logger.LogWarning(NatsKVLogEvents.RecreateConsumer, "Missed messages, recreating consumer");
@@ -231,7 +231,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
                                         continue;
                                     }
 
-                                    var delta = (long)metadata.NumPending;
+                                    var delta = metadata.NumPending;
 
                                     var entry = new NatsKVEntry<T>(_bucket, key)
                                     {

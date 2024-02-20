@@ -7,7 +7,7 @@ public record StreamState
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("messages")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
-    [System.ComponentModel.DataAnnotations.Range(0D, 18446744073709552000D)]
+    [System.ComponentModel.DataAnnotations.Range(ulong.MinValue, ulong.MaxValue)]
     public long Messages { get; set; }
 
     /// <summary>
@@ -15,7 +15,7 @@ public record StreamState
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("bytes")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
-    [System.ComponentModel.DataAnnotations.Range(0D, 18446744073709552000D)]
+    [System.ComponentModel.DataAnnotations.Range(ulong.MinValue, ulong.MaxValue)]
     public long Bytes { get; set; }
 
     /// <summary>
@@ -23,8 +23,8 @@ public record StreamState
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("first_seq")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
-    [System.ComponentModel.DataAnnotations.Range(0D, 18446744073709552000D)]
-    public long FirstSeq { get; set; }
+    [System.ComponentModel.DataAnnotations.Range(ulong.MinValue, ulong.MaxValue)]
+    public ulong FirstSeq { get; set; }
 
     /// <summary>
     /// The timestamp of the first message in the Stream
@@ -38,8 +38,8 @@ public record StreamState
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("last_seq")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
-    [System.ComponentModel.DataAnnotations.Range(0D, 18446744073709552000D)]
-    public long LastSeq { get; set; }
+    [System.ComponentModel.DataAnnotations.Range(ulong.MinValue, ulong.MaxValue)]
+    public ulong LastSeq { get; set; }
 
     /// <summary>
     /// The timestamp of the last message in the Stream
@@ -67,7 +67,7 @@ public record StreamState
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("num_subjects")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
+    [System.ComponentModel.DataAnnotations.Range(long.MinValue, long.MaxValue)]
     public long NumSubjects { get; set; }
 
     /// <summary>
@@ -75,7 +75,7 @@ public record StreamState
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("num_deleted")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
+    [System.ComponentModel.DataAnnotations.Range(long.MinValue, long.MaxValue)]
     public long NumDeleted { get; set; }
 
     [System.Text.Json.Serialization.JsonPropertyName("lost")]
@@ -87,6 +87,6 @@ public record StreamState
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("consumer_count")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
-    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
+    [System.ComponentModel.DataAnnotations.Range(long.MinValue, long.MaxValue)]
     public long ConsumerCount { get; set; }
 }

@@ -27,8 +27,8 @@ public record StreamSource
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("opt_start_seq")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    [System.ComponentModel.DataAnnotations.Range(0D, 18446744073709552000D)]
-    public long OptStartSeq { get; set; }
+    [System.ComponentModel.DataAnnotations.Range(ulong.MinValue, ulong.MaxValue)]
+    public ulong OptStartSeq { get; set; }
 
     /// <summary>
     /// Time stamp to start replicating from

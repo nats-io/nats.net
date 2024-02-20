@@ -18,6 +18,6 @@ public record LostStreamData
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("bytes")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    [System.ComponentModel.DataAnnotations.Range(0D, 18446744073709552000D)]
+    [System.ComponentModel.DataAnnotations.Range(0L, long.MaxValue)]
     public long Bytes { get; set; }
 }

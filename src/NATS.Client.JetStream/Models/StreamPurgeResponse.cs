@@ -15,6 +15,6 @@ public record StreamPurgeResponse
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("purged")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
-    [System.ComponentModel.DataAnnotations.Range(0D, 18446744073709552000D)]
+    [System.ComponentModel.DataAnnotations.Range(ulong.MinValue, ulong.MaxValue)]
     public long Purged { get; set; }
 }
