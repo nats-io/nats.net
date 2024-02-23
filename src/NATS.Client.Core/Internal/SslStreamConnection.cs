@@ -27,11 +27,7 @@ internal sealed class SslStreamConnection : ISocketConnection
 
     public Task<Exception> WaitForClosed => _waitForClosedSource.Task;
 
-#if NET6_0
-    public ValueTask DisposeAsync()
-#else
     public async ValueTask DisposeAsync()
-#endif
     {
         if (Interlocked.Increment(ref _disposed) == 1)
         {
@@ -47,11 +43,9 @@ internal sealed class SslStreamConnection : ISocketConnection
             catch
             {
             }
-        }
 
-#if NET6_0
-        return ValueTask.CompletedTask;
-#endif
+            await _sslStream.DisposeAsync().ConfigureAwait(false);
+        }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
