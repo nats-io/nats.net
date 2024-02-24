@@ -103,10 +103,18 @@ internal sealed class TcpConnection : ISocketConnection
             {
             }
 
+            try
+            {
+                _socket.Shutdown(SocketShutdown.Both);
+            }
+            catch
+            {
+            }
+
             _socket.Dispose();
         }
 
-        return default;
+        return ValueTask.CompletedTask;
     }
 
     // when catch SocketClosedException, call this method.

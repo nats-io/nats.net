@@ -48,7 +48,12 @@ public class MockServer : IAsyncDisposable
                     {
                         while (!cancellationToken.IsCancellationRequested)
                         {
-                            var line = (await sr.ReadLineAsync())!;
+                            var line = await sr.ReadLineAsync();
+                            if (line == null)
+                            {
+                                // empty read, socket closed
+                                return;
+                            }
 
                             if (line.StartsWith("CONNECT"))
                             {
