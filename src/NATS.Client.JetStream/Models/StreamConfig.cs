@@ -61,15 +61,15 @@ public record StreamConfig
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("max_consumers")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
-    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
-    public long MaxConsumers { get; set; }
+    [System.ComponentModel.DataAnnotations.Range(int.MinValue, int.MaxValue)]
+    public int MaxConsumers { get; set; }
 
     /// <summary>
     /// How many messages may be in a Stream, oldest messages will be removed if the Stream exceeds this size. -1 for unlimited.
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("max_msgs")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
-    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
+    [System.ComponentModel.DataAnnotations.Range(long.MinValue, long.MaxValue)]
     public long MaxMsgs { get; set; }
 
     /// <summary>
@@ -77,7 +77,7 @@ public record StreamConfig
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("max_msgs_per_subject")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
+    [System.ComponentModel.DataAnnotations.Range(int.MinValue, int.MaxValue)]
     public long MaxMsgsPerSubject { get; set; }
 
     /// <summary>
@@ -85,7 +85,7 @@ public record StreamConfig
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("max_bytes")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
-    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
+    [System.ComponentModel.DataAnnotations.Range(long.MinValue, long.MinValue)]
     public long MaxBytes { get; set; }
 
     /// <summary>
@@ -130,8 +130,8 @@ public record StreamConfig
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("num_replicas")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
-    [System.ComponentModel.DataAnnotations.Range(-9223372036854776000D, 9223372036854776000D)]
-    public long NumReplicas { get; set; }
+    [System.ComponentModel.DataAnnotations.Range(int.MinValue, int.MaxValue)]
+    public int NumReplicas { get; set; }
 
     /// <summary>
     /// Disables acknowledging messages that are received by the Stream.

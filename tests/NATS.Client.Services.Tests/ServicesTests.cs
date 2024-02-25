@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using NATS.Client.Core.Tests;
 using NATS.Client.Services.Internal;
 using NATS.Client.Services.Models;
@@ -263,5 +264,90 @@ public class ServicesTests
         Assert.Equal(2, stats.Count);
         Assert.Equal("1.0.0", stats.First(s => s.Name == "s1").Version);
         Assert.Equal("2.0.0", stats.First(s => s.Name == "s2").Version);
+    }
+
+    [Fact]
+    public async Task Pass_headers_to_request_and_in_response()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        await using var server = NatsServer.Start();
+        await using var nats = server.CreateClientConnection();
+        var svc = new NatsSvcContext(nats);
+
+        await using var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
+
+        await s1.AddEndpointAsync<int>(
+            name: "e1",
+            handler: async m =>
+            {
+                if (m.Headers != null)
+                {
+                    var headers = m.Headers;
+                    if (headers.TryGetValue("foo", out var foo))
+                    {
+                        if (foo != "bar")
+                        {
+                            await m.ReplyErrorAsync(m.Data, "Expected 'foo' = 'bar' header", cancellationToken: cancellationToken);
+                            return;
+                        }
+
+                        await m.ReplyAsync(m.Data, headers: new NatsHeaders { { "bar", "baz" } }, cancellationToken: cancellationToken);
+                        return;
+                    }
+                }
+
+                await m.ReplyErrorAsync(m.Data, "Missing 'foo' header", cancellationToken: cancellationToken);
+            },
+            cancellationToken: cancellationToken);
+
+        // With headers
+        var headers = new NatsHeaders { { "foo", "bar" } };
+        var response = await nats.RequestAsync<int, int>("e1", 999, headers, cancellationToken: cancellationToken);
+        Assert.Equal(999, response.Data);
+        Assert.Equal("baz", response.Headers?["bar"]);
+
+        // With headers, but not the expected one.
+        headers = new NatsHeaders
+        {
+            { "not-the-expected", "4711" },
+            { "also-not-the-expected", "4242" },
+        };
+        response = await nats.RequestAsync<int, int>("e1", 999, headers, cancellationToken: cancellationToken);
+        Assert.Equal("999", response.Headers?["Nats-Service-Error-Code"]);
+        Assert.Equal("Missing 'foo' header", response.Headers?["Nats-Service-Error"]);
+
+        // No headers.
+        response = await nats.RequestAsync<int, int>("e1", 999, cancellationToken: cancellationToken);
+        Assert.Equal("999", response.Headers?["Nats-Service-Error-Code"]);
+        Assert.Equal("Missing 'foo' header", response.Headers?["Nats-Service-Error"]);
+    }
+
+    [Fact]
+    public async Task Service_started_time()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(200));
+        var cancellationToken = cts.Token;
+
+        await using var server = NatsServer.Start();
+        await using var nats = server.CreateClientConnection();
+        var svc = new NatsSvcContext(nats);
+
+        await using var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
+
+        await s1.AddEndpointAsync<int>(
+            name: "e1",
+            handler: async m =>
+            {
+                await m.ReplyAsync(m.Data, cancellationToken: cancellationToken);
+            },
+            cancellationToken: cancellationToken);
+
+        var stats = s1.GetStats();
+
+        // Match: 2021-09-01T12:34:56.1234567Z
+        var formatRegex = new Regex(@"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{7}Z$");
+        Assert.Matches(formatRegex, stats.Started);
     }
 }

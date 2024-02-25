@@ -45,4 +45,39 @@ public class GetKeysTest
 
         Assert.Equal(new List<string> { "k1", "k3" }, ks2);
     }
+
+    [Fact]
+    public async Task Get_keys_when_empty()
+    {
+        const string bucket = "b1";
+        var config = new NatsKVConfig(bucket) { History = 10 };
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        await using var server = NatsServer.StartJS();
+        await using var nats1 = server.CreateClientConnection();
+        var js1 = new NatsJSContext(nats1);
+        var kv1 = new NatsKVContext(js1);
+        var store1 = await kv1.CreateStoreAsync(config, cancellationToken: cancellationToken);
+
+        var count = 0;
+        await foreach (var k in store1.GetKeysAsync(cancellationToken: cancellationToken))
+        {
+            count++;
+        }
+
+        Assert.Equal(0, count);
+
+        await store1.PutAsync("k1", 1, cancellationToken: cancellationToken);
+        await store1.PutAsync("k2", 2, cancellationToken: cancellationToken);
+        await store1.PutAsync("k3", 3, cancellationToken: cancellationToken);
+
+        await foreach (var k in store1.GetKeysAsync(cancellationToken: cancellationToken))
+        {
+            count++;
+        }
+
+        Assert.Equal(3, count);
+    }
 }

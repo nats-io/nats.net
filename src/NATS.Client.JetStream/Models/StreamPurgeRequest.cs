@@ -18,14 +18,14 @@ public record StreamPurgeRequest
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("seq")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    [System.ComponentModel.DataAnnotations.Range(0D, 18446744073709552000D)]
-    public long Seq { get; set; }
+    [System.ComponentModel.DataAnnotations.Range(ulong.MinValue, ulong.MaxValue)]
+    public ulong Seq { get; set; }
 
     /// <summary>
     /// Ensures this many messages are present after the purge. Can be combined with the subject filter but not the sequence
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("keep")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    [System.ComponentModel.DataAnnotations.Range(0D, 18446744073709552000D)]
-    public long Keep { get; set; }
+    [System.ComponentModel.DataAnnotations.Range(ulong.MinValue, ulong.MaxValue)]
+    public ulong Keep { get; set; }
 }

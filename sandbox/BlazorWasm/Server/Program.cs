@@ -2,6 +2,7 @@ using BlazorWasm.Server.NatsServices;
 using Example.Core;
 using NATS.Client.Hosting;
 using OpenTelemetry.Trace;
+using NATS.Client.Serializers.Json;
 
 TracingSetup.SetSandboxEnv();
 
@@ -16,7 +17,12 @@ builder.Services.AddOpenTelemetry()
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
-builder.Services.AddNats(configureOpts: opt => opt with { Url = "localhost:4222", Name = "BlazorServer" });
+builder.Services.AddNats(configureOpts: opt => opt with
+{
+    SerializerRegistry = NatsJsonSerializerRegistry.Default,
+    Url = "localhost:4222",
+    Name = "BlazorServer",
+});
 builder.Services.AddHostedService<WeatherForecastService>();
 
 var app = builder.Build();

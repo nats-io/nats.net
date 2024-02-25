@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using NATS.Client.Core.Tests;
 
 namespace NATS.Client.JetStream.Tests;
@@ -115,6 +116,69 @@ public class OrderedConsumerTest
                 i++;
             }
         }
+    }
+
+    [Fact]
+    public async Task Fetch_no_wait_test()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+        var js = new NatsJSContext(nats);
+
+        var stream = await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
+
+        var consumer = await stream.CreateOrderedConsumerAsync(cancellationToken: cts.Token);
+
+        // Where there is no data, we should not wait for the timeout.
+        var count = 0;
+        var stopwatch = Stopwatch.StartNew();
+        await foreach (var msg in consumer.FetchNoWaitAsync<int>(opts: new NatsJSFetchOpts { MaxMsgs = 10 }, cancellationToken: cts.Token))
+        {
+            count++;
+        }
+
+        stopwatch.Stop();
+
+        _output.WriteLine($"stopwatch.Elapsed: {stopwatch.Elapsed}");
+
+        Assert.Equal(0, count);
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(3));
+
+        // Where there is less than we want to fetch, we should get all the messages
+        // without waiting for the timeout.
+        for (var i = 0; i < 10; i++)
+        {
+            await js.PublishAsync("s1.foo", i, cancellationToken: cts.Token);
+        }
+
+        stopwatch.Restart();
+        var iterationCount = 0;
+        while (!cts.IsCancellationRequested)
+        {
+            var currentCount = 0;
+            await foreach (var msg in consumer.FetchNoWaitAsync<int>(opts: new NatsJSFetchOpts { MaxMsgs = 6 }, cancellationToken: cts.Token))
+            {
+                _output.WriteLine($"[RCV][{iterationCount}] {msg.Data}");
+                Assert.Equal(count, msg.Data);
+                count++;
+                currentCount++;
+            }
+
+            // no data
+            if (currentCount == 0)
+            {
+                break;
+            }
+
+            iterationCount++;
+        }
+
+        stopwatch.Stop();
+
+        Assert.Equal(2, iterationCount);
+        Assert.Equal(10, count);
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(3));
     }
 
     [Fact]

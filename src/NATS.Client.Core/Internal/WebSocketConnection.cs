@@ -8,6 +8,7 @@ internal sealed class WebSocketConnection : ISocketConnection
 {
     private readonly ClientWebSocket _socket;
     private readonly TaskCompletionSource<Exception> _waitForClosedSource = new();
+    private readonly TimeSpan _socketCloseTimeout = TimeSpan.FromSeconds(5); // matches _socketComponentDisposeTimeout in NatsConnection.cs
     private int _disposed;
 
     public WebSocketConnection()
@@ -78,7 +79,7 @@ internal sealed class WebSocketConnection : ISocketConnection
         return default;
     }
 
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (Interlocked.Increment(ref _disposed) == 1)
         {
@@ -90,10 +91,17 @@ internal sealed class WebSocketConnection : ISocketConnection
             {
             }
 
+            try
+            {
+                var cts = new CancellationTokenSource(_socketCloseTimeout);
+                await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, default, cts.Token).ConfigureAwait(false);
+            }
+            catch
+            {
+            }
+
             _socket.Dispose();
         }
-
-        return default;
     }
 
     // when catch SocketClosedException, call this method.

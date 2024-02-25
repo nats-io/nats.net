@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.JetStream.Internal;
@@ -195,6 +197,22 @@ public partial class NatsJSContext
         }
     }
 
+    internal static void ThrowIfInvalidStreamName([NotNull] string? name, [CallerArgumentExpression("name")] string? paramName = null)
+    {
+        ArgumentNullException.ThrowIfNull(name, paramName);
+
+        if (name.Length == 0)
+        {
+            ThrowEmptyException(paramName);
+        }
+
+        var nameSpan = name.AsSpan();
+        if (nameSpan.IndexOfAny(" .") >= 0)
+        {
+            ThrowInvalidStreamNameException(paramName);
+        }
+    }
+
     internal string NewInbox() => NatsConnection.NewInbox(Connection.Opts.InboxPrefix);
 
     internal async ValueTask<TResponse> JSRequestResponseAsync<TRequest, TResponse>(
@@ -273,4 +291,12 @@ public partial class NatsJSContext
             throw;
         }
     }
+
+    [DoesNotReturn]
+    private static void ThrowInvalidStreamNameException(string? paramName) =>
+        throw new ArgumentException("Stream name cannot contain ' ', '.'", paramName);
+
+    [DoesNotReturn]
+    private static void ThrowEmptyException(string? paramName) =>
+        throw new ArgumentException("The value cannot be an empty string.", paramName);
 }

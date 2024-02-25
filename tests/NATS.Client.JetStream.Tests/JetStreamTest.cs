@@ -9,6 +9,42 @@ public class JetStreamTest
 
     public JetStreamTest(ITestOutputHelper output) => _output = output;
 
+    [Theory]
+    [InlineData("Invalid.DotName")]
+    [InlineData("Invalid SpaceName")]
+    [InlineData(null)]
+    public async Task Stream_invalid_name_test(string? streamName)
+    {
+        var jsmContext = new NatsJSContext(new NatsConnection());
+
+        var cfg = new StreamConfig()
+        {
+            Name = streamName,
+            Subjects = new[] { "events.*" },
+        };
+
+        // Create stream
+        await Assert.ThrowsAnyAsync<ArgumentException>(async () => await jsmContext.CreateStreamAsync(cfg));
+
+        // Delete stream
+        await Assert.ThrowsAnyAsync<ArgumentException>(async () => await jsmContext.DeleteStreamAsync(streamName!));
+
+        // Get stream
+        await Assert.ThrowsAnyAsync<ArgumentException>(async () => await jsmContext.GetStreamAsync(streamName!, null));
+
+        // Update stream
+        await Assert.ThrowsAnyAsync<ArgumentException>(async () => await jsmContext.UpdateStreamAsync(cfg));
+
+        // Purge stream
+        await Assert.ThrowsAnyAsync<ArgumentException>(async () => await jsmContext.PurgeStreamAsync(streamName!, new StreamPurgeRequest()));
+
+        // Get stream
+        await Assert.ThrowsAnyAsync<ArgumentException>(async () => await jsmContext.GetStreamAsync(streamName!));
+
+        // Delete Messages
+        await Assert.ThrowsAnyAsync<ArgumentException>(async () => await jsmContext.DeleteMessageAsync(streamName!, new StreamMsgDeleteRequest()));
+    }
+
     [Fact]
     public async Task Create_stream_test()
     {

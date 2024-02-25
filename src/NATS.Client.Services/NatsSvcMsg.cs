@@ -55,6 +55,11 @@ public readonly struct NatsSvcMsg<T>
     public string? ReplyTo => _msg.ReplyTo;
 
     /// <summary>
+    /// Pass additional information using name-value pairs.
+    /// </summary>
+    public NatsHeaders? Headers => _msg.Headers;
+
+    /// <summary>
     /// Send a reply with an empty message body.
     /// </summary>
     /// <param name="headers">Optional message headers.</param>

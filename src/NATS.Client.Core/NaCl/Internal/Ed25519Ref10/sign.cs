@@ -26,7 +26,7 @@ namespace NATS.Client.Core.NaCl.Internal.Ed25519Ref10
 		{
 			byte[] az, r, hram;
 			GroupElementP3 R;
-		    var hasher = new Sha512();
+		    using var hasher = new Sha512();
 			{
                 hasher.Update(sk, skoffset, 32);
 			    az = hasher.Finalize();

@@ -40,7 +40,7 @@ public class NatsSvcServer : INatsSvcServer
         _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _channel = Channel.CreateBounded<SvcMsg>(32);
         _taskMsgLoop = Task.Run(MsgLoop);
-        _started = DateTimeOffset.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffffffZ");
+        _started = DateTimeOffset.UtcNow.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fffffff'Z'");
     }
 
     /// <summary>

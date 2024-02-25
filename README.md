@@ -1,3 +1,6 @@
+[![License Apache 2.0](https://img.shields.io/badge/License-Apache2-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+[![NuGet](https://img.shields.io/nuget/v/NATS.Net.svg?cacheSeconds=3600)](https://www.nuget.org/packages/NATS.Net)
+
 # NATS.Net
 
 [NATS](https://nats.io) client for modern [.NET](https://dot.net/).
@@ -34,6 +37,8 @@ Check out the [documentation](https://nats-io.github.io/nats.net.v2/) for guides
 - Run `dotnet build` at root directory and make sure there are no errors or warnings
 
 Find us on [slack.nats.io dotnet channel](https://natsio.slack.com/channels/dotnet)
+
+Please also check out the [Contributor Guide](CONTRIBUTING.md) and [Code of Conduct](CODE-OF-CONDUCT.md).
 
 ## Attribution
 

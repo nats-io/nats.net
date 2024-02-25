@@ -47,9 +47,10 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
     private readonly Task _commandTask;
 
     private ulong _sequenceStream;
-    private long _sequenceConsumer;
+    private ulong _sequenceConsumer;
     private string _consumer;
     private volatile NatsKVWatchSub<T>? _sub;
+    private INatsJSConsumer? _initialConsumer;
 
     public NatsKVWatcher(
         NatsJSContext context,
@@ -114,6 +115,12 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
 
     public ChannelReader<NatsKVEntry<T>> Entries => _entryChannel.Reader;
 
+    internal INatsJSConsumer InitialConsumer
+    {
+        get => _initialConsumer ?? throw new InvalidOperationException("Consumer not initialized");
+        private set => _initialConsumer = value;
+    }
+
     internal string Consumer
     {
         get => Volatile.Read(ref _consumer);
@@ -136,10 +143,10 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
         await _commandTask;
     }
 
-    internal ValueTask InitAsync()
+    internal async ValueTask InitAsync()
     {
         Consumer = NewNuid();
-        return CreatePushConsumer("init");
+        InitialConsumer = await CreatePushConsumer("init");
     }
 
     private ValueTask OnDisconnected(object? sender, NatsEventArgs args)
@@ -219,7 +226,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
 
                                     var sequence = Interlocked.Increment(ref _sequenceConsumer);
 
-                                    if (sequence != (long)metadata.Sequence.Consumer)
+                                    if (sequence != metadata.Sequence.Consumer)
                                     {
                                         CreateSub("sequence-mismatch");
                                         _logger.LogWarning(NatsKVLogEvents.RecreateConsumer, "Missed messages, recreating consumer");
@@ -231,7 +238,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
                                         continue;
                                     }
 
-                                    var delta = (long)metadata.NumPending;
+                                    var delta = metadata.NumPending;
 
                                     var entry = new NatsKVEntry<T>(_bucket, key)
                                     {
@@ -308,7 +315,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
         }
     }
 
-    private async ValueTask CreatePushConsumer(string origin)
+    private async ValueTask<INatsJSConsumer> CreatePushConsumer(string origin)
     {
         if (_debug)
         {
@@ -375,7 +382,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
             config.OptStartSeq = sequence + 1;
         }
 
-        await _context.CreateOrUpdateConsumerAsync(
+        var consumer = await _context.CreateOrUpdateConsumerAsync(
             _stream,
             config,
             cancellationToken: _cancellationToken);
@@ -384,6 +391,8 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
         {
             _logger.LogDebug(NatsKVLogEvents.NewConsumerCreated, "Created new consumer {Consumer} from {Origin}", Consumer, origin);
         }
+
+        return consumer;
     }
 
     private string NewNuid()

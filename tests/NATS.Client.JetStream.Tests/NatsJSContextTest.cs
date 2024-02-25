@@ -27,4 +27,12 @@ public class NatsJSContextTest
             interfaceMethods.Select(m => m.Name).Should().Contain(name);
         }
     }
+
+    [Fact]
+    public void Invalid_stream_validation_test()
+    {
+        Assert.Throws<ArgumentNullException>(() => NatsJSContext.ThrowIfInvalidStreamName(null!));
+        Assert.Throws<ArgumentException>(() => NatsJSContext.ThrowIfInvalidStreamName("Invalid.DotName"));
+        Assert.Throws<ArgumentException>(() => NatsJSContext.ThrowIfInvalidStreamName("Invalid SpaceName"));
+    }
 }

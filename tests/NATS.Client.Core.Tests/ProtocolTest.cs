@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Collections.Concurrent;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using NATS.Client.TestUtilities;
@@ -335,17 +336,29 @@ public class ProtocolTest
             () => proxy.ClientFrames.Any(f => f.Message.StartsWith("PUB foo")));
 
         var frames = proxy.ClientFrames.Select(f => f.Message).ToList();
+
+        foreach (var frame in frames)
+        {
+            _output.WriteLine($"frame: {frame}");
+        }
+
         Assert.StartsWith("SUB foo", frames[0]);
-        Assert.StartsWith("PUB bar1", frames[1]);
-        Assert.StartsWith("PUB bar2", frames[2]);
-        Assert.StartsWith("PUB bar3", frames[3]);
-        Assert.StartsWith("PUB foo", frames[4]);
+
+        for (var i = 0; i < 100; i++)
+        {
+            Assert.StartsWith($"PUB bar{i}", frames[i + 1]);
+        }
+
+        Assert.StartsWith("PUB foo", frames[101]);
 
         await nats.DisposeAsync();
     }
 
-    [Fact]
-    public async Task Protocol_parser_under_load()
+    [Theory]
+    [InlineData(1)]
+    [InlineData(1024)]
+    [InlineData(1024 * 1024)]
+    public async Task Protocol_parser_under_load(int size)
     {
         await using var server = NatsServer.Start();
         var logger = new InMemoryTestLoggerFactory(LogLevel.Error);
@@ -355,24 +368,27 @@ public class ProtocolTest
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         var signal = new WaitSignal();
-
+        var counts = new ConcurrentDictionary<string, int>();
         _ = Task.Run(
             async () =>
             {
                 var count = 0;
-                await foreach (var unused in nats.SubscribeAsync<string>("x", cancellationToken: cts.Token))
+                await foreach (var msg in nats.SubscribeAsync<byte[]>("x.*", cancellationToken: cts.Token))
                 {
-                    if (++count > 10_000)
+                    if (++count > 100)
                         signal.Pulse();
+                    counts.AddOrUpdate(msg.Subject, 1, (_, c) => c + 1);
                 }
             },
             cts.Token);
 
+        var payload = new byte[size];
+        var r = 0;
         _ = Task.Run(
             async () =>
             {
                 while (!cts.Token.IsCancellationRequested)
-                    await nats.PublishAsync("x", "x", cancellationToken: cts.Token);
+                    await nats.PublishAsync($"x.{Volatile.Read(ref r)}", payload, cancellationToken: cts.Token);
             },
             cts.Token);
 
@@ -381,13 +397,98 @@ public class ProtocolTest
         for (var i = 0; i < 3; i++)
         {
             await Task.Delay(1_000, cts.Token);
+            var subjectCount = counts.Count;
             await server.RestartAsync();
+            Interlocked.Increment(ref r);
+
+            await Retry.Until("subject count goes up", () => counts.Count > subjectCount);
         }
 
         foreach (var log in logger.Logs.Where(x => x.EventId == NatsLogEvents.Protocol && x.LogLevel == LogLevel.Error))
         {
             Assert.DoesNotContain("Unknown Protocol Operation", log.Message);
         }
+
+        foreach (var (key, value) in counts)
+        {
+            _output.WriteLine($"{key} {value}");
+        }
+
+        counts.Count.Should().BeGreaterOrEqualTo(3);
+    }
+
+    [Fact]
+    public async Task Proactively_reject_payloads_over_the_threshold_set_by_server()
+    {
+        await using var server = NatsServer.Start();
+        await using var nats = server.CreateClientConnection();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        var sync = 0;
+        var count = 0;
+        var signal1 = new WaitSignal<NatsMsg<byte[]>>();
+        var signal2 = new WaitSignal<NatsMsg<byte[]>>();
+        var subTask = Task.Run(
+            async () =>
+            {
+                await foreach (var m in nats.SubscribeAsync<byte[]>("foo.*", cancellationToken: cts.Token))
+                {
+                    if (m.Subject == "foo.sync")
+                    {
+                        Interlocked.Exchange(ref sync, 1);
+                        continue;
+                    }
+
+                    Interlocked.Increment(ref count);
+
+                    if (m.Subject == "foo.signal1")
+                    {
+                        signal1.Pulse(m);
+                    }
+                    else if (m.Subject == "foo.signal2")
+                    {
+                        signal2.Pulse(m);
+                    }
+                    else if (m.Subject == "foo.end")
+                    {
+                        break;
+                    }
+                }
+            },
+            cancellationToken: cts.Token);
+
+        await Retry.Until(
+            reason: "subscription is active",
+            condition: () => Volatile.Read(ref sync) == 1,
+            action: async () => await nats.PublishAsync("foo.sync", cancellationToken: cts.Token),
+            retryDelay: TimeSpan.FromSeconds(.3));
+        {
+            var payload = new byte[nats.ServerInfo!.MaxPayload];
+            await nats.PublishAsync("foo.signal1", payload, cancellationToken: cts.Token);
+            var msg1 = await signal1;
+            Assert.Equal(payload.Length, msg1.Data!.Length);
+        }
+
+        {
+            var payload = new byte[nats.ServerInfo!.MaxPayload + 1];
+            var exception = await Assert.ThrowsAsync<NatsException>(async () =>
+                await nats.PublishAsync("foo.none", payload, cancellationToken: cts.Token));
+            Assert.Matches(@"Payload size \d+ exceeds server's maximum payload size \d+", exception.Message);
+        }
+
+        {
+            var payload = new byte[123];
+            await nats.PublishAsync("foo.signal2", payload, cancellationToken: cts.Token);
+            var msg1 = await signal2;
+            Assert.Equal(payload.Length, msg1.Data!.Length);
+        }
+
+        await nats.PublishAsync("foo.end", cancellationToken: cts.Token);
+
+        await subTask;
+
+        Assert.Equal(3, Volatile.Read(ref count));
     }
 
     private sealed class NatsSubReconnectTest : NatsSubBase
@@ -403,9 +504,10 @@ public class ProtocolTest
             await base.WriteReconnectCommandsAsync(commandWriter, sid);
 
             // Any additional commands to send on reconnect
-            await commandWriter.PublishAsync("bar1", default, default, default, NatsRawSerializer<byte>.Default, default);
-            await commandWriter.PublishAsync("bar2", default, default, default, NatsRawSerializer<byte>.Default, default);
-            await commandWriter.PublishAsync("bar3", default, default, default, NatsRawSerializer<byte>.Default, default);
+            for (var i = 0; i < 100; i++)
+            {
+                await commandWriter.PublishAsync($"bar{i}", default, default, default, NatsRawSerializer<byte>.Default, default);
+            }
         }
 
         protected override ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)

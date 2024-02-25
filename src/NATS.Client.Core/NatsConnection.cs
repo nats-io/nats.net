@@ -32,7 +32,7 @@ public partial class NatsConnection : INatsConnection
     public Func<(string Host, int Port), ValueTask<(string Host, int Port)>>? OnConnectingAsync;
 
     internal readonly ConnectionStatsCounter Counter; // allow to call from external sources
-    internal ServerInfo? WritableServerInfo;
+    internal volatile ServerInfo? WritableServerInfo;
     internal bool IsDisposed;
 
 #pragma warning restore SA1401
@@ -56,7 +56,6 @@ public partial class NatsConnection : INatsConnection
     private volatile NatsUri? _currentConnectUri;
     private volatile NatsUri? _lastSeedConnectUri;
     private NatsReadProtocolProcessor? _socketReader;
-    private NatsPipeliningWriteProtocolProcessor? _socketWriter;
     private TaskCompletionSource _waitForOpenConnection;
     private TlsCerts? _tlsCerts;
     private UserCredentials? _userCredentials;
@@ -80,7 +79,7 @@ public partial class NatsConnection : INatsConnection
         _cancellationTimerPool = new CancellationTimerPool(_pool, _disposedCancellationTokenSource.Token);
         _name = opts.Name;
         Counter = new ConnectionStatsCounter();
-        CommandWriter = new CommandWriter(Opts, Counter, EnqueuePing);
+        CommandWriter = new CommandWriter(this, _pool, Opts, Counter, EnqueuePing);
         InboxPrefix = NewInbox(opts.InboxPrefix);
         SubscriptionManager = new SubscriptionManager(this, InboxPrefix);
         _logger = opts.LoggerFactory.CreateLogger<NatsConnection>();
@@ -133,7 +132,8 @@ public partial class NatsConnection : INatsConnection
 
     internal ObjectPool ObjectPool => _pool;
 
-    internal bool SocketIsWebSocket => _socket is WebSocketConnection;
+    // only used for internal testing
+    internal ISocketConnection? TestSocket => _socket;
 
     /// <summary>
     /// Connect socket and write CONNECT command to nats server.
@@ -217,7 +217,8 @@ public partial class NatsConnection : INatsConnection
     {
         try
         {
-            return CommandWriter.UnsubscribeAsync(sid, CancellationToken.None);
+            // TODO: use maxMsgs in INatsSub<T> to unsubscribe.
+            return CommandWriter.UnsubscribeAsync(sid, null, CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -430,7 +431,7 @@ public partial class NatsConnection : INatsConnection
             // Authentication
             _userCredentials?.Authenticate(_clientOpts, WritableServerInfo);
 
-            await using (var priorityCommandWriter = new PriorityCommandWriter(_socket!, Opts, Counter, EnqueuePing))
+            await using (var priorityCommandWriter = new PriorityCommandWriter(this, _pool, _socket!, Opts, Counter, EnqueuePing))
             {
                 // add CONNECT and PING command to priority lane
                 await priorityCommandWriter.CommandWriter.ConnectAsync(_clientOpts, CancellationToken.None).ConfigureAwait(false);
@@ -454,7 +455,7 @@ public partial class NatsConnection : INatsConnection
             }
 
             // create the socket writer
-            _socketWriter = CommandWriter.CreateNatsPipeliningWriteProtocolProcessor(_socket!);
+            CommandWriter.Reset(_socket!);
 
             lock (_gate)
             {
@@ -499,6 +500,8 @@ public partial class NatsConnection : INatsConnection
             // If dispose this client, WaitForClosed throws OperationCanceledException so stop reconnect-loop correctly.
             await _socket!.WaitForClosed.ConfigureAwait(false);
 
+            await CommandWriter.CancelReaderLoopAsync().ConfigureAwait(false);
+
             _logger.LogTrace(NatsLogEvents.Connection, "Connection {Name} is closed. Will cleanup and reconnect", _name);
             lock (_gate)
             {
@@ -528,7 +531,7 @@ public partial class NatsConnection : INatsConnection
             _currentConnectUri = null;
             var urlEnumerator = urls.AsEnumerable().GetEnumerator();
             NatsUri? url = null;
-            CONNECT_AGAIN:
+        CONNECT_AGAIN:
             try
             {
                 if (urlEnumerator.MoveNext())
@@ -799,13 +802,6 @@ public partial class NatsConnection : INatsConnection
     // Dispose Reader(Drain read buffers but no reads more)
     private async ValueTask DisposeSocketAsync(bool asyncReaderDispose)
     {
-        // writer's internal buffer/channel is not thread-safe, must wait until complete.
-        if (_socketWriter != null)
-        {
-            await DisposeSocketComponentAsync(_socketWriter, "socket writer").ConfigureAwait(false);
-            _socketWriter = null;
-        }
-
         if (_socket != null)
         {
             await DisposeSocketComponentAsync(_socket, "socket").ConfigureAwait(false);

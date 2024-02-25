@@ -21,8 +21,8 @@ public class NatsHeaderTest
             ["key"] = "a-long-header-value",
         };
         var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
-        var writer = new HeaderWriter(pipe.Writer, Encoding.UTF8);
-        var written = writer.Write(headers);
+        var writer = new HeaderWriter(Encoding.UTF8);
+        var written = writer.Write(pipe.Writer, headers);
 
         var text = "NATS/1.0\r\nk1: v1\r\nk2: v2-0\r\nk2: v2-1\r\na-long-header-key: value\r\nkey: a-long-header-value\r\n\r\n";
         var expected = new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(text));
@@ -30,7 +30,24 @@ public class NatsHeaderTest
         Assert.Equal(expected.Length, written);
         await pipe.Writer.FlushAsync();
         var result = await pipe.Reader.ReadAtLeastAsync((int)written);
+        Assert.True(expected.ToSpan().SequenceEqual(result.Buffer.ToSpan()));
+        _output.WriteLine($"Buffer:\n{result.Buffer.FirstSpan.Dump()}");
+    }
 
+    [Fact]
+    public async Task WriterEmptyTests()
+    {
+        var headers = new NatsHeaders();
+        var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
+        var writer = new HeaderWriter(Encoding.UTF8);
+        var written = writer.Write(pipe.Writer, headers);
+
+        var text = "NATS/1.0\r\n\r\n";
+        var expected = new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(text));
+
+        Assert.Equal(expected.Length, written);
+        await pipe.Writer.FlushAsync();
+        var result = await pipe.Reader.ReadAtLeastAsync((int)written);
         Assert.True(expected.ToSpan().SequenceEqual(result.Buffer.ToSpan()));
         _output.WriteLine($"Buffer:\n{result.Buffer.FirstSpan.Dump()}");
     }
