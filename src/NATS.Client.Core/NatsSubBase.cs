@@ -244,6 +244,8 @@ public abstract class NatsSubBase
         }
         catch (Exception e)
         {
+            _logger.LogError(NatsLogEvents.Subscription, e, "Error while processing message");
+
             var payload = new Memory<byte>(new byte[payloadBuffer.Length]);
             payloadBuffer.CopyTo(payload.Span);
 
