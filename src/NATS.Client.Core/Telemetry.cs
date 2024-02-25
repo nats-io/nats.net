@@ -224,7 +224,10 @@ internal static class Telemetry
         var message = GetMessage(exception);
         var eventTags = new ActivityTagsCollection
         {
-            ["exception.escaped"] = BoxedTrue, ["exception.type"] = exception.GetType().FullName, ["exception.message"] = message, ["exception.stacktrace"] = GetStackTrace(exception),
+            ["exception.escaped"] = BoxedTrue,
+            ["exception.type"] = exception.GetType().FullName,
+            ["exception.message"] = message,
+            ["exception.stacktrace"] = GetStackTrace(exception),
         };
 
         var activityEvent = new ActivityEvent("exception", DateTimeOffset.UtcNow, eventTags);

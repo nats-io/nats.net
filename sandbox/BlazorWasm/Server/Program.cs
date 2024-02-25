@@ -1,8 +1,8 @@
 using BlazorWasm.Server.NatsServices;
 using Example.Core;
 using NATS.Client.Hosting;
-using OpenTelemetry.Trace;
 using NATS.Client.Serializers.Json;
+using OpenTelemetry.Trace;
 
 TracingSetup.SetSandboxEnv();
 

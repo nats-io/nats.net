@@ -83,6 +83,22 @@ public partial class NatsJSContext
         CancellationToken cancellationToken = default)
         => PublishAsync(Telemetry.NatsActivities, subject, data, serializer, opts, headers, cancellationToken);
 
+    internal static void ThrowIfInvalidStreamName([NotNull] string? name, [CallerArgumentExpression("name")] string? paramName = null)
+    {
+        ArgumentNullException.ThrowIfNull(name, paramName);
+
+        if (name.Length == 0)
+        {
+            ThrowEmptyException(paramName);
+        }
+
+        var nameSpan = name.AsSpan();
+        if (nameSpan.IndexOfAny(" .") >= 0)
+        {
+            ThrowInvalidStreamNameException(paramName);
+        }
+    }
+
     internal async ValueTask<PubAckResponse> PublishAsync<T>(
         ActivitySource activitySource,
         string subject,
@@ -194,22 +210,6 @@ public partial class NatsJSContext
         {
             Telemetry.SetException(activity, ex);
             throw;
-        }
-    }
-
-    internal static void ThrowIfInvalidStreamName([NotNull] string? name, [CallerArgumentExpression("name")] string? paramName = null)
-    {
-        ArgumentNullException.ThrowIfNull(name, paramName);
-
-        if (name.Length == 0)
-        {
-            ThrowEmptyException(paramName);
-        }
-
-        var nameSpan = name.AsSpan();
-        if (nameSpan.IndexOfAny(" .") >= 0)
-        {
-            ThrowInvalidStreamNameException(paramName);
         }
     }
 

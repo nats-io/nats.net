@@ -132,6 +132,8 @@ public partial class NatsConnection : INatsConnection
 
     internal ObjectPool ObjectPool => _pool;
 
+    internal bool SocketIsWebSocket => _socket is WebSocketConnection;
+
     // only used for internal testing
     internal ISocketConnection? TestSocket => _socket;
 
