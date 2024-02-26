@@ -10,6 +10,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\..\src\NATS.Client.Services\NATS.Client.Services.csproj" />
+      <ProjectReference Include="..\Example.Core\Example.Core.csproj" />
     </ItemGroup>
 
   <ItemGroup>

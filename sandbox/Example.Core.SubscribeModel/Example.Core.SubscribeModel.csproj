@@ -11,6 +11,7 @@
     <ItemGroup>
       <ProjectReference Include="..\..\src\NATS.Client.Core\NATS.Client.Core.csproj" />
       <ProjectReference Include="..\..\src\NATS.Client.Serializers.Json\NATS.Client.Serializers.Json.csproj" />
+      <ProjectReference Include="..\Example.Core\Example.Core.csproj" />
     </ItemGroup>
 
   <ItemGroup>

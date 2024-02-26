@@ -1,9 +1,12 @@
 using System.Diagnostics;
 using System.Text;
+using Example.Core;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Models;
+
+using var tracer = TracingSetup.RunSandboxTracing(internalTraces: false);
 
 var cts = new CancellationTokenSource();
 
@@ -82,6 +85,7 @@ try
                 // NoWaitFetch is a specialized operation not available on the public interface.
                 await foreach (var msg in ((NatsJSConsumer)consumer).FetchNoWaitAsync<NatsMemoryOwner<byte>>(opts: fetchNoWaitOpts, cancellationToken: cts.Token))
                 {
+                    using var activity = msg.StartChildActivity();
                     fetchMsgCount++;
                     using (msg.Data)
                     {
@@ -120,6 +124,7 @@ try
                 await consumer.RefreshAsync(cts.Token);
                 await foreach (var msg in consumer.FetchAsync<NatsMemoryOwner<byte>>(opts: fetchOpts, cancellationToken: cts.Token))
                 {
+                    using var activity = msg.StartChildActivity();
                     using (msg.Data)
                     {
                         var message = Encoding.ASCII.GetString(msg.Data.Span);
@@ -151,6 +156,7 @@ try
                 var next = await consumer.NextAsync<NatsMemoryOwner<byte>>(opts: nextOpts, cancellationToken: cts.Token);
                 if (next is { } msg)
                 {
+                    using var activity = msg.StartChildActivity();
                     using (msg.Data)
                     {
                         var message = Encoding.ASCII.GetString(msg.Data.Span);
@@ -183,6 +189,7 @@ try
                 var consumeStop = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
                 await foreach (var msg in consumer.ConsumeAsync<NatsMemoryOwner<byte>>(opts: consumeOpts, cancellationToken: consumeStop.Token))
                 {
+                    using var activity = msg.StartChildActivity();
                     using (msg.Data)
                     {
                         var message = Encoding.ASCII.GetString(msg.Data.Span);

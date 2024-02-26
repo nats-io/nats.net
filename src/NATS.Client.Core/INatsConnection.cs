@@ -1,5 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
-
 namespace NATS.Client.Core;
 
 public interface INatsConnection : IAsyncDisposable

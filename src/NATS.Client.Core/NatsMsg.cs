@@ -1,4 +1,4 @@
-using System.Buffers;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 
 namespace NATS.Client.Core;
@@ -120,42 +120,11 @@ public readonly record struct NatsMsg<T>(
     T? Data,
     INatsConnection? Connection) : INatsMsg<T>
 {
-    internal static NatsMsg<T> Build(
-        string subject,
-        string? replyTo,
-        in ReadOnlySequence<byte>? headersBuffer,
-        in ReadOnlySequence<byte> payloadBuffer,
-        INatsConnection? connection,
-        NatsHeaderParser headerParser,
-        INatsDeserialize<T> serializer)
-    {
-        // Consider an empty payload as null or default value for value types. This way we are able to
-        // receive sentinels as nulls or default values. This might cause an issue with where we are not
-        // able to differentiate between an empty sentinel and actual default value of a struct e.g. 0 (zero).
-        var data = payloadBuffer.Length > 0
-            ? serializer.Deserialize(payloadBuffer)
-            : default;
-
-        NatsHeaders? headers = null;
-
-        if (headersBuffer != null)
-        {
-            headers = new NatsHeaders();
-            if (!headerParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), headers))
-            {
-                throw new NatsException("Error parsing headers");
-            }
-
-            headers.SetReadOnly();
-        }
-
-        var size = subject.Length
-                   + (replyTo?.Length ?? 0)
-                   + (headersBuffer?.Length ?? 0)
-                   + payloadBuffer.Length;
-
-        return new NatsMsg<T>(subject, replyTo, (int)size, headers, data, connection);
-    }
+    /// <summary>
+    /// Activity used to trace the receiving of the this message. It can be used to create child activities under this context.
+    /// </summary>
+    /// <seealso cref="NatsMsgTelemetryExtensions.StartChildActivity{T}"/>
+    public Activity? Activity => Headers?.Activity;
 
     /// <summary>
     /// Reply with an empty message.
@@ -168,7 +137,10 @@ public readonly record struct NatsMsg<T>(
     public ValueTask ReplyAsync(NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         CheckReplyPreconditions();
-        return Connection.PublishAsync(ReplyTo, headers, replyTo, opts, cancellationToken);
+        var activitySource = Activity?.Source ?? Telemetry.NatsInternalActivities;
+
+        // TODO: un-hack
+        return ((NatsConnection)Connection).PublishNoneAsync(activitySource, subject: ReplyTo, headers, replyTo, cancellationToken);
     }
 
     /// <summary>
@@ -196,7 +168,10 @@ public readonly record struct NatsMsg<T>(
     public ValueTask ReplyAsync<TReply>(TReply data, NatsHeaders? headers = default, string? replyTo = default, INatsSerialize<TReply>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         CheckReplyPreconditions();
-        return Connection.PublishAsync(ReplyTo, data, headers, replyTo, serializer, opts, cancellationToken);
+        var activitySource = Activity?.Source ?? Telemetry.NatsInternalActivities;
+
+        // TODO: un-hack
+        return ((NatsConnection)Connection).PublishAsync(activitySource, subject: ReplyTo, data, headers, replyTo, serializer, cancellationToken);
     }
 
     /// <summary>
@@ -214,7 +189,10 @@ public readonly record struct NatsMsg<T>(
     public ValueTask ReplyAsync<TReply>(NatsMsg<TReply> msg, INatsSerialize<TReply>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         CheckReplyPreconditions();
-        return Connection.PublishAsync(msg with { Subject = ReplyTo }, serializer, opts, cancellationToken);
+        var activitySource = Activity?.Source ?? Telemetry.NatsInternalActivities;
+
+        // TODO: un-hack
+        return ((NatsConnection)Connection).PublishAsync(activitySource, subject: ReplyTo, msg.Data, msg.Headers, msg.ReplyTo, serializer, cancellationToken);
     }
 
     [MemberNotNull(nameof(Connection))]

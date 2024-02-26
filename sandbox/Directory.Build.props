@@ -1,0 +1,12 @@
+<Project>
+    <!-- Multi-layer .props files must be imported manually -->
+    <Import Project="..\Directory.Build.props" />
+
+    <ItemGroup>
+        <ProjectReference Include="$(MSBuildThisFileDirectory)..\src\NATS.Net.OpenTelemetry\NATS.Net.OpenTelemetry.csproj"/>
+        <PackageReference Include="OpenTelemetry" Version="1.6.0" />
+        <PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.6.0" />
+        <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.6.0" />
+    </ItemGroup>
+
+</Project>

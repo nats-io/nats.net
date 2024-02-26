@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using NATS.Client.Core;
@@ -146,6 +147,12 @@ public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
     }
 
     /// <summary>
+    /// Activity used to trace the receiving of the this message. It can be used to create child activities under this context.
+    /// </summary>
+    /// <seealso cref="NatsJSMsgTelemetryExtensions.StartChildActivity{T}"/>
+    public Activity? Activity => _msg.Activity;
+
+    /// <summary>
     /// Subject of the user message.
     /// </summary>
     public string Subject => _msg.Subject;
@@ -260,13 +267,16 @@ public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
     private async ValueTask SendAckAsync(ReadOnlySequence<byte> payload, AckOpts? opts = default, CancellationToken cancellationToken = default)
     {
         CheckPreconditions();
+        var activitySource = Activity?.Source ?? Telemetry.NatsInternalActivities;
 
         if (_msg == default)
             throw new NatsJSException("No user message, can't acknowledge");
 
         if (opts?.DoubleAck ?? _context.Opts.DoubleAck)
         {
-            await Connection.RequestAsync<ReadOnlySequence<byte>, object?>(
+            // TODO: un-hack
+            await ((NatsConnection)Connection).RequestAsync<ReadOnlySequence<byte>, object?>(
+                activitySource,
                 subject: ReplyTo,
                 data: payload,
                 requestSerializer: NatsRawSerializer<ReadOnlySequence<byte>>.Default,
@@ -275,7 +285,14 @@ public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
         }
         else
         {
-            await _msg.ReplyAsync(
+            var sub = ReplyTo;
+            if (string.IsNullOrWhiteSpace(sub))
+                throw new NatsException("unable to send reply; ReplyTo is empty");
+
+            // TODO: un-hack
+            await ((NatsConnection)Connection).PublishAsync(
+                activitySource,
+                subject: sub,
                 data: payload,
                 serializer: NatsRawSerializer<ReadOnlySequence<byte>>.Default,
                 cancellationToken: cancellationToken);

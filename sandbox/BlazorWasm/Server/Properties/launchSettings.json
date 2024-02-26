@@ -1,14 +1,16 @@
 {
-    "profiles": {
-      "BlazorWasm.Server": {
-        "commandName": "Project",
-        "dotnetRunMessages": true,
-        "launchBrowser": true,
-        "inspectUri": "{wsProtocol}://{url.hostname}:{url.port}/_framework/debug/ws-proxy?browser={browserInspectUri}",
-        "applicationUrl": "http://localhost:5000",
-        "environmentVariables": {
-          "ASPNETCORE_ENVIRONMENT": "Development"
-        }
+  "$schema": "http://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "BlazorWasm.Server": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "inspectUri": "{wsProtocol}://{url.hostname}:{url.port}/_framework/debug/ws-proxy?browser={browserInspectUri}",
+      "applicationUrl": "http://localhost:5000",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "OTEL_SERVICE_NAME": "BlazorWasm.Server"
       }
     }
   }
+}

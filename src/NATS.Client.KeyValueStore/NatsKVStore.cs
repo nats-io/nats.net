@@ -57,7 +57,7 @@ public class NatsKVStore : INatsKVStore
     /// <inheritdoc />
     public async ValueTask<ulong> PutAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
-        var ack = await _context.PublishAsync($"$KV.{Bucket}.{key}", value, serializer: serializer, cancellationToken: cancellationToken);
+        var ack = await _context.PublishAsync(Telemetry.NatsActivities, $"$KV.{Bucket}.{key}", value, serializer: serializer, cancellationToken: cancellationToken);
         ack.EnsureSuccess();
         return ack.Seq;
     }
@@ -94,7 +94,7 @@ public class NatsKVStore : INatsKVStore
 
         try
         {
-            var ack = await _context.PublishAsync($"$KV.{Bucket}.{key}", value, headers: headers, serializer: serializer, cancellationToken: cancellationToken);
+            var ack = await _context.PublishAsync(Telemetry.NatsActivities, $"$KV.{Bucket}.{key}", value, headers: headers, serializer: serializer, cancellationToken: cancellationToken);
             ack.EnsureSuccess();
 
             return ack.Seq;
@@ -135,7 +135,7 @@ public class NatsKVStore : INatsKVStore
 
         try
         {
-            var ack = await _context.PublishAsync<object?>(subject, null, headers: headers, cancellationToken: cancellationToken);
+            var ack = await _context.PublishAsync<object?>(Telemetry.NatsActivities, subject, null, headers: headers, cancellationToken: cancellationToken);
             ack.EnsureSuccess();
         }
         catch (NatsJSApiException e)

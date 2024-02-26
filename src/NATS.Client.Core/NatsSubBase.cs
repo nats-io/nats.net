@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Diagnostics;
 using System.Runtime.ExceptionServices;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
@@ -345,5 +346,63 @@ public abstract class NatsSubBase
         UnsubscribeAsync();
 #pragma warning restore VSTHRD110
 #pragma warning restore CA2012
+    }
+
+    protected NatsMsg<T> ParseMsg<T>(
+        ActivitySource activitySource,
+        string activityName,
+        string subject,
+        string? replyTo,
+        ReadOnlySequence<byte>? headersBuffer,
+        in ReadOnlySequence<byte> payloadBuffer,
+        INatsConnection? connection,
+        NatsHeaderParser headerParser,
+        INatsDeserialize<T> serializer)
+    {
+        NatsHeaders? headers;
+        if (headersBuffer != null)
+        {
+            headers = new NatsHeaders();
+            if (!headerParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), headers))
+                throw new NatsException("Error parsing headers");
+        }
+        else
+        {
+            headers = null;
+        }
+
+        var size = subject.Length
+                   + (replyTo?.Length ?? 0)
+                   + (headersBuffer?.Length ?? 0)
+                   + payloadBuffer.Length;
+
+        var activity = Telemetry.StartReceiveActivity(
+            activitySource,
+            Connection,
+            name: activityName,
+            subscriptionSubject: Subject,
+            queueGroup: QueueGroup,
+            subject: subject,
+            replyTo: replyTo,
+            bodySize: payloadBuffer.Length,
+            size: size,
+            headers: headers);
+
+        if (activity is not null)
+        {
+            headers ??= new NatsHeaders();
+            headers.Activity = activity;
+        }
+
+        headers?.SetReadOnly();
+
+        // Consider an empty payload as null or default value for value types. This way we are able to
+        // receive sentinels as nulls or default values. This might cause an issue with where we are not
+        // able to differentiate between an empty sentinel and actual default value of a struct e.g. 0 (zero).
+        var data = payloadBuffer.Length > 0
+            ? serializer.Deserialize(payloadBuffer)
+            : default;
+
+        return new NatsMsg<T>(subject, replyTo, (int)size, headers, data, connection);
     }
 }

@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using NATS.Client.Core;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
@@ -21,6 +22,7 @@ public partial class NatsJSContext
     {
         ThrowIfInvalidStreamName(config.Name, nameof(config.Name));
         var response = await JSRequestResponseAsync<StreamConfig, StreamInfo>(
+            Telemetry.NatsActivities,
             subject: $"{Opts.Prefix}.STREAM.CREATE.{config.Name}",
             config,
             cancellationToken);
@@ -43,6 +45,7 @@ public partial class NatsJSContext
     {
         ThrowIfInvalidStreamName(stream);
         var response = await JSRequestResponseAsync<object, StreamMsgDeleteResponse>(
+            Telemetry.NatsActivities,
             subject: $"{Opts.Prefix}.STREAM.DELETE.{stream}",
             request: null,
             cancellationToken);
@@ -67,6 +70,7 @@ public partial class NatsJSContext
     {
         ThrowIfInvalidStreamName(stream);
         var response = await JSRequestResponseAsync<StreamPurgeRequest, StreamPurgeResponse>(
+            Telemetry.NatsActivities,
             subject: $"{Opts.Prefix}.STREAM.PURGE.{stream}",
             request: request,
             cancellationToken);
@@ -91,6 +95,7 @@ public partial class NatsJSContext
     {
         ThrowIfInvalidStreamName(stream);
         var response = await JSRequestResponseAsync<StreamMsgDeleteRequest, StreamMsgDeleteResponse>(
+            Telemetry.NatsActivities,
             subject: $"{Opts.Prefix}.STREAM.MSG.DELETE.{stream}",
             request: request,
             cancellationToken);
@@ -115,6 +120,7 @@ public partial class NatsJSContext
     {
         ThrowIfInvalidStreamName(stream);
         var response = await JSRequestResponseAsync<StreamInfoRequest, StreamInfoResponse>(
+            Telemetry.NatsActivities,
             subject: $"{Opts.Prefix}.STREAM.INFO.{stream}",
             request: request,
             cancellationToken);
@@ -137,6 +143,7 @@ public partial class NatsJSContext
     {
         ThrowIfInvalidStreamName(request.Name, nameof(request.Name));
         var response = await JSRequestResponseAsync<StreamConfig, StreamUpdateResponse>(
+            Telemetry.NatsActivities,
             subject: $"{Opts.Prefix}.STREAM.UPDATE.{request.Name}",
             request: request,
             cancellationToken);
@@ -159,6 +166,7 @@ public partial class NatsJSContext
         while (!cancellationToken.IsCancellationRequested)
         {
             var response = await JSRequestResponseAsync<StreamListRequest, StreamListResponse>(
+                Telemetry.NatsActivities,
                 subject: $"{Opts.Prefix}.STREAM.LIST",
                 request: new StreamListRequest
                 {
@@ -189,6 +197,7 @@ public partial class NatsJSContext
         while (!cancellationToken.IsCancellationRequested)
         {
             var response = await JSRequestResponseAsync<StreamNamesRequest, StreamNamesResponse>(
+                Telemetry.NatsActivities,
                 subject: $"{Opts.Prefix}.STREAM.NAMES",
                 request: new StreamNamesRequest
                 {

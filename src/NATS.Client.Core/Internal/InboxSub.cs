@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 
@@ -28,7 +29,7 @@ internal class InboxSub : NatsSubBase
 
     // Not used. Dummy implementation to keep base happy.
     protected override ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
-        => ValueTask.CompletedTask;
+        => throw new InvalidOperationException("InboxSub.ReceiveInternalAsync should not be called.");
 
     protected override void TryComplete()
     {

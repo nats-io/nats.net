@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Primitives;
 
@@ -72,6 +73,8 @@ public class NatsHeaders : IDictionary<string, StringValues>
 
     public Messages Message { get; internal set; } = Messages.Text;
 
+    internal Activity? Activity { get; set; }
+
     /// <summary>
     /// Initializes a new instance of <see cref="NatsHeaders"/>.
     /// </summary>
@@ -126,6 +129,7 @@ public class NatsHeaders : IDictionary<string, StringValues>
             {
                 return value;
             }
+
             return StringValues.Empty;
         }
         set
@@ -134,6 +138,7 @@ public class NatsHeaders : IDictionary<string, StringValues>
             {
                 throw new ArgumentNullException(nameof(key));
             }
+
             ThrowIfReadOnly();
 
             if (value.Count == 0)
@@ -150,7 +155,7 @@ public class NatsHeaders : IDictionary<string, StringValues>
 
     StringValues IDictionary<string, StringValues>.this[string key]
     {
-        get { return this[key]; }
+        get => this[key];
         set
         {
             ThrowIfReadOnly();
@@ -181,6 +186,7 @@ public class NatsHeaders : IDictionary<string, StringValues>
             {
                 return EmptyKeys;
             }
+
             return Store.Keys;
         }
     }
@@ -196,6 +202,7 @@ public class NatsHeaders : IDictionary<string, StringValues>
             {
                 return EmptyValues;
             }
+
             return Store.Values;
         }
     }
@@ -210,6 +217,7 @@ public class NatsHeaders : IDictionary<string, StringValues>
         {
             throw new ArgumentException("The key is null");
         }
+
         ThrowIfReadOnly();
         EnsureStore(1);
         Store.Add(item.Key, item.Value);
@@ -226,6 +234,7 @@ public class NatsHeaders : IDictionary<string, StringValues>
         {
             throw new ArgumentNullException(nameof(key));
         }
+
         ThrowIfReadOnly();
         EnsureStore(1);
         Store.Add(key, value);
@@ -253,6 +262,7 @@ public class NatsHeaders : IDictionary<string, StringValues>
         {
             return false;
         }
+
         return true;
     }
 
@@ -267,6 +277,7 @@ public class NatsHeaders : IDictionary<string, StringValues>
         {
             return false;
         }
+
         return Store.ContainsKey(key);
     }
 
@@ -306,6 +317,7 @@ public class NatsHeaders : IDictionary<string, StringValues>
         {
             return Store.Remove(item.Key);
         }
+
         return false;
     }
 
@@ -321,6 +333,7 @@ public class NatsHeaders : IDictionary<string, StringValues>
         {
             return false;
         }
+
         return Store.Remove(key);
     }
 
@@ -337,6 +350,7 @@ public class NatsHeaders : IDictionary<string, StringValues>
             value = default(StringValues);
             return false;
         }
+
         return Store.TryGetValue(key, out value);
     }
 
@@ -351,6 +365,7 @@ public class NatsHeaders : IDictionary<string, StringValues>
             // Non-boxed Enumerator
             return default;
         }
+
         return new Enumerator(Store.GetEnumerator());
     }
 
@@ -365,6 +380,7 @@ public class NatsHeaders : IDictionary<string, StringValues>
             // Non-boxed Enumerator
             return EmptyIEnumeratorType;
         }
+
         return Store.GetEnumerator();
     }
 
@@ -379,6 +395,7 @@ public class NatsHeaders : IDictionary<string, StringValues>
             // Non-boxed Enumerator
             return EmptyIEnumerator;
         }
+
         return Store.GetEnumerator();
     }
 
@@ -418,6 +435,7 @@ public class NatsHeaders : IDictionary<string, StringValues>
             {
                 return _dictionaryEnumerator.MoveNext();
             }
+
             return false;
         }
 
@@ -432,6 +450,7 @@ public class NatsHeaders : IDictionary<string, StringValues>
                 {
                     return _dictionaryEnumerator.Current;
                 }
+
                 return default(KeyValuePair<string, StringValues>);
             }
         }

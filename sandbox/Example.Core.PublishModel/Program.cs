@@ -1,7 +1,11 @@
 // > nats sub bar.*
+
+using Example.Core;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.Serializers.Json;
+
+using var tracer = TracingSetup.RunSandboxTracing();
 
 var subject = "bar.xyz";
 var options = NatsOpts.Default with
@@ -13,6 +17,7 @@ var options = NatsOpts.Default with
 Print("[CON] Connecting...\n");
 
 await using var connection = new NatsConnection(options);
+await connection.ConnectAsync();
 
 for (var i = 0; i < 10; i++)
 {

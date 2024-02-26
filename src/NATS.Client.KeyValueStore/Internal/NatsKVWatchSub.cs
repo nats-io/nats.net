@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Diagnostics;
 using System.Threading.Channels;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
@@ -10,7 +11,6 @@ internal class NatsKVWatchSub<T> : NatsSubBase
     private readonly NatsJSContext _context;
     private readonly CancellationToken _cancellationToken;
     private readonly NatsConnection _nats;
-    private readonly NatsHeaderParser _headerParser;
     private readonly INatsDeserialize<T> _serializer;
     private readonly ChannelWriter<NatsKVWatchCommandMsg<T>> _commands;
 
@@ -31,7 +31,6 @@ internal class NatsKVWatchSub<T> : NatsSubBase
         _cancellationToken = cancellationToken;
         _serializer = serializer;
         _nats = context.Connection;
-        _headerParser = _nats.HeaderParser;
         _commands = commandChannel.Writer;
         _nats.ConnectionOpened += OnConnectionOpened;
     }
@@ -54,7 +53,19 @@ internal class NatsKVWatchSub<T> : NatsSubBase
         ReadOnlySequence<byte>? headersBuffer,
         ReadOnlySequence<byte> payloadBuffer)
     {
-        var msg = new NatsJSMsg<T>(NatsMsg<T>.Build(subject, replyTo, headersBuffer, payloadBuffer, _nats, _headerParser, _serializer), _context);
+        var msg = new NatsJSMsg<T>(
+            ParseMsg(
+                activitySource: Telemetry.NatsInternalActivities,
+                activityName: "kv_cmd_receive",
+                subject: subject,
+                replyTo: replyTo,
+                headersBuffer,
+                in payloadBuffer,
+                Connection,
+                Connection.HeaderParser,
+                serializer: _serializer),
+            _context);
+
         await _commands.WriteAsync(new NatsKVWatchCommandMsg<T> { Command = NatsKVWatchCommand.Msg, Msg = msg }, _cancellationToken).ConfigureAwait(false);
     }
 

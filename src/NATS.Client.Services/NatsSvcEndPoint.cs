@@ -190,7 +190,17 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
         Exception? exception;
         try
         {
-            msg = NatsMsg<T>.Build(subject, replyTo, headersBuffer, payloadBuffer, _nats, _nats.HeaderParser, _serializer);
+            msg = ParseMsg(
+                activitySource: Telemetry.NatsActivities,
+                activityName: "svc_receive",
+                subject: subject,
+                replyTo: replyTo,
+                headersBuffer,
+                in payloadBuffer,
+                Connection,
+                Connection.HeaderParser,
+                serializer: _serializer);
+
             exception = null;
         }
         catch (Exception e)

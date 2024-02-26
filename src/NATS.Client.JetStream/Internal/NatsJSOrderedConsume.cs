@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Diagnostics;
 using System.Text;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
@@ -97,12 +98,12 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
         _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg>>(
             Connection.GetChannelOpts(Connection.Opts, opts?.ChannelOpts),
             msg => Connection.OnMessageDropped(this, _userMsgs?.Reader.Count ?? 0, msg.Msg));
-        Msgs = _userMsgs.Reader;
+        Msgs = new ActivityEndingJSMsgReader<TMsg>(_userMsgs.Reader);
 
         // Pull request channel is set as unbounded because we don't want to drop
         // them and minimize potential lock contention.
         _pullRequests = Channel.CreateUnbounded<PullRequest>();
-        _pullTask = Task.Run(PullLoop);
+        _pullTask = Task.Run(PullLoop, CancellationToken.None);
 
         ResetPending();
 
@@ -122,6 +123,7 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
         }
 
         return Connection.PublishAsync(
+            Telemetry.NatsInternalActivities,
             subject: $"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
             data: request,
             replyTo: Subject,
@@ -269,14 +271,16 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
         else
         {
             var msg = new NatsJSMsg<TMsg>(
-                NatsMsg<TMsg>.Build(
-                    subject,
-                    replyTo,
+                ParseMsg(
+                    Telemetry.NatsActivities,
+                    activityName: "js_receive",
+                    subject: subject,
+                    replyTo: replyTo,
                     headersBuffer,
-                    payloadBuffer,
+                    in payloadBuffer,
                     Connection,
                     Connection.HeaderParser,
-                    _serializer),
+                    serializer: _serializer),
                 _context);
 
             lock (_pendingGate)

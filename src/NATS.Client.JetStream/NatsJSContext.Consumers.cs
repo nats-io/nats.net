@@ -1,6 +1,8 @@
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using NATS.Client.Core;
 using NATS.Client.Core.Internal;
-using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
@@ -27,38 +29,11 @@ public partial class NatsJSContext : INatsJSContext
     }
 
     /// <inheritdoc />>
-    public async ValueTask<INatsJSConsumer> CreateOrUpdateConsumerAsync(
+    public ValueTask<INatsJSConsumer> CreateOrUpdateConsumerAsync(
         string stream,
         ConsumerConfig config,
         CancellationToken cancellationToken = default)
-    {
-        ThrowIfInvalidStreamName(stream);
-
-        // TODO: Adjust API subject according to server version and filter subject
-        var subject = $"{Opts.Prefix}.CONSUMER.CREATE.{stream}";
-
-        if (!string.IsNullOrWhiteSpace(config.Name))
-        {
-            subject += $".{config.Name}";
-            config.Name = default!;
-        }
-
-        if (!string.IsNullOrWhiteSpace(config.FilterSubject))
-        {
-            subject += $".{config.FilterSubject}";
-        }
-
-        var response = await JSRequestResponseAsync<ConsumerCreateRequest, ConsumerInfo>(
-            subject: subject,
-            new ConsumerCreateRequest
-            {
-                StreamName = stream,
-                Config = config,
-            },
-            cancellationToken);
-
-        return new NatsJSConsumer(this, response);
-    }
+        => CreateOrUpdateConsumerAsync(Telemetry.NatsActivities, stream, config, cancellationToken);
 
     /// <summary>
     /// Gets consumer information from the server and creates a NATS JetStream consumer <see cref="NatsJSConsumer"/>.
@@ -75,6 +50,7 @@ public partial class NatsJSContext : INatsJSContext
     {
         ThrowIfInvalidStreamName(stream);
         var response = await JSRequestResponseAsync<object, ConsumerInfo>(
+            Telemetry.NatsActivities,
             subject: $"{Opts.Prefix}.CONSUMER.INFO.{stream}.{consumer}",
             request: null,
             cancellationToken);
@@ -91,6 +67,7 @@ public partial class NatsJSContext : INatsJSContext
         while (!cancellationToken.IsCancellationRequested)
         {
             var response = await JSRequestResponseAsync<ConsumerListRequest, ConsumerListResponse>(
+                Telemetry.NatsActivities,
                 subject: $"{Opts.Prefix}.CONSUMER.LIST.{stream}",
                 new ConsumerListRequest { Offset = offset },
                 cancellationToken);
@@ -117,6 +94,7 @@ public partial class NatsJSContext : INatsJSContext
         while (!cancellationToken.IsCancellationRequested)
         {
             var response = await JSRequestResponseAsync<ConsumerNamesRequest, ConsumerNamesResponse>(
+                Telemetry.NatsActivities,
                 subject: $"{Opts.Prefix}.CONSUMER.NAMES.{stream}",
                 new ConsumerNamesRequest { Offset = offset },
                 cancellationToken);
@@ -142,14 +120,53 @@ public partial class NatsJSContext : INatsJSContext
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
     /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
-    public async ValueTask<bool> DeleteConsumerAsync(string stream, string consumer, CancellationToken cancellationToken = default)
+    public ValueTask<bool> DeleteConsumerAsync(string stream, string consumer, CancellationToken cancellationToken = default)
+        => DeleteConsumerAsync(Telemetry.NatsActivities, stream, consumer, cancellationToken);
+
+    public async ValueTask<bool> DeleteConsumerAsync(ActivitySource activitySource, string stream, string consumer, CancellationToken cancellationToken = default)
     {
         ThrowIfInvalidStreamName(stream);
         var response = await JSRequestResponseAsync<object, ConsumerDeleteResponse>(
+            activitySource,
             subject: $"{Opts.Prefix}.CONSUMER.DELETE.{stream}.{consumer}",
             request: null,
             cancellationToken);
         return response.Success;
+    }
+
+    internal async ValueTask<INatsJSConsumer> CreateOrUpdateConsumerAsync(
+        ActivitySource activitySource,
+        string stream,
+        ConsumerConfig config,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfInvalidStreamName(stream);
+
+        // TODO: Adjust API subject according to server version and filter subject
+        var subject = $"{Opts.Prefix}.CONSUMER.CREATE.{stream}";
+
+        if (!string.IsNullOrWhiteSpace(config.Name))
+        {
+            subject += $".{config.Name}";
+            config.Name = default!;
+        }
+
+        if (!string.IsNullOrWhiteSpace(config.FilterSubject))
+        {
+            subject += $".{config.FilterSubject}";
+        }
+
+        var response = await JSRequestResponseAsync<ConsumerCreateRequest, ConsumerInfo>(
+            activitySource,
+            subject: subject,
+            new ConsumerCreateRequest
+            {
+                StreamName = stream,
+                Config = config,
+            },
+            cancellationToken);
+
+        return new NatsJSConsumer(this, response);
     }
 
     internal ValueTask<ConsumerInfo> CreateOrderedConsumerInternalAsync(
@@ -195,6 +212,7 @@ public partial class NatsJSContext : INatsJSContext
         var subject = $"{Opts.Prefix}.CONSUMER.CREATE.{stream}.{name}";
 
         return JSRequestResponseAsync<ConsumerCreateRequest, ConsumerInfo>(
+            activitySource: Telemetry.NatsInternalActivities,
             subject: subject,
             request,
             cancellationToken);

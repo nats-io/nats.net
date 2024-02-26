@@ -1,7 +1,10 @@
+using Example.Core;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.KeyValueStore;
+
+using var tracer = TracingSetup.RunSandboxTracing();
 
 // var options = NatsOpts.Default with { LoggerFactory = new MinimumConsoleLoggerFactory(LogLevel.Error) };
 // var nats = new NatsConnection(options);

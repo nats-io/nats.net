@@ -150,7 +150,7 @@ public class RequestReplyTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var opts = new NatsSubOpts { Timeout = TimeSpan.FromSeconds(4) };
         await using var rep =
-            await nats.RequestSubAsync<int, int>("foo", 4, replyOpts: opts, cancellationToken: cts.Token);
+            await nats.RequestSubAsync<int, int>(Telemetry.NatsActivities, "foo", 4, replyOpts: opts, cancellationToken: cts.Token);
         await foreach (var msg in rep.Msgs.ReadAllAsync(cts.Token))
         {
             Assert.Equal(results[count++], msg.Data);
@@ -184,7 +184,7 @@ public class RequestReplyTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var opts = new NatsSubOpts { IdleTimeout = TimeSpan.FromSeconds(3) };
         await using var rep =
-            await nats.RequestSubAsync<int, int>("foo", 3, replyOpts: opts, cancellationToken: cts.Token);
+            await nats.RequestSubAsync<int, int>(Telemetry.NatsActivities, "foo", 3, replyOpts: opts, cancellationToken: cts.Token);
         await foreach (var msg in rep.Msgs.ReadAllAsync(cts.Token))
         {
             Assert.Equal(results[count++], msg.Data);
@@ -214,7 +214,7 @@ public class RequestReplyTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var opts = new NatsSubOpts { StartUpTimeout = TimeSpan.FromSeconds(1) };
         await using var rep =
-            await nats.RequestSubAsync<int, int>("foo", 2, replyOpts: opts, cancellationToken: cts.Token);
+            await nats.RequestSubAsync<int, int>(Telemetry.NatsActivities, "foo", 2, replyOpts: opts, cancellationToken: cts.Token);
         await foreach (var msg in rep.Msgs.ReadAllAsync(cts.Token))
         {
             count++;
@@ -247,7 +247,7 @@ public class RequestReplyTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var opts = new NatsSubOpts { MaxMsgs = 2 };
         await using var rep =
-            await nats.RequestSubAsync<int, int>("foo", 1, replyOpts: opts, cancellationToken: cts.Token);
+            await nats.RequestSubAsync<int, int>(Telemetry.NatsActivities, "foo", 1, replyOpts: opts, cancellationToken: cts.Token);
         await foreach (var msg in rep.Msgs.ReadAllAsync(cts.Token))
         {
             Assert.Equal(results[count++], msg.Data);

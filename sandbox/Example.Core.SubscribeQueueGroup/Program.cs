@@ -1,6 +1,10 @@
 // > nats pub foo.xyz --count=10 "my_message_{{ Count }}"
+
+using Example.Core;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
+
+using var tracer = TracingSetup.RunSandboxTracing();
 
 var subject = "foo.*";
 var options = NatsOpts.Default with { LoggerFactory = LoggerFactory.Create(builder => builder.AddConsole()) };
