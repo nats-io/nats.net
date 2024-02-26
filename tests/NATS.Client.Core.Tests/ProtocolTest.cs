@@ -104,6 +104,32 @@ public class ProtocolTest
     }
 
     [Fact]
+    public async Task Subscription_queue_group()
+    {
+        await using var server = NatsServer.Start();
+        var (nats, proxy) = server.CreateProxiedClientConnection();
+
+        await using var sub1 = await nats.SubscribeCoreAsync<int>("foo", queueGroup: "group1");
+        await using var sub2 = await nats.SubscribeCoreAsync<int>("foo", queueGroup: "group2");
+
+        await Retry.Until(
+            "frames collected",
+            () => proxy.ClientFrames.Any(f => f.Message.StartsWith("SUB foo")));
+
+        var frames = proxy.ClientFrames.Select(f => f.Message).ToList();
+
+        foreach (var frame in frames)
+        {
+            _output.WriteLine($"frame: {frame}");
+        }
+
+        Assert.StartsWith("SUB foo group1 ", frames[0]);
+        Assert.StartsWith("SUB foo group2 ", frames[1]);
+
+        await nats.DisposeAsync();
+    }
+
+    [Fact]
     public async Task Publish_empty_message_for_notifications()
     {
         void Log(string text)
