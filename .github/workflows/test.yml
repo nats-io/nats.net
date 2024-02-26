@@ -111,9 +111,9 @@ jobs:
           mkdir tools-nats-server && cd tools-nats-server
           gh_api_url="https://api.github.com/repos/nats-io/nats-server/releases"
           branch="${{ matrix.config.branch }}"
-          if [[ branch == "v"* ]]; then
+          if [[ $branch == "v"* ]]; then
             branch=$(curl -s $gh_api_url | jq -r '.[].tag_name' | grep $branch | sort -V | tail -1)
-          elif [[ branch == "latest" ]]; then
+          elif [[ $branch == "latest" ]]; then
             branch=$(curl -s $gh_api_url/latest | jq -r .tag_name)
           fi
           for i in 1 2 3
