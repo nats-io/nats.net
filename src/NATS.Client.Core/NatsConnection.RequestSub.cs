@@ -10,9 +10,13 @@ public partial class NatsConnection
         INatsDeserialize<TReply>? replySerializer = default,
         NatsPubOpts? requestOpts = default,
         NatsSubOpts? replyOpts = default,
+        string? replyTo = null,
         CancellationToken cancellationToken = default)
     {
-        var replyTo = NewInbox();
+        if (replyTo == null)
+        {
+            replyTo = NewInbox();
+        }
 
         replySerializer ??= Opts.SerializerRegistry.GetDeserializer<TReply>();
         var sub = new NatsSub<TReply>(this, SubscriptionManager.InboxSubBuilder, replyTo, queueGroup: default, replyOpts, replySerializer);

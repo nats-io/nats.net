@@ -34,7 +34,7 @@ public partial class NatsConnection
         CancellationToken cancellationToken = default)
     {
         replyOpts = SetReplyOptsDefaults(replyOpts);
-        await using var sub = await RequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
+        await using var sub = await RequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, null,cancellationToken)
             .ConfigureAwait(false);
 
         if (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
@@ -60,7 +60,7 @@ public partial class NatsConnection
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         replyOpts = SetReplyManyOptsDefaults(replyOpts);
-        await using var sub = await RequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
+        await using var sub = await RequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, null, cancellationToken)
             .ConfigureAwait(false);
 
         while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))

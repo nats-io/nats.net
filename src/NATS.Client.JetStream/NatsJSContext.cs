@@ -139,6 +139,7 @@ public partial class NatsJSContext
                         // No responders error might also happen when reconnecting to cluster
                         ThrowIfNoResponders = true,
                     },
+                    null,
                     cancellationToken)
                 .ConfigureAwait(false);
 
