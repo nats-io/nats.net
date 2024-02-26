@@ -37,7 +37,7 @@ jobs:
           fi
           for i in 1 2 3
           do
-            curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@${{ matrix.config.branch }} | PREFIX=. sh && break || sleep 30
+            curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@$branch | PREFIX=. sh && break || sleep 30
           done
           sudo mv nats-server /usr/local/bin
 
