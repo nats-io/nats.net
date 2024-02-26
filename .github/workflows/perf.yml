@@ -13,8 +13,8 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - branch: 'v2.9.22'
-          - branch: 'v2.10.9'
+          - branch: 'v2.9'
+          - branch: 'latest'
           - branch: 'main'
     runs-on: ubuntu-latest
     env:
@@ -24,15 +24,20 @@ jobs:
     steps:
       - name: Install nats
         run: |
-          # latest 0.1.1 doesn't have binaries
-          # rel=$(curl -s https://api.github.com/repos/nats-io/natscli/releases/latest | jq -r .tag_name | sed s/v//)
-          rel=0.1.0
+          rel=$(curl -s https://api.github.com/repos/nats-io/natscli/releases/latest | jq -r .tag_name | sed s/v//)
           wget https://github.com/nats-io/natscli/releases/download/v$rel/nats-$rel-linux-amd64.zip
           unzip nats-$rel-linux-amd64.zip
           sudo mv nats-$rel-linux-amd64/nats /usr/local/bin
+          gh_api_url="https://api.github.com/repos/nats-io/nats-server/releases"
+          branch="${{ matrix.config.branch }}"
+          if [[ $branch == "v"* ]]; then
+            branch=$(curl -s $gh_api_url | jq -r '.[].tag_name' | grep $branch | sort -V | tail -1)
+          elif [[ $branch == "latest" ]]; then
+            branch=$(curl -s $gh_api_url/latest | jq -r .tag_name)
+          fi
           for i in 1 2 3
           do
-            curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@${{ matrix.config.branch }} | PREFIX=. sh && break || sleep 30
+            curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@$branch | PREFIX=. sh && break || sleep 30
           done
           sudo mv nats-server /usr/local/bin
 
