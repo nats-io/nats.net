@@ -114,7 +114,7 @@ public class ProtocolTest
 
         await Retry.Until(
             "frames collected",
-            () => proxy.ClientFrames.Any(f => f.Message.StartsWith("SUB foo")));
+            () => proxy.ClientFrames.Count(f => f.Message.StartsWith("SUB foo")) == 2);
 
         var frames = proxy.ClientFrames.Select(f => f.Message).ToList();
 
