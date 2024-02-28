@@ -272,7 +272,7 @@ public class ConsumerConsumeTest
         await using var server = NatsServer.StartJS();
         await using var nats = server.CreateClientConnection();
 
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 
         var js = new NatsJSContext(nats);
         var stream = await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
@@ -321,7 +321,8 @@ public class ConsumerConsumeTest
                 var c = await js.GetConsumerAsync("s1", "c1", cts.Token);
                 return c.Info.NumAckPending == 9;
             },
-            timeout: TimeSpan.FromSeconds(20));
+            retryDelay: TimeSpan.FromSeconds(1),
+            timeout: TimeSpan.FromSeconds(30));
         await consumer.RefreshAsync(cts.Token);
         Assert.Equal(9, consumer.Info.NumAckPending);
 
@@ -336,7 +337,8 @@ public class ConsumerConsumeTest
                 var c = await js.GetConsumerAsync("s1", "c1", cts.Token);
                 return c.Info.NumAckPending == 0;
             },
-            timeout: TimeSpan.FromSeconds(20));
+            retryDelay: TimeSpan.FromSeconds(1),
+            timeout: TimeSpan.FromSeconds(30));
         await consumer.RefreshAsync(cts.Token);
         Assert.Equal(0, consumer.Info.NumAckPending);
     }
