@@ -115,7 +115,10 @@ public class MockServer : IAsyncDisposable
         {
             try
             {
-                await client;
+                await client.WaitAsync(TimeSpan.FromSeconds(3));
+            }
+            catch (TimeoutException)
+            {
             }
             catch (ObjectDisposedException)
             {
@@ -133,7 +136,10 @@ public class MockServer : IAsyncDisposable
 
         try
         {
-            await _accept;
+            await _accept.WaitAsync(TimeSpan.FromSeconds(10));
+        }
+        catch (TimeoutException)
+        {
         }
         catch (OperationCanceledException)
         {

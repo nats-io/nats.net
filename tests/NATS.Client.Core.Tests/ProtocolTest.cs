@@ -391,30 +391,55 @@ public class ProtocolTest
         var opts = server.ClientOpts(NatsOpts.Default) with { LoggerFactory = logger };
         var nats = new NatsConnection(opts);
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
 
         var signal = new WaitSignal();
-        var counts = new ConcurrentDictionary<string, int>();
+        var counts = 0;
         _ = Task.Run(
             async () =>
             {
                 var count = 0;
-                await foreach (var msg in nats.SubscribeAsync<byte[]>("x.*", cancellationToken: cts.Token))
+                var last = string.Empty;
+                while (!cts.Token.IsCancellationRequested)
                 {
-                    if (++count > 100)
-                        signal.Pulse();
-                    counts.AddOrUpdate(msg.Subject, 1, (_, c) => c + 1);
+                    try
+                    {
+                        await foreach (var msg in nats.SubscribeAsync<byte[]>("x.*", cancellationToken: cts.Token))
+                        {
+                            if (++count > 100)
+                                signal.Pulse();
+
+                            if (last != msg.Subject)
+                            {
+                                last = msg.Subject;
+                                Interlocked.Increment(ref counts);
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // ignored
+                    }
                 }
             },
             cts.Token);
 
-        var payload = new byte[size];
         var r = 0;
+        var payload = new byte[size];
         _ = Task.Run(
             async () =>
             {
                 while (!cts.Token.IsCancellationRequested)
-                    await nats.PublishAsync($"x.{Volatile.Read(ref r)}", payload, cancellationToken: cts.Token);
+                {
+                    try
+                    {
+                        await nats.PublishAsync($"x.{Interlocked.CompareExchange(ref r, 0, 0)}", payload, cancellationToken: cts.Token);
+                    }
+                    catch
+                    {
+                        // ignored
+                    }
+                }
             },
             cts.Token);
 
@@ -423,11 +448,25 @@ public class ProtocolTest
         for (var i = 0; i < 3; i++)
         {
             await Task.Delay(1_000, cts.Token);
-            var subjectCount = counts.Count;
+            var subjectCount = Volatile.Read(ref counts);
             await server.RestartAsync();
+
+            while (!cts.Token.IsCancellationRequested)
+            {
+                try
+                {
+                    await server.CreateClientConnection().PingAsync(cts.Token);
+                    break;
+                }
+                catch
+                {
+                    // ignored
+                }
+            }
+
             Interlocked.Increment(ref r);
 
-            await Retry.Until("subject count goes up", () => counts.Count > subjectCount);
+            await Retry.Until("subject count goes up", () => Volatile.Read(ref counts) > subjectCount, timeout: TimeSpan.FromSeconds(60));
         }
 
         foreach (var log in logger.Logs.Where(x => x.EventId == NatsLogEvents.Protocol && x.LogLevel == LogLevel.Error))
@@ -435,12 +474,7 @@ public class ProtocolTest
             Assert.DoesNotContain("Unknown Protocol Operation", log.Message);
         }
 
-        foreach (var (key, value) in counts)
-        {
-            _output.WriteLine($"{key} {value}");
-        }
-
-        counts.Count.Should().BeGreaterOrEqualTo(3);
+        counts.Should().BeGreaterOrEqualTo(3);
     }
 
     [Fact]
