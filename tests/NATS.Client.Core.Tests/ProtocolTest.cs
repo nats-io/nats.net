@@ -8,7 +8,6 @@ namespace NATS.Client.Core.Tests;
 
 public class ProtocolTest
 {
-    int r = 0;
     private readonly ITestOutputHelper _output;
 
     public ProtocolTest(ITestOutputHelper output) => _output = output;
@@ -395,11 +394,12 @@ public class ProtocolTest
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 
         var signal = new WaitSignal();
-        var counts = new ConcurrentDictionary<string, int>();
+        var counts = 0;
         _ = Task.Run(
             async () =>
             {
                 var count = 0;
+                var last = string.Empty;
                 while (!cts.Token.IsCancellationRequested)
                 {
                     try
@@ -408,7 +408,12 @@ public class ProtocolTest
                         {
                             if (++count > 100)
                                 signal.Pulse();
-                            counts.AddOrUpdate(msg.Subject, 1, (_, c) => c + 1);
+
+                            if (last != msg.Subject)
+                            {
+                                last = msg.Subject;
+                                Interlocked.Increment(ref counts);
+                            }
                         }
                     }
                     catch
@@ -419,6 +424,7 @@ public class ProtocolTest
             },
             cts.Token);
 
+        var r = 0;
         var payload = new byte[size];
         _ = Task.Run(
             async () =>
@@ -442,11 +448,11 @@ public class ProtocolTest
         for (var i = 0; i < 3; i++)
         {
             await Task.Delay(1_000, cts.Token);
-            var subjectCount = counts.Count;
+            var subjectCount = Volatile.Read(ref counts);
             await server.RestartAsync();
             Interlocked.Increment(ref r);
 
-            await Retry.Until("subject count goes up", () => counts.Count > subjectCount, timeout: TimeSpan.FromSeconds(20));
+            await Retry.Until("subject count goes up", () => Volatile.Read(ref counts) > subjectCount, timeout: TimeSpan.FromSeconds(20));
         }
 
         foreach (var log in logger.Logs.Where(x => x.EventId == NatsLogEvents.Protocol && x.LogLevel == LogLevel.Error))
@@ -454,12 +460,7 @@ public class ProtocolTest
             Assert.DoesNotContain("Unknown Protocol Operation", log.Message);
         }
 
-        foreach (var (key, value) in counts)
-        {
-            _output.WriteLine($"{key} {value}");
-        }
-
-        counts.Count.Should().BeGreaterOrEqualTo(3);
+        counts.Should().BeGreaterOrEqualTo(3);
     }
 
     [Fact]
