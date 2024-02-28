@@ -53,25 +53,27 @@ public class SendBufferTest
         for (var i = 0; i < 10; i++)
         {
             var i1 = i;
-            tasks.Add(Task.Run(async () =>
-            {
-                var stopwatch = Stopwatch.StartNew();
+            tasks.Add(Task.Run(
+                async () =>
+                {
+                    var stopwatch = Stopwatch.StartNew();
 
-                try
-                {
-                    Log($"[C] ({i1}) publish...");
-                    await nats.PublishAsync("x", payload, cancellationToken: cts.Token);
-                }
-                catch (Exception e)
-                {
+                    try
+                    {
+                        Log($"[C] ({i1}) publish...");
+                        await nats.PublishAsync("x", payload, cancellationToken: cts.Token);
+                    }
+                    catch (Exception e)
+                    {
+                        stopwatch.Stop();
+                        Log($"[C] ({i1}) publish cancelled after {stopwatch.Elapsed.TotalSeconds:n0} s (exception: {e.GetType()})");
+                        return;
+                    }
+
                     stopwatch.Stop();
-                    Log($"[C] ({i1}) publish cancelled after {stopwatch.Elapsed.TotalSeconds:n0} s (exception: {e.GetType()})");
-                    return;
-                }
-
-                stopwatch.Stop();
-                Log($"[C] ({i1}) publish took {stopwatch.Elapsed.TotalSeconds:n3} s");
-            }));
+                    Log($"[C] ({i1}) publish took {stopwatch.Elapsed.TotalSeconds:n3} s");
+                },
+                cts.Token));
         }
 
         for (var i = 0; i < 10; i++)
