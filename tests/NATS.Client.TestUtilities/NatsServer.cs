@@ -217,8 +217,11 @@ public class NatsServer : IAsyncDisposable
 
         try
         {
-            Process.GetProcessById(serverProcessId.Value).Kill();
-            Process.GetProcessById(serverProcessId.Value).WaitForExit();
+            if (serverProcessId != null)
+            {
+                Process.GetProcessById(serverProcessId.Value).Kill();
+                Process.GetProcessById(serverProcessId.Value).WaitForExit();
+            }
         }
         catch
         {
