@@ -211,7 +211,20 @@ public class NatsServer : IAsyncDisposable
     {
         var t1 = ServerProcess?.StartTime;
 
+        var serverProcessId = ServerProcess?.Id;
+
         await StopAsync();
+
+        try
+        {
+            Process.GetProcessById(serverProcessId.Value).Kill();
+            Process.GetProcessById(serverProcessId.Value).WaitForExit();
+        }
+        catch
+        {
+            // ignore
+        }
+
         StartServerProcess();
 
         var t2 = ServerProcess?.StartTime;
