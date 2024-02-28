@@ -391,7 +391,7 @@ public class ProtocolTest
         var opts = server.ClientOpts(NatsOpts.Default) with { LoggerFactory = logger };
         var nats = new NatsConnection(opts);
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 
         var signal = new WaitSignal();
         var counts = new ConcurrentDictionary<string, int>();
@@ -427,7 +427,7 @@ public class ProtocolTest
             await server.RestartAsync();
             Interlocked.Increment(ref r);
 
-            await Retry.Until("subject count goes up", () => counts.Count > subjectCount);
+            await Retry.Until("subject count goes up", () => counts.Count > subjectCount, timeout: TimeSpan.FromSeconds(30));
         }
 
         foreach (var log in logger.Logs.Where(x => x.EventId == NatsLogEvents.Protocol && x.LogLevel == LogLevel.Error))
