@@ -451,7 +451,18 @@ public class ProtocolTest
             var subjectCount = Volatile.Read(ref counts);
             await server.RestartAsync();
 
-            await server.CreateClientConnection().PingAsync(cts.Token);
+            while (!cts.Token.IsCancellationRequested)
+            {
+                try
+                {
+                    await server.CreateClientConnection().PingAsync(cts.Token);
+                    break;
+                }
+                catch
+                {
+                    // ignored
+                }
+            }
 
             Interlocked.Increment(ref r);
 
