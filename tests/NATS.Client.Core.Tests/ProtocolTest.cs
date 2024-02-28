@@ -450,6 +450,9 @@ public class ProtocolTest
             await Task.Delay(1_000, cts.Token);
             var subjectCount = Volatile.Read(ref counts);
             await server.RestartAsync();
+
+            await server.CreateClientConnection().PingAsync(cts.Token);
+
             Interlocked.Increment(ref r);
 
             await Retry.Until("subject count goes up", () => Volatile.Read(ref counts) > subjectCount, timeout: TimeSpan.FromSeconds(60));
