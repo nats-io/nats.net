@@ -8,6 +8,7 @@ namespace NATS.Client.Core.Tests;
 
 public class ProtocolTest
 {
+    int r = 0;
     private readonly ITestOutputHelper _output;
 
     public ProtocolTest(ITestOutputHelper output) => _output = output;
@@ -419,7 +420,6 @@ public class ProtocolTest
             cts.Token);
 
         var payload = new byte[size];
-        var r = 0;
         _ = Task.Run(
             async () =>
             {
@@ -427,7 +427,7 @@ public class ProtocolTest
                 {
                     try
                     {
-                        await nats.PublishAsync($"x.{Volatile.Read(ref r)}", payload, cancellationToken: cts.Token);
+                        await nats.PublishAsync($"x.{Interlocked.CompareExchange(ref r, 0, 0)}", payload, cancellationToken: cts.Token);
                     }
                     catch
                     {
