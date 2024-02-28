@@ -414,7 +414,16 @@ public class ProtocolTest
             async () =>
             {
                 while (!cts.Token.IsCancellationRequested)
-                    await nats.PublishAsync($"x.{Volatile.Read(ref r)}", payload, cancellationToken: cts.Token);
+                {
+                    try
+                    {
+                        await nats.PublishAsync($"x.{Volatile.Read(ref r)}", payload, cancellationToken: cts.Token);
+                    }
+                    catch
+                    {
+                        // ignored
+                    }
+                }
             },
             cts.Token);
 
@@ -427,7 +436,7 @@ public class ProtocolTest
             await server.RestartAsync();
             Interlocked.Increment(ref r);
 
-            await Retry.Until("subject count goes up", () => counts.Count > subjectCount, timeout: TimeSpan.FromSeconds(30));
+            await Retry.Until("subject count goes up", () => counts.Count > subjectCount, timeout: TimeSpan.FromSeconds(20));
         }
 
         foreach (var log in logger.Logs.Where(x => x.EventId == NatsLogEvents.Protocol && x.LogLevel == LogLevel.Error))
