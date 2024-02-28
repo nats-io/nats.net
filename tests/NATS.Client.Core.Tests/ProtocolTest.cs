@@ -399,11 +399,21 @@ public class ProtocolTest
             async () =>
             {
                 var count = 0;
-                await foreach (var msg in nats.SubscribeAsync<byte[]>("x.*", cancellationToken: cts.Token))
+                while (!cts.Token.IsCancellationRequested)
                 {
-                    if (++count > 100)
-                        signal.Pulse();
-                    counts.AddOrUpdate(msg.Subject, 1, (_, c) => c + 1);
+                    try
+                    {
+                        await foreach (var msg in nats.SubscribeAsync<byte[]>("x.*", cancellationToken: cts.Token))
+                        {
+                            if (++count > 100)
+                                signal.Pulse();
+                            counts.AddOrUpdate(msg.Subject, 1, (_, c) => c + 1);
+                        }
+                    }
+                    catch
+                    {
+                        // ignored
+                    }
                 }
             },
             cts.Token);
