@@ -197,6 +197,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
                                 if (headers is { Code: 100, MessageText: "FlowControl Request" })
                                 {
                                     await msg.ReplyAsync(cancellationToken: _cancellationToken);
+                                    continue;
                                 }
                             }
 
