@@ -193,6 +193,11 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
                                         _ => operation,
                                     };
                                 }
+
+                                if (headers is { Code: 100, MessageText: "FlowControl Request" })
+                                {
+                                    await msg.ReplyAsync(cancellationToken: _cancellationToken);
+                                }
                             }
 
                             var subSubject = _sub?.Subject;
