@@ -15,6 +15,7 @@ public static class NatsHostingExtensions
     [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.SpacingRules", "SA1009:Closing parenthesis should not be preceded by a space", Justification = "Required for conditional build.")]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.ReadabilityRules", "SA1111:Closing parenthesis should be on the same line as the last parameter", Justification = "Required for conditional build.")]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.ReadabilityRules", "SA1113:Comma should be on the same line as previous parameter", Justification = "Required for conditional build.")]
+    [Obsolete("This package is obsolete. Use NATS.Extensions.Microsoft.DependencyInjection instead.")]
     public static IServiceCollection AddNats(
         this IServiceCollection services,
         int poolSize = 1,
