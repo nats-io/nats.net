@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -119,7 +119,6 @@ public class NatsBuilder
     {
         var options = NatsOpts.Default with { LoggerFactory = provider.GetRequiredService<ILoggerFactory>() };
         options = _configureOpts?.Invoke(options) ?? options;
-
 
         return new NatsConnectionPool(_poolSize, options, _configureConnection ?? (_ => { }));
     }
