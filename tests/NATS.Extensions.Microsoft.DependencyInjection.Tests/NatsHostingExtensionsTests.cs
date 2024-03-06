@@ -1,9 +1,10 @@
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NATS.Client.Core;
+using NATS.Client.Core.Tests;
 
-namespace NATS.Client.Hosting.Tests;
+namespace NATS.Extensions.Microsoft.DependencyInjection.Tests;
 public class NatsHostingExtensionsTests
 {
     [Fact]
@@ -11,10 +12,9 @@ public class NatsHostingExtensionsTests
     {
         var services = new ServiceCollection();
         services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
+        services.AddNats();
 
-        services.AddNats(poolSize: 1);
         var provider = services.BuildServiceProvider();
-
         var natsConnection1 = provider.GetRequiredService<INatsConnection>();
         var natsConnection2 = provider.GetRequiredService<INatsConnection>();
 
@@ -27,15 +27,37 @@ public class NatsHostingExtensionsTests
     {
         var services = new ServiceCollection();
         services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
+        services.AddNats(builder => builder.WithPoolSize(2));
 
-        services.AddNats(poolSize: 2);
         var provider = services.BuildServiceProvider();
-
         var natsConnection1 = provider.GetRequiredService<INatsConnection>();
         var natsConnection2 = provider.GetRequiredService<INatsConnection>();
 
         Assert.NotNull(natsConnection1);
         Assert.NotSame(natsConnection1, natsConnection2); // Transient should return different instances
+    }
+
+    [Fact]
+    public async Task AddNats_WithJsonSerializer()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
+        services.AddNats(builder => builder.AddJsonSerialization(MyJsonContext.Default));
+
+        var provider = services.BuildServiceProvider();
+        var nats = provider.GetRequiredService<INatsConnection>();
+
+        await using var server = NatsServer.Start();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        await using var sub = await nats.SubscribeCoreAsync<MyData>("foo", cancellationToken: cancellationToken);
+        await nats.PingAsync(cancellationToken);
+        await nats.PublishAsync("foo", new MyData("bar"), cancellationToken: cancellationToken);
+
+        var msg = await sub.Msgs.ReadAsync(cancellationToken);
+        Assert.Equal("bar", msg.Data?.Name);
     }
 
 #if NET8_0_OR_GREATER
@@ -48,8 +70,9 @@ public class NatsHostingExtensionsTests
         var services = new ServiceCollection();
         services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
 
-        services.AddNats(poolSize: 1, key: key1);
-        services.AddNats(poolSize: 1, key: key2);
+        services.AddNats(builder => builder.WithKey(key1));
+        services.AddNats(builder => builder.WithKey(key2));
+
         var provider = services.BuildServiceProvider();
 
         var natsConnection1A = provider.GetKeyedService<INatsConnection>(key1);
@@ -72,8 +95,8 @@ public class NatsHostingExtensionsTests
         var services = new ServiceCollection();
         services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
 
-        services.AddNats(poolSize: 2, key: key1);
-        services.AddNats(poolSize: 2, key: key2);
+        services.AddNats(builder => builder.WithPoolSize(2).WithKey(key1));
+        services.AddNats(builder => builder.WithPoolSize(2).WithKey(key2));
         var provider = services.BuildServiceProvider();
 
         Dictionary<string, List<object>> connections = new();

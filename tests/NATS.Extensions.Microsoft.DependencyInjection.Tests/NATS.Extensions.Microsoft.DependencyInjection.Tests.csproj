@@ -28,7 +28,8 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\src\NATS.Client.Hosting\NATS.Client.Hosting.csproj" />
+      <ProjectReference Include="..\..\src\NATS.Extensions.Microsoft.DependencyInjection\NATS.Extensions.Microsoft.DependencyInjection.csproj" />
+      <ProjectReference Include="..\NATS.Client.TestUtilities\NATS.Client.TestUtilities.csproj" />
     </ItemGroup>
 
 </Project>
