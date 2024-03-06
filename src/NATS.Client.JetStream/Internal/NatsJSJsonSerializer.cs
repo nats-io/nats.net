@@ -45,6 +45,8 @@ internal static class NatsJSJsonSerializer<T>
 [JsonSerializable(typeof(ConsumerListResponse))]
 [JsonSerializable(typeof(ConsumerNamesRequest))]
 [JsonSerializable(typeof(ConsumerNamesResponse))]
+[JsonSerializable(typeof(ConsumerPauseRequest))]
+[JsonSerializable(typeof(ConsumerPauseResponse))]
 [JsonSerializable(typeof(ErrorResponse))]
 [JsonSerializable(typeof(ExternalStreamSource))]
 [JsonSerializable(typeof(IterableRequest))]
@@ -334,4 +336,31 @@ internal class NatsJSJsonNanosecondsConverter : JsonConverter<TimeSpan>
 
     public override void Write(Utf8JsonWriter writer, TimeSpan value, JsonSerializerOptions options) =>
         writer.WriteNumberValue((long)(value.TotalMilliseconds * 1_000_000L));
+}
+
+internal class NatsJSJsonNullableNanosecondsConverter : JsonConverter<TimeSpan?>
+{
+    private readonly NatsJSJsonNanosecondsConverter _converter = new();
+
+    public override TimeSpan? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.Null)
+        {
+            return null;
+        }
+
+        return _converter.Read(ref reader, typeToConvert, options);
+    }
+
+    public override void Write(Utf8JsonWriter writer, TimeSpan? value, JsonSerializerOptions options)
+    {
+        if (value == null)
+        {
+            writer.WriteNullValue();
+        }
+        else
+        {
+            _converter.Write(writer, value.Value, options);
+        }
+    }
 }

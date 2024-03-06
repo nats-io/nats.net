@@ -91,6 +91,33 @@ public interface INatsJSContext
     ValueTask<bool> DeleteConsumerAsync(string stream, string consumer, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Pause a consumer.
+    /// </summary>
+    /// <param name="stream">Stream name where consumer is associated to.</param>
+    /// <param name="consumer">Consumer name to be paused.</param>
+    /// <param name="pauseUntil">Until when the consumer should be paused.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>Result of pausing the consumer.</returns>
+    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
+    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
+    /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
+    ValueTask<ConsumerPauseResponse> PauseConsumerAsync(string stream, string consumer, DateTimeOffset pauseUntil, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Resume a (paused) consumer.
+    /// </summary>
+    /// <param name="stream">Stream name where consumer is associated to.</param>
+    /// <param name="consumer">Consumer name to be resumed.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>Result of resuming the (paused) consumer.</returns>
+    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
+    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
+    /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
+    ValueTask<bool> ResumeConsumerAsync(string stream, string consumer, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Calls JetStream Account Info API.
     /// </summary>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>

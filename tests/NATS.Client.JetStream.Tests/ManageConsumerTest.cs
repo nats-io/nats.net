@@ -81,4 +81,40 @@ public class ManageConsumerTest
             Assert.DoesNotContain(list, c => c.Info.Config.Name == "c1");
         }
     }
+
+    [Fact]
+    public async Task Pause_resume_consumer()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        await using var server = NatsServer.StartJS();
+        var nats = server.CreateClientConnection();
+        var js = new NatsJSContext(nats);
+        await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
+        await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+
+        var pauseUntil = DateTimeOffset.Now.AddHours(1);
+
+        // Pause
+        {
+            var consumerPauseResponse = await js.PauseConsumerAsync("s1", "c1", pauseUntil, cts.Token);
+
+            Assert.True(consumerPauseResponse.Paused);
+            Assert.Equal(pauseUntil, consumerPauseResponse.PauseUntil);
+
+            var consumerInfo = await js.GetConsumerAsync("s1", "c1", cts.Token);
+            Assert.True(consumerInfo.Info.Paused);
+            Assert.Equal(pauseUntil, consumerInfo.Info.Config.PauseUntil);
+        }
+
+        // Resume
+        {
+            var isResumed = await js.ResumeConsumerAsync("s1", "c1", cts.Token);
+            Assert.True(isResumed);
+
+            var consumerInfo = await js.GetConsumerAsync("s1", "c1", cts.Token);
+            Assert.False(consumerInfo.Info.Paused);
+            Assert.Null(consumerInfo.Info.Config.PauseUntil);
+        }
+    }
 }

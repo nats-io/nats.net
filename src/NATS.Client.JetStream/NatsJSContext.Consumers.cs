@@ -152,6 +152,49 @@ public partial class NatsJSContext : INatsJSContext
         return response.Success;
     }
 
+    /// <summary>
+    /// Pause a consumer.
+    /// </summary>
+    /// <param name="stream">Stream name where consumer is associated to.</param>
+    /// <param name="consumer">Consumer name to be paused.</param>
+    /// <param name="pauseUntil">Until when the consumer should be paused.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>Result of pausing the consumer.</returns>
+    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
+    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
+    /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
+    public async ValueTask<ConsumerPauseResponse> PauseConsumerAsync(string stream, string consumer, DateTimeOffset pauseUntil, CancellationToken cancellationToken = default)
+    {
+        ThrowIfInvalidStreamName(stream);
+        var response = await JSRequestResponseAsync<ConsumerPauseRequest, ConsumerPauseResponse>(
+            subject: $"{Opts.Prefix}.CONSUMER.PAUSE.{stream}.{consumer}",
+            request: new ConsumerPauseRequest { PauseUntil = pauseUntil },
+            cancellationToken);
+        return response;
+    }
+
+    /// <summary>
+    /// Resume a (paused) consumer.
+    /// </summary>
+    /// <param name="stream">Stream name where consumer is associated to.</param>
+    /// <param name="consumer">Consumer name to be resumed.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>Result of resuming the (paused) consumer.</returns>
+    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
+    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
+    /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
+    public async ValueTask<bool> ResumeConsumerAsync(string stream, string consumer, CancellationToken cancellationToken = default)
+    {
+        ThrowIfInvalidStreamName(stream);
+        var response = await JSRequestResponseAsync<object, ConsumerPauseResponse>(
+            subject: $"{Opts.Prefix}.CONSUMER.PAUSE.{stream}.{consumer}",
+            request: null,
+            cancellationToken);
+        return !response.Paused;
+    }
+
     internal ValueTask<ConsumerInfo> CreateOrderedConsumerInternalAsync(
         string stream,
         NatsJSOrderedConsumerOpts opts,
