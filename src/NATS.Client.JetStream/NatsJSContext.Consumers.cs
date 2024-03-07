@@ -192,7 +192,7 @@ public partial class NatsJSContext : INatsJSContext
             subject: $"{Opts.Prefix}.CONSUMER.PAUSE.{stream}.{consumer}",
             request: null,
             cancellationToken);
-        return !response.Paused;
+        return !response.IsPaused;
     }
 
     internal ValueTask<ConsumerInfo> CreateOrderedConsumerInternalAsync(

@@ -104,10 +104,10 @@ public record ConsumerInfo
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("paused")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public bool Paused { get; set; }
+    public bool IsPaused { get; set; }
 
     /// <summary>
-    /// If the consumer is <see cref="Paused"/>, this contains how much time is remaining until this consumer is unpaused.
+    /// If the consumer is <see cref="IsPaused"/>, this contains how much time is remaining until this consumer is unpaused.
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("pause_remaining")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]

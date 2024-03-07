@@ -9,14 +9,14 @@ public record ConsumerPauseResponse
 {
     [System.Text.Json.Serialization.JsonPropertyName("paused")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
-    public bool Paused { get; set; }
+    public bool IsPaused { get; init; }
 
     [System.Text.Json.Serialization.JsonPropertyName("pause_until")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public DateTimeOffset PauseUntil { get; set; }
+    public DateTimeOffset PauseUntil { get; init; }
 
     [System.Text.Json.Serialization.JsonPropertyName("pause_remaining")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonNullableNanosecondsConverter))]
-    public TimeSpan? PauseRemaining { get; set; }
+    public TimeSpan? PauseRemaining { get; init; }
 }

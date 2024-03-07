@@ -62,7 +62,7 @@ public class ConsumerSetupTest
         var consumer = await js.GetConsumerAsync("s1", "c1", cts.Token);
 
         var info = consumer.Info;
-        Assert.True(info.Paused);
+        Assert.True(info.IsPaused);
 
         var config = info.Config;
         Assert.Equal(pauseUntil, config.PauseUntil);

@@ -99,11 +99,11 @@ public class ManageConsumerTest
         {
             var consumerPauseResponse = await js.PauseConsumerAsync("s1", "c1", pauseUntil, cts.Token);
 
-            Assert.True(consumerPauseResponse.Paused);
+            Assert.True(consumerPauseResponse.IsPaused);
             Assert.Equal(pauseUntil, consumerPauseResponse.PauseUntil);
 
             var consumerInfo = await js.GetConsumerAsync("s1", "c1", cts.Token);
-            Assert.True(consumerInfo.Info.Paused);
+            Assert.True(consumerInfo.Info.IsPaused);
             Assert.Equal(pauseUntil, consumerInfo.Info.Config.PauseUntil);
         }
 
@@ -113,7 +113,7 @@ public class ManageConsumerTest
             Assert.True(isResumed);
 
             var consumerInfo = await js.GetConsumerAsync("s1", "c1", cts.Token);
-            Assert.False(consumerInfo.Info.Paused);
+            Assert.False(consumerInfo.Info.IsPaused);
             Assert.Null(consumerInfo.Info.Config.PauseUntil);
         }
     }
