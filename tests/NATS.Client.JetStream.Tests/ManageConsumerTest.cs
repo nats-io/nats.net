@@ -82,16 +82,17 @@ public class ManageConsumerTest
         }
     }
 
-    [Fact]
+    [SkipIfNatsServer(versionEarlierThan: "2.11")]
     public async Task Pause_resume_consumer()
     {
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+        var js = new NatsJSContextFactory().CreateContext(nats);
+
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-        await using var server = NatsServer.StartJS();
-        var nats = server.CreateClientConnection();
-        var js = new NatsJSContext(nats);
-        await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
-        await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+        await js.CreateStreamAsync(new StreamConfig("s1", new[] { "s1.*" }), cts.Token);
+        await js.CreateOrUpdateConsumerAsync("s1", new ConsumerConfig("c1"), cts.Token);
 
         var pauseUntil = DateTimeOffset.Now.AddHours(1);
 

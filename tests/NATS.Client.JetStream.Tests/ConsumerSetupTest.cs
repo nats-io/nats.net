@@ -37,16 +37,16 @@ public class ConsumerSetupTest
         Assert.Equal("q1", config.DeliverGroup);
     }
 
-    [Fact]
+    [SkipIfNatsServer(versionEarlierThan: "2.11")]
     public async Task Create_paused_consumer()
     {
         await using var server = NatsServer.StartJS();
         await using var nats = server.CreateClientConnection();
-        var js = new NatsJSContext(nats);
+        var js = new NatsJSContextFactory().CreateContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
-        await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
+        await js.CreateStreamAsync(new StreamConfig("s1", new[] { "s1.*" }), cts.Token);
 
         var pauseUntil = DateTimeOffset.Now.AddHours(1);
 
