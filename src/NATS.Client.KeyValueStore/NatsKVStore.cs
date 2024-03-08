@@ -315,14 +315,21 @@ public class NatsKVStore : INatsKVStore
     {
         await using var watcher = await WatchInternalAsync<T>(key, serializer, opts, cancellationToken);
 
+        if (watcher.InitialConsumer.Info.NumPending == 0 && opts?.EndOfCurrentData != null)
+            await opts.EndOfCurrentData(cancellationToken);
+
         while (await watcher.Entries.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
             while (watcher.Entries.TryRead(out var entry))
             {
                 yield return entry;
+
+                if (entry.Delta == 0 && opts?.EndOfCurrentData != null)
+                    await opts.EndOfCurrentData(cancellationToken);
             }
         }
     }
+
 
     public async IAsyncEnumerable<NatsKVEntry<T>> HistoryAsync<T>(string key, INatsDeserialize<T>? serializer = default, NatsKVWatchOpts? opts = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
