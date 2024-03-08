@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using NATS.Client.Core;
 
 namespace NATS.Client.KeyValueStore;
@@ -14,21 +15,19 @@ public interface INatsKVStore
     /// </summary>
     /// <param name="key">Key of the entry</param>
     /// <param name="value">Value of the entry</param>
-    /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <typeparam name="T">Serialized value type</typeparam>
-    ValueTask<ulong> PutAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default);
+    ValueTask<ulong> PutAsync<T>(string key, T value, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Create a new entry in the bucket only if it doesn't exist
     /// </summary>
     /// <param name="key">Key of the entry</param>
     /// <param name="value">Value of the entry</param>
-    /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <typeparam name="T">Serialized value type</typeparam>
     /// <returns>The revision number of the entry</returns>
-    ValueTask<ulong> CreateAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default);
+    ValueTask<ulong> CreateAsync<T>(string key, T value, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Update an entry in the bucket only if last update revision matches
@@ -36,11 +35,10 @@ public interface INatsKVStore
     /// <param name="key">Key of the entry</param>
     /// <param name="value">Value of the entry</param>
     /// <param name="revision">Last revision number to match</param>
-    /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <typeparam name="T">Serialized value type</typeparam>
     /// <returns>The revision number of the updated entry</returns>
-    ValueTask<ulong> UpdateAsync<T>(string key, T value, ulong revision, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default);
+    ValueTask<ulong> UpdateAsync<T>(string key, T value, ulong revision, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Delete an entry from the bucket

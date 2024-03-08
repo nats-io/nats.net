@@ -119,3 +119,5 @@ nuget/*.unitypackage
 
 # MacOS folder attributes
 .DS_Store
+/tests/NATS.Client.KeyValueStore.Tests/NatsKVWatcherTest.cs
+/.gitignore
