@@ -330,7 +330,6 @@ public class NatsKVStore : INatsKVStore
         }
     }
 
-
     public async IAsyncEnumerable<NatsKVEntry<T>> HistoryAsync<T>(string key, INatsDeserialize<T>? serializer = default, NatsKVWatchOpts? opts = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         try

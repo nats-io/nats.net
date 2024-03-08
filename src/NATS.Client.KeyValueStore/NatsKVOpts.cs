@@ -40,8 +40,7 @@ public record NatsKVWatchOpts
     /// <summary>
     /// Async function called when the enumerator reaches the end of data
     /// </summary>
-    public Func<CancellationToken, Task> EndOfCurrentData { get; init; } = null;
-
+    public Func<CancellationToken, Task>? EndOfCurrentData { get; init; }
 }
 
 public record NatsKVDeleteOpts
