@@ -77,9 +77,10 @@ public interface INatsKVStore
     /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="opts">Watch options</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <param name="endOfCurrentData">An Action callback for when there is currently no more data to process</param>
     /// <typeparam name="T">Serialized value type</typeparam>
     /// <returns>An asynchronous enumerable which can be used in <c>await foreach</c> loops</returns>
-    IAsyncEnumerable<NatsKVEntry<T>> WatchAsync<T>(string key, INatsDeserialize<T>? serializer = default, NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default);
+    IAsyncEnumerable<NatsKVEntry<T>> WatchAsync<T>(string key, INatsDeserialize<T>? serializer = default, NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default, Action endOfCurrentData = null);
 
     /// <summary>
     /// Start a watcher for all the keys in the bucket
@@ -87,9 +88,10 @@ public interface INatsKVStore
     /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="opts">Watch options</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <param name="endOfCurrentData">An Action callback for when there is currently no more data to process</param>
     /// <typeparam name="T">Serialized value type</typeparam>
     /// <returns>An asynchronous enumerable which can be used in <c>await foreach</c> loops</returns>
-    IAsyncEnumerable<NatsKVEntry<T>> WatchAsync<T>(INatsDeserialize<T>? serializer = default, NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default);
+    IAsyncEnumerable<NatsKVEntry<T>> WatchAsync<T>(INatsDeserialize<T>? serializer = default, NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default, Action endOfCurrentData = null);
 
     /// <summary>
     /// Get the history of an entry by key

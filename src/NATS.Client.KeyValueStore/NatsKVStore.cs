@@ -309,17 +309,24 @@ public class NatsKVStore : INatsKVStore
     /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="opts">Watch options</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <param name="endOfCurrentData">An Action callback for when there is currently no more data to process</param>
     /// <typeparam name="T">Serialized value type</typeparam>
     /// <returns>An asynchronous enumerable which can be used in <c>await foreach</c> loops</returns>
-    public async IAsyncEnumerable<NatsKVEntry<T>> WatchAsync<T>(string key, INatsDeserialize<T>? serializer = default, NatsKVWatchOpts? opts = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<NatsKVEntry<T>> WatchAsync<T>(string key, INatsDeserialize<T>? serializer = default, NatsKVWatchOpts? opts = default, [EnumeratorCancellation] CancellationToken cancellationToken = default, Action endOfCurrentData = null)
     {
         await using var watcher = await WatchInternalAsync<T>(key, serializer, opts, cancellationToken);
+
+        if (watcher.InitialConsumer.Info.NumPending == 0)
+            endOfCurrentData?.Invoke();
 
         while (await watcher.Entries.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
             while (watcher.Entries.TryRead(out var entry))
             {
                 yield return entry;
+
+                if (entry.Delta == 0)
+                    endOfCurrentData?.Invoke();
             }
         }
     }
