@@ -49,6 +49,30 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
 
     public ValueTask SubscribeAsync(NatsSubBase sub, CancellationToken cancellationToken)
     {
+        if (Telemetry.HasListeners())
+        {
+            using var activity = Telemetry.StartSendActivity($"{Telemetry.Constants.SubscribeActivityName} {_connection.SubjectOrInbox(sub.Subject)}", _connection, sub.Subject, null, null);
+            try
+            {
+                if (IsInboxSubject(sub.Subject))
+                {
+                    if (sub.QueueGroup != null)
+                    {
+                        throw new NatsException("Inbox subscriptions don't support queue groups");
+                    }
+
+                    return SubscribeInboxAsync(sub, cancellationToken);
+                }
+
+                return SubscribeInternalAsync(sub.Subject, sub.QueueGroup, sub.Opts, sub, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                Telemetry.SetException(activity, ex);
+                throw;
+            }
+        }
+
         if (IsInboxSubject(sub.Subject))
         {
             if (sub.QueueGroup != null)

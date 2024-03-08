@@ -1,5 +1,7 @@
 using System.Buffers;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
 
@@ -153,6 +155,34 @@ public readonly record struct NatsMsg<T>(
                    + (replyTo?.Length ?? 0)
                    + (headersBuffer?.Length ?? 0)
                    + payloadBuffer.Length;
+
+        if (Telemetry.HasListeners())
+        {
+            var subjectName = subject;
+
+            if (connection is NatsConnection nats)
+            {
+                subjectName = nats.SubjectOrInbox(subject);
+            }
+
+            headers ??= new NatsHeaders();
+
+            var activity = Telemetry.StartReceiveActivity(
+                connection,
+                name: $"{Telemetry.Constants.ReceiveActivityName} {subjectName}",
+                subscriptionSubject: subject,
+                queueGroup: null,
+                subject: subject,
+                replyTo: replyTo,
+                bodySize: payloadBuffer.Length,
+                size: size,
+                headers: headers);
+
+            if (activity is not null)
+            {
+                headers.Activity = activity;
+            }
+        }
 
         return new NatsMsg<T>(subject, replyTo, (int)size, headers, data, connection);
     }
