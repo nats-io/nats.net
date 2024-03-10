@@ -158,18 +158,15 @@ public readonly record struct NatsMsg<T>(
 
         if (Telemetry.HasListeners())
         {
-            var subjectName = subject;
-
-            if (connection is NatsConnection nats)
-            {
-                subjectName = nats.SubjectOrInbox(subject);
-            }
+            var activityName = connection is NatsConnection nats
+                ? $"{nats.SpanDestinationName(subject)} {Telemetry.Constants.ReceiveActivityName}"
+                : Telemetry.Constants.ReceiveActivityName;
 
             headers ??= new NatsHeaders();
 
             var activity = Telemetry.StartReceiveActivity(
                 connection,
-                name: $"{Telemetry.Constants.ReceiveActivityName} {subjectName}",
+                name: activityName,
                 subscriptionSubject: subject,
                 queueGroup: null,
                 subject: subject,

@@ -35,7 +35,7 @@ public partial class NatsConnection
     {
         if (Telemetry.HasListeners())
         {
-            using var activity = Telemetry.StartSendActivity($"{Telemetry.Constants.RequestReplyActivityName} {SubjectOrInbox(subject)}", this, subject, null);
+            using var activity = Telemetry.StartSendActivity($"{SpanDestinationName(subject)} {Telemetry.Constants.RequestReplyActivityName}", this, subject, null);
             try
             {
                 replyOpts = SetReplyOptsDefaults(replyOpts);

@@ -196,9 +196,14 @@ public partial class NatsConnection : INatsConnection
         }
     }
 
-    internal string SubjectOrInbox(string subject)
+    internal string SpanDestinationName(string subject)
     {
-        return subject.StartsWith(Opts.InboxPrefix, StringComparison.Ordinal) ? "INBOX" : subject;
+        if (subject.StartsWith(Opts.InboxPrefix, StringComparison.Ordinal))
+            return "inbox";
+
+        // to avoid long span names and low cardinality, only take the first two tokens
+        var tokens = subject.Split('.');
+        return tokens.Length < 2 ? subject : $"{tokens[0]}.{tokens[1]}";
     }
 
     internal NatsStats GetStats() => Counter.ToStats();

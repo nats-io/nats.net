@@ -251,10 +251,10 @@ internal static class Telemetry
     {
         public const string True = "true";
         public const string False = "false";
-        public const string RequestReplyActivityName = "REQ";
-        public const string PublishActivityName = "PUB";
-        public const string SubscribeActivityName = "SUB";
-        public const string ReceiveActivityName = "MSG";
+        public const string RequestReplyActivityName = "request";
+        public const string PublishActivityName = "publish";
+        public const string SubscribeActivityName = "subscribe";
+        public const string ReceiveActivityName = "receive";
 
         public const string SystemKey = "messaging.system";
         public const string SystemVal = "nats";
