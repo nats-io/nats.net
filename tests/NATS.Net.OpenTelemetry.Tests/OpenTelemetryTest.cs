@@ -52,8 +52,8 @@ public class OpenTelemetryTest
             _output.WriteLine($"  Links: {string.Join(", ", item.Links.Select(x => $"{x.Context.TraceId}"))}");
         }
 
-        var sendActivity = activities.First(x => x.OperationName == $"PUB {subject}");
-        var receiveActivity = activities.First(x => x.OperationName == $"MSG {subject}");
+        var sendActivity = activities.First(x => x.OperationName == $"{subject} publish");
+        var receiveActivity = activities.First(x => x.OperationName == $"{subject} receive");
 
         Assert.Equal(ActivityKind.Producer, sendActivity.Kind);
         Assert.Equal(ActivityKind.Consumer, receiveActivity.Kind);
