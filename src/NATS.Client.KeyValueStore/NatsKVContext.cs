@@ -85,6 +85,18 @@ public class NatsKVContext : INatsKVContext
 
         var replicas = config.NumberOfReplicas > 0 ? config.NumberOfReplicas : 1;
 
+        // MIMIC GO CLient
+        // When stream's MaxAge is not set, server uses 2 minutes as the default
+        // for the duplicate window. If MaxAge is set, and lower than 2 minutes,
+        // then the duplicate window will be set to that. If MaxAge is greater,
+        // we will cap the duplicate window to 2 minutes (to be consistent with
+        // previous behavior).
+        var duplicateWindow = TimeSpan.FromMinutes(2);  // 120_000_000_000ns, from ADR-8
+        if (config.MaxAge > TimeSpan.Zero && config.MaxAge < duplicateWindow)
+        {
+            duplicateWindow = config.MaxAge;
+        }
+
         var streamConfig = new StreamConfig
         {
             Name = BucketToStream(config.Bucket),
@@ -108,7 +120,7 @@ public class NatsKVContext : INatsKVContext
             // MirrorDirect =
             // Mirror =
             Retention = StreamConfigRetention.Limits, // from ADR-8
-            DuplicateWindow = config.DuplicateWindow ?? TimeSpan.FromMinutes(2), // 120_000_000_000ns, from ADR-8
+            DuplicateWindow = duplicateWindow,
         };
 
         var stream = await _context.CreateStreamAsync(streamConfig, cancellationToken);
