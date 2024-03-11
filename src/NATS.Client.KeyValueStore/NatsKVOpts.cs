@@ -38,9 +38,9 @@ public record NatsKVWatchOpts
     public bool MetaOnly { get; init; } = false;
 
     /// <summary>
-    /// Async function called when the enumerator reaches the end of data
+    /// Async function called when the enumerator reaches the end of data. Return True to break the async enumeration, False to allow the enumeration to continue.
     /// </summary>
-    public Func<CancellationToken, Task>? EndOfCurrentData { get; init; }
+    public Func<CancellationToken, ValueTask<bool>>? EndOfCurrentData { get; init; }
 }
 
 public record NatsKVDeleteOpts

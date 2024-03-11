@@ -269,23 +269,17 @@ public class NatsKVWatcherTest
                         await Task.CompletedTask;
                         endOfDataHit = true;
                         signal.Pulse();
+                        return true;
                     },
                 };
-                try
-                {
-                    await foreach (var entry in store.WatchAsync<string>("*", opts: opts, cancellationToken: cancellationToken))
-                    {
-                    }
-                }
-                catch (TaskCanceledException)
+
+                await foreach (var entry in store.WatchAsync<string>("*", opts: opts, cancellationToken: cancellationToken))
                 {
                 }
             },
             cancellationToken);
 
         await signal;
-
-        cts.Cancel();
 
         Assert.True(endOfDataHit, "End of Current Data not set");
 
