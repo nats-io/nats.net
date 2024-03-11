@@ -273,6 +273,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
             {
                 OptStartSeq = seq + 1,
                 DeliverPolicy = ConsumerConfigDeliverPolicy.ByStartSequence,
+                OptStartTime = default,
             };
 
             if (consumer != string.Empty)

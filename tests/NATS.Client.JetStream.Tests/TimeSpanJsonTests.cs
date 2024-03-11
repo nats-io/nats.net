@@ -206,4 +206,33 @@ public class TimeSpanJsonTests
         Assert.NotNull(result);
         Assert.Equal(time, result.Active);
     }
+
+    [Theory]
+    [InlineData(null, "\"pause_remaining\":null\\b")]
+    [InlineData("00:00:00.001", "\"pause_remaining\":1000000\\b")]
+    [InlineData("00:00:01.000", "\"pause_remaining\":1000000000\\b")]
+    [InlineData("00:00:01.234", "\"pause_remaining\":1234000000\\b")]
+    public void ConsumerInfoPauseRemaining_test(string? value, string expected)
+    {
+        TimeSpan? time = value != null ? TimeSpan.Parse(value) : null;
+        var serializer = NatsJSJsonSerializer<ConsumerInfo>.Default;
+
+        var bw = new NatsBufferWriter<byte>();
+        serializer.Serialize(bw, new ConsumerInfo { StreamName = "test", Name = "test", PauseRemaining = time });
+
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan);
+        if (value != null)
+        {
+            Assert.Matches(expected, json);
+        }
+        else
+        {
+            // PauseRemaining should not be serialized, if the value is null.
+            Assert.DoesNotMatch(expected, "pause_remaining");
+        }
+
+        var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory));
+        Assert.NotNull(result);
+        Assert.Equal(time, result.PauseRemaining);
+    }
 }
