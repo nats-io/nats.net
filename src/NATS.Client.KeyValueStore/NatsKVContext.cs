@@ -108,7 +108,7 @@ public class NatsKVContext : INatsKVContext
             // MirrorDirect =
             // Mirror =
             Retention = StreamConfigRetention.Limits, // from ADR-8
-            DuplicateWindow = TimeSpan.FromMinutes(2), // 120_000_000_000ns, from ADR-8
+            DuplicateWindow = config.DuplicateWindow ?? TimeSpan.FromMinutes(2), // 120_000_000_000ns, from ADR-8
         };
 
         var stream = await _context.CreateStreamAsync(streamConfig, cancellationToken);

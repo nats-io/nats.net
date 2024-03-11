@@ -61,6 +61,11 @@ public record NatsKVConfig
     /// </summary>
     public bool Compression { get; init; }
 
+    /// <summary>
+    /// The time window to track duplicate messages for
+    /// </summary>
+    public TimeSpan? DuplicateWindow { get; init; } = null;
+
     // TODO: Bucket mirror configuration.
     // pub mirror: Option<Source>,
     // Bucket sources configuration.
