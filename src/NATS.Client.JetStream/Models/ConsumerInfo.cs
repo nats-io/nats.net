@@ -1,3 +1,5 @@
+using NATS.Client.JetStream.Internal;
+
 namespace NATS.Client.JetStream.Models;
 
 public record ConsumerInfo
@@ -96,6 +98,21 @@ public record ConsumerInfo
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Range(ulong.MinValue, ulong.MaxValue)]
     public ulong NumPending { get; set; }
+
+    /// <summary>
+    /// Whether the consumer is paused.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("paused")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool IsPaused { get; set; }
+
+    /// <summary>
+    /// If the consumer is <see cref="IsPaused"/>, this contains how much time is remaining until this consumer is unpaused.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("pause_remaining")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonNullableNanosecondsConverter))]
+    public TimeSpan? PauseRemaining { get; set; }
 
     [System.Text.Json.Serialization.JsonPropertyName("cluster")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
