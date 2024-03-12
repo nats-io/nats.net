@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Primitives;
 
@@ -96,6 +97,8 @@ public class NatsHeaders : IDictionary<string, StringValues>
     {
         EnsureStore(capacity);
     }
+
+    internal Activity? Activity { get; set; }
 
     private Dictionary<string, StringValues>? Store { get; set; }
 

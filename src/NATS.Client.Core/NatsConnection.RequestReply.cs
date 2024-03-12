@@ -33,6 +33,32 @@ public partial class NatsConnection
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default)
     {
+        if (Telemetry.HasListeners())
+        {
+            using var activity = Telemetry.StartSendActivity($"{SpanDestinationName(subject)} {Telemetry.Constants.RequestReplyActivityName}", this, subject, null);
+            try
+            {
+                replyOpts = SetReplyOptsDefaults(replyOpts);
+                await using var sub1 = await RequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (await sub1.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    if (sub1.Msgs.TryRead(out var msg))
+                    {
+                        return msg;
+                    }
+                }
+
+                throw new NatsNoReplyException();
+            }
+            catch (Exception e)
+            {
+                Telemetry.SetException(activity, e);
+                throw;
+            }
+        }
+
         replyOpts = SetReplyOptsDefaults(replyOpts);
         await using var sub = await RequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
             .ConfigureAwait(false);
