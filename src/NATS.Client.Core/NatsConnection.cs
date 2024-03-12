@@ -196,6 +196,16 @@ public partial class NatsConnection : INatsConnection
         }
     }
 
+    internal string SpanDestinationName(string subject)
+    {
+        if (subject.StartsWith(Opts.InboxPrefix, StringComparison.Ordinal))
+            return "inbox";
+
+        // to avoid long span names and low cardinality, only take the first two tokens
+        var tokens = subject.Split('.');
+        return tokens.Length < 2 ? subject : $"{tokens[0]}.{tokens[1]}";
+    }
+
     internal NatsStats GetStats() => Counter.ToStats();
 
     internal ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)

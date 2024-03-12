@@ -66,6 +66,9 @@ jobs:
       - name: Test Services
         run: dotnet test -c Debug --no-build --logger:"console;verbosity=normal" tests/NATS.Client.Services.Tests/NATS.Client.Services.Tests.csproj
 
+      - name: Test OpenTelemetry
+        run: dotnet test -c Debug --no-build --logger:"console;verbosity=normal" tests/NATS.Net.OpenTelemetry.Tests/NATS.Net.OpenTelemetry.Tests.csproj
+
       - name: Check Native AOT
         run: |
           cd tests/NATS.Client.CheckNativeAot
