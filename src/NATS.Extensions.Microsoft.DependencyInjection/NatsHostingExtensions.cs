@@ -1,7 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Logging;
-using NATS.Client.Core;
 
 namespace NATS.Extensions.Microsoft.DependencyInjection;
 

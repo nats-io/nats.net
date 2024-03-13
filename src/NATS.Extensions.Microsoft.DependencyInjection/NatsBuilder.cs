@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -13,7 +12,7 @@ public class NatsBuilder
     private int _poolSize = 1;
     private Func<NatsOpts, NatsOpts>? _configureOpts;
     private Action<NatsConnection>? _configureConnection;
-    private object? _diKey;
+    private object? _diKey = null;
 
     public NatsBuilder(IServiceCollection services)
         => _services = services;
