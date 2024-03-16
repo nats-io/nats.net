@@ -1,14 +1,8 @@
 namespace NATS.Client.Services;
 
 [AttributeUsage(AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
-public sealed class ServiceEndpointAttribute : Attribute
+public sealed class ServiceEndpointAttribute(string name, string group = null) : Attribute
 {
-    public string Name { get; }
-    public string Group { get; }
-
-    public ServiceEndpointAttribute(string name, string group = null)
-    {
-        Name = name;
-        Group = group;
-    }
+    public string Name { get; } = name;
+    public string Group { get; } = group;
 }

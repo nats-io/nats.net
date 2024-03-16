@@ -14,20 +14,10 @@ internal class Program
         var svc = new NatsSvcContext(nats);
         await using var testService = await svc.AddServiceAsync("test", "1.0.0");
 
-        var factory = GetFactory();
-        var registrar = factory.CreateRegistrar();
+        var registrar = INatsSvcEndpointRegistrar.GetRegistrar();
         await registrar.RegisterEndpointsAsync(testService);
-
-
+        
         Console.ReadLine();
-    }
-
-    private static IEndpointRegistrarFactory GetFactory()
-    {
-        var factoryType = Type.GetType("NATS.Client.Services.Generated.EndpointRegistrarFactory");
-        if (factoryType != null)
-            return Activator.CreateInstance(factoryType) as IEndpointRegistrarFactory ?? throw new InvalidOperationException("Factory not found. Ensure the source generator executed correctly.");
-        return null!;
     }
 }
 

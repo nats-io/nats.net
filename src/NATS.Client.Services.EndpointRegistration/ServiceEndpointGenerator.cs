@@ -16,17 +16,16 @@ public class ServiceEndpointGenerator : ISourceGenerator
         var compilation = context.Compilation;
         var symbolsWithEndpointAttribute = GetSymbolsWithEndpointAttribute(compilation);
 
-        if (symbolsWithEndpointAttribute.Any())
-        {
-            var source = GenerateRegistrationCode(symbolsWithEndpointAttribute);
-            context.AddSource("NatsSvcServerExtensions.Generated.cs", source);
-        }
+        var withEndpointAttribute = symbolsWithEndpointAttribute as IMethodSymbol[] ?? symbolsWithEndpointAttribute.ToArray();
+        if (!withEndpointAttribute.Any()) return;
+        var source = GenerateRegistrationCode(withEndpointAttribute);
+        context.AddSource("NatsSvcServerExtensions.Generated.cs", source);
     }
 
     private static IEnumerable<IMethodSymbol> GetSymbolsWithEndpointAttribute(Compilation compilation)
     {
         var endpointAttributeSymbol = compilation.GetTypeByMetadataName("NATS.Client.Services.ServiceEndpointAttribute");
-        if (endpointAttributeSymbol == null) return Enumerable.Empty<IMethodSymbol>();
+        if (endpointAttributeSymbol == null) return [];
 
         return compilation.SyntaxTrees
             .SelectMany(st => st.GetRoot().DescendantNodes())
@@ -44,22 +43,12 @@ public class ServiceEndpointGenerator : ISourceGenerator
         sb.AppendLine("using System.Threading;");
         sb.AppendLine("using System.Threading.Tasks;");
         sb.AppendLine("using NATS.Client.Services;");
-        sb.AppendLine("using NATS.Client.Core;"); // Assuming this is where INatsSvcServer and other relevant types are defined
+        sb.AppendLine("using NATS.Client.Core;");
         sb.AppendLine();
-        sb.AppendLine("namespace NATS.Client.Services.Generated");
-        sb.AppendLine("{");
-        sb.AppendLine("    public class EndpointRegistrarFactory : IEndpointRegistrarFactory");
-        sb.AppendLine("    {");
-        sb.AppendLine("        public IEndpointRegistrar CreateRegistrar()");
-        sb.AppendLine("        {");
-        sb.AppendLine("            return new EndpointRegistrar();");
-        sb.AppendLine("        }");
-        sb.AppendLine("    }");
-        sb.AppendLine("}");
 
         sb.AppendLine("namespace NATS.Client.Services.Generated");
         sb.AppendLine("{");
-        sb.AppendLine("    public class EndpointRegistrar : IEndpointRegistrar");
+        sb.AppendLine("    public class NatsSvcEndpointRegistrar : INatsSvcEndpointRegistrar");
         sb.AppendLine("    {");
         sb.AppendLine("        public async Task RegisterEndpointsAsync(INatsSvcServer service, CancellationToken cancellationToken = default)");
         sb.AppendLine("        {");
@@ -68,10 +57,12 @@ public class ServiceEndpointGenerator : ISourceGenerator
         foreach (var methodSymbol in methodSymbols)
         {
             var endpointAttribute = methodSymbol.GetAttributes().FirstOrDefault(a => a.AttributeClass?.Name == "ServiceEndpointAttribute");
-            if (endpointAttribute != null)
+            if (endpointAttribute == null) continue;
+
+            if (endpointAttribute.ConstructorArguments.Any())
             {
-                var endpointName = (string)endpointAttribute.ConstructorArguments[0].Value;
-                var queueGroup = endpointAttribute.ConstructorArguments.Length > 1 ? (string)endpointAttribute.ConstructorArguments[1].Value : "null";
+                var endpointName = endpointAttribute.ConstructorArguments[0].Value?.ToString();
+                var queueGroup = endpointAttribute.ConstructorArguments.Length > 1 ? endpointAttribute.ConstructorArguments[1].Value?.ToString() : "null";
 
                 var className = methodSymbol.ContainingType.ToDisplayString();
                 var methodName = methodSymbol.Name;
@@ -95,9 +86,10 @@ public class ServiceEndpointGenerator : ISourceGenerator
                 sb.AppendLine($"                        await m.ReplyErrorAsync(500, ex.Message);");
                 sb.AppendLine($"                    }}");
                 sb.AppendLine($"                }},");
-                sb.AppendLine($"                queueGroup: {(queueGroup != "null" ? $"\"{queueGroup}\"" : "null")},");
-                sb.AppendLine($"                cancellationToken: cancellationToken);");
+                sb.AppendLine($"                queueGroup: {(queueGroup != "null" ? $"\"{queueGroup}\"" : "null")}");
             }
+
+            sb.AppendLine(",cancellationToken: cancellationToken);");
         }
 
         sb.AppendLine("        }");
