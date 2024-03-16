@@ -64,3 +64,4 @@ public record NatsSvcConfig
     /// </summary>
     public Func<INatsSvcEndpoint, JsonNode>? StatsHandler { get; init; }
 }
+

@@ -31,79 +31,83 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MinimumWebApp", "sandbox\Mi
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "BlazorWasm", "BlazorWasm", "{326017A7-18B3-4567-B9F9-5521E4467198}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BlazorWasm.Client", "sandbox\BlazorWasm\Client\BlazorWasm.Client.csproj", "{EFBCEF7F-51AA-4717-8E3E-304B6506F1AC}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BlazorWasm.Client", "sandbox\BlazorWasm\Client\BlazorWasm.Client.csproj", "{EFBCEF7F-51AA-4717-8E3E-304B6506F1AC}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BlazorWasm.Server", "sandbox\BlazorWasm\Server\BlazorWasm.Server.csproj", "{36B9F490-681F-432D-B8FA-64440EC076D9}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BlazorWasm.Server", "sandbox\BlazorWasm\Server\BlazorWasm.Server.csproj", "{36B9F490-681F-432D-B8FA-64440EC076D9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BlazorWasm.Shared", "sandbox\BlazorWasm\Shared\BlazorWasm.Shared.csproj", "{35D141D0-F80A-4E9B-A2AA-A1AEA925C9C2}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BlazorWasm.Shared", "sandbox\BlazorWasm\Shared\BlazorWasm.Shared.csproj", "{35D141D0-F80A-4E9B-A2AA-A1AEA925C9C2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.Core.SubscribeRaw", "sandbox\Example.Core.SubscribeRaw\Example.Core.SubscribeRaw.csproj", "{07217C71-7260-4C5B-B405-75905E5BC76B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Example.Core.SubscribeRaw", "sandbox\Example.Core.SubscribeRaw\Example.Core.SubscribeRaw.csproj", "{07217C71-7260-4C5B-B405-75905E5BC76B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.Core.SubscribeModel", "sandbox\Example.Core.SubscribeModel\Example.Core.SubscribeModel.csproj", "{6E000410-7557-46F0-BACC-10CD31FF1D5B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Example.Core.SubscribeModel", "sandbox\Example.Core.SubscribeModel\Example.Core.SubscribeModel.csproj", "{6E000410-7557-46F0-BACC-10CD31FF1D5B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.Core.SubscribeQueueGroup", "sandbox\Example.Core.SubscribeQueueGroup\Example.Core.SubscribeQueueGroup.csproj", "{C85BA135-3C21-4027-BE5A-849E1011DD0A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Example.Core.SubscribeQueueGroup", "sandbox\Example.Core.SubscribeQueueGroup\Example.Core.SubscribeQueueGroup.csproj", "{C85BA135-3C21-4027-BE5A-849E1011DD0A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.Core.PublishModel", "sandbox\Example.Core.PublishModel\Example.Core.PublishModel.csproj", "{29F96D05-D02F-4610-A8FB-3527BF83C4A5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Example.Core.PublishModel", "sandbox\Example.Core.PublishModel\Example.Core.PublishModel.csproj", "{29F96D05-D02F-4610-A8FB-3527BF83C4A5}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.Core.MemoryTests", "tests\NATS.Client.Core.MemoryTests\NATS.Client.Core.MemoryTests.csproj", "{B26DE6AC-A4D5-4427-8453-EE3514E4B513}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NATS.Client.Core.MemoryTests", "tests\NATS.Client.Core.MemoryTests\NATS.Client.Core.MemoryTests.csproj", "{B26DE6AC-A4D5-4427-8453-EE3514E4B513}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.Core.PublishHeaders", "sandbox\Example.Core.PublishHeaders\Example.Core.PublishHeaders.csproj", "{B0C82F24-BDEC-4420-A02A-F74E2423D755}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Example.Core.PublishHeaders", "sandbox\Example.Core.PublishHeaders\Example.Core.PublishHeaders.csproj", "{B0C82F24-BDEC-4420-A02A-F74E2423D755}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.Core.SubscribeHeaders", "sandbox\Example.Core.SubscribeHeaders\Example.Core.SubscribeHeaders.csproj", "{A96660DB-DAEB-4C57-8096-F236AC4FA927}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Example.Core.SubscribeHeaders", "sandbox\Example.Core.SubscribeHeaders\Example.Core.SubscribeHeaders.csproj", "{A96660DB-DAEB-4C57-8096-F236AC4FA927}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.JetStream", "src\NATS.Client.JetStream\NATS.Client.JetStream.csproj", "{56A9B885-6B7E-4BC6-AED0-ADC67C9A68DB}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NATS.Client.JetStream", "src\NATS.Client.JetStream\NATS.Client.JetStream.csproj", "{56A9B885-6B7E-4BC6-AED0-ADC67C9A68DB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.JetStream.Tests", "tests\NATS.Client.JetStream.Tests\NATS.Client.JetStream.Tests.csproj", "{2D39F649-C512-4EE5-9DFA-7BD4D9E4F145}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NATS.Client.JetStream.Tests", "tests\NATS.Client.JetStream.Tests\NATS.Client.JetStream.Tests.csproj", "{2D39F649-C512-4EE5-9DFA-7BD4D9E4F145}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.TestUtilities", "tests\NATS.Client.TestUtilities\NATS.Client.TestUtilities.csproj", "{90E5BF38-70C1-460A-9177-CE42815BDBF5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NATS.Client.TestUtilities", "tests\NATS.Client.TestUtilities\NATS.Client.TestUtilities.csproj", "{90E5BF38-70C1-460A-9177-CE42815BDBF5}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{BD234E2E-F51A-4B18-B8BE-8AF6D546BF87}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Schema.Generation", "tools\Schema.Generation\Schema.Generation.csproj", "{B7DD4A9C-2D24-4772-951E-86A665C59ADF}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Schema.Generation", "tools\Schema.Generation\Schema.Generation.csproj", "{B7DD4A9C-2D24-4772-951E-86A665C59ADF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.Perf", "tests\NATS.Client.Perf\NATS.Client.Perf.csproj", "{ADF66CBA-4F3E-4E91-9842-E194E3BC06A1}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NATS.Client.Perf", "tests\NATS.Client.Perf\NATS.Client.Perf.csproj", "{ADF66CBA-4F3E-4E91-9842-E194E3BC06A1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.JetStream.PullConsumer", "sandbox\Example.JetStream.PullConsumer\Example.JetStream.PullConsumer.csproj", "{3A9FC281-3B81-4D63-A76B-E1127C1D2241}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Example.JetStream.PullConsumer", "sandbox\Example.JetStream.PullConsumer\Example.JetStream.PullConsumer.csproj", "{3A9FC281-3B81-4D63-A76B-E1127C1D2241}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.KeyValueStore", "src\NATS.Client.KeyValueStore\NATS.Client.KeyValueStore.csproj", "{A102AB7B-A90C-4717-B17C-045240838060}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NATS.Client.KeyValueStore", "src\NATS.Client.KeyValueStore\NATS.Client.KeyValueStore.csproj", "{A102AB7B-A90C-4717-B17C-045240838060}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.KeyValueStore.Tests", "tests\NATS.Client.KeyValueStore.Tests\NATS.Client.KeyValueStore.Tests.csproj", "{908F2CED-CAC0-4A4E-AD19-362A413B5DA4}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NATS.Client.KeyValueStore.Tests", "tests\NATS.Client.KeyValueStore.Tests\NATS.Client.KeyValueStore.Tests.csproj", "{908F2CED-CAC0-4A4E-AD19-362A413B5DA4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.KeyValueStore.Watcher", "sandbox\Example.KeyValueStore.Watcher\Example.KeyValueStore.Watcher.csproj", "{912A4F2F-1BD1-4AE2-BAB8-5A49C221DB53}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Example.KeyValueStore.Watcher", "sandbox\Example.KeyValueStore.Watcher\Example.KeyValueStore.Watcher.csproj", "{912A4F2F-1BD1-4AE2-BAB8-5A49C221DB53}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.ObjectStore", "src\NATS.Client.ObjectStore\NATS.Client.ObjectStore.csproj", "{3F8840BA-4F91-4359-AA53-6B26823E7F55}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NATS.Client.ObjectStore", "src\NATS.Client.ObjectStore\NATS.Client.ObjectStore.csproj", "{3F8840BA-4F91-4359-AA53-6B26823E7F55}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.ObjectStore.Tests", "tests\NATS.Client.ObjectStore.Tests\NATS.Client.ObjectStore.Tests.csproj", "{BB2F4EEE-1AB3-43F7-B004-6C9B3D52353E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NATS.Client.ObjectStore.Tests", "tests\NATS.Client.ObjectStore.Tests\NATS.Client.ObjectStore.Tests.csproj", "{BB2F4EEE-1AB3-43F7-B004-6C9B3D52353E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.ObjectStore", "sandbox\Example.ObjectStore\Example.ObjectStore.csproj", "{51882883-A66E-4F95-A1AB-CFCBF71B4376}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Example.ObjectStore", "sandbox\Example.ObjectStore\Example.ObjectStore.csproj", "{51882883-A66E-4F95-A1AB-CFCBF71B4376}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nats.Client.Compat", "tests\Nats.Client.Compat\Nats.Client.Compat.csproj", "{35578296-FF6C-4BA4-BEE5-C1A6E7DB7024}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nats.Client.Compat", "tests\Nats.Client.Compat\Nats.Client.Compat.csproj", "{35578296-FF6C-4BA4-BEE5-C1A6E7DB7024}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.Services", "src\NATS.Client.Services\NATS.Client.Services.csproj", "{050C63EE-8F1C-4535-9C6C-E12E62A1FF1D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NATS.Client.Services", "src\NATS.Client.Services\NATS.Client.Services.csproj", "{050C63EE-8F1C-4535-9C6C-E12E62A1FF1D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.Services.Tests", "tests\NATS.Client.Services.Tests\NATS.Client.Services.Tests.csproj", "{749CAE39-4C1E-4627-9E31-A36B987BC453}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NATS.Client.Services.Tests", "tests\NATS.Client.Services.Tests\NATS.Client.Services.Tests.csproj", "{749CAE39-4C1E-4627-9E31-A36B987BC453}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.Services", "sandbox\Example.Services\Example.Services.csproj", "{DD0AB72A-D6CD-4054-A9C9-0DCA3EDBA00F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Example.Services", "sandbox\Example.Services\Example.Services.csproj", "{DD0AB72A-D6CD-4054-A9C9-0DCA3EDBA00F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.TlsFirst", "sandbox\Example.TlsFirst\Example.TlsFirst.csproj", "{88625045-978F-417F-9F51-A4E3A9718945}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Example.TlsFirst", "sandbox\Example.TlsFirst\Example.TlsFirst.csproj", "{88625045-978F-417F-9F51-A4E3A9718945}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.NativeAot", "sandbox\Example.NativeAot\Example.NativeAot.csproj", "{51362D87-49C8-414C-AAB7-E51B946231E7}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Example.NativeAot", "sandbox\Example.NativeAot\Example.NativeAot.csproj", "{51362D87-49C8-414C-AAB7-E51B946231E7}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.CheckNativeAot", "tests\NATS.Client.CheckNativeAot\NATS.Client.CheckNativeAot.csproj", "{CF44A42E-C075-4C5C-BE8B-3DF266FC617B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NATS.Client.CheckNativeAot", "tests\NATS.Client.CheckNativeAot\NATS.Client.CheckNativeAot.csproj", "{CF44A42E-C075-4C5C-BE8B-3DF266FC617B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.ProtoBufMessages", "sandbox\Example.ProtoBufMessages\Example.ProtoBufMessages.csproj", "{9FCD9377-FE5F-4D94-BDCF-54427DB6487D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Example.ProtoBufMessages", "sandbox\Example.ProtoBufMessages\Example.ProtoBufMessages.csproj", "{9FCD9377-FE5F-4D94-BDCF-54427DB6487D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.Serializers.Json", "src\NATS.Client.Serializers.Json\NATS.Client.Serializers.Json.csproj", "{5B4B30A5-941B-44F9-98C6-06F0BB2242AB}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NATS.Client.Serializers.Json", "src\NATS.Client.Serializers.Json\NATS.Client.Serializers.Json.csproj", "{5B4B30A5-941B-44F9-98C6-06F0BB2242AB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Net", "src\NATS.Net\NATS.Net.csproj", "{6A7B9B9F-BFA4-4A6D-9006-0AAF597FC6DD}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NATS.Net", "src\NATS.Net\NATS.Net.csproj", "{6A7B9B9F-BFA4-4A6D-9006-0AAF597FC6DD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Net.DocsExamples", "tests\NATS.Net.DocsExamples\NATS.Net.DocsExamples.csproj", "{389C05EB-A0B3-4097-8C1F-4D55818438CC}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NATS.Net.DocsExamples", "tests\NATS.Net.DocsExamples\NATS.Net.DocsExamples.csproj", "{389C05EB-A0B3-4097-8C1F-4D55818438CC}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.Hosting.Tests", "tests\NATS.Client.Hosting.Tests\NATS.Client.Hosting.Tests.csproj", "{766C2486-34C3-4DD1-B31C-540C17C044B0}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NATS.Client.Hosting.Tests", "tests\NATS.Client.Hosting.Tests\NATS.Client.Hosting.Tests.csproj", "{766C2486-34C3-4DD1-B31C-540C17C044B0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.OpenTelemetry", "sandbox\Example.OpenTelemetry\Example.OpenTelemetry.csproj", "{474BA453-9CFF-41C2-B2E7-ADD92CC93E86}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Example.OpenTelemetry", "sandbox\Example.OpenTelemetry\Example.OpenTelemetry.csproj", "{474BA453-9CFF-41C2-B2E7-ADD92CC93E86}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Net.OpenTelemetry.Tests", "tests\NATS.Net.OpenTelemetry.Tests\NATS.Net.OpenTelemetry.Tests.csproj", "{B8554582-DE19-41A2-9784-9B27C9F22429}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NATS.Net.OpenTelemetry.Tests", "tests\NATS.Net.OpenTelemetry.Tests\NATS.Net.OpenTelemetry.Tests.csproj", "{B8554582-DE19-41A2-9784-9B27C9F22429}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.Services.EndpointRegistration", "src\NATS.Client.Services.EndpointRegistration\NATS.Client.Services.EndpointRegistration.csproj", "{068CB141-21E1-40FE-81AD-9F3CAC437FD3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EndpointRegistrationTest", "tests\EndpointRegistrationTest\EndpointRegistrationTest.csproj", "{0F4D25D5-88E1-407B-8255-1217975D6458}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -279,6 +283,14 @@ Global
 		{B8554582-DE19-41A2-9784-9B27C9F22429}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B8554582-DE19-41A2-9784-9B27C9F22429}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B8554582-DE19-41A2-9784-9B27C9F22429}.Release|Any CPU.Build.0 = Release|Any CPU
+		{068CB141-21E1-40FE-81AD-9F3CAC437FD3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{068CB141-21E1-40FE-81AD-9F3CAC437FD3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{068CB141-21E1-40FE-81AD-9F3CAC437FD3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{068CB141-21E1-40FE-81AD-9F3CAC437FD3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0F4D25D5-88E1-407B-8255-1217975D6458}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0F4D25D5-88E1-407B-8255-1217975D6458}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0F4D25D5-88E1-407B-8255-1217975D6458}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0F4D25D5-88E1-407B-8255-1217975D6458}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -327,6 +339,8 @@ Global
 		{766C2486-34C3-4DD1-B31C-540C17C044B0} = {C526E8AB-739A-48D7-8FC4-048978C9B650}
 		{474BA453-9CFF-41C2-B2E7-ADD92CC93E86} = {95A69671-16CA-4133-981C-CC381B7AAA30}
 		{B8554582-DE19-41A2-9784-9B27C9F22429} = {C526E8AB-739A-48D7-8FC4-048978C9B650}
+		{068CB141-21E1-40FE-81AD-9F3CAC437FD3} = {4827B3EC-73D8-436D-AE2A-5E29AC95FD0C}
+		{0F4D25D5-88E1-407B-8255-1217975D6458} = {C526E8AB-739A-48D7-8FC4-048978C9B650}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {8CBB7278-D093-448E-B3DE-B5991209A1AA}
