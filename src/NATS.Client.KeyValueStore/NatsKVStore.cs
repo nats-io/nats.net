@@ -315,9 +315,9 @@ public class NatsKVStore : INatsKVStore
     {
         await using var watcher = await WatchInternalAsync<T>(key, serializer, opts, cancellationToken);
 
-        if (watcher.InitialConsumer.Info.NumPending == 0 && opts?.EndOfCurrentData != null)
+        if (watcher.InitialConsumer.Info.NumPending == 0 && opts?.OnNoData != null)
         {
-            if (await opts.EndOfCurrentData(cancellationToken))
+            if (await opts.OnNoData(cancellationToken))
             {
                 yield break;
             }
@@ -328,14 +328,6 @@ public class NatsKVStore : INatsKVStore
             while (watcher.Entries.TryRead(out var entry))
             {
                 yield return entry;
-
-                if (entry.Delta == 0 && opts?.EndOfCurrentData != null)
-                {
-                    if (await opts.EndOfCurrentData(cancellationToken))
-                    {
-                        yield break;
-                    }
-                }
             }
         }
     }
