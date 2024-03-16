@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using NATS.Client.Core.Tests;
+using NATS.Client.Services.EndpointGenerator;
 using NATS.Client.Services.Internal;
 using NATS.Client.Services.Models;
 
@@ -350,4 +351,88 @@ public class ServicesTests
         var formatRegex = new Regex(@"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{7}Z$");
         Assert.Matches(formatRegex, stats.Started);
     }
+
+    [Fact]
+public async Task RegisterEndpointsAsync_ShouldRegisterEndpoints()
+{
+    var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+    var cancellationToken = cts.Token;
+
+    await using var server = NatsServer.Start();
+    await using var nats = server.CreateClientConnection();
+
+    var svc = new NatsSvcContext(nats);
+    await using var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
+
+    await s1.RegisterEndpointsAsync(cancellationToken: cancellationToken);
+
+    var info1 = (await nats.FindServicesAsync("$SRV.INFO", 1, NatsSrvJsonSerializer<InfoResponse>.Default, cancellationToken)).First();
+    var info2 = s1.GetInfo();
+
+    foreach (var info in new[] { info1, info2 })
+    {
+        Assert.Single(info.Endpoints);
+        var endpointInfo1 = info.Endpoints.First();
+        Assert.Equal("e1", endpointInfo1.Name);
+    }
+
+    var endpointInfo = info1.Endpoints.First();
+
+    for (var i = 0; i < 10; i++)
+    {
+        var response = await nats.RequestAsync<int, int>(endpointInfo.Subject, i, cancellationToken: cancellationToken);
+
+        if (i is 7 or 8)
+        {
+            Assert.Equal($"{i}", response.Headers?["Nats-Service-Error-Code"]);
+            Assert.Equal($"Error{i}", response.Headers?["Nats-Service-Error"]);
+        }
+        else if (i is 9)
+        {
+            Assert.Equal("999", response.Headers?["Nats-Service-Error-Code"]);
+            Assert.Equal("Handler error", response.Headers?["Nats-Service-Error"]);
+        }
+        else
+        {
+            Assert.Equal(i * i, response.Data);
+            Assert.Null(response.Headers);
+        }
+    }
+
+    var stat1 = (await nats.FindServicesAsync("$SRV.STATS", 1, NatsSrvJsonSerializer<StatsResponse>.Default, cancellationToken)).First();
+    var stat2 = s1.GetStats();
+
+    foreach (var stat in new[] { stat1, stat2 })
+    {
+        Assert.Single(stat.Endpoints);
+        var endpointStats = stat.Endpoints.First();
+        Assert.Equal("e1", endpointStats.Name);
+        Assert.Equal(10, endpointStats.NumRequests);
+        Assert.Equal(3, endpointStats.NumErrors);
+        Assert.Equal("999:Handler error", endpointStats.LastError);
+        Assert.True(endpointStats.ProcessingTime > 0);
+        Assert.True(endpointStats.AverageProcessingTime > 0);
+    }
+}
+
+public class MyService
+{
+    [ServiceEndpoint("e1")]
+    public async ValueTask<int> Endpoint1(NatsSvcMsg<int> m)
+    {
+        if (m.Data == 7)
+        {
+            throw new NatsSvcEndpointException(m.Data, $"Error{m.Data}");
+        }
+        if (m.Data == 8)
+        {
+            throw new NatsSvcEndpointException(m.Data, $"Error{m.Data}");
+        }
+        if (m.Data == 9)
+        {
+            throw new Exception("this won't be exposed");
+        }
+        return m.Data * m.Data;
+    }
+}
 }
