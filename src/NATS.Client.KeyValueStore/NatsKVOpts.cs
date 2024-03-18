@@ -36,6 +36,11 @@ public record NatsKVWatchOpts
     /// Meta only to get the metadata of the entries
     /// </summary>
     public bool MetaOnly { get; init; } = false;
+
+    /// <summary>
+    /// Async function called when the enumerator reaches the end of data. Return True to break the async enumeration, False to allow the enumeration to continue.
+    /// </summary>
+    public Func<CancellationToken, ValueTask<bool>>? OnNoData { get; init; }
 }
 
 public record NatsKVDeleteOpts

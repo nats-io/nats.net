@@ -315,6 +315,14 @@ public class NatsKVStore : INatsKVStore
     {
         await using var watcher = await WatchInternalAsync<T>(key, serializer, opts, cancellationToken);
 
+        if (watcher.InitialConsumer.Info.NumPending == 0 && opts?.OnNoData != null)
+        {
+            if (await opts.OnNoData(cancellationToken))
+            {
+                yield break;
+            }
+        }
+
         while (await watcher.Entries.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
             while (watcher.Entries.TryRead(out var entry))
