@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Diagnostics;
 using System.Runtime.ExceptionServices;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
@@ -256,6 +257,8 @@ public abstract class NatsSubBase
             }
 
             SetException(new NatsSubException($"Message error: {e.Message}", ExceptionDispatchInfo.Capture(e), payload, headers));
+
+            Telemetry.SetException(Activity.Current, e);
         }
     }
 

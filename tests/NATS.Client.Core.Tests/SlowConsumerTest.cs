@@ -50,6 +50,8 @@ public class SlowConsumerTest
 
                     await signal;
 
+                    await Task.Delay(100, cancellationToken);
+
                     Interlocked.Increment(ref count);
                     _output.WriteLine($"GOOD {msg.Data}");
                 }

@@ -235,6 +235,13 @@ public record ConsumerConfig
     public long NumReplicas { get; set; }
 
     /// <summary>
+    /// If the consumer is paused, this contains until which time it is paused.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("pause_until")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public DateTimeOffset? PauseUntil { get; set; }
+
+    /// <summary>
     /// Force the consumer state to be kept in memory rather than inherit the setting from the stream
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("mem_storage")]

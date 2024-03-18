@@ -13,8 +13,8 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - branch: 'v2.9.22'
-          - branch: 'v2.10.9'
+          - branch: 'v2.9'
+          - branch: 'latest'
           - branch: 'main'
     runs-on: ubuntu-latest
     env:
@@ -24,9 +24,16 @@ jobs:
     steps:
       - name: Install nats-server
         run: |
+          gh_api_url="https://api.github.com/repos/nats-io/nats-server/releases"
+          branch="${{ matrix.config.branch }}"
+          if [[ $branch == "v"* ]]; then
+            branch=$(curl -s $gh_api_url | jq -r '.[].tag_name' | grep $branch | sort -V | tail -1)
+          elif [[ $branch == "latest" ]]; then
+            branch=$(curl -s $gh_api_url/latest | jq -r .tag_name)
+          fi
           for i in 1 2 3
           do
-            curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@${{ matrix.config.branch }} | PREFIX=. sh && break || sleep 30
+            curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@$branch | PREFIX=. sh && break || sleep 30
           done
           sudo mv nats-server /usr/local/bin
 
@@ -59,6 +66,9 @@ jobs:
       - name: Test Services
         run: dotnet test -c Debug --no-build --logger:"console;verbosity=normal" tests/NATS.Client.Services.Tests/NATS.Client.Services.Tests.csproj
 
+      - name: Test OpenTelemetry
+        run: dotnet test -c Debug --no-build --logger:"console;verbosity=normal" tests/NATS.Net.OpenTelemetry.Tests/NATS.Net.OpenTelemetry.Tests.csproj
+
       - name: Check Native AOT
         run: |
           cd tests/NATS.Client.CheckNativeAot
@@ -86,8 +96,8 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - branch: 'v2.9.22'
-          - branch: 'v2.10.9'
+          - branch: 'v2.9'
+          - branch: 'latest'
           - branch: 'main'
     runs-on: windows-latest
     env:
@@ -109,9 +119,16 @@ jobs:
         shell: bash
         run: |
           mkdir tools-nats-server && cd tools-nats-server
+          gh_api_url="https://api.github.com/repos/nats-io/nats-server/releases"
+          branch="${{ matrix.config.branch }}"
+          if [[ $branch == "v"* ]]; then
+            branch=$(curl -s $gh_api_url | jq -r '.[].tag_name' | grep $branch | sort -V | tail -1)
+          elif [[ $branch == "latest" ]]; then
+            branch=$(curl -s $gh_api_url/latest | jq -r .tag_name)
+          fi
           for i in 1 2 3
           do
-            curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@${{ matrix.config.branch }} | PREFIX=. sh && break || sleep 30
+            curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@$branch | PREFIX=. sh && break || sleep 30
           done
           mv nats-server nats-server.exe
           cygpath -w "$(pwd)" | tee -a "$GITHUB_PATH"

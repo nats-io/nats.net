@@ -114,7 +114,7 @@ internal sealed class ProtocolWriter
 
         if (queueGroup != null)
         {
-            written = _subjectEncoding.GetBytes(subject, span);
+            written = _subjectEncoding.GetBytes(queueGroup, span);
             span[written] = (byte)' ';
             size += written + 1;
             span = span[(written + 1)..];

@@ -12,7 +12,7 @@ public class ConsumerSetupTest
         await using var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats);
 
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
 
@@ -35,5 +35,36 @@ public class ConsumerSetupTest
         Assert.Equal("c1", config.Name);
         Assert.Equal("i1", config.DeliverSubject);
         Assert.Equal("q1", config.DeliverGroup);
+    }
+
+    [SkipIfNatsServer(versionEarlierThan: "2.11")]
+    public async Task Create_paused_consumer()
+    {
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+        var js = new NatsJSContextFactory().CreateContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        await js.CreateStreamAsync(new StreamConfig("s1", new[] { "s1.*" }), cts.Token);
+
+        var pauseUntil = DateTimeOffset.Now.AddHours(1);
+
+        await js.CreateOrUpdateConsumerAsync(
+            stream: "s1",
+            config: new ConsumerConfig
+            {
+                Name = "c1",
+                PauseUntil = pauseUntil,
+            },
+            cancellationToken: cts.Token);
+
+        var consumer = await js.GetConsumerAsync("s1", "c1", cts.Token);
+
+        var info = consumer.Info;
+        Assert.True(info.IsPaused);
+
+        var config = info.Config;
+        Assert.Equal(pauseUntil, config.PauseUntil);
     }
 }

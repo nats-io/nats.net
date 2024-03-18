@@ -240,4 +240,40 @@ public class NatsKVWatcherTest
             }
         }
     }
+
+    [Fact]
+    public async Task Watch_push_consumer_flow_control()
+    {
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var timeout = TimeSpan.FromSeconds(60);
+        var cts = new CancellationTokenSource(timeout);
+        var cancellationToken = cts.Token;
+
+        var bucket = "b1";
+        var store = await kv.CreateStoreAsync(bucket, cancellationToken: cancellationToken);
+
+        // with large number of entries we'd receive the flow control messages
+        const int max = 50_000;
+        for (var i = 0; i < max; i++)
+        {
+            await store.PutAsync($"k{i}", i, cancellationToken: cancellationToken);
+        }
+
+        HashSet<string> keys = new();
+        var count = 0;
+        await foreach (var entry in store.WatchAsync<int>(cancellationToken: cancellationToken))
+        {
+            Assert.True(keys.Add(entry.Key));
+            if (++count == max)
+                break;
+        }
+
+        Assert.Equal(max, count);
+        Assert.Equal(max, keys.Count);
+    }
 }

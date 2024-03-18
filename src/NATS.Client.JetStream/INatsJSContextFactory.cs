@@ -2,7 +2,7 @@ using NATS.Client.Core;
 
 namespace NATS.Client.JetStream;
 
-internal interface INatsJSContextFactory
+public interface INatsJSContextFactory
 {
     INatsJSContext CreateContext(INatsConnection connection);
 
