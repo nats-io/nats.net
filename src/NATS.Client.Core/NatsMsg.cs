@@ -300,6 +300,16 @@ public class NatsMsgError
 
     public byte[]? Headers { get; internal set; }
 
+    public void Throw()
+    {
+        if (SerializerException != null)
+            throw new NatsException(SerializerException.Message, SerializerException);
+        if (HeaderParserException != null)
+            throw new NatsException(HeaderParserException.Message, HeaderParserException);
+
+        Debug.Assert(false, "Unknown error");
+    }
+
     public override string ToString() =>
         SerializerException?.Message
         ?? HeaderParserException?.Message
