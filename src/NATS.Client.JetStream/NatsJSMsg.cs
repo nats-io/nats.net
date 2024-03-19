@@ -70,6 +70,12 @@ public interface INatsJSMsg<out T>
     /// </summary>
     public string? ReplyTo { get; }
 
+    /// <summary>Any errors (generally serialization errors) encountered while processing the message.</summary>
+    NatsMsgError? Error { get; }
+
+    /// <summary>Throws an exception if the message contains any errors (generally serialization errors).</summary>
+    void EnsureSuccess();
+
     /// <summary>
     /// Reply with an empty message.
     /// </summary>
@@ -186,7 +192,13 @@ public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
     /// </summary>
     public string? ReplyTo => _msg.ReplyTo;
 
+    /// <inheritdoc />
+    public NatsMsgError? Error => _msg.Error;
+
     internal NatsMsg<T> Msg => _msg;
+
+    /// <inheritdoc />
+    public void EnsureSuccess() => _msg.EnsureSuccess();
 
     /// <summary>
     /// Reply with an empty message.

@@ -46,6 +46,12 @@ public interface INatsMsg<T>
     /// <summary>NATS connection this message is associated to.</summary>
     INatsConnection? Connection { get; init; }
 
+    /// <summary>Any errors (generally serialization errors) encountered while processing the message.</summary>
+    NatsMsgError? Error { get; }
+
+    /// <summary>Throws an exception if the message contains any errors (generally serialization errors).</summary>
+    void EnsureSuccess();
+
     /// <summary>
     /// Reply with an empty message.
     /// </summary>
@@ -122,6 +128,7 @@ public readonly record struct NatsMsg<T>(
     T? Data,
     INatsConnection? Connection) : INatsMsg<T>
 {
+    /// <inheritdoc />
     public NatsMsgError? Error => Headers?.Error;
 
     internal static NatsMsg<T> Build(
@@ -213,6 +220,9 @@ public readonly record struct NatsMsg<T>(
 
         return new NatsMsg<T>(subject, replyTo, (int)size, headers, data, connection);
     }
+
+    /// <inheritdoc />
+    public void EnsureSuccess() => Error?.Throw();
 
     /// <summary>
     /// Reply with an empty message.
