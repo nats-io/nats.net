@@ -230,14 +230,14 @@ public partial class NatsJSContext
         {
             if (sub.Msgs.TryRead(out var msg))
             {
-                if (msg.Error?.SerializerException is NatsJSApiErrorException jsError)
-                {
-                    return new NatsJSResponse<TResponse>(default, jsError.Error);
-                }
-
                 if (msg.Error is { } error)
                 {
-                    error.Throw();
+                    if (error is NatsJSApiErrorException jsError)
+                    {
+                        return new NatsJSResponse<TResponse>(default, jsError.Error);
+                    }
+
+                    throw error;
                 }
 
                 if (msg.Data == null)

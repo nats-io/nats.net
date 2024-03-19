@@ -305,9 +305,9 @@ public class SubscriptionTest
         var msg = await sub.Msgs.ReadAsync(cts.Token);
 
         Assert.NotNull(msg.Error);
-        Assert.IsType<NatsException>(msg.Error.SerializerException);
-        Assert.Contains("Can't deserialize System.Int32", msg.Error.SerializerException.Message);
-
-        Assert.Throws<NatsException>(() => msg.EnsureSuccess());
+        Assert.IsType<NatsDeserializeException>(msg.Error);
+        Assert.Equal("Exception during deserialization", msg.Error.Message);
+        Assert.Contains("Can't deserialize System.Int32", msg.Error.InnerException!.Message);
+        Assert.Throws<NatsDeserializeException>(() => msg.EnsureSuccess());
     }
 }

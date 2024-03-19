@@ -244,6 +244,7 @@ public class NatsKVStore : INatsKVStore
                     Value = msg.Data,
                     Delta = 0,
                     UsedDirectGet = true,
+                    Error = msg.Error,
                 };
             }
             else
@@ -267,6 +268,7 @@ public class NatsKVStore : INatsKVStore
                 throw new NatsKVException("Can't parse timestamp message value");
 
             T? data;
+            NatsDeserializeException? deserializeException = null;
             if (response.Message.Data != null)
             {
                 var bytes = ArrayPool<byte>.Shared.Rent(response.Message.Data.Length);
@@ -275,7 +277,16 @@ public class NatsKVStore : INatsKVStore
                     if (Convert.TryFromBase64String(response.Message.Data, bytes, out var written))
                     {
                         var buffer = new ReadOnlySequence<byte>(bytes.AsMemory(0, written));
-                        data = serializer.Deserialize(buffer);
+
+                        try
+                        {
+                            data = serializer.Deserialize(buffer);
+                        }
+                        catch (Exception e)
+                        {
+                            deserializeException = new NatsDeserializeException(buffer.ToArray(), e);
+                            data = default;
+                        }
                     }
                     else
                     {
@@ -298,6 +309,7 @@ public class NatsKVStore : INatsKVStore
                 Revision = response.Message.Seq,
                 Value = data,
                 UsedDirectGet = false,
+                Error = deserializeException,
             };
         }
     }

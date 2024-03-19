@@ -26,9 +26,11 @@ internal sealed class NatsJSErrorAwareJsonSerializer<T> : INatsDeserialize<T>
     }
 }
 
-internal class NatsJSApiErrorException : Exception
+internal class NatsJSApiErrorException : NatsException
 {
-    public NatsJSApiErrorException(ApiError error) => Error = error;
+    public NatsJSApiErrorException(ApiError error)
+        : base("JetStream API error")
+        => Error = error;
 
     public ApiError Error { get; }
 }

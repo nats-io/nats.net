@@ -1,3 +1,5 @@
+using NATS.Client.Core;
+
 namespace NATS.Client.KeyValueStore;
 
 /// <summary>
@@ -43,5 +45,17 @@ public readonly record struct NatsKVEntry<T>(string Bucket, string Key)
     /// </summary>
     public NatsKVOperation Operation { get; init; } = default;
 
+    /// <summary>Any errors encountered while processing the message.</summary>
+    public NatsException? Error { get; init; } = default;
+
     internal bool UsedDirectGet { get; init; } = true;
+
+    /// <summary>Throws an exception if the message contains any errors.</summary>
+    public void EnsureSuccess()
+    {
+        if (Error is not null)
+        {
+            throw Error;
+        }
+    }
 }

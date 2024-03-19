@@ -1,5 +1,4 @@
 using System.Buffers;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using NATS.Client.Core.Internal;
 
@@ -47,7 +46,7 @@ public interface INatsMsg<T>
     INatsConnection? Connection { get; init; }
 
     /// <summary>Any errors (generally serialization errors) encountered while processing the message.</summary>
-    NatsMsgError? Error { get; }
+    NatsException? Error { get; }
 
     /// <summary>Throws an exception if the message contains any errors (generally serialization errors).</summary>
     void EnsureSuccess();
@@ -129,7 +128,7 @@ public readonly record struct NatsMsg<T>(
     INatsConnection? Connection) : INatsMsg<T>
 {
     /// <inheritdoc />
-    public NatsMsgError? Error => Headers?.Error;
+    public NatsException? Error => Headers?.Error;
 
     internal static NatsMsg<T> Build(
         string subject,
@@ -142,33 +141,9 @@ public readonly record struct NatsMsg<T>(
     {
         NatsHeaders? headers = null;
 
-        // Consider an empty payload as null or default value for value types. This way we are able to
-        // receive sentinels as nulls or default values. This might cause an issue with where we are not
-        // able to differentiate between an empty sentinel and actual default value of a struct e.g. 0 (zero).
-        T? data;
-        if (payloadBuffer.Length > 0)
-        {
-            try
-            {
-                data = serializer.Deserialize(payloadBuffer);
-            }
-            catch (Exception e)
-            {
-                headers ??= new NatsHeaders();
-                headers.Error ??= new NatsMsgError();
-                headers.Error.SerializerException = e;
-                headers.Error.Payload = payloadBuffer.ToArray();
-                data = default;
-            }
-        }
-        else
-        {
-            data = default;
-        }
-
         if (headersBuffer != null)
         {
-            headers ??= new NatsHeaders();
+            headers = new NatsHeaders();
 
             try
             {
@@ -180,13 +155,33 @@ public readonly record struct NatsMsg<T>(
             }
             catch (Exception e)
             {
-                headers.Error ??= new NatsMsgError();
-                headers.Error.HeaderParserException = e;
-                headers.Error.Headers = headersBuffer.Value.ToArray();
+                headers.Error ??= new NatsHeaderParseException(headersBuffer.Value.ToArray(), e);
             }
         }
 
         headers?.SetReadOnly();
+
+        // Consider an empty payload as null or default value for value types. This way we are able to
+        // receive sentinels as nulls or default values. This might cause an issue with where we are not
+        // able to differentiate between an empty sentinel and actual default value of a struct e.g. 0 (zero).
+        T? data;
+        if (headers?.Error == null && payloadBuffer.Length > 0)
+        {
+            try
+            {
+                data = serializer.Deserialize(payloadBuffer);
+            }
+            catch (Exception e)
+            {
+                headers ??= new NatsHeaders();
+                headers.Error = new NatsDeserializeException(payloadBuffer.ToArray(), e);
+                data = default;
+            }
+        }
+        else
+        {
+            data = default;
+        }
 
         var size = subject.Length
                    + (replyTo?.Length ?? 0)
@@ -222,7 +217,11 @@ public readonly record struct NatsMsg<T>(
     }
 
     /// <inheritdoc />
-    public void EnsureSuccess() => Error?.Throw();
+    public void EnsureSuccess()
+    {
+        if (Error != null)
+            throw Error;
+    }
 
     /// <summary>
     /// Reply with an empty message.
@@ -300,28 +299,20 @@ public readonly record struct NatsMsg<T>(
     }
 }
 
-public class NatsMsgError
+public class NatsDeserializeException : NatsException
 {
-    public Exception? SerializerException { get; internal set; }
+    public NatsDeserializeException(byte[] rawData, Exception inner)
+        : base("Exception during deserialization", inner) =>
+        RawData = rawData;
 
-    public byte[]? Payload { get; internal set; }
+    public byte[] RawData { get; }
+}
 
-    public Exception? HeaderParserException { get; internal set; }
+public class NatsHeaderParseException : NatsException
+{
+    public NatsHeaderParseException(byte[] rawData, Exception inner)
+        : base("Exception parsing headers", inner) =>
+        RawData = rawData;
 
-    public byte[]? Headers { get; internal set; }
-
-    public void Throw()
-    {
-        if (SerializerException != null)
-            throw new NatsException(SerializerException.Message, SerializerException);
-        if (HeaderParserException != null)
-            throw new NatsException(HeaderParserException.Message, HeaderParserException);
-
-        Debug.Assert(false, "Unknown error");
-    }
-
-    public override string ToString() =>
-        SerializerException?.Message
-        ?? HeaderParserException?.Message
-        ?? "Unknown error";
+    public byte[] RawData { get; }
 }
