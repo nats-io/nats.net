@@ -122,6 +122,8 @@ public readonly record struct NatsMsg<T>(
     T? Data,
     INatsConnection? Connection) : INatsMsg<T>
 {
+    public NatsMsgError? Error => Headers?.Error;
+
     internal static NatsMsg<T> Build(
         string subject,
         string? replyTo,
@@ -131,25 +133,53 @@ public readonly record struct NatsMsg<T>(
         NatsHeaderParser headerParser,
         INatsDeserialize<T> serializer)
     {
+        NatsHeaders? headers = null;
+
         // Consider an empty payload as null or default value for value types. This way we are able to
         // receive sentinels as nulls or default values. This might cause an issue with where we are not
         // able to differentiate between an empty sentinel and actual default value of a struct e.g. 0 (zero).
-        var data = payloadBuffer.Length > 0
-            ? serializer.Deserialize(payloadBuffer)
-            : default;
-
-        NatsHeaders? headers = null;
+        T? data;
+        if (payloadBuffer.Length > 0)
+        {
+            try
+            {
+                data = serializer.Deserialize(payloadBuffer);
+            }
+            catch (Exception e)
+            {
+                headers ??= new NatsHeaders();
+                headers.Error ??= new NatsMsgError();
+                headers.Error.SerializerException = e;
+                headers.Error.Payload = payloadBuffer.ToArray();
+                data = default;
+            }
+        }
+        else
+        {
+            data = default;
+        }
 
         if (headersBuffer != null)
         {
-            headers = new NatsHeaders();
-            if (!headerParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), headers))
-            {
-                throw new NatsException("Error parsing headers");
-            }
+            headers ??= new NatsHeaders();
 
-            headers.SetReadOnly();
+            try
+            {
+                // Parsing can also throw an exception.
+                if (!headerParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), headers))
+                {
+                    throw new NatsException("Error parsing headers");
+                }
+            }
+            catch (Exception e)
+            {
+                headers.Error ??= new NatsMsgError();
+                headers.Error.HeaderParserException = e;
+                headers.Error.Headers = headersBuffer.Value.ToArray();
+            }
         }
+
+        headers?.SetReadOnly();
 
         var size = subject.Length
                    + (replyTo?.Length ?? 0)
@@ -258,4 +288,20 @@ public readonly record struct NatsMsg<T>(
             throw new NatsException("unable to send reply; ReplyTo is empty");
         }
     }
+}
+
+public class NatsMsgError
+{
+    public Exception? SerializerException { get; internal set; }
+
+    public byte[]? Payload { get; internal set; }
+
+    public Exception? HeaderParserException { get; internal set; }
+
+    public byte[]? Headers { get; internal set; }
+
+    public override string ToString() =>
+        SerializerException?.Message
+        ?? HeaderParserException?.Message
+        ?? "Unknown error";
 }
