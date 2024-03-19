@@ -278,6 +278,51 @@ public class NatsKVWatcherTest
     }
 
     [Fact]
+    public async Task Watch_empty_bucket_for_end_of_data()
+    {
+        var timeout = TimeSpan.FromSeconds(10);
+        var cts = new CancellationTokenSource(timeout);
+        var cancellationToken = cts.Token;
+
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var bucket = "b1";
+        var store = await kv.CreateStoreAsync(bucket, cancellationToken: cancellationToken);
+
+        var signal = new WaitSignal(timeout);
+        var endOfDataHit = false;
+        var watchTask = Task.Run(
+            async () =>
+            {
+                var opts = new NatsKVWatchOpts
+                {
+                    OnNoData = async (cancellationToken) =>
+                    {
+                        await Task.CompletedTask;
+                        endOfDataHit = true;
+                        signal.Pulse();
+                        return true;
+                    },
+                };
+
+                await foreach (var entry in store.WatchAsync<string>("*", opts: opts, cancellationToken: cancellationToken))
+                {
+                }
+            },
+            cancellationToken);
+
+        await signal;
+
+        Assert.True(endOfDataHit, "End of Current Data not set");
+
+        await watchTask;
+    }
+
+    [Fact]
     public async Task Serialization_errors()
     {
         await using var server = NatsServer.StartJS();
