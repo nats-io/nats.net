@@ -321,4 +321,30 @@ public class NatsKVWatcherTest
 
         await watchTask;
     }
+
+    [Fact]
+    public async Task Serialization_errors()
+    {
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        var store = await kv.CreateStoreAsync("b1", cancellationToken: cts.Token);
+
+        await store.PutAsync($"k1", "not an int", cancellationToken: cts.Token);
+
+        await foreach (var entry in store.WatchAsync<int>(cancellationToken: cts.Token))
+        {
+            Assert.NotNull(entry.Error);
+            Assert.IsType<NatsDeserializeException>(entry.Error);
+            Assert.Equal("Exception during deserialization", entry.Error.Message);
+            Assert.Contains("Can't deserialize System.Int32", entry.Error.InnerException!.Message);
+            Assert.Throws<NatsDeserializeException>(() => entry.EnsureSuccess());
+            break;
+        }
+    }
 }

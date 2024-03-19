@@ -418,4 +418,32 @@ public class ConsumerConsumeTest
         await consumer.RefreshAsync(cts.Token);
         Assert.Equal(0, consumer.Info.NumAckPending);
     }
+
+    [Fact]
+    public async Task Serialization_errors()
+    {
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+        var js = new NatsJSContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
+
+        var ack = await js.PublishAsync("s1.foo", "not an int", cancellationToken: cts.Token);
+        ack.EnsureSuccess();
+
+        var consumer = await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+
+        await foreach (var msg in consumer.ConsumeAsync<int>(cancellationToken: cts.Token))
+        {
+            Assert.NotNull(msg.Error);
+            Assert.IsType<NatsDeserializeException>(msg.Error);
+            Assert.Equal("Exception during deserialization", msg.Error.Message);
+            Assert.Contains("Can't deserialize System.Int32", msg.Error.InnerException!.Message);
+            Assert.Throws<NatsDeserializeException>(() => msg.EnsureSuccess());
+
+            break;
+        }
+    }
 }

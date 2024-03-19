@@ -230,6 +230,16 @@ public partial class NatsJSContext
         {
             if (sub.Msgs.TryRead(out var msg))
             {
+                if (msg.Error is { } error)
+                {
+                    if (error.InnerException is NatsJSApiErrorException jsError)
+                    {
+                        return new NatsJSResponse<TResponse>(default, jsError.Error);
+                    }
+
+                    throw error;
+                }
+
                 if (msg.Data == null)
                 {
                     throw new NatsJSException("No response data received");
@@ -241,14 +251,6 @@ public partial class NatsJSContext
 
         if (sub is NatsSubBase { EndReason: NatsSubEndReason.Exception, Exception: not null } sb)
         {
-            if (sb.Exception is NatsSubException { Exception.SourceException: NatsJSApiErrorException jsError })
-            {
-                // Clear exception here so that subscription disposal won't throw it.
-                sb.ClearException();
-
-                return new NatsJSResponse<TResponse>(default, jsError.Error);
-            }
-
             throw sb.Exception;
         }
 

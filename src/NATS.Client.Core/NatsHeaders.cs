@@ -203,6 +203,8 @@ public class NatsHeaders : IDictionary<string, StringValues>
         }
     }
 
+    public NatsException? Error { get; internal set; }
+
     /// <summary>
     /// Adds a new header item to the collection.
     /// </summary>
