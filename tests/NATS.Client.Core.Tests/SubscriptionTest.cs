@@ -289,4 +289,25 @@ public class SubscriptionTest
             return inboxSubMessage;
         }
     }
+
+    [Fact]
+    public async Task Serialization_exceptions()
+    {
+        await using var server = NatsServer.Start();
+        await using var nats = server.CreateClientConnection();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        await using var sub = await nats.SubscribeCoreAsync<int>("foo", cancellationToken: cts.Token);
+
+        await nats.PublishAsync("foo", "not an int", cancellationToken: cts.Token);
+
+        var msg = await sub.Msgs.ReadAsync(cts.Token);
+
+        Assert.NotNull(msg.Error);
+        Assert.IsType<NatsException>(msg.Error.SerializerException);
+        Assert.Contains("Can't deserialize System.Int32", msg.Error.SerializerException.Message);
+
+        Assert.Throws<NatsException>(() => msg.EnsureSuccess());
+    }
 }
