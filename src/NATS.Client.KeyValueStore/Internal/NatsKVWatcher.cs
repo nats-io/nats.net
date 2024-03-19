@@ -253,6 +253,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
                                         Operation = operation,
                                         Created = metadata.Timestamp,
                                         Delta = delta,
+                                        Error = msg.Error,
                                     };
 
                                     // Increment the sequence before writing to the channel in case the channel is full

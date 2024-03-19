@@ -1,5 +1,4 @@
 using System.Buffers;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using NATS.Client.Core.Internal;
 
@@ -45,6 +44,12 @@ public interface INatsMsg<T>
 
     /// <summary>NATS connection this message is associated to.</summary>
     INatsConnection? Connection { get; init; }
+
+    /// <summary>Any errors (generally serialization errors) encountered while processing the message.</summary>
+    NatsException? Error { get; }
+
+    /// <summary>Throws an exception if the message contains any errors (generally serialization errors).</summary>
+    void EnsureSuccess();
 
     /// <summary>
     /// Reply with an empty message.
@@ -122,6 +127,9 @@ public readonly record struct NatsMsg<T>(
     T? Data,
     INatsConnection? Connection) : INatsMsg<T>
 {
+    /// <inheritdoc />
+    public NatsException? Error => Headers?.Error;
+
     internal static NatsMsg<T> Build(
         string subject,
         string? replyTo,
@@ -131,24 +139,48 @@ public readonly record struct NatsMsg<T>(
         NatsHeaderParser headerParser,
         INatsDeserialize<T> serializer)
     {
-        // Consider an empty payload as null or default value for value types. This way we are able to
-        // receive sentinels as nulls or default values. This might cause an issue with where we are not
-        // able to differentiate between an empty sentinel and actual default value of a struct e.g. 0 (zero).
-        var data = payloadBuffer.Length > 0
-            ? serializer.Deserialize(payloadBuffer)
-            : default;
-
         NatsHeaders? headers = null;
 
         if (headersBuffer != null)
         {
             headers = new NatsHeaders();
-            if (!headerParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), headers))
-            {
-                throw new NatsException("Error parsing headers");
-            }
 
-            headers.SetReadOnly();
+            try
+            {
+                // Parsing can also throw an exception.
+                if (!headerParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), headers))
+                {
+                    throw new NatsException("Error parsing headers");
+                }
+            }
+            catch (Exception e)
+            {
+                headers.Error ??= new NatsHeaderParseException(headersBuffer.Value.ToArray(), e);
+            }
+        }
+
+        headers?.SetReadOnly();
+
+        // Consider an empty payload as null or default value for value types. This way we are able to
+        // receive sentinels as nulls or default values. This might cause an issue with where we are not
+        // able to differentiate between an empty sentinel and actual default value of a struct e.g. 0 (zero).
+        T? data;
+        if (headers?.Error == null && payloadBuffer.Length > 0)
+        {
+            try
+            {
+                data = serializer.Deserialize(payloadBuffer);
+            }
+            catch (Exception e)
+            {
+                headers ??= new NatsHeaders();
+                headers.Error = new NatsDeserializeException(payloadBuffer.ToArray(), e);
+                data = default;
+            }
+        }
+        else
+        {
+            data = default;
         }
 
         var size = subject.Length
@@ -182,6 +214,13 @@ public readonly record struct NatsMsg<T>(
         }
 
         return new NatsMsg<T>(subject, replyTo, (int)size, headers, data, connection);
+    }
+
+    /// <inheritdoc />
+    public void EnsureSuccess()
+    {
+        if (Error != null)
+            throw Error;
     }
 
     /// <summary>
@@ -258,4 +297,22 @@ public readonly record struct NatsMsg<T>(
             throw new NatsException("unable to send reply; ReplyTo is empty");
         }
     }
+}
+
+public class NatsDeserializeException : NatsException
+{
+    public NatsDeserializeException(byte[] rawData, Exception inner)
+        : base("Exception during deserialization", inner) =>
+        RawData = rawData;
+
+    public byte[] RawData { get; }
+}
+
+public class NatsHeaderParseException : NatsException
+{
+    public NatsHeaderParseException(byte[] rawData, Exception inner)
+        : base("Exception parsing headers", inner) =>
+        RawData = rawData;
+
+    public byte[] RawData { get; }
 }
