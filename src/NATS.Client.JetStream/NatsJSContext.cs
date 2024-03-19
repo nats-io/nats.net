@@ -232,7 +232,7 @@ public partial class NatsJSContext
             {
                 if (msg.Error is { } error)
                 {
-                    if (error is NatsJSApiErrorException jsError)
+                    if (error.InnerException is NatsJSApiErrorException jsError)
                     {
                         return new NatsJSResponse<TResponse>(default, jsError.Error);
                     }
