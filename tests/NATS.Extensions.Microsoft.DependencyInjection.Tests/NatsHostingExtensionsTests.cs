@@ -12,7 +12,7 @@ public class NatsHostingExtensionsTests
     {
         var services = new ServiceCollection();
         services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
-        services.AddNats();
+        services.AddNatsClient();
 
         var provider = services.BuildServiceProvider();
         var natsConnection1 = provider.GetRequiredService<INatsConnection>();
@@ -27,7 +27,7 @@ public class NatsHostingExtensionsTests
     {
         var services = new ServiceCollection();
         services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
-        services.AddNats(builder => builder.WithPoolSize(2));
+        services.AddNatsClient(builder => builder.WithPoolSize(2));
 
         var provider = services.BuildServiceProvider();
         var natsConnection1 = provider.GetRequiredService<INatsConnection>();
@@ -42,7 +42,7 @@ public class NatsHostingExtensionsTests
     {
         var services = new ServiceCollection();
         services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
-        services.AddNats(builder => builder.AddJsonSerialization(MyJsonContext.Default));
+        services.AddNatsClient(builder => builder.AddJsonSerialization(MyJsonContext.Default));
 
         var provider = services.BuildServiceProvider();
         var nats = provider.GetRequiredService<INatsConnection>();
@@ -70,8 +70,8 @@ public class NatsHostingExtensionsTests
         var services = new ServiceCollection();
         services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
 
-        services.AddNats(builder => builder.WithKey(key1));
-        services.AddNats(builder => builder.WithKey(key2));
+        services.AddNatsClient(builder => builder.WithKey(key1));
+        services.AddNatsClient(builder => builder.WithKey(key2));
 
         var provider = services.BuildServiceProvider();
 
@@ -95,8 +95,8 @@ public class NatsHostingExtensionsTests
         var services = new ServiceCollection();
         services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
 
-        services.AddNats(builder => builder.WithPoolSize(2).WithKey(key1));
-        services.AddNats(builder => builder.WithPoolSize(2).WithKey(key2));
+        services.AddNatsClient(builder => builder.WithPoolSize(2).WithKey(key1));
+        services.AddNatsClient(builder => builder.WithPoolSize(2).WithKey(key2));
         var provider = services.BuildServiceProvider();
 
         Dictionary<string, List<object>> connections = new();
