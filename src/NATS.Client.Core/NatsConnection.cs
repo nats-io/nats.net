@@ -33,7 +33,6 @@ public partial class NatsConnection : INatsConnection
 
     internal readonly ConnectionStatsCounter Counter; // allow to call from external sources
     internal volatile ServerInfo? WritableServerInfo;
-    internal bool IsDisposed;
 
 #pragma warning restore SA1401
     private readonly object _gate = new object();
@@ -49,6 +48,7 @@ public partial class NatsConnection : INatsConnection
 
     private int _pongCount;
     private int _connectionState;
+    private int _isDisposed;
 
     // when reconnected, make new instance.
     private ISocketConnection? _socket;
@@ -121,6 +121,12 @@ public partial class NatsConnection : INatsConnection
     }
 
     public INatsServerInfo? ServerInfo => WritableServerInfo; // server info is set when received INFO
+
+    internal bool IsDisposed
+    {
+        get => Interlocked.CompareExchange(ref _isDisposed, 0, 0) == 1;
+        private set => Interlocked.Exchange(ref _isDisposed, value ? 1 : 0);
+    }
 
     internal NatsHeaderParser HeaderParser { get; }
 
@@ -542,6 +548,15 @@ public partial class NatsConnection : INatsConnection
             var urlEnumerator = urls.AsEnumerable().GetEnumerator();
             NatsUri? url = null;
         CONNECT_AGAIN:
+
+            if (IsDisposed)
+            {
+                // No point in trying to reconnect.
+                // This can happen if the we're disposed while we're waiting for the next reconnect
+                // and potentially gets us stuck in a reconnect loop.
+                return;
+            }
+
             try
             {
                 if (urlEnumerator.MoveNext())
@@ -595,6 +610,12 @@ public partial class NatsConnection : INatsConnection
             }
             catch (Exception ex)
             {
+                if (IsDisposed)
+                {
+                    // No point in trying to reconnect.
+                    return;
+                }
+
                 if (url != null)
                 {
                     _logger.LogWarning(NatsLogEvents.Connection, ex, "Failed to connect NATS {Url}", url);
@@ -623,7 +644,21 @@ public partial class NatsConnection : INatsConnection
             if (ex is OperationCanceledException)
                 return;
             _waitForOpenConnection.TrySetException(ex);
-            _logger.LogError(NatsLogEvents.Connection, ex, "Retry loop stopped and connection state is invalid");
+            try
+            {
+                if (!IsDisposed)
+                {
+                    // Only log if we're not disposing, otherwise we might log exceptions that are expected
+                    _logger.LogError(NatsLogEvents.Connection, ex, "Retry loop stopped and connection state is invalid");
+                }
+            }
+            catch
+            {
+                // ignore logging exceptions since our host might be disposed or shutting down
+                // and some logging providers might throw exceptions when they can't log
+                // which in turn would crash the application.
+                // (e.g. we've seen this with EventLog provider on Windows)
+            }
         }
     }
 
