@@ -170,6 +170,42 @@ internal sealed class SslStreamConnection : ISocketConnection
             rcsCb = RcsCbCaCertChain;
         }
 
+#if NET8_0_OR_GREATER
+        X509ChainPolicy? policy = null;
+        SslStreamCertificateContext? streamCertificateContext = null;
+        if (_tlsCerts?.ClientCerts != null && _tlsCerts.CaCerts != null && _tlsCerts.ClientCerts.Count >= 1)
+        {
+            streamCertificateContext = SslStreamCertificateContext.Create(
+                _tlsCerts.ClientCerts[0],
+                _tlsCerts.ClientCerts,
+                trust: SslCertificateTrust.CreateForX509Collection(_tlsCerts.CaCerts));
+
+            policy = new()
+            {
+                RevocationMode = _tlsOpts.CertificateRevocationCheckMode,
+                TrustMode = X509ChainTrustMode.CustomRootTrust,
+            };
+
+            policy.CustomTrustStore.AddRange(_tlsCerts.CaCerts);
+
+            if (_tlsCerts.ClientCerts.Count > 1)
+            {
+                policy.ExtraStore.AddRange(_tlsCerts.ClientCerts);
+            }
+        }
+
+        var options = new SslClientAuthenticationOptions
+        {
+            TargetHost = uri.Host,
+            EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
+            ClientCertificates = _tlsCerts?.ClientCerts,
+            ClientCertificateContext = streamCertificateContext,
+            CertificateChainPolicy = policy,
+            LocalCertificateSelectionCallback = lcsCb,
+            RemoteCertificateValidationCallback = rcsCb,
+            CertificateRevocationCheckMode = _tlsOpts.CertificateRevocationCheckMode,
+        };
+#else
         var options = new SslClientAuthenticationOptions
         {
             TargetHost = uri.Host,
@@ -179,6 +215,7 @@ internal sealed class SslStreamConnection : ISocketConnection
             RemoteCertificateValidationCallback = rcsCb,
             CertificateRevocationCheckMode = _tlsOpts.CertificateRevocationCheckMode,
         };
+#endif
 
         return options;
     }

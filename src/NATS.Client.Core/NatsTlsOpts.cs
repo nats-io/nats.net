@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using NATS.Client.Core.Internal;
 
@@ -62,7 +63,7 @@ public sealed record NatsTlsOpts
     /// <summary>
     /// Callback that loads Client Certificate
     /// </summary>
-    public Func<ValueTask<X509Certificate2>>? LoadClientCert { get; init; }
+    public Func<ValueTask<X509Certificate2Collection>>? LoadClientCerts { get; init; }
 
     /// <summary>
     /// String or file path to PEM-encoded X509 CA Certificate
@@ -84,7 +85,7 @@ public sealed record NatsTlsOpts
     /// <summary>TLS mode to use during connection</summary>
     public TlsMode Mode { get; init; }
 
-    internal bool HasTlsCerts => CertFile != default || KeyFile != default || LoadClientCert != default || CaFile != default || LoadCaCerts != default;
+    internal bool HasTlsCerts => CertFile != default || KeyFile != default || LoadClientCerts != default || CaFile != default || LoadCaCerts != default;
 
     internal TlsMode EffectiveMode(NatsUri uri) => Mode switch
     {
@@ -99,12 +100,25 @@ public sealed record NatsTlsOpts
     }
 
     /// <summary>
-    /// Helper method to load a Client Certificate from a pem-encoded string
+    /// Helper method to load a Client Certificates from a pem-encoded string
     /// </summary>
-    public static Func<ValueTask<X509Certificate2>> LoadClientCertFromPem(string certPem, string keyPem)
+    public static Func<ValueTask<X509Certificate2Collection>> LoadClientCertsFromPem(string certPem, string keyPem)
     {
-        var clientCert = X509Certificate2.CreateFromPem(certPem, keyPem);
-        return () => ValueTask.FromResult(clientCert);
+        var certificateCollection = LoadClientCertsFromMultiPem(certPem, keyPem);
+
+        return () => ValueTask.FromResult(certificateCollection);
+    }
+
+    /// <summary>
+    /// Helper method to load a Client Certificates from a pem-encoded string
+    /// </summary>
+    public static Func<ValueTask<X509Certificate2Collection>> LoadClientCertsFromPemFile(string certPemFile, string keyPemFile)
+    {
+        var certPem = File.ReadAllText(certPemFile);
+        var keyPem = File.ReadAllText(keyPemFile);
+        var certificateCollection = LoadClientCertsFromMultiPem(certPem, keyPem);
+
+        return () => ValueTask.FromResult(certificateCollection);
     }
 
     /// <summary>
@@ -115,5 +129,34 @@ public sealed record NatsTlsOpts
         var caCerts = new X509Certificate2Collection();
         caCerts.ImportFromPem(caPem);
         return () => ValueTask.FromResult(caCerts);
+    }
+
+    /// <summary>
+    /// Helper method to load a Client Certificates from a pem-encoded string
+    /// </summary>
+    internal static X509Certificate2Collection LoadClientCertsFromMultiPem(ReadOnlySpan<char> certPem, ReadOnlySpan<char> keyPem)
+    {
+        var multiPemCertificateCollection = new X509Certificate2Collection();
+        var addKey = true;
+
+        while (PemEncoding.TryFind(certPem, out var fields))
+        {
+            X509Certificate2 certificate;
+
+            if (addKey)
+            {
+                certificate = X509Certificate2.CreateFromPem(certPem, keyPem);
+                addKey = false;
+            }
+            else
+            {
+                certificate = X509Certificate2.CreateFromPem(certPem);
+            }
+
+            multiPemCertificateCollection.Add(certificate);
+            certPem = certPem[fields.Location.End..];
+        }
+
+        return multiPemCertificateCollection;
     }
 }
