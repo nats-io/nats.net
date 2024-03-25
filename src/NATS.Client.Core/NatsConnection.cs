@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Diagnostics;
+using System.Text;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
@@ -81,6 +82,7 @@ public partial class NatsConnection : INatsConnection
         Counter = new ConnectionStatsCounter();
         CommandWriter = new CommandWriter(this, _pool, Opts, Counter, EnqueuePing);
         InboxPrefix = NewInbox(opts.InboxPrefix);
+        InboxPrefixBytes = Encoding.ASCII.GetBytes(InboxPrefix);
         SubscriptionManager = new SubscriptionManager(this, InboxPrefix);
         _logger = opts.LoggerFactory.CreateLogger<NatsConnection>();
         _clientOpts = ClientOpts.Create(Opts);
@@ -121,6 +123,8 @@ public partial class NatsConnection : INatsConnection
     }
 
     public INatsServerInfo? ServerInfo => WritableServerInfo; // server info is set when received INFO
+
+    internal readonly ReadOnlyMemory<byte> InboxPrefixBytes;
 
     internal NatsHeaderParser HeaderParser { get; }
 
@@ -208,8 +212,14 @@ public partial class NatsConnection : INatsConnection
 
     internal NatsStats GetStats() => Counter.ToStats();
 
-    internal ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
+    internal ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer, long? responseId)
     {
+        if (responseId is { } id)
+        {
+            SetRequestReply(subject, replyTo, sid, headersBuffer, payloadBuffer, id);
+            return default;
+        }
+
         return SubscriptionManager.PublishToClientHandlersAsync(subject, replyTo, sid, headersBuffer, payloadBuffer);
     }
 

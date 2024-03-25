@@ -198,7 +198,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
         return this;
     }
 
-    private async ValueTask SubscribeInboxAsync(NatsSubBase sub, CancellationToken cancellationToken)
+    public async Task EnsureMuxInboxSubscribedAsync(CancellationToken cancellationToken)
     {
         if (Interlocked.CompareExchange(ref _inboxSub, _inboxSubSentinel, _inboxSubSentinel) == _inboxSubSentinel)
         {
@@ -227,6 +227,11 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
                 _inboxSubLock.Release();
             }
         }
+    }
+
+    private async ValueTask SubscribeInboxAsync(NatsSubBase sub, CancellationToken cancellationToken)
+    {
+        await EnsureMuxInboxSubscribedAsync(cancellationToken).ConfigureAwait(false);
 
         await InboxSubBuilder.RegisterAsync(sub).ConfigureAwait(false);
     }

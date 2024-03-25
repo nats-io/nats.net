@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
@@ -72,6 +73,101 @@ public partial class NatsConnection
         }
 
         throw new NatsNoReplyException();
+    }
+
+    //
+    //
+    public async ValueTask<NatsMsg<TReply>> RequestAsync2<TRequest, TReply>(
+        string subject,
+        TRequest? data,
+        NatsHeaders? headers = default,
+        INatsSerialize<TRequest>? requestSerializer = default,
+        INatsDeserialize<TReply>? replySerializer = default,
+        NatsPubOpts? requestOpts = default,
+        NatsSubOpts? replyOpts = default,
+        CancellationToken cancellationToken = default)
+    {
+        if (Telemetry.HasListeners())
+        {
+            using var activity = Telemetry.StartSendActivity($"{SpanDestinationName(subject)} {Telemetry.Constants.RequestReplyActivityName}", this, subject, null);
+            try
+            {
+                replyOpts = SetReplyOptsDefaults(replyOpts);
+                await using var sub1 = await RequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (await sub1.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    if (sub1.Msgs.TryRead(out var msg))
+                    {
+                        return msg;
+                    }
+                }
+
+                throw new NatsNoReplyException();
+            }
+            catch (Exception e)
+            {
+                Telemetry.SetException(activity, e);
+                throw;
+            }
+        }
+
+        // RequestManager
+        await SubscriptionManager.EnsureMuxInboxSubscribedAsync(cancellationToken).ConfigureAwait(false);
+        var req = new ReqCmd();
+        req.Tcs = new TaskCompletionSource<NatsMsg<NatsMemoryOwner<byte>>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var id = Interlocked.Increment(ref _requestId);
+        lock (_requests)
+        {
+            _requests.Add(id, req);
+        }
+        var replyTo = $"{InboxPrefix}.{id}";
+
+        await PublishAsync(subject, data, headers, replyTo, requestSerializer, requestOpts, cancellationToken).ConfigureAwait(false);
+
+        var msgBytes = await req.Tcs.Task.ConfigureAwait(false);
+        using var memoryOwner = msgBytes.Data;
+        var replyData = (replySerializer ?? NatsDefaultSerializer<TReply>.Default)
+            .Deserialize(new ReadOnlySequence<byte>(memoryOwner.Memory));
+        return new NatsMsg<TReply>(
+            msgBytes.Subject,
+            msgBytes.ReplyTo,
+            msgBytes.Size,
+            msgBytes.Headers,
+            replyData,
+            msgBytes.Connection);
+    }
+
+    internal void SetRequestReply(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer, long id)
+    {
+        ReqCmd req;
+        lock (_requests)
+        {
+            if (!_requests.Remove(id, out req))
+            {
+                return;
+            }
+        }
+
+        var natsMsg = NatsMsg<NatsMemoryOwner<byte>>.Build(
+            subject,
+            replyTo,
+            headersBuffer,
+            payloadBuffer,
+            this,
+            HeaderParser,
+            NatsDefaultSerializer<NatsMemoryOwner<byte>>.Default);
+
+        req.Tcs.TrySetResult(natsMsg);
+    }
+
+    long _requestId;
+    Dictionary<long, ReqCmd> _requests = new();
+
+    internal class ReqCmd
+    {
+        public TaskCompletionSource<NatsMsg<NatsMemoryOwner<byte>>> Tcs;
     }
 
     /// <inheritdoc />

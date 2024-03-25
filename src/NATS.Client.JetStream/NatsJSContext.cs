@@ -173,6 +173,101 @@ public partial class NatsJSContext
         throw new NatsJSPublishNoResponseException();
     }
 
+    public async ValueTask<PubAckResponse> PublishAsync2<T>(
+        string subject,
+        T? data,
+        INatsSerialize<T>? serializer = default,
+        NatsJSPubOpts? opts = default,
+        NatsHeaders? headers = default,
+        CancellationToken cancellationToken = default)
+    {
+        if (opts != null)
+        {
+            if (opts.MsgId != null)
+            {
+                headers ??= new NatsHeaders();
+                headers["Nats-Msg-Id"] = opts.MsgId;
+            }
+
+            if (opts.ExpectedLastMsgId != null)
+            {
+                headers ??= new NatsHeaders();
+                headers["Nats-Expected-Last-Msg-Id"] = opts.ExpectedLastMsgId;
+            }
+
+            if (opts.ExpectedStream != null)
+            {
+                headers ??= new NatsHeaders();
+                headers["Nats-Expected-Stream"] = opts.ExpectedStream;
+            }
+
+            if (opts.ExpectedLastSequence != null)
+            {
+                headers ??= new NatsHeaders();
+                headers["Nats-Expected-Last-Sequence"] = opts.ExpectedLastSequence.ToString();
+            }
+
+            if (opts.ExpectedLastSubjectSequence != null)
+            {
+                headers ??= new NatsHeaders();
+                headers["Nats-Expected-Last-Subject-Sequence"] = opts.ExpectedLastSubjectSequence.ToString();
+            }
+        }
+
+        opts ??= NatsJSPubOpts.Default;
+        var retryMax = opts.RetryAttempts;
+        var retryWait = opts.RetryWaitBetweenAttempts;
+
+        for (var i = 0; i < retryMax; i++)
+        {
+            try
+            {
+                var msg = await Connection.RequestAsync2<T, PubAckResponse>(
+                        subject: subject,
+                        data: data,
+                        headers: headers,
+                        requestSerializer: serializer,
+                        replySerializer: NatsJSJsonSerializer<PubAckResponse>.Default,
+                        requestOpts: opts,
+                        replyOpts: new NatsSubOpts
+                        {
+                            // It's important to set the timeout here so that the subscription can be
+                            // stopped if the server doesn't respond or more likely case is that if there
+                            // is a reconnect to the cluster between the request and waiting for a response,
+                            // without the timeout the publish call will hang forever since the server
+                            // which received the request won't be there to respond anymore.
+                            Timeout = Connection.Opts.RequestTimeout,
+
+                            // If JetStream is disabled, a no responders error will be returned
+                            // No responders error might also happen when reconnecting to cluster
+                            ThrowIfNoResponders = true,
+                        },
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (msg.Data == null)
+                {
+                    throw new NatsJSException("No response data received");
+                }
+
+                return msg.Data;
+            }
+            catch (NatsNoRespondersException)
+            {
+            }
+
+            if (i < retryMax)
+            {
+                _logger.LogDebug(NatsJSLogEvents.PublishNoResponseRetry, "No response received, retrying {RetryCount}/{RetryMax}", i + 1, retryMax);
+                await Task.Delay(retryWait, cancellationToken);
+            }
+        }
+
+        // We throw a specific exception here for convenience so that the caller doesn't
+        // have to check for the exception message etc.
+        throw new NatsJSPublishNoResponseException();
+    }
+
     internal static void ThrowIfInvalidStreamName([NotNull] string? name, [CallerArgumentExpression("name")] string? paramName = null)
     {
         ArgumentNullException.ThrowIfNull(name, paramName);

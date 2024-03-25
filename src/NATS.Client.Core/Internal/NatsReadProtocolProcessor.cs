@@ -174,7 +174,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                         }
 
                         var msgHeader = buffer.Slice(0, positionBeforePayload.Value);
-                        var (subject, sid, payloadLength, replyTo) = ParseMessageHeader(msgHeader);
+                        var (subject, sid, payloadLength, replyTo, responseId) = ParseMessageHeader(msgHeader);
 
                         if (payloadLength == 0)
                         {
@@ -192,7 +192,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                                 buffer = buffer.Slice(buffer.GetPosition(3, positionBeforePayload.Value));
                             }
 
-                            await _connection.PublishToClientHandlersAsync(subject, replyTo, sid, null, ReadOnlySequence<byte>.Empty).ConfigureAwait(false);
+                            await _connection.PublishToClientHandlersAsync(subject, replyTo, sid, null, ReadOnlySequence<byte>.Empty, responseId).ConfigureAwait(false);
                         }
                         else
                         {
@@ -213,7 +213,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
 
                             buffer = buffer.Slice(buffer.GetPosition(2, payloadSlice.End)); // payload + \r\n
 
-                            await _connection.PublishToClientHandlersAsync(subject, replyTo, sid, null, payloadSlice).ConfigureAwait(false);
+                            await _connection.PublishToClientHandlersAsync(subject, replyTo, sid, null, payloadSlice, responseId).ConfigureAwait(false);
                         }
                     }
                     else if (code == ServerOpCodes.HMsg)
@@ -237,7 +237,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                             _logger.LogTrace(NatsLogEvents.Protocol, "HMSG trace dump: {MsgHeader}", msgHeader.Dump());
                         }
 
-                        var (subject, sid, replyTo, headersLength, totalLength) = ParseHMessageHeader(msgHeader);
+                        var (subject, sid, replyTo, headersLength, totalLength, responseId) = ParseHMessageHeader(msgHeader);
 
                         if (_trace)
                         {
@@ -271,7 +271,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                         var headerSlice = totalSlice.Slice(0, headersLength);
                         var payloadSlice = totalSlice.Slice(headersLength, payloadLength);
 
-                        await _connection.PublishToClientHandlersAsync(subject, replyTo, sid, headerSlice, payloadSlice)
+                        await _connection.PublishToClientHandlersAsync(subject, replyTo, sid, headerSlice, payloadSlice, responseId)
                             .ConfigureAwait(false);
                     }
                     else
@@ -427,7 +427,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#msg
     // MSG <subject> <sid> [reply-to] <#bytes>\r\n[payload]
-    private (string subject, int sid, int payloadLength, string? replyTo) ParseMessageHeader(ReadOnlySpan<byte> msgHeader)
+    private (string subject, int sid, int payloadLength, string? replyTo, long? responseId) ParseMessageHeader(ReadOnlySpan<byte> msgHeader)
     {
         msgHeader = msgHeader.Slice(4);
         msgHeader.Split(out var subjectBytes, out msgHeader);
@@ -436,11 +436,25 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
 
         var subject = Encoding.ASCII.GetString(subjectBytes);
 
+        // Parse: _INBOX.NUID.ID
+        long? responseId = null;
+        if (subjectBytes.StartsWith(_connection.InboxPrefixBytes.Span))
+        {
+            var lastIndex = subjectBytes.LastIndexOf((byte)'.');
+            if (lastIndex != -1)
+            {
+                if (Utf8Parser.TryParse(subjectBytes.Slice(lastIndex + 1), out long id, out _))
+                {
+                    responseId = id;
+                }
+            }
+        }
+
         if (msgHeader.Length == 0)
         {
             var sid = GetInt32(sidBytes);
             var size = GetInt32(replyToOrSizeBytes);
-            return (subject, sid, size, null);
+            return (subject, sid, size, null, responseId);
         }
         else
         {
@@ -450,11 +464,11 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
             var sid = GetInt32(sidBytes);
             var payloadLength = GetInt32(bytesSlice);
             var replyTo = Encoding.ASCII.GetString(replyToBytes);
-            return (subject, sid, payloadLength, replyTo);
+            return (subject, sid, payloadLength, replyTo, responseId);
         }
     }
 
-    private (string subject, int sid, int payloadLength, string? replyTo) ParseMessageHeader(in ReadOnlySequence<byte> msgHeader)
+    private (string subject, int sid, int payloadLength, string? replyTo, long? responseId) ParseMessageHeader(in ReadOnlySequence<byte> msgHeader)
     {
         if (msgHeader.IsSingleSegment)
         {
@@ -479,7 +493,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#hmsg
     // HMSG <subject> <sid> [reply-to] <#header bytes> <#total bytes>\r\n[headers]\r\n\r\n[payload]\r\n
-    private (string subject, int sid, string? replyTo, int headersLength, int totalLength) ParseHMessageHeader(ReadOnlySpan<byte> msgHeader)
+    private (string subject, int sid, string? replyTo, int headersLength, int totalLength, long? responseId) ParseHMessageHeader(ReadOnlySpan<byte> msgHeader)
     {
         // 'HMSG' literal
         msgHeader.Split(out _, out msgHeader);
@@ -489,6 +503,20 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         msgHeader.Split(out var replyToOrHeaderLenBytes, out msgHeader);
         msgHeader.Split(out var headerLenOrTotalLenBytes, out msgHeader);
 
+        // Parse: _INBOX.NUID.ID
+        long? responseId = null;
+        if (subjectBytes.StartsWith(_connection.InboxPrefixBytes.Span))
+        {
+            var lastIndex = subjectBytes.LastIndexOf((byte)'.');
+            if (lastIndex != -1)
+            {
+                if (Utf8Parser.TryParse(subjectBytes.Slice(lastIndex + 1), out long id, out _))
+                {
+                    responseId = id;
+                }
+            }
+        }
+
         var subject = Encoding.ASCII.GetString(subjectBytes);
         var sid = GetInt32(sidBytes);
 
@@ -497,7 +525,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         {
             var headersLength = GetInt32(replyToOrHeaderLenBytes);
             var totalLen = GetInt32(headerLenOrTotalLenBytes);
-            return (subject, sid, null, headersLength, totalLen);
+            return (subject, sid, null, headersLength, totalLen, responseId);
         }
 
         // There is more data because of the reply-to field
@@ -511,11 +539,11 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
             var lastBytes = msgHeader;
             var totalLen = GetInt32(lastBytes);
 
-            return (subject, sid, replyTo, headerLen, totalLen);
+            return (subject, sid, replyTo, headerLen, totalLen, responseId);
         }
     }
 
-    private (string subject, int sid, string? replyTo, int headersLength, int totalLength) ParseHMessageHeader(in ReadOnlySequence<byte> msgHeader)
+    private (string subject, int sid, string? replyTo, int headersLength, int totalLength, long? responseId) ParseHMessageHeader(in ReadOnlySequence<byte> msgHeader)
     {
         if (msgHeader.IsSingleSegment)
         {
