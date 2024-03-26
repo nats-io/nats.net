@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/usr/bin/env bash
 
 set -e
 
@@ -6,6 +6,17 @@ set -e
 # Make sure to disable POSIX-to-Windows path conversion e.g.
 # export MSYS_NO_PATHCONV=1
 #
+
+function create_child_cert {
+    signing_cert_name=$1
+    child_cert_name=$2
+    
+    openssl req -new -nodes -out "store/$child_cert_name.csr" -newkey rsa:4096 -keyout "store/$child_cert_name.key" -subj "/CN=$child_cert_name"
+    openssl x509 -req -in "store/$child_cert_name.csr" -CA "store/$signing_cert_name.crt" -CAkey "store/$signing_cert_name.key" -CAcreateserial -out "store/$child_cert_name.crt" -days 3650 -sha256
+    openssl x509 -noout -text -in "store/$child_cert_name.crt"
+    cp "store/$child_cert_name.crt" "$child_cert_name-cert.pem"
+    cp "store/$child_cert_name.key" "$child_cert_name-key.pem"
+}
 
 rm -rf store
 mkdir store
@@ -40,10 +51,18 @@ cp store/server.key server-key.pem
 echo ================================
 echo CLIENT
 echo ================================
-openssl req -new -nodes -out store/client.csr -newkey rsa:4096 -keyout store/client.key -subj '/CN=client'
-openssl x509 -req -in store/client.csr -CA store/ca.crt -CAkey store/ca.key -CAcreateserial -out store/client.crt -days 3650 -sha256
-openssl x509 -noout -text -in store/client.crt
-cp store/client.crt client-cert.pem
-cp store/client.key client-key.pem
+create_child_cert ca client
+
+echo ================================
+echo CLIENT WITH CHAIN
+echo ================================
+create_child_cert ca intermediate01
+create_child_cert intermediate01 intermediate02
+create_child_cert intermediate02 leafclient
+# create single cert file for chained client
+cp store/leafclient.crt chainedclient-cert.pem
+cp store/leafclient.key chainedclient-key.pem
+cat store/intermediate02.crt >> chainedclient-cert.pem
+cat store/intermediate01.crt >> chainedclient-cert.pem
 
 rm -rf store

@@ -73,11 +73,45 @@ public class TlsCertsTest
     }
 
     [Fact]
-    public async Task Client_connect()
+    public async Task Load_client_cert_chain_and_key()
+    {
+        const string clientCertFile = "resources/certs/chainedclient-cert.pem";
+        const string clientKeyFile = "resources/certs/chainedclient-key.pem";
+
+        await ValidateAsync(new NatsTlsOpts
+        {
+            CertFile = clientCertFile,
+            KeyFile = clientKeyFile,
+        });
+        await ValidateAsync(new NatsTlsOpts
+        {
+            LoadClientCerts = NatsTlsOpts.LoadClientCertsFromPem(await File.ReadAllTextAsync(clientCertFile), await File.ReadAllTextAsync(clientKeyFile)),
+        });
+
+        return;
+
+        static async Task ValidateAsync(NatsTlsOpts opts)
+        {
+            var certs = await TlsCerts.FromNatsTlsOptsAsync(opts);
+
+            Assert.NotNull(certs.ClientCerts);
+            Assert.Equal(3, certs.ClientCerts.Count);
+
+            certs.ClientCerts[0].Subject.Should().Be("CN=leafclient");
+            var encryptValue = certs.ClientCerts[0].GetRSAPublicKey()!.Encrypt(Encoding.UTF8.GetBytes("test123"), RSAEncryptionPadding.OaepSHA1);
+            var decryptValue = certs.ClientCerts[0].GetRSAPrivateKey()!.Decrypt(encryptValue, RSAEncryptionPadding.OaepSHA1);
+            Encoding.UTF8.GetString(decryptValue).Should().Be("test123");
+            certs.ClientCerts[1].Subject.Should().Be("CN=intermediate02");
+            certs.ClientCerts[2].Subject.Should().Be("CN=intermediate01");
+        }
+    }
+
+    [Theory]
+    [InlineData("resources/certs/client-cert.pem", "resources/certs/client-key.pem")]
+    [InlineData("resources/certs/chainedclient-cert.pem", "resources/certs/chainedclient-key.pem")]
+    public async Task Client_connect(string clientCertFile, string clientKeyFile)
     {
         const string caFile = "resources/certs/ca-cert.pem";
-        const string clientCertFile = "resources/certs/client-cert.pem";
-        const string clientKeyFile = "resources/certs/client-key.pem";
 
         await using var server = NatsServer.Start(
             new NullOutputHelper(),
