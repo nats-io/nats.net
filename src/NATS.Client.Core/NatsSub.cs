@@ -8,6 +8,7 @@ namespace NATS.Client.Core;
 public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
 {
     private readonly Channel<NatsMsg<T>> _msgs;
+    private readonly bool _deserializeEmptyPayloads;
 
     internal NatsSub(
         NatsConnection connection,
@@ -19,6 +20,7 @@ public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
         CancellationToken cancellationToken = default)
         : base(connection, manager, subject, queueGroup, opts, cancellationToken)
     {
+        _deserializeEmptyPayloads = opts?.DeserializeEmptyPayloads ?? false;
         _msgs = Channel.CreateBounded<NatsMsg<T>>(
             connection.GetChannelOpts(connection.Opts, opts?.ChannelOpts),
             msg => Connection.OnMessageDropped(this, _msgs?.Reader.Count ?? 0, msg));
@@ -41,7 +43,8 @@ public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
             payloadBuffer,
             Connection,
             Connection.HeaderParser,
-            Serializer);
+            Serializer,
+            _deserializeEmptyPayloads);
 
         await _msgs.Writer.WriteAsync(natsMsg).ConfigureAwait(false);
 
