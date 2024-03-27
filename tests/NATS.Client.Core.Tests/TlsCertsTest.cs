@@ -1,6 +1,8 @@
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace NATS.Client.Core.Tests;
 
@@ -106,11 +108,14 @@ public class TlsCertsTest
         }
     }
 
-    [Theory]
-    [InlineData("resources/certs/client-cert.pem", "resources/certs/client-key.pem")]
-    [InlineData("resources/certs/chainedclient-cert.pem", "resources/certs/chainedclient-key.pem")]
-    public async Task Client_connect(string clientCertFile, string clientKeyFile)
+    [SkippableTheory]
+    [InlineData("resources/certs/client-cert.pem", "resources/certs/client-key.pem", 6)]
+    [InlineData("resources/certs/chainedclient-cert.pem", "resources/certs/chainedclient-key.pem", 8)]
+    public async Task Client_connect(string clientCertFile, string clientKeyFile, int minimumFrameworkVersion)
     {
+        var version = int.Parse(Regex.Match(RuntimeInformation.FrameworkDescription, @"(\d+)\.\d").Groups[1].Value);
+        Skip.IfNot(version >= minimumFrameworkVersion, $"Requires .NET {minimumFrameworkVersion}");
+
         const string caFile = "resources/certs/ca-cert.pem";
 
         await using var server = NatsServer.Start(
