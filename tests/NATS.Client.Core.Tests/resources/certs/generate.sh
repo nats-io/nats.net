@@ -10,9 +10,20 @@ set -e
 function create_child_cert {
     signing_cert_name=$1
     child_cert_name=$2
-    
+    is_ca=$3
+
     openssl req -new -nodes -out "store/$child_cert_name.csr" -newkey rsa:4096 -keyout "store/$child_cert_name.key" -subj "/CN=$child_cert_name"
-    openssl x509 -req -in "store/$child_cert_name.csr" -CA "store/$signing_cert_name.crt" -CAkey "store/$signing_cert_name.key" -CAcreateserial -out "store/$child_cert_name.crt" -days 3650 -sha256
+    if [[ "$is_ca" == "true" ]]; then
+        # Use CA extensions for intermediate CA certificates
+        cat <<EOF > "store/$child_cert_name.ext"
+basicConstraints=CA:TRUE
+keyUsage = digitalSignature, keyCertSign, cRLSign
+EOF
+        openssl x509 -req -in "store/$child_cert_name.csr" -CA "store/$signing_cert_name.crt" -CAkey "store/$signing_cert_name.key" -CAcreateserial -out "store/$child_cert_name.crt" -days 3650 -sha256 -extfile "store/$child_cert_name.ext"
+    else
+        # For end-entity certificates (non-CAs)
+        openssl x509 -req -in "store/$child_cert_name.csr" -CA "store/$signing_cert_name.crt" -CAkey "store/$signing_cert_name.key" -CAcreateserial -out "store/$child_cert_name.crt" -days 3650 -sha256
+    fi
     openssl x509 -noout -text -in "store/$child_cert_name.crt"
     cp "store/$child_cert_name.crt" "$child_cert_name-cert.pem"
     cp "store/$child_cert_name.key" "$child_cert_name-key.pem"
@@ -56,9 +67,9 @@ create_child_cert ca client
 echo ================================
 echo CLIENT WITH CHAIN
 echo ================================
-create_child_cert ca intermediate01
-create_child_cert intermediate01 intermediate02
-create_child_cert intermediate02 leafclient
+create_child_cert ca intermediate01 true
+create_child_cert intermediate01 intermediate02 true
+create_child_cert intermediate02 leafclient false
 # create single cert file for chained client
 cp store/leafclient.crt chainedclient-cert.pem
 cp store/leafclient.key chainedclient-key.pem
@@ -66,3 +77,7 @@ cat store/intermediate02.crt >> chainedclient-cert.pem
 cat store/intermediate01.crt >> chainedclient-cert.pem
 
 rm -rf store
+
+echo ================================
+echo DONE
+echo ================================
