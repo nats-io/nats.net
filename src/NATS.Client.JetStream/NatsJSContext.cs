@@ -181,91 +181,20 @@ public partial class NatsJSContext
         NatsHeaders? headers = default,
         CancellationToken cancellationToken = default)
     {
-        if (opts != null)
-        {
-            if (opts.MsgId != null)
-            {
-                headers ??= new NatsHeaders();
-                headers["Nats-Msg-Id"] = opts.MsgId;
-            }
-
-            if (opts.ExpectedLastMsgId != null)
-            {
-                headers ??= new NatsHeaders();
-                headers["Nats-Expected-Last-Msg-Id"] = opts.ExpectedLastMsgId;
-            }
-
-            if (opts.ExpectedStream != null)
-            {
-                headers ??= new NatsHeaders();
-                headers["Nats-Expected-Stream"] = opts.ExpectedStream;
-            }
-
-            if (opts.ExpectedLastSequence != null)
-            {
-                headers ??= new NatsHeaders();
-                headers["Nats-Expected-Last-Sequence"] = opts.ExpectedLastSequence.ToString();
-            }
-
-            if (opts.ExpectedLastSubjectSequence != null)
-            {
-                headers ??= new NatsHeaders();
-                headers["Nats-Expected-Last-Subject-Sequence"] = opts.ExpectedLastSubjectSequence.ToString();
-            }
-        }
-
         opts ??= NatsJSPubOpts.Default;
-        var retryMax = opts.RetryAttempts;
-        var retryWait = opts.RetryWaitBetweenAttempts;
 
-        for (var i = 0; i < retryMax; i++)
-        {
-            try
-            {
-                var msg = await Connection.RequestAsync2<T, PubAckResponse>(
-                        subject: subject,
-                        data: data,
-                        headers: headers,
-                        requestSerializer: serializer,
-                        replySerializer: NatsJSJsonSerializer<PubAckResponse>.Default,
-                        requestOpts: opts,
-                        replyOpts: new NatsSubOpts
-                        {
-                            // It's important to set the timeout here so that the subscription can be
-                            // stopped if the server doesn't respond or more likely case is that if there
-                            // is a reconnect to the cluster between the request and waiting for a response,
-                            // without the timeout the publish call will hang forever since the server
-                            // which received the request won't be there to respond anymore.
-                            Timeout = Connection.Opts.RequestTimeout,
+        await Connection.RequestAsync2<T, PubAckResponse>(
+                subject: subject,
+                data: data,
+                headers: headers,
+                requestSerializer: serializer,
+                replySerializer: NatsJSJsonSerializer<PubAckResponse>.Default,
+                requestOpts: opts,
+                replyOpts: default,
+                cancellationToken)
+            .ConfigureAwait(false);
 
-                            // If JetStream is disabled, a no responders error will be returned
-                            // No responders error might also happen when reconnecting to cluster
-                            ThrowIfNoResponders = true,
-                        },
-                        cancellationToken)
-                    .ConfigureAwait(false);
-
-                if (msg.Data == null)
-                {
-                    throw new NatsJSException("No response data received");
-                }
-
-                return msg.Data;
-            }
-            catch (NatsNoRespondersException)
-            {
-            }
-
-            if (i < retryMax)
-            {
-                _logger.LogDebug(NatsJSLogEvents.PublishNoResponseRetry, "No response received, retrying {RetryCount}/{RetryMax}", i + 1, retryMax);
-                await Task.Delay(retryWait, cancellationToken);
-            }
-        }
-
-        // We throw a specific exception here for convenience so that the caller doesn't
-        // have to check for the exception message etc.
-        throw new NatsJSPublishNoResponseException();
+        return default;
     }
 
     internal static void ThrowIfInvalidStreamName([NotNull] string? name, [CallerArgumentExpression("name")] string? paramName = null)
@@ -294,6 +223,18 @@ public partial class NatsJSContext
         where TResponse : class
     {
         var response = await JSRequestAsync<TRequest, TResponse>(subject, request, cancellationToken);
+        response.EnsureSuccess();
+        return response.Response!;
+    }
+
+    internal async ValueTask<TResponse> JSRequestResponseAsync2<TRequest, TResponse>(
+        string subject,
+        TRequest? request,
+        CancellationToken cancellationToken = default)
+        where TRequest : class
+        where TResponse : class
+    {
+        var response = await JSRequestAsync2<TRequest, TResponse>(subject, request, cancellationToken);
         response.EnsureSuccess();
         return response.Response!;
     }
@@ -350,6 +291,32 @@ public partial class NatsJSContext
         }
 
         throw new NatsJSApiNoResponseException();
+    }
+
+    internal async ValueTask<NatsJSResponse<TResponse>> JSRequestAsync2<TRequest, TResponse>(
+        string subject,
+        TRequest? request,
+        CancellationToken cancellationToken = default)
+        where TRequest : class
+        where TResponse : class
+    {
+        if (request != null)
+        {
+            // TODO: Can't validate using JSON serializer context at the moment.
+            // Validator.ValidateObject(request, new ValidationContext(request));
+        }
+
+        var msg = await Connection.RequestAsync2<TRequest, TResponse>(
+                subject: subject,
+                data: request,
+                headers: default,
+                replyOpts: default, // new NatsSubOpts { Timeout = Connection.Opts.RequestTimeout },
+                requestSerializer: NatsJSJsonSerializer<TRequest>.Default,
+                replySerializer: NatsJSErrorAwareJsonSerializer<TResponse>.Default,
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        return new NatsJSResponse<TResponse>(msg.Data, default);
     }
 
     [DoesNotReturn]

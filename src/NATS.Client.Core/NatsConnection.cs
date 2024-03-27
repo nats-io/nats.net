@@ -84,6 +84,7 @@ public partial class NatsConnection : INatsConnection
         InboxPrefix = NewInbox(opts.InboxPrefix);
         InboxPrefixBytes = Encoding.ASCII.GetBytes(InboxPrefix);
         SubscriptionManager = new SubscriptionManager(this, InboxPrefix);
+        RequestManager = new RequestManager(this, InboxPrefix);
         _logger = opts.LoggerFactory.CreateLogger<NatsConnection>();
         _clientOpts = ClientOpts.Create(Opts);
         HeaderParser = new NatsHeaderParser(opts.HeaderEncoding);
@@ -129,6 +130,8 @@ public partial class NatsConnection : INatsConnection
     internal NatsHeaderParser HeaderParser { get; }
 
     internal SubscriptionManager SubscriptionManager { get; }
+
+    internal RequestManager RequestManager { get; }
 
     internal CommandWriter CommandWriter { get; }
 
@@ -216,7 +219,7 @@ public partial class NatsConnection : INatsConnection
     {
         if (responseId is { } id)
         {
-            SetRequestReply(subject, replyTo, sid, headersBuffer, payloadBuffer, id);
+            RequestManager.SetRequestReply(subject, replyTo, sid, headersBuffer, payloadBuffer, id);
             return default;
         }
 

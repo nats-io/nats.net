@@ -1,7 +1,9 @@
 using System.Buffers;
+using System.Buffers.Text;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
@@ -87,87 +89,31 @@ public partial class NatsConnection
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default)
     {
-        if (Telemetry.HasListeners())
-        {
-            using var activity = Telemetry.StartSendActivity($"{SpanDestinationName(subject)} {Telemetry.Constants.RequestReplyActivityName}", this, subject, null);
-            try
-            {
-                replyOpts = SetReplyOptsDefaults(replyOpts);
-                await using var sub1 = await RequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
-                    .ConfigureAwait(false);
-
-                if (await sub1.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
-                {
-                    if (sub1.Msgs.TryRead(out var msg))
-                    {
-                        return msg;
-                    }
-                }
-
-                throw new NatsNoReplyException();
-            }
-            catch (Exception e)
-            {
-                Telemetry.SetException(activity, e);
-                throw;
-            }
-        }
-
-        // RequestManager
-        await SubscriptionManager.EnsureMuxInboxSubscribedAsync(cancellationToken).ConfigureAwait(false);
-        var req = new ReqCmd();
-        req.Tcs = new TaskCompletionSource<NatsMsg<NatsMemoryOwner<byte>>>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var id = Interlocked.Increment(ref _requestId);
-        lock (_requests)
-        {
-            _requests.Add(id, req);
-        }
-        var replyTo = $"{InboxPrefix}.{id}";
+        var (tcs, replyTo) = await RequestManager.NewRequestAsync(cancellationToken).ConfigureAwait(false);
 
         await PublishAsync(subject, data, headers, replyTo, requestSerializer, requestOpts, cancellationToken).ConfigureAwait(false);
 
-        var msgBytes = await req.Tcs.Task.ConfigureAwait(false);
+        // var msgBytes = await req.Tcs.Task.ConfigureAwait(false);
+
+        var msgBytes = await tcs.RunAsync().ConfigureAwait(false);
+
+        if (msgBytes.Headers?.Code == 503)
+        {
+            throw new NatsNoRespondersException();
+        }
+
         using var memoryOwner = msgBytes.Data;
-        var replyData = (replySerializer ?? NatsDefaultSerializer<TReply>.Default)
-            .Deserialize(new ReadOnlySequence<byte>(memoryOwner.Memory));
+
+        // var replyData = (replySerializer ?? NatsDefaultSerializer<TReply>.Default)
+        //     .Deserialize(new ReadOnlySequence<byte>(memoryOwner.Memory));
+
         return new NatsMsg<TReply>(
             msgBytes.Subject,
             msgBytes.ReplyTo,
             msgBytes.Size,
             msgBytes.Headers,
-            replyData,
+            default, // replyData,
             msgBytes.Connection);
-    }
-
-    internal void SetRequestReply(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer, long id)
-    {
-        ReqCmd req;
-        lock (_requests)
-        {
-            if (!_requests.Remove(id, out req))
-            {
-                return;
-            }
-        }
-
-        var natsMsg = NatsMsg<NatsMemoryOwner<byte>>.Build(
-            subject,
-            replyTo,
-            headersBuffer,
-            payloadBuffer,
-            this,
-            HeaderParser,
-            NatsDefaultSerializer<NatsMemoryOwner<byte>>.Default);
-
-        req.Tcs.TrySetResult(natsMsg);
-    }
-
-    long _requestId;
-    Dictionary<long, ReqCmd> _requests = new();
-
-    internal class ReqCmd
-    {
-        public TaskCompletionSource<NatsMsg<NatsMemoryOwner<byte>>> Tcs;
     }
 
     /// <inheritdoc />
@@ -217,6 +163,55 @@ public partial class NatsConnection
             var remaining = buffer.Slice((int)totalPrefixLength);
             var didWrite = NuidWriter.TryWriteNuid(remaining);
             Debug.Assert(didWrite, "didWrite");
+            return new string(buffer);
+        }
+
+        return Throw();
+
+        [DoesNotReturn]
+        string Throw()
+        {
+            Debug.Fail("Must not happen");
+            throw new InvalidOperationException("This should never be raised!");
+        }
+    }
+
+    [SkipLocalsInit]
+    internal static string NewInbox(ReadOnlySpan<char> prefix, long id)
+    {
+        Span<char> buffer = stackalloc char[64];
+        Span<byte> idBuffer = stackalloc byte[32];
+
+        if (!Utf8Formatter.TryFormat(id, idBuffer, out var idLength))
+        {
+            return Throw();
+        }
+
+        var separatorLength = prefix.Length > 0 ? 1u : 0u;
+        var totalLength = (uint)prefix.Length + (uint)idLength + separatorLength;
+        if (totalLength <= buffer.Length)
+        {
+            buffer = buffer.Slice(0, (int)totalLength);
+        }
+        else
+        {
+            buffer = new char[totalLength];
+        }
+
+        var totalPrefixLength = (uint)prefix.Length + separatorLength;
+        if ((uint)buffer.Length > totalPrefixLength && (uint)buffer.Length > (uint)prefix.Length)
+        {
+            prefix.CopyTo(buffer);
+            buffer[prefix.Length] = '.';
+            var remaining = buffer.Slice((int)totalPrefixLength);
+
+            var bs = idBuffer.Slice(0, idLength);
+            for (var index = 0; index < bs.Length; index++)
+            {
+                var b = bs[index];
+                remaining[index] = (char)b;
+            }
+
             return new string(buffer);
         }
 

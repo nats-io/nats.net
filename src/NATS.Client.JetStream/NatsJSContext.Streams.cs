@@ -27,6 +27,18 @@ public partial class NatsJSContext
         return new NatsJSStream(this, response);
     }
 
+    public async ValueTask<INatsJSStream> CreateStreamAsync2(
+        StreamConfig config,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfInvalidStreamName(config.Name, nameof(config.Name));
+        var response = await JSRequestResponseAsync2<StreamConfig, StreamInfo>(
+            subject: $"{Opts.Prefix}.STREAM.CREATE.{config.Name}",
+            config,
+            cancellationToken);
+        return null;//new NatsJSStream(this, response);
+    }
+
     /// <summary>
     /// Deletes a stream.
     /// </summary>
