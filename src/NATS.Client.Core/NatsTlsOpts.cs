@@ -127,7 +127,7 @@ public sealed record NatsTlsOpts
     /// </remarks>
     public static Func<ValueTask<X509Certificate2Collection>> LoadClientCertFromPem(string certPem, string keyPem)
     {
-        var certificateCollection = LoadClientCertsFromMultiPem(certPem, keyPem);
+        var certificateCollection = LoadCertsFromMultiPem(certPem, keyPem);
 
         return () => ValueTask.FromResult(certificateCollection);
     }
@@ -151,15 +151,15 @@ public sealed record NatsTlsOpts
     {
         var certPem = File.ReadAllText(certPemFile);
         var keyPem = File.ReadAllText(keyPemFile);
-        var certificateCollection = LoadClientCertsFromMultiPem(certPem, keyPem);
+        var certificateCollection = LoadCertsFromMultiPem(certPem, keyPem);
 
         return () => ValueTask.FromResult(certificateCollection);
     }
 
     /// <summary>
-    /// Helper method to load a Client Certificates from a PEM-encoded string
+    /// Helper method to load certificates from a PEM-encoded text.
     /// </summary>
-    private static X509Certificate2Collection LoadClientCertsFromMultiPem(ReadOnlySpan<char> certPem, ReadOnlySpan<char> keyPem)
+    private static X509Certificate2Collection LoadCertsFromMultiPem(ReadOnlySpan<char> certPem, ReadOnlySpan<char> keyPem)
     {
         var multiPemCertificateCollection = new X509Certificate2Collection();
         var addKey = true;
