@@ -105,11 +105,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Example.OpenTelemetry", "sa
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NATS.Net.OpenTelemetry.Tests", "tests\NATS.Net.OpenTelemetry.Tests\NATS.Net.OpenTelemetry.Tests.csproj", "{B8554582-DE19-41A2-9784-9B27C9F22429}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NATS.Client.Services.Controllers.SourceGenerator", "src\NATS.Client.Services.EndpointRegistration\NATS.Client.Services.Controllers.SourceGenerator.csproj", "{068CB141-21E1-40FE-81AD-9F3CAC437FD3}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EndpointRegistrationTest", "tests\EndpointRegistrationTest\EndpointRegistrationTest.csproj", "{0F4D25D5-88E1-407B-8255-1217975D6458}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.Services.Controllers", "src\NATS.Client.Services.Controllers\NATS.Client.Services.Controllers.csproj", "{B7579135-D227-4D22-8CA1-4AD6759CA9E6}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NATS.Client.Services.Controllers", "src\NATS.Client.Services.Controllers\NATS.Client.Services.Controllers.csproj", "{B7579135-D227-4D22-8CA1-4AD6759CA9E6}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NATS.Client.Services.Controllers.SourceGenerator", "src\NATS.Client.Services.Controllers.SourceGeneration\NATS.Client.Services.Controllers.SourceGenerator.csproj", "{AACE7D0E-76F7-4918-B5A1-65240C721F23}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -285,10 +285,6 @@ Global
 		{B8554582-DE19-41A2-9784-9B27C9F22429}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B8554582-DE19-41A2-9784-9B27C9F22429}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B8554582-DE19-41A2-9784-9B27C9F22429}.Release|Any CPU.Build.0 = Release|Any CPU
-		{068CB141-21E1-40FE-81AD-9F3CAC437FD3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{068CB141-21E1-40FE-81AD-9F3CAC437FD3}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{068CB141-21E1-40FE-81AD-9F3CAC437FD3}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{068CB141-21E1-40FE-81AD-9F3CAC437FD3}.Release|Any CPU.Build.0 = Release|Any CPU
 		{0F4D25D5-88E1-407B-8255-1217975D6458}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{0F4D25D5-88E1-407B-8255-1217975D6458}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0F4D25D5-88E1-407B-8255-1217975D6458}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -297,6 +293,10 @@ Global
 		{B7579135-D227-4D22-8CA1-4AD6759CA9E6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B7579135-D227-4D22-8CA1-4AD6759CA9E6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B7579135-D227-4D22-8CA1-4AD6759CA9E6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AACE7D0E-76F7-4918-B5A1-65240C721F23}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AACE7D0E-76F7-4918-B5A1-65240C721F23}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AACE7D0E-76F7-4918-B5A1-65240C721F23}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AACE7D0E-76F7-4918-B5A1-65240C721F23}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -345,9 +345,9 @@ Global
 		{766C2486-34C3-4DD1-B31C-540C17C044B0} = {C526E8AB-739A-48D7-8FC4-048978C9B650}
 		{474BA453-9CFF-41C2-B2E7-ADD92CC93E86} = {95A69671-16CA-4133-981C-CC381B7AAA30}
 		{B8554582-DE19-41A2-9784-9B27C9F22429} = {C526E8AB-739A-48D7-8FC4-048978C9B650}
-		{068CB141-21E1-40FE-81AD-9F3CAC437FD3} = {4827B3EC-73D8-436D-AE2A-5E29AC95FD0C}
 		{0F4D25D5-88E1-407B-8255-1217975D6458} = {C526E8AB-739A-48D7-8FC4-048978C9B650}
 		{B7579135-D227-4D22-8CA1-4AD6759CA9E6} = {4827B3EC-73D8-436D-AE2A-5E29AC95FD0C}
+		{AACE7D0E-76F7-4918-B5A1-65240C721F23} = {4827B3EC-73D8-436D-AE2A-5E29AC95FD0C}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {8CBB7278-D093-448E-B3DE-B5991209A1AA}

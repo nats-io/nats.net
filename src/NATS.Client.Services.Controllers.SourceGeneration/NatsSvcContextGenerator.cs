@@ -24,8 +24,8 @@ public class NatsSvcContextGenerator : ISourceGenerator
 
     private static IEnumerable<IMethodSymbol> GetSymbolsWithEndpointAttribute(Compilation compilation)
     {
-        var endpointAttributeSymbol = compilation.GetTypeByMetadataName("NATS.Client.Services.ServiceEndpointAttribute");
-        if (endpointAttributeSymbol == null) return [];
+        var endpointAttributeSymbol = compilation.GetTypeByMetadataName("NATS.Client.Services.Controllers.NatsServiceEndpointAttribute");
+        if (endpointAttributeSymbol == null) return new List<IMethodSymbol> { }.AsReadOnly();
 
         return compilation.SyntaxTrees
             .SelectMany(st => st.GetRoot().DescendantNodes())
