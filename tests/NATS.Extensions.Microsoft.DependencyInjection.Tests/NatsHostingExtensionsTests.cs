@@ -40,14 +40,18 @@ public class NatsHostingExtensionsTests
     [Fact]
     public async Task AddNats_WithJsonSerializer()
     {
+        await using var server = NatsServer.Start();
+
         var services = new ServiceCollection();
         services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
-        services.AddNatsClient(builder => builder.AddJsonSerialization(MyJsonContext.Default));
+        services.AddNatsClient(builder =>
+        {
+            builder.ConfigureOptions(opts => server.ClientOpts(opts));
+            builder.AddJsonSerialization(MyJsonContext.Default);
+        });
 
         var provider = services.BuildServiceProvider();
         var nats = provider.GetRequiredService<INatsConnection>();
-
-        await using var server = NatsServer.Start();
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
