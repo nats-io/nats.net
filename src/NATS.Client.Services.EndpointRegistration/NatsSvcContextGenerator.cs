@@ -4,10 +4,10 @@ using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
-namespace NATS.Client.Services.EndpointRegistration;
+namespace NATS.Client.Services.Controllers.SourceGenerator;
 
 [Generator]
-public class ServiceEndpointGenerator : ISourceGenerator
+public class NatsSvcContextGenerator : ISourceGenerator
 {
     public void Initialize(GeneratorInitializationContext context) { }
 
@@ -19,7 +19,7 @@ public class ServiceEndpointGenerator : ISourceGenerator
         var withEndpointAttribute = symbolsWithEndpointAttribute as IMethodSymbol[] ?? symbolsWithEndpointAttribute.ToArray();
         if (!withEndpointAttribute.Any()) return;
         var source = GenerateRegistrationCode(withEndpointAttribute);
-        context.AddSource("NatsSvcServerExtensions.Generated.cs", source);
+        context.AddSource("NatsSvcContextExtensions.Generated.cs", source);
     }
 
     private static IEnumerable<IMethodSymbol> GetSymbolsWithEndpointAttribute(Compilation compilation)
@@ -38,21 +38,18 @@ public class ServiceEndpointGenerator : ISourceGenerator
     private static string GenerateRegistrationCode(IEnumerable<IMethodSymbol> methodSymbols)
     {
         var sb = new StringBuilder();
+        sb.AppendLine(@"namespace NATS.Client.Services.Controllers;
+                        using System.Threading.Tasks;
 
-        sb.AppendLine("using System;");
-        sb.AppendLine("using System.Threading;");
-        sb.AppendLine("using System.Threading.Tasks;");
-        sb.AppendLine("using NATS.Client.Services;");
-        sb.AppendLine("using NATS.Client.Core;");
-        sb.AppendLine();
-
-        sb.AppendLine("namespace NATS.Client.Services.Generated");
-        sb.AppendLine("{");
-        sb.AppendLine("    public class NatsSvcEndpointRegistrar : INatsSvcEndpointRegistrar");
-        sb.AppendLine("    {");
-        sb.AppendLine("        public async Task RegisterEndpointsAsync(INatsSvcServer service, CancellationToken cancellationToken = default)");
-        sb.AppendLine("        {");
-
+                        public static class NatsSvcContextExtensions
+                        {
+                            /// <summary>
+                            /// Adds endpoint controllers to the service.
+                            /// </summary>
+                            /// <param name=""context"">The NatsSvcContext instance.</param>
+                            /// <returns>A task that represents the asynchronous operation.</returns>
+                            public static Task AddEndpointControllers(this NatsSvcContext context)
+                            {");
 
         foreach (var methodSymbol in methodSymbols)
         {
