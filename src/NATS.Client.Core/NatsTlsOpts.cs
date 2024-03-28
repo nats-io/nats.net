@@ -1,3 +1,4 @@
+using System.Net.Security;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using NATS.Client.Core.Internal;
@@ -81,6 +82,15 @@ public sealed record NatsTlsOpts
     /// <summary>Certificate revocation mode for certificate validation.</summary>
     /// <value>One of the values in <see cref="T:System.Security.Cryptography.X509Certificates.X509RevocationMode" />. The default is <see langword="NoCheck" />.</value>
     public X509RevocationMode CertificateRevocationCheckMode { get; init; }
+
+    /// <summary>
+    /// Gets or sets an optional customized policy for remote certificate
+    /// validation. If not <see langword="null"/>,
+    /// <see cref="CertificateRevocationCheckMode"/> and <see cref="SslCertificateTrust"/>
+    /// are ignored.
+    /// </summary>
+    /// <remarks>This option is only available in .NET 8 and above.</remarks>
+    public X509ChainPolicy? CertificateChainPolicy { get; init; }
 
     /// <summary>TLS mode to use during connection</summary>
     public TlsMode Mode { get; init; }

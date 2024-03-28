@@ -171,60 +171,28 @@ internal sealed class SslStreamConnection : ISocketConnection
         }
 
 #if NET8_0_OR_GREATER
-        X509ChainPolicy? policy = null;
         SslStreamCertificateContext? streamCertificateContext = null;
         if (_tlsCerts?.ClientCerts is { Count: >= 1 })
         {
-            policy = new()
-            {
-                RevocationMode = _tlsOpts.CertificateRevocationCheckMode,
-                TrustMode = X509ChainTrustMode.CustomRootTrust,
-            };
-
-            // CAs might already be in the machine store
-            if (_tlsCerts.CaCerts != null)
-            {
-                policy.CustomTrustStore.AddRange(_tlsCerts.CaCerts);
-                streamCertificateContext = SslStreamCertificateContext.Create(
-                    _tlsCerts.ClientCerts[0],
-                    _tlsCerts.ClientCerts,
-                    trust: SslCertificateTrust.CreateForX509Collection(_tlsCerts.CaCerts));
-            }
-            else
-            {
-                streamCertificateContext = SslStreamCertificateContext.Create(
+            streamCertificateContext = SslStreamCertificateContext.Create(
                     _tlsCerts.ClientCerts[0],
                     _tlsCerts.ClientCerts);
-            }
-
-            if (_tlsCerts.ClientCerts.Count > 1)
-            {
-                policy.ExtraStore.AddRange(_tlsCerts.ClientCerts);
-            }
         }
+#endif
 
         var options = new SslClientAuthenticationOptions
         {
             TargetHost = uri.Host,
             EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
             ClientCertificates = _tlsCerts?.ClientCerts,
+#if NET8_0_OR_GREATER
             ClientCertificateContext = streamCertificateContext,
-            CertificateChainPolicy = policy,
-            LocalCertificateSelectionCallback = lcsCb,
-            RemoteCertificateValidationCallback = rcsCb,
-            CertificateRevocationCheckMode = _tlsOpts.CertificateRevocationCheckMode,
-        };
-#else
-        var options = new SslClientAuthenticationOptions
-        {
-            TargetHost = uri.Host,
-            EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
-            ClientCertificates = _tlsCerts?.ClientCerts,
-            LocalCertificateSelectionCallback = lcsCb,
-            RemoteCertificateValidationCallback = rcsCb,
-            CertificateRevocationCheckMode = _tlsOpts.CertificateRevocationCheckMode,
-        };
+            CertificateChainPolicy = _tlsOpts.CertificateChainPolicy,
 #endif
+            LocalCertificateSelectionCallback = lcsCb,
+            RemoteCertificateValidationCallback = rcsCb,
+            CertificateRevocationCheckMode = _tlsOpts.CertificateRevocationCheckMode,
+        };
 
         return options;
     }
