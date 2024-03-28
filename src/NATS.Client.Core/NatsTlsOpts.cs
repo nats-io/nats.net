@@ -147,7 +147,7 @@ public sealed record NatsTlsOpts
     /// <summary>
     /// Helper method to load a client certificates and its key from PEM-encoded files
     /// </summary>
-    internal static Func<ValueTask<X509Certificate2Collection>> LoadClientCertsFromPemFile(string certPemFile, string keyPemFile)
+    internal static Func<ValueTask<X509Certificate2Collection>> LoadClientCertFromPemFile(string certPemFile, string keyPemFile)
     {
         var certPem = File.ReadAllText(certPemFile);
         var keyPem = File.ReadAllText(keyPemFile);

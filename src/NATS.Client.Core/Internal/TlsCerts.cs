@@ -46,7 +46,7 @@ internal class TlsCerts
         // client certificates
         var clientCertsProvider = tlsOpts switch
         {
-            { CertFile: not null, KeyFile: not null } => NatsTlsOpts.LoadClientCertsFromPemFile(tlsOpts.CertFile, tlsOpts.KeyFile),
+            { CertFile: not null, KeyFile: not null } => NatsTlsOpts.LoadClientCertFromPemFile(tlsOpts.CertFile, tlsOpts.KeyFile),
             { LoadClientCert: not null } => tlsOpts.LoadClientCert,
             _ => null,
         };
