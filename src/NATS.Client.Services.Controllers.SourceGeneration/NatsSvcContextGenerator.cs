@@ -66,15 +66,12 @@ public class NatsSvcContextGenerator : ISourceGenerator
                 var parameterType = methodSymbol.Parameters.FirstOrDefault()?.Type.ToString();
                 var returnType = methodSymbol.ReturnType.ToString();
 
-                // Ensuring async lambda usage and proper exception handling
                 sb.AppendLine($"            service.AddEndpointAsync<{parameterType}>(");
                 sb.AppendLine($"                name: \"{endpointName}\",");
                 sb.AppendLine($"                handler: async m =>");
                 sb.AppendLine($"                {{");
                 sb.AppendLine($"                    try");
                 sb.AppendLine($"                    {{");
-                // This assumes your method might want to directly use the message payload (m.Data)
-                // Adjust based on your method's expected parameters
                 sb.AppendLine($"                        var result = await new {className}().{methodName}(m.Data);");
                 sb.AppendLine($"                        await m.ReplyAsync(result);");
                 sb.AppendLine($"                    }}");

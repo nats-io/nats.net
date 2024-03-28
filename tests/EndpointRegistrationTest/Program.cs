@@ -38,5 +38,6 @@ public class PingController : NatsServiceControllerBase
     {
         if (arg.Data == "Ping!")
             await arg.ReplyAsync("Pong!");
+
     }
 }
