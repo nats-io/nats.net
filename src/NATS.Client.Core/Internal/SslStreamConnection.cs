@@ -175,11 +175,6 @@ internal sealed class SslStreamConnection : ISocketConnection
         SslStreamCertificateContext? streamCertificateContext = null;
         if (_tlsCerts?.ClientCerts is { Count: >= 1 })
         {
-            streamCertificateContext = SslStreamCertificateContext.Create(
-                _tlsCerts.ClientCerts[0],
-                _tlsCerts.ClientCerts,
-                trust: SslCertificateTrust.CreateForX509Collection(_tlsCerts.CaCerts));
-
             policy = new()
             {
                 RevocationMode = _tlsOpts.CertificateRevocationCheckMode,
@@ -190,6 +185,16 @@ internal sealed class SslStreamConnection : ISocketConnection
             if (_tlsCerts.CaCerts != null)
             {
                 policy.CustomTrustStore.AddRange(_tlsCerts.CaCerts);
+                streamCertificateContext = SslStreamCertificateContext.Create(
+                    _tlsCerts.ClientCerts[0],
+                    _tlsCerts.ClientCerts,
+                    trust: SslCertificateTrust.CreateForX509Collection(_tlsCerts.CaCerts));
+            }
+            else
+            {
+                streamCertificateContext = SslStreamCertificateContext.Create(
+                    _tlsCerts.ClientCerts[0],
+                    _tlsCerts.ClientCerts);
             }
 
             if (_tlsCerts.ClientCerts.Count > 1)
