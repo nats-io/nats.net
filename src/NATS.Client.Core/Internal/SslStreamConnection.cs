@@ -173,7 +173,7 @@ internal sealed class SslStreamConnection : ISocketConnection
 #if NET8_0_OR_GREATER
         X509ChainPolicy? policy = null;
         SslStreamCertificateContext? streamCertificateContext = null;
-        if (_tlsCerts?.ClientCerts != null && _tlsCerts.CaCerts != null && _tlsCerts.ClientCerts.Count >= 1)
+        if (_tlsCerts?.ClientCerts is { Count: >= 1 })
         {
             streamCertificateContext = SslStreamCertificateContext.Create(
                 _tlsCerts.ClientCerts[0],
@@ -186,7 +186,11 @@ internal sealed class SslStreamConnection : ISocketConnection
                 TrustMode = X509ChainTrustMode.CustomRootTrust,
             };
 
-            policy.CustomTrustStore.AddRange(_tlsCerts.CaCerts);
+            // CAs might already be in the machine store
+            if (_tlsCerts.CaCerts != null)
+            {
+                policy.CustomTrustStore.AddRange(_tlsCerts.CaCerts);
+            }
 
             if (_tlsCerts.ClientCerts.Count > 1)
             {

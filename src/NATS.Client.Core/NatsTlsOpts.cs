@@ -63,7 +63,7 @@ public sealed record NatsTlsOpts
     /// <summary>
     /// Callback that loads Client Certificate
     /// </summary>
-    public Func<ValueTask<X509Certificate2Collection>>? LoadClientCerts { get; init; }
+    public Func<ValueTask<X509Certificate2Collection>>? LoadClientCert { get; init; }
 
     /// <summary>
     /// String or file path to PEM-encoded X509 CA Certificate
@@ -85,7 +85,7 @@ public sealed record NatsTlsOpts
     /// <summary>TLS mode to use during connection</summary>
     public TlsMode Mode { get; init; }
 
-    internal bool HasTlsCerts => CertFile != default || KeyFile != default || LoadClientCerts != default || CaFile != default || LoadCaCerts != default;
+    internal bool HasTlsCerts => CertFile != default || KeyFile != default || LoadClientCert != default || CaFile != default || LoadCaCerts != default;
 
     internal TlsMode EffectiveMode(NatsUri uri) => Mode switch
     {

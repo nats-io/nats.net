@@ -53,7 +53,7 @@ public class TlsCertsTest
         });
         await ValidateAsync(new NatsTlsOpts
         {
-            LoadClientCerts = NatsTlsOpts.LoadClientCertsFromPem(await File.ReadAllTextAsync(clientCertFile), await File.ReadAllTextAsync(clientKeyFile)),
+            LoadClientCert = NatsTlsOpts.LoadClientCertsFromPem(await File.ReadAllTextAsync(clientCertFile), await File.ReadAllTextAsync(clientKeyFile)),
         });
 
         return;
@@ -87,7 +87,7 @@ public class TlsCertsTest
         });
         await ValidateAsync(new NatsTlsOpts
         {
-            LoadClientCerts = NatsTlsOpts.LoadClientCertsFromPem(await File.ReadAllTextAsync(clientCertFile), await File.ReadAllTextAsync(clientKeyFile)),
+            LoadClientCert = NatsTlsOpts.LoadClientCertsFromPem(await File.ReadAllTextAsync(clientCertFile), await File.ReadAllTextAsync(clientKeyFile)),
         });
 
         return;
@@ -136,7 +136,7 @@ public class TlsCertsTest
         await Validate(server, new NatsTlsOpts
         {
             LoadCaCerts = NatsTlsOpts.LoadCaCertsFromPem(await File.ReadAllTextAsync(caFile)),
-            LoadClientCerts = NatsTlsOpts.LoadClientCertsFromPem(await File.ReadAllTextAsync(clientCertFile), await File.ReadAllTextAsync(clientKeyFile)),
+            LoadClientCert = NatsTlsOpts.LoadClientCertsFromPem(await File.ReadAllTextAsync(clientCertFile), await File.ReadAllTextAsync(clientKeyFile)),
         });
 
         return;

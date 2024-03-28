@@ -25,7 +25,7 @@ internal class TlsCerts
         {
         case { CertFile: not null, KeyFile: null } or { KeyFile: not null, CertFile: null }:
             throw new ArgumentException("NatsTlsOpts.CertFile and NatsTlsOpts.KeyFile must both be set");
-        case { CertFile: not null, KeyFile: not null, LoadClientCerts: not null }:
+        case { CertFile: not null, KeyFile: not null, LoadClientCert: not null }:
             throw new ArgumentException("NatsTlsOpts.CertFile/KeyFile and NatsTlsOpts.LoadClientCert cannot both be set");
         case { CaFile: not null, LoadCaCerts: not null }:
             throw new ArgumentException("NatsTlsOpts.CaFile and NatsTlsOpts.LoadCaCerts cannot both be set");
@@ -47,7 +47,7 @@ internal class TlsCerts
         var clientCertsProvider = tlsOpts switch
         {
             { CertFile: not null, KeyFile: not null } => NatsTlsOpts.LoadClientCertsFromPemFile(tlsOpts.CertFile, tlsOpts.KeyFile),
-            { LoadClientCerts: not null } => tlsOpts.LoadClientCerts,
+            { LoadClientCert: not null } => tlsOpts.LoadClientCert,
             _ => null,
         };
 
