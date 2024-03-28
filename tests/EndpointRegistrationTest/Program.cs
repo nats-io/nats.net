@@ -1,11 +1,8 @@
-using System.Diagnostics;
-using System.Reflection.Metadata.Ecma335;
-using System.Security.Cryptography.X509Certificates;
+
+using System.Net.NetworkInformation;
 using NATS.Client.Core;
 using NATS.Client.Services;
 using NATS.Client.Services.Controllers;
-
-//using NATS.Client.Services.Controllers;
 
 namespace EndpointRegistrationTest;
 
@@ -25,42 +22,21 @@ internal class Program
         var svc = new NatsSvcContext(nats);
 
         var service = await svc.AddServiceAsync("", "", "q");
-        var controller = new MathController();
-        await service.AddEndpointAsync<string>(controller.TestFunc, "TestFunc", "Subject", "QueueGroup");
+        var controller = new PingController();
+        await service.AddEndpointAsync<string>(controller.Ping, "TestFunc", "Subject", "QueueGroup");
         
         Console.ReadLine();
     }
-
-    private static ValueTask HandleIncomingMessageAsync(NatsSvcMsg<MyMessage> arg)
-    {
-        throw new NotImplementedException();
-    }
 }
 
-internal class MyMessage
-{
-}
 
 [NatsServiceController(Name = "Name", Version = "Version", QueueGroup = "QueueGroup")]
-public class MathController : NatsServiceControllerBase
+public class PingController : NatsServiceControllerBase
 {
-    [NatsServiceEndpoint("divide42", "math-group")]
-    public async Task<int> Divide42(int data)
+    [NatsServiceEndpoint("Ping", "Subject", "QueueGroup")]
+    public async ValueTask Ping(NatsSvcMsg<string> arg)
     {
-        if (data == 0)
-        {
-            throw new ArgumentException("Division by zero");
-        }
-
-        return 42 / data;
-    }
-
-    [NatsServiceEndpoint("getname", "name-group")]
-    public async Task<string> GetName(string input) => input + " " + input;
-
-    public ValueTask TestFunc(NatsSvcMsg<string> arg)
-    {
-
-        return ValueTask.CompletedTask;
+        if (arg.Data == "Ping!")
+            await arg.ReplyAsync("Pong!");
     }
 }
