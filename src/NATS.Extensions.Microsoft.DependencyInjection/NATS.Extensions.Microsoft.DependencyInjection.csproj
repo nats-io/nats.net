@@ -1,5 +1,5 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-    
+
     <PropertyGroup>
         <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
         <ImplicitUsings>enable</ImplicitUsings>
@@ -8,7 +8,7 @@
 
         <!-- NuGet Packaging -->
         <PackageTags>pubsub;messaging</PackageTags>
-        <Description>ASP.NET Core and Generic Host support for NATS.Client.</Description>
+        <Description>ASP.NET Core and Generic Host support for NATS.Net.</Description>
         <IsPackable>true</IsPackable>
     </PropertyGroup>
 
@@ -21,11 +21,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\NATS.Client.Core\NATS.Client.Core.csproj" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <ProjectReference Include="..\NATS.Client.Core\NATS.Client.Core.csproj" />
+      <ProjectReference Include="..\NATS.Net\NATS.Net.csproj" />
     </ItemGroup>
 
 </Project>
