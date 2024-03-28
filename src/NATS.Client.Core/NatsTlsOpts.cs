@@ -64,6 +64,11 @@ public sealed record NatsTlsOpts
     /// <summary>
     /// Callback that loads Client Certificate
     /// </summary>
+    /// <remarks>
+    /// Callback may return multiple certificates, in which case the first
+    /// certificate is used as the client certificate and the rest are used as intermediates.
+    /// Using intermediate certificates is only supported on targets .NET 8 and above.
+    /// </remarks>
     public Func<ValueTask<X509Certificate2Collection>>? LoadClientCert { get; init; }
 
     /// <summary>
@@ -110,17 +115,17 @@ public sealed record NatsTlsOpts
     }
 
     /// <summary>
-    /// Helper method to load a client certificates and its key from PEM-encoded texts.
+    /// Helper method to load a client certificate and its key from PEM-encoded texts.
     /// </summary>
     /// <param name="certPem">Text of PEM-encoded certificates</param>
     /// <param name="keyPem">Text of PEM-encoded key</param>
     /// <returns>Returns a callback that will return a collection of certificates</returns>
     /// <remarks>
-    /// Client certificates string may contain multiple certificates, in which case the first
+    /// Client certificate string may contain multiple certificates, in which case the first
     /// certificate is used as the client certificate and the rest are used as intermediates.
     /// Using intermediate certificates is only supported on targets .NET 8 and above.
     /// </remarks>
-    public static Func<ValueTask<X509Certificate2Collection>> LoadClientCertsFromPem(string certPem, string keyPem)
+    public static Func<ValueTask<X509Certificate2Collection>> LoadClientCertFromPem(string certPem, string keyPem)
     {
         var certificateCollection = LoadClientCertsFromMultiPem(certPem, keyPem);
 
