@@ -67,6 +67,4 @@ public record NatsSubOpts
     /// Allows Configuration of <see cref="Channel"/> options for a subscription.
     /// </summary>
     public NatsSubChannelOpts? ChannelOpts { get; init; }
-
-    public bool? DeserializeEmptyPayloads { get; set; }
 }
