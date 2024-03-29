@@ -43,6 +43,10 @@ public interface INatsDeserialize<out T>
     T? Deserialize(in ReadOnlySequence<byte> buffer);
 }
 
+public interface INatsDeserializeWithEmpty<out T> : INatsDeserialize<T>
+{
+}
+
 public interface INatsSerializerRegistry
 {
     INatsSerialize<T> GetSerializer<T>();

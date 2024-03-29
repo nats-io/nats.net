@@ -165,7 +165,7 @@ public readonly record struct NatsMsg<T>(
         // receive sentinels as nulls or default values. This might cause an issue with where we are not
         // able to differentiate between an empty sentinel and actual default value of a struct e.g. 0 (zero).
         T? data;
-        if (headers?.Error == null && payloadBuffer.Length > 0)
+        if (headers?.Error == null && (payloadBuffer.Length > 0 || serializer is INatsDeserializeWithEmpty<T>))
         {
             try
             {

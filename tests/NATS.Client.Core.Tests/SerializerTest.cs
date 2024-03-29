@@ -58,6 +58,27 @@ public class SerializerTest
             Assert.Equal(0, msg.Data.Span.Length);
         }
     }
+
+    [Fact]
+    public async Task Deserialize_with_empty()
+    {
+        await using var server = NatsServer.Start();
+        await using var nats = server.CreateClientConnection();
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        await nats.ConnectAsync();
+
+        var serializer = new TestDeserializeWithEmpty<int>();
+        var sub = await nats.SubscribeCoreAsync("foo", serializer: serializer, cancellationToken: cancellationToken);
+
+        await nats.PublishAsync("foo", cancellationToken: cancellationToken);
+
+        var result = await sub.Msgs.ReadAsync(cancellationToken);
+
+        Assert.Equal(42, result.Data);
+    }
 }
 
 public class TestSerializer<T> : INatsSerialize<T>, INatsDeserialize<T>
@@ -69,4 +90,9 @@ public class TestSerializer<T> : INatsSerialize<T>, INatsDeserialize<T>
 
 public class TestSerializerException : Exception
 {
+}
+
+public class TestDeserializeWithEmpty<T> : INatsDeserializeWithEmpty<T>
+{
+    public T? Deserialize(in ReadOnlySequence<byte> buffer) => (T)(object)42;
 }
