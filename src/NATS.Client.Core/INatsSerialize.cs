@@ -43,6 +43,11 @@ public interface INatsDeserialize<out T>
     T? Deserialize(in ReadOnlySequence<byte> buffer);
 }
 
+/// <summary>
+/// Marker interface for deserializers that would be used when the message is empty.
+/// By default the deserializer will not be called if the message is empty.
+/// </summary>
+/// <typeparam name="T">Deserialized object type</typeparam>
 public interface INatsDeserializeWithEmpty<out T> : INatsDeserialize<T>
 {
 }
