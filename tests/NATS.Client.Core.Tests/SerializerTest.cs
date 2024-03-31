@@ -92,7 +92,7 @@ public class TestSerializerException : Exception
 {
 }
 
-public class TestDeserializeWithEmpty<T> : INatsDeserializeWithEmpty<T>
+public class TestDeserializeWithEmpty<T> : INatsDeserialize<T>
 {
     public T? Deserialize(in ReadOnlySequence<byte> buffer) => (T)(object)42;
 }

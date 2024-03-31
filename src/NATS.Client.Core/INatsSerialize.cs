@@ -43,15 +43,6 @@ public interface INatsDeserialize<out T>
     T? Deserialize(in ReadOnlySequence<byte> buffer);
 }
 
-/// <summary>
-/// Marker interface for deserializers that would be used when the message is empty.
-/// By default the deserializer will not be called if the message is empty.
-/// </summary>
-/// <typeparam name="T">Deserialized object type</typeparam>
-public interface INatsDeserializeWithEmpty<out T> : INatsDeserialize<T>
-{
-}
-
 public interface INatsSerializerRegistry
 {
     INatsSerialize<T> GetSerializer<T>();
@@ -377,6 +368,11 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
     /// <inheritdoc />
     public T? Deserialize(in ReadOnlySequence<byte> buffer)
     {
+        if (buffer.Length == 0)
+        {
+            return default;
+        }
+
         if (typeof(T) == typeof(string))
         {
             return (T)(object)Encoding.UTF8.GetString(buffer);
@@ -622,6 +618,11 @@ public class NatsRawSerializer<T> : INatsSerializer<T>
     /// <inheritdoc />
     public T? Deserialize(in ReadOnlySequence<byte> buffer)
     {
+        if (buffer.Length == 0)
+        {
+            return default;
+        }
+
         if (typeof(T) == typeof(byte[]))
         {
             return (T)(object)buffer.ToArray();
@@ -734,6 +735,11 @@ public sealed class NatsJsonContextSerializer<T> : INatsSerializer<T>
     /// <inheritdoc />
     public T? Deserialize(in ReadOnlySequence<byte> buffer)
     {
+        if (buffer.Length == 0)
+        {
+            return default;
+        }
+
         foreach (var context in _contexts)
         {
             if (context.GetTypeInfo(typeof(T)) is JsonTypeInfo<T> jsonTypeInfo)
