@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Text;
 
 namespace NATS.Client.Core.Tests;
 
@@ -70,14 +71,17 @@ public class SerializerTest
 
         await nats.ConnectAsync();
 
-        var serializer = new TestDeserializeWithEmpty<int>();
+        var serializer = new TestDeserializeWithEmpty<string>();
         var sub = await nats.SubscribeCoreAsync("foo", serializer: serializer, cancellationToken: cancellationToken);
 
         await nats.PublishAsync("foo", cancellationToken: cancellationToken);
+        await nats.PublishAsync("foo", "something", cancellationToken: cancellationToken);
 
-        var result = await sub.Msgs.ReadAsync(cancellationToken);
+        var result1 = await sub.Msgs.ReadAsync(cancellationToken);
+        Assert.Equal("__EMPTY__", result1.Data);
 
-        Assert.Equal(42, result.Data);
+        var result2 = await sub.Msgs.ReadAsync(cancellationToken);
+        Assert.Equal("something", result2.Data);
     }
 }
 
@@ -94,5 +98,7 @@ public class TestSerializerException : Exception
 
 public class TestDeserializeWithEmpty<T> : INatsDeserialize<T>
 {
-    public T? Deserialize(in ReadOnlySequence<byte> buffer) => (T)(object)42;
+    public T? Deserialize(in ReadOnlySequence<byte> buffer) => (T)(object)(buffer.IsEmpty
+        ? "__EMPTY__"
+        : Encoding.ASCII.GetString(buffer));
 }
