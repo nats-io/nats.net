@@ -1,7 +1,6 @@
+using System.Net.Security;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
-using System.Text;
 
 namespace NATS.Client.Core.Internal;
 
@@ -10,6 +9,10 @@ internal class TlsCerts
     public X509Certificate2Collection? CaCerts { get; private set; }
 
     public X509Certificate2Collection? ClientCerts { get; private set; }
+
+#if NET8_0_OR_GREATER
+    public SslStreamCertificateContext? ClientCertContext { get; private set; }
+#endif
 
     public static async ValueTask<TlsCerts> FromNatsTlsOptsAsync(NatsTlsOpts tlsOpts)
     {
@@ -43,34 +46,51 @@ internal class TlsCerts
             tlsCerts.CaCerts = await tlsOpts.LoadCaCerts().ConfigureAwait(false);
         }
 
-        // client certificates
-        var clientCertsProvider = tlsOpts switch
+        // client cert context
+        SslStreamCertificateContext? clientCertContext = null;
+#if NET8_0_OR_GREATER
+        clientCertContext = tlsOpts switch
         {
-            { CertFile: not null, KeyFile: not null } => NatsTlsOpts.LoadClientCertFromPemFile(tlsOpts.CertFile, tlsOpts.KeyFile),
-            { LoadClientCert: not null } => tlsOpts.LoadClientCert,
+            { CertFile: not null, KeyFile: not null } => await NatsTlsOpts.LoadClientCertContextFromPem(
+                await File.ReadAllTextAsync(tlsOpts.CertFile).ConfigureAwait(false),
+                await File.ReadAllTextAsync(tlsOpts.KeyFile).ConfigureAwait(false))().ConfigureAwait(false),
+            { LoadClientCertContext: not null } => await tlsOpts.LoadClientCertContext().ConfigureAwait(false),
             _ => null,
         };
+        tlsCerts.ClientCertContext = clientCertContext;
+#endif
 
-        var clientCerts = clientCertsProvider != null ? await clientCertsProvider().ConfigureAwait(false) : null;
+        // client certificates
+        X509Certificate2? clientCert = null;
+        if (clientCertContext != null)
+        {
+#if NET8_0_OR_GREATER
+            clientCert = clientCertContext.TargetCertificate;
+#endif
+        }
+        else
+        {
+            clientCert = tlsOpts switch
+            {
+                { CertFile: not null, KeyFile: not null } => X509Certificate2.CreateFromPemFile(tlsOpts.CertFile, tlsOpts.KeyFile),
+                { LoadClientCert: not null } => await tlsOpts.LoadClientCert().ConfigureAwait(false),
+                _ => null,
+            };
+        }
 
-        if (clientCerts != null)
+        if (clientCert != null)
         {
             // On Windows, ephemeral keys/certificates do not work with schannel. e.g. unless stored in certificate store.
             // https://github.com/dotnet/runtime/issues/66283#issuecomment-1061014225
             // https://github.com/dotnet/runtime/blob/380a4723ea98067c28d54f30e1a652483a6a257a/src/libraries/System.Net.Security/tests/FunctionalTests/TestHelper.cs#L192-L197
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                var windowsCerts = new X509Certificate2Collection();
-                foreach (var ephemeralCert in clientCerts)
-                {
-                    windowsCerts.Add(new X509Certificate2(ephemeralCert.Export(X509ContentType.Pfx)));
-                    ephemeralCert.Dispose();
-                }
-
-                clientCerts = windowsCerts;
+                var ephemeral = clientCert;
+                clientCert = new X509Certificate2(clientCert.Export(X509ContentType.Pfx));
+                ephemeral.Dispose();
             }
 
-            tlsCerts.ClientCerts = clientCerts;
+            tlsCerts.ClientCerts = new X509Certificate2Collection(clientCert);
         }
 
         return tlsCerts;

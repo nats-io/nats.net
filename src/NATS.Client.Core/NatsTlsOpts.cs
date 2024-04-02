@@ -1,5 +1,4 @@
 using System.Net.Security;
-using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using NATS.Client.Core.Internal;
 
@@ -56,7 +55,7 @@ public sealed record NatsTlsOpts
     /// <summary>
     /// String or file path to PEM-encoded Private Key
     /// </summary>
-    /// /// <remarks>
+    /// <remarks>
     /// Must be used in conjunction with <see cref="CertFile"/>.
     /// </remarks>
     public string? KeyFile { get; init; }
@@ -65,11 +64,18 @@ public sealed record NatsTlsOpts
     /// Callback that loads Client Certificate
     /// </summary>
     /// <remarks>
-    /// Callback may return multiple certificates, in which case the first
-    /// certificate is used as the client certificate and the rest are used as intermediates.
-    /// Using intermediate certificates is only supported on targets .NET 8 and above.
+    /// If the Client Certificate includes intermediates, use
+    /// LoadClientCertContext (.NET 8 and above) instead.
     /// </remarks>
-    public Func<ValueTask<X509Certificate2Collection>>? LoadClientCert { get; init; }
+    public Func<ValueTask<X509Certificate2>>? LoadClientCert { get; init; }
+
+#if NET8_0_OR_GREATER
+    /// <summary>
+    /// Callback that loads Client Certificate
+    /// </summary>
+    /// <remarks>This option is only available in .NET 8 and above.</remarks>
+    public Func<ValueTask<SslStreamCertificateContext>>? LoadClientCertContext { get; init; }
+#endif
 
     /// <summary>
     /// String or file path to PEM-encoded X509 CA Certificate
@@ -88,14 +94,16 @@ public sealed record NatsTlsOpts
     /// <value>One of the values in <see cref="T:System.Security.Cryptography.X509Certificates.X509RevocationMode" />. The default is <see langword="NoCheck" />.</value>
     public X509RevocationMode CertificateRevocationCheckMode { get; init; }
 
+#if NET8_0_OR_GREATER
     /// <summary>
-    /// Gets or sets an optional customized policy for remote certificate
-    /// validation. If not <see langword="null"/>,
-    /// <see cref="CertificateRevocationCheckMode"/> and <see cref="SslCertificateTrust"/>
-    /// are ignored.
+    /// Gets or sets an optional customized policy for remote certificate validation.
+    /// If not <see langword="null"/>,
+    /// <see cref="CertificateRevocationCheckMode"/> and
+    /// <see cref="T:System.Net.Security.SslCertificateTrust" /> are ignored.
     /// </summary>
     /// <remarks>This option is only available in .NET 8 and above.</remarks>
     public X509ChainPolicy? CertificateChainPolicy { get; init; }
+#endif
 
     /// <summary>TLS mode to use during connection</summary>
     public TlsMode Mode { get; init; }
@@ -103,45 +111,52 @@ public sealed record NatsTlsOpts
     internal bool HasTlsCerts => CertFile != default || KeyFile != default || LoadClientCert != default || CaFile != default || LoadCaCerts != default;
 
     /// <summary>
-    /// Helper method to load a client certificate and its key from PEM-encoded texts.
+    /// Helper method to load a Client Certificate from a pem-encoded string
     /// </summary>
-    /// <param name="certPem">Text of PEM-encoded certificates</param>
-    /// <param name="keyPem">Text of PEM-encoded key</param>
-    /// <returns>Returns a callback that will return a collection of certificates</returns>
     /// <remarks>
-    /// Client certificate string may contain multiple certificates, in which case the first
-    /// certificate is used as the client certificate and the rest are used as intermediates.
-    /// Using intermediate certificates is only supported on targets .NET 8 and above.
+    /// If the Client Certificate includes intermediates, use
+    /// LoadClientCertContextFromPem (.NET 8 and above) instead.
     /// </remarks>
-    public static Func<ValueTask<X509Certificate2Collection>> LoadClientCertFromPem(string certPem, string keyPem)
+    public static Func<ValueTask<X509Certificate2>> LoadClientCertFromPem(string certPem, string keyPem)
     {
-        var certificateCollection = LoadCertsFromMultiPem(certPem, keyPem);
-
-        return () => ValueTask.FromResult(certificateCollection);
+        var clientCert = X509Certificate2.CreateFromPem(certPem, keyPem);
+        return () => ValueTask.FromResult(clientCert);
     }
 
+#if NET8_0_OR_GREATER
     /// <summary>
-    /// Helper method to load CA certificates from a PEM-encoded text.
+    /// Helper method to load a Client Certificate Context from a pem-encoded string
     /// </summary>
-    /// <param name="caPem">Text of PEM-encoded CA certificates</param>
-    /// <returns>Returns a callback that will return a collection of CA certificates</returns>
+    /// <param name="certPem">string with the PEM-encoded X509 certificate</param>
+    /// <param name="keyPem">string with the PEM-encoded private key</param>
+    /// <param name="offline">
+    /// <see langword="false" /> to indicate that the missing certificates can be downloaded from the network;
+    /// <see langword="true" /> to indicate that only available X509Certificate stores should be searched for missing certificates.
+    /// </param>
+    /// <param name="trust">An optional trust policy, to replace the default system trust.</param>
+    public static Func<ValueTask<SslStreamCertificateContext>> LoadClientCertContextFromPem(string certPem, string keyPem, bool offline = false, SslCertificateTrust? trust = null)
+    {
+        var leafCert = X509Certificate2.CreateFromPem(certPem, keyPem);
+        var intermediateCerts = new X509Certificate2Collection();
+        intermediateCerts.ImportFromPem(certPem);
+        if (intermediateCerts.Count > 0)
+        {
+            intermediateCerts.RemoveAt(0);
+        }
+
+        var clientCertContext = SslStreamCertificateContext.Create(leafCert, intermediateCerts, offline, trust);
+        return () => ValueTask.FromResult(clientCertContext);
+    }
+#endif
+
+    /// <summary>
+    /// Helper method to load CA Certificates from a pem-encoded string
+    /// </summary>
     public static Func<ValueTask<X509Certificate2Collection>> LoadCaCertsFromPem(string caPem)
     {
         var caCerts = new X509Certificate2Collection();
         caCerts.ImportFromPem(caPem);
         return () => ValueTask.FromResult(caCerts);
-    }
-
-    /// <summary>
-    /// Helper method to load a client certificates and its key from PEM-encoded files
-    /// </summary>
-    internal static Func<ValueTask<X509Certificate2Collection>> LoadClientCertFromPemFile(string certPemFile, string keyPemFile)
-    {
-        var certPem = File.ReadAllText(certPemFile);
-        var keyPem = File.ReadAllText(keyPemFile);
-        var certificateCollection = LoadCertsFromMultiPem(certPem, keyPem);
-
-        return () => ValueTask.FromResult(certificateCollection);
     }
 
     internal TlsMode EffectiveMode(NatsUri uri) => Mode switch
@@ -154,34 +169,5 @@ public sealed record NatsTlsOpts
     {
         var effectiveMode = EffectiveMode(uri);
         return effectiveMode is TlsMode.Require or TlsMode.Prefer;
-    }
-
-    /// <summary>
-    /// Helper method to load certificates from a PEM-encoded text.
-    /// </summary>
-    private static X509Certificate2Collection LoadCertsFromMultiPem(ReadOnlySpan<char> certPem, ReadOnlySpan<char> keyPem)
-    {
-        var multiPemCertificateCollection = new X509Certificate2Collection();
-        var addKey = true;
-
-        while (PemEncoding.TryFind(certPem, out var fields))
-        {
-            X509Certificate2 certificate;
-
-            if (addKey)
-            {
-                certificate = X509Certificate2.CreateFromPem(certPem, keyPem);
-                addKey = false;
-            }
-            else
-            {
-                certificate = X509Certificate2.CreateFromPem(certPem);
-            }
-
-            multiPemCertificateCollection.Add(certificate);
-            certPem = certPem[fields.Location.End..];
-        }
-
-        return multiPemCertificateCollection;
     }
 }
