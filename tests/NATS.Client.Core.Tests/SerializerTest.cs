@@ -71,18 +71,56 @@ public class SerializerTest
 
         await nats.ConnectAsync();
 
-        var serializer = new TestDeserializeWithEmpty<string>();
+        var serializer = new TestSerializerWithEmpty<TestData>();
         var sub = await nats.SubscribeCoreAsync("foo", serializer: serializer, cancellationToken: cancellationToken);
 
         await nats.PublishAsync("foo", cancellationToken: cancellationToken);
         await nats.PublishAsync("foo", "something", cancellationToken: cancellationToken);
 
         var result1 = await sub.Msgs.ReadAsync(cancellationToken);
-        Assert.Equal("__EMPTY__", result1.Data);
+        Assert.NotNull(result1.Data);
+        Assert.Equal("__EMPTY__", result1.Data.Name);
 
         var result2 = await sub.Msgs.ReadAsync(cancellationToken);
-        Assert.Equal("something", result2.Data);
+        Assert.NotNull(result2.Data);
+        Assert.Equal("something", result2.Data.Name);
     }
+
+    [Fact]
+    public async Task Deserialize_chained_with_empty()
+    {
+        await using var server = NatsServer.Start();
+        await using var nats = server.CreateClientConnection(new NatsOpts
+        {
+            SerializerRegistry = new TestSerializerRegistry(),
+        });
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        await nats.ConnectAsync();
+
+        var serializer = new TestSerializerWithEmpty<string>();
+        var sub = await nats.SubscribeCoreAsync<TestData>("foo", cancellationToken: cancellationToken);
+
+        await nats.PublishAsync("foo", cancellationToken: cancellationToken);
+        await nats.PublishAsync("foo", "something", cancellationToken: cancellationToken);
+
+        var result1 = await sub.Msgs.ReadAsync(cancellationToken);
+        Assert.NotNull(result1.Data);
+        Assert.Equal("__EMPTY__", result1.Data.Name);
+
+        var result2 = await sub.Msgs.ReadAsync(cancellationToken);
+        Assert.NotNull(result2.Data);
+        Assert.Equal("something", result2.Data.Name);
+    }
+}
+
+public class TestSerializerRegistry : INatsSerializerRegistry
+{
+    public INatsSerialize<T> GetSerializer<T>() => new NatsUtf8PrimitivesSerializer<T>(new TestSerializerWithEmpty<T>());
+
+    public INatsDeserialize<T> GetDeserializer<T>() => new NatsUtf8PrimitivesSerializer<T>(new TestSerializerWithEmpty<T>());
 }
 
 public class TestSerializer<T> : INatsSerialize<T>, INatsDeserialize<T>
@@ -96,9 +134,13 @@ public class TestSerializerException : Exception
 {
 }
 
-public class TestDeserializeWithEmpty<T> : INatsDeserialize<T>
+public class TestSerializerWithEmpty<T> : INatsSerializer<T>
 {
     public T? Deserialize(in ReadOnlySequence<byte> buffer) => (T)(object)(buffer.IsEmpty
-        ? "__EMPTY__"
-        : Encoding.ASCII.GetString(buffer));
+        ? new TestData("__EMPTY__")
+        : new TestData(Encoding.ASCII.GetString(buffer)));
+
+    public void Serialize(IBufferWriter<byte> bufferWriter, T value) => throw new Exception("not used");
 }
+
+public record TestData(string Name);
