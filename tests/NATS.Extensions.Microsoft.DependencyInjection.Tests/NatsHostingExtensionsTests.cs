@@ -5,6 +5,7 @@ using NATS.Client.Core;
 using NATS.Client.Core.Tests;
 
 namespace NATS.Extensions.Microsoft.DependencyInjection.Tests;
+
 public class NatsHostingExtensionsTests
 {
     [Fact]

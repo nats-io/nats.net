@@ -582,6 +582,10 @@ internal sealed class CommandWriter : IAsyncDisposable
         {
             // Expected during shutdown
         }
+        catch (ObjectDisposedException)
+        {
+            // Expected during shutdown
+        }
         catch (Exception e)
         {
             logger.LogError(NatsLogEvents.Buffer, e, "Unexpected error in send buffer reader loop");
