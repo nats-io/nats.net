@@ -368,7 +368,6 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
     /// <inheritdoc />
     public T? Deserialize(in ReadOnlySequence<byte> buffer)
     {
-
         if (typeof(T) == typeof(string))
         {
             if (buffer.Length == 0)
