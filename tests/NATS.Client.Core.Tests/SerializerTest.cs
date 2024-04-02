@@ -82,32 +82,93 @@ public class SerializerTest
         SerializeDeserialize<ulong>(42, "42");
 
         // Test chaining
-        Assert.Throws<TestSerializerException>(() => Serialize<TestData>(new TestData("42"), "throws exception"));
-        Assert.Throws<TestSerializerException>(() => Deserialize<TestData>("throws exception", new TestData("42")));
+        var testDataSerializer = new NatsUtf8PrimitivesSerializer<TestData>(new TestSerializer<TestData>());
+
+        Assert.Throws<TestSerializerException>(() => Serialize<TestData>(testDataSerializer, new TestData("42"), "throws exception"));
+        Assert.Throws<TestSerializerException>(() => Deserialize<TestData>(testDataSerializer, "throws exception", new TestData("42")));
 
         return;
 
         void SerializeDeserialize<T>(T actual, string expected)
         {
-            Serialize(actual, expected);
-            Deserialize(expected, actual);
+            var serializer = new NatsUtf8PrimitivesSerializer<T>(new TestSerializer<T>());
+            Serialize(serializer, actual, expected);
+            Deserialize(serializer, expected, actual);
         }
 
-        void Serialize<T>(T value, string expected)
+        void Serialize<T>(INatsSerialize<T> serializer, T value, string expected)
         {
             var buffer = new NatsBufferWriter<byte>();
-            var serializer = new NatsUtf8PrimitivesSerializer<T>(new TestSerializer<T>());
             serializer.Serialize(buffer, value);
             var actual = Encoding.UTF8.GetString(buffer.WrittenMemory.Span);
             Assert.Equal(expected, actual);
         }
 
-        void Deserialize<T>(string input, T expected)
+        void Deserialize<T>(INatsDeserialize<T> serializer, string input, T expected)
         {
             var buffer = new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(input));
-            var serializer = new NatsUtf8PrimitivesSerializer<T>(new TestSerializer<T>());
             var actual = serializer.Deserialize(buffer);
             Assert.Equal(expected, actual);
+        }
+    }
+
+    [Fact]
+    public void Raw_serializer()
+    {
+        byte[] bytes = [1, 2, 3, 42];
+
+        SerializeDeserialize<byte[]>(bytes, b => b, b => b);
+        SerializeDeserialize<Memory<byte>>(bytes, b => b, b => b.ToArray());
+        SerializeDeserialize<ReadOnlyMemory<byte>>(bytes, b => b, b => b.ToArray());
+        SerializeDeserialize<ReadOnlySequence<byte>>(bytes, b => new ReadOnlySequence<byte>(b), b => b.ToArray());
+
+        SerializeDeserialize<NatsMemoryOwner<byte>>(
+            bytes,
+            b =>
+            {
+                var memoryOwner = NatsMemoryOwner<byte>.Allocate(b.Length);
+                b.CopyTo(memoryOwner.Memory);
+                return memoryOwner;
+            },
+            b => b.Memory.ToArray());
+
+        // Test chaining
+        var testDataSerializer = new NatsRawSerializer<TestData>(new TestSerializer<TestData>());
+
+        Assert.Throws<TestSerializerException>(() => Serialize<TestData>(testDataSerializer, bytes, _ => new TestData("42")));
+        Assert.Throws<TestSerializerException>(() => Deserialize<TestData>(testDataSerializer, bytes, _ => Array.Empty<byte>()));
+
+        return;
+
+        void SerializeDeserialize<T>(byte[] inputBuffer, Func<byte[], T> input, Func<T, byte[]> output)
+        {
+            var serializer = new NatsRawSerializer<T>(new TestSerializer<T>());
+            Serialize(serializer, inputBuffer, input);
+            Deserialize(serializer, inputBuffer, output);
+        }
+
+        void Serialize<T>(INatsSerialize<T> serializer, byte[] inputBuffer, Func<byte[], T> input)
+        {
+            var buffer = new NatsBufferWriter<byte>();
+            serializer.Serialize(buffer, input(inputBuffer));
+            var actual = buffer.WrittenMemory.ToArray();
+            for (var i = 0; i < inputBuffer.Length; i++)
+            {
+                var b = inputBuffer[i];
+                Assert.Equal(b, actual[i]);
+            }
+        }
+
+        void Deserialize<T>(INatsDeserialize<T> serializer, byte[] inputBuffer, Func<T, byte[]> output)
+        {
+            var buffer = new ReadOnlySequence<byte>(inputBuffer);
+            var actual = serializer.Deserialize(buffer);
+            Assert.True(actual is { });
+            for (var i = 0; i < inputBuffer.Length; i++)
+            {
+                var b = bytes[i];
+                Assert.Equal(b, output(actual)[i]);
+            }
         }
     }
 
