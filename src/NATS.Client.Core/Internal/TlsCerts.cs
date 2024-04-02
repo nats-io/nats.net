@@ -1,5 +1,7 @@
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using System.Text;
 
 namespace NATS.Client.Core.Internal;
 
@@ -42,26 +44,33 @@ internal class TlsCerts
         }
 
         // client certificates
-        var clientCert = tlsOpts switch
+        var clientCertsProvider = tlsOpts switch
         {
-            { CertFile: not null, KeyFile: not null } => X509Certificate2.CreateFromPemFile(tlsOpts.CertFile, tlsOpts.KeyFile),
-            { LoadClientCert: not null } => await tlsOpts.LoadClientCert().ConfigureAwait(false),
+            { CertFile: not null, KeyFile: not null } => NatsTlsOpts.LoadClientCertFromPemFile(tlsOpts.CertFile, tlsOpts.KeyFile),
+            { LoadClientCert: not null } => tlsOpts.LoadClientCert,
             _ => null,
         };
 
-        if (clientCert != null)
+        var clientCerts = clientCertsProvider != null ? await clientCertsProvider().ConfigureAwait(false) : null;
+
+        if (clientCerts != null)
         {
             // On Windows, ephemeral keys/certificates do not work with schannel. e.g. unless stored in certificate store.
             // https://github.com/dotnet/runtime/issues/66283#issuecomment-1061014225
             // https://github.com/dotnet/runtime/blob/380a4723ea98067c28d54f30e1a652483a6a257a/src/libraries/System.Net.Security/tests/FunctionalTests/TestHelper.cs#L192-L197
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                var ephemeral = clientCert;
-                clientCert = new X509Certificate2(clientCert.Export(X509ContentType.Pfx));
-                ephemeral.Dispose();
+                var windowsCerts = new X509Certificate2Collection();
+                foreach (var ephemeralCert in clientCerts)
+                {
+                    windowsCerts.Add(new X509Certificate2(ephemeralCert.Export(X509ContentType.Pfx)));
+                    ephemeralCert.Dispose();
+                }
+
+                clientCerts = windowsCerts;
             }
 
-            tlsCerts.ClientCerts = new X509Certificate2Collection(clientCert);
+            tlsCerts.ClientCerts = clientCerts;
         }
 
         return tlsCerts;

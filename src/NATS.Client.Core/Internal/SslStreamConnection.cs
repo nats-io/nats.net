@@ -170,11 +170,25 @@ internal sealed class SslStreamConnection : ISocketConnection
             rcsCb = RcsCbCaCertChain;
         }
 
+#if NET8_0_OR_GREATER
+        SslStreamCertificateContext? streamCertificateContext = null;
+        if (_tlsCerts?.ClientCerts is { Count: >= 1 })
+        {
+            streamCertificateContext = SslStreamCertificateContext.Create(
+                    _tlsCerts.ClientCerts[0],
+                    _tlsCerts.ClientCerts);
+        }
+#endif
+
         var options = new SslClientAuthenticationOptions
         {
             TargetHost = uri.Host,
             EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
             ClientCertificates = _tlsCerts?.ClientCerts,
+#if NET8_0_OR_GREATER
+            ClientCertificateContext = streamCertificateContext,
+            CertificateChainPolicy = _tlsOpts.CertificateChainPolicy,
+#endif
             LocalCertificateSelectionCallback = lcsCb,
             RemoteCertificateValidationCallback = rcsCb,
             CertificateRevocationCheckMode = _tlsOpts.CertificateRevocationCheckMode,
