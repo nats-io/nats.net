@@ -73,7 +73,7 @@ public record ObjectMetadata
     /// </summary>
     [JsonPropertyName("headers")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    public Dictionary<string, string>? Headers { get; set; }
+    public Dictionary<string, string[]>? Headers { get; set; }
 
     /// <summary>
     /// Object deleted
