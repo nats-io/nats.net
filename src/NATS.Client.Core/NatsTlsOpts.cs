@@ -102,18 +102,6 @@ public sealed record NatsTlsOpts
 
     internal bool HasTlsCerts => CertFile != default || KeyFile != default || LoadClientCert != default || CaFile != default || LoadCaCerts != default;
 
-    internal TlsMode EffectiveMode(NatsUri uri) => Mode switch
-    {
-        TlsMode.Auto => HasTlsCerts || uri.Uri.Scheme.ToLower() == "tls" ? TlsMode.Require : TlsMode.Prefer,
-        _ => Mode,
-    };
-
-    internal bool TryTls(NatsUri uri)
-    {
-        var effectiveMode = EffectiveMode(uri);
-        return effectiveMode is TlsMode.Require or TlsMode.Prefer;
-    }
-
     /// <summary>
     /// Helper method to load a client certificate and its key from PEM-encoded texts.
     /// </summary>
@@ -183,5 +171,17 @@ public sealed record NatsTlsOpts
         }
 
         return multiPemCertificateCollection;
+    }
+
+    internal TlsMode EffectiveMode(NatsUri uri) => Mode switch
+    {
+        TlsMode.Auto => HasTlsCerts || uri.Uri.Scheme.ToLower() == "tls" ? TlsMode.Require : TlsMode.Prefer,
+        _ => Mode,
+    };
+
+    internal bool TryTls(NatsUri uri)
+    {
+        var effectiveMode = EffectiveMode(uri);
+        return effectiveMode is TlsMode.Require or TlsMode.Prefer;
     }
 }

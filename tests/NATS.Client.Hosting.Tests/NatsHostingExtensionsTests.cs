@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using NATS.Client.Core;
 
 namespace NATS.Client.Hosting.Tests;
+
 public class NatsHostingExtensionsTests
 {
     [Fact]

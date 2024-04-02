@@ -4,14 +4,14 @@ namespace NATS.Client.JetStream.Models;
 
 public record StreamConfig
 {
-    internal StreamConfig()
-    {
-    }
-
     public StreamConfig(string name, ICollection<string> subjects)
     {
         Name = name;
         Subjects = subjects;
+    }
+
+    internal StreamConfig()
+    {
     }
 
     /// <summary>
