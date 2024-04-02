@@ -144,6 +144,18 @@ public sealed record NatsTlsOpts
         return () => ValueTask.FromResult(certificateCollection);
     }
 
+    internal TlsMode EffectiveMode(NatsUri uri) => Mode switch
+    {
+        TlsMode.Auto => HasTlsCerts || uri.Uri.Scheme.ToLower() == "tls" ? TlsMode.Require : TlsMode.Prefer,
+        _ => Mode,
+    };
+
+    internal bool TryTls(NatsUri uri)
+    {
+        var effectiveMode = EffectiveMode(uri);
+        return effectiveMode is TlsMode.Require or TlsMode.Prefer;
+    }
+
     /// <summary>
     /// Helper method to load certificates from a PEM-encoded text.
     /// </summary>
@@ -171,17 +183,5 @@ public sealed record NatsTlsOpts
         }
 
         return multiPemCertificateCollection;
-    }
-
-    internal TlsMode EffectiveMode(NatsUri uri) => Mode switch
-    {
-        TlsMode.Auto => HasTlsCerts || uri.Uri.Scheme.ToLower() == "tls" ? TlsMode.Require : TlsMode.Prefer,
-        _ => Mode,
-    };
-
-    internal bool TryTls(NatsUri uri)
-    {
-        var effectiveMode = EffectiveMode(uri);
-        return effectiveMode is TlsMode.Require or TlsMode.Prefer;
     }
 }
