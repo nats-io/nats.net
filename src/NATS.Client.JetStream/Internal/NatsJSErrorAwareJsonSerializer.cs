@@ -11,6 +11,11 @@ internal sealed class NatsJSErrorAwareJsonSerializer<T> : INatsDeserialize<T>
 
     public T? Deserialize(in ReadOnlySequence<byte> buffer)
     {
+        if (buffer.Length == 0)
+        {
+            return default;
+        }
+
         // We need to determine what type we're deserializing into
         // .NET 6 new APIs to the rescue: we can read the buffer once
         // by deserializing into a document, inspect and using the new

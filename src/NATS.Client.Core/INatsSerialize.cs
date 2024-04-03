@@ -370,6 +370,8 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
     {
         if (typeof(T) == typeof(string))
         {
+            if (buffer.Length == 0)
+                return default;
             return (T)(object)Encoding.UTF8.GetString(buffer);
         }
 
@@ -377,6 +379,9 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
 
         if (typeof(T) == typeof(DateTime) || typeof(T) == typeof(DateTime?))
         {
+            if (buffer.Length == 0)
+                return default;
+
             if (Utf8Parser.TryParse(span, out DateTime value, out _))
             {
                 return (T)(object)value;
@@ -387,6 +392,9 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
 
         if (typeof(T) == typeof(DateTimeOffset) || typeof(T) == typeof(DateTimeOffset?))
         {
+            if (buffer.Length == 0)
+                return default;
+
             if (Utf8Parser.TryParse(span, out DateTimeOffset value, out _))
             {
                 return (T)(object)value;
@@ -397,6 +405,9 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
 
         if (typeof(T) == typeof(Guid) || typeof(T) == typeof(Guid?))
         {
+            if (buffer.Length == 0)
+                return default;
+
             if (Utf8Parser.TryParse(span, out Guid value, out _))
             {
                 return (T)(object)value;
@@ -407,6 +418,9 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
 
         if (typeof(T) == typeof(TimeSpan) || typeof(T) == typeof(TimeSpan?))
         {
+            if (buffer.Length == 0)
+                return default;
+
             if (Utf8Parser.TryParse(span, out TimeSpan value, out _))
             {
                 return (T)(object)value;
@@ -417,6 +431,9 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
 
         if (typeof(T) == typeof(bool) || typeof(T) == typeof(bool?))
         {
+            if (buffer.Length == 0)
+                return default;
+
             if (Utf8Parser.TryParse(span, out bool value, out _))
             {
                 return (T)(object)value;
@@ -427,6 +444,9 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
 
         if (typeof(T) == typeof(byte) || typeof(T) == typeof(byte?))
         {
+            if (buffer.Length == 0)
+                return default;
+
             if (Utf8Parser.TryParse(span, out byte value, out _))
             {
                 return (T)(object)value;
@@ -437,6 +457,9 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
 
         if (typeof(T) == typeof(decimal) || typeof(T) == typeof(decimal?))
         {
+            if (buffer.Length == 0)
+                return default;
+
             if (Utf8Parser.TryParse(span, out decimal value, out _))
             {
                 return (T)(object)value;
@@ -447,6 +470,9 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
 
         if (typeof(T) == typeof(double) || typeof(T) == typeof(double?))
         {
+            if (buffer.Length == 0)
+                return default;
+
             if (Utf8Parser.TryParse(span, out double value, out _))
             {
                 return (T)(object)value;
@@ -457,6 +483,9 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
 
         if (typeof(T) == typeof(float) || typeof(T) == typeof(float?))
         {
+            if (buffer.Length == 0)
+                return default;
+
             if (Utf8Parser.TryParse(span, out float value, out _))
             {
                 return (T)(object)value;
@@ -467,6 +496,9 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
 
         if (typeof(T) == typeof(int) || typeof(T) == typeof(int?))
         {
+            if (buffer.Length == 0)
+                return default;
+
             if (Utf8Parser.TryParse(span, out int value, out _))
             {
                 return (T)(object)value;
@@ -477,6 +509,9 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
 
         if (typeof(T) == typeof(long) || typeof(T) == typeof(long?))
         {
+            if (buffer.Length == 0)
+                return default;
+
             if (Utf8Parser.TryParse(span, out long value, out _))
             {
                 return (T)(object)value;
@@ -487,6 +522,9 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
 
         if (typeof(T) == typeof(sbyte) || typeof(T) == typeof(sbyte?))
         {
+            if (buffer.Length == 0)
+                return default;
+
             if (Utf8Parser.TryParse(span, out sbyte value, out _))
             {
                 return (T)(object)value;
@@ -497,6 +535,9 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
 
         if (typeof(T) == typeof(short) || typeof(T) == typeof(short?))
         {
+            if (buffer.Length == 0)
+                return default;
+
             if (Utf8Parser.TryParse(span, out short value, out _))
             {
                 return (T)(object)value;
@@ -507,6 +548,9 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
 
         if (typeof(T) == typeof(uint) || typeof(T) == typeof(uint?))
         {
+            if (buffer.Length == 0)
+                return default;
+
             if (Utf8Parser.TryParse(span, out uint value, out _))
             {
                 return (T)(object)value;
@@ -517,6 +561,9 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
 
         if (typeof(T) == typeof(ulong) || typeof(T) == typeof(ulong?))
         {
+            if (buffer.Length == 0)
+                return default;
+
             if (Utf8Parser.TryParse(span, out ulong value, out _))
             {
                 return (T)(object)value;
@@ -615,26 +662,36 @@ public class NatsRawSerializer<T> : INatsSerializer<T>
     {
         if (typeof(T) == typeof(byte[]))
         {
+            if (buffer.Length == 0)
+                return default;
             return (T)(object)buffer.ToArray();
         }
 
         if (typeof(T) == typeof(Memory<byte>))
         {
+            if (buffer.Length == 0)
+                return default;
             return (T)(object)new Memory<byte>(buffer.ToArray());
         }
 
         if (typeof(T) == typeof(ReadOnlyMemory<byte>))
         {
+            if (buffer.Length == 0)
+                return default;
             return (T)(object)new ReadOnlyMemory<byte>(buffer.ToArray());
         }
 
         if (typeof(T) == typeof(ReadOnlySequence<byte>))
         {
+            if (buffer.Length == 0)
+                return default;
             return (T)(object)new ReadOnlySequence<byte>(buffer.ToArray());
         }
 
         if (typeof(T) == typeof(IMemoryOwner<byte>) || typeof(T) == typeof(NatsMemoryOwner<byte>))
         {
+            if (buffer.Length == 0)
+                return default;
             var memoryOwner = NatsMemoryOwner<byte>.Allocate((int)buffer.Length);
             buffer.CopyTo(memoryOwner.Memory.Span);
             return (T)(object)memoryOwner;
@@ -725,6 +782,11 @@ public sealed class NatsJsonContextSerializer<T> : INatsSerializer<T>
     /// <inheritdoc />
     public T? Deserialize(in ReadOnlySequence<byte> buffer)
     {
+        if (buffer.Length == 0)
+        {
+            return default;
+        }
+
         foreach (var context in _contexts)
         {
             if (context.GetTypeInfo(typeof(T)) is JsonTypeInfo<T> jsonTypeInfo)
