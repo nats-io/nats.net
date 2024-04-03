@@ -147,6 +147,7 @@ public sealed record NatsTlsOpts
 
     internal async ValueTask<SslClientAuthenticationOptions> AuthenticateAsClientOptionsAsync(NatsUri uri)
     {
+#pragma warning disable CS0618 // Type or member is obsolete
         if (EffectiveMode(uri) == TlsMode.Disable)
         {
             throw new InvalidOperationException("TLS is not permitted when TlsMode is set to Disable");
@@ -155,6 +156,7 @@ public sealed record NatsTlsOpts
         var options = new SslClientAuthenticationOptions
         {
             TargetHost = uri.Host,
+
             CertificateRevocationCheckMode = CertificateRevocationCheckMode,
             EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
         };
@@ -203,6 +205,7 @@ public sealed record NatsTlsOpts
         }
 
         return options;
+#pragma warning restore CS0618 // Type or member is obsolete
     }
 }
 
