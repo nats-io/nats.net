@@ -1,14 +1,12 @@
 using System.Buffers;
 using System.Text;
 
+// ReSharper disable RedundantTypeArgumentsOfMethod
+// ReSharper disable ReturnTypeCanBeNotNullable
 namespace NATS.Client.Core.Tests;
 
 public class SerializerTest
 {
-    private readonly ITestOutputHelper _output;
-
-    public SerializerTest(ITestOutputHelper output) => _output = output;
-
     [Fact]
     public async Task Serializer_exceptions()
     {
@@ -79,7 +77,6 @@ public class SerializerTest
         SerializeDeserialize<short>(42, "42");
         SerializeDeserialize<uint>(42, "42");
         SerializeDeserialize<ulong>(42, "42");
-        SerializeDeserialize<ulong>(42, "42");
 
         // Test chaining
         var testDataSerializer = new NatsUtf8PrimitivesSerializer<TestData>(new TestSerializer<TestData>());
@@ -109,6 +106,43 @@ public class SerializerTest
             var buffer = new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(input));
             var actual = serializer.Deserialize(buffer);
             Assert.Equal(expected, actual);
+        }
+    }
+
+    [Fact]
+    public void Utf8_deserialize_empty()
+    {
+        var emptyBuffer = new ReadOnlySequence<byte>(Array.Empty<byte>());
+
+        Deserialize<string>();
+        Deserialize<DateTime>();
+        Deserialize<DateTimeOffset>();
+        Deserialize<Guid>();
+        Deserialize<TimeSpan>();
+        Deserialize<bool>();
+        Deserialize<byte>();
+        Deserialize<decimal>();
+        Deserialize<double>();
+        Deserialize<float>();
+        Deserialize<int>();
+        Deserialize<long>();
+        Deserialize<sbyte>();
+        Deserialize<short>();
+        Deserialize<uint>();
+        Deserialize<ulong>();
+        Deserialize<ulong>();
+
+        // Test chaining
+        var testDataSerializer = new NatsUtf8PrimitivesSerializer<TestData>(new TestSerializer<TestData>());
+        Assert.Throws<TestSerializerException>(() => testDataSerializer.Deserialize(emptyBuffer));
+
+        return;
+
+        void Deserialize<T>()
+        {
+            var serializer = new NatsUtf8PrimitivesSerializer<T>(new TestSerializer<T>());
+            var actual = serializer.Deserialize(emptyBuffer);
+            Assert.Equal(actual, default);
         }
     }
 
@@ -152,11 +186,7 @@ public class SerializerTest
             var buffer = new NatsBufferWriter<byte>();
             serializer.Serialize(buffer, input(inputBuffer));
             var actual = buffer.WrittenMemory.ToArray();
-            for (var i = 0; i < inputBuffer.Length; i++)
-            {
-                var b = inputBuffer[i];
-                Assert.Equal(b, actual[i]);
-            }
+            AssertByteArray(inputBuffer, actual);
         }
 
         void Deserialize<T>(INatsDeserialize<T> serializer, byte[] inputBuffer, Func<T, byte[]> output)
@@ -164,16 +194,37 @@ public class SerializerTest
             var buffer = new ReadOnlySequence<byte>(inputBuffer);
             var actual = serializer.Deserialize(buffer);
             Assert.True(actual is { });
-            for (var i = 0; i < inputBuffer.Length; i++)
-            {
-                var b = bytes[i];
-                Assert.Equal(b, output(actual)[i]);
-            }
+            AssertByteArray(inputBuffer, output(actual));
         }
     }
 
     [Fact]
-    public async Task Deserialize_with_empty()
+    public void Raw_deserialize_empty()
+    {
+        var emptyBuffer = new ReadOnlySequence<byte>(Array.Empty<byte>());
+
+        Deserialize<byte[]>();
+        Deserialize<Memory<byte>>();
+        Deserialize<ReadOnlyMemory<byte>>();
+        Deserialize<ReadOnlySequence<byte>>();
+        Deserialize<NatsMemoryOwner<byte>>();
+
+        // Test chaining
+        var testDataSerializer = new NatsRawSerializer<TestData>(new TestSerializer<TestData>());
+        Assert.Throws<TestSerializerException>(() => testDataSerializer.Deserialize(emptyBuffer));
+
+        return;
+
+        void Deserialize<T>()
+        {
+            var serializer = new NatsRawSerializer<T>(new TestSerializer<T>());
+            var actual = serializer.Deserialize(emptyBuffer);
+            Assert.Equal(actual, default);
+        }
+    }
+
+    [Fact]
+    public async Task Deserialize_with_empty_should_still_go_through_the_deserializer()
     {
         await using var server = NatsServer.Start();
         await using var nats = server.CreateClientConnection();
@@ -212,7 +263,6 @@ public class SerializerTest
 
         await nats.ConnectAsync();
 
-        var serializer = new TestSerializerWithEmpty<string>();
         var sub = await nats.SubscribeCoreAsync<TestData>("foo", cancellationToken: cancellationToken);
 
         await nats.PublishAsync("foo", cancellationToken: cancellationToken);
@@ -225,6 +275,15 @@ public class SerializerTest
         var result2 = await sub.Msgs.ReadAsync(cancellationToken);
         Assert.NotNull(result2.Data);
         Assert.Equal("something", result2.Data.Name);
+    }
+
+    private static void AssertByteArray(byte[] expected, byte[] actual)
+    {
+        Assert.Equal(expected.Length, actual.Length);
+        for (var i = 0; i < expected.Length; i++)
+        {
+            Assert.Equal(expected[i], actual[i]);
+        }
     }
 }
 
@@ -242,9 +301,7 @@ public class TestSerializer<T> : INatsSerializer<T>
     public T? Deserialize(in ReadOnlySequence<byte> buffer) => throw new TestSerializerException();
 }
 
-public class TestSerializerException : Exception
-{
-}
+public class TestSerializerException : Exception;
 
 public class TestSerializerWithEmpty<T> : INatsSerializer<T>
 {
