@@ -8,10 +8,10 @@ internal class TlsCerts
 {
     public X509Certificate2Collection? CaCerts { get; private set; }
 
-    public X509Certificate2Collection? ClientCerts { get; private set; }
-
 #if NET8_0_OR_GREATER
     public SslStreamCertificateContext? ClientCertContext { get; private set; }
+#else
+    public X509Certificate2Collection? ClientCerts { get; private set; }
 #endif
 
     public static async ValueTask<TlsCerts> FromNatsTlsOptsAsync(NatsTlsOpts tlsOpts)
@@ -46,37 +46,23 @@ internal class TlsCerts
             tlsCerts.CaCerts = await tlsOpts.LoadCaCerts().ConfigureAwait(false);
         }
 
-        // client cert context
-        SslStreamCertificateContext? clientCertContext = null;
 #if NET8_0_OR_GREATER
-        clientCertContext = tlsOpts switch
+        tlsCerts.ClientCertContext = tlsOpts switch
         {
             { CertFile: not null, KeyFile: not null } => await NatsTlsOpts.LoadClientCertContextFromPem(
                 await File.ReadAllTextAsync(tlsOpts.CertFile).ConfigureAwait(false),
                 await File.ReadAllTextAsync(tlsOpts.KeyFile).ConfigureAwait(false))().ConfigureAwait(false),
             { LoadClientCertContext: not null } => await tlsOpts.LoadClientCertContext().ConfigureAwait(false),
+            { LoadClientCert: not null } => SslStreamCertificateContext.Create(await tlsOpts.LoadClientCert().ConfigureAwait(false), null),
             _ => null,
         };
-        tlsCerts.ClientCertContext = clientCertContext;
-#endif
-
-        // client certificates
-        X509Certificate2? clientCert = null;
-        if (clientCertContext != null)
+#else
+        var clientCert = tlsOpts switch
         {
-#if NET8_0_OR_GREATER
-            clientCert = clientCertContext.TargetCertificate;
-#endif
-        }
-        else
-        {
-            clientCert = tlsOpts switch
-            {
-                { CertFile: not null, KeyFile: not null } => X509Certificate2.CreateFromPemFile(tlsOpts.CertFile, tlsOpts.KeyFile),
-                { LoadClientCert: not null } => await tlsOpts.LoadClientCert().ConfigureAwait(false),
-                _ => null,
-            };
-        }
+            { CertFile: not null, KeyFile: not null } => X509Certificate2.CreateFromPemFile(tlsOpts.CertFile, tlsOpts.KeyFile),
+            { LoadClientCert: not null } => await tlsOpts.LoadClientCert().ConfigureAwait(false),
+            _ => null,
+        };
 
         if (clientCert != null)
         {
@@ -92,6 +78,7 @@ internal class TlsCerts
 
             tlsCerts.ClientCerts = new X509Certificate2Collection(clientCert);
         }
+#endif
 
         return tlsCerts;
     }

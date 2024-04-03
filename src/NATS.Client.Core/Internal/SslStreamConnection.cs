@@ -154,11 +154,13 @@ internal sealed class SslStreamConnection : ISocketConnection
             throw new InvalidOperationException("TLS is not permitted when TlsMode is set to Disable");
         }
 
+#if NET6_0
         LocalCertificateSelectionCallback? lcsCb = default;
         if (_tlsCerts?.ClientCerts != default && _tlsCerts.ClientCerts.Any())
         {
             lcsCb = LcsCbClientCerts;
         }
+#endif
 
         RemoteCertificateValidationCallback? rcsCb = default;
         if (_tlsOpts.InsecureSkipVerify)
@@ -174,12 +176,13 @@ internal sealed class SslStreamConnection : ISocketConnection
         {
             TargetHost = uri.Host,
             EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
-            ClientCertificates = _tlsCerts?.ClientCerts,
 #if NET8_0_OR_GREATER
             ClientCertificateContext = _tlsCerts?.ClientCertContext,
             CertificateChainPolicy = _tlsOpts.CertificateChainPolicy,
-#endif
+#else
+            ClientCertificates = _tlsCerts?.ClientCerts,
             LocalCertificateSelectionCallback = lcsCb,
+#endif
             RemoteCertificateValidationCallback = rcsCb,
             CertificateRevocationCheckMode = _tlsOpts.CertificateRevocationCheckMode,
         };

@@ -61,22 +61,29 @@ public class TlsCertsTest
         static async Task ValidateAsync(NatsTlsOpts opts)
         {
             var certs = await TlsCerts.FromNatsTlsOptsAsync(opts);
-
+#if NET8_0_OR_GREATER
+            Assert.NotNull(certs.ClientCertContext);
+            var leafCert = certs.ClientCertContext.TargetCertificate;
+#else
             Assert.NotNull(certs.ClientCerts);
             Assert.Single(certs.ClientCerts);
-            foreach (var c in certs.ClientCerts)
-            {
-                c.Subject.Should().Be("CN=client");
-                var encryptValue = c.GetRSAPublicKey()!.Encrypt(Encoding.UTF8.GetBytes("test123"), RSAEncryptionPadding.OaepSHA1);
-                var decryptValue = c.GetRSAPrivateKey()!.Decrypt(encryptValue, RSAEncryptionPadding.OaepSHA1);
-                Encoding.UTF8.GetString(decryptValue).Should().Be("test123");
-            }
+            var leafCert = certs.ClientCerts[0];
+#endif
+            leafCert.Subject.Should().Be("CN=client");
+            var encryptValue = leafCert.GetRSAPublicKey()!.Encrypt(Encoding.UTF8.GetBytes("test123"), RSAEncryptionPadding.OaepSHA1);
+            var decryptValue = leafCert.GetRSAPrivateKey()!.Decrypt(encryptValue, RSAEncryptionPadding.OaepSHA1);
+            Encoding.UTF8.GetString(decryptValue).Should().Be("test123");
         }
     }
 
+#if NET8_0_OR_GREATER
     [Fact]
+#else
+    [Fact(Skip = "intermediate certs not supported on net6.0")]
+#endif
     public async Task Load_client_cert_chain_and_key()
     {
+#if NET8_0_OR_GREATER
         const string clientCertFile = "resources/certs/chainedclient-cert.pem";
         const string clientKeyFile = "resources/certs/chainedclient-key.pem";
 
@@ -85,43 +92,30 @@ public class TlsCertsTest
             CertFile = clientCertFile,
             KeyFile = clientKeyFile,
         });
-#if NET8_0_OR_GREATER
+
         await ValidateAsync(new NatsTlsOpts
         {
             LoadClientCertContext = NatsTlsOpts.LoadClientCertContextFromPem(await File.ReadAllTextAsync(clientCertFile), await File.ReadAllTextAsync(clientKeyFile)),
         });
-#endif
 
         return;
 
         static async Task ValidateAsync(NatsTlsOpts opts)
         {
             var certs = await TlsCerts.FromNatsTlsOptsAsync(opts);
-            Assert.NotNull(certs.ClientCerts);
-            Assert.Single(certs.ClientCerts);
-
-            var cc = new List<X509Certificate2> { certs.ClientCerts[0] };
-
-#if NET8_0_OR_GREATER
             Assert.NotNull(certs.ClientCertContext);
-            cc.Add(certs.ClientCertContext.TargetCertificate);
-#endif
+            var leafCert = certs.ClientCertContext.TargetCertificate;
 
-            foreach (var cert in cc)
-            {
-                cert.Subject.Should().Be("CN=leafclient");
-                var encryptValue = cert.GetRSAPublicKey()!.Encrypt(Encoding.UTF8.GetBytes("test123"), RSAEncryptionPadding.OaepSHA1);
-                var decryptValue = cert.GetRSAPrivateKey()!.Decrypt(encryptValue, RSAEncryptionPadding.OaepSHA1);
-                Encoding.UTF8.GetString(decryptValue).Should().Be("test123");
-            }
+            leafCert.Subject.Should().Be("CN=leafclient");
+            var encryptValue = leafCert.GetRSAPublicKey()!.Encrypt(Encoding.UTF8.GetBytes("test123"), RSAEncryptionPadding.OaepSHA1);
+            var decryptValue = leafCert.GetRSAPrivateKey()!.Decrypt(encryptValue, RSAEncryptionPadding.OaepSHA1);
+            Encoding.UTF8.GetString(decryptValue).Should().Be("test123");
 
-#if NET8_0_OR_GREATER
-            // net6.0 does not support intermediate certs
             Assert.Equal(2, certs.ClientCertContext.IntermediateCertificates.Count);
             certs.ClientCertContext.IntermediateCertificates[0].Subject.Should().Be("CN=intermediate02");
             certs.ClientCertContext.IntermediateCertificates[1].Subject.Should().Be("CN=intermediate01");
-#endif
         }
+#endif
     }
 
     [SkippableTheory]
