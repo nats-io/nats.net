@@ -1,3 +1,4 @@
+using System.Net.Security;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
@@ -6,37 +7,37 @@ using System.Text.RegularExpressions;
 
 namespace NATS.Client.Core.Tests;
 
-public class TlsCertsTest
+public class TlsOptsTest
 {
     [Fact]
     public async Task Load_ca_cert()
     {
         const string caFile = "resources/certs/ca-cert.pem";
 
-        // CA cert from file
+        await ValidateAsync(new NatsTlsOpts
         {
-            var opts = new NatsTlsOpts { CaFile = caFile };
-            var certs = await TlsCerts.FromNatsTlsOptsAsync(opts);
+            CaFile = caFile,
+        });
 
-            Assert.NotNull(certs.CaCerts);
-            Assert.Single(certs.CaCerts);
-            foreach (var cert in certs.CaCerts)
-            {
-                cert.Subject.Should().Be("CN=ca");
-            }
-        }
-
-        // CA cert from PEM string
+        await ValidateAsync(new NatsTlsOpts
         {
-            var opts = new NatsTlsOpts { LoadCaCerts = NatsTlsOpts.LoadCaCertsFromPem(await File.ReadAllTextAsync(caFile)) };
-            var certs = await TlsCerts.FromNatsTlsOptsAsync(opts);
+            LoadCaCerts = NatsTlsOpts.LoadCaCertsFromPem(await File.ReadAllTextAsync(caFile)),
+        });
 
-            Assert.NotNull(certs.CaCerts);
-            Assert.Single(certs.CaCerts);
-            foreach (var cert in certs.CaCerts)
+        await ValidateAsync(new NatsTlsOpts
+        {
+            ConfigureClientAuthentication = async options =>
             {
-                cert.Subject.Should().Be("CN=ca");
-            }
+                options.LoadCaCertsFromPem(await File.ReadAllTextAsync(caFile));
+            },
+        });
+
+        return;
+
+        static async ValueTask ValidateAsync(NatsTlsOpts opts)
+        {
+            var clientOpts = await opts.AuthenticateAsClientOptionsAsync(new NatsUri("demo.nats.io", true));
+            Assert.NotNull(clientOpts.RemoteCertificateValidationCallback);
         }
     }
 
@@ -51,39 +52,44 @@ public class TlsCertsTest
             CertFile = clientCertFile,
             KeyFile = clientKeyFile,
         });
+
         await ValidateAsync(new NatsTlsOpts
         {
             LoadClientCert = NatsTlsOpts.LoadClientCertFromPem(await File.ReadAllTextAsync(clientCertFile), await File.ReadAllTextAsync(clientKeyFile)),
+        });
+
+        await ValidateAsync(new NatsTlsOpts
+        {
+            ConfigureClientAuthentication = async options =>
+            {
+                options.LoadClientCertFromPem(await File.ReadAllTextAsync(clientCertFile), await File.ReadAllTextAsync(clientKeyFile));
+            },
         });
 
         return;
 
         static async Task ValidateAsync(NatsTlsOpts opts)
         {
-            var certs = await TlsCerts.FromNatsTlsOptsAsync(opts);
+            var clientOpts = await opts.AuthenticateAsClientOptionsAsync(new NatsUri("demo.nats.io", true));
+
 #if NET8_0_OR_GREATER
-            Assert.NotNull(certs.ClientCertContext);
-            var leafCert = certs.ClientCertContext.TargetCertificate;
-#else
-            Assert.NotNull(certs.ClientCerts);
-            Assert.Single(certs.ClientCerts);
-            var leafCert = certs.ClientCerts[0];
-#endif
+            Assert.NotNull(clientOpts.ClientCertificateContext);
+            var leafCert = clientOpts.ClientCertificateContext.TargetCertificate;
+
             leafCert.Subject.Should().Be("CN=client");
             var encryptValue = leafCert.GetRSAPublicKey()!.Encrypt(Encoding.UTF8.GetBytes("test123"), RSAEncryptionPadding.OaepSHA1);
             var decryptValue = leafCert.GetRSAPrivateKey()!.Decrypt(encryptValue, RSAEncryptionPadding.OaepSHA1);
             Encoding.UTF8.GetString(decryptValue).Should().Be("test123");
+#else
+            Assert.NotNull(clientOpts.ClientCertificates);
+            Assert.Single(clientOpts.ClientCertificates);
+#endif
         }
     }
 
-#if NET8_0_OR_GREATER
     [Fact]
-#else
-    [Fact(Skip = "intermediate certs not supported on net6.0")]
-#endif
     public async Task Load_client_cert_chain_and_key()
     {
-#if NET8_0_OR_GREATER
         const string clientCertFile = "resources/certs/chainedclient-cert.pem";
         const string clientKeyFile = "resources/certs/chainedclient-key.pem";
 
@@ -95,27 +101,34 @@ public class TlsCertsTest
 
         await ValidateAsync(new NatsTlsOpts
         {
-            LoadClientCertContext = NatsTlsOpts.LoadClientCertContextFromPem(await File.ReadAllTextAsync(clientCertFile), await File.ReadAllTextAsync(clientKeyFile)),
+            ConfigureClientAuthentication = async options =>
+            {
+                options.LoadClientCertFromPem(await File.ReadAllTextAsync(clientCertFile), await File.ReadAllTextAsync(clientKeyFile));
+            },
         });
 
         return;
 
         static async Task ValidateAsync(NatsTlsOpts opts)
         {
-            var certs = await TlsCerts.FromNatsTlsOptsAsync(opts);
-            Assert.NotNull(certs.ClientCertContext);
-            var leafCert = certs.ClientCertContext.TargetCertificate;
+#if NET8_0_OR_GREATER
+            var clientOpts = await opts.AuthenticateAsClientOptionsAsync(new NatsUri("demo.nats.io", true));
+            var ctx = clientOpts.ClientCertificateContext;
+            Assert.NotNull(ctx);
 
+            var leafCert = ctx.TargetCertificate;
             leafCert.Subject.Should().Be("CN=leafclient");
             var encryptValue = leafCert.GetRSAPublicKey()!.Encrypt(Encoding.UTF8.GetBytes("test123"), RSAEncryptionPadding.OaepSHA1);
             var decryptValue = leafCert.GetRSAPrivateKey()!.Decrypt(encryptValue, RSAEncryptionPadding.OaepSHA1);
             Encoding.UTF8.GetString(decryptValue).Should().Be("test123");
 
-            Assert.Equal(2, certs.ClientCertContext.IntermediateCertificates.Count);
-            certs.ClientCertContext.IntermediateCertificates[0].Subject.Should().Be("CN=intermediate02");
-            certs.ClientCertContext.IntermediateCertificates[1].Subject.Should().Be("CN=intermediate01");
-        }
+            Assert.Equal(2, ctx.IntermediateCertificates.Count);
+            ctx.IntermediateCertificates[0].Subject.Should().Be("CN=intermediate02");
+            ctx.IntermediateCertificates[1].Subject.Should().Be("CN=intermediate01");
+#else
+            await Assert.ThrowsAsync<NotSupportedException>(async () => await opts.AuthenticateAsClientOptionsAsync(new NatsUri("demo.nats.io", true)));
 #endif
+        }
     }
 
     [SkippableTheory]
@@ -135,7 +148,7 @@ public class TlsCertsTest
                 .Build());
 
         // Using files
-        await Validate(server, new NatsTlsOpts
+        await ValidateAsync(server, new NatsTlsOpts
         {
             CaFile = caFile,
             CertFile = clientCertFile,
@@ -144,26 +157,27 @@ public class TlsCertsTest
 
         if (minimumFrameworkVersion < 8)
         {
-            // Using PEM strings with LoadClientCert
-            await Validate(server, new NatsTlsOpts
+            // Using callbacks
+            await ValidateAsync(server, new NatsTlsOpts
             {
                 LoadCaCerts = NatsTlsOpts.LoadCaCertsFromPem(await File.ReadAllTextAsync(caFile)),
                 LoadClientCert = NatsTlsOpts.LoadClientCertFromPem(await File.ReadAllTextAsync(clientCertFile), await File.ReadAllTextAsync(clientKeyFile)),
             });
         }
 
-#if NET8_0_OR_GREATER
-        // Using PEM strings with LoadClientCertContext
-        await Validate(server, new NatsTlsOpts
+        // Using ConfigureClientAuthentication
+        await ValidateAsync(server, new NatsTlsOpts
         {
-            LoadCaCerts = NatsTlsOpts.LoadCaCertsFromPem(await File.ReadAllTextAsync(caFile)),
-            LoadClientCertContext = NatsTlsOpts.LoadClientCertContextFromPem(await File.ReadAllTextAsync(clientCertFile), await File.ReadAllTextAsync(clientKeyFile)),
+            ConfigureClientAuthentication = async options =>
+            {
+                options.LoadCaCertsFromPem(await File.ReadAllTextAsync(caFile));
+                options.LoadClientCertFromPem(await File.ReadAllTextAsync(clientCertFile), await File.ReadAllTextAsync(clientKeyFile));
+            },
         });
-#endif
 
         return;
 
-        static async Task Validate(NatsServer natsServer, NatsTlsOpts opts)
+        static async Task ValidateAsync(NatsServer natsServer, NatsTlsOpts opts)
         {
             // overwrite the entire TLS option, because NatsServer.Start comes with some defaults
             var clientOpts = natsServer.ClientOpts(NatsOpts.Default) with
