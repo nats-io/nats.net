@@ -21,7 +21,9 @@ public class TlsOptsTest
 
         await ValidateAsync(new NatsTlsOpts
         {
+#pragma warning disable CS0618 // Type or member is obsolete
             LoadCaCerts = NatsTlsOpts.LoadCaCertsFromPem(await File.ReadAllTextAsync(caFile)),
+#pragma warning restore CS0618 // Type or member is obsolete
         });
 
         await ValidateAsync(new NatsTlsOpts
@@ -55,7 +57,9 @@ public class TlsOptsTest
 
         await ValidateAsync(new NatsTlsOpts
         {
+#pragma warning disable CS0618 // Type or member is obsolete
             LoadClientCert = NatsTlsOpts.LoadClientCertFromPem(await File.ReadAllTextAsync(clientCertFile), await File.ReadAllTextAsync(clientKeyFile)),
+#pragma warning restore CS0618 // Type or member is obsolete
         });
 
         await ValidateAsync(new NatsTlsOpts
@@ -160,8 +164,10 @@ public class TlsOptsTest
             // Using callbacks
             await ValidateAsync(server, new NatsTlsOpts
             {
+#pragma warning disable CS0618 // Type or member is obsolete
                 LoadCaCerts = NatsTlsOpts.LoadCaCertsFromPem(await File.ReadAllTextAsync(caFile)),
                 LoadClientCert = NatsTlsOpts.LoadClientCertFromPem(await File.ReadAllTextAsync(clientCertFile), await File.ReadAllTextAsync(clientKeyFile)),
+#pragma warning restore CS0618 // Type or member is obsolete
             });
         }
 
