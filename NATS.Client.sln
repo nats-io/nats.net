@@ -107,6 +107,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.OpenTelemetry", "sa
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Net.OpenTelemetry.Tests", "tests\NATS.Net.OpenTelemetry.Tests\NATS.Net.OpenTelemetry.Tests.csproj", "{B8554582-DE19-41A2-9784-9B27C9F22429}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NatsProtocolParserProf", "NatsProtocolParserProf\NatsProtocolParserProf.csproj", "{1981B633-D522-4468-873D-5CC49B489159}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -285,6 +287,10 @@ Global
 		{B8554582-DE19-41A2-9784-9B27C9F22429}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B8554582-DE19-41A2-9784-9B27C9F22429}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B8554582-DE19-41A2-9784-9B27C9F22429}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1981B633-D522-4468-873D-5CC49B489159}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1981B633-D522-4468-873D-5CC49B489159}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1981B633-D522-4468-873D-5CC49B489159}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1981B633-D522-4468-873D-5CC49B489159}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
