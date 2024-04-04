@@ -57,7 +57,6 @@ public partial class NatsConnection : INatsConnection
     private volatile NatsUri? _lastSeedConnectUri;
     private NatsReadProtocolProcessor? _socketReader;
     private TaskCompletionSource _waitForOpenConnection;
-    private TlsCerts? _tlsCerts;
     private UserCredentials? _userCredentials;
     private int _connectRetry;
     private TimeSpan _backoff = TimeSpan.Zero;
@@ -290,9 +289,6 @@ public partial class NatsConnection : INatsConnection
                 throw new NatsException($"URI {uri} requires TLS but TlsMode is set to Disable");
         }
 
-        if (Opts.TlsOpts.HasTlsCerts)
-            _tlsCerts = await TlsCerts.FromNatsTlsOptsAsync(Opts.TlsOpts).ConfigureAwait(false);
-
         if (!Opts.AuthOpts.IsAnonymous)
         {
             _userCredentials = new UserCredentials(Opts.AuthOpts);
@@ -325,7 +321,7 @@ public partial class NatsConnection : INatsConnection
                     if (Opts.TlsOpts.EffectiveMode(uri) == TlsMode.Implicit)
                     {
                         // upgrade TcpConnection to SslConnection
-                        var sslConnection = conn.UpgradeToSslStreamConnection(Opts.TlsOpts, _tlsCerts);
+                        var sslConnection = conn.UpgradeToSslStreamConnection(Opts.TlsOpts);
                         await sslConnection.AuthenticateAsClientAsync(uri, Opts.ConnectTimeout).ConfigureAwait(false);
                         _socket = sslConnection;
                     }
@@ -430,7 +426,7 @@ public partial class NatsConnection : INatsConnection
                     _socketReader = null;
 
                     // upgrade TcpConnection to SslConnection
-                    var sslConnection = tcpConnection.UpgradeToSslStreamConnection(Opts.TlsOpts, _tlsCerts);
+                    var sslConnection = tcpConnection.UpgradeToSslStreamConnection(Opts.TlsOpts);
                     await sslConnection.AuthenticateAsClientAsync(targetUri, Opts.ConnectTimeout).ConfigureAwait(false);
                     _socket = sslConnection;
 
@@ -591,7 +587,7 @@ public partial class NatsConnection : INatsConnection
                         if (Opts.TlsOpts.EffectiveMode(url) == TlsMode.Implicit)
                         {
                             // upgrade TcpConnection to SslConnection
-                            var sslConnection = conn.UpgradeToSslStreamConnection(Opts.TlsOpts, _tlsCerts);
+                            var sslConnection = conn.UpgradeToSslStreamConnection(Opts.TlsOpts);
                             await sslConnection.AuthenticateAsClientAsync(FixTlsHost(url), Opts.ConnectTimeout).ConfigureAwait(false);
                             _socket = sslConnection;
                         }

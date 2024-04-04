@@ -125,7 +125,7 @@ internal sealed class TcpConnection : ISocketConnection
 
     // NetworkStream will own the Socket, so mark as disposed
     // in order to skip socket.Dispose() in DisposeAsync
-    public SslStreamConnection UpgradeToSslStreamConnection(NatsTlsOpts tlsOpts, TlsCerts? tlsCerts)
+    public SslStreamConnection UpgradeToSslStreamConnection(NatsTlsOpts tlsOpts)
     {
         if (Interlocked.Increment(ref _disposed) == 1)
         {
@@ -133,7 +133,6 @@ internal sealed class TcpConnection : ISocketConnection
                 _logger,
                 new SslStream(new NetworkStream(_socket, true)),
                 tlsOpts,
-                tlsCerts,
                 _waitForClosedSource);
         }
 
