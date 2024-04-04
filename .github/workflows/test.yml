@@ -7,8 +7,8 @@ on:
     - main
 
 jobs:
-  dotnet:
-    name: dotnet
+  linux_test:
+    name: Test (Linux)
     strategy:
       fail-fast: false
       matrix:
@@ -90,8 +90,8 @@ jobs:
 
           ./NATS.Client.CheckNativeAot
 
-  memory_test:
-    name: memory test
+  windows_test:
+    name: Test (Windows)
     strategy:
       fail-fast: false
       matrix:
@@ -149,3 +149,6 @@ jobs:
 
       - name: Memory Test
         run: dotMemoryUnit .\NUnit.ConsoleRunner.3.16.3\tools\nunit3-console.exe --propagate-exit-code -- .\tests\NATS.Client.Core.MemoryTests\bin\Debug\net6.0\NATS.Client.Core.MemoryTests.dll
+
+      - name: Test Core
+        run: dotnet test -c Debug --no-build --logger:"console;verbosity=normal" tests/NATS.Client.Core.Tests/NATS.Client.Core.Tests.csproj
