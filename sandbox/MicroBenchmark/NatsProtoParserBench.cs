@@ -9,8 +9,8 @@ namespace MicroBenchmark;
 [PlainExporter]
 public class NatsProtoParserBench
 {
-    private List<ReadOnlySequence<byte>> _sequences;
-    private NatsProtocolParser _parser;
+    private List<ReadOnlySequence<byte>> _sequences = new();
+    private NatsProtocolParser _parser = new();
 
     [GlobalSetup]
     public void Setup()

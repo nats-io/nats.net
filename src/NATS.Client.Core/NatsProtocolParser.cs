@@ -146,7 +146,7 @@ public class NatsProtocolParser
         public string GetString() => Encoding.ASCII.GetString(sequence);
     }
 
-    public struct NatsTokenizer
+    public ref struct NatsTokenizer
     {
         /*
         B: PING␍␊
