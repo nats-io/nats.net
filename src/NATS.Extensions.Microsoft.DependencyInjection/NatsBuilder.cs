@@ -61,7 +61,7 @@ public class NatsBuilder
     }
 #endif
 
-    public IServiceCollection Build()
+    internal IServiceCollection Build()
     {
         if (_poolSize != 1)
         {
