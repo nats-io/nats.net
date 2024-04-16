@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Models;
@@ -42,6 +43,7 @@ public class NatsKVStore : INatsKVStore
     private const string NatsSubject = "Nats-Subject";
     private const string NatsSequence = "Nats-Sequence";
     private const string NatsTimeStamp = "Nats-Time-Stamp";
+    private static readonly Regex ValidKeyRegex = new(pattern: @"\A[-/_=\.a-zA-Z0-9]+\z", RegexOptions.Compiled);
     private readonly NatsJSContext _context;
     private readonly INatsJSStream _stream;
 
@@ -57,6 +59,7 @@ public class NatsKVStore : INatsKVStore
     /// <inheritdoc />
     public async ValueTask<ulong> PutAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
+        ValidateKey(key);
         var ack = await _context.PublishAsync($"$KV.{Bucket}.{key}", value, serializer: serializer, cancellationToken: cancellationToken);
         ack.EnsureSuccess();
         return ack.Seq;
@@ -65,6 +68,8 @@ public class NatsKVStore : INatsKVStore
     /// <inheritdoc />
     public async ValueTask<ulong> CreateAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
+        ValidateKey(key);
+
         // First try to create a new entry
         try
         {
@@ -90,6 +95,7 @@ public class NatsKVStore : INatsKVStore
     /// <inheritdoc />
     public async ValueTask<ulong> UpdateAsync<T>(string key, T value, ulong revision, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
+        ValidateKey(key);
         var headers = new NatsHeaders { { NatsExpectedLastSubjectSequence, revision.ToString() } };
 
         try
@@ -112,6 +118,7 @@ public class NatsKVStore : INatsKVStore
 
     public async ValueTask DeleteAsync(string key, NatsKVDeleteOpts? opts = default, CancellationToken cancellationToken = default)
     {
+        ValidateKey(key);
         opts ??= new NatsKVDeleteOpts();
 
         var headers = new NatsHeaders();
@@ -164,6 +171,7 @@ public class NatsKVStore : INatsKVStore
     /// <exception cref="NatsKVException">There was an error with metadata</exception>
     public async ValueTask<NatsKVEntry<T>> GetEntryAsync<T>(string key, ulong revision = default, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
+        ValidateKey(key);
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
         var request = new StreamMsgGetRequest();
@@ -483,6 +491,30 @@ public class NatsKVStore : INatsKVStore
 
         return watcher;
     }
+
+    /// <summary>
+    /// Valid keys are \A[-/_=\.a-zA-Z0-9]+\z, additionally they may not start or end in .
+    /// </summary>
+    private static void ValidateKey(string key)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            ThrowNatsKVException("Key cannot be empty");
+        }
+
+        if (key.StartsWith('.') || key.EndsWith('.'))
+        {
+            ThrowNatsKVException("Key cannot start or end with a period");
+        }
+
+        if (!ValidKeyRegex.IsMatch(key))
+        {
+            ThrowNatsKVException("Key contains invalid characters");
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void ThrowNatsKVException(string message) => throw new NatsKVException(message);
 }
 
 public record NatsKVStatus(string Bucket, bool IsCompressed, StreamInfo Info);

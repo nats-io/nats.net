@@ -20,7 +20,6 @@ public enum NatsKVStorageType
 public class NatsKVContext : INatsKVContext
 {
     private static readonly Regex ValidBucketRegex = new(pattern: @"\A[a-zA-Z0-9_-]+\z", RegexOptions.Compiled);
-    private static readonly Regex ValidKeyRegex = new(pattern: @"\A[-/_=\.a-zA-Z0-9]+\z", RegexOptions.Compiled);
 
     private readonly NatsJSContext _context;
 
@@ -159,14 +158,6 @@ public class NatsKVContext : INatsKVContext
         if (!ValidBucketRegex.IsMatch(bucket))
         {
             throw new NatsKVException("Invalid bucket name");
-        }
-    }
-
-    internal static void ValidateKeyName(string key)
-    {
-        if (!ValidKeyRegex.IsMatch(key))
-        {
-            throw new NatsKVException("Invalid key name");
         }
     }
 
