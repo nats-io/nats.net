@@ -530,6 +530,8 @@ public class NatsCluster : IAsyncDisposable
 
     public NatsServer Server3 { get; }
 
+    public NatsServer[] Servers => [Server1, Server2, Server3];
+
     public async ValueTask DisposeAsync()
     {
         _outputHelper.WriteLine($"Stopping server 1...");

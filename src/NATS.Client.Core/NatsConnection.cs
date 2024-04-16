@@ -529,16 +529,21 @@ public partial class NatsConnection : INatsConnection
             // Cleanup current socket
             await DisposeSocketAsync(true).ConfigureAwait(false);
 
-            var defaultScheme = _currentConnectUri!.Uri.Scheme;
-            var urls = (Opts.NoRandomize
-                           ? WritableServerInfo?.ClientConnectUrls?.Select(x => new NatsUri(x, false, defaultScheme)).Distinct().ToArray()
-                           : WritableServerInfo?.ClientConnectUrls?.Select(x => new NatsUri(x, false, defaultScheme)).OrderBy(_ => Guid.NewGuid()).Distinct().ToArray())
-                       ?? Array.Empty<NatsUri>();
-            if (urls.Length == 0)
-                urls = Opts.GetSeedUris();
+            var serverReportedUrls = ServerInfo?
+                                         .ClientConnectUrls?
+                                         .Select(x => new NatsUri(x, false))
+                                     ?? Array.Empty<NatsUri>();
+
+            // Always keep the original seed URLs in the list of URLs to connect to
+            var connectUrls = serverReportedUrls.Concat(Opts.GetSeedUris());
+
+            var urls = Opts.NoRandomize
+                ? connectUrls.Distinct().ToArray()
+                : connectUrls.OrderBy(_ => Guid.NewGuid()).Distinct().ToArray();
 
             // add last.
-            urls = urls.Where(x => x != _currentConnectUri).Append(_currentConnectUri).ToArray();
+            if (_currentConnectUri != null)
+                urls = urls.Where(x => x != _currentConnectUri).Append(_currentConnectUri).ToArray();
 
             _currentConnectUri = null;
             var urlEnumerator = urls.AsEnumerable().GetEnumerator();
