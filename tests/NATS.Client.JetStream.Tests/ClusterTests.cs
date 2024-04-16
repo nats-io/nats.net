@@ -55,7 +55,8 @@ public class ClusterTests
         HashSet<string> connectedUrls = new();
         nats.ConnectionOpened += (_, _) =>
         {
-            lock (connectedUrls) connectedUrls.Add(nats.ServerInfo!.Name);
+            lock (connectedUrls)
+                connectedUrls.Add(nats.ServerInfo!.Name);
             return default;
         };
 
@@ -90,7 +91,8 @@ public class ClusterTests
                 }
             }
 
-            if (currentCount == 6) break;
+            if (currentCount == 6)
+                break;
 
             await Task.Delay(TimeSpan.FromSeconds(1), cts.Token);
         }
