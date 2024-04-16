@@ -1,4 +1,3 @@
-using System.Net;
 using NATS.Client.Core.Tests;
 
 namespace NATS.Client.JetStream.Tests;
