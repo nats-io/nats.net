@@ -528,6 +528,7 @@ public partial class NatsConnection : INatsConnection
 
             // Cleanup current socket
             await DisposeSocketAsync(true).ConfigureAwait(false);
+
             var defaultScheme = _currentConnectUri!.Uri.Scheme;
             var serverReportedUrls = ServerInfo?
                                          .ClientConnectUrls?
@@ -542,7 +543,7 @@ public partial class NatsConnection : INatsConnection
                 : connectUrls.OrderBy(_ => Guid.NewGuid()).Distinct().ToArray();
 
             // add last.
-            urls = urls.Where(x => x != _currentConnectUri!).Append(_currentConnectUri!).ToArray();
+            urls = urls.Where(x => x != _currentConnectUri).Append(_currentConnectUri).ToArray();
 
             _currentConnectUri = null;
             var urlEnumerator = urls.AsEnumerable().GetEnumerator();
