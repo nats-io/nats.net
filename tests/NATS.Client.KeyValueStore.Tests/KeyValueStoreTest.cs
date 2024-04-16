@@ -581,8 +581,8 @@ public class KeyValueStoreTest
             await store.DeleteAsync(key);
         }
 
-        string?[] invalidKeys = [
-            null,
+        string[] invalidKeys = [
+            null!,
             string.Empty,
             ".k",
             "k.",
