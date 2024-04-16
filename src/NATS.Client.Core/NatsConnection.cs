@@ -528,10 +528,10 @@ public partial class NatsConnection : INatsConnection
 
             // Cleanup current socket
             await DisposeSocketAsync(true).ConfigureAwait(false);
-
+            var defaultScheme = _currentConnectUri!.Uri.Scheme;
             var serverReportedUrls = ServerInfo?
                                          .ClientConnectUrls?
-                                         .Select(x => new NatsUri(x, false))
+                                         .Select(x => new NatsUri(x, false, defaultScheme))
                                      ?? Array.Empty<NatsUri>();
 
             // Always keep the original seed URLs in the list of URLs to connect to
@@ -542,8 +542,7 @@ public partial class NatsConnection : INatsConnection
                 : connectUrls.OrderBy(_ => Guid.NewGuid()).Distinct().ToArray();
 
             // add last.
-            if (_currentConnectUri != null)
-                urls = urls.Where(x => x != _currentConnectUri).Append(_currentConnectUri).ToArray();
+            urls = urls.Where(x => x != _currentConnectUri!).Append(_currentConnectUri!).ToArray();
 
             _currentConnectUri = null;
             var urlEnumerator = urls.AsEnumerable().GetEnumerator();
