@@ -1,10 +1,10 @@
 using NATS.Client.Core;
-using NATS.Client.Hosting;
+using NATS.Extensions.Microsoft.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Register NatsConnectionPool, NatsConnection, INatsCommand to ServiceCollection
-builder.Services.AddNats();
+// Register NatsConnectionPool, NatsConnection to ServiceCollection
+builder.Services.AddNatsClient();
 
 var app = builder.Build();
 
