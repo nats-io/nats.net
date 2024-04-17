@@ -536,13 +536,13 @@ public partial class NatsConnection : INatsConnection
                                      ?? Array.Empty<NatsUri>();
 
             // Always keep the original seed URLs in the list of URLs to connect to
-            var connectUrls = serverReportedUrls.Concat(Opts.GetSeedUris());
+            var urls = serverReportedUrls.Concat(Opts.GetSeedUris()).Distinct();
+            if (!Opts.NoRandomize)
+            {
+                urls = urls.OrderBy(_ => Guid.NewGuid());
+            }
 
-            var urls = Opts.NoRandomize
-                ? connectUrls.Distinct().ToArray()
-                : connectUrls.OrderBy(_ => Guid.NewGuid()).Distinct().ToArray();
-
-            // add last.
+            // Ensure the current URL is last in the list
             urls = urls.Where(x => x != _currentConnectUri).Append(_currentConnectUri).ToArray();
 
             _currentConnectUri = null;
