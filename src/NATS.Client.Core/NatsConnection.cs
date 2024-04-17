@@ -530,14 +530,19 @@ public partial class NatsConnection : INatsConnection
             await DisposeSocketAsync(true).ConfigureAwait(false);
 
             var defaultScheme = _currentConnectUri!.Uri.Scheme;
-            var urls = (Opts.NoRandomize
-                           ? WritableServerInfo?.ClientConnectUrls?.Select(x => new NatsUri(x, false, defaultScheme)).Distinct().ToArray()
-                           : WritableServerInfo?.ClientConnectUrls?.Select(x => new NatsUri(x, false, defaultScheme)).OrderBy(_ => Guid.NewGuid()).Distinct().ToArray())
-                       ?? Array.Empty<NatsUri>();
-            if (urls.Length == 0)
-                urls = Opts.GetSeedUris();
+            var serverReportedUrls = ServerInfo?
+                                         .ClientConnectUrls?
+                                         .Select(x => new NatsUri(x, false, defaultScheme))
+                                     ?? Array.Empty<NatsUri>();
 
-            // add last.
+            // Always keep the original seed URLs in the list of URLs to connect to
+            var urls = serverReportedUrls.Concat(Opts.GetSeedUris()).Distinct();
+            if (!Opts.NoRandomize)
+            {
+                urls = urls.OrderBy(_ => Guid.NewGuid());
+            }
+
+            // Ensure the current URL is last in the list
             urls = urls.Where(x => x != _currentConnectUri).Append(_currentConnectUri).ToArray();
 
             _currentConnectUri = null;
