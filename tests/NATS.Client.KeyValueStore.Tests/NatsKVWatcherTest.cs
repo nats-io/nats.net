@@ -164,16 +164,21 @@ public class NatsKVWatcherTest
         var watchTask = Task.Run(
             async () =>
             {
+                HashSet<string> keys = new();
+
+                // Multiple keys are only supported in NATS Server 2.10 and later
                 await foreach (var entry in store.WatchAsync<string>(["k1", "k2"], cancellationToken: cancellationToken))
                 {
                     signal.Pulse();
                     _output.WriteLine($"WATCH: {entry.Key} ({entry.Revision}): {entry.Value}");
 
-                    Assert.True(entry.Key is "k1" or "k2");
-
-                    if (entry is { Key: "k2", Value: "v3" })
+                    if (entry is { Value: "end" })
                         break;
+
+                    keys.Add(entry.Key);
                 }
+
+                Assert.Equal(["k1", "k2"], keys.OrderBy(x => x));
             },
             cancellationToken);
 
@@ -195,6 +200,7 @@ public class NatsKVWatcherTest
         Assert.Equal("v3", (await store.GetEntryAsync<string>("k2", cancellationToken: cancellationToken)).Value);
         Assert.Equal("v3", (await store.GetEntryAsync<string>("k3", cancellationToken: cancellationToken)).Value);
 
+        await store.PutAsync("k1", "end", cancellationToken: cancellationToken);
         await watchTask;
     }
 
