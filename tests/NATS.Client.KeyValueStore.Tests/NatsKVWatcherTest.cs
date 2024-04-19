@@ -168,6 +168,9 @@ public class NatsKVWatcherTest
                 {
                     signal.Pulse();
                     _output.WriteLine($"WATCH: {entry.Key} ({entry.Revision}): {entry.Value}");
+
+                    Assert.True(entry.Key is "k1" or "k2");
+
                     if (entry is { Key: "k2", Value: "v3" })
                         break;
                 }
