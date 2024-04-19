@@ -319,7 +319,7 @@ public class NatsKVStore : INatsKVStore
         => WatchAsync<T>([key], serializer, opts, cancellationToken);
 
     /// <inheritdoc />
-    public async IAsyncEnumerable<NatsKVEntry<T>> WatchAsync<T>(IList<string> keys, INatsDeserialize<T>? serializer = default, NatsKVWatchOpts? opts = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<NatsKVEntry<T>> WatchAsync<T>(IEnumerable<string> keys, INatsDeserialize<T>? serializer = default, NatsKVWatchOpts? opts = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         await using var watcher = await WatchInternalAsync<T>(keys, serializer, opts, cancellationToken);
 
@@ -451,7 +451,7 @@ public class NatsKVStore : INatsKVStore
         }
     }
 
-    internal async ValueTask<NatsKVWatcher<T>> WatchInternalAsync<T>(IList<string> keys, INatsDeserialize<T>? serializer = default, NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default)
+    internal async ValueTask<NatsKVWatcher<T>> WatchInternalAsync<T>(IEnumerable<string> keys, INatsDeserialize<T>? serializer = default, NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default)
     {
         opts ??= NatsKVWatchOpts.Default;
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
