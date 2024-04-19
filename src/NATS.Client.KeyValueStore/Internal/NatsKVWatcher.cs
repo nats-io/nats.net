@@ -35,7 +35,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
     private readonly NatsSubOpts? _subOpts;
     private readonly CancellationToken _cancellationToken;
     private readonly string _keyBase;
-    private readonly string _filter;
+    private readonly IList<string> _filters;
     private readonly NatsConnection _nats;
     private readonly Channel<NatsKVWatchCommandMsg<T>> _commandChannel;
     private readonly Channel<NatsKVEntry<T>> _entryChannel;
@@ -55,7 +55,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
     public NatsKVWatcher(
         NatsJSContext context,
         string bucket,
-        string key,
+        IList<string> keys,
         INatsDeserialize<T> serializer,
         NatsKVWatchOpts opts,
         NatsSubOpts? subOpts,
@@ -69,7 +69,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
         _opts = opts;
         _subOpts = subOpts;
         _keyBase = $"$KV.{_bucket}.";
-        _filter = $"{_keyBase}{key}";
+        _filters = keys.Select(key => $"{_keyBase}{key}").ToList();
         _cancellationToken = cancellationToken;
         _nats = context.Connection;
         _stream = $"KV_{_bucket}";
@@ -358,7 +358,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
             DeliverPolicy = ConsumerConfigDeliverPolicy.All,
             AckPolicy = ConsumerConfigAckPolicy.None,
             DeliverSubject = _sub.Subject,
-            FilterSubject = _filter,
+            FilterSubjects = _filters,
             FlowControl = true,
             IdleHeartbeat = _opts.IdleHeartbeat,
             AckWait = TimeSpan.FromHours(22),
