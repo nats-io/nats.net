@@ -140,7 +140,7 @@ public class NatsKVWatcherTest
         await watchTask;
     }
 
-    [Fact]
+    [SkipIfNatsServer(versionEarlierThan: "2.10")]
     public async Task Watch_subset()
     {
         var timeout = TimeSpan.FromSeconds(10);
