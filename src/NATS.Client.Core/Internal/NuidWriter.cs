@@ -64,7 +64,7 @@ internal sealed class NuidWriter
         ref var digitsPtr = ref MemoryMarshal.GetReference(Digits);
 
         // write backwards so the last two characters change the fastest
-        for (nuint i = NuidLength; i > PrefixLength;)
+        for (var i = NuidLength; i > PrefixLength;)
         {
             i--;
             var digitIndex = (nuint)(sequential % Base);
