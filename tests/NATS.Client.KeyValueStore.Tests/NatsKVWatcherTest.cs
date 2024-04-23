@@ -421,15 +421,43 @@ public class NatsKVWatcherTest
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
 
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
         var store = await kv.CreateStoreAsync("b1", cancellationToken: cts.Token);
 
         await Assert.ThrowsAsync<ArgumentException>(async () =>
         {
-            await foreach (var entry in store.WatchAsync<int>(keys: Array.Empty<string>(), cancellationToken: cts.Token))
+            await foreach (var unused in store.WatchAsync<int>(keys: Array.Empty<string>(), cancellationToken: cts.Token))
             {
             }
         });
+    }
+
+    [SkipIfNatsServer(versionLaterThan: "2.9.999")]
+    public async Task Watch_with_multiple_filter_on_old_server()
+    {
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        var store = await kv.CreateStoreAsync("b1", cancellationToken: cts.Token);
+
+        // If we try to watch with multiple keys on an old server, we will have to
+        // let the request go through since there is no way to know the server version
+        // as the server hosting JetStream is not necessarily be the server we're connected to.
+        var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () =>
+        {
+            await foreach (var unused in store.WatchAsync<int>(keys: ["1", "2"], cancellationToken: cts.Token))
+            {
+            }
+        });
+
+        Assert.Equal(400, exception.Error.Code);
+        Assert.Equal(10094, exception.Error.ErrCode);
+        Assert.Equal("consumer delivery policy is deliver last per subject, but optional filter subject is not set", exception.Error.Description);
     }
 }
