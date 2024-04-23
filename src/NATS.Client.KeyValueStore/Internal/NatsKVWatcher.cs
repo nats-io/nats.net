@@ -367,13 +367,15 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
             ReplayPolicy = ConsumerConfigReplayPolicy.Instant,
         };
 
-        // nat2.9.x
+        // Use FilterSubject (singular) when there is only one filter
+        // This is for compatibility with older NATS servers (<2.10)
         if (_filters.Length == 1)
         {
             config.FilterSubject = _filters[0];
         }
 
-        // nat2.10.x
+        // Use FilterSubjects (plural) when there are multiple filters
+        // This is for compatibility with newer NATS servers (>=2.10)
         if (_filters.Length > 1)
         {
             config.FilterSubjects = _filters;
