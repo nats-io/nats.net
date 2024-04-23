@@ -70,6 +70,14 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
         _subOpts = subOpts;
         _keyBase = $"$KV.{_bucket}.";
         _filters = keys.Select(key => $"{_keyBase}{key}").ToArray();
+
+        if (_filters.Length == 0)
+        {
+            // Without this check we'd get an error from the server:
+            // 'consumer delivery policy is deliver last per subject, but optional filter subject is not set'
+            throw new ArgumentException("At least one key must be provided", nameof(keys));
+        }
+
         _cancellationToken = cancellationToken;
         _nats = context.Connection;
         _stream = $"KV_{_bucket}";

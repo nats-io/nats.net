@@ -411,4 +411,25 @@ public class NatsKVWatcherTest
             break;
         }
     }
+
+    [Fact]
+    public async Task Watch_with_empty_filter()
+    {
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        var store = await kv.CreateStoreAsync("b1", cancellationToken: cts.Token);
+
+        await Assert.ThrowsAsync<ArgumentException>(async () =>
+        {
+            await foreach (var entry in store.WatchAsync<int>(keys: Array.Empty<string>(), cancellationToken: cts.Token))
+            {
+            }
+        });
+    }
 }
