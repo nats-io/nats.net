@@ -407,7 +407,6 @@ public class NatsKVWatcherTest
         // Expects k2, k3 and k4
         fromRevisionEntries.Should().HaveCount(2);
 
-
         // Watch from none existing revision
         var noData = false;
         var watchOpsNoneExisting = watchOps with
