@@ -364,6 +364,9 @@ public class KeyValueStoreTest
 
         _output.WriteLine($"COUNT={count}");
         Assert.Equal(0, count);
+
+        _output.WriteLine("PURGE ALL DELETES ON EMPTY BUCKET");
+        await store.PurgeDeletesAsync(opts: new NatsKVPurgeOpts { DeleteMarkersThreshold = TimeSpan.Zero }, cancellationToken: cancellationToken);
     }
 
     [Fact]
