@@ -9,10 +9,12 @@ public record ConsumerConfig
     /// </summary>
     /// <remarks>
     /// When <c>DurableName</c> is not specified, the consumer is ephemeral.
-    /// This default constructor doesn't set any properties explicitly.
+    /// This default constructor doesn't set any properties explicitly,
+    /// other than the default <c>AckPolicy</c> of <c>Explicit</c>.
     /// </remarks>
     public ConsumerConfig()
     {
+        AckPolicy = ConsumerConfigAckPolicy.Explicit;
     }
 
     /// <summary>
