@@ -41,6 +41,14 @@ public record NatsKVWatchOpts
     /// Async function called when the enumerator reaches the end of data. Return True to break the async enumeration, False to allow the enumeration to continue.
     /// </summary>
     public Func<CancellationToken, ValueTask<bool>>? OnNoData { get; init; }
+
+    /// <summary>
+    /// The revision to start from, if set to 0 (default) this will be ignored.
+    /// <remarks>
+    /// Setting this to a non-zero value will cause the watcher to ignore the values for <see cref="IncludeHistory"/> and <see cref="IncludeHistory"/>.
+    /// </remarks>
+    /// </summary>
+    public ulong ResumeAtRevision { get; set; }
 }
 
 public record NatsKVDeleteOpts

@@ -383,10 +383,14 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
             config.HeadersOnly = true;
         }
 
-        if (sequence > 0)
+        // Resume from a specific revision ?
+        if (sequence > 0 || _opts.ResumeAtRevision > 0)
         {
             config.DeliverPolicy = ConsumerConfigDeliverPolicy.ByStartSequence;
-            config.OptStartSeq = sequence + 1;
+
+            // If Sequence is set, it means that the consumer is being recreated, and we should start
+            // from the next sequence, otherwise we should use the revision specified in the options.
+            config.OptStartSeq = sequence > 0 ? sequence + 1 : _opts.ResumeAtRevision;
         }
 
         var consumer = await _context.CreateOrUpdateConsumerAsync(
