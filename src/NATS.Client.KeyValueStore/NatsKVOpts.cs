@@ -48,7 +48,7 @@ public record NatsKVWatchOpts
     /// Setting this to a non-zero value will cause the watcher to ignore the values for <see cref="IncludeHistory"/> and <see cref="UpdatesOnly"/>.
     /// </remarks>
     /// </summary>
-    public ulong ResumeAtRevision { get; set; }
+    public ulong ResumeAtRevision { get; init; }
 }
 
 public record NatsKVDeleteOpts
