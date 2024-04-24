@@ -45,7 +45,7 @@ public record NatsKVWatchOpts
     /// <summary>
     /// The revision to start from, if set to 0 (default) this will be ignored.
     /// <remarks>
-    /// Setting this to a non-zero value will cause the watcher to ignore the values for <see cref="IncludeHistory"/> and <see cref="IncludeHistory"/>.
+    /// Setting this to a non-zero value will cause the watcher to ignore the values for <see cref="IncludeHistory"/> and <see cref="UpdatesOnly"/>.
     /// </remarks>
     /// </summary>
     public ulong ResumeAtRevision { get; set; }
