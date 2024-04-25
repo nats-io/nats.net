@@ -186,7 +186,6 @@ public class NuidWriterTests
         ConcurrentQueue<(char[] nuid, int threadId)> nuids = new();
 
         // Act
-        var count = 0;
         var threads = new List<Thread>();
 
         for (var i = 0; i < 10; i++)
@@ -196,11 +195,6 @@ public class NuidWriterTests
                 var buffer = new char[22];
                 NuidWriter.TryWriteNuid(buffer);
                 nuids.Enqueue((buffer, Environment.CurrentManagedThreadId));
-
-                Interlocked.Increment(ref count);
-
-                // Avoid exiting the thread so the ids won't clash.
-                SpinWait.SpinUntil(() => Volatile.Read(ref count) == 10);
             });
             t.Start();
             threads.Add(t);
@@ -223,7 +217,7 @@ public class NuidWriterTests
         Assert.Equal(10, uniqueThreadIds.Count);
     }
 
-    [Fact(Skip = "long running")]
+    [Fact]
     public void AllNuidsAreUnique()
     {
         const int count = 1_000 * 1_000 * 10;
@@ -249,7 +243,7 @@ public class NuidWriterTests
         }
     }
 
-    [Fact(Skip = "long running")]
+    [Fact]
     public void AllNuidsAreUnique_SmallSequentials()
     {
         var writeFailed = false;
@@ -292,7 +286,7 @@ public class NuidWriterTests
         Assert.Equal(string.Empty, duplicateFailure);
     }
 
-    [Fact(Skip = "long running")]
+    [Fact]
     public void AllNuidsAreUnique_ZeroSequential()
     {
         var writeFailed = false;
@@ -330,6 +324,22 @@ public class NuidWriterTests
 
         Assert.False(writeFailed);
         Assert.Equal(string.Empty, duplicateFailure);
+    }
+
+    [Fact]
+    public void Only_last_two_digits_change()
+    {
+        var nuid1 = NuidWriter.NewNuid();
+        var head1 = nuid1.Substring(0, 20);
+        var tail1 = nuid1.Substring(20, 2);
+
+        var nuid2 = NuidWriter.NewNuid();
+        var head2 = nuid2.Substring(0, 20);
+        var tail2 = nuid2.Substring(20, 2);
+
+        Assert.NotEqual(nuid1, nuid2);
+        Assert.Equal(head1, head2);
+        Assert.NotEqual(tail1, tail2);
     }
 
     // This messes with NuidWriter's internal state and must be used

@@ -63,8 +63,10 @@ internal sealed class NuidWriter
         // NOTE: We must never write to digitsPtr!
         ref var digitsPtr = ref MemoryMarshal.GetReference(Digits);
 
-        for (nuint i = PrefixLength; i < NuidLength; i++)
+        // write backwards so the last two characters change the fastest
+        for (var i = NuidLength; i > PrefixLength;)
         {
+            i--;
             var digitIndex = (nuint)(sequential % Base);
             Unsafe.Add(ref buffer[0], i) = Unsafe.Add(ref digitsPtr, digitIndex);
             sequential /= Base;
