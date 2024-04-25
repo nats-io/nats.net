@@ -562,7 +562,7 @@ public sealed class SkipIfNatsServer : FactAttribute
 
     static SkipIfNatsServer() => SupportsTlsFirst = NatsServer.SupportsTlsFirst();
 
-    public SkipIfNatsServer(bool doesNotSupportTlsFirst = false, string? versionEarlierThan = default)
+    public SkipIfNatsServer(bool doesNotSupportTlsFirst = false, string? versionEarlierThan = default, string? versionLaterThan = default)
     {
         if (doesNotSupportTlsFirst && !SupportsTlsFirst)
         {
@@ -572,6 +572,11 @@ public sealed class SkipIfNatsServer : FactAttribute
         if (versionEarlierThan != null && new Version(versionEarlierThan) > NatsServer.Version)
         {
             Skip = $"NATS server version ({NatsServer.Version}) is earlier than {versionEarlierThan}";
+        }
+
+        if (versionLaterThan != null && new Version(versionLaterThan) < NatsServer.Version)
+        {
+            Skip = $"NATS server version ({NatsServer.Version}) is later than {versionLaterThan}";
         }
     }
 }

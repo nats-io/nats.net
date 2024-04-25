@@ -35,7 +35,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
     private readonly NatsSubOpts? _subOpts;
     private readonly CancellationToken _cancellationToken;
     private readonly string _keyBase;
-    private readonly string _filter;
+    private readonly string[] _filters;
     private readonly NatsConnection _nats;
     private readonly Channel<NatsKVWatchCommandMsg<T>> _commandChannel;
     private readonly Channel<NatsKVEntry<T>> _entryChannel;
@@ -55,7 +55,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
     public NatsKVWatcher(
         NatsJSContext context,
         string bucket,
-        string key,
+        IEnumerable<string> keys,
         INatsDeserialize<T> serializer,
         NatsKVWatchOpts opts,
         NatsSubOpts? subOpts,
@@ -69,7 +69,15 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
         _opts = opts;
         _subOpts = subOpts;
         _keyBase = $"$KV.{_bucket}.";
-        _filter = $"{_keyBase}{key}";
+        _filters = keys.Select(key => $"{_keyBase}{key}").ToArray();
+
+        if (_filters.Length == 0)
+        {
+            // Without this check we'd get an error from the server:
+            // 'consumer delivery policy is deliver last per subject, but optional filter subject is not set'
+            throw new ArgumentException("At least one key must be provided", nameof(keys));
+        }
+
         _cancellationToken = cancellationToken;
         _nats = context.Connection;
         _stream = $"KV_{_bucket}";
@@ -358,7 +366,6 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
             DeliverPolicy = ConsumerConfigDeliverPolicy.All,
             AckPolicy = ConsumerConfigAckPolicy.None,
             DeliverSubject = _sub.Subject,
-            FilterSubject = _filter,
             FlowControl = true,
             IdleHeartbeat = _opts.IdleHeartbeat,
             AckWait = TimeSpan.FromHours(22),
@@ -367,6 +374,20 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
             NumReplicas = 1,
             ReplayPolicy = ConsumerConfigReplayPolicy.Instant,
         };
+
+        // Use FilterSubject (singular) when there is only one filter
+        // This is for compatibility with older NATS servers (<2.10)
+        if (_filters.Length == 1)
+        {
+            config.FilterSubject = _filters[0];
+        }
+
+        // Use FilterSubjects (plural) when there are multiple filters
+        // This is for compatibility with newer NATS servers (>=2.10)
+        if (_filters.Length > 1)
+        {
+            config.FilterSubjects = _filters;
+        }
 
         if (!_opts.IncludeHistory)
         {
