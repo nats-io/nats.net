@@ -116,6 +116,7 @@ public class NatsKVStore : INatsKVStore
         }
     }
 
+    /// <inheritdoc />
     public async ValueTask DeleteAsync(string key, NatsKVDeleteOpts? opts = default, CancellationToken cancellationToken = default)
     {
         ValidateKey(key);
@@ -159,16 +160,7 @@ public class NatsKVStore : INatsKVStore
     public ValueTask PurgeAsync(string key, NatsKVDeleteOpts? opts = default, CancellationToken cancellationToken = default) =>
         DeleteAsync(key, (opts ?? new NatsKVDeleteOpts()) with { Purge = true }, cancellationToken);
 
-    /// <summary>
-    /// Get an entry from the bucket using the key
-    /// </summary>
-    /// <param name="key">Key of the entry</param>
-    /// <param name="revision">Revision to retrieve</param>
-    /// <param name="serializer">Optional serialized to override the default</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <typeparam name="T">Serialized value type</typeparam>
-    /// <returns>The entry</returns>
-    /// <exception cref="NatsKVException">There was an error with metadata</exception>
+    /// <inheritdoc />
     public async ValueTask<NatsKVEntry<T>> GetEntryAsync<T>(string key, ulong revision = default, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
         ValidateKey(key);
@@ -322,18 +314,14 @@ public class NatsKVStore : INatsKVStore
         }
     }
 
-    /// <summary>
-    /// Start a watcher for specific keys
-    /// </summary>
-    /// <param name="key">Key to watch (subject-based wildcards may be used)</param>
-    /// <param name="serializer">Serializer to use for the message type.</param>
-    /// <param name="opts">Watch options</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <typeparam name="T">Serialized value type</typeparam>
-    /// <returns>An asynchronous enumerable which can be used in <c>await foreach</c> loops</returns>
-    public async IAsyncEnumerable<NatsKVEntry<T>> WatchAsync<T>(string key, INatsDeserialize<T>? serializer = default, NatsKVWatchOpts? opts = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    /// <inheritdoc />
+    public IAsyncEnumerable<NatsKVEntry<T>> WatchAsync<T>(string key, INatsDeserialize<T>? serializer = default, NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default)
+        => WatchAsync<T>([key], serializer, opts, cancellationToken);
+
+    /// <inheritdoc />
+    public async IAsyncEnumerable<NatsKVEntry<T>> WatchAsync<T>(IEnumerable<string> keys, INatsDeserialize<T>? serializer = default, NatsKVWatchOpts? opts = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        await using var watcher = await WatchInternalAsync<T>(key, serializer, opts, cancellationToken);
+        await using var watcher = await WatchInternalAsync<T>(keys, serializer, opts, cancellationToken);
 
         if (watcher.InitialConsumer.Info.NumPending == 0 && opts?.OnNoData != null)
         {
@@ -369,7 +357,7 @@ public class NatsKVStore : INatsKVStore
         opts ??= NatsKVWatchOpts.Default;
         opts = opts with { IncludeHistory = true };
 
-        await using var watcher = await WatchInternalAsync<T>(key, serializer, opts, cancellationToken);
+        await using var watcher = await WatchInternalAsync<T>([key], serializer, opts, cancellationToken);
 
         while (await watcher.Entries.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
@@ -382,6 +370,7 @@ public class NatsKVStore : INatsKVStore
         }
     }
 
+    /// <inheritdoc />
     public async ValueTask<NatsKVStatus> GetStatusAsync(CancellationToken cancellationToken = default)
     {
         await _stream.RefreshAsync(cancellationToken);
@@ -389,16 +378,9 @@ public class NatsKVStore : INatsKVStore
         return new NatsKVStatus(Bucket, isCompressed, _stream.Info);
     }
 
-    /// <summary>
-    /// Start a watcher for all the keys in the bucket
-    /// </summary>
-    /// <param name="serializer">Serializer to use for the message type.</param>
-    /// <param name="opts">Watch options</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <typeparam name="T">Serialized value type</typeparam>
-    /// <returns>An asynchronous enumerable which can be used in <c>await foreach</c> loops</returns>
+    /// <inheritdoc />
     public IAsyncEnumerable<NatsKVEntry<T>> WatchAsync<T>(INatsDeserialize<T>? serializer = default, NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default) =>
-        WatchAsync<T>(">", serializer, opts, cancellationToken);
+        WatchAsync<T>([">"], serializer, opts, cancellationToken);
 
     public async ValueTask PurgeDeletesAsync(NatsKVPurgeOpts? opts = default, CancellationToken cancellationToken = default)
     {
@@ -411,7 +393,7 @@ public class NatsKVStore : INatsKVStore
         var deleted = new List<NatsKVEntry<int>>();
 
         // Type doesn't matter here, we're just using the watcher to get the keys
-        await using (var watcher = await WatchInternalAsync<int>(">", opts: new NatsKVWatchOpts { MetaOnly = true }, cancellationToken: cancellationToken))
+        await using (var watcher = await WatchInternalAsync<int>([">"], opts: new NatsKVWatchOpts { MetaOnly = true }, cancellationToken: cancellationToken))
         {
             if (watcher.InitialConsumer.Info.NumPending == 0)
                 return;
@@ -447,19 +429,15 @@ public class NatsKVStore : INatsKVStore
         }
     }
 
+    /// <inheritdoc />
     public async IAsyncEnumerable<string> GetKeysAsync(NatsKVWatchOpts? opts = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         opts ??= NatsKVWatchOpts.Default;
 
-        opts = opts with
-        {
-            IgnoreDeletes = false,
-            MetaOnly = true,
-            UpdatesOnly = false,
-        };
+        opts = opts with { IgnoreDeletes = false, MetaOnly = true, UpdatesOnly = false, };
 
         // Type doesn't matter here, we're just using the watcher to get the keys
-        await using var watcher = await WatchInternalAsync<int>(">", serializer: default, opts, cancellationToken);
+        await using var watcher = await WatchInternalAsync<int>([">"], serializer: default, opts, cancellationToken);
 
         if (watcher.InitialConsumer.Info.NumPending == 0)
             yield break;
@@ -476,7 +454,7 @@ public class NatsKVStore : INatsKVStore
         }
     }
 
-    internal async ValueTask<NatsKVWatcher<T>> WatchInternalAsync<T>(string key, INatsDeserialize<T>? serializer = default, NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default)
+    internal async ValueTask<NatsKVWatcher<T>> WatchInternalAsync<T>(IEnumerable<string> keys, INatsDeserialize<T>? serializer = default, NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default)
     {
         opts ??= NatsKVWatchOpts.Default;
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
@@ -484,7 +462,7 @@ public class NatsKVStore : INatsKVStore
         var watcher = new NatsKVWatcher<T>(
             context: _context,
             bucket: Bucket,
-            key: key,
+            keys: keys,
             opts: opts,
             serializer: serializer,
             subOpts: default,

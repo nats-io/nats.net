@@ -30,7 +30,7 @@ public class NatsKVWatcherTest
         var js2 = new NatsJSContext(nats2);
         var kv2 = new NatsKVContext(js2);
         var store2 = (NatsKVStore)await kv2.CreateStoreAsync(config, cancellationToken: cancellationToken);
-        var watcher = await store2.WatchInternalAsync<NatsMemoryOwner<byte>>("k1.*", cancellationToken: cancellationToken);
+        var watcher = await store2.WatchInternalAsync<NatsMemoryOwner<byte>>(["k1.*"], cancellationToken: cancellationToken);
 
         await store1.PutAsync("k1.p1", 1, cancellationToken: cancellationToken);
         await store1.PutAsync("k1.p1", 2, cancellationToken: cancellationToken);
@@ -140,6 +140,70 @@ public class NatsKVWatcherTest
         await watchTask;
     }
 
+    [SkipIfNatsServer(versionEarlierThan: "2.10")]
+    public async Task Watch_subset()
+    {
+        var timeout = TimeSpan.FromSeconds(10);
+        var cts = new CancellationTokenSource(timeout);
+        var cancellationToken = cts.Token;
+
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var bucket = "b1";
+        var store = await kv.CreateStoreAsync(bucket, cancellationToken: cancellationToken);
+
+        await store.PutAsync("k1", "v1", cancellationToken: cancellationToken);
+        await store.PutAsync("k2", "v1", cancellationToken: cancellationToken);
+        await store.PutAsync("k3", "v1", cancellationToken: cancellationToken);
+
+        var signal = new WaitSignal(timeout);
+        var watchTask = Task.Run(
+            async () =>
+            {
+                HashSet<string> keys = new();
+
+                // Multiple keys are only supported in NATS Server 2.10 and later
+                await foreach (var entry in store.WatchAsync<string>(["k1", "k2"], cancellationToken: cancellationToken))
+                {
+                    signal.Pulse();
+                    _output.WriteLine($"WATCH: {entry.Key} ({entry.Revision}): {entry.Value}");
+
+                    if (entry is { Value: "end" })
+                        break;
+
+                    keys.Add(entry.Key);
+                }
+
+                Assert.Equal(["k1", "k2"], keys.OrderBy(x => x));
+            },
+            cancellationToken);
+
+        await signal;
+
+        Assert.Equal("v1", (await store.GetEntryAsync<string>("k1", cancellationToken: cancellationToken)).Value);
+        Assert.Equal("v1", (await store.GetEntryAsync<string>("k2", cancellationToken: cancellationToken)).Value);
+        Assert.Equal("v1", (await store.GetEntryAsync<string>("k3", cancellationToken: cancellationToken)).Value);
+
+        await store.PutAsync("k1", "v2", cancellationToken: cancellationToken);
+        await store.PutAsync("k2", "v2", cancellationToken: cancellationToken);
+        await store.PutAsync("k3", "v2", cancellationToken: cancellationToken);
+
+        await store.PutAsync("k1", "v3", cancellationToken: cancellationToken);
+        await store.PutAsync("k2", "v3", cancellationToken: cancellationToken);
+        await store.PutAsync("k3", "v3", cancellationToken: cancellationToken);
+
+        Assert.Equal("v3", (await store.GetEntryAsync<string>("k1", cancellationToken: cancellationToken)).Value);
+        Assert.Equal("v3", (await store.GetEntryAsync<string>("k2", cancellationToken: cancellationToken)).Value);
+        Assert.Equal("v3", (await store.GetEntryAsync<string>("k3", cancellationToken: cancellationToken)).Value);
+
+        await store.PutAsync("k1", "end", cancellationToken: cancellationToken);
+        await watchTask;
+    }
+
     [Fact]
     public async Task Watcher_timeout_reconnect()
     {
@@ -159,7 +223,7 @@ public class NatsKVWatcherTest
         var js2 = new NatsJSContext(nats2);
         var kv2 = new NatsKVContext(js2);
         var store2 = (NatsKVStore)await kv2.CreateStoreAsync(bucket, cancellationToken: cancellationToken);
-        var watcher = await store2.WatchInternalAsync<NatsMemoryOwner<byte>>("k1.*", cancellationToken: cancellationToken);
+        var watcher = await store2.WatchInternalAsync<NatsMemoryOwner<byte>>(["k1.*"], cancellationToken: cancellationToken);
 
         // Swallow heartbeats
         proxy.ServerInterceptors.Add(m => m?.Contains("Idle Heartbeat") ?? false ? null : m);
@@ -346,5 +410,54 @@ public class NatsKVWatcherTest
             Assert.Throws<NatsDeserializeException>(() => entry.EnsureSuccess());
             break;
         }
+    }
+
+    [Fact]
+    public async Task Watch_with_empty_filter()
+    {
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        var store = await kv.CreateStoreAsync("b1", cancellationToken: cts.Token);
+
+        await Assert.ThrowsAsync<ArgumentException>(async () =>
+        {
+            await foreach (var unused in store.WatchAsync<int>(keys: Array.Empty<string>(), cancellationToken: cts.Token))
+            {
+            }
+        });
+    }
+
+    [SkipIfNatsServer(versionLaterThan: "2.9.999")]
+    public async Task Watch_with_multiple_filter_on_old_server()
+    {
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        var store = await kv.CreateStoreAsync("b1", cancellationToken: cts.Token);
+
+        // If we try to watch with multiple keys on an old server, we will have to
+        // let the request go through since there is no way to know the server version
+        // as the server hosting JetStream is not necessarily be the server we're connected to.
+        var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () =>
+        {
+            await foreach (var unused in store.WatchAsync<int>(keys: ["1", "2"], cancellationToken: cts.Token))
+            {
+            }
+        });
+
+        Assert.Equal(400, exception.Error.Code);
+        Assert.Equal(10094, exception.Error.ErrCode);
+        Assert.Equal("consumer delivery policy is deliver last per subject, but optional filter subject is not set", exception.Error.Description);
     }
 }
