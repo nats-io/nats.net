@@ -17,6 +17,7 @@ public interface INatsKVStore
     /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <typeparam name="T">Serialized value type</typeparam>
+    /// <returns>Revision number</returns>
     ValueTask<ulong> PutAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -80,6 +81,17 @@ public interface INatsKVStore
     /// <typeparam name="T">Serialized value type</typeparam>
     /// <returns>An asynchronous enumerable which can be used in <c>await foreach</c> loops</returns>
     IAsyncEnumerable<NatsKVEntry<T>> WatchAsync<T>(string key, INatsDeserialize<T>? serializer = default, NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Start a watcher for specific keys
+    /// </summary>
+    /// <param name="keys">Keys to watch (subject-based wildcards may be used)</param>
+    /// <param name="serializer">Serializer to use for the message type.</param>
+    /// <param name="opts">Watch options</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <typeparam name="T">Serialized value type</typeparam>
+    /// <returns>An asynchronous enumerable which can be used in <c>await foreach</c> loops</returns>
+    IAsyncEnumerable<NatsKVEntry<T>> WatchAsync<T>(IEnumerable<string> keys, INatsDeserialize<T>? serializer = default, NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Start a watcher for all the keys in the bucket

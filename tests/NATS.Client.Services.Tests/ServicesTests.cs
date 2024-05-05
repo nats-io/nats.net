@@ -350,4 +350,37 @@ public class ServicesTests
         var formatRegex = new Regex(@"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{7}Z$");
         Assert.Matches(formatRegex, stats.Started);
     }
+
+    [Fact]
+    public async Task Service_ids_unique()
+    {
+        await using var server = NatsServer.Start();
+        await using var nats = server.CreateClientConnection();
+        var svc = new NatsSvcContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        var cancellationToken = cts.Token;
+
+        List<string> ids = new();
+        for (var i = 0; i < 100; i++)
+        {
+            await using var s = await svc.AddServiceAsync($"s{i}", "1.0.0", cancellationToken: cancellationToken);
+            ids.Add(s.GetInfo().Id);
+        }
+
+        ids.Sort();
+
+        HashSet<string> uniqueIds = new();
+        foreach (var id in ids)
+        {
+            if (!uniqueIds.Add(id))
+            {
+                _output.WriteLine($"Duplicate ID: {id}");
+            }
+
+            _output.WriteLine($"{id.Substring(0, 12)} {id.Substring(12, 10)}");
+        }
+
+        Assert.Equal(ids.Count, uniqueIds.Count);
+    }
 }

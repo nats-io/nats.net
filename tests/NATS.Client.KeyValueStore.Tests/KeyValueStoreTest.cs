@@ -364,6 +364,9 @@ public class KeyValueStoreTest
 
         _output.WriteLine($"COUNT={count}");
         Assert.Equal(0, count);
+
+        _output.WriteLine("PURGE ALL DELETES ON EMPTY BUCKET");
+        await store.PurgeDeletesAsync(opts: new NatsKVPurgeOpts { DeleteMarkersThreshold = TimeSpan.Zero }, cancellationToken: cancellationToken);
     }
 
     [Fact]
@@ -550,5 +553,58 @@ public class KeyValueStoreTest
         Assert.Equal("kv2", status2.Bucket);
         Assert.Equal("KV_kv2", status2.Info.Config.Name);
         Assert.Equal(StreamConfigCompression.S2, status2.Info.Config.Compression);
+    }
+
+    [Fact]
+    public async Task Validate_keys()
+    {
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var store = await kv.CreateStoreAsync("b1");
+
+        string[] validKeys = [
+            "k.1",
+            "=",
+            "_",
+            "-",
+            "123",
+            "Abc",
+        ];
+
+        foreach (var key in validKeys)
+        {
+            var rev = await store.PutAsync(key, "value1");
+            await store.UpdateAsync(key, "value2", rev);
+            var entry = await store.GetEntryAsync<string>(key);
+            Assert.Equal("value2", entry.Value);
+            await store.DeleteAsync(key);
+        }
+
+        string[] invalidKeys = [
+            null!,
+            string.Empty,
+            ".k",
+            "k.",
+            "k$",
+            "k%",
+            "k*",
+            "k>",
+            "k\n",
+            "k\r",
+        ];
+
+        foreach (var key in invalidKeys)
+        {
+            await Assert.ThrowsAsync<NatsKVException>(async () => await store.CreateAsync(key, "value"));
+            await Assert.ThrowsAsync<NatsKVException>(async () => await store.PutAsync(key, "value"));
+            await Assert.ThrowsAsync<NatsKVException>(async () => await store.UpdateAsync(key, "value", 1));
+            await Assert.ThrowsAsync<NatsKVException>(async () => await store.GetEntryAsync<string>(key));
+            await Assert.ThrowsAsync<NatsKVException>(async () => await store.DeleteAsync(key));
+            await Assert.ThrowsAsync<NatsKVException>(async () => await store.PurgeAsync(key));
+        }
     }
 }

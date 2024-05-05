@@ -130,92 +130,6 @@ public readonly record struct NatsMsg<T>(
     /// <inheritdoc />
     public NatsException? Error => Headers?.Error;
 
-    internal static NatsMsg<T> Build(
-        string subject,
-        string? replyTo,
-        in ReadOnlySequence<byte>? headersBuffer,
-        in ReadOnlySequence<byte> payloadBuffer,
-        INatsConnection? connection,
-        NatsHeaderParser headerParser,
-        INatsDeserialize<T> serializer)
-    {
-        NatsHeaders? headers = null;
-
-        if (headersBuffer != null)
-        {
-            headers = new NatsHeaders();
-
-            try
-            {
-                // Parsing can also throw an exception.
-                if (!headerParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), headers))
-                {
-                    throw new NatsException("Error parsing headers");
-                }
-            }
-            catch (Exception e)
-            {
-                headers.Error ??= new NatsHeaderParseException(headersBuffer.Value.ToArray(), e);
-            }
-        }
-
-        headers?.SetReadOnly();
-
-        // Consider an empty payload as null or default value for value types. This way we are able to
-        // receive sentinels as nulls or default values. This might cause an issue with where we are not
-        // able to differentiate between an empty sentinel and actual default value of a struct e.g. 0 (zero).
-        T? data;
-        if (headers?.Error == null && payloadBuffer.Length > 0)
-        {
-            try
-            {
-                data = serializer.Deserialize(payloadBuffer);
-            }
-            catch (Exception e)
-            {
-                headers ??= new NatsHeaders();
-                headers.Error = new NatsDeserializeException(payloadBuffer.ToArray(), e);
-                data = default;
-            }
-        }
-        else
-        {
-            data = default;
-        }
-
-        var size = subject.Length
-                   + (replyTo?.Length ?? 0)
-                   + (headersBuffer?.Length ?? 0)
-                   + payloadBuffer.Length;
-
-        if (Telemetry.HasListeners())
-        {
-            var activityName = connection is NatsConnection nats
-                ? $"{nats.SpanDestinationName(subject)} {Telemetry.Constants.ReceiveActivityName}"
-                : Telemetry.Constants.ReceiveActivityName;
-
-            headers ??= new NatsHeaders();
-
-            var activity = Telemetry.StartReceiveActivity(
-                connection,
-                name: activityName,
-                subscriptionSubject: subject,
-                queueGroup: null,
-                subject: subject,
-                replyTo: replyTo,
-                bodySize: payloadBuffer.Length,
-                size: size,
-                headers: headers);
-
-            if (activity is not null)
-            {
-                headers.Activity = activity;
-            }
-        }
-
-        return new NatsMsg<T>(subject, replyTo, (int)size, headers, data, connection);
-    }
-
     /// <inheritdoc />
     public void EnsureSuccess()
     {
@@ -281,6 +195,89 @@ public readonly record struct NatsMsg<T>(
     {
         CheckReplyPreconditions();
         return Connection.PublishAsync(msg with { Subject = ReplyTo }, serializer, opts, cancellationToken);
+    }
+
+    internal static NatsMsg<T> Build(
+        string subject,
+        string? replyTo,
+        in ReadOnlySequence<byte>? headersBuffer,
+        in ReadOnlySequence<byte> payloadBuffer,
+        INatsConnection? connection,
+        NatsHeaderParser headerParser,
+        INatsDeserialize<T> serializer)
+    {
+        NatsHeaders? headers = null;
+
+        if (headersBuffer != null)
+        {
+            headers = new NatsHeaders();
+
+            try
+            {
+                // Parsing can also throw an exception.
+                if (!headerParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), headers))
+                {
+                    throw new NatsException("Error parsing headers");
+                }
+            }
+            catch (Exception e)
+            {
+                headers.Error ??= new NatsHeaderParseException(headersBuffer.Value.ToArray(), e);
+            }
+        }
+
+        headers?.SetReadOnly();
+
+        T? data;
+        if (headers?.Error == null)
+        {
+            try
+            {
+                data = serializer.Deserialize(payloadBuffer);
+            }
+            catch (Exception e)
+            {
+                headers ??= new NatsHeaders();
+                headers.Error = new NatsDeserializeException(payloadBuffer.ToArray(), e);
+                data = default;
+            }
+        }
+        else
+        {
+            data = default;
+        }
+
+        var size = subject.Length
+                   + (replyTo?.Length ?? 0)
+                   + (headersBuffer?.Length ?? 0)
+                   + payloadBuffer.Length;
+
+        if (Telemetry.HasListeners())
+        {
+            var activityName = connection is NatsConnection nats
+                ? $"{nats.SpanDestinationName(subject)} {Telemetry.Constants.ReceiveActivityName}"
+                : Telemetry.Constants.ReceiveActivityName;
+
+            headers ??= new NatsHeaders();
+
+            var activity = Telemetry.StartReceiveActivity(
+                connection,
+                name: activityName,
+                subscriptionSubject: subject,
+                queueGroup: null,
+                subject: subject,
+                replyTo: replyTo,
+                bodySize: payloadBuffer.Length,
+                size: size,
+                headers: headers);
+
+            if (activity is not null)
+            {
+                headers.Activity = activity;
+            }
+        }
+
+        return new NatsMsg<T>(subject, replyTo, (int)size, headers, data, connection);
     }
 
     [MemberNotNull(nameof(Connection))]

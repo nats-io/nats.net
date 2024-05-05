@@ -9,8 +9,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\NATS.Client.Hosting\NATS.Client.Hosting.csproj" />
     <ProjectReference Include="..\..\src\NATS.Client.Core\NATS.Client.Core.csproj" />
+    <ProjectReference Include="..\..\src\NATS.Extensions.Microsoft.DependencyInjection\NATS.Extensions.Microsoft.DependencyInjection.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,6 +1,5 @@
 using System.Buffers;
 using System.Diagnostics;
-using System.Text;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
@@ -34,7 +33,6 @@ public partial class NatsConnection : INatsConnection
 
     internal readonly ConnectionStatsCounter Counter; // allow to call from external sources
     internal volatile ServerInfo? WritableServerInfo;
-    internal bool IsDisposed;
 
 #pragma warning restore SA1401
     private readonly object _gate = new object();
@@ -50,6 +48,7 @@ public partial class NatsConnection : INatsConnection
 
     private int _pongCount;
     private int _connectionState;
+    private int _isDisposed;
 
     // when reconnected, make new instance.
     private ISocketConnection? _socket;
@@ -58,7 +57,6 @@ public partial class NatsConnection : INatsConnection
     private volatile NatsUri? _lastSeedConnectUri;
     private NatsReadProtocolProcessor? _socketReader;
     private TaskCompletionSource _waitForOpenConnection;
-    private TlsCerts? _tlsCerts;
     private UserCredentials? _userCredentials;
     private int _connectRetry;
     private TimeSpan _backoff = TimeSpan.Zero;
@@ -82,9 +80,7 @@ public partial class NatsConnection : INatsConnection
         Counter = new ConnectionStatsCounter();
         CommandWriter = new CommandWriter(this, _pool, Opts, Counter, EnqueuePing);
         InboxPrefix = NewInbox(opts.InboxPrefix);
-        InboxPrefixBytes = Encoding.ASCII.GetBytes(InboxPrefix);
         SubscriptionManager = new SubscriptionManager(this, InboxPrefix);
-        RequestManager = new RequestManager(this, InboxPrefix);
         _logger = opts.LoggerFactory.CreateLogger<NatsConnection>();
         _clientOpts = ClientOpts.Create(Opts);
         HeaderParser = new NatsHeaderParser(opts.HeaderEncoding);
@@ -125,13 +121,15 @@ public partial class NatsConnection : INatsConnection
 
     public INatsServerInfo? ServerInfo => WritableServerInfo; // server info is set when received INFO
 
-    internal readonly ReadOnlyMemory<byte> InboxPrefixBytes;
+    internal bool IsDisposed
+    {
+        get => Interlocked.CompareExchange(ref _isDisposed, 0, 0) == 1;
+        private set => Interlocked.Exchange(ref _isDisposed, value ? 1 : 0);
+    }
 
     internal NatsHeaderParser HeaderParser { get; }
 
     internal SubscriptionManager SubscriptionManager { get; }
-
-    internal RequestManager RequestManager { get; }
 
     internal CommandWriter CommandWriter { get; }
 
@@ -215,14 +213,8 @@ public partial class NatsConnection : INatsConnection
 
     internal NatsStats GetStats() => Counter.ToStats();
 
-    internal ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer, long? responseId)
+    internal ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
     {
-        if (responseId is { } id)
-        {
-            RequestManager.SetRequestReply(subject, replyTo, sid, headersBuffer, payloadBuffer, id);
-            return default;
-        }
-
         return SubscriptionManager.PublishToClientHandlersAsync(subject, replyTo, sid, headersBuffer, payloadBuffer);
     }
 
@@ -297,9 +289,6 @@ public partial class NatsConnection : INatsConnection
                 throw new NatsException($"URI {uri} requires TLS but TlsMode is set to Disable");
         }
 
-        if (Opts.TlsOpts.HasTlsCerts)
-            _tlsCerts = await TlsCerts.FromNatsTlsOptsAsync(Opts.TlsOpts).ConfigureAwait(false);
-
         if (!Opts.AuthOpts.IsAnonymous)
         {
             _userCredentials = new UserCredentials(Opts.AuthOpts);
@@ -332,7 +321,7 @@ public partial class NatsConnection : INatsConnection
                     if (Opts.TlsOpts.EffectiveMode(uri) == TlsMode.Implicit)
                     {
                         // upgrade TcpConnection to SslConnection
-                        var sslConnection = conn.UpgradeToSslStreamConnection(Opts.TlsOpts, _tlsCerts);
+                        var sslConnection = conn.UpgradeToSslStreamConnection(Opts.TlsOpts);
                         await sslConnection.AuthenticateAsClientAsync(uri, Opts.ConnectTimeout).ConfigureAwait(false);
                         _socket = sslConnection;
                     }
@@ -437,7 +426,7 @@ public partial class NatsConnection : INatsConnection
                     _socketReader = null;
 
                     // upgrade TcpConnection to SslConnection
-                    var sslConnection = tcpConnection.UpgradeToSslStreamConnection(Opts.TlsOpts, _tlsCerts);
+                    var sslConnection = tcpConnection.UpgradeToSslStreamConnection(Opts.TlsOpts);
                     await sslConnection.AuthenticateAsClientAsync(targetUri, Opts.ConnectTimeout).ConfigureAwait(false);
                     _socket = sslConnection;
 
@@ -541,20 +530,34 @@ public partial class NatsConnection : INatsConnection
             await DisposeSocketAsync(true).ConfigureAwait(false);
 
             var defaultScheme = _currentConnectUri!.Uri.Scheme;
-            var urls = (Opts.NoRandomize
-                           ? WritableServerInfo?.ClientConnectUrls?.Select(x => new NatsUri(x, false, defaultScheme)).Distinct().ToArray()
-                           : WritableServerInfo?.ClientConnectUrls?.Select(x => new NatsUri(x, false, defaultScheme)).OrderBy(_ => Guid.NewGuid()).Distinct().ToArray())
-                       ?? Array.Empty<NatsUri>();
-            if (urls.Length == 0)
-                urls = Opts.GetSeedUris();
+            var serverReportedUrls = ServerInfo?
+                                         .ClientConnectUrls?
+                                         .Select(x => new NatsUri(x, false, defaultScheme))
+                                     ?? Array.Empty<NatsUri>();
 
-            // add last.
+            // Always keep the original seed URLs in the list of URLs to connect to
+            var urls = serverReportedUrls.Concat(Opts.GetSeedUris()).Distinct();
+            if (!Opts.NoRandomize)
+            {
+                urls = urls.OrderBy(_ => Guid.NewGuid());
+            }
+
+            // Ensure the current URL is last in the list
             urls = urls.Where(x => x != _currentConnectUri).Append(_currentConnectUri).ToArray();
 
             _currentConnectUri = null;
             var urlEnumerator = urls.AsEnumerable().GetEnumerator();
             NatsUri? url = null;
         CONNECT_AGAIN:
+
+            if (IsDisposed)
+            {
+                // No point in trying to reconnect.
+                // This can happen if the we're disposed while we're waiting for the next reconnect
+                // and potentially gets us stuck in a reconnect loop.
+                return;
+            }
+
             try
             {
                 if (urlEnumerator.MoveNext())
@@ -589,7 +592,7 @@ public partial class NatsConnection : INatsConnection
                         if (Opts.TlsOpts.EffectiveMode(url) == TlsMode.Implicit)
                         {
                             // upgrade TcpConnection to SslConnection
-                            var sslConnection = conn.UpgradeToSslStreamConnection(Opts.TlsOpts, _tlsCerts);
+                            var sslConnection = conn.UpgradeToSslStreamConnection(Opts.TlsOpts);
                             await sslConnection.AuthenticateAsClientAsync(FixTlsHost(url), Opts.ConnectTimeout).ConfigureAwait(false);
                             _socket = sslConnection;
                         }
@@ -608,6 +611,12 @@ public partial class NatsConnection : INatsConnection
             }
             catch (Exception ex)
             {
+                if (IsDisposed)
+                {
+                    // No point in trying to reconnect.
+                    return;
+                }
+
                 if (url != null)
                 {
                     _logger.LogWarning(NatsLogEvents.Connection, ex, "Failed to connect NATS {Url}", url);
@@ -636,7 +645,21 @@ public partial class NatsConnection : INatsConnection
             if (ex is OperationCanceledException)
                 return;
             _waitForOpenConnection.TrySetException(ex);
-            _logger.LogError(NatsLogEvents.Connection, ex, "Retry loop stopped and connection state is invalid");
+            try
+            {
+                if (!IsDisposed)
+                {
+                    // Only log if we're not disposing, otherwise we might log exceptions that are expected
+                    _logger.LogError(NatsLogEvents.Connection, ex, "Retry loop stopped and connection state is invalid");
+                }
+            }
+            catch
+            {
+                // ignore logging exceptions since our host might be disposed or shutting down
+                // and some logging providers might throw exceptions when they can't log
+                // which in turn would crash the application.
+                // (e.g. we've seen this with EventLog provider on Windows)
+            }
         }
     }
 

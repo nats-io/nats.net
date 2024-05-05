@@ -53,6 +53,11 @@ public sealed class NatsJsonSerializer<T> : INatsSerialize<T>, INatsDeserialize<
     /// <inheritdoc />
     public T? Deserialize(in ReadOnlySequence<byte> buffer)
     {
+        if (buffer.Length == 0)
+        {
+            return default;
+        }
+
         var reader = new Utf8JsonReader(buffer); // Utf8JsonReader is ref struct, no allocate.
         return JsonSerializer.Deserialize<T>(ref reader, _opts);
     }
