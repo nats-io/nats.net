@@ -173,30 +173,6 @@ public partial class NatsJSContext
         throw new NatsJSPublishNoResponseException();
     }
 
-    public async ValueTask<PubAckResponse> PublishAsync2<T>(
-        string subject,
-        T? data,
-        INatsSerialize<T>? serializer = default,
-        NatsJSPubOpts? opts = default,
-        NatsHeaders? headers = default,
-        CancellationToken cancellationToken = default)
-    {
-        opts ??= NatsJSPubOpts.Default;
-
-        await Connection.RequestAsync2<T, PubAckResponse>(
-                subject: subject,
-                data: data,
-                headers: headers,
-                requestSerializer: serializer,
-                replySerializer: NatsJSJsonSerializer<PubAckResponse>.Default,
-                requestOpts: opts,
-                replyOpts: default,
-                cancellationToken)
-            .ConfigureAwait(false);
-
-        return default;
-    }
-
     internal static void ThrowIfInvalidStreamName([NotNull] string? name, [CallerArgumentExpression("name")] string? paramName = null)
     {
         ArgumentNullException.ThrowIfNull(name, paramName);
@@ -223,18 +199,6 @@ public partial class NatsJSContext
         where TResponse : class
     {
         var response = await JSRequestAsync<TRequest, TResponse>(subject, request, cancellationToken);
-        response.EnsureSuccess();
-        return response.Response!;
-    }
-
-    internal async ValueTask<TResponse> JSRequestResponseAsync2<TRequest, TResponse>(
-        string subject,
-        TRequest? request,
-        CancellationToken cancellationToken = default)
-        where TRequest : class
-        where TResponse : class
-    {
-        var response = await JSRequestAsync2<TRequest, TResponse>(subject, request, cancellationToken);
         response.EnsureSuccess();
         return response.Response!;
     }
@@ -291,32 +255,6 @@ public partial class NatsJSContext
         }
 
         throw new NatsJSApiNoResponseException();
-    }
-
-    internal async ValueTask<NatsJSResponse<TResponse>> JSRequestAsync2<TRequest, TResponse>(
-        string subject,
-        TRequest? request,
-        CancellationToken cancellationToken = default)
-        where TRequest : class
-        where TResponse : class
-    {
-        if (request != null)
-        {
-            // TODO: Can't validate using JSON serializer context at the moment.
-            // Validator.ValidateObject(request, new ValidationContext(request));
-        }
-
-        var msg = await Connection.RequestAsync2<TRequest, TResponse>(
-                subject: subject,
-                data: request,
-                headers: default,
-                replyOpts: default, // new NatsSubOpts { Timeout = Connection.Opts.RequestTimeout },
-                requestSerializer: NatsJSJsonSerializer<TRequest>.Default,
-                replySerializer: NatsJSErrorAwareJsonSerializer<TResponse>.Default,
-                cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
-
-        return new NatsJSResponse<TResponse>(msg.Data, default);
     }
 
     [DoesNotReturn]

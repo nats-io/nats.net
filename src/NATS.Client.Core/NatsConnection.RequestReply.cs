@@ -1,9 +1,6 @@
-using System.Buffers;
-using System.Buffers.Text;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
@@ -77,45 +74,6 @@ public partial class NatsConnection
         throw new NatsNoReplyException();
     }
 
-    //
-    //
-    public async ValueTask<NatsMsg<TReply>> RequestAsync2<TRequest, TReply>(
-        string subject,
-        TRequest? data,
-        NatsHeaders? headers = default,
-        INatsSerialize<TRequest>? requestSerializer = default,
-        INatsDeserialize<TReply>? replySerializer = default,
-        NatsPubOpts? requestOpts = default,
-        NatsSubOpts? replyOpts = default,
-        CancellationToken cancellationToken = default)
-    {
-        var (tcs, replyTo) = await RequestManager.NewRequestAsync(cancellationToken).ConfigureAwait(false);
-
-        await PublishAsync(subject, data, headers, replyTo, requestSerializer, requestOpts, cancellationToken).ConfigureAwait(false);
-
-        // var msgBytes = await req.Tcs.Task.ConfigureAwait(false);
-
-        var msgBytes = await tcs.RunAsync().ConfigureAwait(false);
-
-        if (msgBytes.Headers?.Code == 503)
-        {
-            throw new NatsNoRespondersException();
-        }
-
-        using var memoryOwner = msgBytes.Data;
-
-        // var replyData = (replySerializer ?? NatsDefaultSerializer<TReply>.Default)
-        //     .Deserialize(new ReadOnlySequence<byte>(memoryOwner.Memory));
-
-        return new NatsMsg<TReply>(
-            msgBytes.Subject,
-            msgBytes.ReplyTo,
-            msgBytes.Size,
-            msgBytes.Headers,
-            default, // replyData,
-            msgBytes.Connection);
-    }
-
     /// <inheritdoc />
     public async IAsyncEnumerable<NatsMsg<TReply>> RequestManyAsync<TRequest, TReply>(
         string subject,
@@ -163,55 +121,6 @@ public partial class NatsConnection
             var remaining = buffer.Slice((int)totalPrefixLength);
             var didWrite = NuidWriter.TryWriteNuid(remaining);
             Debug.Assert(didWrite, "didWrite");
-            return new string(buffer);
-        }
-
-        return Throw();
-
-        [DoesNotReturn]
-        string Throw()
-        {
-            Debug.Fail("Must not happen");
-            throw new InvalidOperationException("This should never be raised!");
-        }
-    }
-
-    [SkipLocalsInit]
-    internal static string NewInbox(ReadOnlySpan<char> prefix, long id)
-    {
-        Span<char> buffer = stackalloc char[64];
-        Span<byte> idBuffer = stackalloc byte[32];
-
-        if (!Utf8Formatter.TryFormat(id, idBuffer, out var idLength))
-        {
-            return Throw();
-        }
-
-        var separatorLength = prefix.Length > 0 ? 1u : 0u;
-        var totalLength = (uint)prefix.Length + (uint)idLength + separatorLength;
-        if (totalLength <= buffer.Length)
-        {
-            buffer = buffer.Slice(0, (int)totalLength);
-        }
-        else
-        {
-            buffer = new char[totalLength];
-        }
-
-        var totalPrefixLength = (uint)prefix.Length + separatorLength;
-        if ((uint)buffer.Length > totalPrefixLength && (uint)buffer.Length > (uint)prefix.Length)
-        {
-            prefix.CopyTo(buffer);
-            buffer[prefix.Length] = '.';
-            var remaining = buffer.Slice((int)totalPrefixLength);
-
-            var bs = idBuffer.Slice(0, idLength);
-            for (var index = 0; index < bs.Length; index++)
-            {
-                var b = bs[index];
-                remaining[index] = (char)b;
-            }
-
             return new string(buffer);
         }
 
