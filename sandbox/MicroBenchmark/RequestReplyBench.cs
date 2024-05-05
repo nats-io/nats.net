@@ -38,6 +38,11 @@ public class RequestReplyBench
     }
 
     [Benchmark]
-    public async Task<NatsMsg<int>> RequestReplyAsync() =>
-        await _nats.RequestAsync<int, int>("req_rep_bench", 0xDEAD);
+    public async Task<int> RequestReplyAsync()
+    {
+        var reply = await _nats.RequestAsync<int, int>("req_rep_bench", 0xDEAD);
+        var result = reply.Data;
+        ArgumentOutOfRangeException.ThrowIfNotEqual(0xBEEF, result);
+        return result;
+    }
 }
