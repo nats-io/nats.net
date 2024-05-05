@@ -13,12 +13,11 @@
         <PackageReference Include="BenchmarkDotNet" Version="0.13.12" />
         <PackageReference Include="StackExchange.Redis" Version="2.5.43" />
         <PackageReference Include="ZLogger" Version="1.6.1" />
-        <PackageReference Include="NATS.Client" Version="1.1.4" />
+        <PackageReference Include="NATS.Client" Version="0.14.5" />
     </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\NATS.Client.Core\NATS.Client.Core.csproj" />
-        <ProjectReference Include="..\..\src\NATS.Client.JetStream\NATS.Client.JetStream.csproj" />
     </ItemGroup>
 
 </Project>
