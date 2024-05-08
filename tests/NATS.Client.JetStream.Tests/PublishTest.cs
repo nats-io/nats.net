@@ -36,6 +36,7 @@ public class PublishTest
             Assert.Equal(1, (int)ack.Seq);
             Assert.Equal("s1", ack.Stream);
             Assert.False(ack.Duplicate);
+            Assert.True(ack.IsSuccess());
         }
 
         // Duplicate
@@ -49,6 +50,7 @@ public class PublishTest
             Assert.Null(ack1.Error);
             Assert.Equal(2, (int)ack1.Seq);
             Assert.False(ack1.Duplicate);
+            Assert.True(ack1.IsSuccess());
 
             var ack2 = await js.PublishAsync(
                 subject: "s1.foo",
@@ -58,6 +60,7 @@ public class PublishTest
                 cancellationToken: cts.Token);
             Assert.Null(ack2.Error);
             Assert.True(ack2.Duplicate);
+            Assert.False(ack2.IsSuccess());
         }
 
         // ExpectedStream
@@ -77,6 +80,7 @@ public class PublishTest
             Assert.Equal(400, ack2.Error?.Code);
             Assert.Equal(10060, ack2.Error?.ErrCode);
             Assert.Equal("expected stream does not match", ack2.Error?.Description);
+            Assert.False(ack2.IsSuccess());
         }
 
         // ExpectedLastSequence
