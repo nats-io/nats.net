@@ -21,7 +21,6 @@ internal static class NatsJSJsonSerializer<T>
             new JsonStringEnumConverter<StreamConfigDiscard>(JsonNamingPolicy.SnakeCaseLower),
             new JsonStringEnumConverter<StreamConfigRetention>(JsonNamingPolicy.SnakeCaseLower),
             new JsonStringEnumConverter<StreamConfigStorage>(JsonNamingPolicy.SnakeCaseLower),
-            new JsonStringEnumConverter<ConsumerCreateRequestAction>(JsonNamingPolicy.SnakeCaseLower),
         },
     }));
 #endif
@@ -329,6 +328,56 @@ internal class NatsJSJsonStringEnumConverter<TEnum> : JsonConverter<TEnum>
             }
         }
         else if (value is ConsumerCreateRequestAction consumerCreateRequestAction)
+        {
+            switch (consumerCreateRequestAction)
+            {
+            case ConsumerCreateRequestAction.Create:
+                writer.WriteStringValue("create");
+                return;
+            case ConsumerCreateRequestAction.Update:
+                writer.WriteStringValue("update");
+                return;
+            case ConsumerCreateRequestAction.CreateOrUpdate:
+                writer.WriteStringValue(string.Empty);
+                return;
+            }
+        }
+
+        throw new InvalidOperationException($"Writing unknown enum value {value.GetType().Name}.{value}");
+    }
+}
+#else
+internal class NatsJSJsonStringEnumConverter<TEnum> : JsonConverter<TEnum>
+    where TEnum : struct, Enum
+{
+    public override TEnum Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType != JsonTokenType.String)
+        {
+            throw new InvalidOperationException();
+        }
+
+        var stringValue = reader.GetString();
+
+        if (typeToConvert == typeof(ConsumerCreateRequestAction))
+        {
+            switch (stringValue)
+            {
+            case "create":
+                return (TEnum)(object)ConsumerCreateRequestAction.Create;
+            case "update":
+                return (TEnum)(object)ConsumerCreateRequestAction.Update;
+            case "":
+                return (TEnum)(object)ConsumerCreateRequestAction.CreateOrUpdate;
+            }
+        }
+
+        throw new InvalidOperationException($"Reading unknown enum type {typeToConvert.Name} or value {stringValue}");
+    }
+
+    public override void Write(Utf8JsonWriter writer, TEnum value, JsonSerializerOptions options)
+    {
+        if (value is ConsumerCreateRequestAction consumerCreateRequestAction)
         {
             switch (consumerCreateRequestAction)
             {

@@ -33,6 +33,8 @@ internal record ConsumerCreateRequest
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
 #if NET6_0
     [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonStringEnumConverter<ConsumerCreateRequestAction>))]
+#else
+    [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonStringEnumConverter<ConsumerCreateRequestAction>))]
 #endif
     public ConsumerCreateRequestAction Action { get; set; }
 }

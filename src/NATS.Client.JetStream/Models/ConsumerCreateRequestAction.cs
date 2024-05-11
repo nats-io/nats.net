@@ -1,4 +1,4 @@
-﻿using System.Runtime.Serialization;
+using System.Runtime.Serialization;
 
 namespace NATS.Client.JetStream.Models;
 

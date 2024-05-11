@@ -119,7 +119,7 @@ public class ManageConsumerTest
         }
     }
 
-    [Fact]
+    [SkipIfNatsServer(versionEarlierThan: "2.10")]
     public async Task Consumer_create_update_action()
     {
         await using var server = NatsServer.StartJS();
@@ -152,8 +152,7 @@ public class ManageConsumerTest
 
         // Try create when consumer exactly
         {
-            var changedConsumerConfig = new ConsumerConfig { Name = "c1", MaxBatch = 100 };
-
+            var changedConsumerConfig = new ConsumerConfig { Name = "c1", AckWait = TimeSpan.FromSeconds(10) };
             var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () => await js.CreateConsumerAsync("s1", changedConsumerConfig));
 
             Assert.Equal("consumer already exists", exception.Message);
