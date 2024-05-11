@@ -52,6 +52,10 @@ public class NatsKVContextFactoryTest
 
         public ValueTask<INatsJSConsumer> CreateOrUpdateConsumerAsync(string stream, ConsumerConfig config, CancellationToken cancellationToken = default) => throw new NotImplementedException();
 
+        public ValueTask<INatsJSConsumer> CreateConsumerAsync(string stream, ConsumerConfig config, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+
+        public ValueTask<INatsJSConsumer> UpdateConsumerAsync(string stream, ConsumerConfig config, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+
         public ValueTask<INatsJSConsumer> GetConsumerAsync(string stream, string consumer, CancellationToken cancellationToken = default) => throw new NotImplementedException();
 
         public IAsyncEnumerable<INatsJSConsumer> ListConsumersAsync(string stream, CancellationToken cancellationToken = default) => throw new NotImplementedException();

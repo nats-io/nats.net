@@ -47,9 +47,9 @@ public class ManageConsumerTest
         var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
-        await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
-        await js.CreateConsumerAsync("s1", "c2", cancellationToken: cts.Token);
-        await js.CreateConsumerAsync("s1", "c3", cancellationToken: cts.Token);
+        await js.CreateOrUpdateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+        await js.CreateOrUpdateConsumerAsync("s1", "c2", cancellationToken: cts.Token);
+        await js.CreateOrUpdateConsumerAsync("s1", "c3", cancellationToken: cts.Token);
 
         // List
         {
@@ -116,6 +116,48 @@ public class ManageConsumerTest
             var consumerInfo = await js.GetConsumerAsync("s1", "c1", cts.Token);
             Assert.False(consumerInfo.Info.IsPaused);
             Assert.Null(consumerInfo.Info.Config.PauseUntil);
+        }
+    }
+
+    [Fact]
+    public async Task Consumer_create_update_action()
+    {
+        await using var server = NatsServer.StartJS();
+        var nats = server.CreateClientConnection();
+        var js = new NatsJSContext(nats);
+
+        var streamConfig = new StreamConfig { Name = "s1" };
+        await js.CreateStreamAsync(streamConfig);
+
+        var consumerConfig = new ConsumerConfig { Name = "c1" };
+
+        // Try update when consumer does not exist
+        {
+            var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () => await js.UpdateConsumerAsync("s1", consumerConfig));
+
+            Assert.Equal("consumer does not exist", exception.Message);
+            Assert.Equal(10149, exception.Error.ErrCode);
+        }
+
+        // Create and update consumer, with exactly the same config.
+        {
+            await js.CreateOrUpdateConsumerAsync("s1", consumerConfig);
+            await js.CreateOrUpdateConsumerAsync("s1", consumerConfig);
+        }
+
+        // Create consumer, with exactly the same config.
+        {
+            await js.CreateConsumerAsync("s1", consumerConfig);
+        }
+
+        // Try create when consumer exactly
+        {
+            var changedConsumerConfig = new ConsumerConfig { Name = "c1", MaxBatch = 100 };
+
+            var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () => await js.CreateConsumerAsync("s1", changedConsumerConfig));
+
+            Assert.Equal("consumer already exists", exception.Message);
+            Assert.Equal(10148, exception.Error.ErrCode);
         }
     }
 }

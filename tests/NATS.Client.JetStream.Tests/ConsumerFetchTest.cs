@@ -17,7 +17,7 @@ public class ConsumerFetchTest
         await using var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
-        await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+        await js.CreateOrUpdateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
 
         for (var i = 0; i < 10; i++)
         {
@@ -47,7 +47,7 @@ public class ConsumerFetchTest
         await using var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
-        await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+        await js.CreateOrUpdateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
 
         for (var i = 0; i < 10; i++)
         {
@@ -77,7 +77,7 @@ public class ConsumerFetchTest
 
         var js = new NatsJSContext(nats);
         var stream = await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
-        var consumer = (NatsJSConsumer)await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+        var consumer = (NatsJSConsumer)await js.CreateOrUpdateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
 
         var fetchOpts = new NatsJSFetchOpts
         {

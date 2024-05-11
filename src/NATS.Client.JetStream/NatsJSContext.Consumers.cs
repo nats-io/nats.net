@@ -33,31 +33,25 @@ public partial class NatsJSContext : INatsJSContext
         CancellationToken cancellationToken = default)
     {
         ThrowIfInvalidStreamName(stream);
+        return await CreateOrUpdateConsumerInternalAsync(stream, config, ConsumerCreateRequestAction.CreateOrUpdate, cancellationToken);
+    }
 
-        // TODO: Adjust API subject according to server version and filter subject
-        var subject = $"{Opts.Prefix}.CONSUMER.CREATE.{stream}";
+    public async ValueTask<INatsJSConsumer> CreateConsumerAsync(
+        string stream,
+        ConsumerConfig config,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfInvalidStreamName(stream);
+        return await CreateOrUpdateConsumerInternalAsync(stream, config, ConsumerCreateRequestAction.Create, cancellationToken);
+    }
 
-        if (!string.IsNullOrWhiteSpace(config.Name))
-        {
-            subject += $".{config.Name}";
-            config.Name = default!;
-        }
-
-        if (!string.IsNullOrWhiteSpace(config.FilterSubject))
-        {
-            subject += $".{config.FilterSubject}";
-        }
-
-        var response = await JSRequestResponseAsync<ConsumerCreateRequest, ConsumerInfo>(
-            subject: subject,
-            new ConsumerCreateRequest
-            {
-                StreamName = stream,
-                Config = config,
-            },
-            cancellationToken);
-
-        return new NatsJSConsumer(this, response);
+    public async ValueTask<INatsJSConsumer> UpdateConsumerAsync(
+        string stream,
+        ConsumerConfig config,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfInvalidStreamName(stream);
+        return await CreateOrUpdateConsumerInternalAsync(stream, config, ConsumerCreateRequestAction.Update, cancellationToken);
     }
 
     /// <summary>
@@ -212,6 +206,7 @@ public partial class NatsJSContext : INatsJSContext
                 NumReplicas = 1,
                 MemStorage = true,
             },
+            Action = ConsumerCreateRequestAction.Create,
         };
 
         if (opts.OptStartSeq > 0)
@@ -241,5 +236,38 @@ public partial class NatsJSContext : INatsJSContext
             subject: subject,
             request,
             cancellationToken);
+    }
+
+    private async ValueTask<NatsJSConsumer> CreateOrUpdateConsumerInternalAsync(
+        string stream,
+        ConsumerConfig config,
+        ConsumerCreateRequestAction requestAction,
+        CancellationToken cancellationToken)
+    {
+        // TODO: Adjust API subject according to server version and filter subject
+        var subject = $"{Opts.Prefix}.CONSUMER.CREATE.{stream}";
+
+        if (!string.IsNullOrWhiteSpace(config.Name))
+        {
+            subject += $".{config.Name}";
+            config.Name = default!;
+        }
+
+        if (!string.IsNullOrWhiteSpace(config.FilterSubject))
+        {
+            subject += $".{config.FilterSubject}";
+        }
+
+        var response = await JSRequestResponseAsync<ConsumerCreateRequest, ConsumerInfo>(
+            subject: subject,
+            new ConsumerCreateRequest
+            {
+                StreamName = stream,
+                Config = config,
+                Action = requestAction,
+            },
+            cancellationToken);
+
+        return new NatsJSConsumer(this, response);
     }
 }
