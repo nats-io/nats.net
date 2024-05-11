@@ -129,24 +129,10 @@ public class ManageConsumerTest
         var streamConfig = new StreamConfig { Name = "s1" };
         await js.CreateStreamAsync(streamConfig);
 
-        var consumerConfig = new ConsumerConfig { Name = "c1" };
-
-        // Try update when consumer does not exist
+        // Create consumer
         {
-            var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () => await js.UpdateConsumerAsync("s1", consumerConfig));
+            var consumerConfig = new ConsumerConfig { Name = "c1" };
 
-            Assert.Equal("consumer does not exist", exception.Message);
-            Assert.Equal(10149, exception.Error.ErrCode);
-        }
-
-        // Create and update consumer, with exactly the same config.
-        {
-            await js.CreateOrUpdateConsumerAsync("s1", consumerConfig);
-            await js.CreateOrUpdateConsumerAsync("s1", consumerConfig);
-        }
-
-        // Create consumer, with exactly the same config.
-        {
             await js.CreateConsumerAsync("s1", consumerConfig);
         }
 
@@ -157,6 +143,21 @@ public class ManageConsumerTest
 
             Assert.Equal("consumer already exists", exception.Message);
             Assert.Equal(10148, exception.Error.ErrCode);
+        }
+
+        // Update cosnsumer
+        {
+            var changedConsumerConfig = new ConsumerConfig { Name = "c1", AckWait = TimeSpan.FromSeconds(10) };
+            await js.CreateOrUpdateConsumerAsync("s1", changedConsumerConfig);
+        }
+
+        // Try update when consumer does not exist
+        {
+            var notExistConsumerConfig = new ConsumerConfig { Name = "c2", AckWait = TimeSpan.FromSeconds(10) };
+            var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () => await js.UpdateConsumerAsync("s1", notExistConsumerConfig));
+
+            Assert.Equal("consumer does not exist", exception.Message);
+            Assert.Equal(10149, exception.Error.ErrCode);
         }
     }
 }
