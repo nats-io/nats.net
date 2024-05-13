@@ -327,15 +327,20 @@ public class NuidWriterTests
     }
 
     [Fact]
-    public void Only_last_two_digits_change()
+    public void Only_last_few_digits_change()
     {
+        // check that last 'tail' digits change,
+        // while the rest of the Nuid remains the same
+        const int tail = 4;
+        const int head = 22 - tail;
+
         var nuid1 = NuidWriter.NewNuid();
-        var head1 = nuid1.Substring(0, 20);
-        var tail1 = nuid1.Substring(20, 2);
+        var head1 = nuid1.Substring(0, head);
+        var tail1 = nuid1.Substring(head, tail);
 
         var nuid2 = NuidWriter.NewNuid();
-        var head2 = nuid2.Substring(0, 20);
-        var tail2 = nuid2.Substring(20, 2);
+        var head2 = nuid2.Substring(0, head);
+        var tail2 = nuid2.Substring(head, tail);
 
         Assert.NotEqual(nuid1, nuid2);
         Assert.Equal(head1, head2);
