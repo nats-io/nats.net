@@ -33,7 +33,7 @@ public partial class NatsJSContext : INatsJSContext
         CancellationToken cancellationToken = default)
     {
         ThrowIfInvalidStreamName(stream);
-        return await CreateOrUpdateConsumerInternalAsync(stream, config, ConsumerCreateRequestAction.CreateOrUpdate, cancellationToken);
+        return await CreateOrUpdateConsumerInternalAsync(stream, config, null, cancellationToken);
     }
 
     public async ValueTask<INatsJSConsumer> CreateConsumerAsync(
@@ -42,7 +42,7 @@ public partial class NatsJSContext : INatsJSContext
         CancellationToken cancellationToken = default)
     {
         ThrowIfInvalidStreamName(stream);
-        return await CreateOrUpdateConsumerInternalAsync(stream, config, ConsumerCreateRequestAction.Create, cancellationToken);
+        return await CreateOrUpdateConsumerInternalAsync(stream, config, ConsumerCreateAction.Create, cancellationToken);
     }
 
     public async ValueTask<INatsJSConsumer> UpdateConsumerAsync(
@@ -51,7 +51,7 @@ public partial class NatsJSContext : INatsJSContext
         CancellationToken cancellationToken = default)
     {
         ThrowIfInvalidStreamName(stream);
-        return await CreateOrUpdateConsumerInternalAsync(stream, config, ConsumerCreateRequestAction.Update, cancellationToken);
+        return await CreateOrUpdateConsumerInternalAsync(stream, config, ConsumerCreateAction.Update, cancellationToken);
     }
 
     /// <summary>
@@ -206,7 +206,7 @@ public partial class NatsJSContext : INatsJSContext
                 NumReplicas = 1,
                 MemStorage = true,
             },
-            Action = ConsumerCreateRequestAction.Create,
+            Action = ConsumerCreateAction.Create,
         };
 
         if (opts.OptStartSeq > 0)
@@ -241,7 +241,7 @@ public partial class NatsJSContext : INatsJSContext
     private async ValueTask<NatsJSConsumer> CreateOrUpdateConsumerInternalAsync(
         string stream,
         ConsumerConfig config,
-        ConsumerCreateRequestAction requestAction,
+        ConsumerCreateAction? action,
         CancellationToken cancellationToken)
     {
         // TODO: Adjust API subject according to server version and filter subject
@@ -264,7 +264,7 @@ public partial class NatsJSContext : INatsJSContext
             {
                 StreamName = stream,
                 Config = config,
-                Action = requestAction,
+                Action = action,
             },
             cancellationToken);
 
