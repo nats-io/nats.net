@@ -217,7 +217,7 @@ internal class NatsJSJsonStringEnumConverter<TEnum> : JsonConverter<TEnum>
             case "update":
                 return (TEnum)(object)ConsumerCreateAction.Update;
             default:
-                return (TEnum)(object)ConsumerCreateAction.Default;
+                return (TEnum)(object)ConsumerCreateAction.CreateOrUpdate;
             }
         }
 
@@ -332,7 +332,7 @@ internal class NatsJSJsonStringEnumConverter<TEnum> : JsonConverter<TEnum>
         {
             switch (consumerCreateRequestAction)
             {
-            case ConsumerCreateAction.Default:
+            case ConsumerCreateAction.CreateOrUpdate:
                 // ignore default value
                 return;
             case ConsumerCreateAction.Create:
