@@ -23,7 +23,7 @@ public class DoubleAckTest
 
         // fetch loop
         {
-            var consumer = (NatsJSConsumer)await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+            var consumer = (NatsJSConsumer)await js.CreateOrUpdateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
 
             var fetchOpts = new NatsJSFetchOpts
             {
@@ -45,7 +45,7 @@ public class DoubleAckTest
 
         // consume loop
         {
-            var consumer = (NatsJSConsumer)await js.CreateConsumerAsync("s1", "c2", cancellationToken: cts.Token);
+            var consumer = (NatsJSConsumer)await js.CreateOrUpdateConsumerAsync("s1", "c2", cancellationToken: cts.Token);
 
             var opts = new NatsJSConsumeOpts
             {

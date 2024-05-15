@@ -18,7 +18,7 @@ public class ConsumerNextTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
-        var consumer = await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+        var consumer = await js.CreateOrUpdateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
 
         for (var i = 0; i < 10; i++)
         {
