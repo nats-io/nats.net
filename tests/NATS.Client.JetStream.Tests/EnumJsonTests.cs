@@ -152,8 +152,8 @@ public class EnumJsonTests
     [Theory]
     [InlineData(ConsumerCreateAction.Create, "{\"stream_name\":\"\",\"config\":null,\"action\":\"create\"}")]
     [InlineData(ConsumerCreateAction.Update, "{\"stream_name\":\"\",\"config\":null,\"action\":\"update\"}")]
-    [InlineData(null, "{\"stream_name\":\"\",\"config\":null}")]
-    public void ConsumerCreateRequestAction_Test(ConsumerCreateAction? value, string expected)
+    [InlineData(ConsumerCreateAction.Default, "{\"stream_name\":\"\",\"config\":null}")]
+    public void ConsumerCreateRequestAction_Test(ConsumerCreateAction value, string expected)
     {
         var serializer = NatsJSJsonSerializer<ConsumerCreateRequest>.Default;
 

@@ -108,6 +108,7 @@ internal partial class NatsJSJsonSerializerContext : JsonSerializerContext
 
 #if NET6_0
 internal class NatsJSJsonStringEnumConverter<TEnum> : JsonConverter<TEnum>
+    where TEnum : struct, Enum
 {
     public override TEnum Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
@@ -207,7 +208,7 @@ internal class NatsJSJsonStringEnumConverter<TEnum> : JsonConverter<TEnum>
             }
         }
 
-        if (typeToConvert == typeof(ConsumerCreateAction?))
+        if (typeToConvert == typeof(ConsumerCreateAction))
         {
             switch (stringValue)
             {
@@ -215,6 +216,8 @@ internal class NatsJSJsonStringEnumConverter<TEnum> : JsonConverter<TEnum>
                 return (TEnum)(object)ConsumerCreateAction.Create;
             case "update":
                 return (TEnum)(object)ConsumerCreateAction.Update;
+            default:
+                return (TEnum)(object)ConsumerCreateAction.Default;
             }
         }
 
@@ -329,6 +332,9 @@ internal class NatsJSJsonStringEnumConverter<TEnum> : JsonConverter<TEnum>
         {
             switch (consumerCreateRequestAction)
             {
+            case ConsumerCreateAction.Default:
+                // ignore default value
+                return;
             case ConsumerCreateAction.Create:
                 writer.WriteStringValue("create");
                 return;

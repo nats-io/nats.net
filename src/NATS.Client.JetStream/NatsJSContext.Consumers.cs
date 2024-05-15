@@ -1,6 +1,5 @@
 using System.Runtime.CompilerServices;
 using NATS.Client.Core.Internal;
-using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
@@ -33,7 +32,7 @@ public partial class NatsJSContext : INatsJSContext
         CancellationToken cancellationToken = default)
     {
         ThrowIfInvalidStreamName(stream);
-        return await CreateOrUpdateConsumerInternalAsync(stream, config, null, cancellationToken);
+        return await CreateOrUpdateConsumerInternalAsync(stream, config, default, cancellationToken);
     }
 
     public async ValueTask<INatsJSConsumer> CreateConsumerAsync(
@@ -241,7 +240,7 @@ public partial class NatsJSContext : INatsJSContext
     private async ValueTask<NatsJSConsumer> CreateOrUpdateConsumerInternalAsync(
         string stream,
         ConsumerConfig config,
-        ConsumerCreateAction? action,
+        ConsumerCreateAction action,
         CancellationToken cancellationToken)
     {
         // TODO: Adjust API subject according to server version and filter subject

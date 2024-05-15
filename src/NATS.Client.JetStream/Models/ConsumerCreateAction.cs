@@ -2,6 +2,7 @@ namespace NATS.Client.JetStream.Models;
 
 public enum ConsumerCreateAction
 {
-    Create = 0,
-    Update = 1,
+    Default = 0,
+    Create = 1,
+    Update = 2,
 }

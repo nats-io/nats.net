@@ -30,9 +30,9 @@ internal record ConsumerCreateRequest
     public ConsumerConfig? Config { get; set; }
 
     [System.Text.Json.Serialization.JsonPropertyName("action")]
-    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
 #if NET6_0
-    [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonStringEnumConverter<ConsumerCreateAction?>))]
+    [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonStringEnumConverter<ConsumerCreateAction>))]
 #endif
-    public ConsumerCreateAction? Action { get; set; }
+    public ConsumerCreateAction Action { get; set; }
 }
