@@ -155,7 +155,6 @@ public class ManageConsumerTest
 
             var c2 = await js.GetConsumerAsync("s1", "c1");
             Assert.Equal(TimeSpan.FromSeconds(10), c2.Info.Config.AckWait);
-
         }
 
         // Try to update when consumer does not exist
