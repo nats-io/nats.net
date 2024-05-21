@@ -29,7 +29,6 @@ public record ConsumerConfig
     {
         Name = name;
         DurableName = name;
-        AckPolicy = ConsumerConfigAckPolicy.Explicit;
     }
 
     [System.Text.Json.Serialization.JsonPropertyName("deliver_policy")]
@@ -91,7 +90,7 @@ public record ConsumerConfig
 #if NET6_0
     [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonStringEnumConverter<ConsumerConfigAckPolicy>))]
 #endif
-    public ConsumerConfigAckPolicy AckPolicy { get; set; } = ConsumerConfigAckPolicy.None;
+    public ConsumerConfigAckPolicy AckPolicy { get; set; } = ConsumerConfigAckPolicy.Explicit;
 
     /// <summary>
     /// How long (in nanoseconds) to allow messages to remain un-acknowledged before attempting redelivery
