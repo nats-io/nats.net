@@ -65,7 +65,7 @@ public class ConsumerConsumeTest
         var (nats, proxy) = server.CreateProxiedClientConnection();
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
-        await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+        await js.CreateOrUpdateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
 
         for (var i = 0; i < 30; i++)
         {
@@ -128,7 +128,7 @@ public class ConsumerConsumeTest
 
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
-        await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+        await js.CreateOrUpdateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
 
         var ack = await js.PublishAsync("s1.foo", new TestData { Test = 0 }, serializer: TestDataJsonSerializer<TestData>.Default, cancellationToken: cts.Token);
         ack.EnsureSuccess();
@@ -203,7 +203,7 @@ public class ConsumerConsumeTest
         var js = new NatsJSContext(nats);
         var js2 = new NatsJSContext(nats2);
         await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
-        await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+        await js.CreateOrUpdateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
 
         var consumerOpts = new NatsJSConsumeOpts
         {
@@ -276,7 +276,7 @@ public class ConsumerConsumeTest
 
         var js = new NatsJSContext(nats);
         var stream = await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
-        var consumer = (NatsJSConsumer)await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+        var consumer = (NatsJSConsumer)await js.CreateOrUpdateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
 
         var consumerOpts = new NatsJSConsumeOpts
         {
@@ -353,7 +353,7 @@ public class ConsumerConsumeTest
 
         var js = new NatsJSContext(nats);
         var stream = await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
-        var consumer = (NatsJSConsumer)await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+        var consumer = (NatsJSConsumer)await js.CreateOrUpdateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
 
         var consumerOpts = new NatsJSConsumeOpts
         {
@@ -433,7 +433,7 @@ public class ConsumerConsumeTest
         var ack = await js.PublishAsync("s1.foo", "not an int", cancellationToken: cts.Token);
         ack.EnsureSuccess();
 
-        var consumer = await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+        var consumer = await js.CreateOrUpdateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
 
         await foreach (var msg in consumer.ConsumeAsync<int>(cancellationToken: cts.Token))
         {

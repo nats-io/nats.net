@@ -148,4 +148,23 @@ public class EnumJsonTests
         Assert.NotNull(result);
         Assert.Equal(value, result.Storage);
     }
+
+    [Theory]
+    [InlineData(ConsumerCreateAction.Create, "{\"stream_name\":\"\",\"config\":null,\"action\":\"create\"}")]
+    [InlineData(ConsumerCreateAction.Update, "{\"stream_name\":\"\",\"config\":null,\"action\":\"update\"}")]
+    [InlineData(ConsumerCreateAction.CreateOrUpdate, "{\"stream_name\":\"\",\"config\":null}")]
+    public void ConsumerCreateRequestAction_Test(ConsumerCreateAction value, string expected)
+    {
+        var serializer = NatsJSJsonSerializer<ConsumerCreateRequest>.Default;
+
+        var bw = new NatsBufferWriter<byte>();
+        serializer.Serialize(bw, new ConsumerCreateRequest { Action = value, StreamName = string.Empty });
+
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan);
+        Assert.Contains(expected, json);
+
+        var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory));
+        Assert.NotNull(result);
+        Assert.Equal(value, result.Action);
+    }
 }
