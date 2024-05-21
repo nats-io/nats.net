@@ -148,7 +148,7 @@ public class ManageConsumerTest
         // Update consumer
         {
             var c1 = await js.GetConsumerAsync("s1", "c1");
-            Assert.Equal(default, c1.Info.Config.AckWait);
+            Assert.Equal(TimeSpan.FromSeconds(30), c1.Info.Config.AckWait);
 
             var changedConsumerConfig = new ConsumerConfig { Name = "c1", AckWait = TimeSpan.FromSeconds(10) };
             await js.UpdateConsumerAsync("s1", changedConsumerConfig);
