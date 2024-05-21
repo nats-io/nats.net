@@ -29,7 +29,6 @@ public record ConsumerConfig
     {
         Name = name;
         DurableName = name;
-        AckPolicy = ConsumerConfigAckPolicy.Explicit;
     }
 
     [System.Text.Json.Serialization.JsonPropertyName("deliver_policy")]
