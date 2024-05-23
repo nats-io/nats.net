@@ -407,7 +407,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     }
 
     // only used for internal testing
-    internal async Task TestStallFlushAsync(TimeSpan timeSpan)
+    internal async Task TestStallFlushAsync(TimeSpan timeSpan, CancellationToken cancellationToken)
     {
         await _semLock.WaitAsync().ConfigureAwait(false);
 
@@ -418,7 +418,7 @@ internal sealed class CommandWriter : IAsyncDisposable
                 await _flushTask.ConfigureAwait(false);
             }
 
-            _flushTask = Task.Delay(timeSpan);
+            _flushTask = Task.Delay(timeSpan, cancellationToken);
         }
         finally
         {
