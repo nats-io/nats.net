@@ -10,7 +10,7 @@ public class CancellationTest
     [Fact]
     public async Task CommandTimeoutTest()
     {
-        var server = NatsServer.Start(_output, TransportType.Tcp);
+        await using var server = NatsServer.Start();
 
         await using var conn = server.CreateClientConnection(NatsOpts.Default with { CommandTimeout = TimeSpan.FromMilliseconds(1) });
         await conn.ConnectAsync();
@@ -19,7 +19,8 @@ public class CancellationTest
         var cancellationToken = cts.Token;
 
         // stall the flush task
-        var stallTask = conn.CommandWriter.TestStallFlushAsync(TimeSpan.FromSeconds(1));
+        var stopToken = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var stallTask = conn.CommandWriter.TestStallFlushAsync(TimeSpan.FromSeconds(10), stopToken.Token);
 
         // commands that call ConnectAsync throw OperationCanceledException
         await Assert.ThrowsAsync<OperationCanceledException>(() => conn.PingAsync(cancellationToken).AsTask());
@@ -31,6 +32,7 @@ public class CancellationTest
             }
         });
 
+        stopToken.Cancel();
         await stallTask;
     }
 
