@@ -123,6 +123,8 @@ public class NatsJSContextFactoryTest
             CancellationToken cancellationToken = default)
             => throw new NotImplementedException();
 
+        public ValueTask<NatsMsg<TReply>> RequestAsync<TReply>(string subject, INatsDeserialize<TReply>? replySerializer = default, NatsSubOpts? replyOpts = default, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+
         public IAsyncEnumerable<NatsMsg<TReply>> RequestManyAsync<TRequest, TReply>(
             string subject,
             TRequest? data,

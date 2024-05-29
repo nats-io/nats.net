@@ -392,4 +392,30 @@ public class RequestReplyTest
         await sub.DisposeAsync();
         await reg;
     }
+
+    [Fact]
+    public async Task Simple_empty_request_reply_test()
+    {
+        await using var server = NatsServer.Start();
+        await using var nats = server.CreateClientConnection();
+
+        const string subject = "foo";
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cancellationToken = cts.Token;
+
+        var sub = await nats.SubscribeCoreAsync<int>(subject, cancellationToken: cancellationToken);
+        var reg = sub.Register(async msg =>
+        {
+            await msg.ReplyAsync(42, cancellationToken: cancellationToken);
+        });
+
+        var reply1 = await nats.RequestAsync<object, int>(subject, null, cancellationToken: cancellationToken);
+        var reply2 = await nats.RequestAsync<int>(subject, cancellationToken: cancellationToken);
+
+        Assert.Equal(42, reply1.Data);
+        Assert.Equal(42, reply2.Data);
+
+        await sub.DisposeAsync();
+        await reg;
+    }
 }

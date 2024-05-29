@@ -131,7 +131,7 @@ public interface INatsConnection : IAsyncDisposable
     /// <remarks>
     /// Response can be (null) or one <see cref="NatsMsg{T}"/>.
     /// Reply option's max messages will be set to 1.
-    /// if reply option's timeout is not defined then it will be set to NatsOpts.RequestTimeout.
+    /// If reply option's timeout is not defined, then it will be set to NatsOpts.RequestTimeout.
     /// </remarks>
     ValueTask<NatsMsg<TReply>> RequestAsync<TRequest, TReply>(
         string subject,
@@ -140,6 +140,27 @@ public interface INatsConnection : IAsyncDisposable
         INatsSerialize<TRequest>? requestSerializer = default,
         INatsDeserialize<TReply>? replySerializer = default,
         NatsPubOpts? requestOpts = default,
+        NatsSubOpts? replyOpts = default,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Send an empty request message and await the reply message asynchronously.
+    /// </summary>
+    /// <param name="subject">Subject of the responder</param>
+    /// <param name="replySerializer">Serializer to use for the reply message type.</param>
+    /// <param name="replyOpts">Reply handler subscription options</param>
+    /// <param name="cancellationToken">Cancel this request</param>
+    /// <typeparam name="TReply">Reply type</typeparam>
+    /// <returns>Returns the <see cref="NatsMsg{T}"/> received from the responder as reply.</returns>
+    /// <exception cref="OperationCanceledException">Raised when cancellation token is used</exception>
+    /// <remarks>
+    /// Response can be (null) or one <see cref="NatsMsg{T}"/>.
+    /// Reply option's max messages will be set to 1.
+    /// If reply option's timeout is not defined, then it will be set to NatsOpts.RequestTimeout.
+    /// </remarks>
+    ValueTask<NatsMsg<TReply>> RequestAsync<TReply>(
+        string subject,
+        INatsDeserialize<TReply>? replySerializer = default,
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default);
 

@@ -75,6 +75,22 @@ public partial class NatsConnection
     }
 
     /// <inheritdoc />
+    public ValueTask<NatsMsg<TReply>> RequestAsync<TReply>(
+        string subject,
+        INatsDeserialize<TReply>? replySerializer = default,
+        NatsSubOpts? replyOpts = default,
+        CancellationToken cancellationToken = default) =>
+        RequestAsync<object, TReply>(
+            subject: subject,
+            data: default,
+            headers: default,
+            requestSerializer: default,
+            replySerializer: replySerializer,
+            requestOpts: default,
+            replyOpts: replyOpts,
+            cancellationToken: cancellationToken);
+
+    /// <inheritdoc />
     public async IAsyncEnumerable<NatsMsg<TReply>> RequestManyAsync<TRequest, TReply>(
         string subject,
         TRequest? data,
