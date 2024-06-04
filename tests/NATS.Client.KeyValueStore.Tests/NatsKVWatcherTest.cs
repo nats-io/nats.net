@@ -544,4 +544,79 @@ public class NatsKVWatcherTest
 
         noData.Should().BeTrue();
     }
+
+    [Fact]
+    public async Task Validate_watch_options()
+    {
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+
+        const string bucket = nameof(Validate_watch_options);
+        var config = new NatsKVConfig(bucket) { History = 10 };
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+        var store = await kv.CreateStoreAsync(config, cancellationToken: cancellationToken);
+
+        for (int i = 0; i < 10; i++)
+        {
+            await store.PutAsync("x", i, cancellationToken: cancellationToken);
+        }
+
+        // Valid options
+        foreach (var opts in new[]
+                 {
+                     new NatsKVWatchOpts { IncludeHistory = false, UpdatesOnly = false, ResumeAtRevision = 5 },
+                     new NatsKVWatchOpts { IncludeHistory = true, UpdatesOnly = false, ResumeAtRevision = 0 },
+                     new NatsKVWatchOpts { IncludeHistory = false, UpdatesOnly = true, ResumeAtRevision = 0 },
+                 })
+        {
+            var count = 0;
+            var cts2 = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+            if (opts.UpdatesOnly)
+            {
+                cts2.Cancel();
+                count++;
+            }
+
+            try
+            {
+                await foreach (var entry in store.WatchAsync<int>([">"], opts: opts, cancellationToken: cts2.Token))
+                {
+                    count++;
+                    _output.WriteLine($"entry: {entry.Key} ({entry.Revision}): {entry.Value}");
+                    if (entry.Value == 9)
+                        break;
+                }
+            }
+            catch (TaskCanceledException)
+            {
+            }
+            catch (OperationCanceledException)
+            {
+            }
+
+            count.Should().BeGreaterThan(0);
+        }
+
+        // Invalid options
+        foreach (var opts in new[]
+                 {
+                     new NatsKVWatchOpts { IncludeHistory = true, UpdatesOnly = false, ResumeAtRevision = 5 },
+                     new NatsKVWatchOpts { IncludeHistory = true, UpdatesOnly = true, ResumeAtRevision = 5 },
+                     new NatsKVWatchOpts { IncludeHistory = false, UpdatesOnly = true, ResumeAtRevision = 5 },
+                     new NatsKVWatchOpts { IncludeHistory = true, UpdatesOnly = true, ResumeAtRevision = 0 },
+                 })
+        {
+            await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            {
+                await foreach (var entry in store.WatchAsync<int>([">"], opts: opts, cancellationToken: cancellationToken))
+                {
+                }
+            });
+        }
+    }
 }
