@@ -22,12 +22,9 @@ public partial class NatsConnection
 
         // We don't cancel the channel reader here because we want to keep reading until the subscription
         // channel writer completes so that messages left in the channel can be consumed before exit the loop.
-        while (await sub.Msgs.WaitToReadAsync(CancellationToken.None).ConfigureAwait(false))
+        await foreach (var msg in sub.Msgs.ReadAllAsync(CancellationToken.None).ConfigureAwait(false))
         {
-            while (sub.Msgs.TryRead(out var msg))
-            {
-                yield return msg;
-            }
+            yield return msg;
         }
     }
 

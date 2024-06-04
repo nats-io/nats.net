@@ -23,6 +23,9 @@ public class PublishSerialBench
         await _nats.ConnectAsync();
     }
 
+    [GlobalCleanup]
+    public async Task Cleanup() => await _nats.DisposeAsync();
+
     [Benchmark]
     public async Task PublishAsync()
     {
