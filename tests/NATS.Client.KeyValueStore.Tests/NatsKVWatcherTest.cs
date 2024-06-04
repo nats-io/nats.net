@@ -560,7 +560,7 @@ public class NatsKVWatcherTest
         var kv = new NatsKVContext(js);
         var store = await kv.CreateStoreAsync(config, cancellationToken: cancellationToken);
 
-        for (int i = 0; i < 10; i++)
+        for (var i = 0; i < 10; i++)
         {
             await store.PutAsync("x", i, cancellationToken: cancellationToken);
         }
