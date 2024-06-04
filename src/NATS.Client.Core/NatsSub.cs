@@ -23,7 +23,7 @@ public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
             connection.GetChannelOpts(connection.Opts, opts?.ChannelOpts),
             msg => Connection.OnMessageDropped(this, _msgs?.Reader.Count ?? 0, msg));
 
-        Msgs = new ActivityEndingMsgReader<T>(_msgs.Reader);
+        Msgs = new ActivityEndingMsgReader<T>(_msgs.Reader, this);
 
         Serializer = serializer;
     }

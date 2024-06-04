@@ -16,9 +16,8 @@ public partial class NatsConnection
     {
         serializer ??= Opts.SerializerRegistry.GetDeserializer<T>();
 
+        // call to RegisterSubAnchor is no longer needed; sub is kept alive in ActivityEndingMsgReader
         await using var sub = new NatsSub<T>(this, SubscriptionManager.GetManagerFor(subject), subject, queueGroup, opts, serializer, cancellationToken);
-        using var anchor = RegisterSubAnchor(sub);
-
         await SubAsync(sub, cancellationToken: cancellationToken).ConfigureAwait(false);
 
         // We don't cancel the channel reader here because we want to keep reading until the subscription
