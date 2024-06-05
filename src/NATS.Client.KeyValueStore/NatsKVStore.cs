@@ -331,12 +331,9 @@ public class NatsKVStore : INatsKVStore
             }
         }
 
-        while (await watcher.Entries.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+        await foreach (var entry in watcher.Entries.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
-            while (watcher.Entries.TryRead(out var entry))
-            {
-                yield return entry;
-            }
+            yield return entry;
         }
     }
 
@@ -359,14 +356,11 @@ public class NatsKVStore : INatsKVStore
 
         await using var watcher = await WatchInternalAsync<T>([key], serializer, opts, cancellationToken);
 
-        while (await watcher.Entries.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+        await foreach (var entry in watcher.Entries.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
-            while (watcher.Entries.TryRead(out var entry))
-            {
-                yield return entry;
-                if (entry.Delta == 0)
-                    yield break;
-            }
+            yield return entry;
+            if (entry.Delta == 0)
+                yield break;
         }
     }
 
@@ -398,15 +392,12 @@ public class NatsKVStore : INatsKVStore
             if (watcher.InitialConsumer.Info.NumPending == 0)
                 return;
 
-            while (await watcher.Entries.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+            await foreach (var entry in watcher.Entries.ReadAllAsync(cancellationToken).ConfigureAwait(false))
             {
-                while (watcher.Entries.TryRead(out var entry))
-                {
-                    if (entry.Operation is NatsKVOperation.Purge or NatsKVOperation.Del)
-                        deleted.Add(entry);
-                    if (entry.Delta == 0)
-                        goto PURGE_LOOP_DONE;
-                }
+                if (entry.Operation is NatsKVOperation.Purge or NatsKVOperation.Del)
+                    deleted.Add(entry);
+                if (entry.Delta == 0)
+                    goto PURGE_LOOP_DONE;
             }
         }
 
@@ -442,15 +433,12 @@ public class NatsKVStore : INatsKVStore
         if (watcher.InitialConsumer.Info.NumPending == 0)
             yield break;
 
-        while (await watcher.Entries.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+        await foreach (var entry in watcher.Entries.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
-            while (watcher.Entries.TryRead(out var entry))
-            {
-                if (entry.Operation is NatsKVOperation.Put)
-                    yield return entry.Key;
-                if (entry.Delta == 0)
-                    yield break;
-            }
+            if (entry.Operation is NatsKVOperation.Put)
+                yield return entry.Key;
+            if (entry.Delta == 0)
+                yield break;
         }
     }
 
