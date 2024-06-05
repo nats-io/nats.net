@@ -128,11 +128,12 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
             Timeout.Infinite,
             Timeout.Infinite);
 
-        // This channel is used to pass messages
-        // to the user from the subscription channel (which should be set to a
-        // sufficiently large value to avoid blocking socket reads in the
-        // NATS connection).
-        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg>>(1000);
+        // This channel is used to pass messages to the user from the subscription channel.
+        // Capacity is set to maxMsgs to avoid pulling too many messages from the server
+        // resulting in a large number of pending messages (which can be a problem if the
+        // application is slow to process messages). The capacity is bounded to a maximum of 1024
+        // to avoid LOH allocations.
+        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg>>(maxMsgs > 1024 ? 1024 : (int)maxMsgs);
         Msgs = _userMsgs.Reader;
 
         // Capacity as 1 is enough here since it's used for signaling only.
