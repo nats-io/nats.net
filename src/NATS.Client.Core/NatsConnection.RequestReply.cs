@@ -42,12 +42,9 @@ public partial class NatsConnection
                 await using var sub1 = await RequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
                     .ConfigureAwait(false);
 
-                if (await sub1.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+                await foreach (var msg in sub1.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
                 {
-                    if (sub1.Msgs.TryRead(out var msg))
-                    {
-                        return msg;
-                    }
+                    return msg;
                 }
 
                 throw new NatsNoReplyException();
@@ -63,12 +60,9 @@ public partial class NatsConnection
         await using var sub = await RequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
             .ConfigureAwait(false);
 
-        if (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+        await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
-            if (sub.Msgs.TryRead(out var msg))
-            {
-                return msg;
-            }
+            return msg;
         }
 
         throw new NatsNoReplyException();
@@ -105,12 +99,9 @@ public partial class NatsConnection
         await using var sub = await RequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
             .ConfigureAwait(false);
 
-        while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+        await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
-            while (sub.Msgs.TryRead(out var msg))
-            {
-                yield return msg;
-            }
+            yield return msg;
         }
     }
 

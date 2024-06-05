@@ -144,17 +144,14 @@ public partial class NatsJSContext
 
             try
             {
-                while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+                await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
                 {
-                    while (sub.Msgs.TryRead(out var msg))
+                    if (msg.Data == null)
                     {
-                        if (msg.Data == null)
-                        {
-                            throw new NatsJSException("No response data received");
-                        }
-
-                        return msg.Data;
+                        throw new NatsJSException("No response data received");
                     }
+
+                    return msg.Data;
                 }
             }
             catch (NatsNoRespondersException)
@@ -226,27 +223,24 @@ public partial class NatsJSContext
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
-        if (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+        await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
-            if (sub.Msgs.TryRead(out var msg))
+            if (msg.Error is { } error)
             {
-                if (msg.Error is { } error)
+                if (error.InnerException is NatsJSApiErrorException jsError)
                 {
-                    if (error.InnerException is NatsJSApiErrorException jsError)
-                    {
-                        return new NatsJSResponse<TResponse>(default, jsError.Error);
-                    }
-
-                    throw error;
+                    return new NatsJSResponse<TResponse>(default, jsError.Error);
                 }
 
-                if (msg.Data == null)
-                {
-                    throw new NatsJSException("No response data received");
-                }
-
-                return new NatsJSResponse<TResponse>(msg.Data, default);
+                throw error;
             }
+
+            if (msg.Data == null)
+            {
+                throw new NatsJSException("No response data received");
+            }
+
+            return new NatsJSResponse<TResponse>(msg.Data, default);
         }
 
         if (sub is NatsSubBase { EndReason: NatsSubEndReason.Exception, Exception: not null } sb)
