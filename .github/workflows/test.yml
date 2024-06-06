@@ -140,15 +140,12 @@ jobs:
         run: |
           Invoke-WebRequest https://download.jetbrains.com/resharper/JetBrains.dotMemoryUnit.3.2.20220510.zip -OutFile dotMemoryUnit.zip
           Expand-Archive dotMemoryUnit.zip
-          nuget install NUnit.ConsoleRunner -version 3.16.3
           $current_path = (Get-Item .).FullName
           echo "$current_path\dotMemoryUnit" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          dotnet tool install --global NUnit.ConsoleRunner.NetCore
 
       - name: Build
         run:  dotnet build -c Release
 
       - name: Memory Test (net6.0)
-        run: dotMemoryUnit .\NUnit.ConsoleRunner.3.16.3\tools\nunit3-console.exe --propagate-exit-code -- .\tests\NATS.Client.Core.MemoryTests\bin\Release\net6.0\NATS.Client.Core.MemoryTests.dll
-
-      - name: Memory Test (net8.0)
-        run: dotMemoryUnit .\NUnit.ConsoleRunner.3.16.3\tools\nunit3-console.exe --propagate-exit-code -- .\tests\NATS.Client.Core.MemoryTests\bin\Release\net8.0\NATS.Client.Core.MemoryTests.dll
+        run: dotMemoryUnit $env:userprofile\.dotnet\tools\nunit.exe --propagate-exit-code -- .\tests\NATS.Client.Core.MemoryTests\bin\Release\net6.0\NATS.Client.Core.MemoryTests.dll
