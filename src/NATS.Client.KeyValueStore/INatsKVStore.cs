@@ -128,7 +128,6 @@ public interface INatsKVStore
     /// </summary>
     /// <param name="opts">Purge options</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <exception cref="InvalidOperationException">There was a conflict in options, e.g. IncludeHistory and UpdatesOnly are only valid when ResumeAtRevision is set to a non-zero value.</exception>
     ValueTask PurgeDeletesAsync(NatsKVPurgeOpts? opts = default, CancellationToken cancellationToken = default);
 
     /// <summary>
