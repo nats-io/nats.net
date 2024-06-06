@@ -404,10 +404,16 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
             config.HeadersOnly = true;
         }
 
+        // Resume from a specific revision ?
         if (sequence > 0)
         {
             config.DeliverPolicy = ConsumerConfigDeliverPolicy.ByStartSequence;
             config.OptStartSeq = sequence + 1;
+        }
+        else if (_opts.ResumeAtRevision > 0)
+        {
+            config.DeliverPolicy = ConsumerConfigDeliverPolicy.ByStartSequence;
+            config.OptStartSeq = _opts.ResumeAtRevision;
         }
 
         var consumer = await _context.CreateOrUpdateConsumerAsync(

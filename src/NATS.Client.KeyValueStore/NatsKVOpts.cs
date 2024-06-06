@@ -25,11 +25,19 @@ public record NatsKVWatchOpts
     /// <summary>
     /// Include history of the entries
     /// </summary>
+    /// <remarks>
+    /// Setting this will cause the watcher to throw <see cref="InvalidOperationException"/>
+    /// if the values for <see cref="UpdatesOnly"/> and/or <see cref="ResumeAtRevision"/> are set.
+    /// </remarks>
     public bool IncludeHistory { get; init; } = false;
 
     /// <summary>
     /// Only retrieve updates, not current values
     /// </summary>
+    /// <remarks>
+    /// Setting this will cause the watcher to throw <see cref="InvalidOperationException"/>
+    /// if the values for <see cref="IncludeHistory"/> and/or <see cref="ResumeAtRevision"/> are set.
+    /// </remarks>
     public bool UpdatesOnly { get; init; } = false;
 
     /// <summary>
@@ -41,6 +49,33 @@ public record NatsKVWatchOpts
     /// Async function called when the enumerator reaches the end of data. Return True to break the async enumeration, False to allow the enumeration to continue.
     /// </summary>
     public Func<CancellationToken, ValueTask<bool>>? OnNoData { get; init; }
+
+    /// <summary>
+    /// The revision to start from, if set to 0 (default) this will be ignored.
+    /// <remarks>
+    /// Setting this to a non-zero value will cause the watcher to throw <see cref="InvalidOperationException"/>
+    /// if the values for <see cref="IncludeHistory"/> and/or <see cref="UpdatesOnly"/> are set.
+    /// </remarks>
+    /// </summary>
+    public ulong ResumeAtRevision { get; init; }
+
+    internal void ThrowIfInvalid()
+    {
+        if (ResumeAtRevision > 0)
+        {
+            if (IncludeHistory || UpdatesOnly)
+            {
+                throw new InvalidOperationException("IncludeHistory and UpdatesOnly are only valid when ResumeAtRevision is not set.");
+            }
+        }
+        else
+        {
+            if (IncludeHistory && UpdatesOnly)
+            {
+                throw new InvalidOperationException("IncludeHistory and UpdatesOnly are mutually exclusive.");
+            }
+        }
+    }
 }
 
 public record NatsKVDeleteOpts

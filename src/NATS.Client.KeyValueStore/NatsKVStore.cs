@@ -337,6 +337,7 @@ public class NatsKVStore : INatsKVStore
         }
     }
 
+    /// <inheritdoc />
     public async IAsyncEnumerable<NatsKVEntry<T>> HistoryAsync<T>(string key, INatsDeserialize<T>? serializer = default, NatsKVWatchOpts? opts = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         try
@@ -376,6 +377,7 @@ public class NatsKVStore : INatsKVStore
     public IAsyncEnumerable<NatsKVEntry<T>> WatchAsync<T>(INatsDeserialize<T>? serializer = default, NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default) =>
         WatchAsync<T>([">"], serializer, opts, cancellationToken);
 
+    /// <inheritdoc />
     public async ValueTask PurgeDeletesAsync(NatsKVPurgeOpts? opts = default, CancellationToken cancellationToken = default)
     {
         opts ??= NatsKVPurgeOpts.Default;
@@ -446,6 +448,8 @@ public class NatsKVStore : INatsKVStore
     {
         opts ??= NatsKVWatchOpts.Default;
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
+
+        opts.ThrowIfInvalid();
 
         var watcher = new NatsKVWatcher<T>(
             context: _context,
