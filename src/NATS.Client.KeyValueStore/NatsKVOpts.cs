@@ -65,7 +65,7 @@ public record NatsKVWatchOpts
         {
             if (IncludeHistory || UpdatesOnly)
             {
-                throw new InvalidOperationException("IncludeHistory and UpdatesOnly are only valid when ResumeAtRevision is set to a non-zero value.");
+                throw new InvalidOperationException("IncludeHistory and UpdatesOnly are only valid when ResumeAtRevision is set to a zero value.");
             }
         }
         else
