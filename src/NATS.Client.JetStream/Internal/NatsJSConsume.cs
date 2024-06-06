@@ -4,7 +4,6 @@ using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.Core.Commands;
-using NATS.Client.Core.Internal;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Internal;
@@ -113,8 +112,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
 
                 if (self.Connection.ConnectionState == NatsConnectionState.Open)
                 {
-                    self.Pull("heartbeat-timeout", self._maxMsgs, self._maxBytes);
-                    self.ResetPending();
+                    self.CheckPending("heartbeat-timeout");
                     if (self._debug)
                     {
                         self._logger.LogDebug(
@@ -129,12 +127,8 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
             Timeout.Infinite);
 
         // This channel is used to pass messages to the user from the subscription channel.
-        // Capacity is set to maxMsgs to avoid pulling too many messages from the server
-        // resulting in a large number of pending messages (which can be a problem if the
-        // application is slow to process messages). The capacity is bounded to a maximum of 1024
-        // to avoid LOH allocations. Also, if maxMsgs is set to 0, we default to 1024 since it
-        // means maxBytes is set.
-        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg>>(maxMsgs is > 1024 or <= 0 ? 1024 : (int)maxMsgs);
+        // Capacity is bounded to a maximum of 1024 to avoid LOH allocations.
+        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg>>(1024);
         Msgs = _userMsgs.Reader;
 
         // Capacity as 1 is enough here since it's used for signaling only.
@@ -166,6 +160,28 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
 
     public void ResetHeartbeatTimer() => _timer.Change(_hbTimeout, _hbTimeout);
 
+    public void Delivered(int msgSize)
+    {
+        lock (_pendingGate)
+        {
+            if (_pendingMsgs > 0)
+                _pendingMsgs--;
+        }
+
+        if (_maxBytes > 0)
+        {
+            if (_debug)
+                _logger.LogDebug(NatsJSLogEvents.MessageProperty, "Message size {Size}", msgSize);
+
+            lock (_pendingGate)
+            {
+                _pendingBytes -= msgSize;
+            }
+        }
+
+        CheckPending("delivered");
+    }
+
     public override async ValueTask DisposeAsync()
     {
         Interlocked.Exchange(ref _disposed, 1);
@@ -181,26 +197,48 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
     internal override async ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter, int sid)
     {
         await base.WriteReconnectCommandsAsync(commandWriter, sid);
-        ResetPending();
-
-        var request = new ConsumerGetnextRequest
-        {
-            Batch = _maxMsgs,
-            MaxBytes = _maxBytes,
-            IdleHeartbeat = _idle,
-            Expires = _expires,
-        };
 
         if (_cancellationToken.IsCancellationRequested)
             return;
 
-        await commandWriter.PublishAsync(
-            subject: $"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
-            value: request,
-            headers: default,
-            replyTo: Subject,
-            serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
-            cancellationToken: CancellationToken.None);
+        long maxMsgs = 0;
+        long maxBytes = 0;
+
+        // We have to do the pending check here because we can't access
+        // the publish method here since the connection state is not open yet
+        // and we're just writing the reconnect commands.
+        lock (_pendingGate)
+        {
+            if (_maxBytes > 0 && _pendingBytes <= _thresholdBytes)
+            {
+                maxBytes = _maxBytes - _pendingBytes;
+            }
+            else if (_maxBytes == 0 && _pendingMsgs <= _thresholdMsgs && _pendingMsgs < _maxMsgs)
+            {
+                maxMsgs = _maxMsgs - _pendingMsgs;
+            }
+        }
+
+        if (maxMsgs > 0 || maxBytes > 0)
+        {
+            var request = new ConsumerGetnextRequest
+            {
+                Batch = maxMsgs,
+                MaxBytes = maxBytes,
+                IdleHeartbeat = _idle,
+                Expires = _expires,
+            };
+
+            await commandWriter.PublishAsync(
+                subject: $"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
+                value: request,
+                headers: default,
+                replyTo: Subject,
+                serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
+                cancellationToken: CancellationToken.None);
+
+            ResetPending();
+        }
     }
 
     protected override async ValueTask ReceiveInternalAsync(
@@ -321,6 +359,8 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
             {
                 throw new NatsJSException("No header found");
             }
+
+            CheckPending("control-msg");
         }
         else
         {
@@ -335,23 +375,6 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                     _serializer),
                 _context);
 
-            lock (_pendingGate)
-            {
-                if (_pendingMsgs > 0)
-                    _pendingMsgs--;
-            }
-
-            if (_maxBytes > 0)
-            {
-                if (_debug)
-                    _logger.LogDebug(NatsJSLogEvents.MessageProperty, "Message size {Size}", msg.Size);
-
-                lock (_pendingGate)
-                {
-                    _pendingBytes -= msg.Size;
-                }
-            }
-
             // Stop feeding the user if we are disposed.
             // We need to exit as soon as possible.
             if (Volatile.Read(ref _disposed) == 0)
@@ -359,11 +382,9 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                 // We can't pass cancellation token here because we need to hand
                 // the message to the user to be processed. Writer will be completed
                 // when the user calls Stop() or when the subscription is closed.
-                await _userMsgs.Writer.WriteAsync(msg).ConfigureAwait(false);
+                await _userMsgs.Writer.WriteAsync(msg, CancellationToken.None).ConfigureAwait(false);
             }
         }
-
-        CheckPending();
     }
 
     protected override void TryComplete()
@@ -381,7 +402,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         }
     }
 
-    private void CheckPending()
+    private void CheckPending(string origin)
     {
         lock (_pendingGate)
         {
@@ -390,7 +411,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                 if (_debug)
                     _logger.LogDebug(NatsJSLogEvents.PendingCount, "Check pending bytes {Pending}, {MaxBytes}", _pendingBytes, _maxBytes);
 
-                Pull("chk-bytes", _maxMsgs, _maxBytes - _pendingBytes);
+                Pull($"chk-bytes({origin})", _maxMsgs, _maxBytes - _pendingBytes);
                 ResetPending();
             }
             else if (_maxBytes == 0 && _pendingMsgs <= _thresholdMsgs && _pendingMsgs < _maxMsgs)
@@ -398,7 +419,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                 if (_debug)
                     _logger.LogDebug(NatsJSLogEvents.PendingCount, "Check pending messages {Pending}, {MaxMsgs}", _pendingMsgs, _maxMsgs);
 
-                Pull("chk-msgs", _maxMsgs - _pendingMsgs, 0);
+                Pull($"chk-msgs({origin})", _maxMsgs - _pendingMsgs, 0);
                 ResetPending();
             }
         }
