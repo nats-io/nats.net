@@ -134,7 +134,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         // application is slow to process messages). The capacity is bounded to a maximum of 1024
         // to avoid LOH allocations. Also, the capacity is set to a minimum of 64 to avoid
         // socket reads being blocked.
-        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg>>(maxMsgs > 1024 ? 1024 : maxMsgs < 64 ? 64 : (int)maxMsgs);
+        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg>>(maxMsgs > 1024 ? 1024 : maxMsgs < 1 ? 1 : (int)maxMsgs);
         Msgs = _userMsgs.Reader;
 
         // Capacity as 1 is enough here since it's used for signaling only.
