@@ -179,19 +179,20 @@ public class NatsHeaderTest
     }
 
     [Theory]
-    [InlineData("NATS/1.0 123 Test Message\r\nk2: v2-0\r\nk2: v2-1\r\n\r\n", "v2-1")]
-    [InlineData("NATS/1.0 123 Test Message\r\nk2: v2-0\r\n\r\n", "v2-0")]
-    public void GetLastValueTests(string text, string expectedLastValue)
+    [InlineData("NATS/1.0 123 Test Message\r\nk2: v2-0\r\nk2: v2-1\r\n\r\n", true, "v2-1")]
+    [InlineData("NATS/1.0 123 Test Message\r\nk2: v2-0\r\n\r\n", true, "v2-0")]
+    [InlineData("NATS/1.0 123 Test Message\r\nk3: v2-0\r\n\r\n", false, null)]
+    [InlineData("NATS/1.0 123 Test Message\r\n\r\n", false, null)]
+    public void GetLastValueTests(string text, bool expectedResult, string? expectedLastValue)
     {
         var parser = new NatsHeaderParser(Encoding.UTF8);
         var input = new SequenceReader<byte>(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(text)));
         var headers = new NatsHeaders();
         parser.ParseHeaders(input, headers);
 
-        Assert.True(headers.ContainsKey("k2"));
-
         var result = headers.TryGetLastValue("k2", out var lastValue);
-        Assert.True(result);
+
+        Assert.Equal(result, expectedResult);
         Assert.Equal(lastValue, expectedLastValue);
     }
 }
