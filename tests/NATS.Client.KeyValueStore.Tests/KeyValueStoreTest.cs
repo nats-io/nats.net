@@ -607,4 +607,45 @@ public class KeyValueStoreTest
             await Assert.ThrowsAsync<NatsKVException>(async () => await store.PurgeAsync(key));
         }
     }
+
+    [Fact]
+    public async Task TestDirectMessageRepublishedSubject()
+    {
+        var streamBucketName = "sb-" + NuidWriter.NewNuid();
+        var subject = "test";
+        var streamSubject = subject + ".>";
+        var publishSubject1 = subject + ".one";
+        var publishSubject2 = subject + ".two";
+        var publishSubject3 = subject + ".three";
+        var republishDest = "$KV." + streamBucketName + ".>";
+
+        var streamConfig = new StreamConfig(streamBucketName, new[] { streamSubject }) { Republish = new Republish { Src = ">", Dest = republishDest } };
+
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var store = await kv.CreateStoreAsync(streamBucketName);
+        await js.CreateStreamAsync(streamConfig);
+
+        await nats.PublishAsync<string>(publishSubject1, "uno");
+        await js.PublishAsync<string>(publishSubject2, "dos");
+        await store.PutAsync(publishSubject3, "tres");
+
+        var kve1 = await store.GetEntryAsync<string>(publishSubject1);
+        Assert.Equal(streamBucketName, kve1.Bucket);
+        Assert.Equal(publishSubject1, kve1.Key);
+        Assert.Equal("uno", kve1.Value);
+
+        var kve2 = await store.GetEntryAsync<string>(publishSubject2);
+        Assert.Equal(streamBucketName, kve2.Bucket);
+        Assert.Equal(publishSubject2, kve2.Key);
+        Assert.Equal("dos", kve2.Value);
+
+        var kve3 = await store.GetEntryAsync<string>(publishSubject3);
+        Assert.Equal(streamBucketName, kve3.Bucket);
+        Assert.Equal(publishSubject3, kve3.Key);
+        Assert.Equal("tres", kve3.Value);
+    }
 }
