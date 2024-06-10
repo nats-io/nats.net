@@ -7,6 +7,9 @@ using System.Text;
 using Microsoft.Extensions.Primitives;
 using NATS.Client.Core.Commands;
 using NATS.Client.Core.Internal;
+#if !NET6_0_OR_GREATER
+using NATS.Client.Core.Internal.NetStandardExtensions;
+#endif
 
 // ReSharper disable ConditionIsAlwaysTrueOrFalse
 // ReSharper disable PossiblyImpureMethodCallOnReadonlyVariable
@@ -237,7 +240,9 @@ public class NatsHeaderParser
         return true;
     }
 
+#if NET6_0_OR_GREATER
     [StackTraceHidden]
+#endif
     private void RejectRequestHeader(ReadOnlySpan<byte> headerLine)
         => throw new NatsException(
             $"Protocol error: invalid request header line '{headerLine.Dump()}'");

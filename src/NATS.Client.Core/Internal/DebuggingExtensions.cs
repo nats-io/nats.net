@@ -1,5 +1,8 @@
 using System.Buffers;
 using System.Text;
+#if NETSTANDARD2_0
+using NATS.Client.Core.Internal.NetStandardExtensions;
+#endif
 
 namespace NATS.Client.Core.Internal;
 

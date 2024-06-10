@@ -377,6 +377,10 @@ internal static class Crc16
 // Borrowed from:  https://stackoverflow.com/a/7135008
 internal class Base32
 {
+#if NETSTANDARD2_0
+    public static byte[] Decode(string input) => Decode(input.AsSpan());
+#endif
+
     public static byte[] Decode(ReadOnlySpan<char> input)
     {
         if (input == null || input.Length == 0)

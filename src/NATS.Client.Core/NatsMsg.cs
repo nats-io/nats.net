@@ -148,7 +148,11 @@ public readonly record struct NatsMsg<T>(
     public ValueTask ReplyAsync(NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         CheckReplyPreconditions();
+#if NET6_0_OR_GREATER
         return Connection.PublishAsync(ReplyTo, headers, replyTo, opts, cancellationToken);
+#else
+        return Connection!.PublishAsync(ReplyTo!, headers, replyTo, opts, cancellationToken);
+#endif
     }
 
     /// <summary>
@@ -176,7 +180,11 @@ public readonly record struct NatsMsg<T>(
     public ValueTask ReplyAsync<TReply>(TReply data, NatsHeaders? headers = default, string? replyTo = default, INatsSerialize<TReply>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         CheckReplyPreconditions();
+#if NET6_0_OR_GREATER
         return Connection.PublishAsync(ReplyTo, data, headers, replyTo, serializer, opts, cancellationToken);
+#else
+        return Connection!.PublishAsync(ReplyTo!, data, headers, replyTo, serializer, opts, cancellationToken);
+#endif
     }
 
     /// <summary>
@@ -194,7 +202,11 @@ public readonly record struct NatsMsg<T>(
     public ValueTask ReplyAsync<TReply>(NatsMsg<TReply> msg, INatsSerialize<TReply>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         CheckReplyPreconditions();
+#if NET6_0_OR_GREATER
         return Connection.PublishAsync(msg with { Subject = ReplyTo }, serializer, opts, cancellationToken);
+#else
+        return Connection!.PublishAsync(msg with { Subject = ReplyTo! }, serializer, opts, cancellationToken);
+#endif
     }
 
     internal static NatsMsg<T> Build(
@@ -280,8 +292,10 @@ public readonly record struct NatsMsg<T>(
         return new NatsMsg<T>(subject, replyTo, (int)size, headers, data, connection);
     }
 
+#if NET6_0_OR_GREATER
     [MemberNotNull(nameof(Connection))]
     [MemberNotNull(nameof(ReplyTo))]
+#endif
     private void CheckReplyPreconditions()
     {
         if (Connection == default)

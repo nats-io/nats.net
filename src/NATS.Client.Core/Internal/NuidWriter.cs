@@ -2,10 +2,15 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+#if !NET6_0_OR_GREATER
+using Random = NATS.Client.Core.Internal.NetStandardExtensions.Random;
+#endif
 
 namespace NATS.Client.Core.Internal;
 
+#if NET6_0_OR_GREATER
 [SkipLocalsInit]
+#endif
 internal sealed class NuidWriter
 {
     internal const nuint NuidLength = PrefixLength + SequentialLength;
@@ -19,7 +24,11 @@ internal sealed class NuidWriter
     [ThreadStatic]
     private static NuidWriter? _writer;
 
+#if NET6_0_OR_GREATER
     private char[] _prefix;
+#else
+    private char[] _prefix = null!;
+#endif
     private ulong _increment;
     private ulong _sequential;
 
@@ -28,7 +37,11 @@ internal sealed class NuidWriter
         Refresh(out _);
     }
 
-    private static ReadOnlySpan<char> Digits => "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    private static ReadOnlySpan<char> Digits => "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+#if NETSTANDARD2_0
+        .AsSpan()
+#endif
+    ;
 
     public static bool TryWriteNuid(Span<char> nuidBuffer)
     {
@@ -45,7 +58,11 @@ internal sealed class NuidWriter
         Span<char> buffer = stackalloc char[22];
         if (TryWriteNuid(buffer))
         {
+#if NETSTANDARD2_0
+            return new string(buffer.ToArray());
+#else
             return new string(buffer);
+#endif
         }
 
         throw new InvalidOperationException("Internal error: can't generate nuid");
@@ -87,6 +104,15 @@ internal sealed class NuidWriter
 
     private static char[] GetPrefix(RandomNumberGenerator? rng = null)
     {
+#if NETSTANDARD2_0
+        var randomBytes = new byte[(int)PrefixLength];
+
+        if (rng == null)
+        {
+            using var randomNumberGenerator = RandomNumberGenerator.Create();
+            randomNumberGenerator.GetBytes(randomBytes);
+        }
+#else
         Span<byte> randomBytes = stackalloc byte[(int)PrefixLength];
 
         // TODO: For .NET 8+, use GetItems for better distribution
@@ -94,6 +120,7 @@ internal sealed class NuidWriter
         {
             RandomNumberGenerator.Fill(randomBytes);
         }
+#endif
         else
         {
             rng.GetBytes(randomBytes);
@@ -137,7 +164,9 @@ internal sealed class NuidWriter
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
+#if NET6_0_OR_GREATER
     [MemberNotNull(nameof(_prefix))]
+#endif
     private char[] Refresh(out ulong sequential)
     {
         var prefix = _prefix = GetPrefix();

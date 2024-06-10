@@ -1,5 +1,8 @@
 using System.Diagnostics;
 using NATS.Client.Core.Internal;
+#if !NET6_0_OR_GREATER
+using NATS.Client.Core.Internal.NetStandardExtensions;
+#endif
 
 namespace NATS.Client.Core;
 

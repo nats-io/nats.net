@@ -1,10 +1,13 @@
 // adapted from https://github.com/CommunityToolkit/dotnet/blob/main/src/CommunityToolkit.HighPerformance/Buffers/NatsBufferWriter%7BT%7D.cs
+#pragma warning disable SA1116, SA1117
 
 using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+#if NET6_0_OR_GREATER
 using BitOperations = System.Numerics.BitOperations;
+#endif
 
 namespace NATS.Client.Core;
 
@@ -361,6 +364,7 @@ public sealed class NatsBufferWriter<T> : IBufferWriter<T>, IMemoryOwner<T>
     {
         var minimumSize = (uint)_index + (uint)sizeHint;
 
+#if NET6_0_OR_GREATER
         // The ArrayPool<T> class has a maximum threshold of 1024 * 1024 for the maximum length of
         // pooled arrays, and once this is exceeded it will just allocate a new array every time
         // of exactly the requested size. In that case, we manually round up the requested size to
@@ -370,6 +374,7 @@ public sealed class NatsBufferWriter<T> : IBufferWriter<T>, IMemoryOwner<T>
         {
             minimumSize = BitOperations.RoundUpToPowerOf2(minimumSize);
         }
+#endif
 
         _pool.Resize(ref _array, (int)minimumSize);
     }
@@ -387,7 +392,11 @@ internal static class NatsBufferWriterExtensions
     /// <param name="clearArray">Indicates whether the contents of the array should be cleared before reuse.</param>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="newSize"/> is less than 0.</exception>
     /// <remarks>When this method returns, the caller must not use any references to the old array anymore.</remarks>
-    public static void Resize<T>(this ArrayPool<T> pool, [NotNull] ref T[]? array, int newSize, bool clearArray = false)
+    public static void Resize<T>(this ArrayPool<T> pool,
+#if !NETSTANDARD2_0
+        [NotNull]
+#endif
+        ref T[]? array, int newSize, bool clearArray = false)
     {
         // If the old array is null, just create a new one with the requested size
         if (array is null)

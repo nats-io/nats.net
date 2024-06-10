@@ -102,7 +102,9 @@ public class NatsHeaders : IDictionary<string, StringValues>
 
     private Dictionary<string, StringValues>? Store { get; set; }
 
+#if NET6_0_OR_GREATER
     [MemberNotNull(nameof(Store))]
+#endif
     private void EnsureStore(int capacity)
     {
         if (Store == null)
@@ -146,7 +148,11 @@ public class NatsHeaders : IDictionary<string, StringValues>
             else
             {
                 EnsureStore(1);
+#if NET6_0_OR_GREATER
                 Store[key] = value;
+#else
+                Store![key] = value;
+#endif
             }
         }
     }
@@ -217,7 +223,11 @@ public class NatsHeaders : IDictionary<string, StringValues>
         }
         ThrowIfReadOnly();
         EnsureStore(1);
+#if NET6_0_OR_GREATER
         Store.Add(item.Key, item.Value);
+#else
+        Store!.Add(item.Key, item.Value);
+#endif
     }
 
     /// <summary>
@@ -233,7 +243,11 @@ public class NatsHeaders : IDictionary<string, StringValues>
         }
         ThrowIfReadOnly();
         EnsureStore(1);
+#if NET6_0_OR_GREATER
         Store.Add(key, value);
+#else
+        Store!.Add(key, value);
+#endif
     }
 
     /// <summary>

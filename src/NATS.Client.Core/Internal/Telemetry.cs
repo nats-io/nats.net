@@ -204,7 +204,11 @@ internal static class Telemetry
         static string GetStackTrace(Exception? exception)
         {
             var stackTrace = exception?.StackTrace;
+#if NETSTANDARD2_0
+            return string.IsNullOrWhiteSpace(stackTrace) ? string.Empty : stackTrace!;
+#else
             return string.IsNullOrWhiteSpace(stackTrace) ? string.Empty : stackTrace;
+#endif
         }
     }
 

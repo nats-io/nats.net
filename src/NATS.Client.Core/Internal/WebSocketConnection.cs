@@ -1,6 +1,9 @@
 using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Runtime.CompilerServices;
+#if !NET6_0_OR_GREATER
+using System.Runtime.InteropServices;
+#endif
 
 namespace NATS.Client.Core.Internal;
 
@@ -60,14 +63,25 @@ internal sealed class WebSocketConnection : ISocketConnection
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public async ValueTask<int> SendAsync(ReadOnlyMemory<byte> buffer)
     {
+#if NET6_0_OR_GREATER
         await _socket.SendAsync(buffer, WebSocketMessageType.Binary, WebSocketMessageFlags.EndOfMessage, CancellationToken.None).ConfigureAwait(false);
+#else
+        // ReSharper disable once SuggestVarOrType_Elsewhere
+        MemoryMarshal.TryGetArray(buffer, out ArraySegment<byte> segment);
+        await _socket.SendAsync(segment, WebSocketMessageType.Binary, true, CancellationToken.None).ConfigureAwait(false);
+#endif
         return buffer.Length;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public async ValueTask<int> ReceiveAsync(Memory<byte> buffer)
     {
+#if NETSTANDARD2_0
+        MemoryMarshal.TryGetArray(buffer, out ArraySegment<byte> segment);
+        var wsRead = await _socket.ReceiveAsync(segment, CancellationToken.None).ConfigureAwait(false);
+#else
         var wsRead = await _socket.ReceiveAsync(buffer, CancellationToken.None).ConfigureAwait(false);
+#endif
         return wsRead.Count;
     }
 

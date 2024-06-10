@@ -66,9 +66,18 @@ namespace NATS.Client.Core.NaCl
         /// <returns>Hash bytes</returns>
         public static byte[] Hash(byte[] data, int index, int length)
         {
+#if NET6_0_OR_GREATER
             ArgumentNullException.ThrowIfNull(data);
             ReadOnlySpan<byte> dataSpan = data;
             return SHA512.HashData(dataSpan.Slice(index, length));
+#else
+            if (data == null)
+            {
+                throw new ArgumentNullException(nameof(data));
+            }
+            using var sha512 = SHA512.Create();
+            return sha512.ComputeHash(data, index, length);
+#endif
         }
 
         /// <inheritdoc/>

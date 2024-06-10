@@ -1,3 +1,5 @@
+#if NET6_0_OR_GREATER
+
 using System.Net.Security;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
@@ -118,3 +120,5 @@ internal static class SslClientAuthenticationOptionsExtensions
             SslPolicyErrors sslPolicyErrors) => true;
     }
 }
+
+#endif

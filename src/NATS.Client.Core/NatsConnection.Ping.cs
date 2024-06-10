@@ -1,12 +1,18 @@
 using System.Runtime.CompilerServices;
 using NATS.Client.Core.Commands;
+using NATS.Client.Core.Internal;
+#if !NET6_0_OR_GREATER
+using NATS.Client.Core.Internal.NetStandardExtensions;
+#endif
 
 namespace NATS.Client.Core;
 
 public partial class NatsConnection
 {
     /// <inheritdoc />
+#if NET6_0_OR_GREATER
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
+#endif
     public async ValueTask<TimeSpan> PingAsync(CancellationToken cancellationToken = default)
     {
         if (ConnectionState != NatsConnectionState.Open)
@@ -38,5 +44,5 @@ public partial class NatsConnection
     private ValueTask PingOnlyAsync(CancellationToken cancellationToken = default) =>
         ConnectionState == NatsConnectionState.Open
             ? CommandWriter.PingAsync(new PingCommand(_pool), cancellationToken)
-            : ValueTask.CompletedTask;
+            : default;
 }

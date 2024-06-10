@@ -8,6 +8,9 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
+#if !NET6_0_OR_GREATER
+using NATS.Client.Core.Internal.NetStandardExtensions;
+#endif
 
 namespace NATS.Client.Core.Internal;
 
@@ -86,10 +89,17 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
 
     private static int GetInt32(in ReadOnlySequence<byte> sequence)
     {
+#if NETSTANDARD2_0
+        if (sequence.IsSingleSegment || sequence.First.Span.Length <= 10)
+        {
+            return GetInt32(sequence.First.Span);
+        }
+#else
         if (sequence.IsSingleSegment || sequence.FirstSpan.Length <= 10)
         {
             return GetInt32(sequence.FirstSpan);
         }
+#endif
 
         Span<byte> buf = stackalloc byte[Math.Min((int)sequence.Length, 10)];
         sequence.Slice(buf.Length).CopyTo(buf);
@@ -300,7 +310,9 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         }
     }
 
+#if NET6_0_OR_GREATER
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
+#endif
     private async ValueTask<ReadOnlySequence<byte>> DispatchCommandAsync(int code, ReadOnlySequence<byte> buffer)
     {
         var length = (int)buffer.Length;
@@ -458,7 +470,11 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
     {
         if (msgHeader.IsSingleSegment)
         {
+#if NETSTANDARD2_0
+            return ParseMessageHeader(msgHeader.First.Span);
+#else
             return ParseMessageHeader(msgHeader.FirstSpan);
+#endif
         }
 
         // header parsing use Slice frequently so ReadOnlySequence is high cost, should use Span.
@@ -519,7 +535,11 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
     {
         if (msgHeader.IsSingleSegment)
         {
+#if NETSTANDARD2_0
+            return ParseHMessageHeader(msgHeader.First.Span);
+#else
             return ParseHMessageHeader(msgHeader.FirstSpan);
+#endif
         }
 
         // header parsing use Slice frequently so ReadOnlySequence is high cost, should use Span.

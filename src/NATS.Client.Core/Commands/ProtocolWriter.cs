@@ -5,6 +5,9 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using NATS.Client.Core.Internal;
+#if NETSTANDARD2_0
+using NATS.Client.Core.Internal.NetStandardExtensions;
+#endif
 
 namespace NATS.Client.Core.Commands;
 

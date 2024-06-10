@@ -75,13 +75,20 @@ public abstract class NatsSubBase
         // might be a problem. This should reduce the impact of that problem.
         cancellationToken.ThrowIfCancellationRequested();
 
-        _tokenRegistration = cancellationToken.UnsafeRegister(
-            state =>
-            {
-                var self = (NatsSubBase)state!;
-                self.EndSubscription(NatsSubEndReason.Cancelled);
-            },
-            this);
+        _tokenRegistration = cancellationToken
+#if NET6_0_OR_GREATER
+            .UnsafeRegister(
+#else
+            .Register(
+#endif
+#pragma warning disable SA1114
+                state =>
+                {
+                    var self = (NatsSubBase)state!;
+                    self.EndSubscription(NatsSubEndReason.Cancelled);
+                },
+#pragma warning restore SA1114
+                this);
 
         // Only allocate timers if necessary to reduce GC pressure
         if (_idleTimeout != default)
@@ -143,7 +150,7 @@ public abstract class NatsSubBase
         _startUpTimeoutTimer?.Change(_startUpTimeout, Timeout.InfiniteTimeSpan);
         _timeoutTimer?.Change(dueTime: _timeout, period: Timeout.InfiniteTimeSpan);
 
-        return ValueTask.CompletedTask;
+        return default;
     }
 
     /// <summary>
@@ -156,7 +163,7 @@ public abstract class NatsSubBase
         lock (_gate)
         {
             if (_unsubscribed)
-                return ValueTask.CompletedTask;
+                return default;
             _unsubscribed = true;
         }
 
@@ -186,7 +193,7 @@ public abstract class NatsSubBase
         lock (_gate)
         {
             if (_disposed)
-                return ValueTask.CompletedTask;
+                return default;
             _disposed = true;
         }
 

@@ -42,11 +42,21 @@ public partial class NatsConnection
                 await using var sub1 = await RequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
                     .ConfigureAwait(false);
 
+#if NETSTANDARD2_0
+                if (await sub1.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    if (sub1.Msgs.TryRead(out var msg))
+                    {
+                        return msg;
+                    }
+                }
+#else
+                // Prefer ReadAllAsync() since underlying ActivityEndingMsgReader maintains GCHandle for the subscription more efficiently.
                 await foreach (var msg in sub1.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
                 {
                     return msg;
                 }
-
+#endif
                 throw new NatsNoReplyException();
             }
             catch (Exception e)
@@ -60,10 +70,21 @@ public partial class NatsConnection
         await using var sub = await RequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
             .ConfigureAwait(false);
 
+#if NETSTANDARD2_0
+        if (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            if (sub.Msgs.TryRead(out var msg))
+            {
+                return msg;
+            }
+        }
+#else
+        // Prefer ReadAllAsync() since underlying ActivityEndingMsgReader maintains GCHandle for the subscription more efficiently.
         await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
             return msg;
         }
+#endif
 
         throw new NatsNoReplyException();
     }
@@ -99,13 +120,30 @@ public partial class NatsConnection
         await using var sub = await RequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
             .ConfigureAwait(false);
 
+#if NETSTANDARD2_0
+        if (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            if (sub.Msgs.TryRead(out var msg))
+            {
+                yield return msg;
+            }
+        }
+#else
+        // Prefer ReadAllAsync() since underlying ActivityEndingMsgReader maintains GCHandle for the subscription more efficiently.
         await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
             yield return msg;
         }
+#endif
     }
 
+#if NETSTANDARD2_0
+    internal static string NewInbox(string prefix) => NewInbox(prefix.AsSpan());
+#endif
+
+#if NET6_0_OR_GREATER
     [SkipLocalsInit]
+#endif
     internal static string NewInbox(ReadOnlySpan<char> prefix)
     {
         Span<char> buffer = stackalloc char[64];
@@ -128,12 +166,18 @@ public partial class NatsConnection
             var remaining = buffer.Slice((int)totalPrefixLength);
             var didWrite = NuidWriter.TryWriteNuid(remaining);
             Debug.Assert(didWrite, "didWrite");
+#if NETSTANDARD2_0
+            return new string(buffer.ToArray());
+#else
             return new string(buffer);
+#endif
         }
 
         return Throw();
 
+#if NETSTANDARD2_1 || NET6_0_OR_GREATER
         [DoesNotReturn]
+#endif
         string Throw()
         {
             Debug.Fail("Must not happen");

@@ -82,22 +82,4 @@ public class CancellationTest
             }
         });
     }
-
-    [Fact]
-    public async Task Cancellation_timer()
-    {
-        var objectPool = new ObjectPool(10);
-        var cancellationTimerPool = new CancellationTimerPool(objectPool, CancellationToken.None);
-        var cancellationTimer = cancellationTimerPool.Start(TimeSpan.FromSeconds(2), CancellationToken.None);
-
-        try
-        {
-            await Task.Delay(TimeSpan.FromSeconds(4), cancellationTimer.Token);
-            _output.WriteLine($"delayed 4 seconds");
-        }
-        catch (Exception e)
-        {
-            _output.WriteLine($"Exception: {e.GetType().Name}");
-        }
-    }
 }
