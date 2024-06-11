@@ -188,10 +188,8 @@ public class NatsKVStore : INatsKVStore
                 if (headers.Code == 404)
                     throw new NatsKVKeyNotFoundException();
 
-                if (!headers.TryGetValue(NatsSubject, out var subjectValues))
+                if (!headers.TryGetLastValue(NatsSubject, out var subject))
                     throw new NatsKVException("Missing sequence header");
-
-                var subject = subjectValues[^1];
 
                 if (revision != default)
                 {
@@ -201,22 +199,16 @@ public class NatsKVStore : INatsKVStore
                     }
                 }
 
-                if (!headers.TryGetValue(NatsSequence, out var sequenceValues))
+                if (!headers.TryGetLastValue(NatsSequence, out var sequenceValue))
                     throw new NatsKVException("Missing sequence header");
 
-                if (sequenceValues.Count != 1)
-                    throw new NatsKVException("Unexpected number of sequence headers");
-
-                if (!ulong.TryParse(sequenceValues[0], out var sequence))
+                if (!ulong.TryParse(sequenceValue, out var sequence))
                     throw new NatsKVException("Can't parse sequence header");
 
-                if (!headers.TryGetValue(NatsTimeStamp, out var timestampValues))
+                if (!headers.TryGetLastValue(NatsTimeStamp, out var timestampValue))
                     throw new NatsKVException("Missing timestamp header");
 
-                if (timestampValues.Count != 1)
-                    throw new NatsKVException("Unexpected number of timestamp headers");
-
-                if (!DateTimeOffset.TryParse(timestampValues[0], out var timestamp))
+                if (!DateTimeOffset.TryParse(timestampValue, out var timestamp))
                     throw new NatsKVException("Can't parse timestamp header");
 
                 var operation = NatsKVOperation.Put;
