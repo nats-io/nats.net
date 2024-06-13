@@ -34,7 +34,7 @@ public sealed class NatsServerException : NatsException
     public NatsServerException(string error)
         : base($"Server error: {error}")
     {
-        Error = error;
+        Error = error.ToLower();
         IsAuthError = Error.Contains("authorization violation")
                       || Error.Contains("user authentication expired")
                       || Error.Contains("user authentication revoked")
