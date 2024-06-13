@@ -255,9 +255,9 @@ public class NatsJSConsumer : INatsJSConsumer
 
         await using var fc = await FetchInternalAsync<T>(opts with { NoWait = true }, serializer, cancellationToken).ConfigureAwait(false);
 
-        if (await fc.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+        while (await fc.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            if (fc.Msgs.TryRead(out var msg))
+            while (fc.Msgs.TryRead(out var msg))
             {
                 yield return msg;
             }

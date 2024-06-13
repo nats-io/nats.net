@@ -64,11 +64,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         _maxBytes = maxBytes;
         _expires = expires;
         _idle = idle;
-#if NETSTANDARD2_0
         _hbTimeout = (int)new TimeSpan(idle.Ticks * 2).TotalMilliseconds;
-#else
-        _hbTimeout = (int)(idle * 2).TotalMilliseconds;
-#endif
         _pendingMsgs = _maxMsgs;
         _pendingBytes = _maxBytes;
 

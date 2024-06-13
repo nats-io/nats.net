@@ -61,13 +61,8 @@ internal class NatsJSOrderedPushConsumer<T>
     private readonly Task _consumerCreateTask;
     private readonly Task _commandTask;
 
-#if NET6_0_OR_GREATER
-    private ulong _sequenceStream;
-    private ulong _sequenceConsumer;
-#else
     private long _sequenceStream;
     private long _sequenceConsumer;
-#endif
     private string _consumer;
     private volatile NatsJSOrderedPushConsumerSub<T>? _sub;
     private int _done;
@@ -91,11 +86,7 @@ internal class NatsJSOrderedPushConsumer<T>
         _subOpts = subOpts;
         _cancellationToken = cancellationToken;
         _nats = context.Connection;
-#if NETSTANDARD2_0
         _hbTimeout = (int)new TimeSpan(opts.IdleHeartbeat.Ticks * 2).TotalMilliseconds;
-#else
-        _hbTimeout = (int)(opts.IdleHeartbeat * 2).TotalMilliseconds;
-#endif
         _consumer = NewNuid();
 
         _nats.ConnectionDisconnected += OnDisconnected;
@@ -230,11 +221,7 @@ internal class NatsJSOrderedPushConsumer<T>
 
                                     var sequence = Interlocked.Increment(ref _sequenceConsumer);
 
-#if NET6_0_OR_GREATER
-                                    if (sequence != metadata.Sequence.Consumer)
-#else
                                     if (sequence != (long)metadata.Sequence.Consumer)
-#endif
                                     {
                                         CreateSub("sequence-mismatch");
                                         _logger.LogWarning(NatsJSLogEvents.RecreateConsumer, "Missed messages, recreating consumer");
@@ -244,11 +231,7 @@ internal class NatsJSOrderedPushConsumer<T>
                                     // Increment the sequence before writing to the channel in case the channel is full
                                     // and the writer is waiting for the reader to read the message. This way the sequence
                                     // will be correctly incremented in case the timeout kicks in and recreated the consumer.
-#if NET6_0_OR_GREATER
-                                    Interlocked.Exchange(ref _sequenceStream, metadata.Sequence.Stream);
-#else
                                     Interlocked.Exchange(ref _sequenceStream, (long)metadata.Sequence.Stream);
-#endif
 
                                     if (!IsDone)
                                     {

@@ -81,11 +81,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         _thresholdBytes = thresholdBytes;
         _expires = expires;
         _idle = idle;
-#if NETSTANDARD2_0
         _hbTimeout = (int)new TimeSpan(idle.Ticks * 2).TotalMilliseconds;
-#else
-        _hbTimeout = (int)(idle * 2).TotalMilliseconds;
-#endif
 
         if (_debug)
         {
@@ -442,9 +438,9 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
 
     private async Task PullLoop()
     {
-        if (await _pullRequests.Reader.WaitToReadAsync().ConfigureAwait(false))
+        while (await _pullRequests.Reader.WaitToReadAsync().ConfigureAwait(false))
         {
-            if (_pullRequests.Reader.TryRead(out var pr))
+            while (_pullRequests.Reader.TryRead(out var pr))
             {
                 var origin = $"pull-loop({pr.Origin})";
                 await CallMsgNextAsync(origin, pr.Request).ConfigureAwait(false);
