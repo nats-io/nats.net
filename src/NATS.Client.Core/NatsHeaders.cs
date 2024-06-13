@@ -360,6 +360,24 @@ public class NatsHeaders : IDictionary<string, StringValues>
     }
 
     /// <summary>
+    /// Retrieves a last value from the dictionary.
+    /// </summary>
+    /// <param name="key">The header name.</param>
+    /// <param name="value">The value.</param>
+    /// <returns>true if the <see cref="NatsHeaders" /> contains the key; otherwise, false.</returns>
+    public bool TryGetLastValue(string key, [NotNullWhen(returnValue: true)] out string? value)
+    {
+        if (Store != null && Store.TryGetValue(key, out var values))
+        {
+            value = values[^1];
+            return true;
+        }
+
+        value = default;
+        return false;
+    }
+
+    /// <summary>
     /// Returns an enumerator that iterates through a collection.
     /// </summary>
     /// <returns>An <see cref="Enumerator" /> object that can be used to iterate through the collection.</returns>

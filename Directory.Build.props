@@ -5,6 +5,9 @@
         <NoWarn>$(NoWarn);CS1591;SA0001</NoWarn>
         <SignAssembly>true</SignAssembly>
         <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)opensource.snk</AssemblyOriginatorKeyFile>
+
+        <!-- Do not package by default to avoid accidental publishing -->
+        <IsPackable>false</IsPackable>
     </PropertyGroup>
 
     <ItemGroup>
