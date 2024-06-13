@@ -605,9 +605,13 @@ public class NatsObjStore : INatsObjStore
 
         pushConsumer.Init();
 
+#if NET6_0_OR_GREATER
+        await foreach (var msg in pushConsumer.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+#else
         while (await pushConsumer.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
             while (pushConsumer.Msgs.TryRead(out var msg))
+#endif
             {
                 if (pushConsumer.IsDone)
                     continue;
@@ -633,7 +637,9 @@ public class NatsObjStore : INatsObjStore
                     }
                 }
             }
+#if !NET6_0_OR_GREATER
         }
+#endif
     }
 
     /// <summary>
