@@ -12,9 +12,9 @@
     <IsPackable>true</IsPackable>
   </PropertyGroup>
 
-    <PropertyGroup Condition="'$(TargetFramework)' != 'netstandard2.0' AND '$(TargetFramework)' != 'netstandard2.1'">
-        <IsTrimmable>true</IsTrimmable>
-    </PropertyGroup>
+  <PropertyGroup Condition="'$(TargetFramework)' != 'netstandard2.0' AND '$(TargetFramework)' != 'netstandard2.1'">
+    <IsTrimmable>true</IsTrimmable>
+  </PropertyGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' != 'net8.0'">
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="6.0.0"/>

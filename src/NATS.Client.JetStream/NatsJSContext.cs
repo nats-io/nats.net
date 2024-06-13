@@ -4,6 +4,9 @@ using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
+#if NETSTANDARD2_0
+using NATS.Client.Core.Internal.NetStandardExtensions;
+#endif
 
 namespace NATS.Client.JetStream;
 
@@ -144,17 +147,18 @@ public partial class NatsJSContext
 
             try
             {
-                while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+#if NETSTANDARD2_0
+                await foreach (var msg in sub.Msgs.ReadAllLoopAsync(cancellationToken).ConfigureAwait(false))
+#else
+                await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+#endif
                 {
-                    while (sub.Msgs.TryRead(out var msg))
+                    if (msg.Data == null)
                     {
-                        if (msg.Data == null)
-                        {
-                            throw new NatsJSException("No response data received");
-                        }
-
-                        return msg.Data;
+                        throw new NatsJSException("No response data received");
                     }
+
+                    return msg.Data;
                 }
             }
             catch (NatsNoRespondersException)
@@ -243,24 +247,36 @@ public partial class NatsJSContext
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
-        var msg = await sub.Msgs.ReadAsync(cancellationToken).ConfigureAwait(false);
-
-        if (msg.Error is { } error)
+#if NETSTANDARD2_0
+        await foreach (var msg in sub.Msgs.ReadAllLoopAsync(cancellationToken).ConfigureAwait(false))
+#else
+        await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+#endif
         {
-            if (error.InnerException is NatsJSApiErrorException jsError)
+            if (msg.Error is { } error)
             {
-                return new NatsJSResponse<TResponse>(default, jsError.Error);
+                if (error.InnerException is NatsJSApiErrorException jsError)
+                {
+                    return new NatsJSResponse<TResponse>(default, jsError.Error);
+                }
+
+                throw error;
             }
 
-            throw error;
+            if (msg.Data == null)
+            {
+                throw new NatsJSException("No response data received");
+            }
+
+            return new NatsJSResponse<TResponse>(msg.Data, default);
         }
 
-        if (msg.Data == null)
+        if (sub is NatsSubBase { EndReason: NatsSubEndReason.Exception, Exception: not null } sb)
         {
-            throw new NatsJSException("No response data received");
+            throw sb.Exception;
         }
 
-        return new NatsJSResponse<TResponse>(msg.Data, default);
+        throw new NatsJSApiNoResponseException();
     }
 
 #if NETSTANDARD2_1 || NET6_0_OR_GREATER

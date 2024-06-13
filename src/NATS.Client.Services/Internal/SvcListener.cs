@@ -1,5 +1,8 @@
 using System.Threading.Channels;
 using NATS.Client.Core;
+#if NETSTANDARD2_0
+using NATS.Client.Core.Internal.NetStandardExtensions;
+#endif
 
 namespace NATS.Client.Services.Internal;
 
@@ -30,12 +33,13 @@ internal class SvcListener : IAsyncDisposable
         {
             await using (sub)
             {
-                while (await sub.Msgs.WaitToReadAsync().ConfigureAwait(false))
+#if NETSTANDARD2_0
+                await foreach (var msg in sub.Msgs.ReadAllLoopAsync())
+#else
+                await foreach (var msg in sub.Msgs.ReadAllAsync())
+#endif
                 {
-                    while (sub.Msgs.TryRead(out var msg))
-                    {
-                        await _channel.Writer.WriteAsync(new SvcMsg(_type, msg), _cts.Token).ConfigureAwait(false);
-                    }
+                    await _channel.Writer.WriteAsync(new SvcMsg(_type, msg), _cts.Token).ConfigureAwait(false);
                 }
             }
         });

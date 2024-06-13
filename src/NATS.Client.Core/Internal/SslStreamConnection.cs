@@ -5,7 +5,7 @@ using System.Security.Authentication;
 using Microsoft.Extensions.Logging;
 
 #if NETSTANDARD2_0
-#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
+#pragma warning disable CS1998
 #endif
 
 namespace NATS.Client.Core.Internal;

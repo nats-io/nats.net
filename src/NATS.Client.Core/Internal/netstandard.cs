@@ -9,6 +9,7 @@
 
 #if NETSTANDARD2_0 || NETSTANDARD2_1
 
+// Enable init only setters
 namespace System.Runtime.CompilerServices
 {
     internal static class IsExternalInit
@@ -23,25 +24,10 @@ namespace NATS.Client.Core.Internal.NetStandardExtensions
     using System.Runtime.CompilerServices;
     using System.Runtime.InteropServices;
     using System.Text;
-    using System.Threading.Channels;
 
     [StructLayout(LayoutKind.Sequential, Size = 1)]
     internal readonly struct VoidResult
     {
-    }
-
-    internal static class ChannelReaderExtensions
-    {
-        public static async IAsyncEnumerable<T> ReadAllLoopAsync<T>(this ChannelReader<T> reader, [EnumeratorCancellation] CancellationToken cancellationToken = default)
-        {
-            while (await reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
-            {
-                while (reader.TryRead(out var msg))
-                {
-                    yield return msg;
-                }
-            }
-        }
     }
 
     internal sealed class TaskCompletionSource : TaskCompletionSource<VoidResult>
@@ -257,7 +243,9 @@ namespace NATS.Client.Core.Internal.NetStandardExtensions
 
 namespace NATS.Client.Core.Internal.NetStandardExtensions
 {
+    using System.Runtime.CompilerServices;
     using System.Text;
+    using System.Threading.Channels;
 
     internal static class EncodingExtensions
     {
@@ -288,6 +276,20 @@ namespace NATS.Client.Core.Internal.NetStandardExtensions
         {
             key = kv.Key;
             value = kv.Value;
+        }
+    }
+
+    internal static class ChannelReaderExtensions
+    {
+        public static async IAsyncEnumerable<T> ReadAllLoopAsync<T>(this ChannelReader<T> reader, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            while (await reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                while (reader.TryRead(out var msg))
+                {
+                    yield return msg;
+                }
+            }
         }
     }
 }

@@ -2,7 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
-#if !NET6_0_OR_GREATER
+#if NETSTANDARD2_0 || NETSTANDARD2_1
 using Random = NATS.Client.Core.Internal.NetStandardExtensions.Random;
 #endif
 

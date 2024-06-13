@@ -6,6 +6,9 @@ using NATS.Client.Core;
 using NATS.Client.Core.Internal;
 using NATS.Client.Services.Internal;
 using NATS.Client.Services.Models;
+#if NETSTANDARD2_0
+using NATS.Client.Core.Internal.NetStandardExtensions;
+#endif
 
 namespace NATS.Client.Services;
 
@@ -227,62 +230,63 @@ public class NatsSvcServer : INatsSvcServer
 
     private async Task MsgLoop()
     {
-        while (await _channel.Reader.WaitToReadAsync(_cts.Token).ConfigureAwait(false))
+#if NETSTANDARD2_0
+        await foreach (var svcMsg in _channel.Reader.ReadAllLoopAsync(_cts.Token))
+#else
+        await foreach (var svcMsg in _channel.Reader.ReadAllAsync(_cts.Token))
+#endif
         {
-            while (_channel.Reader.TryRead(out var svcMsg))
+            try
             {
-                try
+                var type = svcMsg.MsgType;
+                var data = svcMsg.Msg.Data;
+
+                if (type == SvcMsgType.Ping)
                 {
-                    var type = svcMsg.MsgType;
-                    var data = svcMsg.Msg.Data;
-
-                    if (type == SvcMsgType.Ping)
+                    using (data)
                     {
-                        using (data)
-                        {
-                            // empty request payload
-                        }
-
-                        await svcMsg.Msg.ReplyAsync(
-                            data: new PingResponse
-                            {
-                                Name = _config.Name,
-                                Id = _id,
-                                Version = _config.Version,
-                                Metadata = _config.Metadata!,
-                            },
-                            serializer: NatsSrvJsonSerializer<PingResponse>.Default,
-                            cancellationToken: _cts.Token);
+                        // empty request payload
                     }
-                    else if (type == SvcMsgType.Info)
-                    {
-                        using (data)
-                        {
-                            // empty request payload
-                        }
 
-                        await svcMsg.Msg.ReplyAsync(
-                            data: GetInfo(),
-                            serializer: NatsSrvJsonSerializer<InfoResponse>.Default,
-                            cancellationToken: _cts.Token);
-                    }
-                    else if (type == SvcMsgType.Stats)
-                    {
-                        using (data)
+                    await svcMsg.Msg.ReplyAsync(
+                        data: new PingResponse
                         {
-                            // empty request payload
-                        }
-
-                        await svcMsg.Msg.ReplyAsync(
-                            data: GetStats(),
-                            serializer: NatsSrvJsonSerializer<StatsResponse>.Default,
-                            cancellationToken: _cts.Token);
-                    }
+                            Name = _config.Name,
+                            Id = _id,
+                            Version = _config.Version,
+                            Metadata = _config.Metadata!,
+                        },
+                        serializer: NatsSrvJsonSerializer<PingResponse>.Default,
+                        cancellationToken: _cts.Token);
                 }
-                catch (Exception ex)
+                else if (type == SvcMsgType.Info)
                 {
-                    _logger.LogError(ex, "Message loop error");
+                    using (data)
+                    {
+                        // empty request payload
+                    }
+
+                    await svcMsg.Msg.ReplyAsync(
+                        data: GetInfo(),
+                        serializer: NatsSrvJsonSerializer<InfoResponse>.Default,
+                        cancellationToken: _cts.Token);
                 }
+                else if (type == SvcMsgType.Stats)
+                {
+                    using (data)
+                    {
+                        // empty request payload
+                    }
+
+                    await svcMsg.Msg.ReplyAsync(
+                        data: GetStats(),
+                        serializer: NatsSrvJsonSerializer<StatsResponse>.Default,
+                        cancellationToken: _cts.Token);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Message loop error");
             }
         }
     }

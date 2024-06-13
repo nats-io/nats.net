@@ -1,7 +1,6 @@
 using System.Runtime.CompilerServices;
 using NATS.Client.Core.Commands;
-using NATS.Client.Core.Internal;
-#if !NET6_0_OR_GREATER
+#if NETSTANDARD2_0 || NETSTANDARD2_1
 using NATS.Client.Core.Internal.NetStandardExtensions;
 #endif
 

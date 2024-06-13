@@ -4,7 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
-#if !NET6_0_OR_GREATER
+#if NETSTANDARD2_0 || NETSTANDARD2_1
 using NATS.Client.Core.Internal.NetStandardExtensions;
 #endif
 

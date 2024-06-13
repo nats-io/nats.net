@@ -5,6 +5,9 @@ using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.Core.Internal;
+#if NETSTANDARD2_0
+using NATS.Client.Core.Internal.NetStandardExtensions;
+#endif
 
 namespace NATS.Client.Services;
 
@@ -212,59 +215,60 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
     private async Task HandlerLoop()
     {
         var stopwatch = new Stopwatch();
-        while (await _channel.Reader.WaitToReadAsync(_cancellationToken).ConfigureAwait(false))
+#if NETSTANDARD2_0
+        await foreach (var svcMsg in _channel.Reader.ReadAllLoopAsync(_cancellationToken).ConfigureAwait(false))
+#else
+        await foreach (var svcMsg in _channel.Reader.ReadAllAsync(_cancellationToken).ConfigureAwait(false))
+#endif
         {
-            while (_channel.Reader.TryRead(out var svcMsg))
+            Interlocked.Increment(ref _requests);
+            stopwatch.Restart();
+            try
             {
-                Interlocked.Increment(ref _requests);
-                stopwatch.Restart();
+                await _handler(svcMsg).ConfigureAwait(false);
+            }
+            catch (Exception e)
+            {
+                int code;
+                string message;
+                string body;
+                if (e is NatsSvcEndpointException epe)
+                {
+                    code = epe.Code;
+                    message = epe.Message;
+                    body = epe.Body;
+                }
+                else
+                {
+                    // Do not expose exceptions unless explicitly
+                    // thrown as NatsSvcEndpointException
+                    code = 999;
+                    message = "Handler error";
+                    body = string.Empty;
+
+                    // Only log unknown exceptions
+                    _logger.LogError(NatsSvcLogEvents.Endpoint, e, "Endpoint {Name} error processing message", Name);
+                }
+
                 try
                 {
-                    await _handler(svcMsg).ConfigureAwait(false);
-                }
-                catch (Exception e)
-                {
-                    int code;
-                    string message;
-                    string body;
-                    if (e is NatsSvcEndpointException epe)
+                    if (string.IsNullOrWhiteSpace(body))
                     {
-                        code = epe.Code;
-                        message = epe.Message;
-                        body = epe.Body;
+                        await svcMsg.ReplyErrorAsync(code, message, cancellationToken: _cancellationToken);
                     }
                     else
                     {
-                        // Do not expose exceptions unless explicitly
-                        // thrown as NatsSvcEndpointException
-                        code = 999;
-                        message = "Handler error";
-                        body = string.Empty;
-
-                        // Only log unknown exceptions
-                        _logger.LogError(NatsSvcLogEvents.Endpoint, e, "Endpoint {Name} error processing message", Name);
-                    }
-
-                    try
-                    {
-                        if (string.IsNullOrWhiteSpace(body))
-                        {
-                            await svcMsg.ReplyErrorAsync(code, message, cancellationToken: _cancellationToken);
-                        }
-                        else
-                        {
-                            await svcMsg.ReplyErrorAsync(code, message, data: Encoding.UTF8.GetBytes(body), cancellationToken: _cancellationToken);
-                        }
-                    }
-                    catch (Exception e1)
-                    {
-                        _logger.LogError(NatsSvcLogEvents.Endpoint, e1, "Endpoint {Name} error responding", Name);
+                        await svcMsg.ReplyErrorAsync(code, message, data: Encoding.UTF8.GetBytes(body), cancellationToken: _cancellationToken);
                     }
                 }
-                finally
+                catch (Exception e1)
                 {
-                    Interlocked.Add(ref _processingTime, ToNanos(stopwatch.Elapsed));
+                    _logger.LogError(NatsSvcLogEvents.Endpoint, e1, "Endpoint {Name} error responding", Name);
                 }
+            }
+            finally
+            {
+                Interlocked.Add(ref _processingTime, ToNanos(stopwatch.Elapsed));
             }
         }
     }

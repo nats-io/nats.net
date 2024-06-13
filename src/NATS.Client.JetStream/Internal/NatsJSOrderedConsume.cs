@@ -5,6 +5,9 @@ using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.Core.Commands;
 using NATS.Client.JetStream.Models;
+#if NETSTANDARD2_0
+using NATS.Client.Core.Internal.NetStandardExtensions;
+#endif
 
 namespace NATS.Client.JetStream.Internal;
 
@@ -391,16 +394,17 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
 
     private async Task PullLoop()
     {
-        while (await _pullRequests.Reader.WaitToReadAsync().ConfigureAwait(false))
+#if NETSTANDARD2_0
+        await foreach (var pr in _pullRequests.Reader.ReadAllLoopAsync().ConfigureAwait(false))
+#else
+        await foreach (var pr in _pullRequests.Reader.ReadAllAsync().ConfigureAwait(false))
+#endif
         {
-            while (_pullRequests.Reader.TryRead(out var pr))
+            var origin = $"pull-loop({pr.Origin})";
+            await CallMsgNextAsync(origin, pr.Request).ConfigureAwait(false);
+            if (_debug)
             {
-                var origin = $"pull-loop({pr.Origin})";
-                await CallMsgNextAsync(origin, pr.Request).ConfigureAwait(false);
-                if (_debug)
-                {
-                    _logger.LogDebug(NatsJSLogEvents.PullRequest, "Pull request issued for {Origin} {Batch}, {MaxBytes}", origin, pr.Request.Batch, pr.Request.MaxBytes);
-                }
+                _logger.LogDebug(NatsJSLogEvents.PullRequest, "Pull request issued for {Origin} {Batch}, {MaxBytes}", origin, pr.Request.Batch, pr.Request.MaxBytes);
             }
         }
     }

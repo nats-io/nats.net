@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Internal;
-#if !NET6_0_OR_GREATER
+#if NETSTANDARD2_0 || NETSTANDARD2_1
 using NATS.Client.Core.Internal.NetStandardExtensions;
 #endif
 
@@ -764,6 +764,7 @@ internal sealed class CommandWriter : IAsyncDisposable
                 await _flushTask.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
             }
 #endif
+
             _protocolWriter.WritePong(_pipeWriter);
             EnqueueCommand();
         }

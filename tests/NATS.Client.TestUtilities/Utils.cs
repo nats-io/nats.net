@@ -2,6 +2,9 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+#if NETSTANDARD2_0
+using NATS.Client.Core.Internal.NetStandardExtensions;
+#endif
 
 namespace NATS.Client.Core.Tests;
 
@@ -71,12 +74,13 @@ public static class NatsMsgTestUtils
             return Task.CompletedTask;
         return Task.Run(async () =>
         {
-            while (await sub.Msgs.WaitToReadAsync(CancellationToken.None).ConfigureAwait(false))
+#if NETSTANDARD2_0
+            await foreach (var natsMsg in sub.Msgs.ReadAllLoopAsync())
+#else
+            await foreach (var natsMsg in sub.Msgs.ReadAllAsync())
+#endif
             {
-                while (sub.Msgs.TryRead(out var msg))
-                {
-                    action(msg);
-                }
+                action(natsMsg);
             }
         });
     }
@@ -87,12 +91,13 @@ public static class NatsMsgTestUtils
             return Task.CompletedTask;
         return Task.Run(async () =>
         {
-            while (await sub.Msgs.WaitToReadAsync(CancellationToken.None).ConfigureAwait(false))
+#if NETSTANDARD2_0
+            await foreach (var natsMsg in sub.Msgs.ReadAllLoopAsync())
+#else
+            await foreach (var natsMsg in sub.Msgs.ReadAllAsync())
+#endif
             {
-                while (sub.Msgs.TryRead(out var msg))
-                {
-                    action(msg);
-                }
+                await action(natsMsg);
             }
         });
     }
@@ -150,7 +155,7 @@ public static class ServiceUtils
             }
 
             return count == limit;
-        }).ConfigureAwait(false);
+        });
 
         var count = 0;
         await foreach (var msg in nats.RequestManyAsync<string, T>(subject, "{}", replySerializer: serializer, replyOpts: replyOpts, cancellationToken: ct).ConfigureAwait(false))

@@ -1,5 +1,4 @@
 // adapted from https://github.com/CommunityToolkit/dotnet/blob/main/src/CommunityToolkit.HighPerformance/Buffers/NatsBufferWriter%7BT%7D.cs
-#pragma warning disable SA1116, SA1117
 
 using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
@@ -392,11 +391,14 @@ internal static class NatsBufferWriterExtensions
     /// <param name="clearArray">Indicates whether the contents of the array should be cleared before reuse.</param>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="newSize"/> is less than 0.</exception>
     /// <remarks>When this method returns, the caller must not use any references to the old array anymore.</remarks>
-    public static void Resize<T>(this ArrayPool<T> pool,
+    public static void Resize<T>(
+        this ArrayPool<T> pool,
 #if !NETSTANDARD2_0
         [NotNull]
 #endif
-        ref T[]? array, int newSize, bool clearArray = false)
+        ref T[]? array,
+        int newSize,
+        bool clearArray = false)
     {
         // If the old array is null, just create a new one with the requested size
         if (array is null)

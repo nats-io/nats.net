@@ -4,7 +4,7 @@ using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
 using NATS.Client.Core.Internal;
-#if !NET6_0_OR_GREATER
+#if NETSTANDARD2_0 || NETSTANDARD2_1
 using NATS.Client.Core.Internal.NetStandardExtensions;
 using Random = NATS.Client.Core.Internal.NetStandardExtensions.Random;
 #endif
@@ -752,11 +752,7 @@ public partial class NatsConnection : INatsConnection
             }
             else
             {
-#if NETSTANDARD2_0
                 _backoff = new TimeSpan(_backoff.Ticks * 2);
-#else
-                _backoff *= 2;
-#endif
                 if (_backoff > Opts.ReconnectWaitMax)
                 {
                     _backoff = Opts.ReconnectWaitMax;

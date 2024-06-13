@@ -3,6 +3,9 @@ using System.Threading.Channels;
 using NATS.Client.Core;
 using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
+#if NETSTANDARD2_0
+using NATS.Client.Core.Internal.NetStandardExtensions;
+#endif
 
 namespace NATS.Client.JetStream;
 
@@ -148,12 +151,13 @@ public class NatsJSConsumer : INatsJSConsumer
             serializer,
             cancellationToken: cancellationToken).ConfigureAwait(false);
 
-        while (await f.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+#if NETSTANDARD2_0
+        await foreach (var natsJSMsg in f.Msgs.ReadAllLoopAsync(cancellationToken).ConfigureAwait(false))
+#else
+        await foreach (var natsJSMsg in f.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+#endif
         {
-            while (f.Msgs.TryRead(out var msg))
-            {
-                return msg;
-            }
+            return natsJSMsg;
         }
 
         return null;
@@ -262,13 +266,13 @@ public class NatsJSConsumer : INatsJSConsumer
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
         await using var fc = await FetchInternalAsync<T>(opts with { NoWait = true }, serializer, cancellationToken).ConfigureAwait(false);
-
-        while (await fc.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+#if NETSTANDARD2_0
+        await foreach (var jsMsg in fc.Msgs.ReadAllLoopAsync(cancellationToken).ConfigureAwait(false))
+#else
+        await foreach (var jsMsg in fc.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+#endif
         {
-            while (fc.Msgs.TryRead(out var msg))
-            {
-                yield return msg;
-            }
+            yield return jsMsg;
         }
     }
 
