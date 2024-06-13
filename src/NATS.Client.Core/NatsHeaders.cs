@@ -365,7 +365,12 @@ public class NatsHeaders : IDictionary<string, StringValues>
     /// <param name="key">The header name.</param>
     /// <param name="value">The value.</param>
     /// <returns>true if the <see cref="NatsHeaders" /> contains the key; otherwise, false.</returns>
-    public bool TryGetLastValue(string key, [NotNullWhen(returnValue: true)] out string? value)
+    public bool TryGetLastValue(
+        string key,
+#if NET6_0_OR_GREATER
+        [NotNullWhen(returnValue: true)]
+#endif
+        out string? value)
     {
         if (Store != null && Store.TryGetValue(key, out var values))
         {
