@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
@@ -130,7 +130,7 @@ public static class ChildProcessTracker
     {
         if (s_jobHandle != IntPtr.Zero)
         {
-            bool success = AssignProcessToJobObject(s_jobHandle, process.Handle);
+            var success = AssignProcessToJobObject(s_jobHandle, process.Handle);
             if (!success && !process.HasExited)
                 throw new Win32Exception();
         }
@@ -149,7 +149,7 @@ public static class ChildProcessTracker
         // The job name is optional (and can be null), but it helps with diagnostics.
         //  If it's not null, it has to be unique. Use SysInternals' Handle command-line
         //  utility: handle -a ChildProcessTracker
-        string jobName = "ChildProcessTracker" + Process.GetCurrentProcess().Id;
+        var jobName = "ChildProcessTracker" + Process.GetCurrentProcess().Id;
         s_jobHandle = CreateJobObject(IntPtr.Zero, jobName);
 
         var info = new JOBOBJECT_BASIC_LIMIT_INFORMATION();
@@ -162,8 +162,8 @@ public static class ChildProcessTracker
         var extendedInfo = new JOBOBJECT_EXTENDED_LIMIT_INFORMATION();
         extendedInfo.BasicLimitInformation = info;
 
-        int length = Marshal.SizeOf(typeof(JOBOBJECT_EXTENDED_LIMIT_INFORMATION));
-        IntPtr extendedInfoPtr = Marshal.AllocHGlobal(length);
+        var length = Marshal.SizeOf(typeof(JOBOBJECT_EXTENDED_LIMIT_INFORMATION));
+        var extendedInfoPtr = Marshal.AllocHGlobal(length);
         try
         {
             Marshal.StructureToPtr(extendedInfo, extendedInfoPtr, false);
@@ -210,15 +210,15 @@ public enum JobObjectInfoType
 [StructLayout(LayoutKind.Sequential)]
 public struct JOBOBJECT_BASIC_LIMIT_INFORMATION
 {
-    public Int64 PerProcessUserTimeLimit;
-    public Int64 PerJobUserTimeLimit;
+    public long PerProcessUserTimeLimit;
+    public long PerJobUserTimeLimit;
     public JOBOBJECTLIMIT LimitFlags;
     public UIntPtr MinimumWorkingSetSize;
     public UIntPtr MaximumWorkingSetSize;
-    public UInt32 ActiveProcessLimit;
-    public Int64 Affinity;
-    public UInt32 PriorityClass;
-    public UInt32 SchedulingClass;
+    public uint ActiveProcessLimit;
+    public long Affinity;
+    public uint PriorityClass;
+    public uint SchedulingClass;
 }
 
 [Flags]
@@ -230,12 +230,12 @@ public enum JOBOBJECTLIMIT : uint
 [StructLayout(LayoutKind.Sequential)]
 public struct IO_COUNTERS
 {
-    public UInt64 ReadOperationCount;
-    public UInt64 WriteOperationCount;
-    public UInt64 OtherOperationCount;
-    public UInt64 ReadTransferCount;
-    public UInt64 WriteTransferCount;
-    public UInt64 OtherTransferCount;
+    public ulong ReadOperationCount;
+    public ulong WriteOperationCount;
+    public ulong OtherOperationCount;
+    public ulong ReadTransferCount;
+    public ulong WriteTransferCount;
+    public ulong OtherTransferCount;
 }
 
 [StructLayout(LayoutKind.Sequential)]
