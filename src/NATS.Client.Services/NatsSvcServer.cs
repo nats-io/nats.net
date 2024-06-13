@@ -246,7 +246,10 @@ public class NatsSvcServer : INatsSvcServer
                         await svcMsg.Msg.ReplyAsync(
                             data: new PingResponse
                             {
-                                Name = _config.Name, Id = _id, Version = _config.Version, Metadata = _config.Metadata!,
+                                Name = _config.Name,
+                                Id = _id,
+                                Version = _config.Version,
+                                Metadata = _config.Metadata!,
                             },
                             serializer: NatsSrvJsonSerializer<PingResponse>.Default,
                             cancellationToken: _cts.Token);
