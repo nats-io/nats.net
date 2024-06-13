@@ -58,8 +58,7 @@ internal sealed class SslStreamConnection : ISocketConnection
     public async ValueTask<int> SendAsync(ReadOnlyMemory<byte> buffer)
     {
 #if NETSTANDARD2_0
-        // ReSharper disable once SuggestVarOrType_Elsewhere
-        MemoryMarshal.TryGetArray(buffer, out ArraySegment<byte> segment);
+        MemoryMarshal.TryGetArray(buffer, out var segment);
         await _sslStream.WriteAsync(segment.Array, segment.Offset, segment.Count, _closeCts.Token).ConfigureAwait(false);
 #else
         await _sslStream.WriteAsync(buffer, _closeCts.Token).ConfigureAwait(false);

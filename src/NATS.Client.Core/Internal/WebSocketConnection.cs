@@ -66,8 +66,7 @@ internal sealed class WebSocketConnection : ISocketConnection
 #if NET6_0_OR_GREATER
         await _socket.SendAsync(buffer, WebSocketMessageType.Binary, WebSocketMessageFlags.EndOfMessage, CancellationToken.None).ConfigureAwait(false);
 #else
-        // ReSharper disable once SuggestVarOrType_Elsewhere
-        MemoryMarshal.TryGetArray(buffer, out ArraySegment<byte> segment);
+        MemoryMarshal.TryGetArray(buffer, out var segment);
         await _socket.SendAsync(segment, WebSocketMessageType.Binary, true, CancellationToken.None).ConfigureAwait(false);
 #endif
         return buffer.Length;

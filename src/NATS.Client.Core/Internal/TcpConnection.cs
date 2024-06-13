@@ -89,8 +89,7 @@ internal sealed class TcpConnection : ISocketConnection
     public ValueTask<int> SendAsync(ReadOnlyMemory<byte> buffer)
     {
 #if NETSTANDARD2_0
-        // ReSharper disable once SuggestVarOrType_Elsewhere
-        MemoryMarshal.TryGetArray(buffer, out ArraySegment<byte> segment);
+        MemoryMarshal.TryGetArray(buffer, out var segment);
         return new ValueTask<int>(_socket.SendAsync(segment, SocketFlags.None));
 #else
         return _socket.SendAsync(buffer, SocketFlags.None, CancellationToken.None);

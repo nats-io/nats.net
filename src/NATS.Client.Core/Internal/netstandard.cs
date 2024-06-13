@@ -107,9 +107,9 @@ namespace NATS.Client.Core.Internal.NetStandardExtensions
             if (minValue > maxValue)
                 throw new ArgumentOutOfRangeException(nameof(minValue), "minValue must be less than or equal to maxValue");
 
-            double range = (double)maxValue - (double)minValue + 1;
-            double sample = NextDouble();
-            double scaled = sample * range;
+            var range = (double)maxValue - (double)minValue + 1;
+            var sample = NextDouble();
+            var scaled = sample * range;
 
             return (long)(scaled + minValue);
         }
@@ -171,13 +171,13 @@ namespace NATS.Client.Core.Internal.NetStandardExtensions
         // Adapted from .NET 6.0 implementation
         internal static long GetOffset<T>(this in ReadOnlySequence<T> sequence, SequencePosition position)
         {
-            object? positionSequenceObject = position.GetObject();
-            bool positionIsNull = positionSequenceObject == null;
+            var positionSequenceObject = position.GetObject();
+            var positionIsNull = positionSequenceObject == null;
 
-            object? startObject = sequence.Start.GetObject();
-            object? endObject = sequence.End.GetObject();
+            var startObject = sequence.Start.GetObject();
+            var endObject = sequence.End.GetObject();
 
-            uint positionIndex = (uint)position.GetInteger();
+            var positionIndex = (uint)position.GetInteger();
 
             // if a sequence object is null, we suppose start segment
             if (positionIsNull)
@@ -202,7 +202,7 @@ namespace NATS.Client.Core.Internal.NetStandardExtensions
                     throw new ArgumentOutOfRangeException();
 
                 // Multi-Segment Sequence
-                ReadOnlySequenceSegment<T>? currentSegment = (ReadOnlySequenceSegment<T>?)startObject;
+                var currentSegment = (ReadOnlySequenceSegment<T>?)startObject;
                 while (currentSegment != null && currentSegment != positionSequenceObject)
                 {
                     currentSegment = currentSegment.Next!;
