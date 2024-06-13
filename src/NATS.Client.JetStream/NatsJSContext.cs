@@ -144,13 +144,18 @@ public partial class NatsJSContext
 
             try
             {
-                var msg = await sub.Msgs.ReadAsync(cancellationToken).ConfigureAwait(false);
-                if (msg.Data == null)
+                while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
                 {
-                    throw new NatsJSException("No response data received");
-                }
+                    while (sub.Msgs.TryRead(out var msg))
+                    {
+                        if (msg.Data == null)
+                        {
+                            throw new NatsJSException("No response data received");
+                        }
 
-                return msg.Data;
+                        return msg.Data;
+                    }
+                }
             }
             catch (NatsNoRespondersException)
             {

@@ -148,7 +148,15 @@ public class NatsJSConsumer : INatsJSConsumer
             serializer,
             cancellationToken: cancellationToken).ConfigureAwait(false);
 
-        return await f.Msgs.ReadAsync(cancellationToken).ConfigureAwait(false);
+        while (await f.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            while (f.Msgs.TryRead(out var msg))
+            {
+                return msg;
+            }
+        }
+
+        return null;
     }
 
     /// <inheritdoc />
