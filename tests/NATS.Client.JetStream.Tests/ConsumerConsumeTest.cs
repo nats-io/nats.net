@@ -2,9 +2,6 @@ using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Tests;
 using NATS.Client.JetStream.Models;
-#if NETFRAMEWORK
-using NATS.Client.Core.Internal.NetStandardExtensions;
-#endif
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -80,11 +77,7 @@ public class ConsumerConsumeTest
         var consumer = (NatsJSConsumer)await js.GetConsumerAsync("s1", "c1", cts.Token);
         var count = 0;
         await using var cc = await consumer.ConsumeInternalAsync<TestData>(serializer: TestDataJsonSerializer<TestData>.Default, consumerOpts, cancellationToken: cts.Token);
-#if NETFRAMEWORK
-        await foreach (var msg in cc.Msgs.ReadAllLoopAsync(cts.Token))
-#else
         await foreach (var msg in cc.Msgs.ReadAllAsync(cts.Token))
-#endif
         {
             await msg.AckAsync(cancellationToken: cts.Token);
             Assert.Equal(count, msg.Data!.Test);
@@ -157,11 +150,7 @@ public class ConsumerConsumeTest
         var consumer = (NatsJSConsumer)await js.GetConsumerAsync("s1", "c1", cts.Token);
         var count = 0;
         var cc = await consumer.ConsumeInternalAsync<TestData>(serializer: TestDataJsonSerializer<TestData>.Default, consumerOpts, cancellationToken: cts.Token);
-#if NETFRAMEWORK
-        await foreach (var msg in cc.Msgs.ReadAllLoopAsync(cts.Token))
-#else
         await foreach (var msg in cc.Msgs.ReadAllAsync(cts.Token))
-#endif
         {
             await msg.AckAsync(cancellationToken: cts.Token);
             Assert.Equal(count, msg.Data!.Test);
@@ -231,11 +220,7 @@ public class ConsumerConsumeTest
         var readerTask = Task.Run(async () =>
         {
             var count = 0;
-#if NETFRAMEWORK
-            await foreach (var msg in cc.Msgs.ReadAllLoopAsync(cts.Token))
-#else
             await foreach (var msg in cc.Msgs.ReadAllAsync(cts.Token))
-#endif
             {
                 await msg.AckAsync(cancellationToken: cts.Token);
                 Assert.Equal(count, msg.Data!.Test);
@@ -312,11 +297,7 @@ public class ConsumerConsumeTest
         var signal2 = new WaitSignal();
         var reader = Task.Run(async () =>
         {
-#if NETFRAMEWORK
-            await foreach (var msg in cc.Msgs.ReadAllLoopAsync(cts.Token))
-#else
             await foreach (var msg in cc.Msgs.ReadAllAsync(cts.Token))
-#endif
             {
                 await msg.AckAsync(cancellationToken: cts.Token);
                 signal1.Pulse();
@@ -394,11 +375,7 @@ public class ConsumerConsumeTest
         var signal2 = new WaitSignal();
         var reader = Task.Run(async () =>
         {
-#if NETFRAMEWORK
-            await foreach (var msg in cc.Msgs.ReadAllLoopAsync(cts.Token))
-#else
             await foreach (var msg in cc.Msgs.ReadAllAsync(cts.Token))
-#endif
             {
                 await msg.AckAsync(cancellationToken: cts.Token);
                 signal1.Pulse();

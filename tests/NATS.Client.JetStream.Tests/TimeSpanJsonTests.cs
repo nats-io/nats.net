@@ -2,9 +2,6 @@ using System.Buffers;
 using System.Text;
 using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
-#if NETFRAMEWORK
-using NATS.Client.Core.Internal.NetStandardExtensions;
-#endif
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -22,7 +19,7 @@ public class TimeSpanJsonTests
         var bw = new NatsBufferWriter<byte>();
         serializer.Serialize(bw, new ConsumerConfig { AckWait = time });
 
-        var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan);
         Assert.Matches(expected, json);
 
         var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory));
@@ -42,7 +39,7 @@ public class TimeSpanJsonTests
         var bw = new NatsBufferWriter<byte>();
         serializer.Serialize(bw, new ConsumerConfig { IdleHeartbeat = time });
 
-        var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan);
         Assert.Matches(expected, json);
 
         var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory));

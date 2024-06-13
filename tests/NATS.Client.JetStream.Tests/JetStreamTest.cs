@@ -1,8 +1,5 @@
 using NATS.Client.Core.Tests;
 using NATS.Client.JetStream.Models;
-#if NETFRAMEWORK
-using NATS.Client.Core.Internal.NetStandardExtensions;
-#endif
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -122,11 +119,7 @@ public class JetStreamTest
                 serializer: TestDataJsonSerializer<TestData>.Default,
                 opts: new NatsJSConsumeOpts { MaxMsgs = 100 },
                 cancellationToken: cts2.Token);
-#if NETFRAMEWORK
-            await foreach (var msg in cc.Msgs.ReadAllLoopAsync(cts2.Token))
-#else
             await foreach (var msg in cc.Msgs.ReadAllAsync(cts2.Token))
-#endif
             {
                 messages.Add(msg);
 

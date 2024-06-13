@@ -2,9 +2,6 @@ using System.Diagnostics;
 using System.Net.Sockets;
 using Microsoft.Extensions.Logging;
 using NATS.Client.TestUtilities;
-#if NETFRAMEWORK
-using NATS.Client.Core.Internal.NetStandardExtensions;
-#endif
 
 namespace NATS.Client.Core.Tests;
 

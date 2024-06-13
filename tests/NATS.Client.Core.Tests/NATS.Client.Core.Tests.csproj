@@ -1,10 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net481;net6.0;net8.0</TargetFrameworks>
+    <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
-    <NoWarn>$(NoWarn);CS8002;VSTHRD111;VSTHRD200;VSTHRD110</NoWarn>
+    <NoWarn>$(NoWarn);CS8002</NoWarn>
     <ImplicitUsings>enable</ImplicitUsings>
     <RunSettingsFilePath>$(MSBuildProjectDirectory)\test.runsettings</RunSettingsFilePath>
     <IsPackable>false</IsPackable>
@@ -25,11 +25,6 @@
     </PackageReference>
     <PackageReference Include="Xunit.SkippableFact" Version="1.4.13" />
   </ItemGroup>
-
-    <!--  Dependencies for netstandard only  -->
-    <ItemGroup Condition="'$(TargetFramework)' == 'net481'">
-        <PackageReference Include="Microsoft.Bcl.HashCode" Version="1.1.1" />
-    </ItemGroup>
 
   <ItemGroup>
     <Using Include="Xunit"/>

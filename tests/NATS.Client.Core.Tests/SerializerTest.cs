@@ -97,7 +97,7 @@ public class SerializerTest
         {
             var buffer = new NatsBufferWriter<byte>();
             serializer.Serialize(buffer, value);
-            var actual = Encoding.UTF8.GetString(buffer.WrittenMemory.Span.ToArray());
+            var actual = Encoding.UTF8.GetString(buffer.WrittenMemory.Span);
             Assert.Equal(expected, actual);
         }
 
@@ -307,7 +307,7 @@ public class TestSerializerWithEmpty<T> : INatsSerializer<T>
 {
     public T? Deserialize(in ReadOnlySequence<byte> buffer) => (T)(object)(buffer.IsEmpty
         ? new TestData("__EMPTY__")
-        : new TestData(Encoding.ASCII.GetString(buffer.ToArray())));
+        : new TestData(Encoding.ASCII.GetString(buffer)));
 
     public void Serialize(IBufferWriter<byte> bufferWriter, T value) => throw new Exception("not used");
 }

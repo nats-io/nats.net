@@ -2,9 +2,6 @@ using System.Buffers.Text;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Tests;
 using NATS.Client.KeyValueStore.Internal;
-#if NETFRAMEWORK
-using NATS.Client.Core.Internal.NetStandardExtensions;
-#endif
 
 namespace NATS.Client.KeyValueStore.Tests;
 
@@ -41,11 +38,7 @@ public class NatsKVWatcherTest
 
         var count = 0;
 
-#if NETFRAMEWORK
-        await foreach (var entry in watcher.Entries.ReadAllLoopAsync(cancellationToken))
-#else
         await foreach (var entry in watcher.Entries.ReadAllAsync(cancellationToken))
-#endif
         {
             using (entry.Value)
             {
@@ -77,11 +70,8 @@ public class NatsKVWatcherTest
         await store1.PutAsync("k1.p1", 4, cancellationToken: cancellationToken);
         await store1.PutAsync("k1.p1", 5, cancellationToken: cancellationToken);
         await store1.PutAsync("k1.p1", 6, cancellationToken: cancellationToken);
-#if NETFRAMEWORK
-        await foreach (var entry in watcher.Entries.ReadAllLoopAsync(cancellationToken))
-#else
+
         await foreach (var entry in watcher.Entries.ReadAllAsync(cancellationToken))
-#endif
         {
             if (entry.Value is { } memoryOwner)
             {
@@ -249,11 +239,7 @@ public class NatsKVWatcherTest
 
         var consumer1 = ((NatsKVWatcher<NatsMemoryOwner<byte>>)watcher).Consumer;
 
-#if NETFRAMEWORK
-        await foreach (var entry in watcher.Entries.ReadAllLoopAsync(cancellationToken))
-#else
         await foreach (var entry in watcher.Entries.ReadAllAsync(cancellationToken))
-#endif
         {
             using (entry.Value)
             {
@@ -294,11 +280,7 @@ public class NatsKVWatcherTest
             retryDelay: TimeSpan.FromSeconds(1),
             timeout: timeout);
 
-#if NETFRAMEWORK
-        await foreach (var entry in watcher.Entries.ReadAllLoopAsync(cancellationToken))
-#else
         await foreach (var entry in watcher.Entries.ReadAllAsync(cancellationToken))
-#endif
         {
             if (entry.Value is { } memoryOwner)
             {
@@ -546,7 +528,7 @@ public class NatsKVWatcherTest
             OnNoData = (_) =>
             {
                 noData = true;
-                return new ValueTask<bool>(true);
+                return ValueTask.FromResult(true);
             },
         };
 

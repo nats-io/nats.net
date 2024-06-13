@@ -27,23 +27,20 @@ public abstract partial class NatsConnectionTest
         var reader1 = Task.Run(
             async () =>
             {
-                while (await sub1.Msgs.WaitToReadAsync(cts.Token).ConfigureAwait(false))
+                await foreach (var msg in sub1.Msgs.ReadAllAsync(cts.Token))
                 {
-                    while (sub1.Msgs.TryRead(out var msg))
+                    if (msg.Subject == "foo.sync")
                     {
-                        if (msg.Subject == "foo.sync")
-                        {
-                            Interlocked.Exchange(ref sync1, 1);
-                            continue;
-                        }
-
-                        Assert.Equal($"foo.xyz{msg.Data}", msg.Subject);
-                        lock (messages1)
-                            messages1.Add(msg.Data);
-                        var total = Interlocked.Increment(ref count);
-                        if (total == messageCount)
-                            cts.Cancel();
+                        Interlocked.Exchange(ref sync1, 1);
+                        continue;
                     }
+
+                    Assert.Equal($"foo.xyz{msg.Data}", msg.Subject);
+                    lock (messages1)
+                        messages1.Add(msg.Data);
+                    var total = Interlocked.Increment(ref count);
+                    if (total == messageCount)
+                        cts.Cancel();
                 }
             },
             cts.Token);
@@ -53,23 +50,20 @@ public abstract partial class NatsConnectionTest
         var reader2 = Task.Run(
             async () =>
             {
-                while (await sub2.Msgs.WaitToReadAsync(cts.Token).ConfigureAwait(false))
+                await foreach (var msg in sub2.Msgs.ReadAllAsync(cts.Token))
                 {
-                    while (sub2.Msgs.TryRead(out var msg))
+                    if (msg.Subject == "foo.sync")
                     {
-                        if (msg.Subject == "foo.sync")
-                        {
-                            Interlocked.Exchange(ref sync2, 1);
-                            continue;
-                        }
-
-                        Assert.Equal($"foo.xyz{msg.Data}", msg.Subject);
-                        lock (messages2)
-                            messages2.Add(msg.Data);
-                        var total = Interlocked.Increment(ref count);
-                        if (total == messageCount)
-                            cts.Cancel();
+                        Interlocked.Exchange(ref sync2, 1);
+                        continue;
                     }
+
+                    Assert.Equal($"foo.xyz{msg.Data}", msg.Subject);
+                    lock (messages2)
+                        messages2.Add(msg.Data);
+                    var total = Interlocked.Increment(ref count);
+                    if (total == messageCount)
+                        cts.Cancel();
                 }
             },
             cts.Token);

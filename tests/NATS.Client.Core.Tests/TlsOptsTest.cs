@@ -1,5 +1,3 @@
-#if !NETFRAMEWORK
-
 using System.Net.Security;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
@@ -201,5 +199,3 @@ public class TlsOptsTest
         }
     }
 }
-
-#endif

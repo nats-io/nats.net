@@ -47,7 +47,7 @@ public class NuidWriterTests
 
         // Assert
         ReadOnlySpan<char> lower = buffer.Slice(0, 22);
-        string resultAsString = new(lower.ToArray());
+        string resultAsString = new(lower);
         ReadOnlySpan<char> upper = buffer.Slice(22);
 
         Assert.True(result);
@@ -113,7 +113,7 @@ public class NuidWriterTests
 
         // Assert
         Assert.True(result);
-        string resultAsString = new(nuid.ToArray());
+        string resultAsString = new(nuid);
         Assert.Matches("[A-z0-9]{22}", resultAsString);
     }
 
@@ -142,7 +142,6 @@ public class NuidWriterTests
         Assert.False(firstNuid.AsSpan(0, 12).SequenceEqual(secondNuid.AsSpan(0, 12)));
     }
 
-#if !NETFRAMEWORK
     [Fact]
     public void GetPrefix_PrefixAsExpected()
     {
@@ -160,7 +159,6 @@ public class NuidWriterTests
         Assert.Equal(12, prefix.Length);
         Assert.True("01234567B567".AsSpan().SequenceEqual(prefix));
     }
-#endif
 
     [Fact]
     public void InitAndWrite_Char()
@@ -210,7 +208,7 @@ public class NuidWriterTests
 
         foreach (var (nuid, threadId) in nuids.ToList())
         {
-            var prefix = new string(nuid.AsSpan(0, prefixLength).ToArray());
+            var prefix = new string(nuid.AsSpan(0, prefixLength));
             Assert.True(uniquePrefixes.Add(prefix), $"Unique prefix {prefix}");
             Assert.True(uniqueThreadIds.Add(threadId), $"Unique thread id {threadId}");
         }
@@ -268,7 +266,7 @@ public class NuidWriterTests
                             return;
                         }
 
-                        var nuid = new string(buffer.ToArray());
+                        var nuid = new string(buffer);
 
                         if (!nuids.Add(nuid))
                         {
@@ -310,7 +308,7 @@ public class NuidWriterTests
                     return;
                 }
 
-                var nuid = new string(buffer.ToArray());
+                var nuid = new string(buffer);
 
                 if (!nuids.Add(nuid))
                 {

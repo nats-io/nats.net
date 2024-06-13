@@ -29,7 +29,7 @@ public class CompatTest
 
         // Verify PUT
         {
-            using var stream = new MemoryStream("Hello, World!"u8.ToArray());
+            await using var stream = new MemoryStream("Hello, World!"u8.ToArray());
             await store.PutAsync(objMeta, stream, cancellationToken: cancellationToken);
 
             // nats obj info b1 o1

@@ -1,10 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net481;net6.0;net8.0</TargetFrameworks>
+    <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <NoWarn>$(NoWarn);CS8002;CS1685;VSTHRD111;VSTHRD200;VSTHRD110</NoWarn>
 
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
@@ -30,7 +29,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\src\NATS.Client.Core\Internal\netstandard.cs" />
     <ProjectReference Include="..\..\src\NATS.Client.JetStream\NATS.Client.JetStream.csproj" />
     <ProjectReference Include="..\NATS.Client.TestUtilities\NATS.Client.TestUtilities.csproj" />
   </ItemGroup>

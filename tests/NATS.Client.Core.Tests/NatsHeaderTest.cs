@@ -31,7 +31,7 @@ public class NatsHeaderTest
         await pipe.Writer.FlushAsync();
         var result = await pipe.Reader.ReadAtLeastAsync((int)written);
         Assert.True(expected.ToSpan().SequenceEqual(result.Buffer.ToSpan()));
-        _output.WriteLine($"Buffer:\n{result.Buffer.First.Span.Dump()}");
+        _output.WriteLine($"Buffer:\n{result.Buffer.FirstSpan.Dump()}");
     }
 
     [Fact]
@@ -49,7 +49,7 @@ public class NatsHeaderTest
         await pipe.Writer.FlushAsync();
         var result = await pipe.Reader.ReadAtLeastAsync((int)written);
         Assert.True(expected.ToSpan().SequenceEqual(result.Buffer.ToSpan()));
-        _output.WriteLine($"Buffer:\n{result.Buffer.First.Span.Dump()}");
+        _output.WriteLine($"Buffer:\n{result.Buffer.FirstSpan.Dump()}");
     }
 
     [Fact]
@@ -176,23 +176,5 @@ public class NatsHeaderTest
         Assert.Equal(1, headers.Version);
         Assert.Equal(123, headers.Code);
         Assert.Equal("Test Message", headers.MessageText);
-    }
-
-    [Theory]
-    [InlineData("NATS/1.0 123 Test Message\r\nk2: v2-0\r\nk2: v2-1\r\n\r\n", true, "v2-1")]
-    [InlineData("NATS/1.0 123 Test Message\r\nk2: v2-0\r\n\r\n", true, "v2-0")]
-    [InlineData("NATS/1.0 123 Test Message\r\nk3: v2-0\r\n\r\n", false, null)]
-    [InlineData("NATS/1.0 123 Test Message\r\n\r\n", false, null)]
-    public void GetLastValueTests(string text, bool expectedResult, string? expectedLastValue)
-    {
-        var parser = new NatsHeaderParser(Encoding.UTF8);
-        var input = new SequenceReader<byte>(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(text)));
-        var headers = new NatsHeaders();
-        parser.ParseHeaders(input, headers);
-
-        var result = headers.TryGetLastValue("k2", out var lastValue);
-
-        Assert.Equal(result, expectedResult);
-        Assert.Equal(lastValue, expectedLastValue);
     }
 }

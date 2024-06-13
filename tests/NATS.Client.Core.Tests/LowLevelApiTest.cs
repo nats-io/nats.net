@@ -80,7 +80,7 @@ public class LowLevelApiTest
                 _builder.MessageReceived(sb.ToString());
             }
 
-            return default;
+            return ValueTask.CompletedTask;
         }
 
         protected override void TryComplete()

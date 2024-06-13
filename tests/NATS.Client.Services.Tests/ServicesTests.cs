@@ -144,25 +144,25 @@ public class ServicesTests
         await s1.AddEndpointAsync<int>(
             name: "baz",
             subject: "foo.baz",
-            handler: _ => default,
+            handler: _ => ValueTask.CompletedTask,
             cancellationToken: cancellationToken);
 
         await s1.AddEndpointAsync<int>(
             subject: "foo.bar1",
-            handler: _ => default,
+            handler: _ => ValueTask.CompletedTask,
             cancellationToken: cancellationToken);
 
         var grp1 = await s1.AddGroupAsync("grp1", cancellationToken: cancellationToken);
 
         await grp1.AddEndpointAsync<int>(
             name: "e1",
-            handler: _ => default,
+            handler: _ => ValueTask.CompletedTask,
             cancellationToken: cancellationToken);
 
         await grp1.AddEndpointAsync<int>(
             name: "e2",
             subject: "foo.bar2",
-            handler: _ => default,
+            handler: _ => ValueTask.CompletedTask,
             cancellationToken: cancellationToken);
 
         var grp2 = await s1.AddGroupAsync(string.Empty, queueGroup: "q_empty", cancellationToken: cancellationToken);
@@ -170,7 +170,7 @@ public class ServicesTests
         await grp2.AddEndpointAsync<int>(
             name: "empty1",
             subject: "foo.empty1",
-            handler: _ => default,
+            handler: _ => ValueTask.CompletedTask,
             cancellationToken: cancellationToken);
 
         // Check that the endpoints are registered correctly
@@ -207,7 +207,7 @@ public class ServicesTests
         await s2.AddEndpointAsync<int>(
             name: "s2baz",
             subject: "s2foo.baz",
-            handler: _ => default,
+            handler: _ => ValueTask.CompletedTask,
             metadata: new Dictionary<string, string> { { "ep-k1", "ep-v1" } },
             cancellationToken: cancellationToken);
 
