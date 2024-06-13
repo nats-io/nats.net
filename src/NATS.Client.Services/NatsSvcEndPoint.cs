@@ -212,56 +212,59 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
     private async Task HandlerLoop()
     {
         var stopwatch = new Stopwatch();
-        await foreach (var svcMsg in _channel.Reader.ReadAllAsync(_cancellationToken).ConfigureAwait(false))
+        while (await _channel.Reader.WaitToReadAsync(_cancellationToken).ConfigureAwait(false))
         {
-            Interlocked.Increment(ref _requests);
-            stopwatch.Restart();
-            try
+            while (_channel.Reader.TryRead(out var svcMsg))
             {
-                await _handler(svcMsg).ConfigureAwait(false);
-            }
-            catch (Exception e)
-            {
-                int code;
-                string message;
-                string body;
-                if (e is NatsSvcEndpointException epe)
-                {
-                    code = epe.Code;
-                    message = epe.Message;
-                    body = epe.Body;
-                }
-                else
-                {
-                    // Do not expose exceptions unless explicitly
-                    // thrown as NatsSvcEndpointException
-                    code = 999;
-                    message = "Handler error";
-                    body = string.Empty;
-
-                    // Only log unknown exceptions
-                    _logger.LogError(NatsSvcLogEvents.Endpoint, e, "Endpoint {Name} error processing message", Name);
-                }
-
+                Interlocked.Increment(ref _requests);
+                stopwatch.Restart();
                 try
                 {
-                    if (string.IsNullOrWhiteSpace(body))
+                    await _handler(svcMsg).ConfigureAwait(false);
+                }
+                catch (Exception e)
+                {
+                    int code;
+                    string message;
+                    string body;
+                    if (e is NatsSvcEndpointException epe)
                     {
-                        await svcMsg.ReplyErrorAsync(code, message, cancellationToken: _cancellationToken);
+                        code = epe.Code;
+                        message = epe.Message;
+                        body = epe.Body;
                     }
                     else
                     {
-                        await svcMsg.ReplyErrorAsync(code, message, data: Encoding.UTF8.GetBytes(body), cancellationToken: _cancellationToken);
+                        // Do not expose exceptions unless explicitly
+                        // thrown as NatsSvcEndpointException
+                        code = 999;
+                        message = "Handler error";
+                        body = string.Empty;
+
+                        // Only log unknown exceptions
+                        _logger.LogError(NatsSvcLogEvents.Endpoint, e, "Endpoint {Name} error processing message", Name);
+                    }
+
+                    try
+                    {
+                        if (string.IsNullOrWhiteSpace(body))
+                        {
+                            await svcMsg.ReplyErrorAsync(code, message, cancellationToken: _cancellationToken);
+                        }
+                        else
+                        {
+                            await svcMsg.ReplyErrorAsync(code, message, data: Encoding.UTF8.GetBytes(body), cancellationToken: _cancellationToken);
+                        }
+                    }
+                    catch (Exception e1)
+                    {
+                        _logger.LogError(NatsSvcLogEvents.Endpoint, e1, "Endpoint {Name} error responding", Name);
                     }
                 }
-                catch (Exception e1)
+                finally
                 {
-                    _logger.LogError(NatsSvcLogEvents.Endpoint, e1, "Endpoint {Name} error responding", Name);
+                    Interlocked.Add(ref _processingTime, ToNanos(stopwatch.Elapsed));
                 }
-            }
-            finally
-            {
-                Interlocked.Add(ref _processingTime, ToNanos(stopwatch.Elapsed));
             }
         }
     }

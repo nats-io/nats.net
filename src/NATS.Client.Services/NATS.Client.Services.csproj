@@ -1,17 +1,21 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
+<!--                      <TargetFramework>netstandard2.0</TargetFramework>-->
+      <TargetFrameworks>netstandard2.0;netstandard2.1;net6.0;net8.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <IsTrimmable>true</IsTrimmable>
 
     <!-- NuGet Packaging -->
     <PackageTags>pubsub;messaging;microservices;services</PackageTags>
     <Description>Service API support for NATS.Client.</Description>
     <IsPackable>true</IsPackable>
   </PropertyGroup>
+
+    <PropertyGroup Condition="'$(TargetFramework)' != 'netstandard2.0' AND '$(TargetFramework)' != 'netstandard2.1'">
+        <IsTrimmable>true</IsTrimmable>
+    </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\NATS.Client.Core\NATS.Client.Core.csproj"/>

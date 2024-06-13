@@ -111,7 +111,7 @@ public class NatsSvcServer : INatsSvcServer
     public ValueTask<Group> AddGroupAsync(string name, string? queueGroup = default, CancellationToken cancellationToken = default)
     {
         var group = new Group(this, name, queueGroup, cancellationToken);
-        return ValueTask.FromResult(group);
+        return new ValueTask<Group>(group);
     }
 
     /// <inheritdoc />
@@ -227,59 +227,59 @@ public class NatsSvcServer : INatsSvcServer
 
     private async Task MsgLoop()
     {
-        await foreach (var svcMsg in _channel.Reader.ReadAllAsync(_cts.Token))
+        while (await _channel.Reader.WaitToReadAsync(_cts.Token).ConfigureAwait(false))
         {
-            try
+            while (_channel.Reader.TryRead(out var svcMsg))
             {
-                var type = svcMsg.MsgType;
-                var data = svcMsg.Msg.Data;
-
-                if (type == SvcMsgType.Ping)
+                try
                 {
-                    using (data)
-                    {
-                        // empty request payload
-                    }
+                    var type = svcMsg.MsgType;
+                    var data = svcMsg.Msg.Data;
 
-                    await svcMsg.Msg.ReplyAsync(
-                        data: new PingResponse
+                    if (type == SvcMsgType.Ping)
+                    {
+                        using (data)
                         {
-                            Name = _config.Name,
-                            Id = _id,
-                            Version = _config.Version,
-                            Metadata = _config.Metadata!,
-                        },
-                        serializer: NatsSrvJsonSerializer<PingResponse>.Default,
-                        cancellationToken: _cts.Token);
-                }
-                else if (type == SvcMsgType.Info)
-                {
-                    using (data)
-                    {
-                        // empty request payload
-                    }
+                            // empty request payload
+                        }
 
-                    await svcMsg.Msg.ReplyAsync(
-                        data: GetInfo(),
-                        serializer: NatsSrvJsonSerializer<InfoResponse>.Default,
-                        cancellationToken: _cts.Token);
-                }
-                else if (type == SvcMsgType.Stats)
-                {
-                    using (data)
-                    {
-                        // empty request payload
+                        await svcMsg.Msg.ReplyAsync(
+                            data: new PingResponse
+                            {
+                                Name = _config.Name, Id = _id, Version = _config.Version, Metadata = _config.Metadata!,
+                            },
+                            serializer: NatsSrvJsonSerializer<PingResponse>.Default,
+                            cancellationToken: _cts.Token);
                     }
+                    else if (type == SvcMsgType.Info)
+                    {
+                        using (data)
+                        {
+                            // empty request payload
+                        }
 
-                    await svcMsg.Msg.ReplyAsync(
-                        data: GetStats(),
-                        serializer: NatsSrvJsonSerializer<StatsResponse>.Default,
-                        cancellationToken: _cts.Token);
+                        await svcMsg.Msg.ReplyAsync(
+                            data: GetInfo(),
+                            serializer: NatsSrvJsonSerializer<InfoResponse>.Default,
+                            cancellationToken: _cts.Token);
+                    }
+                    else if (type == SvcMsgType.Stats)
+                    {
+                        using (data)
+                        {
+                            // empty request payload
+                        }
+
+                        await svcMsg.Msg.ReplyAsync(
+                            data: GetStats(),
+                            serializer: NatsSrvJsonSerializer<StatsResponse>.Default,
+                            cancellationToken: _cts.Token);
+                    }
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Message loop error");
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Message loop error");
+                }
             }
         }
     }

@@ -30,9 +30,12 @@ internal class SvcListener : IAsyncDisposable
         {
             await using (sub)
             {
-                await foreach (var msg in sub.Msgs.ReadAllAsync())
+                while (await sub.Msgs.WaitToReadAsync().ConfigureAwait(false))
                 {
-                    await _channel.Writer.WriteAsync(new SvcMsg(_type, msg), _cts.Token).ConfigureAwait(false);
+                    while (sub.Msgs.TryRead(out var msg))
+                    {
+                        await _channel.Writer.WriteAsync(new SvcMsg(_type, msg), _cts.Token).ConfigureAwait(false);
+                    }
                 }
             }
         });
