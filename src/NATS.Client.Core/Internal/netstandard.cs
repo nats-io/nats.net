@@ -1,4 +1,4 @@
-﻿// ReSharper disable SuggestVarOrType_BuiltInTypes
+// ReSharper disable SuggestVarOrType_BuiltInTypes
 // ReSharper disable ConvertToPrimaryConstructor
 // ReSharper disable RedundantCast
 // ReSharper disable SuggestVarOrType_Elsewhere
