@@ -69,7 +69,11 @@ internal static class NatsJSOptsDefaults
             throw new NatsJSException($"{nameof(expires)} must be greater than {ExpiresMin}");
         }
 
+#if NETSTANDARD2_0
+        var idleHeartbeatOut = idleHeartbeat ?? new TimeSpan(expiresOut.Ticks / 2);
+#else
         var idleHeartbeatOut = idleHeartbeat ?? expiresOut / 2;
+#endif
 
         if (idleHeartbeatOut > HeartbeatCap)
         {

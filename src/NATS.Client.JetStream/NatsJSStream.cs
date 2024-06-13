@@ -13,12 +13,17 @@ public class NatsJSStream : INatsJSStream
     private readonly string _name;
     private bool _deleted;
 
-#if DOT_NET_6
+#if NET8_0_OR_GREATER
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
 #endif
     internal NatsJSStream(NatsJSContext context, StreamInfo info)
     {
+#if NET6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(info.Config.Name, nameof(info.Config.Name));
+#else
+        if (info.Config.Name == null)
+            throw new ArgumentNullException(nameof(info.Config.Name));
+#endif
         _context = context;
         Info = info;
         _name = info.Config.Name!;

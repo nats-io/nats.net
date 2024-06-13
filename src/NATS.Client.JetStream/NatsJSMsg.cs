@@ -278,12 +278,21 @@ public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
 
         if (opts?.DoubleAck ?? _context.Opts.DoubleAck)
         {
+#if NET6_0_OR_GREATER
             await Connection.RequestAsync<ReadOnlySequence<byte>, object?>(
                 subject: ReplyTo,
                 data: payload,
                 requestSerializer: NatsRawSerializer<ReadOnlySequence<byte>>.Default,
                 replySerializer: NatsRawSerializer<object?>.Default,
                 cancellationToken: cancellationToken);
+#else
+            await Connection!.RequestAsync<ReadOnlySequence<byte>, object?>(
+                subject: ReplyTo!,
+                data: payload,
+                requestSerializer: NatsRawSerializer<ReadOnlySequence<byte>>.Default,
+                replySerializer: NatsRawSerializer<object?>.Default,
+                cancellationToken: cancellationToken);
+#endif
         }
         else
         {
@@ -294,8 +303,10 @@ public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
         }
     }
 
+#if NET6_0_OR_GREATER
     [MemberNotNull(nameof(Connection))]
     [MemberNotNull(nameof(ReplyTo))]
+#endif
     private void CheckPreconditions()
     {
         if (Connection == default)

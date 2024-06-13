@@ -148,12 +148,7 @@ public class NatsJSConsumer : INatsJSConsumer
             serializer,
             cancellationToken: cancellationToken).ConfigureAwait(false);
 
-        await foreach (var natsJSMsg in f.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
-        {
-            return natsJSMsg;
-        }
-
-        return null;
+        return await f.Msgs.ReadAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -259,9 +254,13 @@ public class NatsJSConsumer : INatsJSConsumer
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
         await using var fc = await FetchInternalAsync<T>(opts with { NoWait = true }, serializer, cancellationToken).ConfigureAwait(false);
-        await foreach (var jsMsg in fc.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+
+        if (await fc.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            yield return jsMsg;
+            if (fc.Msgs.TryRead(out var msg))
+            {
+                yield return msg;
+            }
         }
     }
 

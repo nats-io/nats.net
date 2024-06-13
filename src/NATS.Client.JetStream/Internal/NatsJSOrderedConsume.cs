@@ -66,7 +66,11 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
         _thresholdBytes = thresholdBytes;
         _expires = expires;
         _idle = idle;
+#if NETSTANDARD2_0
+        _hbTimeout = (int)new TimeSpan(idle.Ticks * 2).TotalMilliseconds;
+#else
         _hbTimeout = (int)(idle * 2).TotalMilliseconds;
+#endif
 
         if (_debug)
         {
@@ -139,13 +143,17 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
 
         await base.DisposeAsync().ConfigureAwait(false);
         await _pullTask.ConfigureAwait(false);
+#if NETSTANDARD2_0
+        _timer.Dispose();
+#else
         await _timer.DisposeAsync().ConfigureAwait(false);
+#endif
     }
 
     internal override ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter, int sid)
     {
         // Override normal subscription behavior to resubscribe on reconnect
-        return ValueTask.CompletedTask;
+        return default;
     }
 
     protected override async ValueTask ReceiveInternalAsync(
@@ -387,13 +395,16 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
 
     private async Task PullLoop()
     {
-        await foreach (var pr in _pullRequests.Reader.ReadAllAsync().ConfigureAwait(false))
+        if (await _pullRequests.Reader.WaitToReadAsync().ConfigureAwait(false))
         {
-            var origin = $"pull-loop({pr.Origin})";
-            await CallMsgNextAsync(origin, pr.Request).ConfigureAwait(false);
-            if (_debug)
+            if (_pullRequests.Reader.TryRead(out var pr))
             {
-                _logger.LogDebug(NatsJSLogEvents.PullRequest, "Pull request issued for {Origin} {Batch}, {MaxBytes}", origin, pr.Request.Batch, pr.Request.MaxBytes);
+                var origin = $"pull-loop({pr.Origin})";
+                await CallMsgNextAsync(origin, pr.Request).ConfigureAwait(false);
+                if (_debug)
+                {
+                    _logger.LogDebug(NatsJSLogEvents.PullRequest, "Pull request issued for {Origin} {Batch}, {MaxBytes}", origin, pr.Request.Batch, pr.Request.MaxBytes);
+                }
             }
         }
     }

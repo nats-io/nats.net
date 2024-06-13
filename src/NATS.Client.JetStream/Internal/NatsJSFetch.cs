@@ -64,7 +64,11 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         _maxBytes = maxBytes;
         _expires = expires;
         _idle = idle;
+#if NETSTANDARD2_0
+        _hbTimeout = (int)new TimeSpan(idle.Ticks * 2).TotalMilliseconds;
+#else
         _hbTimeout = (int)(idle * 2).TotalMilliseconds;
+#endif
         _pendingMsgs = _maxMsgs;
         _pendingBytes = _maxBytes;
 
@@ -140,8 +144,13 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
     {
         Interlocked.Exchange(ref _disposed, 1);
         await base.DisposeAsync().ConfigureAwait(false);
+#if NETSTANDARD2_0
+        _hbTimer.Dispose();
+        _expiresTimer.Dispose();
+#else
         await _hbTimer.DisposeAsync().ConfigureAwait(false);
         await _expiresTimer.DisposeAsync().ConfigureAwait(false);
+#endif
         if (_notificationChannel != null)
         {
             await _notificationChannel.DisposeAsync();

@@ -144,15 +144,13 @@ public partial class NatsJSContext
 
             try
             {
-                await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+                var msg = await sub.Msgs.ReadAsync(cancellationToken).ConfigureAwait(false);
+                if (msg.Data == null)
                 {
-                    if (msg.Data == null)
-                    {
-                        throw new NatsJSException("No response data received");
-                    }
-
-                    return msg.Data;
+                    throw new NatsJSException("No response data received");
                 }
+
+                return msg.Data;
             }
             catch (NatsNoRespondersException)
             {
@@ -170,17 +168,34 @@ public partial class NatsJSContext
         throw new NatsJSPublishNoResponseException();
     }
 
-    internal static void ThrowIfInvalidStreamName([NotNull] string? name, [CallerArgumentExpression("name")] string? paramName = null)
+    internal static void ThrowIfInvalidStreamName(
+#if NETSTANDARD2_1 || NET6_0_OR_GREATER
+        [NotNull]
+#endif
+        string? name,
+#if NET6_0_OR_GREATER
+        [CallerArgumentExpression("name")]
+#endif
+        string? paramName = null)
     {
+#if NET6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(name, paramName);
+#else
+        if (name == null)
+            throw new ArgumentException();
+#endif
 
         if (name.Length == 0)
         {
             ThrowEmptyException(paramName);
         }
 
+#if NETSTANDARD2_0
+        if (name.Contains(" ."))
+#else
         var nameSpan = name.AsSpan();
         if (nameSpan.IndexOfAny(" .") >= 0)
+#endif
         {
             ThrowInvalidStreamNameException(paramName);
         }
@@ -223,39 +238,35 @@ public partial class NatsJSContext
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
-        await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
-        {
-            if (msg.Error is { } error)
-            {
-                if (error.InnerException is NatsJSApiErrorException jsError)
-                {
-                    return new NatsJSResponse<TResponse>(default, jsError.Error);
-                }
+        var msg = await sub.Msgs.ReadAsync(cancellationToken).ConfigureAwait(false);
 
-                throw error;
+        if (msg.Error is { } error)
+        {
+            if (error.InnerException is NatsJSApiErrorException jsError)
+            {
+                return new NatsJSResponse<TResponse>(default, jsError.Error);
             }
 
-            if (msg.Data == null)
-            {
-                throw new NatsJSException("No response data received");
-            }
-
-            return new NatsJSResponse<TResponse>(msg.Data, default);
+            throw error;
         }
 
-        if (sub is NatsSubBase { EndReason: NatsSubEndReason.Exception, Exception: not null } sb)
+        if (msg.Data == null)
         {
-            throw sb.Exception;
+            throw new NatsJSException("No response data received");
         }
 
-        throw new NatsJSApiNoResponseException();
+        return new NatsJSResponse<TResponse>(msg.Data, default);
     }
 
+#if NETSTANDARD2_1 || NET6_0_OR_GREATER
     [DoesNotReturn]
+#endif
     private static void ThrowInvalidStreamNameException(string? paramName) =>
         throw new ArgumentException("Stream name cannot contain ' ', '.'", paramName);
 
+#if NETSTANDARD2_1 || NET6_0_OR_GREATER
     [DoesNotReturn]
+#endif
     private static void ThrowEmptyException(string? paramName) =>
         throw new ArgumentException("The value cannot be an empty string.", paramName);
 }
