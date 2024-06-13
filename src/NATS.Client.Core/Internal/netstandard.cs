@@ -23,10 +23,25 @@ namespace NATS.Client.Core.Internal.NetStandardExtensions
     using System.Runtime.CompilerServices;
     using System.Runtime.InteropServices;
     using System.Text;
+    using System.Threading.Channels;
 
     [StructLayout(LayoutKind.Sequential, Size = 1)]
     internal readonly struct VoidResult
     {
+    }
+
+    internal static class ChannelReaderExtensions
+    {
+        public static async IAsyncEnumerable<T> ReadAllLoopAsync<T>(this ChannelReader<T> reader, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            while (await reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                while (reader.TryRead(out var msg))
+                {
+                    yield return msg;
+                }
+            }
+        }
     }
 
     internal sealed class TaskCompletionSource : TaskCompletionSource<VoidResult>
@@ -113,6 +128,8 @@ namespace NATS.Client.Core.Internal.NetStandardExtensions
 
             return (long)(scaled + minValue);
         }
+
+        internal void NextBytes(byte[] data) => LocalRandom.NextBytes(data);
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static System.Random Create() => _internal = new System.Random();

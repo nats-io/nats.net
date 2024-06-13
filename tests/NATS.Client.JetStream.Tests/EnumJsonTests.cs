@@ -2,6 +2,9 @@ using System.Buffers;
 using System.Text;
 using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
+#if NETFRAMEWORK
+using NATS.Client.Core.Internal.NetStandardExtensions;
+#endif
 
 namespace NATS.Client.JetStream.Tests;
 

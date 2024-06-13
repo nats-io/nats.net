@@ -1,5 +1,8 @@
 using NATS.Client.Core.Tests;
 using NATS.Client.JetStream.Models;
+#if NETFRAMEWORK
+using NATS.Client.Core.Internal.NetStandardExtensions;
+#endif
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -29,7 +32,11 @@ public class ConsumerFetchTest
         var count = 0;
         await using var fc =
             await consumer.FetchInternalAsync<TestData>(serializer: TestDataJsonSerializer<TestData>.Default, opts: new NatsJSFetchOpts { MaxMsgs = 10 }, cancellationToken: cts.Token);
+#if NETFRAMEWORK
+        await foreach (var msg in fc.Msgs.ReadAllLoopAsync(cts.Token))
+#else
         await foreach (var msg in fc.Msgs.ReadAllAsync(cts.Token))
+#endif
         {
             await msg.AckAsync(cancellationToken: cts.Token);
             Assert.Equal(count, msg.Data!.Test);
@@ -98,7 +105,11 @@ public class ConsumerFetchTest
         var signal2 = new WaitSignal();
         var reader = Task.Run(async () =>
         {
+#if NETFRAMEWORK
+            await foreach (var msg in fc.Msgs.ReadAllLoopAsync(cts.Token))
+#else
             await foreach (var msg in fc.Msgs.ReadAllAsync(cts.Token))
+#endif
             {
                 await msg.AckAsync(cancellationToken: cts.Token);
                 signal1.Pulse();

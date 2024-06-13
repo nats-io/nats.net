@@ -5,6 +5,9 @@ using NATS.Client.JetStream.Models;
 using NATS.Client.ObjectStore.Internal;
 using NATS.Client.ObjectStore.Models;
 using NATS.Client.Serializers.Json;
+#if NETFRAMEWORK
+using Random = NATS.Client.Core.Internal.NetStandardExtensions.Random;
+#endif
 
 namespace NATS.Client.ObjectStore.Tests;
 
@@ -73,7 +76,7 @@ public class ObjectStoreTest
 
             var data = await store.GetInfoAsync("k1", cancellationToken: cancellationToken);
 
-            var sha = Base64UrlEncoder.Encode(SHA256.HashData(buffer));
+            var sha = Base64UrlEncoder.Encode(Hash256(buffer));
             var size = buffer.Length;
             var chunks = Math.Ceiling(size / 10.0);
 
@@ -93,7 +96,7 @@ public class ObjectStoreTest
 
             var data = await store.GetInfoAsync("k2", cancellationToken: cancellationToken);
 
-            var sha = Base64UrlEncoder.Encode(SHA256.HashData(buffer));
+            var sha = Base64UrlEncoder.Encode(Hash256(buffer));
             var size = buffer.Length;
             var chunks = Math.Ceiling(size / 10.0);
 
@@ -234,14 +237,14 @@ public class ObjectStoreTest
         const string filename = $"_tmp_test_file_{nameof(Put_and_get_large_file)}.bin";
         var filename1 = $"{filename}.1";
 
-        await File.WriteAllBytesAsync(filename, data, cancellationToken);
+        File.WriteAllBytes(filename, data);
 
         await store.PutAsync("my/random/data.bin", File.OpenRead(filename), cancellationToken: cancellationToken);
 
         await store.GetAsync("my/random/data.bin", File.OpenWrite(filename1), cancellationToken: cancellationToken);
 
-        var hash = Convert.ToBase64String(SHA256.HashData(await File.ReadAllBytesAsync(filename, cancellationToken)));
-        var hash1 = Convert.ToBase64String(SHA256.HashData(await File.ReadAllBytesAsync(filename1, cancellationToken)));
+        var hash = Convert.ToBase64String(Hash256(File.ReadAllBytes(filename)));
+        var hash1 = Convert.ToBase64String(Hash256(File.ReadAllBytes(filename1)));
 
         Assert.Equal(hash, hash1);
     }
@@ -440,5 +443,22 @@ public class ObjectStoreTest
 
         var info = await store.GetInfoAsync("k1", cancellationToken: cancellationToken);
         Assert.Equal("k1", info.Name);
+    }
+
+    private static byte[] Hash256(byte[] data)
+    {
+#if NET6_0_OR_GREATER
+            ArgumentNullException.ThrowIfNull(data);
+            ReadOnlySpan<byte> dataSpan = data;
+            return SHA256.HashData(dataSpan);
+#else
+        if (data == null)
+        {
+            throw new ArgumentNullException(nameof(data));
+        }
+
+        using var s = SHA256.Create();
+        return s.ComputeHash(data);
+#endif
     }
 }
