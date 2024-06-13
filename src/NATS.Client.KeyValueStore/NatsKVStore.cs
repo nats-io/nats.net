@@ -263,6 +263,19 @@ public class NatsKVStore : INatsKVStore
             NatsDeserializeException? deserializeException = null;
             if (response.Message.Data != null)
             {
+#if NETSTANDARD2_0
+                var bytes = Convert.FromBase64String(response.Message.Data);
+                var buffer = new ReadOnlySequence<byte>(bytes);
+                try
+                {
+                    data = serializer.Deserialize(buffer);
+                }
+                catch (Exception e)
+                {
+                    deserializeException = new NatsDeserializeException(buffer.ToArray(), e);
+                    data = default;
+                }
+#else
                 var bytes = ArrayPool<byte>.Shared.Rent(response.Message.Data.Length);
                 try
                 {
@@ -289,6 +302,7 @@ public class NatsKVStore : INatsKVStore
                 {
                     ArrayPool<byte>.Shared.Return(bytes);
                 }
+#endif
             }
             else
             {
@@ -323,9 +337,12 @@ public class NatsKVStore : INatsKVStore
             }
         }
 
-        await foreach (var entry in watcher.Entries.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        while (await watcher.Entries.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            yield return entry;
+            while (watcher.Entries.TryRead(out var entry))
+            {
+                yield return entry;
+            }
         }
     }
 
@@ -349,11 +366,14 @@ public class NatsKVStore : INatsKVStore
 
         await using var watcher = await WatchInternalAsync<T>([key], serializer, opts, cancellationToken);
 
-        await foreach (var entry in watcher.Entries.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        while (await watcher.Entries.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            yield return entry;
-            if (entry.Delta == 0)
-                yield break;
+            while (watcher.Entries.TryRead(out var entry))
+            {
+                yield return entry;
+                if (entry.Delta == 0)
+                    yield break;
+            }
         }
     }
 
@@ -386,12 +406,15 @@ public class NatsKVStore : INatsKVStore
             if (watcher.InitialConsumer.Info.NumPending == 0)
                 return;
 
-            await foreach (var entry in watcher.Entries.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+            while (await watcher.Entries.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
             {
-                if (entry.Operation is NatsKVOperation.Purge or NatsKVOperation.Del)
-                    deleted.Add(entry);
-                if (entry.Delta == 0)
-                    goto PURGE_LOOP_DONE;
+                while (watcher.Entries.TryRead(out var entry))
+                {
+                    if (entry.Operation is NatsKVOperation.Purge or NatsKVOperation.Del)
+                        deleted.Add(entry);
+                    if (entry.Delta == 0)
+                        goto PURGE_LOOP_DONE;
+                }
             }
         }
 
@@ -427,12 +450,15 @@ public class NatsKVStore : INatsKVStore
         if (watcher.InitialConsumer.Info.NumPending == 0)
             yield break;
 
-        await foreach (var entry in watcher.Entries.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        while (await watcher.Entries.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            if (entry.Operation is NatsKVOperation.Put)
-                yield return entry.Key;
-            if (entry.Delta == 0)
-                yield break;
+            while (watcher.Entries.TryRead(out var entry))
+            {
+                if (entry.Operation is NatsKVOperation.Put)
+                    yield return entry.Key;
+                if (entry.Delta == 0)
+                    yield break;
+            }
         }
     }
 
@@ -467,7 +493,7 @@ public class NatsKVStore : INatsKVStore
             ThrowNatsKVException("Key cannot be empty");
         }
 
-        if (key.StartsWith('.') || key.EndsWith('.'))
+        if (key.StartsWith(".") || key.EndsWith("."))
         {
             ThrowNatsKVException("Key cannot start or end with a period");
         }

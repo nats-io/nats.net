@@ -46,8 +46,8 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
     private readonly string _stream;
     private readonly Task _commandTask;
 
-    private ulong _sequenceStream;
-    private ulong _sequenceConsumer;
+    private long _sequenceStream;
+    private long _sequenceConsumer;
     private string _consumer;
     private volatile NatsKVWatchSub<T>? _sub;
     private INatsJSConsumer? _initialConsumer;
@@ -81,7 +81,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
         _cancellationToken = cancellationToken;
         _nats = context.Connection;
         _stream = $"KV_{_bucket}";
-        _hbTimeout = (int)(opts.IdleHeartbeat * 2).TotalMilliseconds;
+        _hbTimeout = (int)new TimeSpan(opts.IdleHeartbeat.Ticks * 2).TotalMilliseconds;
         _consumer = NewNuid();
 
         _nats.ConnectionDisconnected += OnDisconnected;
@@ -240,7 +240,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
 
                                     var sequence = Interlocked.Increment(ref _sequenceConsumer);
 
-                                    if (sequence != metadata.Sequence.Consumer)
+                                    if (sequence != (long)metadata.Sequence.Consumer)
                                     {
                                         CreateSub("sequence-mismatch");
                                         _logger.LogWarning(NatsKVLogEvents.RecreateConsumer, "Missed messages, recreating consumer");
@@ -267,7 +267,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
                                     // Increment the sequence before writing to the channel in case the channel is full
                                     // and the writer is waiting for the reader to read the message. This way the sequence
                                     // will be correctly incremented in case the timeout kicks in and recreated the consumer.
-                                    Interlocked.Exchange(ref _sequenceStream, metadata.Sequence.Stream);
+                                    Interlocked.Exchange(ref _sequenceStream, (long)metadata.Sequence.Stream);
 
                                     await _entryChannel.Writer.WriteAsync(entry, _cancellationToken);
                                 }
@@ -408,7 +408,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
         if (sequence > 0)
         {
             config.DeliverPolicy = ConsumerConfigDeliverPolicy.ByStartSequence;
-            config.OptStartSeq = sequence + 1;
+            config.OptStartSeq = (ulong)sequence + 1;
         }
         else if (_opts.ResumeAtRevision > 0)
         {
@@ -434,7 +434,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
         Span<char> buffer = stackalloc char[22];
         if (NuidWriter.TryWriteNuid(buffer))
         {
-            return new string(buffer);
+            return new string(buffer.ToArray());
         }
 
         throw new InvalidOperationException("Internal error: can't generate nuid");

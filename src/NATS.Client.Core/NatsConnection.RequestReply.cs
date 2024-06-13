@@ -43,9 +43,9 @@ public partial class NatsConnection
                     .ConfigureAwait(false);
 
 #if NETSTANDARD2_0
-                if (await sub1.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+                while (await sub1.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
                 {
-                    if (sub1.Msgs.TryRead(out var msg))
+                    while (sub1.Msgs.TryRead(out var msg))
                     {
                         return msg;
                     }
@@ -71,9 +71,9 @@ public partial class NatsConnection
             .ConfigureAwait(false);
 
 #if NETSTANDARD2_0
-        if (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+        while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            if (sub.Msgs.TryRead(out var msg))
+            while (sub.Msgs.TryRead(out var msg))
             {
                 return msg;
             }
@@ -121,9 +121,9 @@ public partial class NatsConnection
             .ConfigureAwait(false);
 
 #if NETSTANDARD2_0
-        if (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+        while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            if (sub.Msgs.TryRead(out var msg))
+            while (sub.Msgs.TryRead(out var msg))
             {
                 yield return msg;
             }
