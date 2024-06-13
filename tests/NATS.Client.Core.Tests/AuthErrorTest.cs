@@ -65,9 +65,9 @@ authorization: {
 
         // Reload config with different password
         {
-            var conf = (await File.ReadAllTextAsync(server.ConfigFile!, cts.Token))
+            var conf = File.ReadAllText(server.ConfigFile!)
                 .Replace("password: b", "password: c");
-            await File.WriteAllTextAsync(server.ConfigFile!, conf, cts.Token);
+            File.WriteAllText(server.ConfigFile!, conf);
             await Task.Delay(1000, cts.Token);
             Process.Start("kill", $"-HUP {server.ServerProcess!.Id}");
         }
@@ -133,9 +133,9 @@ authorization: {
 
         // Reload config with different password
         {
-            var conf = (await File.ReadAllTextAsync(server.ConfigFile!, cts.Token))
+            var conf = File.ReadAllText(server.ConfigFile!)
                 .Replace("password: b", "password: c");
-            await File.WriteAllTextAsync(server.ConfigFile!, conf, cts.Token);
+            File.WriteAllText(server.ConfigFile!, conf);
             await Task.Delay(1000, cts.Token);
             Process.Start("kill", $"-HUP {server.ServerProcess!.Id}");
         }
@@ -147,9 +147,9 @@ authorization: {
 
         // Reload config with correct password
         {
-            var conf = (await File.ReadAllTextAsync(server.ConfigFile!, cts.Token))
+            var conf = File.ReadAllText(server.ConfigFile!)
                 .Replace("password: c", "password: b");
-            await File.WriteAllTextAsync(server.ConfigFile!, conf, cts.Token);
+            File.WriteAllText(server.ConfigFile!, conf);
             await Task.Delay(1000, cts.Token);
             Process.Start("kill", $"-HUP {server.ServerProcess!.Id}");
         }

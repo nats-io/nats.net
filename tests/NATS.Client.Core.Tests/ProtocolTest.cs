@@ -227,10 +227,13 @@ public class ProtocolTest
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             var cancellationToken = cts.Token;
             var count = 0;
-            await foreach (var natsMsg in sub.Msgs.ReadAllAsync(cancellationToken))
+            while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
             {
-                Assert.Equal(count, natsMsg.Data);
-                count++;
+                while (sub.Msgs.TryRead(out var natsMsg))
+                {
+                    Assert.Equal(count, natsMsg.Data);
+                    count++;
+                }
             }
 
             Assert.Equal(maxMsgs, count);
@@ -261,9 +264,12 @@ public class ProtocolTest
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             var cancellationToken = cts.Token;
             var count = 0;
-            await foreach (var unused in sub.Msgs.ReadAllAsync(cancellationToken))
+            while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
             {
-                count++;
+                while (sub.Msgs.TryRead(out _))
+                {
+                    count++;
+                }
             }
 
             Assert.Equal(0, count);
@@ -572,9 +578,9 @@ public class ProtocolTest
 
         protected override ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
         {
-            _callback(int.Parse(Encoding.UTF8.GetString(payloadBuffer)));
+            _callback(int.Parse(Encoding.UTF8.GetString(payloadBuffer.ToArray())));
             DecrementMaxMsgs();
-            return ValueTask.CompletedTask;
+            return default;
         }
 
         protected override void TryComplete()

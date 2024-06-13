@@ -151,9 +151,13 @@ public class RequestReplyTest
         var opts = new NatsSubOpts { Timeout = TimeSpan.FromSeconds(4) };
         await using var rep =
             await nats.RequestSubAsync<int, int>("foo", 4, replyOpts: opts, cancellationToken: cts.Token);
-        await foreach (var msg in rep.Msgs.ReadAllAsync(cts.Token))
+
+        while (await rep.Msgs.WaitToReadAsync(cts.Token).ConfigureAwait(false))
         {
-            Assert.Equal(results[count++], msg.Data);
+            while (rep.Msgs.TryRead(out var msg))
+            {
+                Assert.Equal(results[count++], msg.Data);
+            }
         }
 
         Assert.Equal(2, count);
@@ -185,9 +189,13 @@ public class RequestReplyTest
         var opts = new NatsSubOpts { IdleTimeout = TimeSpan.FromSeconds(3) };
         await using var rep =
             await nats.RequestSubAsync<int, int>("foo", 3, replyOpts: opts, cancellationToken: cts.Token);
-        await foreach (var msg in rep.Msgs.ReadAllAsync(cts.Token))
+
+        while (await rep.Msgs.WaitToReadAsync(cts.Token).ConfigureAwait(false))
         {
-            Assert.Equal(results[count++], msg.Data);
+            while (rep.Msgs.TryRead(out var msg))
+            {
+                Assert.Equal(results[count++], msg.Data);
+            }
         }
 
         Assert.Equal(2, count);
@@ -215,9 +223,13 @@ public class RequestReplyTest
         var opts = new NatsSubOpts { StartUpTimeout = TimeSpan.FromSeconds(1) };
         await using var rep =
             await nats.RequestSubAsync<int, int>("foo", 2, replyOpts: opts, cancellationToken: cts.Token);
-        await foreach (var msg in rep.Msgs.ReadAllAsync(cts.Token))
+
+        while (await rep.Msgs.WaitToReadAsync(cts.Token).ConfigureAwait(false))
         {
-            count++;
+            while (rep.Msgs.TryRead(out var msg))
+            {
+                count++;
+            }
         }
 
         Assert.Equal(0, count);
@@ -248,9 +260,13 @@ public class RequestReplyTest
         var opts = new NatsSubOpts { MaxMsgs = 2 };
         await using var rep =
             await nats.RequestSubAsync<int, int>("foo", 1, replyOpts: opts, cancellationToken: cts.Token);
-        await foreach (var msg in rep.Msgs.ReadAllAsync(cts.Token))
+
+        while (await rep.Msgs.WaitToReadAsync(cts.Token).ConfigureAwait(false))
         {
-            Assert.Equal(results[count++], msg.Data);
+            while (rep.Msgs.TryRead(out var msg))
+            {
+                Assert.Equal(results[count++], msg.Data);
+            }
         }
 
         Assert.Equal(2, count);
@@ -294,7 +310,7 @@ public class RequestReplyTest
     {
         static string ToStr(ReadOnlyMemory<byte> input)
         {
-            return Encoding.ASCII.GetString(input.Span);
+            return Encoding.ASCII.GetString(input.Span.ToArray());
         }
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -313,7 +329,7 @@ public class RequestReplyTest
             }
         });
 
-        var writer = new ArrayBufferWriter<byte>();
+        var writer = new NatsBufferWriter<byte>();
         await foreach (var msg in nats.RequestManyAsync<string, string>("foo", "1", cancellationToken: cts.Token))
         {
             writer.Write(Encoding.UTF8.GetBytes(msg.Data!));

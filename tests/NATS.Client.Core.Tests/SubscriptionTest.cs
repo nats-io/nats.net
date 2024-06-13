@@ -102,20 +102,26 @@ public class SubscriptionTest
         var cancellationToken = cts.Token;
 
         var count1 = 0;
-        await foreach (var natsMsg in sub1.Msgs.ReadAllAsync(cancellationToken))
+        while (await sub1.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            Assert.Equal(count1, natsMsg.Data);
-            count1++;
+            while (sub1.Msgs.TryRead(out var natsMsg))
+            {
+                Assert.Equal(count1, natsMsg.Data);
+                count1++;
+            }
         }
 
         Assert.Equal(1, count1);
         Assert.Equal(NatsSubEndReason.MaxMsgs, ((NatsSubBase)sub1).EndReason);
 
         var count2 = 0;
-        await foreach (var natsMsg in sub2.Msgs.ReadAllAsync(cancellationToken))
+        while (await sub2.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            Assert.Equal(count2, natsMsg.Data);
-            count2++;
+            while (sub2.Msgs.TryRead(out var natsMsg))
+            {
+                Assert.Equal(count2, natsMsg.Data);
+                count2++;
+            }
         }
 
         Assert.Equal(2, count2);
@@ -142,10 +148,13 @@ public class SubscriptionTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
         var count = 0;
-        await foreach (var natsMsg in sub.Msgs.ReadAllAsync(cancellationToken))
+        while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            Assert.Equal(count, natsMsg.Data);
-            count++;
+            while (sub.Msgs.TryRead(out var natsMsg))
+            {
+                Assert.Equal(count, natsMsg.Data);
+                count++;
+            }
         }
 
         Assert.Equal(maxMsgs, count);
@@ -166,9 +175,12 @@ public class SubscriptionTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
         var count = 0;
-        await foreach (var unused in sub.Msgs.ReadAllAsync(cancellationToken))
+        while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            count++;
+            while (sub.Msgs.TryRead(out _))
+            {
+                count++;
+            }
         }
 
         Assert.Equal(NatsSubEndReason.Timeout, ((NatsSubBase)sub).EndReason);
@@ -196,10 +208,13 @@ public class SubscriptionTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
         var count = 0;
-        await foreach (var natsMsg in sub.Msgs.ReadAllAsync(cancellationToken))
+        while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            Assert.Equal(count, natsMsg.Data);
-            count++;
+            while (sub.Msgs.TryRead(out var natsMsg))
+            {
+                Assert.Equal(count, natsMsg.Data);
+                count++;
+            }
         }
 
         Assert.Equal(NatsSubEndReason.IdleTimeout, ((NatsSubBase)sub).EndReason);
@@ -224,10 +239,13 @@ public class SubscriptionTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
         var count = 0;
-        await foreach (var natsMsg in sub.Msgs.ReadAllAsync(cancellationToken))
+        while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            Assert.Equal(count, natsMsg.Data);
-            count++;
+            while (sub.Msgs.TryRead(out var natsMsg))
+            {
+                Assert.Equal(count, natsMsg.Data);
+                count++;
+            }
         }
 
         Assert.Equal(0, count);

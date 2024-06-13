@@ -73,22 +73,26 @@ public class ConnectionRetryTest
         {
             await using var subConn = server.CreateClientConnection();
             await using var sub = await subConn.SubscribeCoreAsync<NatsMemoryOwner<byte>>("test", cancellationToken: timeoutCts.Token);
-            await foreach (var msg in sub.Msgs.ReadAllAsync(timeoutCts.Token))
+
+            while (await sub.Msgs.WaitToReadAsync(timeoutCts.Token).ConfigureAwait(false))
             {
-                using (msg.Data)
+                while (sub.Msgs.TryRead(out var msg))
                 {
-                    if (msg.Data.Length == 1)
+                    using (msg.Data)
                     {
-                        Interlocked.Increment(ref subActive);
-                    }
-                    else if (msg.Data.Length == 2)
-                    {
-                        break;
-                    }
-                    else
-                    {
-                        Assert.Equal(msgSize, msg.Data.Length);
-                        Interlocked.Increment(ref received);
+                        if (msg.Data.Length == 1)
+                        {
+                            Interlocked.Increment(ref subActive);
+                        }
+                        else if (msg.Data.Length == 2)
+                        {
+                            break;
+                        }
+                        else
+                        {
+                            Assert.Equal(msgSize, msg.Data.Length);
+                            Interlocked.Increment(ref received);
+                        }
                     }
                 }
             }
