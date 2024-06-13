@@ -5,11 +5,11 @@
 
 namespace System.Runtime.CompilerServices
 {
-    public class ExtensionAttribute : Attribute
+    internal class ExtensionAttribute : Attribute
     {
     }
 
-    public sealed class CompilerFeatureRequiredAttribute : Attribute
+    internal sealed class CompilerFeatureRequiredAttribute : Attribute
     {
         public CompilerFeatureRequiredAttribute(string featureName)
         {
