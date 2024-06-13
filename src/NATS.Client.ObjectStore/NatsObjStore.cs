@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text.Json;
 using NATS.Client.Core;
@@ -95,31 +96,43 @@ public class NatsObjStore : INatsObjStore
         var size = 0;
         using (var sha256 = SHA256.Create())
         {
+#if NETSTANDARD2_0
+            using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Write))
+#else
             await using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Write, leaveOpen))
+#endif
             {
-                await foreach (var msg in pushConsumer.Msgs.ReadAllAsync(cancellationToken))
+                while (await pushConsumer.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
                 {
-                    // We have to make sure to carry on consuming the channel to avoid any blocking:
-                    // e.g. if the channel is full, we would be blocking the reads off the socket (this was intentionally
-                    // done ot avoid bloating the memory with a large backlog of messages or dropping messages at this level
-                    // and signal the server that we are a slow consumer); then when we make an request-reply API call to
-                    // delete the consumer, the socket would be blocked trying to send the response back to us; so we need to
-                    // keep consuming the channel to avoid this.
-                    if (pushConsumer.IsDone)
-                        continue;
-
-                    if (msg.Data.Length > 0)
+                    while (pushConsumer.Msgs.TryRead(out var msg))
                     {
-                        using var memoryOwner = msg.Data;
-                        chunks++;
-                        size += memoryOwner.Memory.Length;
-                        await hashedStream.WriteAsync(memoryOwner.Memory, cancellationToken);
-                    }
+                        // We have to make sure to carry on consuming the channel to avoid any blocking:
+                        // e.g. if the channel is full, we would be blocking the reads off the socket (this was intentionally
+                        // done ot avoid bloating the memory with a large backlog of messages or dropping messages at this level
+                        // and signal the server that we are a slow consumer); then when we make an request-reply API call to
+                        // delete the consumer, the socket would be blocked trying to send the response back to us; so we need to
+                        // keep consuming the channel to avoid this.
+                        if (pushConsumer.IsDone)
+                            continue;
 
-                    var p = msg.Metadata?.NumPending;
-                    if (p is 0)
-                    {
-                        pushConsumer.Done();
+                        if (msg.Data.Length > 0)
+                        {
+                            using var memoryOwner = msg.Data;
+                            chunks++;
+                            size += memoryOwner.Memory.Length;
+#if NETSTANDARD2_0
+                            var segment = memoryOwner.DangerousGetArray();
+                            await hashedStream.WriteAsync(segment.Array, segment.Offset, segment.Count, cancellationToken);
+#else
+                            await hashedStream.WriteAsync(memoryOwner.Memory, cancellationToken);
+#endif
+                        }
+
+                        var p = msg.Metadata?.NumPending;
+                        if (p is 0)
+                        {
+                            pushConsumer.Done();
+                        }
                     }
                 }
             }
@@ -213,7 +226,11 @@ public class NatsObjStore : INatsObjStore
         string digest;
         using (var sha256 = SHA256.Create())
         {
+#if NETSTANDARD2_0
+            using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Read))
+#else
             await using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Read, leaveOpen))
+#endif
             {
                 while (true)
                 {
@@ -226,7 +243,12 @@ public class NatsObjStore : INatsObjStore
                     // Fill a chunk
                     while (true)
                     {
+#if NETSTANDARD2_0
+                        MemoryMarshal.TryGetArray((ReadOnlyMemory<byte>)memory, out var segment);
+                        var read = await hashedStream.ReadAsync(segment.Array!, segment.Offset, segment.Count, cancellationToken);
+#else
                         var read = await hashedStream.ReadAsync(memory, cancellationToken);
+#endif
 
                         // End of stream
                         if (read == 0)
@@ -583,28 +605,31 @@ public class NatsObjStore : INatsObjStore
 
         pushConsumer.Init();
 
-        await foreach (var msg in pushConsumer.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        while (await pushConsumer.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            if (pushConsumer.IsDone)
-                continue;
-            using (msg.Data)
+            while (pushConsumer.Msgs.TryRead(out var msg))
             {
-                if (msg.Metadata is { } metadata)
+                if (pushConsumer.IsDone)
+                    continue;
+                using (msg.Data)
                 {
-                    var info = JsonSerializer.Deserialize(msg.Data.Memory.Span, NatsObjJsonSerializerContext.Default.ObjectMetadata);
-                    if (info != null)
+                    if (msg.Metadata is { } metadata)
                     {
-                        if (!opts.IgnoreDeletes || !info.Deleted)
+                        var info = JsonSerializer.Deserialize(msg.Data.Memory.Span, NatsObjJsonSerializerContext.Default.ObjectMetadata);
+                        if (info != null)
                         {
-                            info.MTime = metadata.Timestamp;
-                            yield return info;
+                            if (!opts.IgnoreDeletes || !info.Deleted)
+                            {
+                                info.MTime = metadata.Timestamp;
+                                yield return info;
+                            }
                         }
-                    }
 
-                    if (opts.InitialSetOnly)
-                    {
-                        if (metadata.NumPending == 0)
-                            break;
+                        if (opts.InitialSetOnly)
+                        {
+                            if (metadata.NumPending == 0)
+                                break;
+                        }
                     }
                 }
             }
@@ -636,7 +661,7 @@ public class NatsObjStore : INatsObjStore
 
         await PublishMeta(meta, cancellationToken);
 
-        var response = await _stream.PurgeAsync(new StreamPurgeRequest { Filter = GetChunkSubject(meta.Nuid) }, cancellationToken);
+        var response = await _stream.PurgeAsync(new StreamPurgeRequest { Filter = GetChunkSubject(meta.Nuid!) }, cancellationToken);
         if (!response.Success)
         {
             throw new NatsObjException("Can't purge object chunks");
@@ -658,7 +683,11 @@ public class NatsObjStore : INatsObjStore
         Span<char> buffer = stackalloc char[22];
         if (NuidWriter.TryWriteNuid(buffer))
         {
+#if NETSTANDARD2_0
+            return new string(buffer.ToArray());
+#else
             return new string(buffer);
+#endif
         }
 
         throw new InvalidOperationException("Internal error: can't generate nuid");
