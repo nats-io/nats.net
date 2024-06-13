@@ -2,6 +2,9 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
+#if NETSTANDARD2_0
+using NATS.Client.Core.Internal.NetStandardExtensions;
+#endif
 
 namespace NATS.Client.TestUtilities;
 
@@ -32,7 +35,7 @@ public class MockServer : IAsyncDisposable
                 var n = 0;
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    var tcpClient = await _server.AcceptTcpClientAsync(cancellationToken);
+                    var tcpClient = await _server.AcceptTcpClientAsync();
                     var client = new Client(this, tcpClient);
                     n++;
                     Log($"[S] [{n}] New client connected");

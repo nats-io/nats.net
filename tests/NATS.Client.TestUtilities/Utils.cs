@@ -71,9 +71,12 @@ public static class NatsMsgTestUtils
             return Task.CompletedTask;
         return Task.Run(async () =>
         {
-            await foreach (var natsMsg in sub.Msgs.ReadAllAsync())
+            while (await sub.Msgs.WaitToReadAsync(CancellationToken.None).ConfigureAwait(false))
             {
-                action(natsMsg);
+                while (sub.Msgs.TryRead(out var msg))
+                {
+                    action(msg);
+                }
             }
         });
     }
@@ -84,9 +87,12 @@ public static class NatsMsgTestUtils
             return Task.CompletedTask;
         return Task.Run(async () =>
         {
-            await foreach (var natsMsg in sub.Msgs.ReadAllAsync())
+            while (await sub.Msgs.WaitToReadAsync(CancellationToken.None).ConfigureAwait(false))
             {
-                await action(natsMsg);
+                while (sub.Msgs.TryRead(out var msg))
+                {
+                    action(msg);
+                }
             }
         });
     }
@@ -144,7 +150,7 @@ public static class ServiceUtils
             }
 
             return count == limit;
-        });
+        }).ConfigureAwait(false);
 
         var count = 0;
         await foreach (var msg in nats.RequestManyAsync<string, T>(subject, "{}", replySerializer: serializer, replyOpts: replyOpts, cancellationToken: ct).ConfigureAwait(false))

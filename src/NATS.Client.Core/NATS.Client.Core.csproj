@@ -15,7 +15,7 @@
     <IsPackable>true</IsPackable>
   </PropertyGroup>
 
-    <PropertyGroup  Condition="'$(TargetFramework)' != 'netstandard2.0' AND '$(TargetFramework)' != 'netstandard2.1'">
+    <PropertyGroup Condition="'$(TargetFramework)' != 'netstandard2.0' AND '$(TargetFramework)' != 'netstandard2.1'">
         <IsTrimmable>true</IsTrimmable>
     </PropertyGroup>
 
