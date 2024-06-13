@@ -2,6 +2,9 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using NATS.Client.Core.Internal;
+#if NETSTANDARD2_0
+using NATS.Client.Core.Internal.NetStandardExtensions;
+#endif
 
 namespace NATS.Client.Core;
 
@@ -43,20 +46,15 @@ public partial class NatsConnection
                     .ConfigureAwait(false);
 
 #if NETSTANDARD2_0
-                while (await sub1.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
-                {
-                    while (sub1.Msgs.TryRead(out var msg))
-                    {
-                        return msg;
-                    }
-                }
+                await foreach (var msg in sub1.Msgs.ReadAllLoopAsync(cancellationToken).ConfigureAwait(false))
 #else
                 // Prefer ReadAllAsync() since underlying ActivityEndingMsgReader maintains GCHandle for the subscription more efficiently.
                 await foreach (var msg in sub1.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+#endif
                 {
                     return msg;
                 }
-#endif
+
                 throw new NatsNoReplyException();
             }
             catch (Exception e)
@@ -71,20 +69,14 @@ public partial class NatsConnection
             .ConfigureAwait(false);
 
 #if NETSTANDARD2_0
-        while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
-        {
-            while (sub.Msgs.TryRead(out var msg))
-            {
-                return msg;
-            }
-        }
+        await foreach (var msg in sub.Msgs.ReadAllLoopAsync(cancellationToken).ConfigureAwait(false))
 #else
         // Prefer ReadAllAsync() since underlying ActivityEndingMsgReader maintains GCHandle for the subscription more efficiently.
         await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+#endif
         {
             return msg;
         }
-#endif
 
         throw new NatsNoReplyException();
     }
@@ -121,20 +113,14 @@ public partial class NatsConnection
             .ConfigureAwait(false);
 
 #if NETSTANDARD2_0
-        while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
-        {
-            while (sub.Msgs.TryRead(out var msg))
-            {
-                yield return msg;
-            }
-        }
+        await foreach (var msg in sub.Msgs.ReadAllLoopAsync(cancellationToken).ConfigureAwait(false))
 #else
         // Prefer ReadAllAsync() since underlying ActivityEndingMsgReader maintains GCHandle for the subscription more efficiently.
         await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+#endif
         {
             yield return msg;
         }
-#endif
     }
 
 #if NETSTANDARD2_0
