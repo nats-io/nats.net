@@ -259,15 +259,15 @@ public class NatsProxy : IDisposable
         {
             var size = int.Parse(match.Groups[1].Value);
             var buffer = new char[size + 2];
-            var offset = 0;
+            var span = buffer.AsSpan();
             while (true)
             {
-                var read = sr.Read(buffer, offset, buffer.Length - offset);
+                var read = sr.Read(span);
                 if (read == 0)
                     break;
                 if (read == -1)
                     return false;
-                offset += read;
+                span = span[read..];
             }
 
             var bufferDump = Dump(buffer.AsSpan()[..size]);

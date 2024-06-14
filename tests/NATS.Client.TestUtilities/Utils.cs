@@ -2,9 +2,6 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-#if NETSTANDARD2_0
-using NATS.Client.Core.Internal.NetStandardExtensions;
-#endif
 
 namespace NATS.Client.Core.Tests;
 
@@ -74,11 +71,7 @@ public static class NatsMsgTestUtils
             return Task.CompletedTask;
         return Task.Run(async () =>
         {
-#if NETSTANDARD2_0
-            await foreach (var natsMsg in sub.Msgs.ReadAllLoopAsync())
-#else
             await foreach (var natsMsg in sub.Msgs.ReadAllAsync())
-#endif
             {
                 action(natsMsg);
             }
@@ -91,11 +84,7 @@ public static class NatsMsgTestUtils
             return Task.CompletedTask;
         return Task.Run(async () =>
         {
-#if NETSTANDARD2_0
-            await foreach (var natsMsg in sub.Msgs.ReadAllLoopAsync())
-#else
             await foreach (var natsMsg in sub.Msgs.ReadAllAsync())
-#endif
             {
                 await action(natsMsg);
             }

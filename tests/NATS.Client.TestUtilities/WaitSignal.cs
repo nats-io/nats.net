@@ -1,7 +1,4 @@
 using System.Runtime.CompilerServices;
-#if NETSTANDARD2_0
-using NATS.Client.Core.Internal.NetStandardExtensions;
-#endif
 
 namespace NATS.Client.Core.Tests;
 
@@ -137,17 +134,6 @@ public class WaitSignal<T>
 
     public TaskAwaiter<T> GetAwaiter()
     {
-        var timeoutTask = Task.Delay(_timeout);
-
-        return Task.WhenAny(_tcs.Task, timeoutTask).ContinueWith(
-            completedTask =>
-            {
-                if (completedTask.Result == timeoutTask)
-                {
-                    throw new TimeoutException("The operation has timed out.");
-                }
-
-                return _tcs.Task;
-            }).Unwrap().GetAwaiter();
+        return _tcs.Task.WaitAsync(_timeout).GetAwaiter();
     }
 }

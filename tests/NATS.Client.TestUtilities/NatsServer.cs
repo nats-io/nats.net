@@ -181,7 +181,7 @@ public class NatsServer : IAsyncDisposable
             {
                 try
                 {
-                    await client.ConnectAsync("127.0.0.1", Opts.ServerPort);
+                    await client.ConnectAsync("127.0.0.1", Opts.ServerPort, _cancellationTokenSource.Token);
                     if (client.Connected)
                         return;
                 }
