@@ -235,6 +235,21 @@ namespace NATS.Client.Core.Internal.NetStandardExtensions
             bw.Write(buffer);
         }
     }
+
+    internal static class InterlockedEx
+    {
+        internal static ulong Increment(ref ulong location)
+        {
+            long incremented = Interlocked.Increment(ref Unsafe.As<ulong, long>(ref location));
+            return Unsafe.As<long, ulong>(ref incremented);
+        }
+
+        internal static ulong Exchange(ref ulong location, ulong value)
+        {
+            long original = Interlocked.Exchange(ref Unsafe.As<ulong, long>(ref location), Unsafe.As<ulong, long>(ref value));
+            return Unsafe.As<long, ulong>(ref original);
+        }
+    }
 }
 
 #endif
