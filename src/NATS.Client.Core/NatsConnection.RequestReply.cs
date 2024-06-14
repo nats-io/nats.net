@@ -141,9 +141,7 @@ public partial class NatsConnection
 
         return Throw();
 
-#if NETSTANDARD2_1 || NET6_0_OR_GREATER
         [DoesNotReturn]
-#endif
         string Throw()
         {
             Debug.Fail("Must not happen");

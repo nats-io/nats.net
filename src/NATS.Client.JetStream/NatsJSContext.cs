@@ -259,15 +259,11 @@ public partial class NatsJSContext
         throw new NatsJSApiNoResponseException();
     }
 
-#if NETSTANDARD2_1 || NET6_0_OR_GREATER
     [DoesNotReturn]
-#endif
     private static void ThrowInvalidStreamNameException(string? paramName) =>
         throw new ArgumentException("Stream name cannot contain ' ', '.'", paramName);
 
-#if NETSTANDARD2_1 || NET6_0_OR_GREATER
     [DoesNotReturn]
-#endif
     private static void ThrowEmptyException(string? paramName) =>
         throw new ArgumentException("The value cannot be an empty string.", paramName);
 }
