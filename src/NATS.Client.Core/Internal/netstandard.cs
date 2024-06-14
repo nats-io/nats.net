@@ -34,6 +34,13 @@ namespace System.Runtime.CompilerServices
     }
 }
 
+namespace System.Diagnostics
+{
+    internal sealed class StackTraceHiddenAttribute : Attribute
+    {
+    }
+}
+
 namespace NATS.Client.Core.Internal.NetStandardExtensions
 {
     using System.Buffers;

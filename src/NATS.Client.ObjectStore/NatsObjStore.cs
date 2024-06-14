@@ -1,6 +1,5 @@
 using System.Buffers;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text.Json;
 using NATS.Client.Core;
@@ -10,6 +9,10 @@ using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
 using NATS.Client.ObjectStore.Internal;
 using NATS.Client.ObjectStore.Models;
+
+#if NETSTANDARD2_0
+using System.Runtime.InteropServices;
+#endif
 
 namespace NATS.Client.ObjectStore;
 
@@ -655,7 +658,7 @@ public class NatsObjStore : INatsObjStore
 
         await PublishMeta(meta, cancellationToken);
 
-        var response = await _stream.PurgeAsync(new StreamPurgeRequest { Filter = GetChunkSubject(meta.Nuid!) }, cancellationToken);
+        var response = await _stream.PurgeAsync(new StreamPurgeRequest { Filter = GetChunkSubject(meta.Nuid) }, cancellationToken);
         if (!response.Success)
         {
             throw new NatsObjException("Can't purge object chunks");

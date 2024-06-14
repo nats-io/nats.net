@@ -777,7 +777,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
     }
 
-#if NET6_0_OR_GREATER
+#if !NETSTANDARD
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
 #endif
     private async ValueTask PublishStateMachineAsync(bool lockHeld, string subject, string? replyTo, NatsPooledBufferWriter<byte>? headersBuffer, NatsPooledBufferWriter<byte> payloadBuffer, CancellationToken cancellationToken)

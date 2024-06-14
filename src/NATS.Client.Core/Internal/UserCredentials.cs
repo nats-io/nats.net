@@ -14,20 +14,12 @@ internal class UserCredentials
 
         if (!string.IsNullOrEmpty(authOpts.CredsFile))
         {
-#if NETSTANDARD2_0
-            (Jwt, Seed) = LoadCredsFile(authOpts.CredsFile!);
-#else
             (Jwt, Seed) = LoadCredsFile(authOpts.CredsFile);
-#endif
         }
 
         if (!string.IsNullOrEmpty(authOpts.NKeyFile))
         {
-#if NETSTANDARD2_0
-            (Seed, NKey) = LoadNKeyFile(authOpts.NKeyFile!);
-#else
             (Seed, NKey) = LoadNKeyFile(authOpts.NKeyFile);
-#endif
         }
     }
 

@@ -63,11 +63,11 @@ internal sealed class WebSocketConnection : ISocketConnection
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public async ValueTask<int> SendAsync(ReadOnlyMemory<byte> buffer)
     {
-#if NET6_0_OR_GREATER
-        await _socket.SendAsync(buffer, WebSocketMessageType.Binary, WebSocketMessageFlags.EndOfMessage, CancellationToken.None).ConfigureAwait(false);
-#else
+#if NETSTANDARD
         MemoryMarshal.TryGetArray(buffer, out var segment);
         await _socket.SendAsync(segment, WebSocketMessageType.Binary, true, CancellationToken.None).ConfigureAwait(false);
+#else
+        await _socket.SendAsync(buffer, WebSocketMessageType.Binary, WebSocketMessageFlags.EndOfMessage, CancellationToken.None).ConfigureAwait(false);
 #endif
         return buffer.Length;
     }

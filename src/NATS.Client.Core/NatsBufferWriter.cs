@@ -4,7 +4,7 @@ using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-#if NET6_0_OR_GREATER
+#if !NETSTANDARD
 using BitOperations = System.Numerics.BitOperations;
 #endif
 
@@ -363,7 +363,7 @@ public sealed class NatsBufferWriter<T> : IBufferWriter<T>, IMemoryOwner<T>
     {
         var minimumSize = (uint)_index + (uint)sizeHint;
 
-#if NET6_0_OR_GREATER
+#if !NETSTANDARD
         // The ArrayPool<T> class has a maximum threshold of 1024 * 1024 for the maximum length of
         // pooled arrays, and once this is exceeded it will just allocate a new array every time
         // of exactly the requested size. In that case, we manually round up the requested size to

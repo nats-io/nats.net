@@ -6,7 +6,7 @@ namespace NATS.Client.Core;
 public partial class NatsConnection
 {
     /// <inheritdoc />
-#if NET6_0_OR_GREATER
+#if !NETSTANDARD
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
 #endif
     public async ValueTask<TimeSpan> PingAsync(CancellationToken cancellationToken = default)

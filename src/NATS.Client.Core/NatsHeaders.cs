@@ -146,11 +146,7 @@ public class NatsHeaders : IDictionary<string, StringValues>
             else
             {
                 EnsureStore(1);
-#if NET6_0_OR_GREATER
                 Store[key] = value;
-#else
-                Store![key] = value;
-#endif
             }
         }
     }
@@ -221,11 +217,7 @@ public class NatsHeaders : IDictionary<string, StringValues>
         }
         ThrowIfReadOnly();
         EnsureStore(1);
-#if NET6_0_OR_GREATER
         Store.Add(item.Key, item.Value);
-#else
-        Store!.Add(item.Key, item.Value);
-#endif
     }
 
     /// <summary>
@@ -241,11 +233,7 @@ public class NatsHeaders : IDictionary<string, StringValues>
         }
         ThrowIfReadOnly();
         EnsureStore(1);
-#if NET6_0_OR_GREATER
         Store.Add(key, value);
-#else
-        Store!.Add(key, value);
-#endif
     }
 
     /// <summary>
@@ -363,12 +351,7 @@ public class NatsHeaders : IDictionary<string, StringValues>
     /// <param name="key">The header name.</param>
     /// <param name="value">The value.</param>
     /// <returns>true if the <see cref="NatsHeaders" /> contains the key; otherwise, false.</returns>
-    public bool TryGetLastValue(
-        string key,
-#if NET6_0_OR_GREATER
-        [NotNullWhen(returnValue: true)]
-#endif
-        out string? value)
+    public bool TryGetLastValue(string key, [NotNullWhen(returnValue: true)] out string? value)
     {
         if (Store != null && Store.TryGetValue(key, out var values))
         {

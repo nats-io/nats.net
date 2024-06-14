@@ -31,11 +31,11 @@ internal sealed class NuidWriter
         Refresh(out _);
     }
 
-    private static ReadOnlySpan<char> Digits => "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 #if NETSTANDARD2_0
-        .AsSpan()
+    private static ReadOnlySpan<char> Digits => "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".AsSpan();
+#else
+    private static ReadOnlySpan<char> Digits => "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 #endif
-    ;
 
     public static bool TryWriteNuid(Span<char> nuidBuffer)
     {

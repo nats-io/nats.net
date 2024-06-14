@@ -2,10 +2,6 @@ using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
 using NATS.Client.Core.Internal;
 
-#if NETSTANDARD
-#pragma warning disable CS8774 // Member must have a non-null value when exiting.
-#endif
-
 namespace NATS.Client.Core;
 
 /// <summary>

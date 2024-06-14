@@ -1,4 +1,4 @@
-#if NET6_0_OR_GREATER
+#if !NETSTANDARD
 
 using System.Net.Security;
 using System.Runtime.InteropServices;

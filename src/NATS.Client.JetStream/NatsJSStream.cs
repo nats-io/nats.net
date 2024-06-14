@@ -18,11 +18,10 @@ public class NatsJSStream : INatsJSStream
 #endif
     internal NatsJSStream(NatsJSContext context, StreamInfo info)
     {
-#if NET6_0_OR_GREATER
-        ArgumentNullException.ThrowIfNull(info.Config.Name, nameof(info.Config.Name));
+#if NETSTANDARD
+        ArgumentNullExceptionEx.ThrowIfNull(info.Config.Name, nameof(info.Config.Name));
 #else
-        if (info.Config.Name == null)
-            throw new ArgumentNullException(nameof(info.Config.Name));
+        ArgumentNullException.ThrowIfNull(info.Config.Name, nameof(info.Config.Name));
 #endif
         _context = context;
         Info = info;

@@ -307,7 +307,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         }
     }
 
-#if NET6_0_OR_GREATER
+#if !NETSTANDARD
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
 #endif
     private async ValueTask<ReadOnlySequence<byte>> DispatchCommandAsync(int code, ReadOnlySequence<byte> buffer)

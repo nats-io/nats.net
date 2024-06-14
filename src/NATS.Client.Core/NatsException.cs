@@ -1,5 +1,3 @@
-using System.Globalization;
-
 namespace NATS.Client.Core;
 
 public class NatsException : Exception
@@ -36,7 +34,7 @@ public sealed class NatsServerException : NatsException
     public NatsServerException(string error)
         : base($"Server error: {error}")
     {
-        Error = error.ToLower(CultureInfo.InvariantCulture);
+        Error = error.ToLower();
         IsAuthError = Error.Contains("authorization violation")
                       || Error.Contains("user authentication expired")
                       || Error.Contains("user authentication revoked")

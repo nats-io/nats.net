@@ -4,10 +4,6 @@ using System.Text;
 using NATS.Client.Core;
 using NATS.Client.JetStream.Internal;
 
-#if NETSTANDARD
-#pragma warning disable CS8774 // Member must have a non-null value when exiting.
-#endif
-
 namespace NATS.Client.JetStream;
 
 /// <summary>

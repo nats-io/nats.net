@@ -16,6 +16,10 @@
     <IsTrimmable>true</IsTrimmable>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(TargetFramework)' == 'netstandard2.0' OR '$(TargetFramework)' == 'netstandard2.1'">
+    <NoWarn>$(NoWarn);CS8774</NoWarn>
+  </PropertyGroup>
+
   <!--  Dependencies for netstandard only  -->
   <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0' OR '$(TargetFramework)' == 'netstandard2.1'">
     <PackageReference Include="System.ComponentModel.Annotations" Version="5.0.0" />

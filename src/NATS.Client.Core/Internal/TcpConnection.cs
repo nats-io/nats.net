@@ -47,10 +47,10 @@ internal sealed class TcpConnection : ISocketConnection
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ValueTask ConnectAsync(string host, int port, CancellationToken cancellationToken)
     {
-#if NET6_0_OR_GREATER
-        return _socket.ConnectAsync(host, port, cancellationToken);
-#else
+#if NETSTANDARD
         return new ValueTask(_socket.ConnectAsync(host, port).WaitAsync(Timeout.InfiniteTimeSpan, cancellationToken));
+#else
+        return _socket.ConnectAsync(host, port, cancellationToken);
 #endif
     }
 
@@ -62,10 +62,10 @@ internal sealed class TcpConnection : ISocketConnection
         using var cts = new CancellationTokenSource(timeout);
         try
         {
-#if NET6_0_OR_GREATER
-            await _socket.ConnectAsync(host, port, cts.Token).ConfigureAwait(false);
-#else
+#if NETSTANDARD
             await _socket.ConnectAsync(host, port).WaitAsync(timeout, cts.Token).ConfigureAwait(false);
+#else
+            await _socket.ConnectAsync(host, port, cts.Token).ConfigureAwait(false);
 #endif
         }
         catch (Exception ex)
@@ -106,11 +106,11 @@ internal sealed class TcpConnection : ISocketConnection
 
     public ValueTask AbortConnectionAsync(CancellationToken cancellationToken)
     {
-#if NET6_0_OR_GREATER
-        return _socket.DisconnectAsync(false, cancellationToken);
-#else
+#if NETSTANDARD
         _socket.Disconnect(false);
         return default;
+#else
+        return _socket.DisconnectAsync(false, cancellationToken);
 #endif
     }
 

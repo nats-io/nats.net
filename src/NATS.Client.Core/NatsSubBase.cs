@@ -75,8 +75,8 @@ public abstract class NatsSubBase
         // might be a problem. This should reduce the impact of that problem.
         cancellationToken.ThrowIfCancellationRequested();
 
-#if NET6_0_OR_GREATER
-        _tokenRegistration = cancellationToken.UnsafeRegister(
+#if NETSTANDARD
+        _tokenRegistration = cancellationToken.Register(
             state =>
             {
                 var self = (NatsSubBase)state!;
@@ -84,7 +84,7 @@ public abstract class NatsSubBase
             },
             this);
 #else
-        _tokenRegistration = cancellationToken.Register(
+        _tokenRegistration = cancellationToken.UnsafeRegister(
             state =>
             {
                 var self = (NatsSubBase)state!;

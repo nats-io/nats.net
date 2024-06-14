@@ -46,8 +46,8 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
     private readonly string _stream;
     private readonly Task _commandTask;
 
-    private long _sequenceStream;
-    private long _sequenceConsumer;
+    private ulong _sequenceStream;
+    private ulong _sequenceConsumer;
     private string _consumer;
     private volatile NatsKVWatchSub<T>? _sub;
     private INatsJSConsumer? _initialConsumer;
@@ -238,9 +238,13 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
                                         continue;
                                     }
 
+#if NETSTANDARD
+                                    var sequence = InterlockedEx.Increment(ref _sequenceConsumer);
+#else
                                     var sequence = Interlocked.Increment(ref _sequenceConsumer);
+#endif
 
-                                    if (sequence != (long)metadata.Sequence.Consumer)
+                                    if (sequence != metadata.Sequence.Consumer)
                                     {
                                         CreateSub("sequence-mismatch");
                                         _logger.LogWarning(NatsKVLogEvents.RecreateConsumer, "Missed messages, recreating consumer");
@@ -267,7 +271,11 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
                                     // Increment the sequence before writing to the channel in case the channel is full
                                     // and the writer is waiting for the reader to read the message. This way the sequence
                                     // will be correctly incremented in case the timeout kicks in and recreated the consumer.
-                                    Interlocked.Exchange(ref _sequenceStream, (long)metadata.Sequence.Stream);
+#if NETSTANDARD
+                                    InterlockedEx.Exchange(ref _sequenceStream, metadata.Sequence.Stream);
+#else
+                                    Interlocked.Exchange(ref _sequenceStream, metadata.Sequence.Stream);
+#endif
 
                                     await _entryChannel.Writer.WriteAsync(entry, _cancellationToken);
                                 }
@@ -356,7 +364,11 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
             _logger.LogDebug(NatsKVLogEvents.NewDeliverySubject, "New delivery subject {Subject}", _sub.Subject);
         }
 
+#if NETSTANDARD
+        InterlockedEx.Exchange(ref _sequenceConsumer, 0);
+#else
         Interlocked.Exchange(ref _sequenceConsumer, 0);
+#endif
 
         var sequence = Volatile.Read(ref _sequenceStream);
 
@@ -408,7 +420,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
         if (sequence > 0)
         {
             config.DeliverPolicy = ConsumerConfigDeliverPolicy.ByStartSequence;
-            config.OptStartSeq = (ulong)sequence + 1;
+            config.OptStartSeq = sequence + 1;
         }
         else if (_opts.ResumeAtRevision > 0)
         {

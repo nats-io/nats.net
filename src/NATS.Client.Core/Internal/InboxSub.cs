@@ -166,10 +166,10 @@ internal class InboxSubBuilder : ISubscriptionManager
             {
                 // try to remove this specific instance of the subTable
                 // if an update is in process and sees an empty subTable, it will set a new instance
-#if NET6_0_OR_GREATER
-                _bySubject.TryRemove(KeyValuePair.Create(sub.Subject, subTable));
-#else
+#if NETSTANDARD
                 _bySubject.TryRemove(sub.Subject, out _);
+#else
+                _bySubject.TryRemove(KeyValuePair.Create(sub.Subject, subTable));
 #endif
             }
 #endif
