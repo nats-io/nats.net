@@ -23,11 +23,7 @@ internal sealed class ObjectPool
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool TryRent<T>(
-#if NETSTANDARD2_1 || NET6_0_OR_GREATER
-        [NotNullWhen(true)]
-#endif
-        out T? value)
+    public bool TryRent<T>([NotNullWhen(true)] out T? value)
         where T : class, IObjectPoolNode<T>
     {
         // poolNodes is grow only, safe to access indexer with no-lock
@@ -107,11 +103,7 @@ internal sealed class ObjectPool<T>
     public int Size => _size;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool TryPop(
-#if NETSTANDARD2_1 || NET6_0_OR_GREATER
-        [NotNullWhen(true)]
-#endif
-        out T? result)
+    public bool TryPop([NotNullWhen(true)] out T? result)
     {
         // Instead of lock, use CompareExchange gate.
         // In a worst case, missed cached object(create new one) but it's not a big deal.
