@@ -109,11 +109,11 @@ internal sealed class ActivityEndingMsgReader<T> : ChannelReader<NatsMsg<T>>
         return _inner.TryPeek(out item);
     }
 
-    public
 #if NETSTANDARD2_1 || NET6_0_OR_GREATER
-        override
+    public override async IAsyncEnumerable<NatsMsg<T>> ReadAllAsync([EnumeratorCancellation] CancellationToken cancellationToken = default)
+#else
+    public async IAsyncEnumerable<NatsMsg<T>> ReadAllAsync([EnumeratorCancellation] CancellationToken cancellationToken = default)
 #endif
-        async IAsyncEnumerable<NatsMsg<T>> ReadAllAsync([EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var handle = GCHandle.Alloc(_sub);
         try

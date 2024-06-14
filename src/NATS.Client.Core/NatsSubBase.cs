@@ -75,20 +75,23 @@ public abstract class NatsSubBase
         // might be a problem. This should reduce the impact of that problem.
         cancellationToken.ThrowIfCancellationRequested();
 
-        _tokenRegistration = cancellationToken
 #if NET6_0_OR_GREATER
-            .UnsafeRegister(
+        _tokenRegistration = cancellationToken.UnsafeRegister(
+            state =>
+            {
+                var self = (NatsSubBase)state!;
+                self.EndSubscription(NatsSubEndReason.Cancelled);
+            },
+            this);
 #else
-            .Register(
+        _tokenRegistration = cancellationToken.Register(
+            state =>
+            {
+                var self = (NatsSubBase)state!;
+                self.EndSubscription(NatsSubEndReason.Cancelled);
+            },
+            this);
 #endif
-#pragma warning disable SA1114
-                state =>
-                {
-                    var self = (NatsSubBase)state!;
-                    self.EndSubscription(NatsSubEndReason.Cancelled);
-                },
-#pragma warning restore SA1114
-                this);
 
         // Only allocate timers if necessary to reduce GC pressure
         if (_idleTimeout != default)
