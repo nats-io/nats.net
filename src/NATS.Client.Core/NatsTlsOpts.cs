@@ -125,14 +125,11 @@ public sealed record NatsTlsOpts
     /// <summary>TLS mode to use during connection</summary>
     public TlsMode Mode { get; init; }
 
-    internal bool HasTlsCerts =>
-        CertFile != default
-        || KeyFile != default
-        || CaFile != default
 #if NETSTANDARD2_1 || NET6_0_OR_GREATER
-        || ConfigureClientAuthentication != default
+    internal bool HasTlsCerts => CertFile != default || KeyFile != default || CaFile != default || ConfigureClientAuthentication != default;
+#else
+    internal bool HasTlsCerts => CertFile != default || KeyFile != default || CaFile != default;
 #endif
-        ;
 
 #if NET6_0_OR_GREATER
     /// <summary>
