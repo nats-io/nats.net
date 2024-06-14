@@ -378,13 +378,11 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
             return (T)(object)Encoding.UTF8.GetString(buffer);
         }
 
-        var span = buffer.IsSingleSegment
 #if NETSTANDARD2_0
-            ? buffer.First.Span
+        var span = buffer.IsSingleSegment ? buffer.First.Span : buffer.ToArray();
 #else
-            ? buffer.FirstSpan
+        var span = buffer.IsSingleSegment ? buffer.FirstSpan : buffer.ToArray();
 #endif
-            : buffer.ToArray();
 
         if (typeof(T) == typeof(DateTime) || typeof(T) == typeof(DateTime?))
         {
