@@ -5,9 +5,6 @@ using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.Core.Commands;
 using NATS.Client.JetStream.Models;
-#if NETSTANDARD2_0
-using NATS.Client.Core.Internal.NetStandardExtensions;
-#endif
 
 namespace NATS.Client.JetStream.Internal;
 

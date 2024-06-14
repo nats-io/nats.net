@@ -1,8 +1,5 @@
 using System.Threading.Channels;
 using NATS.Client.Core;
-#if NETSTANDARD2_0
-using NATS.Client.Core.Internal.NetStandardExtensions;
-#endif
 
 namespace NATS.Client.Services.Internal;
 

@@ -8,9 +8,6 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
-#if NETSTANDARD
-using NATS.Client.Core.Internal.NetStandardExtensions;
-#endif
 
 namespace NATS.Client.Core.Internal;
 

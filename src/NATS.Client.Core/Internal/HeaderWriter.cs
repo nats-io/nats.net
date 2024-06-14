@@ -2,9 +2,6 @@ using System.Buffers;
 using System.IO.Pipelines;
 using System.Text;
 using NATS.Client.Core.Commands;
-#if NETSTANDARD2_0
-using NATS.Client.Core.Internal.NetStandardExtensions;
-#endif
 
 namespace NATS.Client.Core.Internal;
 

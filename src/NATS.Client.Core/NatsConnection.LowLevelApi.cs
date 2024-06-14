@@ -1,7 +1,3 @@
-#if NETSTANDARD
-using NATS.Client.Core.Internal.NetStandardExtensions;
-#endif
-
 namespace NATS.Client.Core;
 
 public partial class NatsConnection

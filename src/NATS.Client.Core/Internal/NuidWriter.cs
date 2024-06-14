@@ -3,7 +3,6 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 #if NETSTANDARD
-using NATS.Client.Core.Internal.NetStandardExtensions;
 using Random = NATS.Client.Core.Internal.NetStandardExtensions.Random;
 #endif
 

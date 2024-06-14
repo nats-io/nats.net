@@ -5,7 +5,6 @@ using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
 using NATS.Client.Core.Internal;
 #if NETSTANDARD
-using NATS.Client.Core.Internal.NetStandardExtensions;
 using Random = NATS.Client.Core.Internal.NetStandardExtensions.Random;
 #endif
 

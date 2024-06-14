@@ -6,9 +6,6 @@ using NATS.Client.Core;
 using NATS.Client.Core.Internal;
 using NATS.Client.Services.Internal;
 using NATS.Client.Services.Models;
-#if NETSTANDARD2_0
-using NATS.Client.Core.Internal.NetStandardExtensions;
-#endif
 
 namespace NATS.Client.Services;
 

@@ -1,8 +1,5 @@
 using System.Diagnostics;
 using NATS.Client.Core.Internal;
-#if NETSTANDARD
-using NATS.Client.Core.Internal.NetStandardExtensions;
-#endif
 
 namespace NATS.Client.Core;
 

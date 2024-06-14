@@ -7,9 +7,6 @@ using System.Runtime.InteropServices;
 #if NET6_0_OR_GREATER
 using BitOperations = System.Numerics.BitOperations;
 #endif
-#if NETSTANDARD2_0
-using NATS.Client.Core.Internal.NetStandardExtensions;
-#endif
 
 namespace NATS.Client.Core;
 

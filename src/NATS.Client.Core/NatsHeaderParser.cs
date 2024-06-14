@@ -7,9 +7,6 @@ using System.Text;
 using Microsoft.Extensions.Primitives;
 using NATS.Client.Core.Commands;
 using NATS.Client.Core.Internal;
-#if NETSTANDARD
-using NATS.Client.Core.Internal.NetStandardExtensions;
-#endif
 
 // ReSharper disable ConditionIsAlwaysTrueOrFalse
 // ReSharper disable PossiblyImpureMethodCallOnReadonlyVariable
