@@ -7,6 +7,9 @@ using System.Runtime.InteropServices;
 #if NET6_0_OR_GREATER
 using BitOperations = System.Numerics.BitOperations;
 #endif
+#if NETSTANDARD2_0
+using NATS.Client.Core.Internal.NetStandardExtensions;
+#endif
 
 namespace NATS.Client.Core;
 
@@ -391,14 +394,7 @@ internal static class NatsBufferWriterExtensions
     /// <param name="clearArray">Indicates whether the contents of the array should be cleared before reuse.</param>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="newSize"/> is less than 0.</exception>
     /// <remarks>When this method returns, the caller must not use any references to the old array anymore.</remarks>
-    public static void Resize<T>(
-        this ArrayPool<T> pool,
-#if !NETSTANDARD2_0
-        [NotNull]
-#endif
-        ref T[]? array,
-        int newSize,
-        bool clearArray = false)
+    public static void Resize<T>(this ArrayPool<T> pool, [NotNull] ref T[]? array, int newSize, bool clearArray = false)
     {
         // If the old array is null, just create a new one with the requested size
         if (array is null)

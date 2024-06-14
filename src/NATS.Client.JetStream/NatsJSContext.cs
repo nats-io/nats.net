@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
-#if NETSTANDARD2_0
+#if NETSTANDARD2_0 || NETSTANDARD2_1
 using NATS.Client.Core.Internal.NetStandardExtensions;
 #endif
 
@@ -173,21 +173,12 @@ public partial class NatsJSContext
         throw new NatsJSPublishNoResponseException();
     }
 
-    internal static void ThrowIfInvalidStreamName(
-#if NETSTANDARD2_1 || NET6_0_OR_GREATER
-        [NotNull]
-#endif
-        string? name,
-#if NET6_0_OR_GREATER
-        [CallerArgumentExpression("name")]
-#endif
-        string? paramName = null)
+    internal static void ThrowIfInvalidStreamName([NotNull] string? name, [CallerArgumentExpression("name")] string? paramName = null)
     {
-#if NET6_0_OR_GREATER
-        ArgumentNullException.ThrowIfNull(name, paramName);
+#if NETSTANDARD2_0 || NETSTANDARD2_1
+        ArgumentNullExceptionEx.ThrowIfNull(name, paramName);
 #else
-        if (name == null)
-            throw new ArgumentException();
+        ArgumentNullException.ThrowIfNull(name, paramName);
 #endif
 
         if (name.Length == 0)

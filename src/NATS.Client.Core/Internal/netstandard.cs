@@ -2,6 +2,9 @@
 // ReSharper disable ConvertToPrimaryConstructor
 // ReSharper disable RedundantCast
 // ReSharper disable SuggestVarOrType_Elsewhere
+// ReSharper disable UnusedAutoPropertyAccessor.Global
+// ReSharper disable ArrangeConstructorOrDestructorBody
+// ReSharper disable ArrangeMethodOrOperatorBody
 
 #pragma warning disable SA1403
 #pragma warning disable SA1204
@@ -15,12 +18,23 @@ namespace System.Runtime.CompilerServices
     internal static class IsExternalInit
     {
     }
+
+    internal sealed class CallerArgumentExpressionAttribute : Attribute
+    {
+        public CallerArgumentExpressionAttribute(string parameterName)
+        {
+            ParameterName = parameterName;
+        }
+
+        public string ParameterName { get; }
+    }
 }
 
 namespace NATS.Client.Core.Internal.NetStandardExtensions
 {
     using System.Buffers;
     using System.Diagnostics;
+    using System.Diagnostics.CodeAnalysis;
     using System.Runtime.CompilerServices;
     using System.Runtime.InteropServices;
     using System.Text;
@@ -217,9 +231,9 @@ namespace NATS.Client.Core.Internal.NetStandardExtensions
                     throw new ArgumentOutOfRangeException();
                 }
 
-                Debug.Assert(currentSegment!.RunningIndex + positionIndex >= 0);
+                Debug.Assert(currentSegment.RunningIndex + positionIndex >= 0);
 
-                return currentSegment!.RunningIndex + positionIndex;
+                return currentSegment.RunningIndex + positionIndex;
             }
         }
     }
@@ -250,11 +264,29 @@ namespace NATS.Client.Core.Internal.NetStandardExtensions
             return Unsafe.As<long, ulong>(ref original);
         }
     }
+
+    internal static class ArgumentNullExceptionEx
+    {
+        public static void ThrowIfNull([NotNull] object? argument, [CallerArgumentExpression(nameof(argument))] string? paramName = null)
+        {
+            if (argument is null)
+            {
+                throw new ArgumentException(paramName);
+            }
+        }
+    }
 }
 
 #endif
 
 #if NETSTANDARD2_0
+
+namespace System.Diagnostics.CodeAnalysis
+{
+    internal sealed class NotNullAttribute : Attribute
+    {
+    }
+}
 
 namespace NATS.Client.Core.Internal.NetStandardExtensions
 {
