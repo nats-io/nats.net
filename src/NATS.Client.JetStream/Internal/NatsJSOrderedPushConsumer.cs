@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.Core.Internal;
 using NATS.Client.JetStream.Models;
-#if NETSTANDARD2_0 || NETSTANDARD2_1
+#if NETSTANDARD
 using NATS.Client.Core.Internal.NetStandardExtensions;
 #endif
 
@@ -222,7 +222,7 @@ internal class NatsJSOrderedPushConsumer<T>
                                         continue;
                                     }
 
-#if NETSTANDARD2_0 || NETSTANDARD2_1
+#if NETSTANDARD
                                     var sequence = InterlockedEx.Increment(ref _sequenceConsumer);
 #else
                                     var sequence = Interlocked.Increment(ref _sequenceConsumer);
@@ -238,7 +238,7 @@ internal class NatsJSOrderedPushConsumer<T>
                                     // Increment the sequence before writing to the channel in case the channel is full
                                     // and the writer is waiting for the reader to read the message. This way the sequence
                                     // will be correctly incremented in case the timeout kicks in and recreated the consumer.
-#if NETSTANDARD2_0 || NETSTANDARD2_1
+#if NETSTANDARD
                                     InterlockedEx.Exchange(ref _sequenceStream, metadata.Sequence.Stream);
 #else
                                     Interlocked.Exchange(ref _sequenceStream, metadata.Sequence.Stream);
@@ -342,7 +342,7 @@ internal class NatsJSOrderedPushConsumer<T>
             _logger.LogDebug(NatsJSLogEvents.NewDeliverySubject, "New delivery subject {Subject}", _sub.Subject);
         }
 
-#if NETSTANDARD2_0 || NETSTANDARD2_1
+#if NETSTANDARD
         InterlockedEx.Exchange(ref _sequenceConsumer, 0);
 #else
         Interlocked.Exchange(ref _sequenceConsumer, 0);

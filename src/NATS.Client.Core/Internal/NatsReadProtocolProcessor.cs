@@ -8,7 +8,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
-#if NETSTANDARD2_0 || NETSTANDARD2_1
+#if NETSTANDARD
 using NATS.Client.Core.Internal.NetStandardExtensions;
 #endif
 

@@ -4,7 +4,7 @@ using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
 using NATS.Client.Core.Internal;
-#if NETSTANDARD2_0 || NETSTANDARD2_1
+#if NETSTANDARD
 using NATS.Client.Core.Internal.NetStandardExtensions;
 using Random = NATS.Client.Core.Internal.NetStandardExtensions.Random;
 #endif

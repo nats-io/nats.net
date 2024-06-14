@@ -7,7 +7,7 @@ using System.Text;
 using Microsoft.Extensions.Primitives;
 using NATS.Client.Core.Commands;
 using NATS.Client.Core.Internal;
-#if NETSTANDARD2_0 || NETSTANDARD2_1
+#if NETSTANDARD
 using NATS.Client.Core.Internal.NetStandardExtensions;
 #endif
 

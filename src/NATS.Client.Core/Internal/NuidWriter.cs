@@ -2,15 +2,14 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
-#if NETSTANDARD2_0 || NETSTANDARD2_1
+#if NETSTANDARD
+using NATS.Client.Core.Internal.NetStandardExtensions;
 using Random = NATS.Client.Core.Internal.NetStandardExtensions.Random;
 #endif
 
 namespace NATS.Client.Core.Internal;
 
-#if NET6_0_OR_GREATER
 [SkipLocalsInit]
-#endif
 internal sealed class NuidWriter
 {
     internal const nuint NuidLength = PrefixLength + SequentialLength;
@@ -24,11 +23,7 @@ internal sealed class NuidWriter
     [ThreadStatic]
     private static NuidWriter? _writer;
 
-#if NET6_0_OR_GREATER
     private char[] _prefix;
-#else
-    private char[] _prefix = null!;
-#endif
     private ulong _increment;
     private ulong _sequential;
 
@@ -164,9 +159,7 @@ internal sealed class NuidWriter
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-#if NET6_0_OR_GREATER
     [MemberNotNull(nameof(_prefix))]
-#endif
     private char[] Refresh(out ulong sequential)
     {
         var prefix = _prefix = GetPrefix();

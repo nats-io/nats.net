@@ -112,9 +112,7 @@ public partial class NatsConnection
     internal static string NewInbox(string prefix) => NewInbox(prefix.AsSpan());
 #endif
 
-#if NET6_0_OR_GREATER
     [SkipLocalsInit]
-#endif
     internal static string NewInbox(ReadOnlySpan<char> prefix)
     {
         Span<char> buffer = stackalloc char[64];

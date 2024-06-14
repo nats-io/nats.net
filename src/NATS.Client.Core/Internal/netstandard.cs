@@ -10,7 +10,7 @@
 #pragma warning disable SA1204
 #pragma warning disable SA1405
 
-#if NETSTANDARD2_0 || NETSTANDARD2_1
+#if NETSTANDARD
 
 // Enable init only setters
 namespace System.Runtime.CompilerServices
@@ -27,6 +27,10 @@ namespace System.Runtime.CompilerServices
         }
 
         public string ParameterName { get; }
+    }
+
+    internal sealed class SkipLocalsInitAttribute : Attribute
+    {
     }
 }
 
@@ -280,13 +284,6 @@ namespace NATS.Client.Core.Internal.NetStandardExtensions
 #endif
 
 #if NETSTANDARD2_0
-
-namespace System.Diagnostics.CodeAnalysis
-{
-    internal sealed class NotNullAttribute : Attribute
-    {
-    }
-}
 
 namespace NATS.Client.Core.Internal.NetStandardExtensions
 {

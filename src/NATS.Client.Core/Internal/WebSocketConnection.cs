@@ -1,7 +1,7 @@
 using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Runtime.CompilerServices;
-#if NETSTANDARD2_0 || NETSTANDARD2_1
+#if NETSTANDARD
 using System.Runtime.InteropServices;
 #endif
 
