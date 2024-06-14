@@ -2,6 +2,10 @@ using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
 using NATS.Client.Core.Internal;
 
+#if NETSTANDARD
+#pragma warning disable CS8774 // Member must have a non-null value when exiting.
+#endif
+
 namespace NATS.Client.Core;
 
 /// <summary>
@@ -293,13 +297,7 @@ public readonly record struct NatsMsg<T>(
         {
             throw new NatsException("unable to send reply; ReplyTo is empty");
         }
-#if NETSTANDARD
-#pragma warning disable CS8774 // Member must have a non-null value when exiting.
-#endif
     }
-#if NETSTANDARD
-#pragma warning restore CS8774 // Member must have a non-null value when exiting.
-#endif
 }
 
 public class NatsDeserializeException : NatsException

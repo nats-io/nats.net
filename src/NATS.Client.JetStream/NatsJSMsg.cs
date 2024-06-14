@@ -4,6 +4,10 @@ using System.Text;
 using NATS.Client.Core;
 using NATS.Client.JetStream.Internal;
 
+#if NETSTANDARD
+#pragma warning disable CS8774 // Member must have a non-null value when exiting.
+#endif
+
 namespace NATS.Client.JetStream;
 
 /// <summary>
@@ -307,13 +311,7 @@ public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
         {
             throw new NatsException("unable to send acknowledgment; ReplyTo is empty");
         }
-#if NETSTANDARD
-#pragma warning disable CS8774 // Member must have a non-null value when exiting.
-#endif
     }
-#if NETSTANDARD
-#pragma warning restore CS8774 // Member must have a non-null value when exiting.
-#endif
 }
 
 /// <summary>

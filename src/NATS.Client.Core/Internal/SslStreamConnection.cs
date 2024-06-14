@@ -1,11 +1,11 @@
 using System.Net.Security;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Security.Authentication;
 using Microsoft.Extensions.Logging;
 
 #if NETSTANDARD2_0
-#pragma warning disable CS1998
+using System.Runtime.InteropServices;
+#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
 #endif
 
 namespace NATS.Client.Core.Internal;
