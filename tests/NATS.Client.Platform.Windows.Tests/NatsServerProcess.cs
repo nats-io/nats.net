@@ -2,7 +2,12 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
+using Exception = System.Exception;
+
+#pragma warning disable VSTHRD103
+#pragma warning disable VSTHRD105
 #pragma warning disable SA1512
+
 // ReSharper disable SuggestVarOrType_BuiltInTypes
 // ReSharper disable SuggestVarOrType_SimpleTypes
 // ReSharper disable NotAccessedField.Local
@@ -15,14 +20,14 @@ public class NatsServerProcess : IAsyncDisposable
 {
     private readonly Action<string> _logger;
     private readonly Process _process;
-    private readonly string _portsFile;
+    private readonly string _scratch;
 
-    private NatsServerProcess(Action<string> logger, Process process, string url, string portsFile)
+    private NatsServerProcess(Action<string> logger, Process process, string url, string scratch)
     {
         Url = url;
         _logger = logger;
         _process = process;
-        _portsFile = portsFile;
+        _scratch = scratch;
     }
 
     public string Url { get; }
@@ -31,12 +36,20 @@ public class NatsServerProcess : IAsyncDisposable
     {
         var log = logger ?? (_ => { });
 
-        var tmp = Path.GetTempPath();
-        var tmpEsc = tmp.Replace(@"\", @"\\");
+        var scratch = Path.Combine(Path.GetTempPath(), "nats.net.tests", Guid.NewGuid().ToString());
+
+        var portsFileDir = Path.Combine(scratch, "port");
+        Directory.CreateDirectory(portsFileDir);
+
+        var sd = Path.Combine(scratch, "data");
+        Directory.CreateDirectory(sd);
+
+        var portsFileDirEsc = portsFileDir.Replace(@"\", @"\\");
+        var sdEsc = sd.Replace(@"\", @"\\");
         var info = new ProcessStartInfo
         {
             FileName = "nats-server.exe",
-            Arguments = $"-a 127.0.0.1 -p -1 -js --ports_file_dir \"{tmpEsc}\"",
+            Arguments = $"-a 127.0.0.1 -p -1 -js -sd \"{sdEsc}\" --ports_file_dir \"{portsFileDirEsc}\"",
             UseShellExecute = false,
             CreateNoWindow = false,
             RedirectStandardError = true,
@@ -62,16 +75,47 @@ public class NatsServerProcess : IAsyncDisposable
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
 
-        await tcs.Task;
+        var timeoutTask = Task.Delay(10_000);
+        await Task.WhenAny(tcs.Task, timeoutTask).ContinueWith(
+            completedTask =>
+            {
+                if (completedTask.Result == timeoutTask)
+                {
+                    throw new TimeoutException("The operation has timed out.");
+                }
 
-        var portsFile = Path.Combine(tmp, $"nats-server.exe_{process.Id}.ports");
+                return tcs.Task;
+            }).Unwrap();
+
+        var portsFile = Path.Combine(portsFileDir, $"nats-server.exe_{process.Id}.ports");
         log($"portsFile={portsFile}");
-        var ports = File.ReadAllText(portsFile);
+
+        string? ports = null;
+        Exception? exception = null;
+        for (var i = 0; i < 3; i++)
+        {
+            try
+            {
+                ports = File.ReadAllText(portsFile);
+                break;
+            }
+            catch (Exception e)
+            {
+                exception = e;
+                await Task.Delay(100 + (500 * i));
+            }
+        }
+
+        if (ports == null)
+        {
+            throw exception ?? new Exception("Failed to read ports file.");
+        }
+
         var url = Regex.Match(ports, @"nats://[\d\.]+:\d+").Groups[0].Value;
         log($"ports={ports}");
         log($"url={url}");
 
-        return new NatsServerProcess(log, process, url, portsFile);
+        return new NatsServerProcess(log, process, url, scratch);
     }
 
     public async ValueTask DisposeAsync()
@@ -89,7 +133,7 @@ public class NatsServerProcess : IAsyncDisposable
         {
             try
             {
-                File.Delete(_portsFile);
+                Directory.Delete(_scratch, recursive: true);
                 break;
             }
             catch
