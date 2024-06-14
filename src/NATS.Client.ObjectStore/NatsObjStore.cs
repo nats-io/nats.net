@@ -105,11 +105,7 @@ public class NatsObjStore : INatsObjStore
             await using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Write, leaveOpen))
 #endif
             {
-#if NETSTANDARD2_0
-                await foreach (var msg in pushConsumer.Msgs.ReadAllLoopAsync(cancellationToken))
-#else
                 await foreach (var msg in pushConsumer.Msgs.ReadAllAsync(cancellationToken))
-#endif
                 {
                     // We have to make sure to carry on consuming the channel to avoid any blocking:
                     // e.g. if the channel is full, we would be blocking the reads off the socket (this was intentionally
@@ -609,11 +605,7 @@ public class NatsObjStore : INatsObjStore
 
         pushConsumer.Init();
 
-#if NETSTANDARD2_0
-        await foreach (var msg in pushConsumer.Msgs.ReadAllLoopAsync(cancellationToken).ConfigureAwait(false))
-#else
         await foreach (var msg in pushConsumer.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
-#endif
         {
             if (pushConsumer.IsDone)
                 continue;

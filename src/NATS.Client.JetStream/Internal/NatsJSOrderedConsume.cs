@@ -394,11 +394,7 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
 
     private async Task PullLoop()
     {
-#if NETSTANDARD2_0
-        await foreach (var pr in _pullRequests.Reader.ReadAllLoopAsync().ConfigureAwait(false))
-#else
         await foreach (var pr in _pullRequests.Reader.ReadAllAsync().ConfigureAwait(false))
-#endif
         {
             var origin = $"pull-loop({pr.Origin})";
             await CallMsgNextAsync(origin, pr.Request).ConfigureAwait(false);

@@ -230,11 +230,7 @@ public class NatsSvcServer : INatsSvcServer
 
     private async Task MsgLoop()
     {
-#if NETSTANDARD2_0
-        await foreach (var svcMsg in _channel.Reader.ReadAllLoopAsync(_cts.Token))
-#else
         await foreach (var svcMsg in _channel.Reader.ReadAllAsync(_cts.Token))
-#endif
         {
             try
             {

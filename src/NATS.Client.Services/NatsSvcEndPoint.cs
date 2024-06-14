@@ -215,11 +215,7 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
     private async Task HandlerLoop()
     {
         var stopwatch = new Stopwatch();
-#if NETSTANDARD2_0
-        await foreach (var svcMsg in _channel.Reader.ReadAllLoopAsync(_cancellationToken).ConfigureAwait(false))
-#else
         await foreach (var svcMsg in _channel.Reader.ReadAllAsync(_cancellationToken).ConfigureAwait(false))
-#endif
         {
             Interlocked.Increment(ref _requests);
             stopwatch.Restart();

@@ -240,13 +240,13 @@ namespace NATS.Client.Core.Internal.NetStandardExtensions
     {
         internal static ulong Increment(ref ulong location)
         {
-            long incremented = Interlocked.Increment(ref Unsafe.As<ulong, long>(ref location));
+            var incremented = Interlocked.Increment(ref Unsafe.As<ulong, long>(ref location));
             return Unsafe.As<long, ulong>(ref incremented);
         }
 
         internal static ulong Exchange(ref ulong location, ulong value)
         {
-            long original = Interlocked.Exchange(ref Unsafe.As<ulong, long>(ref location), Unsafe.As<ulong, long>(ref value));
+            var original = Interlocked.Exchange(ref Unsafe.As<ulong, long>(ref location), Unsafe.As<ulong, long>(ref value));
             return Unsafe.As<long, ulong>(ref original);
         }
     }
@@ -296,7 +296,7 @@ namespace NATS.Client.Core.Internal.NetStandardExtensions
 
     internal static class ChannelReaderExtensions
     {
-        public static async IAsyncEnumerable<T> ReadAllLoopAsync<T>(this ChannelReader<T> reader, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        public static async IAsyncEnumerable<T> ReadAllAsync<T>(this ChannelReader<T> reader, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             while (await reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
             {

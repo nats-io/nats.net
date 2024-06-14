@@ -33,11 +33,7 @@ internal class SvcListener : IAsyncDisposable
         {
             await using (sub)
             {
-#if NETSTANDARD2_0
-                await foreach (var msg in sub.Msgs.ReadAllLoopAsync())
-#else
                 await foreach (var msg in sub.Msgs.ReadAllAsync())
-#endif
                 {
                     await _channel.Writer.WriteAsync(new SvcMsg(_type, msg), _cts.Token).ConfigureAwait(false);
                 }

@@ -18,12 +18,7 @@ public partial class NatsConnection
 
         // We don't cancel the channel reader here because we want to keep reading until the subscription
         // channel writer completes so that messages left in the channel can be consumed before exit the loop.
-#if NETSTANDARD2_0
-        await foreach (var msg in sub.Msgs.ReadAllLoopAsync(CancellationToken.None).ConfigureAwait(false))
-#else
-        // Prefer ReadAllAsync() since underlying ActivityEndingMsgReader maintains GCHandle for the subscription more efficiently.
         await foreach (var msg in sub.Msgs.ReadAllAsync(CancellationToken.None).ConfigureAwait(false))
-#endif
         {
             yield return msg;
         }

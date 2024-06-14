@@ -340,11 +340,7 @@ public class NatsKVStore : INatsKVStore
             }
         }
 
-#if NETSTANDARD2_0
-        await foreach (var entry in watcher.Entries.ReadAllLoopAsync(cancellationToken).ConfigureAwait(false))
-#else
         await foreach (var entry in watcher.Entries.ReadAllAsync(cancellationToken).ConfigureAwait(false))
-#endif
         {
             yield return entry;
         }
@@ -370,11 +366,7 @@ public class NatsKVStore : INatsKVStore
 
         await using var watcher = await WatchInternalAsync<T>([key], serializer, opts, cancellationToken);
 
-#if NETSTANDARD2_0
-        await foreach (var entry in watcher.Entries.ReadAllLoopAsync(cancellationToken).ConfigureAwait(false))
-#else
         await foreach (var entry in watcher.Entries.ReadAllAsync(cancellationToken).ConfigureAwait(false))
-#endif
         {
             yield return entry;
             if (entry.Delta == 0)
@@ -411,11 +403,7 @@ public class NatsKVStore : INatsKVStore
             if (watcher.InitialConsumer.Info.NumPending == 0)
                 return;
 
-#if NETSTANDARD2_0
-            await foreach (var entry in watcher.Entries.ReadAllLoopAsync(cancellationToken).ConfigureAwait(false))
-#else
             await foreach (var entry in watcher.Entries.ReadAllAsync(cancellationToken).ConfigureAwait(false))
-#endif
             {
                 if (entry.Operation is NatsKVOperation.Purge or NatsKVOperation.Del)
                     deleted.Add(entry);
@@ -456,11 +444,7 @@ public class NatsKVStore : INatsKVStore
         if (watcher.InitialConsumer.Info.NumPending == 0)
             yield break;
 
-#if NETSTANDARD2_0
-        await foreach (var entry in watcher.Entries.ReadAllLoopAsync(cancellationToken).ConfigureAwait(false))
-#else
         await foreach (var entry in watcher.Entries.ReadAllAsync(cancellationToken).ConfigureAwait(false))
-#endif
         {
             if (entry.Operation is NatsKVOperation.Put)
                 yield return entry.Key;

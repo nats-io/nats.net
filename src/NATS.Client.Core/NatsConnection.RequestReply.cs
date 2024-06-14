@@ -45,12 +45,7 @@ public partial class NatsConnection
                 await using var sub1 = await RequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
                     .ConfigureAwait(false);
 
-#if NETSTANDARD2_0
-                await foreach (var msg in sub1.Msgs.ReadAllLoopAsync(cancellationToken).ConfigureAwait(false))
-#else
-                // Prefer ReadAllAsync() since underlying ActivityEndingMsgReader maintains GCHandle for the subscription more efficiently.
                 await foreach (var msg in sub1.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
-#endif
                 {
                     return msg;
                 }
@@ -68,12 +63,7 @@ public partial class NatsConnection
         await using var sub = await RequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
             .ConfigureAwait(false);
 
-#if NETSTANDARD2_0
-        await foreach (var msg in sub.Msgs.ReadAllLoopAsync(cancellationToken).ConfigureAwait(false))
-#else
-        // Prefer ReadAllAsync() since underlying ActivityEndingMsgReader maintains GCHandle for the subscription more efficiently.
         await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
-#endif
         {
             return msg;
         }
@@ -112,12 +102,7 @@ public partial class NatsConnection
         await using var sub = await RequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
             .ConfigureAwait(false);
 
-#if NETSTANDARD2_0
-        await foreach (var msg in sub.Msgs.ReadAllLoopAsync(cancellationToken).ConfigureAwait(false))
-#else
-        // Prefer ReadAllAsync() since underlying ActivityEndingMsgReader maintains GCHandle for the subscription more efficiently.
         await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
-#endif
         {
             yield return msg;
         }

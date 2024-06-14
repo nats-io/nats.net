@@ -147,11 +147,7 @@ public partial class NatsJSContext
 
             try
             {
-#if NETSTANDARD2_0
-                await foreach (var msg in sub.Msgs.ReadAllLoopAsync(cancellationToken).ConfigureAwait(false))
-#else
                 await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
-#endif
                 {
                     if (msg.Data == null)
                     {
@@ -247,11 +243,7 @@ public partial class NatsJSContext
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
-#if NETSTANDARD2_0
-        await foreach (var msg in sub.Msgs.ReadAllLoopAsync(cancellationToken).ConfigureAwait(false))
-#else
         await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
-#endif
         {
             if (msg.Error is { } error)
             {
