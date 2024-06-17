@@ -164,11 +164,7 @@ internal sealed class CommandWriter : IAsyncDisposable
             return ConnectStateMachineAsync(false, connectOpts, cancellationToken);
         }
 
-#if NETSTANDARD2_0
         if (_flushTask.IsNotCompletedSuccessfully())
-#else
-        if (_flushTask is { IsCompletedSuccessfully: false })
-#endif
         {
             return ConnectStateMachineAsync(true, connectOpts, cancellationToken);
         }
@@ -202,11 +198,7 @@ internal sealed class CommandWriter : IAsyncDisposable
             return PingStateMachineAsync(false, pingCommand, cancellationToken);
         }
 
-#if NETSTANDARD2_0
         if (_flushTask.IsNotCompletedSuccessfully())
-#else
-        if (_flushTask is { IsCompletedSuccessfully: false })
-#endif
         {
             return PingStateMachineAsync(true, pingCommand, cancellationToken);
         }
@@ -241,11 +233,7 @@ internal sealed class CommandWriter : IAsyncDisposable
             return PongStateMachineAsync(false, cancellationToken);
         }
 
-#if NETSTANDARD2_0
         if (_flushTask.IsNotCompletedSuccessfully())
-#else
-        if (_flushTask is { IsCompletedSuccessfully: false })
-#endif
         {
             return PongStateMachineAsync(true, cancellationToken);
         }
@@ -318,11 +306,7 @@ internal sealed class CommandWriter : IAsyncDisposable
             return PublishStateMachineAsync(false, subject, replyTo, headersBuffer, payloadBuffer, cancellationToken);
         }
 
-#if NETSTANDARD2_0
         if (_flushTask.IsNotCompletedSuccessfully())
-#else
-        if (_flushTask is { IsCompletedSuccessfully: false })
-#endif
         {
             return PublishStateMachineAsync(true, subject, replyTo, headersBuffer, payloadBuffer, cancellationToken);
         }
@@ -365,11 +349,7 @@ internal sealed class CommandWriter : IAsyncDisposable
             return SubscribeStateMachineAsync(false, sid, subject, queueGroup, maxMsgs, cancellationToken);
         }
 
-#if NETSTANDARD2_0
         if (_flushTask.IsNotCompletedSuccessfully())
-#else
-        if (_flushTask is { IsCompletedSuccessfully: false })
-#endif
         {
             return SubscribeStateMachineAsync(true, sid, subject, queueGroup, maxMsgs, cancellationToken);
         }
@@ -403,11 +383,7 @@ internal sealed class CommandWriter : IAsyncDisposable
             return UnsubscribeStateMachineAsync(false, sid, maxMsgs, cancellationToken);
         }
 
-#if NETSTANDARD2_0
         if (_flushTask.IsNotCompletedSuccessfully())
-#else
-        if (_flushTask is { IsCompletedSuccessfully: false })
-#endif
         {
             return UnsubscribeStateMachineAsync(true, sid, maxMsgs, cancellationToken);
         }
@@ -437,17 +413,10 @@ internal sealed class CommandWriter : IAsyncDisposable
 
         try
         {
-#if NETSTANDARD2_0
             if (_flushTask.IsNotCompletedSuccessfully())
             {
                 await _flushTask!.ConfigureAwait(false);
             }
-#else
-            if (_flushTask is { IsCompletedSuccessfully: false })
-            {
-                await _flushTask.ConfigureAwait(false);
-            }
-#endif
 
             _flushTask = Task.Delay(timeSpan, cancellationToken);
         }
@@ -661,17 +630,10 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
-#if NETSTANDARD2_0
             if (_flushTask.IsNotCompletedSuccessfully())
             {
                 await _flushTask!.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
             }
-#else
-            if (_flushTask is { IsCompletedSuccessfully: false })
-            {
-                await _flushTask.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
-            }
-#endif
 
             _protocolWriter.WriteConnect(_pipeWriter, connectOpts);
             EnqueueCommand();
@@ -705,17 +667,10 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
-#if NETSTANDARD2_0
             if (_flushTask.IsNotCompletedSuccessfully())
             {
                 await _flushTask!.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
             }
-#else
-            if (_flushTask is { IsCompletedSuccessfully: false })
-            {
-                await _flushTask.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
-            }
-#endif
 
             _protocolWriter.WritePing(_pipeWriter);
             _enqueuePing(pingCommand);
@@ -750,17 +705,10 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
-#if NETSTANDARD2_0
             if (_flushTask.IsNotCompletedSuccessfully())
             {
                 await _flushTask!.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
             }
-#else
-            if (_flushTask is { IsCompletedSuccessfully: false })
-            {
-                await _flushTask.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
-            }
-#endif
 
             _protocolWriter.WritePong(_pipeWriter);
             EnqueueCommand();
@@ -799,17 +747,10 @@ internal sealed class CommandWriter : IAsyncDisposable
                     throw new ObjectDisposedException(nameof(CommandWriter));
                 }
 
-#if NETSTANDARD2_0
                 if (_flushTask.IsNotCompletedSuccessfully())
                 {
                     await _flushTask!.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
                 }
-#else
-                if (_flushTask is { IsCompletedSuccessfully: false })
-                {
-                    await _flushTask.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
-                }
-#endif
 
                 _protocolWriter.WritePublish(_pipeWriter, subject, replyTo, headersBuffer?.WrittenMemory, payloadBuffer.WrittenMemory);
                 EnqueueCommand();
@@ -855,17 +796,10 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
-#if NETSTANDARD2_0
             if (_flushTask.IsNotCompletedSuccessfully())
             {
                 await _flushTask!.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
             }
-#else
-            if (_flushTask is { IsCompletedSuccessfully: false })
-            {
-                await _flushTask.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
-            }
-#endif
 
             _protocolWriter.WriteSubscribe(_pipeWriter, sid, subject, queueGroup, maxMsgs);
             EnqueueCommand();
@@ -899,17 +833,10 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
-#if NETSTANDARD2_0
             if (_flushTask.IsNotCompletedSuccessfully())
             {
                 await _flushTask!.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
             }
-#else
-            if (_flushTask is { IsCompletedSuccessfully: false })
-            {
-                await _flushTask.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
-            }
-#endif
 
             _protocolWriter.WriteUnsubscribe(_pipeWriter, sid, maxMsgs);
             EnqueueCommand();

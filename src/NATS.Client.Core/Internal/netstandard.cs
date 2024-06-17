@@ -313,14 +313,6 @@ namespace NATS.Client.Core.Internal.NetStandardExtensions
         }
     }
 
-    internal static class TaskExtensions
-    {
-        internal static bool IsNotCompletedSuccessfully(this Task? task)
-        {
-            return task != null && (!task.IsCompleted || task.IsCanceled || task.IsFaulted);
-        }
-    }
-
     internal static class KeyValuePairExtensions
     {
         internal static void Deconstruct<TKey, TValue>(this KeyValuePair<TKey, TValue> kv, out TKey key, out TValue value)
@@ -346,3 +338,21 @@ namespace NATS.Client.Core.Internal.NetStandardExtensions
 }
 
 #endif
+
+namespace NATS.Client.Core.Internal
+{
+    using System.Runtime.CompilerServices;
+
+    internal static class TaskExtensions
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static bool IsNotCompletedSuccessfully(this Task? task)
+        {
+            #if NETSTANDARD2_0
+                return task != null && task.Status != TaskStatus.RanToCompletion;
+            #else
+                return task is { IsCompletedSuccessfully: false };
+            #endif
+        }
+    }
+}
