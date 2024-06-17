@@ -132,11 +132,7 @@ public partial class NatsConnection
             var remaining = buffer.Slice((int)totalPrefixLength);
             var didWrite = NuidWriter.TryWriteNuid(remaining);
             Debug.Assert(didWrite, "didWrite");
-#if NETSTANDARD2_0
-            return new string(buffer.ToArray());
-#else
-            return new string(buffer);
-#endif
+            return buffer.ToString();
         }
 
         return Throw();

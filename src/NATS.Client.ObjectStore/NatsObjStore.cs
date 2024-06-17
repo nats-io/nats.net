@@ -680,11 +680,7 @@ public class NatsObjStore : INatsObjStore
         Span<char> buffer = stackalloc char[22];
         if (NuidWriter.TryWriteNuid(buffer))
         {
-#if NETSTANDARD2_0
-            return new string(buffer.ToArray());
-#else
-            return new string(buffer);
-#endif
+            return buffer.ToString();
         }
 
         throw new InvalidOperationException("Internal error: can't generate nuid");
