@@ -341,6 +341,7 @@ namespace NATS.Client.Core.Internal.NetStandardExtensions
 
 namespace NATS.Client.Core.Internal
 {
+    using System.Buffers;
     using System.Runtime.CompilerServices;
 
     internal static class TaskExtensions
@@ -352,6 +353,19 @@ namespace NATS.Client.Core.Internal
                 return task != null && task.Status != TaskStatus.RanToCompletion;
             #else
                 return task is { IsCompletedSuccessfully: false };
+            #endif
+        }
+    }
+
+    internal static class FistSpanExtensions
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static ReadOnlySpan<byte> GetFirstSpan(this ReadOnlySequence<byte> sequence)
+        {
+            #if NETSTANDARD2_0
+                return sequence.First.Span;
+            #else
+                return sequence.FirstSpan;
             #endif
         }
     }
