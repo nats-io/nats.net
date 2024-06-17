@@ -264,7 +264,16 @@ public class NatsKVStore : INatsKVStore
             if (response.Message.Data != null)
             {
 #if NETSTANDARD2_0
-                var bytes = Convert.FromBase64String(response.Message.Data);
+                byte[] bytes;
+                try
+                {
+                    bytes = Convert.FromBase64String(response.Message.Data);
+                }
+                catch (FormatException e)
+                {
+                    throw new NatsKVException("Can't decode data message value", e);
+                }
+
                 var buffer = new ReadOnlySequence<byte>(bytes);
                 try
                 {
