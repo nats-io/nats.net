@@ -244,8 +244,26 @@ public class NatsObjStore : INatsObjStore
                     while (true)
                     {
 #if NETSTANDARD2_0
-                        MemoryMarshal.TryGetArray((ReadOnlyMemory<byte>)memory, out var segment);
-                        var read = await hashedStream.ReadAsync(segment.Array!, segment.Offset, segment.Count, cancellationToken);
+                        int read;
+                        if (MemoryMarshal.TryGetArray((ReadOnlyMemory<byte>)memory, out var segment) == false)
+                        {
+                            read = await hashedStream.ReadAsync(segment.Array!, segment.Offset, segment.Count, cancellationToken);
+                        }
+                        else
+                        {
+                            var bytes = ArrayPool<byte>.Shared.Rent(memory.Length);
+                            try
+                            {
+                                segment = new ArraySegment<byte>(bytes, 0, memory.Length);
+                                read = await hashedStream.ReadAsync(segment.Array!, segment.Offset, segment.Count, cancellationToken);
+                                segment.Array.AsMemory(0, read).CopyTo(memory);
+                            }
+                            finally
+                            {
+                                ArrayPool<byte>.Shared.Return(bytes);
+                            }
+                        }
+
 #else
                         var read = await hashedStream.ReadAsync(memory, cancellationToken);
 #endif

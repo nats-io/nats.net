@@ -58,7 +58,11 @@ internal sealed class SslStreamConnection : ISocketConnection
     public async ValueTask<int> SendAsync(ReadOnlyMemory<byte> buffer)
     {
 #if NETSTANDARD2_0
-        MemoryMarshal.TryGetArray(buffer, out var segment);
+        if (MemoryMarshal.TryGetArray(buffer, out var segment) == false)
+        {
+            segment = new ArraySegment<byte>(buffer.ToArray());
+        }
+
         await _sslStream.WriteAsync(segment.Array, segment.Offset, segment.Count, _closeCts.Token).ConfigureAwait(false);
 #else
         await _sslStream.WriteAsync(buffer, _closeCts.Token).ConfigureAwait(false);
@@ -70,7 +74,11 @@ internal sealed class SslStreamConnection : ISocketConnection
     public ValueTask<int> ReceiveAsync(Memory<byte> buffer)
     {
 #if NETSTANDARD2_0
-        MemoryMarshal.TryGetArray(buffer, out ArraySegment<byte> segment);
+        if (MemoryMarshal.TryGetArray(buffer, out ArraySegment<byte> segment) == false)
+        {
+            ThrowHelper.ThrowInvalidOperationException("Can't get underlying array");
+        }
+
         return new ValueTask<int>(_sslStream.ReadAsync(segment.Array!, segment.Offset, segment.Count, _closeCts.Token));
 #else
         return _sslStream.ReadAsync(buffer, _closeCts.Token);

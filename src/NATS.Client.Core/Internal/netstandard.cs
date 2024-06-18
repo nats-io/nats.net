@@ -335,6 +335,20 @@ namespace NATS.Client.Core.Internal.NetStandardExtensions
             }
         }
     }
+
+    internal static class ThrowHelper
+    {
+        internal static void ThrowInvalidOperationException(string message)
+        {
+            throw CreateInvalidOperationException(message);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static Exception CreateInvalidOperationException(string message)
+        {
+            return (Exception)new InvalidOperationException(message);
+        }
+    }
 }
 
 #endif

@@ -64,7 +64,11 @@ internal sealed class WebSocketConnection : ISocketConnection
     public async ValueTask<int> SendAsync(ReadOnlyMemory<byte> buffer)
     {
 #if NETSTANDARD
-        MemoryMarshal.TryGetArray(buffer, out var segment);
+        if (MemoryMarshal.TryGetArray(buffer, out var segment) == false)
+        {
+            segment = new ArraySegment<byte>(buffer.ToArray());
+        }
+
         await _socket.SendAsync(segment, WebSocketMessageType.Binary, true, CancellationToken.None).ConfigureAwait(false);
 #else
         await _socket.SendAsync(buffer, WebSocketMessageType.Binary, WebSocketMessageFlags.EndOfMessage, CancellationToken.None).ConfigureAwait(false);
@@ -76,7 +80,11 @@ internal sealed class WebSocketConnection : ISocketConnection
     public async ValueTask<int> ReceiveAsync(Memory<byte> buffer)
     {
 #if NETSTANDARD2_0
-        MemoryMarshal.TryGetArray(buffer, out ArraySegment<byte> segment);
+        if (MemoryMarshal.TryGetArray(buffer, out ArraySegment<byte> segment) == false)
+        {
+            ThrowHelper.ThrowInvalidOperationException("Can't get underlying array");
+        }
+
         var wsRead = await _socket.ReceiveAsync(segment, CancellationToken.None).ConfigureAwait(false);
 #else
         var wsRead = await _socket.ReceiveAsync(buffer, CancellationToken.None).ConfigureAwait(false);

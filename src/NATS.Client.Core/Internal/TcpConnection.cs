@@ -86,7 +86,11 @@ internal sealed class TcpConnection : ISocketConnection
     public ValueTask<int> SendAsync(ReadOnlyMemory<byte> buffer)
     {
 #if NETSTANDARD2_0
-        MemoryMarshal.TryGetArray(buffer, out var segment);
+        if (MemoryMarshal.TryGetArray(buffer, out var segment) == false)
+        {
+            segment = new ArraySegment<byte>(buffer.ToArray());
+        }
+
         return new ValueTask<int>(_socket.SendAsync(segment, SocketFlags.None));
 #else
         return _socket.SendAsync(buffer, SocketFlags.None, CancellationToken.None);
@@ -97,7 +101,11 @@ internal sealed class TcpConnection : ISocketConnection
     public ValueTask<int> ReceiveAsync(Memory<byte> buffer)
     {
 #if NETSTANDARD2_0
-        MemoryMarshal.TryGetArray(buffer, out ArraySegment<byte> segment);
+        if (MemoryMarshal.TryGetArray(buffer, out ArraySegment<byte> segment) == false)
+        {
+            ThrowHelper.ThrowInvalidOperationException("Can't get underlying array");
+        }
+
         return new ValueTask<int>(_socket.ReceiveAsync(segment, SocketFlags.None));
 #else
         return _socket.ReceiveAsync(buffer, SocketFlags.None, CancellationToken.None);
