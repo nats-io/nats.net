@@ -158,11 +158,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
         lock (_gate)
         {
             _bySub.Remove(sub);
-#if NETSTANDARD2_0
             _bySid.TryRemove(subMetadata.Sid, out _);
-#else
-            _bySid.Remove(subMetadata.Sid, out _);
-#endif
         }
 
         return _connection.UnsubscribeAsync(subMetadata.Sid);
