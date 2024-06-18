@@ -349,11 +349,11 @@ namespace NATS.Client.Core.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static bool IsNotCompletedSuccessfully(this Task? task)
         {
-            #if NETSTANDARD2_0
-                return task != null && task.Status != TaskStatus.RanToCompletion;
-            #else
+#if NETSTANDARD2_0
+            return task != null && task.Status != TaskStatus.RanToCompletion;
+#else
                 return task is { IsCompletedSuccessfully: false };
-            #endif
+#endif
         }
     }
 
@@ -362,11 +362,11 @@ namespace NATS.Client.Core.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static ReadOnlySpan<byte> GetFirstSpan(this ReadOnlySequence<byte> sequence)
         {
-            #if NETSTANDARD2_0
-                return sequence.First.Span;
-            #else
+#if NETSTANDARD2_0
+            return sequence.First.Span;
+#else
                 return sequence.FirstSpan;
-            #endif
+#endif
         }
     }
 }
