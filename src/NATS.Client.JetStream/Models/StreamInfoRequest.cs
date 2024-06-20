@@ -21,7 +21,7 @@ public record StreamInfoRequest
     public string? SubjectsFilter { get; set; }
 
     /// <summary>
-    /// Paging offset when retrieving pages of subjet details
+    /// Paging offset when retrieving pages of subject details
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("offset")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
