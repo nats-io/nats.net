@@ -14,7 +14,7 @@ public class BasicTests(ITestOutputHelper output)
     [Fact]
     public async Task Core()
     {
-        await using var server = await NatsServerProcess.StartAsync(output.WriteLine);
+        await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, SerializerRegistry = NatsJsonSerializerRegistry.Default });
 
         await nats.PingAsync();
@@ -30,7 +30,7 @@ public class BasicTests(ITestOutputHelper output)
     [Fact]
     public async Task JetStream()
     {
-        await using var server = await NatsServerProcess.StartAsync(output.WriteLine);
+        await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
         var js = new NatsJSContext(nats);
 
@@ -70,7 +70,7 @@ public class BasicTests(ITestOutputHelper output)
     [Fact]
     public async Task KV()
     {
-        await using var server = await NatsServerProcess.StartAsync(output.WriteLine);
+        await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -92,7 +92,7 @@ public class BasicTests(ITestOutputHelper output)
     [Fact]
     public async Task ObjectStore()
     {
-        await using var server = await NatsServerProcess.StartAsync(output.WriteLine);
+        await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
         var js = new NatsJSContext(nats);
         var obj = new NatsObjContext(js);
@@ -114,7 +114,7 @@ public class BasicTests(ITestOutputHelper output)
     [Fact]
     public async Task Services()
     {
-        await using var server = await NatsServerProcess.StartAsync(output.WriteLine);
+        await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
         var svc = new NatsSvcContext(nats);
 

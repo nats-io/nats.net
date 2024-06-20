@@ -32,8 +32,9 @@ public class NatsServerProcess : IAsyncDisposable
 
     public string Url { get; }
 
-    public static async ValueTask<NatsServerProcess> StartAsync(Action<string>? logger = null)
+    public static async ValueTask<NatsServerProcess> StartAsync(Action<string>? logger = null, string? config = null)
     {
+        var isLoggingEnabled = logger != null;
         var log = logger ?? (_ => { });
 
         var scratch = Path.Combine(Path.GetTempPath(), "nats.net.tests", Guid.NewGuid().ToString());
@@ -44,55 +45,44 @@ public class NatsServerProcess : IAsyncDisposable
         var sd = Path.Combine(scratch, "data");
         Directory.CreateDirectory(sd);
 
+        var configFlag = config == null ? string.Empty : $"-c \"{config}\"";
         var portsFileDirEsc = portsFileDir.Replace(@"\", @"\\");
         var sdEsc = sd.Replace(@"\", @"\\");
         var info = new ProcessStartInfo
         {
             FileName = "nats-server.exe",
-            Arguments = $"-a 127.0.0.1 -p -1 -js -sd \"{sdEsc}\" --ports_file_dir \"{portsFileDirEsc}\"",
+            Arguments = $"{configFlag} -a 127.0.0.1 -p -1 -js -sd \"{sdEsc}\" --ports_file_dir \"{portsFileDirEsc}\"",
             UseShellExecute = false,
             CreateNoWindow = false,
-            RedirectStandardError = true,
-            RedirectStandardOutput = true,
+            RedirectStandardError = isLoggingEnabled,
+            RedirectStandardOutput = isLoggingEnabled,
         };
         var process = new Process { StartInfo = info, };
 
-        var tcs = new TaskCompletionSource<string>();
-        DataReceivedEventHandler outputHandler = (_, e) =>
+        if (isLoggingEnabled)
         {
-            log(e.Data);
-            if (e.Data != null && e.Data.Contains("Server is ready"))
-            {
-                tcs.SetResult(e.Data);
-            }
-        };
-        process.OutputDataReceived += outputHandler;
-        process.ErrorDataReceived += outputHandler;
+            DataReceivedEventHandler outputHandler = (_, e) => log(e.Data);
+            process.OutputDataReceived += outputHandler;
+            process.ErrorDataReceived += outputHandler;
+        }
 
         process.Start();
 
         ChildProcessTracker.AddProcess(process);
-        process.BeginOutputReadLine();
-        process.BeginErrorReadLine();
 
-        var timeoutTask = Task.Delay(10_000);
-        await Task.WhenAny(tcs.Task, timeoutTask).ContinueWith(
-            completedTask =>
-            {
-                if (completedTask.Result == timeoutTask)
-                {
-                    throw new TimeoutException("The operation has timed out.");
-                }
+        if (isLoggingEnabled)
+        {
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+        }
 
-                return tcs.Task;
-            }).Unwrap();
-
-        var portsFile = Path.Combine(portsFileDir, $"nats-server.exe_{process.Id}.ports");
+        var natsServerExe = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "nats-server.exe" : "nats-server";
+        var portsFile = Path.Combine(portsFileDir, $"{natsServerExe}_{process.Id}.ports");
         log($"portsFile={portsFile}");
 
         string? ports = null;
         Exception? exception = null;
-        for (var i = 0; i < 3; i++)
+        for (var i = 0; i < 10; i++)
         {
             try
             {
@@ -111,7 +101,7 @@ public class NatsServerProcess : IAsyncDisposable
             throw exception ?? new Exception("Failed to read ports file.");
         }
 
-        var url = Regex.Match(ports, @"nats://[\d\.]+:\d+").Groups[0].Value;
+        var url = Regex.Match(ports, @"\w+://[\d\.]+:\d+").Groups[0].Value;
         log($"ports={ports}");
         log($"url={url}");
 
