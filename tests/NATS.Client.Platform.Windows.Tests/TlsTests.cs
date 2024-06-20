@@ -1,5 +1,6 @@
 using System.Net.Security;
 using System.Runtime.InteropServices;
+using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
@@ -17,7 +18,18 @@ namespace NATS.Client.Platform.Windows.Tests;
 public class TlsTests(ITestOutputHelper output)
 {
     [Fact]
-    public async Task Tls()
+    public async Task Tls_fails_without_certificates()
+    {
+        await using var server = await NatsServerProcess.StartAsync(config: "resources/configs/tls.conf");
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        var exception = await Assert.ThrowsAsync<NatsException>(async () => await nats.ConnectAsync());
+        Assert.Contains("TLS authentication failed", exception.InnerException?.Message);
+        Assert.IsType<AuthenticationException>(exception.InnerException?.InnerException);
+    }
+
+    [Fact]
+    public async Task Tls_with_certificates()
     {
         const string caCertPem = "resources/certs/ca-cert.pem";
         const string clientCertPem = "resources/certs/client-cert.pem";

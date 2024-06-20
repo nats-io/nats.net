@@ -45,12 +45,13 @@ public class NatsServerProcess : IAsyncDisposable
         var sd = Path.Combine(scratch, "data");
         Directory.CreateDirectory(sd);
 
+        var natsServerExe = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "nats-server.exe" : "nats-server";
         var configFlag = config == null ? string.Empty : $"-c \"{config}\"";
         var portsFileDirEsc = portsFileDir.Replace(@"\", @"\\");
         var sdEsc = sd.Replace(@"\", @"\\");
         var info = new ProcessStartInfo
         {
-            FileName = "nats-server.exe",
+            FileName = natsServerExe,
             Arguments = $"{configFlag} -a 127.0.0.1 -p -1 -js -sd \"{sdEsc}\" --ports_file_dir \"{portsFileDirEsc}\"",
             UseShellExecute = false,
             CreateNoWindow = false,
@@ -76,7 +77,6 @@ public class NatsServerProcess : IAsyncDisposable
             process.BeginErrorReadLine();
         }
 
-        var natsServerExe = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "nats-server.exe" : "nats-server";
         var portsFile = Path.Combine(portsFileDir, $"{natsServerExe}_{process.Id}.ports");
         log($"portsFile={portsFile}");
 
