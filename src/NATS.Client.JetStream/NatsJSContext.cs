@@ -172,15 +172,23 @@ public partial class NatsJSContext
 
     internal static void ThrowIfInvalidStreamName([NotNull] string? name, [CallerArgumentExpression("name")] string? paramName = null)
     {
+#if NETSTANDARD
+        ArgumentNullExceptionEx.ThrowIfNull(name, paramName);
+#else
         ArgumentNullException.ThrowIfNull(name, paramName);
+#endif
 
         if (name.Length == 0)
         {
             ThrowEmptyException(paramName);
         }
 
+#if NETSTANDARD2_0
+        if (name.Contains(" ."))
+#else
         var nameSpan = name.AsSpan();
         if (nameSpan.IndexOfAny(" .") >= 0)
+#endif
         {
             ThrowInvalidStreamNameException(paramName);
         }

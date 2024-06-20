@@ -61,11 +61,19 @@ public sealed record NatsTlsOpts
     /// </remarks>
     public string? KeyFile { get; init; }
 
+#if !NETSTANDARD2_0
     /// <summary>
     /// Callback to configure <see cref="SslClientAuthenticationOptions"/>
     /// </summary>
     public Func<SslClientAuthenticationOptions, ValueTask>? ConfigureClientAuthentication { get; init; }
+#endif
 
+#if NETSTANDARD2_0
+    /// <summary>
+    /// Callback that loads Client Certificate
+    /// </summary>
+    public Func<ValueTask<X509Certificate2>>? LoadClientCert { get; init; }
+#else
     /// <summary>
     /// Callback that loads Client Certificate
     /// </summary>
@@ -74,12 +82,19 @@ public sealed record NatsTlsOpts
     /// </remarks>
     [Obsolete("use ConfigureClientAuthentication")]
     public Func<ValueTask<X509Certificate2>>? LoadClientCert { get; init; }
+#endif
 
     /// <summary>
     /// String or file path to PEM-encoded X509 CA Certificate
     /// </summary>
     public string? CaFile { get; init; }
 
+#if NETSTANDARD2_0
+    /// <summary>
+    /// Callback that loads CA Certificates
+    /// </summary>
+    public Func<ValueTask<X509Certificate2Collection>>? LoadCaCerts { get; init; }
+#else
     /// <summary>
     /// Callback that loads CA Certificates
     /// </summary>
@@ -88,10 +103,16 @@ public sealed record NatsTlsOpts
     /// </remarks>
     [Obsolete("use ConfigureClientAuthentication")]
     public Func<ValueTask<X509Certificate2Collection>>? LoadCaCerts { get; init; }
+#endif
 
     /// <summary>When true, skip remote certificate verification and accept any server certificate</summary>
     public bool InsecureSkipVerify { get; init; }
 
+#if NETSTANDARD2_0
+    /// <summary>Certificate revocation mode for certificate validation.</summary>
+    /// <value>One of the values in <see cref="T:System.Security.Cryptography.X509Certificates.X509RevocationMode" />. The default is <see langword="NoCheck" />.</value>
+    public X509RevocationMode CertificateRevocationCheckMode { get; init; }
+#else
     /// <summary>Certificate revocation mode for certificate validation.</summary>
     /// <value>One of the values in <see cref="T:System.Security.Cryptography.X509Certificates.X509RevocationMode" />. The default is <see langword="NoCheck" />.</value>
     /// <remarks>
@@ -99,12 +120,18 @@ public sealed record NatsTlsOpts
     /// </remarks>
     [Obsolete("use ConfigureClientAuthentication")]
     public X509RevocationMode CertificateRevocationCheckMode { get; init; }
+#endif
 
     /// <summary>TLS mode to use during connection</summary>
     public TlsMode Mode { get; init; }
 
+#if NETSTANDARD2_0
+    internal bool HasTlsCerts => CertFile != default || KeyFile != default || CaFile != default;
+#else
     internal bool HasTlsCerts => CertFile != default || KeyFile != default || CaFile != default || ConfigureClientAuthentication != default;
+#endif
 
+#if !NETSTANDARD
     /// <summary>
     /// Helper method to load a Client Certificate from a pem-encoded string
     /// </summary>
@@ -131,6 +158,7 @@ public sealed record NatsTlsOpts
         caCerts.ImportFromPem(caPem);
         return () => ValueTask.FromResult(caCerts);
     }
+#endif
 
     internal TlsMode EffectiveMode(NatsUri uri) => Mode switch
     {
@@ -144,6 +172,7 @@ public sealed record NatsTlsOpts
         return effectiveMode is TlsMode.Require or TlsMode.Prefer;
     }
 
+#if !NETSTANDARD
     internal async ValueTask<SslClientAuthenticationOptions> AuthenticateAsClientOptionsAsync(NatsUri uri)
     {
 #pragma warning disable CS0618 // Type or member is obsolete
@@ -206,4 +235,6 @@ public sealed record NatsTlsOpts
         return options;
 #pragma warning restore CS0618 // Type or member is obsolete
     }
+#endif
+
 }

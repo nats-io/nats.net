@@ -263,6 +263,28 @@ public class NatsKVStore : INatsKVStore
             NatsDeserializeException? deserializeException = null;
             if (response.Message.Data != null)
             {
+#if NETSTANDARD2_0
+                byte[] bytes;
+                try
+                {
+                    bytes = Convert.FromBase64String(response.Message.Data);
+                }
+                catch (FormatException e)
+                {
+                    throw new NatsKVException("Can't decode data message value", e);
+                }
+
+                var buffer = new ReadOnlySequence<byte>(bytes);
+                try
+                {
+                    data = serializer.Deserialize(buffer);
+                }
+                catch (Exception e)
+                {
+                    deserializeException = new NatsDeserializeException(buffer.ToArray(), e);
+                    data = default;
+                }
+#else
                 var bytes = ArrayPool<byte>.Shared.Rent(response.Message.Data.Length);
                 try
                 {
@@ -289,6 +311,7 @@ public class NatsKVStore : INatsKVStore
                 {
                     ArrayPool<byte>.Shared.Return(bytes);
                 }
+#endif
             }
             else
             {
@@ -467,7 +490,7 @@ public class NatsKVStore : INatsKVStore
             ThrowNatsKVException("Key cannot be empty");
         }
 
-        if (key.StartsWith('.') || key.EndsWith('.'))
+        if (key.StartsWith(".") || key.EndsWith("."))
         {
             ThrowNatsKVException("Key cannot start or end with a period");
         }

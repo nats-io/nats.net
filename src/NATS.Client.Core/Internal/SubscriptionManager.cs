@@ -121,15 +121,15 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
             }
         }
 
-        return ValueTask.CompletedTask;
+        return default;
     }
 
     public async ValueTask DisposeAsync()
     {
-#if NET6_0
-        _cts.Cancel();
-#else
+#if NET8_0_OR_GREATER
         await _cts.CancelAsync().ConfigureAwait(false);
+#else
+        _cts.Cancel();
 #endif
 
         WeakReference<NatsSubBase>[] subRefs;
@@ -152,13 +152,13 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
         {
             // this can happen when a call to SubscribeAsync is canceled or timed out before subscribing
             // in that case, return as there is nothing to unsubscribe
-            return ValueTask.CompletedTask;
+            return default;
         }
 
         lock (_gate)
         {
             _bySub.Remove(sub);
-            _bySid.Remove(subMetadata.Sid, out _);
+            _bySid.TryRemove(subMetadata.Sid, out _);
         }
 
         return _connection.UnsubscribeAsync(subMetadata.Sid);
@@ -237,7 +237,16 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
         lock (_gate)
         {
             _bySid[sid] = new SidMetadata(Subject: subject, WeakReference: new WeakReference<NatsSubBase>(sub));
+#if NETSTANDARD2_0
+            lock (_bySub)
+            {
+                if (_bySub.TryGetValue(sub, out _))
+                    _bySub.Remove(sub);
+                _bySub.Add(sub, new SubscriptionMetadata(Sid: sid));
+            }
+#else
             _bySub.AddOrUpdate(sub, new SubscriptionMetadata(Sid: sid));
+#endif
         }
 
         try

@@ -4,7 +4,9 @@ using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+#if !NETSTANDARD
 using BitOperations = System.Numerics.BitOperations;
+#endif
 
 namespace NATS.Client.Core;
 
@@ -361,6 +363,7 @@ public sealed class NatsBufferWriter<T> : IBufferWriter<T>, IMemoryOwner<T>
     {
         var minimumSize = (uint)_index + (uint)sizeHint;
 
+#if !NETSTANDARD
         // The ArrayPool<T> class has a maximum threshold of 1024 * 1024 for the maximum length of
         // pooled arrays, and once this is exceeded it will just allocate a new array every time
         // of exactly the requested size. In that case, we manually round up the requested size to
@@ -370,6 +373,7 @@ public sealed class NatsBufferWriter<T> : IBufferWriter<T>, IMemoryOwner<T>
         {
             minimumSize = BitOperations.RoundUpToPowerOf2(minimumSize);
         }
+#endif
 
         _pool.Resize(ref _array, (int)minimumSize);
     }

@@ -2,6 +2,9 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+#if NETSTANDARD
+using Random = NATS.Client.Core.Internal.NetStandardExtensions.Random;
+#endif
 
 namespace NATS.Client.Core.Internal;
 
@@ -28,7 +31,11 @@ internal sealed class NuidWriter
         Refresh(out _);
     }
 
+#if NETSTANDARD2_0
+    private static ReadOnlySpan<char> Digits => "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".AsSpan();
+#else
     private static ReadOnlySpan<char> Digits => "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+#endif
 
     public static bool TryWriteNuid(Span<char> nuidBuffer)
     {
@@ -45,7 +52,7 @@ internal sealed class NuidWriter
         Span<char> buffer = stackalloc char[22];
         if (TryWriteNuid(buffer))
         {
-            return new string(buffer);
+            return buffer.ToString();
         }
 
         throw new InvalidOperationException("Internal error: can't generate nuid");
@@ -87,6 +94,15 @@ internal sealed class NuidWriter
 
     private static char[] GetPrefix(RandomNumberGenerator? rng = null)
     {
+#if NETSTANDARD2_0
+        var randomBytes = new byte[(int)PrefixLength];
+
+        if (rng == null)
+        {
+            using var randomNumberGenerator = RandomNumberGenerator.Create();
+            randomNumberGenerator.GetBytes(randomBytes);
+        }
+#else
         Span<byte> randomBytes = stackalloc byte[(int)PrefixLength];
 
         // TODO: For .NET 8+, use GetItems for better distribution
@@ -94,6 +110,7 @@ internal sealed class NuidWriter
         {
             RandomNumberGenerator.Fill(randomBytes);
         }
+#endif
         else
         {
             rng.GetBytes(randomBytes);

@@ -29,7 +29,7 @@ internal static class BufferExtensions
     {
         if (buffer.IsSingleSegment)
         {
-            return buffer.FirstSpan;
+            return buffer.GetFirstSpan();
         }
 
         return buffer.ToArray();

@@ -149,3 +149,7 @@ jobs:
 
       - name: Memory Test (net6.0)
         run: dotMemoryUnit $env:userprofile\.dotnet\tools\nunit.exe --propagate-exit-code -- .\tests\NATS.Client.Core.MemoryTests\bin\Release\net6.0\NATS.Client.Core.MemoryTests.dll
+
+      - name: Platform Test (Windows net481)
+        run: dotnet test -c Release --no-build --logger:"console;verbosity=normal" -f net481 .\tests\NATS.Client.Platform.Windows.Tests\NATS.Client.Platform.Windows.Tests.csproj
+

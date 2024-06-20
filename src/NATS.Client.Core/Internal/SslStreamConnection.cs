@@ -3,6 +3,11 @@ using System.Runtime.CompilerServices;
 using System.Security.Authentication;
 using Microsoft.Extensions.Logging;
 
+#if NETSTANDARD2_0
+using System.Runtime.InteropServices;
+#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
+#endif
+
 namespace NATS.Client.Core.Internal;
 
 internal sealed class SslStreamConnection : ISocketConnection
@@ -30,10 +35,10 @@ internal sealed class SslStreamConnection : ISocketConnection
         {
             try
             {
-#if NET6_0
-                _closeCts.Cancel();
-#else
+#if NET8_0_OR_GREATER
                 await _closeCts.CancelAsync().ConfigureAwait(false);
+#else
+                _closeCts.Cancel();
 #endif
                 _waitForClosedSource.TrySetCanceled();
             }
@@ -41,28 +46,54 @@ internal sealed class SslStreamConnection : ISocketConnection
             {
             }
 
+#if NETSTANDARD2_0
+            _sslStream.Dispose();
+#else
             await _sslStream.DisposeAsync().ConfigureAwait(false);
+#endif
         }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public async ValueTask<int> SendAsync(ReadOnlyMemory<byte> buffer)
     {
+#if NETSTANDARD2_0
+        if (MemoryMarshal.TryGetArray(buffer, out var segment) == false)
+        {
+            segment = new ArraySegment<byte>(buffer.ToArray());
+        }
+
+        await _sslStream.WriteAsync(segment.Array, segment.Offset, segment.Count, _closeCts.Token).ConfigureAwait(false);
+#else
         await _sslStream.WriteAsync(buffer, _closeCts.Token).ConfigureAwait(false);
+#endif
         return buffer.Length;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ValueTask<int> ReceiveAsync(Memory<byte> buffer)
     {
+#if NETSTANDARD2_0
+        if (MemoryMarshal.TryGetArray(buffer, out ArraySegment<byte> segment) == false)
+        {
+            ThrowHelper.ThrowInvalidOperationException("Can't get underlying array");
+        }
+
+        return new ValueTask<int>(_sslStream.ReadAsync(segment.Array!, segment.Offset, segment.Count, _closeCts.Token));
+#else
         return _sslStream.ReadAsync(buffer, _closeCts.Token);
+#endif
     }
 
     public async ValueTask AbortConnectionAsync(CancellationToken cancellationToken)
     {
         // SslStream.ShutdownAsync() doesn't accept a cancellation token, so check at the beginning of this method
         cancellationToken.ThrowIfCancellationRequested();
+#if NETSTANDARD2_0
+        _sslStream.Close();
+#else
         await _sslStream.ShutdownAsync().ConfigureAwait(false);
+#endif
     }
 
     // when catch SocketClosedException, call this method.
@@ -73,6 +104,16 @@ internal sealed class SslStreamConnection : ISocketConnection
 
     public async Task AuthenticateAsClientAsync(NatsUri uri, TimeSpan timeout)
     {
+#if NETSTANDARD
+        try
+        {
+            await _sslStream.AuthenticateAsClientAsync(uri.Host).ConfigureAwait(false);
+        }
+        catch (AuthenticationException ex)
+        {
+            throw new NatsException($"TLS authentication failed", ex);
+        }
+#else
         var options = await _tlsOpts.AuthenticateAsClientOptionsAsync(uri).ConfigureAwait(true);
         try
         {
@@ -87,5 +128,6 @@ internal sealed class SslStreamConnection : ISocketConnection
         {
             throw new NatsException($"TLS authentication failed", ex);
         }
+#endif
     }
 }

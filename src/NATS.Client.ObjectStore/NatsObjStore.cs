@@ -10,6 +10,10 @@ using NATS.Client.JetStream.Models;
 using NATS.Client.ObjectStore.Internal;
 using NATS.Client.ObjectStore.Models;
 
+#if NETSTANDARD2_0
+using System.Runtime.InteropServices;
+#endif
+
 namespace NATS.Client.ObjectStore;
 
 /// <summary>
@@ -95,7 +99,11 @@ public class NatsObjStore : INatsObjStore
         var size = 0;
         using (var sha256 = SHA256.Create())
         {
+#if NETSTANDARD2_0
+            using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Write))
+#else
             await using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Write, leaveOpen))
+#endif
             {
                 await foreach (var msg in pushConsumer.Msgs.ReadAllAsync(cancellationToken))
                 {
@@ -113,7 +121,12 @@ public class NatsObjStore : INatsObjStore
                         using var memoryOwner = msg.Data;
                         chunks++;
                         size += memoryOwner.Memory.Length;
+#if NETSTANDARD2_0
+                        var segment = memoryOwner.DangerousGetArray();
+                        await hashedStream.WriteAsync(segment.Array, segment.Offset, segment.Count, cancellationToken);
+#else
                         await hashedStream.WriteAsync(memoryOwner.Memory, cancellationToken);
+#endif
                     }
 
                     var p = msg.Metadata?.NumPending;
@@ -213,7 +226,11 @@ public class NatsObjStore : INatsObjStore
         string digest;
         using (var sha256 = SHA256.Create())
         {
+#if NETSTANDARD2_0
+            using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Read))
+#else
             await using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Read, leaveOpen))
+#endif
             {
                 while (true)
                 {
@@ -226,7 +243,30 @@ public class NatsObjStore : INatsObjStore
                     // Fill a chunk
                     while (true)
                     {
+#if NETSTANDARD2_0
+                        int read;
+                        if (MemoryMarshal.TryGetArray((ReadOnlyMemory<byte>)memory, out var segment) == false)
+                        {
+                            read = await hashedStream.ReadAsync(segment.Array!, segment.Offset, segment.Count, cancellationToken);
+                        }
+                        else
+                        {
+                            var bytes = ArrayPool<byte>.Shared.Rent(memory.Length);
+                            try
+                            {
+                                segment = new ArraySegment<byte>(bytes, 0, memory.Length);
+                                read = await hashedStream.ReadAsync(segment.Array!, segment.Offset, segment.Count, cancellationToken);
+                                segment.Array.AsMemory(0, read).CopyTo(memory);
+                            }
+                            finally
+                            {
+                                ArrayPool<byte>.Shared.Return(bytes);
+                            }
+                        }
+
+#else
                         var read = await hashedStream.ReadAsync(memory, cancellationToken);
+#endif
 
                         // End of stream
                         if (read == 0)
@@ -658,7 +698,7 @@ public class NatsObjStore : INatsObjStore
         Span<char> buffer = stackalloc char[22];
         if (NuidWriter.TryWriteNuid(buffer))
         {
-            return new string(buffer);
+            return buffer.ToString();
         }
 
         throw new InvalidOperationException("Internal error: can't generate nuid");

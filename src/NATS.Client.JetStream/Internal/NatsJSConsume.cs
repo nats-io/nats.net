@@ -81,7 +81,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         _thresholdBytes = thresholdBytes;
         _expires = expires;
         _idle = idle;
-        _hbTimeout = (int)(idle * 2).TotalMilliseconds;
+        _hbTimeout = (int)new TimeSpan(idle.Ticks * 2).TotalMilliseconds;
 
         if (_debug)
         {
@@ -169,7 +169,11 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         Interlocked.Exchange(ref _disposed, 1);
         await base.DisposeAsync().ConfigureAwait(false);
         await _pullTask.ConfigureAwait(false);
+#if NETSTANDARD2_0
+        _timer.Dispose();
+#else
         await _timer.DisposeAsync().ConfigureAwait(false);
+#endif
         if (_notificationChannel != null)
         {
             await _notificationChannel.DisposeAsync();

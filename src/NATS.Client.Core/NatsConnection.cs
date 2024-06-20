@@ -4,6 +4,9 @@ using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
 using NATS.Client.Core.Internal;
+#if NETSTANDARD
+using Random = NATS.Client.Core.Internal.NetStandardExtensions.Random;
+#endif
 
 namespace NATS.Client.Core;
 
@@ -38,7 +41,6 @@ public partial class NatsConnection : INatsConnection
     private readonly object _gate = new object();
     private readonly ILogger<NatsConnection> _logger;
     private readonly ObjectPool _pool;
-    private readonly CancellationTimerPool _cancellationTimerPool;
     private readonly CancellationTokenSource _disposedCancellationTokenSource;
     private readonly string _name;
     private readonly TimeSpan _socketComponentDisposeTimeout = TimeSpan.FromSeconds(5);
@@ -75,7 +77,6 @@ public partial class NatsConnection : INatsConnection
         _waitForOpenConnection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         _disposedCancellationTokenSource = new CancellationTokenSource();
         _pool = new ObjectPool(opts.ObjectPoolSize);
-        _cancellationTimerPool = new CancellationTimerPool(_pool, _disposedCancellationTokenSource.Token);
         _name = opts.Name;
         Counter = new ConnectionStatsCounter();
         CommandWriter = new CommandWriter(this, _pool, Opts, Counter, EnqueuePing);
@@ -183,20 +184,20 @@ public partial class NatsConnection : INatsConnection
             await DisposeSocketAsync(false).ConfigureAwait(false);
             if (_pingTimerCancellationTokenSource != null)
             {
-#if NET6_0
-                _pingTimerCancellationTokenSource.Cancel();
-#else
+#if NET8_0_OR_GREATER
                 await _pingTimerCancellationTokenSource.CancelAsync().ConfigureAwait(false);
+#else
+                _pingTimerCancellationTokenSource.Cancel();
 #endif
             }
 
             await SubscriptionManager.DisposeAsync().ConfigureAwait(false);
             await CommandWriter.DisposeAsync().ConfigureAwait(false);
             _waitForOpenConnection.TrySetCanceled();
-#if NET6_0
-            _disposedCancellationTokenSource.Cancel();
-#else
+#if NET8_0_OR_GREATER
             await _disposedCancellationTokenSource.CancelAsync().ConfigureAwait(false);
+#else
+            _disposedCancellationTokenSource.Cancel();
 #endif
         }
     }
@@ -240,13 +241,13 @@ public partial class NatsConnection : INatsConnection
             // connection is disposed, don't need to unsubscribe command.
             if (IsDisposed)
             {
-                return ValueTask.CompletedTask;
+                return default;
             }
 
             _logger.LogError(NatsLogEvents.Subscription, ex, "Failed to send unsubscribe command");
         }
 
-        return ValueTask.CompletedTask;
+        return default;
     }
 
     internal void OnMessageDropped<T>(NatsSubBase natsSub, int pending, NatsMsg<T> msg)
@@ -717,7 +718,11 @@ public partial class NatsConnection : INatsConnection
             && Uri.CheckHostName(uri.Host) != UriHostNameType.Dns
             && Uri.CheckHostName(lastSeedHost) == UriHostNameType.Dns)
         {
+#if NETSTANDARD2_0
+            return uri.CloneWith(lastSeedHost!);
+#else
             return uri.CloneWith(lastSeedHost);
+#endif
         }
 
         return uri;
@@ -746,7 +751,7 @@ public partial class NatsConnection : INatsConnection
             }
             else
             {
-                _backoff *= 2;
+                _backoff = new TimeSpan(_backoff.Ticks * 2);
                 if (_backoff > Opts.ReconnectWaitMax)
                 {
                     _backoff = Opts.ReconnectWaitMax;
@@ -820,12 +825,6 @@ public partial class NatsConnection : INatsConnection
 
         // Can not add PING, set fail.
         pingCommand.SetCanceled();
-    }
-
-    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-    private CancellationTimer GetRequestCommandTimer(CancellationToken cancellationToken)
-    {
-        return _cancellationTimerPool.Start(Opts.RequestTimeout, cancellationToken);
     }
 
     // catch and log all exceptions, enforcing the socketComponentDisposeTimeout

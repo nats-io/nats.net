@@ -111,7 +111,7 @@ public class NatsSvcServer : INatsSvcServer
     public ValueTask<Group> AddGroupAsync(string name, string? queueGroup = default, CancellationToken cancellationToken = default)
     {
         var group = new Group(this, name, queueGroup, cancellationToken);
-        return ValueTask.FromResult(group);
+        return new ValueTask<Group>(group);
     }
 
     /// <inheritdoc />

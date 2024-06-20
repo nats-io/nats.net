@@ -105,6 +105,10 @@ public partial class NatsConnection
         }
     }
 
+#if NETSTANDARD2_0
+    internal static string NewInbox(string prefix) => NewInbox(prefix.AsSpan());
+#endif
+
     [SkipLocalsInit]
     internal static string NewInbox(ReadOnlySpan<char> prefix)
     {
@@ -128,7 +132,7 @@ public partial class NatsConnection
             var remaining = buffer.Slice((int)totalPrefixLength);
             var didWrite = NuidWriter.TryWriteNuid(remaining);
             Debug.Assert(didWrite, "didWrite");
-            return new string(buffer);
+            return buffer.ToString();
         }
 
         return Throw();

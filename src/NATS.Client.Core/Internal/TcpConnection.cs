@@ -47,7 +47,11 @@ internal sealed class TcpConnection : ISocketConnection
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ValueTask ConnectAsync(string host, int port, CancellationToken cancellationToken)
     {
+#if NETSTANDARD
+        return new ValueTask(_socket.ConnectAsync(host, port).WaitAsync(Timeout.InfiniteTimeSpan, cancellationToken));
+#else
         return _socket.ConnectAsync(host, port, cancellationToken);
+#endif
     }
 
     /// <summary>
@@ -58,7 +62,11 @@ internal sealed class TcpConnection : ISocketConnection
         using var cts = new CancellationTokenSource(timeout);
         try
         {
+#if NETSTANDARD
+            await _socket.ConnectAsync(host, port).WaitAsync(timeout, cts.Token).ConfigureAwait(false);
+#else
             await _socket.ConnectAsync(host, port, cts.Token).ConfigureAwait(false);
+#endif
         }
         catch (Exception ex)
         {
@@ -77,18 +85,41 @@ internal sealed class TcpConnection : ISocketConnection
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ValueTask<int> SendAsync(ReadOnlyMemory<byte> buffer)
     {
+#if NETSTANDARD2_0
+        if (MemoryMarshal.TryGetArray(buffer, out var segment) == false)
+        {
+            segment = new ArraySegment<byte>(buffer.ToArray());
+        }
+
+        return new ValueTask<int>(_socket.SendAsync(segment, SocketFlags.None));
+#else
         return _socket.SendAsync(buffer, SocketFlags.None, CancellationToken.None);
+#endif
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ValueTask<int> ReceiveAsync(Memory<byte> buffer)
     {
+#if NETSTANDARD2_0
+        if (MemoryMarshal.TryGetArray(buffer, out ArraySegment<byte> segment) == false)
+        {
+            ThrowHelper.ThrowInvalidOperationException("Can't get underlying array");
+        }
+
+        return new ValueTask<int>(_socket.ReceiveAsync(segment, SocketFlags.None));
+#else
         return _socket.ReceiveAsync(buffer, SocketFlags.None, CancellationToken.None);
+#endif
     }
 
     public ValueTask AbortConnectionAsync(CancellationToken cancellationToken)
     {
+#if NETSTANDARD
+        _socket.Disconnect(false);
+        return default;
+#else
         return _socket.DisconnectAsync(false, cancellationToken);
+#endif
     }
 
     public ValueTask DisposeAsync()
@@ -114,7 +145,7 @@ internal sealed class TcpConnection : ISocketConnection
             _socket.Dispose();
         }
 
-        return ValueTask.CompletedTask;
+        return default;
     }
 
     // when catch SocketClosedException, call this method.
