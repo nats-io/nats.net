@@ -50,7 +50,6 @@ public sealed record NatsTlsOpts
 
 #if NETSTANDARD
 
-
     /// <summary>
     /// Represents a callback method used to validate the server certificate in a TLS connection.
     /// </summary>
