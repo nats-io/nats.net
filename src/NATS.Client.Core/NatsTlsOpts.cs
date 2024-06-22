@@ -70,10 +70,15 @@ public sealed record NatsTlsOpts
     /// Function called to load client certificates for TLS authentication.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// The function should return a <see cref="X509Certificate2Collection"/> containing the client certificates to be used for TLS authentication.
     /// If this function is not set, the client certificates will not be loaded and <c>null</c> will be passed to <see cref="SslStream"/>.
     /// Returned value of this function will be passed to <see cref="SslStream"/> and it will be called when connecting and reconnecting
     /// so that the client certificates can be reloaded if necessary.
+    /// </para>
+    /// <para>
+    /// It is the library consumer's responsibility for managing the lifetimes of any <see cref="X509Certificate2"/> instances inside the collection.
+    /// </para>
     /// </remarks>
     public Func<ValueTask<X509Certificate2Collection>>? LoadClientCerts { get; init; }
 
@@ -245,7 +250,7 @@ public sealed record NatsTlsOpts
 
     internal TlsMode EffectiveMode(NatsUri uri) => Mode switch
     {
-        TlsMode.Auto => HasTlsCerts || uri.Uri.Scheme.ToLower() == "tls" ? TlsMode.Require : TlsMode.Prefer,
+        TlsMode.Auto => HasTlsCerts || string.Equals(uri.Uri.Scheme, "tls", StringComparison.OrdinalIgnoreCase) ? TlsMode.Require : TlsMode.Prefer,
         _ => Mode,
     };
 

@@ -3,7 +3,6 @@ using System.Runtime.InteropServices;
 using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
-using System.Text;
 using NATS.Client.Core;
 using Org.BouncyCastle.Crypto;
 using Org.BouncyCastle.Crypto.Parameters;
@@ -67,7 +66,7 @@ public class TlsTests(ITestOutputHelper output)
 
         foreach (var caCert in trustedCaCerts)
         {
-            var chain = new X509Chain();
+            using var chain = new X509Chain();
             chain.ChainPolicy.ExtraStore.Add(caCert);
             chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
             chain.ChainPolicy.VerificationFlags = X509VerificationFlags.AllowUnknownCertificateAuthority;
@@ -103,9 +102,9 @@ public class TlsTests(ITestOutputHelper output)
     {
         var collection = new X509Certificate2Collection();
 
-        var certPem = File.ReadAllText(certPemPath);
+        var certPem = File.ReadAllBytes(certPemPath);
         var certParser = new X509CertificateParser();
-        var cert = certParser.ReadCertificate(new MemoryStream(Encoding.ASCII.GetBytes(certPem)));
+        var cert = certParser.ReadCertificate(new MemoryStream(certPem));
 
         var keyPem = File.ReadAllText(keyPemPath);
         AsymmetricKeyParameter privateKey;
