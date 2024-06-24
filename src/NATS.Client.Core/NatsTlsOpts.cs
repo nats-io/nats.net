@@ -45,6 +45,60 @@ public sealed record NatsTlsOpts
 {
     public static readonly NatsTlsOpts Default = new();
 
+    /// <summary>TLS mode to use during connection</summary>
+    public TlsMode Mode { get; init; }
+
+#if NETSTANDARD
+
+    /// <summary>
+    /// Represents a callback method used to validate the server certificate in a TLS connection.
+    /// </summary>
+    /// <remarks>
+    /// This will be passed to <see cref="SslStream"/>.
+    /// </remarks>
+    public RemoteCertificateValidationCallback? RemoteCertificateValidationCallback { get; init; }
+
+    /// <summary>
+    /// Represents a callback method that allows the client to select a certificate for authentication in a TLS handshake.
+    /// </summary>
+    /// <remarks>
+    /// This will be passed to <see cref="SslStream"/>.
+    /// </remarks>
+    public LocalCertificateSelectionCallback? LocalCertificateSelectionCallback { get; init; }
+
+    /// <summary>
+    /// Function called to load client certificates for TLS authentication.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The function should return a <see cref="X509Certificate2Collection"/> containing the client certificates to be used for TLS authentication.
+    /// If this function is not set, the client certificates will not be loaded and <c>null</c> will be passed to <see cref="SslStream"/>.
+    /// Returned value of this function will be passed to <see cref="SslStream"/> and it will be called when connecting and reconnecting
+    /// so that the client certificates can be reloaded if necessary.
+    /// </para>
+    /// <para>
+    /// It is the library consumer's responsibility for managing the lifetimes of any <see cref="X509Certificate2"/> instances inside the collection.
+    /// </para>
+    /// </remarks>
+    public Func<ValueTask<X509Certificate2Collection>>? LoadClientCerts { get; init; }
+
+    /// <summary>
+    /// Indicates whether the certificate revocation check should be performed during SSL/TLS authentication.
+    /// </summary>
+    /// <remarks>
+    /// This will be passed to <see cref="SslStream"/>.
+    /// </remarks>
+    public bool CheckCertificateRevocation { get; init; }
+
+    /// <summary>
+    /// The enabled SSL protocols for the TLS connection. (default: TLS 1.2)
+    /// </summary>
+    public SslProtocols EnabledSslProtocols { get; init; } = SslProtocols.Tls12;
+
+    internal bool HasTlsCerts => LoadClientCerts != default || LocalCertificateSelectionCallback != default;
+
+#else
+
     /// <summary>
     /// String or file path to PEM-encoded X509 Certificate
     /// </summary>
@@ -61,19 +115,11 @@ public sealed record NatsTlsOpts
     /// </remarks>
     public string? KeyFile { get; init; }
 
-#if !NETSTANDARD2_0
     /// <summary>
     /// Callback to configure <see cref="SslClientAuthenticationOptions"/>
     /// </summary>
     public Func<SslClientAuthenticationOptions, ValueTask>? ConfigureClientAuthentication { get; init; }
-#endif
 
-#if NETSTANDARD2_0
-    /// <summary>
-    /// Callback that loads Client Certificate
-    /// </summary>
-    public Func<ValueTask<X509Certificate2>>? LoadClientCert { get; init; }
-#else
     /// <summary>
     /// Callback that loads Client Certificate
     /// </summary>
@@ -82,19 +128,12 @@ public sealed record NatsTlsOpts
     /// </remarks>
     [Obsolete("use ConfigureClientAuthentication")]
     public Func<ValueTask<X509Certificate2>>? LoadClientCert { get; init; }
-#endif
 
     /// <summary>
     /// String or file path to PEM-encoded X509 CA Certificate
     /// </summary>
     public string? CaFile { get; init; }
 
-#if NETSTANDARD2_0
-    /// <summary>
-    /// Callback that loads CA Certificates
-    /// </summary>
-    public Func<ValueTask<X509Certificate2Collection>>? LoadCaCerts { get; init; }
-#else
     /// <summary>
     /// Callback that loads CA Certificates
     /// </summary>
@@ -103,16 +142,10 @@ public sealed record NatsTlsOpts
     /// </remarks>
     [Obsolete("use ConfigureClientAuthentication")]
     public Func<ValueTask<X509Certificate2Collection>>? LoadCaCerts { get; init; }
-#endif
 
     /// <summary>When true, skip remote certificate verification and accept any server certificate</summary>
     public bool InsecureSkipVerify { get; init; }
 
-#if NETSTANDARD2_0
-    /// <summary>Certificate revocation mode for certificate validation.</summary>
-    /// <value>One of the values in <see cref="T:System.Security.Cryptography.X509Certificates.X509RevocationMode" />. The default is <see langword="NoCheck" />.</value>
-    public X509RevocationMode CertificateRevocationCheckMode { get; init; }
-#else
     /// <summary>Certificate revocation mode for certificate validation.</summary>
     /// <value>One of the values in <see cref="T:System.Security.Cryptography.X509Certificates.X509RevocationMode" />. The default is <see langword="NoCheck" />.</value>
     /// <remarks>
@@ -120,18 +153,9 @@ public sealed record NatsTlsOpts
     /// </remarks>
     [Obsolete("use ConfigureClientAuthentication")]
     public X509RevocationMode CertificateRevocationCheckMode { get; init; }
-#endif
 
-    /// <summary>TLS mode to use during connection</summary>
-    public TlsMode Mode { get; init; }
-
-#if NETSTANDARD2_0
-    internal bool HasTlsCerts => CertFile != default || KeyFile != default || CaFile != default;
-#else
     internal bool HasTlsCerts => CertFile != default || KeyFile != default || CaFile != default || ConfigureClientAuthentication != default;
-#endif
 
-#if !NETSTANDARD
     /// <summary>
     /// Helper method to load a Client Certificate from a pem-encoded string
     /// </summary>
@@ -158,21 +182,7 @@ public sealed record NatsTlsOpts
         caCerts.ImportFromPem(caPem);
         return () => ValueTask.FromResult(caCerts);
     }
-#endif
 
-    internal TlsMode EffectiveMode(NatsUri uri) => Mode switch
-    {
-        TlsMode.Auto => HasTlsCerts || uri.Uri.Scheme.ToLower() == "tls" ? TlsMode.Require : TlsMode.Prefer,
-        _ => Mode,
-    };
-
-    internal bool TryTls(NatsUri uri)
-    {
-        var effectiveMode = EffectiveMode(uri);
-        return effectiveMode is TlsMode.Require or TlsMode.Prefer;
-    }
-
-#if !NETSTANDARD
     internal async ValueTask<SslClientAuthenticationOptions> AuthenticateAsClientOptionsAsync(NatsUri uri)
     {
 #pragma warning disable CS0618 // Type or member is obsolete
@@ -235,6 +245,18 @@ public sealed record NatsTlsOpts
         return options;
 #pragma warning restore CS0618 // Type or member is obsolete
     }
+
 #endif
 
+    internal TlsMode EffectiveMode(NatsUri uri) => Mode switch
+    {
+        TlsMode.Auto => HasTlsCerts || string.Equals(uri.Uri.Scheme, "tls", StringComparison.OrdinalIgnoreCase) ? TlsMode.Require : TlsMode.Prefer,
+        _ => Mode,
+    };
+
+    internal bool TryTls(NatsUri uri)
+    {
+        var effectiveMode = EffectiveMode(uri);
+        return effectiveMode is TlsMode.Require or TlsMode.Prefer;
+    }
 }

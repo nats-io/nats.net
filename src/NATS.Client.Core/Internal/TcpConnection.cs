@@ -162,7 +162,7 @@ internal sealed class TcpConnection : ISocketConnection
         {
             return new SslStreamConnection(
                 _logger,
-                new SslStream(new NetworkStream(_socket, true)),
+                _socket,
                 tlsOpts,
                 _waitForClosedSource);
         }

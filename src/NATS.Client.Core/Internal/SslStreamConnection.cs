@@ -1,6 +1,8 @@
 using System.Net.Security;
+using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Security.Authentication;
+using System.Security.Cryptography.X509Certificates;
 using Microsoft.Extensions.Logging;
 
 #if NETSTANDARD2_0
@@ -19,10 +21,18 @@ internal sealed class SslStreamConnection : ISocketConnection
     private readonly CancellationTokenSource _closeCts = new();
     private int _disposed;
 
-    public SslStreamConnection(ILogger logger, SslStream sslStream, NatsTlsOpts tlsOpts, TaskCompletionSource<Exception> waitForClosedSource)
+    public SslStreamConnection(ILogger logger, Socket socket, NatsTlsOpts tlsOpts, TaskCompletionSource<Exception> waitForClosedSource)
     {
         _logger = logger;
-        _sslStream = sslStream;
+#if NETSTANDARD
+        _sslStream = new SslStream(
+            innerStream: new NetworkStream(socket, true),
+            leaveInnerStreamOpen: false,
+            userCertificateSelectionCallback: tlsOpts.LocalCertificateSelectionCallback,
+            userCertificateValidationCallback: tlsOpts.RemoteCertificateValidationCallback);
+#else
+        _sslStream = new SslStream(innerStream: new NetworkStream(socket, true));
+#endif
         _tlsOpts = tlsOpts;
         _waitForClosedSource = waitForClosedSource;
     }
@@ -107,7 +117,21 @@ internal sealed class SslStreamConnection : ISocketConnection
 #if NETSTANDARD
         try
         {
-            await _sslStream.AuthenticateAsClientAsync(uri.Host).ConfigureAwait(false);
+            X509Certificate2Collection? certs;
+            if (_tlsOpts.LoadClientCerts is { } loadCerts)
+            {
+                certs = await loadCerts().ConfigureAwait(false);
+            }
+            else
+            {
+                certs = null;
+            }
+
+            await _sslStream.AuthenticateAsClientAsync(
+                targetHost: uri.Host,
+                clientCertificates: certs,
+                enabledSslProtocols: _tlsOpts.EnabledSslProtocols,
+                checkCertificateRevocation: _tlsOpts.CheckCertificateRevocation).ConfigureAwait(false);
         }
         catch (AuthenticationException ex)
         {

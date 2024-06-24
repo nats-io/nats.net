@@ -11,6 +11,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="BouncyCastle.Cryptography" Version="2.4.0" />
         <PackageReference Include="coverlet.collector" Version="6.0.0"/>
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0"/>
         <PackageReference Include="xunit" Version="2.5.3"/>
@@ -27,4 +28,9 @@
       <ProjectReference Include="..\..\src\NATS.Net\NATS.Net.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+        <Content Include="resources\**\*">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
 </Project>
