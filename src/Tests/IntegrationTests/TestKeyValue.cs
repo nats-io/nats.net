@@ -1493,6 +1493,46 @@ namespace IntegrationTests
                 // Assert.Null(kv2.Get(key2));
             });
         }
+
+        [Fact]
+        public void TestKVConsumerConfiguration()
+        {
+            Context.RunInJsServer(c =>
+            {
+                // get the kv management context
+                IKeyValueManagement kvm = c.CreateKeyValueManagementContext();
+                c.CreateKeyValueManagementContext(KeyValueOptions.Builder(DefaultJsOptions).Build()); // coverage
+                string bucket = Bucket();
+                
+                // create the bucket
+                KeyValueConfiguration kvc = KeyValueConfiguration.Builder()
+                    .WithName(bucket)
+                    .WithMaxHistoryPerKey(3)
+                    .WithStorageType(StorageType.Memory)
+                    .Build();
+                kvm.Create(kvc);
+
+                // create watcher with consumer configuration
+                IKeyValue kv = c.CreateKeyValueContext(bucket);
+                TestKeyValueWatcher keyFullWatcher = new TestKeyValueWatcher(true);
+
+                IDictionary<string, string> metadata = new Dictionary<string, string>
+                {
+                    ["foo"] = "bar"
+                };
+                var description = "description";
+
+                var kvConsumerConfig = KeyValueConsumerConfiguration.Builder().WithDescription(description).WithMetadata(metadata).Build();
+
+                _ = kv.Watch(new List<string> { "key" }, keyFullWatcher, keyValueConsumerConfiguration: kvConsumerConfig, 0, keyFullWatcher.WatchOptions);
+
+            
+                IJetStreamManagement jsm = c.CreateJetStreamManagementContext();
+                IList<ConsumerInfo> consumersInfo = jsm.GetConsumers($"KV_{bucket}").Where( consumer => consumer.ConsumerConfiguration.Description == description).ToList();
+                Assert.Single(consumersInfo);
+                Assert.Equal("bar", consumersInfo[0].ConsumerConfiguration.Metadata["foo"]);
+            });
+        }
     }
 
     class TestKeyValueWatcher : IKeyValueWatcher
