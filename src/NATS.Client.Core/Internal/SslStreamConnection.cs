@@ -124,7 +124,7 @@ internal sealed class SslStreamConnection : ISocketConnection
         try
         {
             await _sslStream.AuthenticateAsClientAsync(
-                targetHost: uri.Host,
+                targetHost: options.TargetHost,
                 clientCertificates: options.ClientCertificates,
                 enabledSslProtocols: options.EnabledSslProtocols,
                 checkCertificateRevocation: options.CertificateRevocationCheckMode != X509RevocationMode.NoCheck).ConfigureAwait(false);
