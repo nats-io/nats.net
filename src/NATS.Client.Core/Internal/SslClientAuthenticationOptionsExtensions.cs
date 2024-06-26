@@ -44,7 +44,10 @@ internal static class SslClientAuthenticationOptionsExtensions
         var leafCert = new X509Certificate2(certBundleFile);
         var intermediateCerts = new X509Certificate2Collection();
         intermediateCerts.Import(certBundleFile);
-        if (intermediateCerts.Count > 0)
+
+        // Linux does not include the leaf by default, but Windows does
+        // compare leaf to first intermediate just to be sure to catch all platform differences
+        if (intermediateCerts.Count > 0 && intermediateCerts[0].RawData.SequenceEqual(leafCert.RawData))
         {
             intermediateCerts.RemoveAt(0);
         }
