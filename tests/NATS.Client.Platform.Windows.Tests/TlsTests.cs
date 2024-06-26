@@ -24,15 +24,13 @@ public class TlsTests
     [Fact]
     public async Task Tls_with_certificates()
     {
-        const string caCertPem = "resources/certs/ca-cert.pem";
-        const string clientCertPem = "resources/certs/client-cert.pem";
-        const string clientKeyPem = "resources/certs/client-key.pem";
+        const string caCertFile = "resources/certs/ca-cert.pem";
+        const string clientCertBundleFile = "resources/certs/client-cert-bundle.pfx";
 
         var tlsOpts = new NatsTlsOpts
         {
-            CaFile = caCertPem,
-            CertFile = clientCertPem,
-            KeyFile = clientKeyPem,
+            CaFile = caCertFile,
+            CertBundleFile = clientCertBundleFile,
         };
 
         await using var server = await NatsServerProcess.StartAsync(config: "resources/configs/tls.conf");

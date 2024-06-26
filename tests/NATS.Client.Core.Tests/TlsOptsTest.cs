@@ -40,12 +40,18 @@ public class TlsOptsTest
     public async Task Load_client_cert_and_key()
     {
         const string clientCertFile = "resources/certs/client-cert.pem";
+        const string clientCertBundleFile = "resources/certs/client-cert-bundle.pfx";
         const string clientKeyFile = "resources/certs/client-key.pem";
 
         await ValidateAsync(new NatsTlsOpts
         {
             CertFile = clientCertFile,
             KeyFile = clientKeyFile,
+        });
+
+        await ValidateAsync(new NatsTlsOpts
+        {
+            CertBundleFile = clientCertBundleFile,
         });
 
         await ValidateAsync(new NatsTlsOpts
@@ -81,12 +87,18 @@ public class TlsOptsTest
     public async Task Load_client_cert_chain_and_key()
     {
         const string clientCertFile = "resources/certs/chainedclient-cert.pem";
+        const string clientCertBundleFile = "resources/certs/chainedclient-cert-bundle.pfx";
         const string clientKeyFile = "resources/certs/chainedclient-key.pem";
 
         await ValidateAsync(new NatsTlsOpts
         {
             CertFile = clientCertFile,
             KeyFile = clientKeyFile,
+        });
+
+        await ValidateAsync(new NatsTlsOpts
+        {
+            CertBundleFile = clientCertBundleFile,
         });
 
         await ValidateAsync(new NatsTlsOpts
@@ -122,9 +134,11 @@ public class TlsOptsTest
     }
 
     [SkippableTheory]
-    [InlineData("resources/certs/client-cert.pem", "resources/certs/client-key.pem", 6)]
-    [InlineData("resources/certs/chainedclient-cert.pem", "resources/certs/chainedclient-key.pem", 8)]
-    public async Task Client_connect(string clientCertFile, string clientKeyFile, int minimumFrameworkVersion)
+    [InlineData("resources/certs/client-cert.pem", "resources/certs/client-key.pem", null, 6)]
+    [InlineData(null, null, "resources/certs/client-cert-bundle.pfx", 6)]
+    [InlineData("resources/certs/chainedclient-cert.pem", "resources/certs/chainedclient-key.pem", null, 8)]
+    [InlineData(null, null, "resources/certs/chainedclient-cert-bundle.pfx", 8)]
+    public async Task Client_connect(string? clientCertFile, string? clientKeyFile, string? clientCertBundleFile, int minimumFrameworkVersion)
     {
         var version = int.Parse(Regex.Match(RuntimeInformation.FrameworkDescription, @"(\d+)\.\d").Groups[1].Value);
         Skip.IfNot(version >= minimumFrameworkVersion, $"Requires .NET {minimumFrameworkVersion}");
@@ -143,6 +157,7 @@ public class TlsOptsTest
             CaFile = caFile,
             CertFile = clientCertFile,
             KeyFile = clientKeyFile,
+            CertBundleFile = clientCertBundleFile,
         });
 
         // Using ConfigureClientAuthentication
@@ -151,7 +166,15 @@ public class TlsOptsTest
             ConfigureClientAuthentication = async options =>
             {
                 options.LoadCaCertsFromPem(await File.ReadAllTextAsync(caFile));
-                options.LoadClientCertFromPem(await File.ReadAllTextAsync(clientCertFile), await File.ReadAllTextAsync(clientKeyFile));
+                if (clientCertFile != default && clientKeyFile != default)
+                {
+                    options.LoadClientCertFromPem(await File.ReadAllTextAsync(clientCertFile), await File.ReadAllTextAsync(clientKeyFile));
+                }
+
+                if (clientCertBundleFile != default)
+                {
+                    options.LoadClientCertFromPfxFile(clientCertBundleFile);
+                }
             },
         });
 

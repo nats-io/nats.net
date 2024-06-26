@@ -48,21 +48,33 @@ public sealed record NatsTlsOpts
 {
     public static readonly NatsTlsOpts Default = new();
 
+#if !NETSTANDARD
     /// <summary>
-    /// String or file path to PEM-encoded X509 Certificate
+    /// File path to PEM-encoded X509 Client Certificate
     /// </summary>
     /// <remarks>
     /// Must be used in conjunction with <see cref="KeyFile"/>.
+    /// Exclusive of <see cref="CertBundleFile"/>.
     /// </remarks>
     public string? CertFile { get; init; }
 
     /// <summary>
-    /// String or file path to PEM-encoded Private Key
+    /// File path to PEM-encoded Private Key
     /// </summary>
     /// <remarks>
+    /// Key should not be password protected
     /// Must be used in conjunction with <see cref="CertFile"/>.
     /// </remarks>
     public string? KeyFile { get; init; }
+#endif
+
+    /// <summary>
+    /// File path to PKCS#12 bundle containing X509 Client Certificate and Private Key
+    /// </summary>
+    /// <remarks>
+    /// Bundle should not be password protected
+    /// </remarks>
+    public string? CertBundleFile { get; init; }
 
     /// <summary>
     /// Callback to configure <see cref="SslClientAuthenticationOptions"/>
@@ -80,7 +92,18 @@ public sealed record NatsTlsOpts
     /// <summary>TLS mode to use during connection</summary>
     public TlsMode Mode { get; init; }
 
-    internal bool HasTlsCerts => CertFile != default || KeyFile != default || CaFile != default || ConfigureClientAuthentication != default;
+    internal bool HasTlsCerts
+    {
+        get
+        {
+#if NETSTANDARD
+            const bool certOrKeyFile = false;
+#else
+            var certOrKeyFile = CertFile != default || KeyFile != default;
+#endif
+            return certOrKeyFile || CertBundleFile != default || CaFile != default || ConfigureClientAuthentication != default;
+        }
+    }
 
     internal TlsMode EffectiveMode(NatsUri uri) => Mode switch
     {
@@ -112,10 +135,15 @@ public sealed record NatsTlsOpts
         };
 
         // validation
-        if (this is { CertFile: not null, KeyFile: null } or { KeyFile: not null, CertFile: null })
+#if !NETSTANDARD
+        switch (this)
         {
-            throw new ArgumentException("NatsTlsOpts.CertFile and NatsTlsOpts.KeyFile must both be set");
+            case { CertFile: not null, KeyFile: null } or { KeyFile: not null, CertFile: null }:
+                throw new ArgumentException("NatsTlsOpts.CertFile and NatsTlsOpts.KeyFile must both be set");
+            case { CertFile: not null, CertBundleFile: not null }:
+                throw new ArgumentException("NatsTlsOpts.CertFile and NatsTlsOpts.CertFileBundle are mutually exclusive");
         }
+#endif
 
         if (CaFile != null)
         {
@@ -127,16 +155,18 @@ public sealed record NatsTlsOpts
             options.LoadCaCertsFromPem(caPem);
         }
 
+#if !NETSTANDARD
         if (CertFile != null && KeyFile != null)
         {
-#if NETSTANDARD2_0
-            var certPem = File.ReadAllText(CertFile);
-            var keyPem = File.ReadAllText(KeyFile);
-#else
-            var certPem = await File.ReadAllTextAsync(CertFile).ConfigureAwait(false);
-            var keyPem = await File.ReadAllTextAsync(KeyFile).ConfigureAwait(false);
+            options.LoadClientCertFromPem(
+                await File.ReadAllTextAsync(CertFile).ConfigureAwait(false),
+                await File.ReadAllTextAsync(KeyFile).ConfigureAwait(false));
+        }
 #endif
-            options.LoadClientCertFromPem(certPem, keyPem);
+
+        if (CertBundleFile != null)
+        {
+            options.LoadClientCertFromPfxFile(CertBundleFile);
         }
 
         if (InsecureSkipVerify)
