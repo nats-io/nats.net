@@ -25,6 +25,16 @@ internal static class SslClientAuthenticationOptionsExtensions
         }
 #endif
 
+        // On Windows, ephemeral keys/certificates do not work with schannel. e.g. unless stored in certificate store.
+        // https://github.com/dotnet/runtime/issues/66283#issuecomment-1061014225
+        // https://github.com/dotnet/runtime/blob/380a4723ea98067c28d54f30e1a652483a6a257a/src/libraries/System.Net.Security/tests/FunctionalTests/TestHelper.cs#L192-L197
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            var ephemeral = leafCert;
+            leafCert = new X509Certificate2(leafCert.Export(X509ContentType.Pfx));
+            ephemeral.Dispose();
+        }
+
         return options.LoadClientCertFromX509(leafCert, intermediateCerts, offline, trust);
     }
 #endif
@@ -34,6 +44,10 @@ internal static class SslClientAuthenticationOptionsExtensions
         var leafCert = new X509Certificate2(certBundleFile);
         var intermediateCerts = new X509Certificate2Collection();
         intermediateCerts.Import(certBundleFile);
+        if (intermediateCerts.Count > 0)
+        {
+            intermediateCerts.RemoveAt(0);
+        }
 
 #if !NET8_0_OR_GREATER
         if (intermediateCerts.Count > 0)
@@ -55,16 +69,6 @@ internal static class SslClientAuthenticationOptionsExtensions
 
     public static SslClientAuthenticationOptions LoadClientCertFromX509(this SslClientAuthenticationOptions options, X509Certificate2 leafCert, X509Certificate2Collection? intermediateCerts = null, bool offline = false, SslCertificateTrust? trust = null)
     {
-        // On Windows, ephemeral keys/certificates do not work with schannel. e.g. unless stored in certificate store.
-        // https://github.com/dotnet/runtime/issues/66283#issuecomment-1061014225
-        // https://github.com/dotnet/runtime/blob/380a4723ea98067c28d54f30e1a652483a6a257a/src/libraries/System.Net.Security/tests/FunctionalTests/TestHelper.cs#L192-L197
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
-            var ephemeral = leafCert;
-            leafCert = new X509Certificate2(leafCert.Export(X509ContentType.Pfx));
-            ephemeral.Dispose();
-        }
-
 #if NET8_0_OR_GREATER
         options.ClientCertificateContext = SslStreamCertificateContext.Create(leafCert, intermediateCerts, offline, trust);
 #else
