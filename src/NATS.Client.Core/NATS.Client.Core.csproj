@@ -25,6 +25,7 @@
 
   <!--  Dependencies for netstandard only  -->
   <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0' OR '$(TargetFramework)' == 'netstandard2.1'">
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.4.0" />
     <PackageReference Include="System.Text.Json" Version="8.0.3"/>
     <PackageReference Include="System.Threading.Channels" Version="8.0.0"/>
     <PackageReference Include="System.Diagnostics.DiagnosticSource" Version="8.0.1"/>

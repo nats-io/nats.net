@@ -9,8 +9,12 @@ using Xunit.Abstractions;
 
 namespace NATS.Client.Platform.Windows.Tests;
 
-public class BasicTests(ITestOutputHelper output)
+public class BasicTests
 {
+    private readonly ITestOutputHelper _output;
+
+    public BasicTests(ITestOutputHelper output) => _output = output;
+
     [Fact]
     public async Task Core()
     {

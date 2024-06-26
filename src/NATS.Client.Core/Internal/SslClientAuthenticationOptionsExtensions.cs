@@ -1,8 +1,17 @@
-#if !NETSTANDARD
-
 using System.Net.Security;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
+using X509Certificate = System.Security.Cryptography.X509Certificates.X509Certificate;
+
+#if NETSTANDARD
+using System.Text;
+using Org.BouncyCastle.Asn1.Pkcs;
+using Org.BouncyCastle.Crypto;
+using Org.BouncyCastle.Pkcs;
+using Org.BouncyCastle.Security;
+using Org.BouncyCastle.Utilities.IO.Pem;
+using Org.BouncyCastle.X509;
+#endif
 
 namespace NATS.Client.Core.Internal;
 
@@ -10,7 +19,11 @@ internal static class SslClientAuthenticationOptionsExtensions
 {
     public static SslClientAuthenticationOptions LoadClientCertFromPem(this SslClientAuthenticationOptions options, string certPem, string keyPem, bool offline = false, SslCertificateTrust? trust = null)
     {
+#if NETSTANDARD
+        var leafCert = X509Certificate2Helpers.CreateFromPem(certPem, keyPem);
+#else
         var leafCert = X509Certificate2.CreateFromPem(certPem, keyPem);
+#endif
         var intermediateCerts = new X509Certificate2Collection();
         intermediateCerts.ImportFromPem(certPem);
         if (intermediateCerts.Count > 0)
@@ -18,7 +31,7 @@ internal static class SslClientAuthenticationOptionsExtensions
             intermediateCerts.RemoveAt(0);
         }
 
-#if NET6_0
+#if !NET8_0_OR_GREATER
         if (intermediateCerts.Count > 0)
         {
             throw new NotSupportedException("Client Certificates with intermediates are only supported in net8.0 and higher");
@@ -57,7 +70,7 @@ internal static class SslClientAuthenticationOptionsExtensions
 
         return options;
 
-#if NET6_0
+#if !NET8_0_OR_GREATER
         static X509Certificate LcsCbClientCerts(
             object sender,
             string targetHost,
@@ -79,7 +92,7 @@ internal static class SslClientAuthenticationOptionsExtensions
             SslPolicyErrors sslPolicyErrors)
         {
             // validate >=1 ca certs
-            if (!caCerts.Any())
+            if (!caCerts.OfType<X509Certificate2>().Any())
             {
                 return false;
             }
@@ -98,8 +111,8 @@ internal static class SslClientAuthenticationOptionsExtensions
 
             // validate >= 1 chain elements and that last chain element was one of the supplied CA certs
             if (chain == default
-                || !chain.ChainElements.Any()
-                || !caCerts.Any(c => c.RawData.SequenceEqual(chain.ChainElements.Last().Certificate.RawData)))
+                || !chain.ChainElements.OfType<X509ChainElement>().Any()
+                || !caCerts.OfType<X509Certificate2>().Any(c => c.RawData.SequenceEqual(chain.ChainElements.OfType<X509ChainElement>().Last().Certificate.RawData)))
             {
                 sslPolicyErrors |= SslPolicyErrors.RemoteCertificateChainErrors;
             }
@@ -121,4 +134,49 @@ internal static class SslClientAuthenticationOptionsExtensions
     }
 }
 
+#if NETSTANDARD
+internal static class X509Certificate2Helpers
+{
+    public static void ImportFromPem(this X509Certificate2Collection certs, string pem)
+    {
+        using var reader = new StringReader(pem);
+        using var pemReader = new PemReader(reader);
+        while (pemReader.ReadPemObject() is { } pemObject)
+        {
+            var cert = new X509Certificate2(pemObject.Content);
+            certs.Add(cert);
+        }
+    }
+
+    public static X509Certificate2 CreateFromPem(string certPem, string keyPem)
+    {
+        var certParser = new X509CertificateParser();
+        var cert = certParser.ReadCertificate(new MemoryStream(Encoding.UTF8.GetBytes(certPem)));
+
+        AsymmetricKeyParameter privateKey;
+        using (var reader = new StringReader(keyPem))
+        {
+            var pemReader = new PemReader(reader);
+            var pemObject = pemReader.ReadPemObject();
+            var privateKeyInfo = PrivateKeyInfo.GetInstance(pemObject.Content);
+            privateKey = PrivateKeyFactory.CreateKey(privateKeyInfo);
+        }
+
+        var store = new Pkcs12StoreBuilder().Build();
+        const string name = "cert";
+        var certificateEntry = new X509CertificateEntry(cert);
+        store.SetCertificateEntry(name, certificateEntry);
+
+        store.SetKeyEntry(name, new AsymmetricKeyEntry(privateKey), new[] { certificateEntry });
+        using var stream = new MemoryStream();
+        store.Save(stream, [], SecureRandom.GetInstance("SHA256PRNG"));
+        var certWithKey = new X509Certificate2(
+            stream.ToArray(),
+            string.Empty,
+            X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.Exportable);
+        return certWithKey;
+    }
+}
+
+internal class SslCertificateTrust;
 #endif
