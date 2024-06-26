@@ -119,24 +119,23 @@ public sealed record NatsTlsOpts
 
         if (CaFile != null)
         {
-#if NETSTANDARD2_0
-            var caPem = File.ReadAllText(CaFile);
+#if NETSTANDARD
+            throw new NatsException("PEM loading is not supported on .NET Standard");
 #else
             var caPem = await File.ReadAllTextAsync(CaFile).ConfigureAwait(false);
-#endif
             options.LoadCaCertsFromPem(caPem);
+#endif
         }
 
         if (CertFile != null && KeyFile != null)
         {
-#if NETSTANDARD2_0
-            var certPem = File.ReadAllText(CertFile);
-            var keyPem = File.ReadAllText(KeyFile);
+#if NETSTANDARD
+            throw new NatsException("PEM loading is not supported on .NET Standard");
 #else
             var certPem = await File.ReadAllTextAsync(CertFile).ConfigureAwait(false);
             var keyPem = await File.ReadAllTextAsync(KeyFile).ConfigureAwait(false);
-#endif
             options.LoadClientCertFromPem(certPem, keyPem);
+#endif
         }
 
         if (InsecureSkipVerify)
@@ -168,4 +167,9 @@ public class SslClientAuthenticationOptions
 
     public LocalCertificateSelectionCallback? LocalCertificateSelectionCallback { get; set; }
 }
+
+#endif
+
+#if NETSTANDARD
+public class SslCertificateTrust;
 #endif

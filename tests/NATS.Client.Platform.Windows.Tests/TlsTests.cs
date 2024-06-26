@@ -1,4 +1,5 @@
 using System.Security.Authentication;
+using System.Security.Cryptography.X509Certificates;
 using NATS.Client.Core;
 using Xunit.Abstractions;
 
@@ -30,9 +31,17 @@ public class TlsTests
 
         var tlsOpts = new NatsTlsOpts
         {
-            CaFile = caCertPem,
-            CertFile = clientCertPem,
-            KeyFile = clientKeyPem,
+            ConfigureClientAuthentication = o =>
+            {
+                var clientCert = X509Certificate2Helpers.CreateFromPem(File.ReadAllText(clientCertPem), File.ReadAllText(clientKeyPem));
+                o.LoadClientCertFromX509(clientCert);
+
+                var caCerts = new X509Certificate2Collection();
+                caCerts.ImportFromPem(File.ReadAllText(caCertPem));
+                o.LoadCaCertsFromX509(caCerts);
+
+                return default;
+            },
         };
 
         await using var server = await NatsServerProcess.StartAsync(config: "resources/configs/tls.conf");
