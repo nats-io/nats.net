@@ -124,15 +124,15 @@ public partial class NatsConnection : INatsConnection
 
     public INatsServerInfo? ServerInfo => WritableServerInfo; // server info is set when received INFO
 
+    public NatsHeaderParser HeaderParser { get; }
+
+    public SubscriptionManager SubscriptionManager { get; }
+
     internal bool IsDisposed
     {
         get => Interlocked.CompareExchange(ref _isDisposed, 0, 0) == 1;
         private set => Interlocked.Exchange(ref _isDisposed, value ? 1 : 0);
     }
-
-    public NatsHeaderParser HeaderParser { get; }
-
-    public SubscriptionManager SubscriptionManager { get; }
 
     internal CommandWriter CommandWriter { get; }
 
@@ -174,6 +174,34 @@ public partial class NatsConnection : INatsConnection
 
         // Only Closed(initial) state, can run initial connect.
         await InitialConnectAsync().ConfigureAwait(false);
+    }
+
+    public void OnMessageDropped<T>(NatsSubBase natsSub, int pending, NatsMsg<T> msg)
+    {
+        var subject = msg.Subject;
+        _logger.LogWarning("Dropped message from {Subject} with {Pending} pending messages", subject, pending);
+        _eventChannel.Writer.TryWrite((NatsEvent.MessageDropped, new NatsMessageDroppedEventArgs(natsSub, pending, subject, msg.ReplyTo, msg.Headers, msg.Data)));
+    }
+
+    public BoundedChannelOptions GetChannelOpts(NatsOpts connectionOpts, NatsSubChannelOpts? subChannelOpts)
+    {
+        if (subChannelOpts is { } overrideOpts)
+        {
+            return new BoundedChannelOptions(overrideOpts.Capacity ??
+                                             _defaultSubscriptionChannelOpts.Capacity)
+            {
+                AllowSynchronousContinuations =
+                    _defaultSubscriptionChannelOpts.AllowSynchronousContinuations,
+                FullMode =
+                    overrideOpts.FullMode ?? _defaultSubscriptionChannelOpts.FullMode,
+                SingleWriter = _defaultSubscriptionChannelOpts.SingleWriter,
+                SingleReader = _defaultSubscriptionChannelOpts.SingleReader,
+            };
+        }
+        else
+        {
+            return _defaultSubscriptionChannelOpts;
+        }
     }
 
     public virtual async ValueTask DisposeAsync()
@@ -250,34 +278,6 @@ public partial class NatsConnection : INatsConnection
         }
 
         return default;
-    }
-
-    public void OnMessageDropped<T>(NatsSubBase natsSub, int pending, NatsMsg<T> msg)
-    {
-        var subject = msg.Subject;
-        _logger.LogWarning("Dropped message from {Subject} with {Pending} pending messages", subject, pending);
-        _eventChannel.Writer.TryWrite((NatsEvent.MessageDropped, new NatsMessageDroppedEventArgs(natsSub, pending, subject, msg.ReplyTo, msg.Headers, msg.Data)));
-    }
-
-    public BoundedChannelOptions GetChannelOpts(NatsOpts connectionOpts, NatsSubChannelOpts? subChannelOpts)
-    {
-        if (subChannelOpts is { } overrideOpts)
-        {
-            return new BoundedChannelOptions(overrideOpts.Capacity ??
-                                             _defaultSubscriptionChannelOpts.Capacity)
-            {
-                AllowSynchronousContinuations =
-                    _defaultSubscriptionChannelOpts.AllowSynchronousContinuations,
-                FullMode =
-                    overrideOpts.FullMode ?? _defaultSubscriptionChannelOpts.FullMode,
-                SingleWriter = _defaultSubscriptionChannelOpts.SingleWriter,
-                SingleReader = _defaultSubscriptionChannelOpts.SingleReader,
-            };
-        }
-        else
-        {
-            return _defaultSubscriptionChannelOpts;
-        }
     }
 
     private async ValueTask InitialConnectAsync()

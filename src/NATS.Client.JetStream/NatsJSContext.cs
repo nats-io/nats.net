@@ -7,12 +7,17 @@ using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
 
+public static class NatsClientExtensions
+{
+    public static INatsJSContext GetJetStream(this INatsClient connection) => new NatsJSContext((NatsConnection)connection.Connection);
+}
+
 /// <summary>Provides management and access to NATS JetStream streams and consumers.</summary>
 public partial class NatsJSContext
 {
     private readonly ILogger _logger;
 
-    /// <inheritdoc cref="NatsJSContext(NATS.Client.Core.NatsConnection,NATS.Client.JetStream.NatsJSOpts)"/>>
+    /// <inheritdoc cref="NatsJSContext(NATS.Client.Core.INatsConnection,NATS.Client.JetStream.NatsJSOpts)"/>>
     public NatsJSContext(INatsConnection connection)
         : this(connection, new NatsJSOpts(connection.Opts))
     {
@@ -266,9 +271,4 @@ public partial class NatsJSContext
     [DoesNotReturn]
     private static void ThrowEmptyException(string? paramName) =>
         throw new ArgumentException("The value cannot be an empty string.", paramName);
-}
-
-public static class Ext
-{
-    public static INatsJSContext GetJetStream(this INatsClient connection) => new NatsJSContext((NatsConnection)connection.Connection);
 }

@@ -144,7 +144,6 @@ public interface INatsConnection : INatsClient
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous send operation.</returns>
     ValueTask PublishAsync<T>(in NatsMsg<T> msg, INatsSerialize<T>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
 
-
     /// <summary>
     /// Initiates a subscription to a subject, optionally joining a distributed queue group
     /// and returns a <see cref="INatsSub{T}"/> object which provides more control over the subscription.
@@ -220,6 +219,8 @@ public interface INatsConnection : INatsClient
         CancellationToken cancellationToken = default);
 
     ValueTask SubAsync(NatsSubBase sub, CancellationToken cancellationToken = default);
+
     void OnMessageDropped<T>(NatsSubBase natsSub, int pending, NatsMsg<T> msg);
+
     BoundedChannelOptions GetChannelOpts(NatsOpts connectionOpts, NatsSubChannelOpts? subChannelOpts);
 }
