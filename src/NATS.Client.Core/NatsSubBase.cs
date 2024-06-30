@@ -47,7 +47,7 @@ public abstract class NatsSubBase
     private Exception? _exception;
 
     internal NatsSubBase(
-        NatsConnection connection,
+        INatsConnection connection,
         ISubscriptionManager manager,
         string subject,
         string? queueGroup,
@@ -141,7 +141,7 @@ public abstract class NatsSubBase
 
     internal NatsSubOpts? Opts { get; private set; }
 
-    protected NatsConnection Connection { get; }
+    protected INatsConnection Connection { get; }
 
     public virtual ValueTask ReadyAsync()
     {

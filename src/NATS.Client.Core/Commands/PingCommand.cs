@@ -3,7 +3,7 @@ using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core.Commands;
 
-internal class PingCommand : IValueTaskSource<TimeSpan>, IObjectPoolNode<PingCommand>
+public class PingCommand : IValueTaskSource<TimeSpan>, IObjectPoolNode<PingCommand>
 {
     private readonly ObjectPool? _pool;
     private DateTimeOffset _start;

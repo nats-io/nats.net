@@ -120,6 +120,8 @@ public partial class NatsConnection : INatsConnection
         private set => Interlocked.Exchange(ref _connectionState, (int)value);
     }
 
+    public INatsConnection Connection => this;
+
     public INatsServerInfo? ServerInfo => WritableServerInfo; // server info is set when received INFO
 
     internal bool IsDisposed
@@ -128,9 +130,9 @@ public partial class NatsConnection : INatsConnection
         private set => Interlocked.Exchange(ref _isDisposed, value ? 1 : 0);
     }
 
-    internal NatsHeaderParser HeaderParser { get; }
+    public NatsHeaderParser HeaderParser { get; }
 
-    internal SubscriptionManager SubscriptionManager { get; }
+    public SubscriptionManager SubscriptionManager { get; }
 
     internal CommandWriter CommandWriter { get; }
 
@@ -250,14 +252,14 @@ public partial class NatsConnection : INatsConnection
         return default;
     }
 
-    internal void OnMessageDropped<T>(NatsSubBase natsSub, int pending, NatsMsg<T> msg)
+    public void OnMessageDropped<T>(NatsSubBase natsSub, int pending, NatsMsg<T> msg)
     {
         var subject = msg.Subject;
         _logger.LogWarning("Dropped message from {Subject} with {Pending} pending messages", subject, pending);
         _eventChannel.Writer.TryWrite((NatsEvent.MessageDropped, new NatsMessageDroppedEventArgs(natsSub, pending, subject, msg.ReplyTo, msg.Headers, msg.Data)));
     }
 
-    internal BoundedChannelOptions GetChannelOpts(NatsOpts connectionOpts, NatsSubChannelOpts? subChannelOpts)
+    public BoundedChannelOptions GetChannelOpts(NatsOpts connectionOpts, NatsSubChannelOpts? subChannelOpts)
     {
         if (subChannelOpts is { } overrideOpts)
         {

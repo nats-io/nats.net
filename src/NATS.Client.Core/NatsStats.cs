@@ -9,7 +9,7 @@ public readonly record struct NatsStats
     long ReceivedMessages,
     long SubscriptionCount);
 
-internal sealed class ConnectionStatsCounter
+public sealed class ConnectionStatsCounter
 {
     // for operate Interlocked.Increment/Decrement/Add, expose field as public
 #pragma warning disable SA1401

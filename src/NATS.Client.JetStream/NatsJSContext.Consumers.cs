@@ -249,7 +249,7 @@ public partial class NatsJSContext : INatsJSContext
         if (!string.IsNullOrWhiteSpace(config.Name))
         {
             subject += $".{config.Name}";
-            config.Name = default!;
+            // config.Name = default!;
         }
 
         if (!string.IsNullOrWhiteSpace(config.FilterSubject))

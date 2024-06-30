@@ -2,7 +2,7 @@ namespace NATS.Client.Core;
 
 public partial class NatsConnection
 {
-    internal async ValueTask<NatsSub<TReply>> RequestSubAsync<TRequest, TReply>(
+    public async ValueTask<NatsSub<TReply>> RequestSubAsync<TRequest, TReply>(
         string subject,
         TRequest? data,
         NatsHeaders? headers = default,

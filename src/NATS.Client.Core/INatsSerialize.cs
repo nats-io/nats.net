@@ -14,6 +14,7 @@ namespace NATS.Client.Core;
 /// <typeparam name="T">Serialized object type</typeparam>
 public interface INatsSerializer<T> : INatsSerialize<T>, INatsDeserialize<T>
 {
+    INatsSerializer<T> CombineWith(INatsSerializer<T> next);
 }
 
 /// <summary>
@@ -72,6 +73,32 @@ public class NatsDefaultSerializerRegistry : INatsSerializerRegistry
     public INatsDeserialize<T> GetDeserializer<T>() => NatsDefaultSerializer<T>.Default;
 }
 
+public class NatsSerializerBuilder<T>
+{
+    private readonly List<INatsSerializer<T>> _serializers = new();
+
+    public NatsSerializerBuilder<T> Add(INatsSerializer<T> serializer)
+    {
+        _serializers.Add(serializer);
+        return this;
+    }
+
+    public INatsSerializer<T> Build()
+    {
+        if (_serializers.Count == 0)
+        {
+            return NatsDefaultSerializer<T>.Default;
+        }
+
+        for (var i = _serializers.Count - 1; i > 0; i--)
+        {
+            _serializers[i - 1] = _serializers[i - 1].CombineWith(_serializers[i]);
+        }
+
+        return _serializers[0];
+    }
+}
+
 /// <summary>
 /// UTF8 serializer for strings and all the primitives.
 /// </summary>
@@ -90,7 +117,9 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
     /// Creates a new instance of <see cref="NatsUtf8PrimitivesSerializer{T}"/>.
     /// </summary>
     /// <param name="next">The next serializer in chain.</param>
-    public NatsUtf8PrimitivesSerializer(INatsSerializer<T>? next) => _next = next;
+    public NatsUtf8PrimitivesSerializer(INatsSerializer<T>? next = default) => _next = next;
+
+    public INatsSerializer<T> CombineWith(INatsSerializer<T>? next) => new NatsUtf8PrimitivesSerializer<T>(next);
 
     /// <inheritdoc />
     public void Serialize(IBufferWriter<byte> bufferWriter, T value)
@@ -595,7 +624,9 @@ public class NatsRawSerializer<T> : INatsSerializer<T>
     /// Creates a new instance of <see cref="NatsRawSerializer{T}"/>.
     /// </summary>
     /// <param name="next">Next serializer in chain.</param>
-    public NatsRawSerializer(INatsSerializer<T>? next) => _next = next;
+    public NatsRawSerializer(INatsSerializer<T>? next = default) => _next = next;
+
+    public INatsSerializer<T> CombineWith(INatsSerializer<T>? next) => new NatsRawSerializer<T>(next);
 
     /// <inheritdoc />
     public void Serialize(IBufferWriter<byte> bufferWriter, T value)
@@ -746,6 +777,8 @@ public sealed class NatsJsonContextSerializer<T> : INatsSerializer<T>
         : this(new[] { context }, next)
     {
     }
+
+    public INatsSerializer<T> CombineWith(INatsSerializer<T> next) => new NatsJsonContextSerializer<T>(_contexts, next);
 
     /// <inheritdoc />
     public void Serialize(IBufferWriter<byte> bufferWriter, T value)

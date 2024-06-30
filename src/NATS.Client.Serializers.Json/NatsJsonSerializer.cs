@@ -11,7 +11,7 @@ namespace NATS.Client.Serializers.Json;
 /// <remarks>
 /// This serializer is not suitable for native AOT deployments since it might rely on reflection
 /// </remarks>
-public sealed class NatsJsonSerializer<T> : INatsSerialize<T>, INatsDeserialize<T>
+public sealed class NatsJsonSerializer<T> : INatsSerializer<T>
 {
     private static readonly JsonWriterOptions JsonWriterOpts = new() { Indented = false, SkipValidation = true, };
 
@@ -19,6 +19,11 @@ public sealed class NatsJsonSerializer<T> : INatsSerialize<T>, INatsDeserialize<
     private static Utf8JsonWriter? _jsonWriter;
 
     private readonly JsonSerializerOptions _opts;
+
+    public NatsJsonSerializer()
+        : this(new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull })
+    {
+    }
 
     /// <summary>
     /// Creates a new instance of <see cref="NatsJsonSerializer{T}"/> with the specified options.
@@ -29,7 +34,10 @@ public sealed class NatsJsonSerializer<T> : INatsSerialize<T>, INatsDeserialize<
     /// <summary>
     /// Default instance of <see cref="NatsJsonSerializer{T}"/> with option set to ignore <c>null</c> values when writing.
     /// </summary>
-    public static NatsJsonSerializer<T> Default { get; } = new(new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
+    public static NatsJsonSerializer<T> Default { get; } = new();
+
+    public INatsSerializer<T> CombineWith(INatsSerializer<T> next)
+        => throw new NotSupportedException();
 
     /// <inheritdoc />flush
     public void Serialize(IBufferWriter<byte> bufferWriter, T? value)

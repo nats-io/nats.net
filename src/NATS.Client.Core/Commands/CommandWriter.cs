@@ -16,7 +16,7 @@ namespace NATS.Client.Core.Commands;
 /// These methods are in the hot path, and have all been
 /// optimized to eliminate allocations and minimize copying
 /// </remarks>
-internal sealed class CommandWriter : IAsyncDisposable
+public sealed class CommandWriter : IAsyncDisposable
 {
     // memory segment used to consolidate multiple small memory chunks
     // 8520 should fit into 6 packets on 1500 MTU TLS connection or 1 packet on 9000 MTU TLS connection

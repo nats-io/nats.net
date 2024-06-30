@@ -9,7 +9,7 @@ namespace NATS.Client.Core.Internal;
 
 // These connections options are serialized and sent to the server.
 // https://github.com/nats-io/nats-server/blob/a23b1b7/server/client.go#L536
-internal sealed class ClientOpts
+public sealed class ClientOpts
 {
     private ClientOpts(NatsOpts opts)
     {

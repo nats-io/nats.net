@@ -3,12 +3,12 @@ using System.Runtime.CompilerServices;
 
 namespace NATS.Client.Core.Internal;
 
-internal interface IObjectPoolNode<T>
+public interface IObjectPoolNode<T>
 {
     ref T? NextNode { get; }
 }
 
-internal sealed class ObjectPool
+public sealed class ObjectPool
 {
     private static int typeId = -1; // Increment by IdentityGenerator<T>
 

@@ -6,7 +6,7 @@ using NATS.Client.Core.Commands;
 
 namespace NATS.Client.Core.Internal;
 
-internal interface ISubscriptionManager
+public interface ISubscriptionManager
 {
     public ValueTask RemoveAsync(NatsSubBase sub);
 }
@@ -15,7 +15,7 @@ internal record struct SidMetadata(string Subject, WeakReference<NatsSubBase> We
 
 internal sealed record SubscriptionMetadata(int Sid);
 
-internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposable
+public sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposable
 {
     private readonly ILogger<SubscriptionManager> _logger;
     private readonly object _gate = new();

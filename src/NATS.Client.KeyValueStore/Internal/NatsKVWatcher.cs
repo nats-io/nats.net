@@ -36,7 +36,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
     private readonly CancellationToken _cancellationToken;
     private readonly string _keyBase;
     private readonly string[] _filters;
-    private readonly NatsConnection _nats;
+    private readonly INatsConnection _nats;
     private readonly Channel<NatsKVWatchCommandMsg<T>> _commandChannel;
     private readonly Channel<NatsKVEntry<T>> _entryChannel;
     private readonly Channel<string> _consumerCreateChannel;
