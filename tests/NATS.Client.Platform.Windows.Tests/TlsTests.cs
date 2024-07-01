@@ -14,7 +14,7 @@ using X509Certificate = System.Security.Cryptography.X509Certificates.X509Certif
 
 namespace NATS.Client.Platform.Windows.Tests;
 
-public class TlsTests(ITestOutputHelper output)
+public class TlsTests
 {
     [Fact]
     public async Task Tls_fails_without_certificates()

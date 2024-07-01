@@ -9,7 +9,7 @@ using Xunit.Abstractions;
 
 namespace NATS.Client.Platform.Windows.Tests;
 
-public class BasicTests(ITestOutputHelper output)
+public class BasicTests
 {
     [Fact]
     public async Task Core()
