@@ -283,4 +283,12 @@ public interface INatsJSContext
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>Async enumerable list of stream names to be used in a <c>await foreach</c> loop.</returns>
     IAsyncEnumerable<string> ListStreamNamesAsync(string? subject = default, CancellationToken cancellationToken = default);
+
+    ValueTask<NatsJSPublishConcurrentFuture> PublishConcurrentAsync<T>(
+        string subject,
+        T? data,
+        INatsSerialize<T>? serializer = default,
+        NatsJSPubOpts? opts = default,
+        NatsHeaders? headers = default,
+        CancellationToken cancellationToken = default);
 }

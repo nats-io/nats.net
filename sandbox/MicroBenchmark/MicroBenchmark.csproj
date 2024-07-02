@@ -18,6 +18,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\NATS.Client.Core\NATS.Client.Core.csproj" />
+        <ProjectReference Include="..\..\src\NATS.Client.JetStream\NATS.Client.JetStream.csproj" />
     </ItemGroup>
 
 </Project>

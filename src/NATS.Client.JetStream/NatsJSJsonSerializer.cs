@@ -3,9 +3,9 @@ using System.Text.Json.Serialization;
 using NATS.Client.Core;
 using NATS.Client.JetStream.Models;
 
-namespace NATS.Client.JetStream.Internal;
+namespace NATS.Client.JetStream;
 
-internal static class NatsJSJsonSerializer<T>
+public static class NatsJSJsonSerializer<T>
 {
 #if NET6_0
     public static readonly INatsSerializer<T> Default = new NatsJsonContextSerializer<T>(NatsJSJsonSerializerContext.Default);
