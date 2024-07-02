@@ -37,9 +37,17 @@ public class TlsClientTest
                 .Build());
 
         var clientOpts = server.ClientOpts(NatsOpts.Default with { Name = "tls-test-client" });
-#pragma warning disable CS0618 // Type or member is obsolete
-        clientOpts = clientOpts with { TlsOpts = clientOpts.TlsOpts with { CertificateRevocationCheckMode = X509RevocationMode.Online } };
-#pragma warning restore CS0618 // Type or member is obsolete
+        clientOpts = clientOpts with
+        {
+            TlsOpts = clientOpts.TlsOpts with
+            {
+                ConfigureClientAuthentication = options =>
+                {
+                    options.CertificateRevocationCheckMode = X509RevocationMode.Online;
+                    return default;
+                },
+            },
+        };
         await using var nats = new NatsConnection(clientOpts);
 
         // At the moment I don't know of a good way of checking if the revocation check is working
