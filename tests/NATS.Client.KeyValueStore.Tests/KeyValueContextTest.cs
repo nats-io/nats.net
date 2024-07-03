@@ -100,6 +100,7 @@ public class KeyValueContextTest
     {
         var bucketName = "kv1";
         var expectedBucketName = $"KV_{bucketName}";
+        var expectedMaxBytes = 10_000;
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
@@ -110,13 +111,13 @@ public class KeyValueContextTest
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
 
-        var natsKVConfig = new NatsKVConfig(bucketName) { Compression = true };
+        var natsKVConfig = new NatsKVConfig(bucketName) { MaxBytes = expectedMaxBytes };
         await kv.CreateStoreAsync(natsKVConfig, cancellationToken);
 
         await foreach (var status in kv.GetStatusesAsync(cancellationToken))
         {
             status.Bucket.Should().Be(expectedBucketName);
-            status.IsCompressed.Should().BeTrue();
+            status.Info.Config.MaxBytes.Should().Be(expectedMaxBytes);
         }
     }
 }
