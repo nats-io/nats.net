@@ -69,7 +69,7 @@ See more details, including how to download and start NATS server and JetStream 
 ## NATS .NET Goals
 
 - Only support Async I/O (async/await)
-- Target current .NET LTS releases (currently .NET 6.0 & .NET 8.0)
+- Target .NET Standard 2.0, 2.1, and .NET LTS releases (currently .NET 6.0 & .NET 8.0)
 
 ## Packages
 
