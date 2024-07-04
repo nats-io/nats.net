@@ -19,8 +19,8 @@ public enum NatsKVStorageType
 /// </summary>
 public class NatsKVContext : INatsKVContext
 {
-    private const string KvStreamPrefix = "KV_";
-    private static readonly int KvStreamPrefixLen = KvStreamPrefix.Length;
+    private const string KvStreamNamePrefix = "KV_";
+    private static readonly int KvStreamNamePrefixLen = KvStreamNamePrefix.Length;
     private static readonly Regex ValidBucketRegex = new(pattern: @"\A[a-zA-Z0-9_-]+\z", RegexOptions.Compiled);
 
     private readonly NatsJSContext _context;
@@ -131,7 +131,7 @@ public class NatsKVContext : INatsKVContext
     {
         await foreach (var name in _context.ListStreamNamesAsync(cancellationToken: cancellationToken))
         {
-            if (!name.StartsWith(KvStreamPrefix))
+            if (!name.StartsWith(KvStreamNamePrefix))
             {
                 continue;
             }
@@ -166,10 +166,10 @@ public class NatsKVContext : INatsKVContext
     }
 
     private static string BucketToStream(string bucket)
-        => $"KV_{bucket}";
+        => KvStreamNamePrefix + bucket;
 
     private static string ExtractBucketName(string streamName)
-        => streamName.Substring(KvStreamPrefixLen);
+        => streamName.Substring(KvStreamNamePrefixLen);
 
     private StreamConfig CreateStreamConfig(NatsKVConfig config)
     {
