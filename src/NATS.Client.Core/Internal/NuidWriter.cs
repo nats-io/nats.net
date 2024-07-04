@@ -144,13 +144,13 @@ internal sealed class NuidWriter
         }
 
         return RefreshAndWrite(nuidBuffer);
+    }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        bool RefreshAndWrite(Span<char> buffer)
-        {
-            var prefix = Refresh(out sequential);
-            return TryWriteNuidCore(buffer, prefix, sequential);
-        }
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private bool RefreshAndWrite(Span<char> buffer)
+    {
+        var prefix = Refresh(out var sequential);
+        return TryWriteNuidCore(buffer, prefix, sequential);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
