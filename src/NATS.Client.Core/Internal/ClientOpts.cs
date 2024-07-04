@@ -102,7 +102,7 @@ internal sealed class ClientOpts
         return asm?.GetCustomAttribute<AssemblyFileVersionAttribute>()?.Version
             ?? asm?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
             ?? asm?.GetCustomAttribute<AssemblyVersionAttribute>()?.Version
-            ?? "1.0.0";
+            ?? "2.0.0";
     }
 }
 
