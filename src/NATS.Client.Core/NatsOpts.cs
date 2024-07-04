@@ -15,7 +15,7 @@ public sealed record NatsOpts
 
     public string Url { get; init; } = "nats://localhost:4222";
 
-    public string Name { get; init; } = "NATS .Net Client";
+    public string Name { get; init; } = "NATS .NET Client";
 
     public bool Echo { get; init; } = true;
 

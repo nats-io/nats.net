@@ -98,11 +98,15 @@ internal sealed class ClientOpts
     private static string GetAssemblyVersion()
     {
         var asm = typeof(ClientOpts).Assembly;
+        var version = "2.0.0";
 
-        return asm?.GetCustomAttribute<AssemblyFileVersionAttribute>()?.Version
-            ?? asm?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
-            ?? asm?.GetCustomAttribute<AssemblyVersionAttribute>()?.Version
-            ?? "2.0.0";
+        var attrInformationalVersion = asm!.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
+        if (attrInformationalVersion != null)
+        {
+            version = attrInformationalVersion.InformationalVersion.Split('\n')[0];
+        }
+
+        return version;
     }
 }
 
