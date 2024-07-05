@@ -81,7 +81,7 @@ public class GetKeysTest
         Assert.Equal(3, count);
     }
 
-    [Fact]
+    [SkipIfNatsServer(versionEarlierThan: "2.10")]
     public async Task Get_filtered_keys()
     {
         const string bucket = "b1";
@@ -105,6 +105,8 @@ public class GetKeysTest
         await store1.PutAsync("d", 2, cancellationToken: cancellationToken);
 
         var ks1 = new List<string>();
+
+        // Multiple keys are only supported in NATS Server 2.10 and later
         await foreach (var k in store1.GetKeysAsync(new string[] { "d", "a.>", "c.>" }, cancellationToken: cancellationToken))
         {
             ks1.Add(k);
