@@ -138,4 +138,14 @@ public interface INatsKVStore
     /// <returns>An async enumerable of keys to be used in an <c>await foreach</c></returns>
     /// <exception cref="InvalidOperationException">There was a conflict in options, e.g. IncludeHistory and UpdatesOnly are only valid when ResumeAtRevision is not set.</exception>
     IAsyncEnumerable<string> GetKeysAsync(NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get a filtered set of keys in the bucket
+    /// </summary>
+    /// <param name="filters">Subject-based wildcard filters to filter on</param>
+    /// <param name="opts">Watch options</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>An async enumerable of keys to be used in an <c>await foreach</c></returns>
+    /// <exception cref="InvalidOperationException">There was a conflict in options, e.g. IncludeHistory and UpdatesOnly are only valid when ResumeAtRevision is not set.</exception>
+    IAsyncEnumerable<string> GetKeysAsync(IEnumerable<string> filters, NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default);
 }
