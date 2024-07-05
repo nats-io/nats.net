@@ -438,14 +438,18 @@ public class NatsKVStore : INatsKVStore
     }
 
     /// <inheritdoc />
-    public async IAsyncEnumerable<string> GetKeysAsync(NatsKVWatchOpts? opts = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public IAsyncEnumerable<string> GetKeysAsync(NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default)
+        => GetKeysAsync([">"], opts, cancellationToken);
+
+    /// <inheritdoc />
+    public async IAsyncEnumerable<string> GetKeysAsync(IEnumerable<string> filters, NatsKVWatchOpts? opts = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         opts ??= NatsKVWatchOpts.Default;
 
         opts = opts with { IgnoreDeletes = false, MetaOnly = true, UpdatesOnly = false, };
 
         // Type doesn't matter here, we're just using the watcher to get the keys
-        await using var watcher = await WatchInternalAsync<int>([">"], serializer: default, opts, cancellationToken);
+        await using var watcher = await WatchInternalAsync<int>(filters, serializer: default, opts, cancellationToken);
 
         if (watcher.InitialConsumer.Info.NumPending == 0)
             yield break;
