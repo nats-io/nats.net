@@ -11,6 +11,11 @@ namespace NATS.Client.Core.Internal;
 [SkipLocalsInit]
 internal sealed class NuidWriter
 {
+    // NuidLength, PrefixLength, SequentialLength were nuint (System.UIntPtr) in the original code
+    // however, they were changed to uint to fix the compilation error for IL2CPP Unity projects.
+    // With nuint, the following error occurs in Unity Linux IL2CPP builds:
+    //   Error: IL2CPP error for method 'System.Char[] NATS.Client.Core.Internal.NuidWriter::Refresh(System.UInt64&)'
+    //   System.ArgumentOutOfRangeException: Cannot create a constant value for types of System.UIntPtr
     internal const uint NuidLength = PrefixLength + SequentialLength;
     private const uint Base = 62;
     private const ulong MaxSequential = 839299365868340224; // 62^10
