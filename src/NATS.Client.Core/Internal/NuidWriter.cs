@@ -11,11 +11,11 @@ namespace NATS.Client.Core.Internal;
 [SkipLocalsInit]
 internal sealed class NuidWriter
 {
-    internal const nuint NuidLength = PrefixLength + SequentialLength;
-    private const nuint Base = 62;
+    internal const uint NuidLength = PrefixLength + SequentialLength;
+    private const uint Base = 62;
     private const ulong MaxSequential = 839299365868340224; // 62^10
     private const uint PrefixLength = 12;
-    private const nuint SequentialLength = 10;
+    private const uint SequentialLength = 10;
     private const int MinIncrement = 33;
     private const int MaxIncrement = 333;
 
