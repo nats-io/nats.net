@@ -55,7 +55,7 @@ public class NatsKVContext : INatsKVContext
     {
         ValidateBucketName(config.Bucket);
 
-        var streamConfig = CreateStreamConfig(config);
+        var streamConfig = NatsKVContext.CreateStreamConfig(config);
 
         var stream = await _context.CreateStreamAsync(streamConfig, cancellationToken);
 
@@ -99,7 +99,7 @@ public class NatsKVContext : INatsKVContext
     {
         ValidateBucketName(config.Bucket);
 
-        var streamConfig = CreateStreamConfig(config);
+        var streamConfig = NatsKVContext.CreateStreamConfig(config);
 
         var stream = await _context.UpdateStreamAsync(streamConfig, cancellationToken);
 
@@ -166,12 +166,12 @@ public class NatsKVContext : INatsKVContext
     }
 
     private static string BucketToStream(string bucket)
-        => KvStreamNamePrefix + bucket;
+        => $"{KvStreamNamePrefix}{bucket}";
 
     private static string ExtractBucketName(string streamName)
         => streamName.Substring(KvStreamNamePrefixLen);
 
-    private StreamConfig CreateStreamConfig(NatsKVConfig config)
+    private static StreamConfig CreateStreamConfig(NatsKVConfig config)
     {
         // TODO: KV Mirrors
         var subjects = new[] { $"$KV.{config.Bucket}.>" };
