@@ -383,7 +383,7 @@ public abstract partial class NatsConnectionTest
     [Fact]
     public void NewInboxEmptyPrefixReturnsNuid()
     {
-        var opts = NatsOpts.Default with { InboxPrefix = "" };
+        var opts = NatsOpts.Default with { InboxPrefix = string.Empty };
         var conn = new NatsConnection(opts);
 
         var inbox = conn.NewInbox();
