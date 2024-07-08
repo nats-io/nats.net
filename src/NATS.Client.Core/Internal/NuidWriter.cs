@@ -99,6 +99,13 @@ internal sealed class NuidWriter
 
     private static char[] GetPrefix(RandomNumberGenerator? rng = null)
     {
+#if NET8_0_OR_GREATER
+        if (rng == null)
+        {
+            return RandomNumberGenerator.GetItems(Digits, (int)PrefixLength);
+        }
+#endif
+
 #if NETSTANDARD2_0
         var randomBytes = new byte[(int)PrefixLength];
 
@@ -109,8 +116,6 @@ internal sealed class NuidWriter
         }
 #else
         Span<byte> randomBytes = stackalloc byte[(int)PrefixLength];
-
-        // TODO: For .NET 8+, use GetItems for better distribution
         if (rng == null)
         {
             RandomNumberGenerator.Fill(randomBytes);
