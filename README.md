@@ -1,3 +1,10 @@
+### :mega: :warning: This repository will be renamed to `nats.net` on Wednesday, July 17th, 2024
+
+Please be prepared to update your references to the new name.
+You can also read the [announcement](REPO_RENAME.md) for more information.
+
+---
+
 [![License Apache 2.0](https://img.shields.io/badge/License-Apache2-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![NuGet](https://img.shields.io/nuget/v/NATS.Net.svg?cacheSeconds=3600)](https://www.nuget.org/packages/NATS.Net)
 
