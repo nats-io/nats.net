@@ -541,8 +541,8 @@ public class NatsObjStore : INatsObjStore
             }
 
             ObjectMetadata data;
-                    var buffer = new ReadOnlySequence<byte>(response.Message.Data);
-                    data = NatsObjJsonSerializer<ObjectMetadata>.Default.Deserialize(buffer) ?? throw new NatsObjException("Can't deserialize object metadata");
+            var buffer = new ReadOnlySequence<byte>(response.Message.Data);
+            data = NatsObjJsonSerializer<ObjectMetadata>.Default.Deserialize(buffer) ?? throw new NatsObjException("Can't deserialize object metadata");
 
             if (!showDeleted && data.Deleted)
             {

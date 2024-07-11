@@ -264,17 +264,17 @@ public class NatsKVStore : INatsKVStore
             NatsDeserializeException? deserializeException = null;
             if (response.Message.Data.Length > 0)
             {
-                        var buffer = new ReadOnlySequence<byte>(response.Message.Data);
+                var buffer = new ReadOnlySequence<byte>(response.Message.Data);
 
-                        try
-                        {
-                            data = serializer.Deserialize(buffer);
-                        }
-                        catch (Exception e)
-                        {
-                            deserializeException = new NatsDeserializeException(buffer.ToArray(), e);
-                            data = default;
-                        }
+                try
+                {
+                    data = serializer.Deserialize(buffer);
+                }
+                catch (Exception e)
+                {
+                    deserializeException = new NatsDeserializeException(buffer.ToArray(), e);
+                    data = default;
+                }
             }
             else
             {
