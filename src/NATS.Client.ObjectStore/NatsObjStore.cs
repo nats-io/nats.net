@@ -1,7 +1,6 @@
 using System.Buffers;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using NATS.Client.Core;
 using NATS.Client.Core.Internal;
@@ -540,9 +539,8 @@ public class NatsObjStore : INatsObjStore
                 throw new NatsObjException("Can't decode data message value");
             }
 
-            ObjectMetadata data;
             var buffer = new ReadOnlySequence<byte>(response.Message.Data);
-            data = NatsObjJsonSerializer<ObjectMetadata>.Default.Deserialize(buffer) ?? throw new NatsObjException("Can't deserialize object metadata");
+            var data = NatsObjJsonSerializer<ObjectMetadata>.Default.Deserialize(buffer) ?? throw new NatsObjException("Can't deserialize object metadata");
 
             if (!showDeleted && data.Deleted)
             {
