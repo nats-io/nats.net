@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Text.RegularExpressions;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
@@ -261,34 +262,13 @@ public class NatsKVStore : INatsKVStore
 
             T? data;
             NatsDeserializeException? deserializeException = null;
-            if (response.Message.Data != null)
+            if (response.Message.Data.Length > 0)
             {
-#if NETSTANDARD2_0
-                byte[] bytes;
-                try
-                {
-                    bytes = Convert.FromBase64String(response.Message.Data);
-                }
-                catch (FormatException e)
-                {
-                    throw new NatsKVException("Can't decode data message value", e);
-                }
-
-                var buffer = new ReadOnlySequence<byte>(bytes);
-                try
-                {
-                    data = serializer.Deserialize(buffer);
-                }
-                catch (Exception e)
-                {
-                    deserializeException = new NatsDeserializeException(buffer.ToArray(), e);
-                    data = default;
-                }
-#else
                 var bytes = ArrayPool<byte>.Shared.Rent(response.Message.Data.Length);
                 try
                 {
-                    if (Convert.TryFromBase64String(response.Message.Data, bytes, out var written))
+                    // We should always be getting a 'full block' here, so we can just check on one OperationStatus and be done.
+                    if (System.Buffers.Text.Base64.DecodeFromUtf8(response.Message.Data.Span, bytes.AsSpan(),out _, out var written) == OperationStatus.Done)
                     {
                         var buffer = new ReadOnlySequence<byte>(bytes.AsMemory(0, written));
 
@@ -311,7 +291,6 @@ public class NatsKVStore : INatsKVStore
                 {
                     ArrayPool<byte>.Shared.Return(bytes);
                 }
-#endif
             }
             else
             {

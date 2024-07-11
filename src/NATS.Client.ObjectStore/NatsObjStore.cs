@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using NATS.Client.Core;
 using NATS.Client.Core.Internal;
@@ -530,17 +531,33 @@ public class NatsObjStore : INatsObjStore
         {
             LastBySubj = GetMetaSubject(key),
         };
+
         try
         {
             var response = await _stream.GetAsync(request, cancellationToken);
-
-            if (response.Message.Data == null)
+            if (response.Message.Data.Length == 0)
             {
                 throw new NatsObjException("Can't decode data message value");
             }
 
-            var base64String = Convert.FromBase64String(response.Message.Data);
-            var data = NatsObjJsonSerializer<ObjectMetadata>.Default.Deserialize(new ReadOnlySequence<byte>(base64String)) ?? throw new NatsObjException("Can't deserialize object metadata");
+            var bytes = ArrayPool<byte>.Shared.Rent(response.Message.Data.Length);
+            ObjectMetadata data;
+            try
+            {
+                if (System.Buffers.Text.Base64.DecodeFromUtf8(response.Message.Data.Span, bytes.AsSpan(),out _, out var written) == OperationStatus.Done)
+                {
+                    var buffer = new ReadOnlySequence<byte>(bytes.AsMemory(0, written));
+                    data = NatsObjJsonSerializer<ObjectMetadata>.Default.Deserialize(buffer) ?? throw new NatsObjException("Can't deserialize object metadata");
+                }
+                else
+                {
+                    throw new NatsObjException("Can't decode data message value");
+                }
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(bytes);
+            }
 
             if (!showDeleted && data.Deleted)
             {
