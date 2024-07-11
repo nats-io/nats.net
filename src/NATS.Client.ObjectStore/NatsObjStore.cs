@@ -544,7 +544,7 @@ public class NatsObjStore : INatsObjStore
             ObjectMetadata data;
             try
             {
-                if (System.Buffers.Text.Base64.DecodeFromUtf8(response.Message.Data.Span, bytes.AsSpan(),out _, out var written) == OperationStatus.Done)
+                if (System.Buffers.Text.Base64.DecodeFromUtf8(response.Message.Data.Span, bytes.AsSpan(), out _, out var written) == OperationStatus.Done)
                 {
                     var buffer = new ReadOnlySequence<byte>(bytes.AsMemory(0, written));
                     data = NatsObjJsonSerializer<ObjectMetadata>.Default.Deserialize(buffer) ?? throw new NatsObjException("Can't deserialize object metadata");
