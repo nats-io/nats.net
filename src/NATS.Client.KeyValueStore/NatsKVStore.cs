@@ -268,7 +268,7 @@ public class NatsKVStore : INatsKVStore
                 try
                 {
                     // We should always be getting a 'full block' here, so we can just check on one OperationStatus and be done.
-                    if (System.Buffers.Text.Base64.DecodeFromUtf8(response.Message.Data.Span, bytes.AsSpan(),out _, out var written) == OperationStatus.Done)
+                    if (System.Buffers.Text.Base64.DecodeFromUtf8(response.Message.Data.Span, bytes.AsSpan(), out _, out var written) == OperationStatus.Done)
                     {
                         var buffer = new ReadOnlySequence<byte>(bytes.AsMemory(0, written));
 

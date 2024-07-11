@@ -29,7 +29,6 @@ public record StoredMessage
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("data")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    //[System.ComponentModel.DataAnnotations.StringLength(int.MaxValue)]
     public ReadOnlyMemory<byte> Data { get; set; }
 
     /// <summary>
