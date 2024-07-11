@@ -264,13 +264,7 @@ public class NatsKVStore : INatsKVStore
             NatsDeserializeException? deserializeException = null;
             if (response.Message.Data.Length > 0)
             {
-                var bytes = ArrayPool<byte>.Shared.Rent(response.Message.Data.Length);
-                try
-                {
-                    // We should always be getting a 'full block' here, so we can just check on one OperationStatus and be done.
-                    if (System.Buffers.Text.Base64.DecodeFromUtf8(response.Message.Data.Span, bytes.AsSpan(), out _, out var written) == OperationStatus.Done)
-                    {
-                        var buffer = new ReadOnlySequence<byte>(bytes.AsMemory(0, written));
+                        var buffer = new ReadOnlySequence<byte>(response.Message.Data);
 
                         try
                         {
@@ -281,16 +275,6 @@ public class NatsKVStore : INatsKVStore
                             deserializeException = new NatsDeserializeException(buffer.ToArray(), e);
                             data = default;
                         }
-                    }
-                    else
-                    {
-                        throw new NatsKVException("Can't decode data message value");
-                    }
-                }
-                finally
-                {
-                    ArrayPool<byte>.Shared.Return(bytes);
-                }
             }
             else
             {

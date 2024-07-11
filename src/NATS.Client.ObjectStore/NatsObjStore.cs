@@ -540,24 +540,9 @@ public class NatsObjStore : INatsObjStore
                 throw new NatsObjException("Can't decode data message value");
             }
 
-            var bytes = ArrayPool<byte>.Shared.Rent(response.Message.Data.Length);
             ObjectMetadata data;
-            try
-            {
-                if (System.Buffers.Text.Base64.DecodeFromUtf8(response.Message.Data.Span, bytes.AsSpan(), out _, out var written) == OperationStatus.Done)
-                {
-                    var buffer = new ReadOnlySequence<byte>(bytes.AsMemory(0, written));
+                    var buffer = new ReadOnlySequence<byte>(response.Message.Data);
                     data = NatsObjJsonSerializer<ObjectMetadata>.Default.Deserialize(buffer) ?? throw new NatsObjException("Can't deserialize object metadata");
-                }
-                else
-                {
-                    throw new NatsObjException("Can't decode data message value");
-                }
-            }
-            finally
-            {
-                ArrayPool<byte>.Shared.Return(bytes);
-            }
 
             if (!showDeleted && data.Deleted)
             {
