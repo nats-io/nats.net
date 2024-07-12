@@ -121,7 +121,14 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
 
         if (readerTask != null)
-            await readerTask.WaitAsync(TimeSpan.FromSeconds(3), _cts.Token).ConfigureAwait(false);
+        {
+            // We have to wait for the reader loop to finish before we can reuse the pipe.
+            // Setting a timeout here is not practical, as we won't be able to recover from a timeout.
+            // The reader loop should finish quickly, as it will be canceled by the reader cancellation token.
+            // If it doesn't, the only potential blocker would be the socket connection, which should be
+            // closed by the time we get here or soon after.
+            await readerTask.WaitAsync(_cts.Token).ConfigureAwait(false);
+        }
     }
 
     public async ValueTask DisposeAsync()
