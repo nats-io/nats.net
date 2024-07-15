@@ -127,7 +127,7 @@ public class NatsObjStore : INatsObjStore
                             var segment = memoryOwner.DangerousGetArray();
                             await hashedStream.WriteAsync(segment.Array, segment.Offset, segment.Count, cancellationToken);
 #else
-                        await hashedStream.WriteAsync(memoryOwner.Memory, cancellationToken);
+                            await hashedStream.WriteAsync(memoryOwner.Memory, cancellationToken);
 #endif
                         }
 
@@ -139,7 +139,7 @@ public class NatsObjStore : INatsObjStore
                     }
                 }
 
-                digest = Base64UrlEncoder.EncodeToMemoryOwner(sha256.Hash);
+            digest = Base64UrlEncoder.EncodeToMemoryOwner(sha256.Hash);
             }
 
             if (info.Digest == null
@@ -148,7 +148,6 @@ public class NatsObjStore : INatsObjStore
             {
                 throw new NatsObjException("SHA-256 digest mismatch");
             }
-
 
             if (chunks != info.Chunks)
             {
@@ -281,17 +280,17 @@ public class NatsObjStore : INatsObjStore
 #endif
 
                             // End of stream
-                            if (read == 0)
+                        if (read == 0)
                             {
                                 eof = true;
                                 break;
                             }
 
-                            memory = memory.Slice(read);
-                            currentChunkSize += read;
+                        memory = memory.Slice(read);
+                        currentChunkSize += read;
 
                             // Chunk filled
-                            if (memory.IsEmpty)
+                        if (memory.IsEmpty)
                             {
                                 break;
                             }
@@ -314,10 +313,10 @@ public class NatsObjStore : INatsObjStore
                     }
                 }
 
-                if (sha256.Hash == null)
+            if (sha256.Hash == null)
                     throw new NatsObjException("Can't compute SHA256 hash");
 
-                digest = Base64UrlEncoder.EncodeToMemoryOwner(sha256.Hash);
+            digest = Base64UrlEncoder.EncodeToMemoryOwner(sha256.Hash);
             }
 
             meta.Chunks = chunks;
