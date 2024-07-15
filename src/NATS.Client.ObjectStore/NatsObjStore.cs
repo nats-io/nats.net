@@ -530,17 +530,17 @@ public class NatsObjStore : INatsObjStore
         {
             LastBySubj = GetMetaSubject(key),
         };
+
         try
         {
             var response = await _stream.GetAsync(request, cancellationToken);
-
-            if (response.Message.Data == null)
+            if (response.Message.Data.Length == 0)
             {
                 throw new NatsObjException("Can't decode data message value");
             }
 
-            var base64String = Convert.FromBase64String(response.Message.Data);
-            var data = NatsObjJsonSerializer<ObjectMetadata>.Default.Deserialize(new ReadOnlySequence<byte>(base64String)) ?? throw new NatsObjException("Can't deserialize object metadata");
+            var buffer = new ReadOnlySequence<byte>(response.Message.Data);
+            var data = NatsObjJsonSerializer<ObjectMetadata>.Default.Deserialize(buffer) ?? throw new NatsObjException("Can't deserialize object metadata");
 
             if (!showDeleted && data.Deleted)
             {
