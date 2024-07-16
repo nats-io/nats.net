@@ -104,7 +104,7 @@ public class NatsObjStore : INatsObjStore
 #if NETSTANDARD2_0
                 using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Write))
 #else
-            await using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Write, leaveOpen))
+                await using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Write, leaveOpen))
 #endif
                 {
                     await foreach (var msg in pushConsumer.Msgs.ReadAllAsync(cancellationToken))
@@ -139,7 +139,7 @@ public class NatsObjStore : INatsObjStore
                     }
                 }
 
-            digest = Base64UrlEncoder.EncodeToMemoryOwner(sha256.Hash);
+                digest = Base64UrlEncoder.EncodeToMemoryOwner(sha256.Hash);
             }
 
             if (info.Digest == null
@@ -280,17 +280,17 @@ public class NatsObjStore : INatsObjStore
 #endif
 
                             // End of stream
-                        if (read == 0)
+                            if (read == 0)
                             {
                                 eof = true;
                                 break;
                             }
 
-                        memory = memory.Slice(read);
-                        currentChunkSize += read;
+                            memory = memory.Slice(read);
+                            currentChunkSize += read;
 
                             // Chunk filled
-                        if (memory.IsEmpty)
+                            if (memory.IsEmpty)
                             {
                                 break;
                             }
@@ -313,10 +313,10 @@ public class NatsObjStore : INatsObjStore
                     }
                 }
 
-            if (sha256.Hash == null)
+                if (sha256.Hash == null)
                     throw new NatsObjException("Can't compute SHA256 hash");
 
-            digest = Base64UrlEncoder.EncodeToMemoryOwner(sha256.Hash);
+                digest = Base64UrlEncoder.EncodeToMemoryOwner(sha256.Hash);
             }
 
             meta.Chunks = chunks;

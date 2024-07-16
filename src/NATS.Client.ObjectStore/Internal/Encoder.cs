@@ -127,7 +127,7 @@ internal static class Base64UrlEncoder
                 j += 3;
             }
 
-        break;
+            break;
 
         case 1:
             {
@@ -138,7 +138,7 @@ internal static class Base64UrlEncoder
                 j += 2;
             }
 
-        break;
+            break;
 
             // default or case 0: no further operations are needed.
         }
