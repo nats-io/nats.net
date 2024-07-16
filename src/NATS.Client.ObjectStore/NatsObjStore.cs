@@ -240,7 +240,7 @@ public class NatsObjStore : INatsObjStore
 #if NETSTANDARD2_0
                 using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Read))
 #else
-            await using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Read, leaveOpen))
+                await using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Read, leaveOpen))
 #endif
                 {
                     while (true)
@@ -276,7 +276,7 @@ public class NatsObjStore : INatsObjStore
                             }
 
 #else
-                        var read = await hashedStream.ReadAsync(memory, cancellationToken);
+                            var read = await hashedStream.ReadAsync(memory, cancellationToken);
 #endif
 
                             // End of stream
