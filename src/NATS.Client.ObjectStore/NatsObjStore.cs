@@ -542,6 +542,10 @@ public class NatsObjStore : INatsObjStore
             var base64String = Convert.FromBase64String(response.Message.Data);
             var data = NatsObjJsonSerializer<ObjectMetadata>.Default.Deserialize(new ReadOnlySequence<byte>(base64String)) ?? throw new NatsObjException("Can't deserialize object metadata");
 
+            if (!DateTimeOffset.TryParse(response.Message.Time, out var created))
+                throw new NatsObjException("Can't parse timestamp message value");
+            data.MTime = created;
+
             if (!showDeleted && data.Deleted)
             {
                 throw new NatsObjNotFoundException($"Object not found: {key}");
