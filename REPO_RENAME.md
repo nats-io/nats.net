@@ -1,4 +1,4 @@
-# This repository will be renamed to `nats.net` on Wednesday, July 17th, 2024
+# This repository was renamed to `nats.net` on Wednesday, July 17th, 2024
 
 We wanted to let you know about an upcoming rename to our NATS .NET GitHub repositories on Wednesday, July 17. Here's what's changing:
 

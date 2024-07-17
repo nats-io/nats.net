@@ -1,7 +1,6 @@
-### :mega: :warning: This repository will be renamed to `nats.net` on Wednesday, July 17th, 2024
+### Looking for NATS .NET v1? [Click here](https://github.com/nats-io/nats.net.v1)
 
-Please be prepared to update your references to the new name.
-You can also read the [announcement](REPO_RENAME.md) for more information.
+Please update your references to the new name. You can also read the [announcement](REPO_RENAME.md) for more information.
 
 ---
 
