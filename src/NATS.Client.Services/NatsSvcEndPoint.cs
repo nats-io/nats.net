@@ -191,17 +191,21 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
         try
         {
             msg = NatsMsg<T>.Build(subject, replyTo, headersBuffer, payloadBuffer, _nats, _nats.HeaderParser, _serializer);
-            exception = null;
+            exception = msg.Error;
         }
         catch (Exception e)
         {
             _logger.LogError(NatsSvcLogEvents.Endpoint, e, "Endpoint {Name} error building message", Name);
             exception = e;
 
-            // Most likely a serialization error.
             // Make sure we have a valid message
             // so handler can reply with an error.
             msg = new NatsMsg<T>(subject, replyTo, subject.Length + (replyTo?.Length ?? 0), default, default, _nats);
+        }
+
+        if (exception is not null)
+        {
+            _logger.LogWarning(NatsSvcLogEvents.Endpoint, exception, "Endpoint {Name} error receiving message", Name);
         }
 
         return _channel.Writer.WriteAsync(new NatsSvcMsg<T>(msg, this, exception), _cancellationToken);
@@ -212,57 +216,67 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
     private async Task HandlerLoop()
     {
         var stopwatch = new Stopwatch();
-        await foreach (var svcMsg in _channel.Reader.ReadAllAsync(_cancellationToken).ConfigureAwait(false))
+        try
         {
-            Interlocked.Increment(ref _requests);
-            stopwatch.Restart();
-            try
+            await foreach (var svcMsg in _channel.Reader.ReadAllAsync(_cancellationToken).ConfigureAwait(false))
             {
-                await _handler(svcMsg).ConfigureAwait(false);
-            }
-            catch (Exception e)
-            {
-                int code;
-                string message;
-                string body;
-                if (e is NatsSvcEndpointException epe)
-                {
-                    code = epe.Code;
-                    message = epe.Message;
-                    body = epe.Body;
-                }
-                else
-                {
-                    // Do not expose exceptions unless explicitly
-                    // thrown as NatsSvcEndpointException
-                    code = 999;
-                    message = "Handler error";
-                    body = string.Empty;
-
-                    // Only log unknown exceptions
-                    _logger.LogError(NatsSvcLogEvents.Endpoint, e, "Endpoint {Name} error processing message", Name);
-                }
-
+                Interlocked.Increment(ref _requests);
+                stopwatch.Restart();
                 try
                 {
-                    if (string.IsNullOrWhiteSpace(body))
+                    await _handler(svcMsg).ConfigureAwait(false);
+                }
+                catch (Exception e)
+                {
+                    int code;
+                    string message;
+                    string body;
+                    if (e is NatsSvcEndpointException epe)
                     {
-                        await svcMsg.ReplyErrorAsync(code, message, cancellationToken: _cancellationToken);
+                        code = epe.Code;
+                        message = epe.Message;
+                        body = epe.Body;
                     }
                     else
                     {
-                        await svcMsg.ReplyErrorAsync(code, message, data: Encoding.UTF8.GetBytes(body), cancellationToken: _cancellationToken);
+                        // Do not expose exceptions unless explicitly
+                        // thrown as NatsSvcEndpointException
+                        code = 999;
+                        message = "Handler error";
+                        body = string.Empty;
+
+                        // Only log unknown exceptions
+                        _logger.LogError(NatsSvcLogEvents.Endpoint, e, "Endpoint {Name} error processing message", Name);
+                    }
+
+                    try
+                    {
+                        if (string.IsNullOrWhiteSpace(body))
+                        {
+                            await svcMsg.ReplyErrorAsync(code, message, cancellationToken: _cancellationToken);
+                        }
+                        else
+                        {
+                            await svcMsg.ReplyErrorAsync(code, message, data: Encoding.UTF8.GetBytes(body), cancellationToken: _cancellationToken);
+                        }
+                    }
+                    catch (Exception e1)
+                    {
+                        _logger.LogError(NatsSvcLogEvents.Endpoint, e1, "Endpoint {Name} error responding", Name);
                     }
                 }
-                catch (Exception e1)
+                finally
                 {
-                    _logger.LogError(NatsSvcLogEvents.Endpoint, e1, "Endpoint {Name} error responding", Name);
+                    Interlocked.Add(ref _processingTime, ToNanos(stopwatch.Elapsed));
                 }
             }
-            finally
-            {
-                Interlocked.Add(ref _processingTime, ToNanos(stopwatch.Elapsed));
-            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(NatsSvcLogEvents.Endpoint, e, "Endpoint {Name} error in handler loop", Name);
         }
     }
 

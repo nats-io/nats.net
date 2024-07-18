@@ -198,7 +198,7 @@ public class NatsSvcServer : INatsSvcServer
             foreach (var subject in new[] { $"$SRV.{type}", $"$SRV.{type}.{name}", $"$SRV.{type}.{name}.{_id}" })
             {
                 // for discovery subjects do not use a queue group
-                var svcListener = new SvcListener(_nats, _channel, svcType, subject, default, _cts.Token);
+                var svcListener = new SvcListener(_logger, _nats, _channel, svcType, subject, default, _cts.Token);
                 await svcListener.StartAsync();
                 _svcListeners.Add(svcListener);
             }
