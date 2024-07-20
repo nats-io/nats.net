@@ -256,9 +256,6 @@ public class NatsKVStore : INatsKVStore
                 }
             }
 
-            if (!DateTimeOffset.TryParse(response.Message.Time, out var created))
-                throw new NatsKVException("Can't parse timestamp message value");
-
             T? data;
             NatsDeserializeException? deserializeException = null;
             if (response.Message.Data.Length > 0)
@@ -282,7 +279,7 @@ public class NatsKVStore : INatsKVStore
 
             return new NatsKVEntry<T>(Bucket, key)
             {
-                Created = created,
+                Created = response.Message.Time,
                 Revision = response.Message.Seq,
                 Value = data,
                 UsedDirectGet = false,

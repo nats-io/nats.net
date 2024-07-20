@@ -542,9 +542,7 @@ public class NatsObjStore : INatsObjStore
             var buffer = new ReadOnlySequence<byte>(response.Message.Data);
             var data = NatsObjJsonSerializer<ObjectMetadata>.Default.Deserialize(buffer) ?? throw new NatsObjException("Can't deserialize object metadata");
 
-            if (!DateTimeOffset.TryParse(response.Message.Time, out var created))
-                throw new NatsObjException("Can't parse timestamp message value");
-            data.MTime = created;
+            data.MTime = response.Message.Time;
 
             if (!showDeleted && data.Deleted)
             {
