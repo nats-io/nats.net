@@ -261,20 +261,10 @@ public class NatsKVStore : INatsKVStore
 
             T? data;
             NatsDeserializeException? deserializeException = null;
-            if (response.Message.Data != null)
+            if (response.Message.Data.Length > 0)
             {
-#if NETSTANDARD2_0
-                byte[] bytes;
-                try
-                {
-                    bytes = Convert.FromBase64String(response.Message.Data);
-                }
-                catch (FormatException e)
-                {
-                    throw new NatsKVException("Can't decode data message value", e);
-                }
+                var buffer = new ReadOnlySequence<byte>(response.Message.Data);
 
-                var buffer = new ReadOnlySequence<byte>(bytes);
                 try
                 {
                     data = serializer.Deserialize(buffer);
@@ -284,34 +274,6 @@ public class NatsKVStore : INatsKVStore
                     deserializeException = new NatsDeserializeException(buffer.ToArray(), e);
                     data = default;
                 }
-#else
-                var bytes = ArrayPool<byte>.Shared.Rent(response.Message.Data.Length);
-                try
-                {
-                    if (Convert.TryFromBase64String(response.Message.Data, bytes, out var written))
-                    {
-                        var buffer = new ReadOnlySequence<byte>(bytes.AsMemory(0, written));
-
-                        try
-                        {
-                            data = serializer.Deserialize(buffer);
-                        }
-                        catch (Exception e)
-                        {
-                            deserializeException = new NatsDeserializeException(buffer.ToArray(), e);
-                            data = default;
-                        }
-                    }
-                    else
-                    {
-                        throw new NatsKVException("Can't decode data message value");
-                    }
-                }
-                finally
-                {
-                    ArrayPool<byte>.Shared.Return(bytes);
-                }
-#endif
             }
             else
             {

@@ -18,6 +18,7 @@ internal sealed record SubscriptionMetadata(int Sid);
 internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposable
 {
     private readonly ILogger<SubscriptionManager> _logger;
+    private readonly bool _debug;
     private readonly object _gate = new();
     private readonly NatsConnection _connection;
     private readonly string _inboxPrefix;
@@ -37,6 +38,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
         _connection = connection;
         _inboxPrefix = inboxPrefix;
         _logger = _connection.Opts.LoggerFactory.CreateLogger<SubscriptionManager>();
+        _debug = _logger.IsEnabled(LogLevel.Debug);
         _cts = new CancellationTokenSource();
         _cleanupInterval = _connection.Opts.SubscriptionCleanUpInterval;
         _timer = Task.Run(CleanupAsync);
@@ -148,17 +150,24 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
 
     public ValueTask RemoveAsync(NatsSubBase sub)
     {
-        if (!_bySub.TryGetValue(sub, out var subMetadata))
-        {
-            // this can happen when a call to SubscribeAsync is canceled or timed out before subscribing
-            // in that case, return as there is nothing to unsubscribe
-            return default;
-        }
-
+        SubscriptionMetadata? subMetadata;
         lock (_gate)
         {
+            if (!_bySub.TryGetValue(sub, out subMetadata))
+            {
+                // this can happen when a call to SubscribeAsync is canceled or timed out before subscribing
+                // in that case, return as there is nothing to unsubscribe
+                _logger.LogInformation(NatsLogEvents.Subscription, "No need to remove subscription {Subject}", sub.Subject);
+                return default;
+            }
+
             _bySub.Remove(sub);
             _bySid.TryRemove(subMetadata.Sid, out _);
+        }
+
+        if (_debug)
+        {
+            _logger.LogDebug(NatsLogEvents.Subscription, "Removing subscription {Subject}/{Sid}", sub.Subject, subMetadata.Sid);
         }
 
         return _connection.UnsubscribeAsync(subMetadata.Sid);
@@ -234,6 +243,12 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
     private async ValueTask SubscribeInternalAsync(string subject, string? queueGroup, NatsSubOpts? opts, NatsSubBase sub, CancellationToken cancellationToken)
     {
         var sid = GetNextSid();
+
+        if (_debug)
+        {
+            _logger.LogDebug(NatsLogEvents.Subscription, "New subscription {Subject}/{Sid}", sub.Subject, sid);
+        }
+
         lock (_gate)
         {
             _bySid[sid] = new SidMetadata(Subject: subject, WeakReference: new WeakReference<NatsSubBase>(sub));

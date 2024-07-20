@@ -17,11 +17,10 @@ public class NuidWriterTests
     }
 
     [Theory]
-    [InlineData(default(string))]
     [InlineData("")]
     [InlineData("__INBOX")]
     [InlineData("long-inbox-prefix-above-stackalloc-limit-of-64")]
-    public void NewInbox_NuidAppended(string? prefix)
+    public void NewInbox_NuidAppended(string prefix)
     {
         var natsOpts = NatsOpts.Default with { InboxPrefix = prefix! };
         var sut = new NatsConnection(natsOpts);
@@ -29,8 +28,8 @@ public class NuidWriterTests
         var inbox = sut.InboxPrefix;
         var newInbox = sut.NewInbox();
 
-        Assert.Matches($"{prefix ?? string.Empty}{(prefix?.Length > 0 ? "." : string.Empty)}[A-z0-9]{{22}}", inbox);
-        Assert.Matches($"{prefix ?? string.Empty}{(prefix?.Length > 0 ? "." : string.Empty)}[A-z0-9]{{22}}.[A-z0-9]{{22}}", newInbox);
+        Assert.Matches($"{prefix}{(prefix.Length > 0 ? "." : string.Empty)}[A-z0-9]{{22}}", inbox);
+        Assert.Matches($"{prefix}{(prefix.Length > 0 ? "." : string.Empty)}[A-z0-9]{{22}}.[A-z0-9]{{22}}", newInbox);
         _outputHelper.WriteLine($"Prefix:   '{prefix}'");
         _outputHelper.WriteLine($"Inbox:    '{inbox}'");
         _outputHelper.WriteLine($"NewInbox: '{newInbox}'");
