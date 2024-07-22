@@ -38,10 +38,10 @@ public record StoredMessage
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
 #if NET6_0
-    public string Time { get; set; } = default!;
+    public DateTimeOffset Time { get; set; } = default!;
 #else
 #pragma warning disable SA1206
-    public required string Time { get; set; }
+    public required DateTimeOffset Time { get; set; }
 #pragma warning restore SA1206
 #endif
 
