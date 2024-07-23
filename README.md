@@ -14,7 +14,7 @@ fully supporting all NATS features.
 It integrates seamlessly with modern .NET asynchronous interfaces such as
 async enumerables and channels, and leverages advanced .NET memory, buffer and IO features.
 
-Check out [NATS .NET client library documentation](https://nats-io.github.io/nats.net.v2/) for guides and examples.
+Check out [NATS .NET client library documentation](https://nats-io.github.io/nats.net/) for guides and examples.
 
 ### What is NATS?
 
@@ -68,7 +68,7 @@ await foreach (var jsMsg in consumer.ConsumeAsync<string>())
 }
 ```
 
-See more details, including how to download and start NATS server and JetStream in our [documentation](https://nats-io.github.io/nats.net.v2/documentation/intro.html).
+See more details, including how to download and start NATS server and JetStream in our [documentation](https://nats-io.github.io/nats.net/documentation/intro.html).
 
 **Additionally check out [NATS by example](https://natsbyexample.com) - An evolving collection of runnable, cross-client reference examples for NATS.**
 
