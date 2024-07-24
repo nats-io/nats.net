@@ -141,6 +141,9 @@ internal class NatsJSOrderedPushConsumer<T>
     {
         _nats.ConnectionDisconnected -= OnDisconnected;
 
+        // For correctly Dispose,
+        // first stop the consumer Creation operations and then the command execution operations.
+        // It is necessary that all consumerCreation operations have time to complete before command CommandLoop stop
         _consumerCreateChannel.Writer.TryComplete();
         await _consumerCreateTask;
 
