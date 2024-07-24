@@ -534,6 +534,7 @@ public class NatsObjStore : INatsObjStore
             InitialSetOnly = true,
             UpdatesOnly = false,
             IgnoreDeletes = !opts.ShowDeleted,
+            OnNoData = opts.OnNoData,
         };
         return WatchAsync(watchOpts, cancellationToken);
     }
@@ -582,6 +583,14 @@ public class NatsObjStore : INatsObjStore
             cancellationToken: cancellationToken);
 
         pushConsumer.Init();
+
+        if (pushConsumer.Msgs.Count == 0 && opts.OnNoData != null)
+        {
+            if (await opts.OnNoData(cancellationToken))
+            {
+                yield break;
+            }
+        }
 
         await foreach (var msg in pushConsumer.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
@@ -685,11 +694,21 @@ public record NatsObjWatchOpts
     /// Only return the initial set of objects and don't watch for further updates.
     /// </summary>
     public bool InitialSetOnly { get; init; }
+
+    /// <summary>
+    /// Async function called when the enumerator reaches the end of data. Return True to break the async enumeration, False to allow the enumeration to continue.
+    /// </summary>
+    public Func<CancellationToken, ValueTask<bool>>? OnNoData { get; init; }
 }
 
 public record NatsObjListOpts
 {
     public bool ShowDeleted { get; init; }
+
+    /// <summary>
+    /// Async function called when the enumerator reaches the end of data. Return True to break the async enumeration, False to allow the enumeration to continue.
+    /// </summary>
+    public Func<CancellationToken, ValueTask<bool>>? OnNoData { get; init; }
 }
 
 public record NatsObjStatus(string Bucket, bool IsCompressed, StreamInfo Info);
