@@ -142,11 +142,12 @@ internal class NatsJSOrderedPushConsumer<T>
         _nats.ConnectionDisconnected -= OnDisconnected;
 
         _consumerCreateChannel.Writer.TryComplete();
-        _commandChannel.Writer.TryComplete();
-        _msgChannel.Writer.TryComplete();
-
         await _consumerCreateTask;
+
+        _commandChannel.Writer.TryComplete();
         await _commandTask;
+
+        _msgChannel.Writer.TryComplete();
 
         await _context.DeleteConsumerAsync(_stream, Consumer, _cancellationToken);
     }
