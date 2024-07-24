@@ -226,12 +226,7 @@ public class NatsKVContext : INatsKVContext
             // MirrorDirect =
             // Mirror =
             Retention = StreamConfigRetention.Limits, // from ADR-8
-            DuplicateWindow = config.MaxAge != default ? config.MaxAge : TimeSpan.FromMinutes(2), // 120_000_000_000ns, from ADR-8
         };
-
-        // https://github.com/nats-io/nats.go/blob/98430acd80423b776149f29d625d158f490ac3c5/jetstream/kv.go#L334-L342
-        if (streamConfig.MaxAge > TimeSpan.Zero && streamConfig.MaxAge < streamConfig.DuplicateWindow)
-            streamConfig.DuplicateWindow = streamConfig.MaxAge;
 
         return streamConfig;
     }
