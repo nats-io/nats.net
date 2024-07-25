@@ -76,7 +76,7 @@ internal static class NatsJSOptsDefaults
             throw new NatsJSException($"{nameof(idleHeartbeat)} must be less than {HeartbeatCap}");
         }
 
-        if (idleHeartbeatOut < HeartbeatMin)
+        if (idleHeartbeatOut != TimeSpan.Zero && idleHeartbeatOut < HeartbeatMin)
         {
             throw new NatsJSException($"{nameof(idleHeartbeat)} must be greater than {HeartbeatMin}");
         }
