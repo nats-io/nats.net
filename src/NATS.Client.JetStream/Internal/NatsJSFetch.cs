@@ -134,7 +134,15 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
             serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
             cancellationToken: cancellationToken);
 
-    public void ResetHeartbeatTimer() => _hbTimer.Change(_hbTimeout, Timeout.Infinite);
+    public void ResetHeartbeatTimer()
+    {
+        // if we don't have an idle timeout, we don't need to reset the timer
+        // because we don't expect any heartbeats.
+        if (_idle == TimeSpan.Zero)
+            return;
+
+        _hbTimer.Change(_hbTimeout, Timeout.Infinite);
+    }
 
     public override async ValueTask DisposeAsync()
     {
