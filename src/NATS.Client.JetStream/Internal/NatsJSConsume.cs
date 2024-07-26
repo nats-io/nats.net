@@ -308,6 +308,8 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                     {
                         _notificationChannel?.Notify(new NatsJSProtocolNotification("Unhandled protocol message", headers.Code, headers.MessageText));
                         _logger.LogWarning(NatsJSLogEvents.ProtocolMessage, "Unhandled protocol message: {Code} {Description}", headers.Code, headers.MessageText);
+                        _userMsgs.Writer.TryComplete(new NatsJSProtocolException(headers.Code, headers.Message, headers.MessageText));
+                        EndSubscription(NatsSubEndReason.JetStreamError);
                     }
                 }
                 else
