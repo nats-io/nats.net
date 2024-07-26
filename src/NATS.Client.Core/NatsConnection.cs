@@ -396,8 +396,9 @@ public partial class NatsConnection : INatsConnection
 
         try
         {
-            // wait for INFO
-            await waitForInfoSignal.Task.ConfigureAwait(false);
+            // Wait for an INFO message from server. If we land on a dead socket and server response
+            // can't be received, this will throw a timeout exception and we will retry the connection.
+            await waitForInfoSignal.Task.WaitAsync(Opts.RequestTimeout).ConfigureAwait(false);
 
             // check to see if we should upgrade to TLS
             if (_socket is TcpConnection tcpConnection)

@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.IO.Pipelines;
+using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
@@ -592,6 +593,21 @@ internal sealed class CommandWriter : IAsyncDisposable
         catch (ObjectDisposedException)
         {
             // Expected during shutdown
+        }
+        catch (SocketException e)
+        {
+            logger.LogWarning(NatsLogEvents.Buffer, e, "Socket error in send buffer reader loop");
+            try
+            {
+                // We signal the connection to disconnect, which will trigger a reconnect
+                // in the connection loop.  This is necessary because the connection may
+                // be half-open, and we can't rely on the reader loop to detect that.
+                connection.SignalDisconnected(e);
+            }
+            catch (Exception e1)
+            {
+                logger.LogWarning(NatsLogEvents.Buffer, e1, "Error when signaling disconnect");
+            }
         }
         catch (Exception e)
         {
