@@ -116,7 +116,7 @@ public class SendBufferTest
 
         Log("__________________________________");
 
-        var testLogger = new InMemoryTestLoggerFactory(LogLevel.Error, m =>
+        var testLogger = new InMemoryTestLoggerFactory(LogLevel.Warning, m =>
         {
             Log($"[NC] {m.Message}");
             if (m.Exception is not SocketException)
