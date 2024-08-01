@@ -1,0 +1,25 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFrameworks>netstandard2.0;netstandard2.1;net6.0;net8.0</TargetFrameworks>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+        <!-- NuGet Packaging -->
+        <PackageTags>pubsub;messaging</PackageTags>
+        <Description>NATS client for .NET</Description>
+
+        <!-- we won't publish on NuGet until we make a proper announcement
+             giving v1 developers a chance to make any potential changes
+             to their build scripts -->
+        <IsPackable>false</IsPackable>
+
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\NATS.Client.Core\NATS.Client.Core.csproj" />
+      <ProjectReference Include="..\NATS.Client.Serializers.Json\NATS.Client.Serializers.Json.csproj" />
+    </ItemGroup>
+
+</Project>

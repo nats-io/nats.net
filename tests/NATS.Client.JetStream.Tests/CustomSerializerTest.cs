@@ -67,6 +67,8 @@ public class CustomSerializerTest
         }
 
         public T Deserialize(in ReadOnlySequence<byte> buffer) => (T)(object)new byte[] { 42 };
+
+        public INatsSerializer<T> CombineWith(INatsSerializer<T> next) => throw new NotImplementedException();
     }
 
     private class Level42SerializerRegistry : INatsSerializerRegistry
