@@ -1,4 +1,4 @@
-﻿namespace NATS.Client.Core;
+namespace NATS.Client.Core;
 
 public interface INatsClient : IAsyncDisposable
 {
@@ -65,7 +65,7 @@ public interface INatsClient : IAsyncDisposable
     /// </remarks>
     IAsyncEnumerable<NatsMsg<T>> SubscribeAsync<T>(string subject, string? queueGroup = default, INatsDeserialize<T>? serializer = default, NatsSubOpts? opts = default, CancellationToken cancellationToken = default);
 
-        /// <summary>
+    /// <summary>
     /// Request and receive a single reply from a responder.
     /// </summary>
     /// <param name="subject">Subject of the responder</param>

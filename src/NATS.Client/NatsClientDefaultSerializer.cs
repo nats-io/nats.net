@@ -1,4 +1,4 @@
-﻿using NATS.Client.Core;
+using NATS.Client.Core;
 using NATS.Client.Serializers.Json;
 
 namespace NATS.Client;

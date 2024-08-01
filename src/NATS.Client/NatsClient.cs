@@ -1,4 +1,4 @@
-﻿using System.Threading.Channels;
+using System.Threading.Channels;
 using NATS.Client.Core;
 
 namespace NATS.Client;
