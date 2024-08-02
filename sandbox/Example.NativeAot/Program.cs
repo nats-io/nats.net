@@ -222,6 +222,8 @@ public class MyProtoBufSerializer<T> : INatsSerializer<T>
 
         throw new NatsException($"Can't deserialize {typeof(T)}");
     }
+
+    public INatsSerializer<T> CombineWith(INatsSerializer<T> next) => throw new NotImplementedException();
 }
 
 public record MyData

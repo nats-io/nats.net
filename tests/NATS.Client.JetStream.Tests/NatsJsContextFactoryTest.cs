@@ -96,6 +96,8 @@ public class NatsJSContextFactoryTest
 
         public NatsOpts Opts { get; } = new();
 
+        public INatsConnection Connection => this;
+
         public NatsConnectionState ConnectionState { get; } = NatsConnectionState.Closed;
 
         public ValueTask<TimeSpan> PingAsync(CancellationToken cancellationToken = default) => throw new NotImplementedException();

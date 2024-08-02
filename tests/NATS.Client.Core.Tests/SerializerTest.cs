@@ -299,6 +299,8 @@ public class TestSerializer<T> : INatsSerializer<T>
     public void Serialize(IBufferWriter<byte> bufferWriter, T? value) => throw new TestSerializerException();
 
     public T? Deserialize(in ReadOnlySequence<byte> buffer) => throw new TestSerializerException();
+
+    public INatsSerializer<T> CombineWith(INatsSerializer<T> next) => throw new NotImplementedException();
 }
 
 public class TestSerializerException : Exception;
@@ -310,6 +312,8 @@ public class TestSerializerWithEmpty<T> : INatsSerializer<T>
         : new TestData(Encoding.ASCII.GetString(buffer)));
 
     public void Serialize(IBufferWriter<byte> bufferWriter, T value) => throw new Exception("not used");
+
+    public INatsSerializer<T> CombineWith(INatsSerializer<T> next) => throw new NotImplementedException();
 }
 
 public record TestData(string Name);

@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
@@ -111,6 +112,8 @@ public partial class NatsConnection : INatsConnection
     public event AsyncEventHandler<NatsEventArgs>? ReconnectFailed;
 
     public event AsyncEventHandler<NatsMessageDroppedEventArgs>? MessageDropped;
+
+    public INatsConnection Connection => this;
 
     public NatsOpts Opts { get; }
 
