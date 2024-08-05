@@ -52,6 +52,7 @@ public partial class NatsConnection : INatsConnection
     private int _pongCount;
     private int _connectionState;
     private int _isDisposed;
+    private int _reconnectCount;
 
     // when reconnected, make new instance.
     private ISocketConnection? _socket;
@@ -73,6 +74,7 @@ public partial class NatsConnection : INatsConnection
 
     public NatsConnection(NatsOpts opts)
     {
+        _logger = opts.LoggerFactory.CreateLogger<NatsConnection>();
         Opts = opts;
         ConnectionState = NatsConnectionState.Closed;
         _waitForOpenConnection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -80,10 +82,9 @@ public partial class NatsConnection : INatsConnection
         _pool = new ObjectPool(opts.ObjectPoolSize);
         _name = opts.Name;
         Counter = new ConnectionStatsCounter();
-        CommandWriter = new CommandWriter(this, _pool, Opts, Counter, EnqueuePing);
+        CommandWriter = new CommandWriter("main", this, _pool, Opts, Counter, EnqueuePing);
         InboxPrefix = NewInbox(opts.InboxPrefix);
         SubscriptionManager = new SubscriptionManager(this, InboxPrefix);
-        _logger = opts.LoggerFactory.CreateLogger<NatsConnection>();
         _clientOpts = ClientOpts.Create(Opts);
         HeaderParser = new NatsHeaderParser(opts.HeaderEncoding);
         _defaultSubscriptionChannelOpts = new BoundedChannelOptions(opts.SubPendingChannelCapacity)
@@ -119,8 +120,12 @@ public partial class NatsConnection : INatsConnection
 
     public NatsConnectionState ConnectionState
     {
-        get => (NatsConnectionState)Volatile.Read(ref _connectionState);
-        private set => Interlocked.Exchange(ref _connectionState, (int)value);
+        get => (NatsConnectionState)Interlocked.CompareExchange(ref _connectionState, 0, 0);
+        private set
+        {
+            _logger.LogDebug(NatsLogEvents.Connection, "Connection state is changing from {OldState} to {NewState}", ConnectionState, value);
+            Interlocked.Exchange(ref _connectionState, (int)value);
+        }
     }
 
     public INatsServerInfo? ServerInfo => WritableServerInfo; // server info is set when received INFO
@@ -388,6 +393,8 @@ public partial class NatsConnection : INatsConnection
 
     private async ValueTask SetupReaderWriterAsync(bool reconnect)
     {
+        _logger.LogDebug(NatsLogEvents.Connection, "Setup reader and writer");
+
         if (_currentConnectUri!.IsSeed)
             _lastSeedConnectUri = _currentConnectUri;
 
@@ -508,18 +515,28 @@ public partial class NatsConnection : INatsConnection
             await DisposeSocketAsync(true).ConfigureAwait(false);
             throw;
         }
+
+        _logger.LogDebug(NatsLogEvents.Connection, "Setup reader and writer completed successfully");
     }
 
     private async void ReconnectLoop()
     {
+        var reconnectCount = Interlocked.Increment(ref _reconnectCount);
+        _logger.LogDebug(NatsLogEvents.Connection, "Reconnect loop started [{ReconnectCount}]", reconnectCount);
+        var debug = _logger.IsEnabled(LogLevel.Debug);
+        var stopwatch = Stopwatch.StartNew();
+
         try
         {
             // If dispose this client, WaitForClosed throws OperationCanceledException so stop reconnect-loop correctly.
             await _socket!.WaitForClosed.ConfigureAwait(false);
 
+            _logger.LogDebug(NatsLogEvents.Connection, "Reconnect loop connection closed [{ReconnectCount}]", reconnectCount);
+
             await CommandWriter.CancelReaderLoopAsync().ConfigureAwait(false);
 
-            _logger.LogTrace(NatsLogEvents.Connection, "Connection {Name} is closed. Will cleanup and reconnect", _name);
+            _logger.LogDebug(NatsLogEvents.Connection, "Connection {Name} is closed. Will cleanup and reconnect [{ReconnectCount}]", _name, reconnectCount);
+
             lock (_gate)
             {
                 ConnectionState = NatsConnectionState.Reconnecting;
@@ -555,11 +572,14 @@ public partial class NatsConnection : INatsConnection
             NatsUri? url = null;
         CONNECT_AGAIN:
 
+            _logger.LogDebug(NatsLogEvents.Connection, "Trying to reconnect [{ReconnectCount}]", reconnectCount);
+
             if (IsDisposed)
             {
                 // No point in trying to reconnect.
-                // This can happen if the we're disposed while we're waiting for the next reconnect
+                // This can happen if we're disposed while we're waiting for the next reconnect
                 // and potentially gets us stuck in a reconnect loop.
+                _logger.LogDebug(NatsLogEvents.Connection, "Disposed, no point in trying to reconnect [{ReconnectCount}]", reconnectCount);
                 return;
             }
 
@@ -572,7 +592,7 @@ public partial class NatsConnection : INatsConnection
                     if (OnConnectingAsync != null)
                     {
                         var target = (url.Host, url.Port);
-                        _logger.LogInformation(NatsLogEvents.Connection, "Try to invoke OnConnectingAsync before connect to NATS");
+                        _logger.LogInformation(NatsLogEvents.Connection, "Try to invoke OnConnectingAsync before connect to NATS [{ReconnectCount}]", reconnectCount);
                         var newTarget = await OnConnectingAsync(target).ConfigureAwait(false);
 
                         if (newTarget.Host != target.Host || newTarget.Port != target.Port)
@@ -581,15 +601,17 @@ public partial class NatsConnection : INatsConnection
                         }
                     }
 
-                    _logger.LogInformation(NatsLogEvents.Connection, "Tried to connect NATS {Url}", url);
+                    _logger.LogInformation(NatsLogEvents.Connection, "Tried to connect NATS {Url} [{ReconnectCount}]", url, reconnectCount);
                     if (url.IsWebSocket)
                     {
+                        _logger.LogDebug(NatsLogEvents.Connection, "Trying to reconnect using WebSocket {Url} [{ReconnectCount}]", url, reconnectCount);
                         var conn = new WebSocketConnection();
                         await conn.ConnectAsync(url.Uri, Opts.ConnectTimeout).ConfigureAwait(false);
                         _socket = conn;
                     }
                     else
                     {
+                        _logger.LogDebug(NatsLogEvents.Connection, "Trying to reconnect using TCP {Url} [{ReconnectCount}]", url, reconnectCount);
                         var conn = new TcpConnection(_logger);
                         await conn.ConnectAsync(url.Host, url.Port, Opts.ConnectTimeout).ConfigureAwait(false);
                         _socket = conn;
@@ -597,6 +619,7 @@ public partial class NatsConnection : INatsConnection
                         if (Opts.TlsOpts.EffectiveMode(url) == TlsMode.Implicit)
                         {
                             // upgrade TcpConnection to SslConnection
+                            _logger.LogDebug(NatsLogEvents.Connection, "Trying to reconnect and upgrading to TLS {Url} [{ReconnectCount}]", url, reconnectCount);
                             var sslConnection = conn.UpgradeToSslStreamConnection(Opts.TlsOpts);
                             await sslConnection.AuthenticateAsClientAsync(FixTlsHost(url), Opts.ConnectTimeout).ConfigureAwait(false);
                             _socket = sslConnection;
@@ -607,6 +630,7 @@ public partial class NatsConnection : INatsConnection
                 }
                 else
                 {
+                    _logger.LogDebug(NatsLogEvents.Connection, "Reconnect URLs exhausted, retrying from the beginning [{ReconnectCount}]", reconnectCount);
                     urlEnumerator.Dispose();
                     urlEnumerator = urls.AsEnumerable().GetEnumerator();
                     goto CONNECT_AGAIN;
@@ -622,13 +646,24 @@ public partial class NatsConnection : INatsConnection
                     return;
                 }
 
-                if (url != null)
-                {
-                    _logger.LogWarning(NatsLogEvents.Connection, ex, "Failed to connect NATS {Url}", url);
-                }
+                _logger.LogWarning(NatsLogEvents.Connection, ex, "Failed to connect NATS {Url} [{ReconnectCount}]", url, reconnectCount);
 
                 _eventChannel.Writer.TryWrite((NatsEvent.ReconnectFailed, new NatsEventArgs(url?.ToString() ?? string.Empty)));
+
+                if (debug)
+                {
+                    stopwatch.Restart();
+                    _logger.LogDebug(NatsLogEvents.Connection, "Reconnect wait with jitter [{ReconnectCount}]", reconnectCount);
+                }
+
                 await WaitWithJitterAsync().ConfigureAwait(false);
+
+                if (debug)
+                {
+                    stopwatch.Stop();
+                    _logger.LogDebug(NatsLogEvents.Connection, "Reconnect wait over after {WaitMs}ms [{ReconnectCount}]", stopwatch.ElapsedMilliseconds, reconnectCount);
+                }
+
                 goto CONNECT_AGAIN;
             }
 
@@ -636,7 +671,7 @@ public partial class NatsConnection : INatsConnection
             {
                 _connectRetry = 0;
                 _backoff = TimeSpan.Zero;
-                _logger.LogInformation(NatsLogEvents.Connection, "Connection succeeded {Name}, NATS {Url}", _name, url);
+                _logger.LogInformation(NatsLogEvents.Connection, "Connection succeeded {Name}, NATS {Url} [{ReconnectCount}]", _name, url, reconnectCount);
                 ConnectionState = NatsConnectionState.Open;
                 _pingTimerCancellationTokenSource = new CancellationTokenSource();
                 StartPingTimer(_pingTimerCancellationTokenSource.Token);
@@ -648,14 +683,26 @@ public partial class NatsConnection : INatsConnection
         catch (Exception ex)
         {
             if (ex is OperationCanceledException)
+            {
+                try
+                {
+                    _logger.LogDebug(NatsLogEvents.Connection, "Operation cancelled. Retry loop stopped because the connection was disposed [{ReconnectCount}]", reconnectCount);
+                }
+                catch
+                {
+                    // ignore logging exceptions in case our host might be disposed or shutting down
+                }
+
                 return;
+            }
+
             _waitForOpenConnection.TrySetException(ex);
             try
             {
                 if (!IsDisposed)
                 {
                     // Only log if we're not disposing, otherwise we might log exceptions that are expected
-                    _logger.LogError(NatsLogEvents.Connection, ex, "Retry loop stopped and connection state is invalid");
+                    _logger.LogError(NatsLogEvents.Connection, ex, "Retry loop stopped and connection state is invalid [{ReconnectCount}]", reconnectCount);
                 }
             }
             catch
@@ -665,6 +712,15 @@ public partial class NatsConnection : INatsConnection
                 // which in turn would crash the application.
                 // (e.g. we've seen this with EventLog provider on Windows)
             }
+        }
+
+        try
+        {
+            _logger.LogDebug(NatsLogEvents.Connection, "Reconnect loop stopped [{ReconnectCount}]", reconnectCount);
+        }
+        catch
+        {
+            // ignore logging exceptions in case our host might be disposed or shutting down
         }
     }
 
@@ -790,6 +846,8 @@ public partial class NatsConnection : INatsConnection
         if (Opts.PingInterval == TimeSpan.Zero)
             return;
 
+        _logger.LogDebug(NatsLogEvents.Connection, "Starting ping timer");
+
         var periodicTimer = new PeriodicTimer(Opts.PingInterval);
         ResetPongCount();
         try
@@ -810,8 +868,28 @@ public partial class NatsConnection : INatsConnection
                 await periodicTimer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false);
             }
         }
+        catch (Exception e)
+        {
+            if (!IsDisposed)
+            {
+                try
+                {
+                    _logger.LogWarning(NatsLogEvents.Connection, e, "Ping timer error");
+                }
+                catch
+                {
+                    // ignore logging exceptions in case our host might be disposed or shutting down
+                }
+            }
+        }
+
+        try
+        {
+            _logger.LogDebug(NatsLogEvents.Connection, "Ping timer stopped");
+        }
         catch
         {
+            // ignore logging exceptions in case our host might be disposed or shutting down
         }
     }
 
@@ -836,13 +914,29 @@ public partial class NatsConnection : INatsConnection
     {
         try
         {
+            _logger.LogDebug(NatsLogEvents.Connection, "Dispose socket component {Description}", description);
+        }
+        catch
+        {
+            // ignore logging exceptions in case our host might be disposed or shutting down
+        }
+
+        try
+        {
             var dispose = component.DisposeAsync();
             if (!dispose.IsCompletedSuccessfully)
                 await dispose.AsTask().WaitAsync(_socketComponentDisposeTimeout).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            _logger.LogError(NatsLogEvents.Connection, ex, $"Error occured when disposing {description}");
+            try
+            {
+                _logger.LogError(NatsLogEvents.Connection, ex, $"Error occured when disposing {description}");
+            }
+            catch
+            {
+                // ignore logging exceptions in case our host might be disposed or shutting down
+            }
         }
     }
 
@@ -851,6 +945,15 @@ public partial class NatsConnection : INatsConnection
     // Dispose Reader(Drain read buffers but no reads more)
     private async ValueTask DisposeSocketAsync(bool asyncReaderDispose)
     {
+        try
+        {
+            _logger.LogDebug(NatsLogEvents.Connection, "Disposing socket");
+        }
+        catch
+        {
+            // ignore logging exceptions in case our host might be disposed or shutting down
+        }
+
         if (_socket != null)
         {
             await DisposeSocketComponentAsync(_socket, "socket").ConfigureAwait(false);
