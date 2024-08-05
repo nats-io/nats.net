@@ -18,6 +18,7 @@ internal sealed record SubscriptionMetadata(int Sid);
 internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposable
 {
     private readonly ILogger<SubscriptionManager> _logger;
+    private readonly bool _trace;
     private readonly bool _debug;
     private readonly object _gate = new();
     private readonly NatsConnection _connection;
@@ -39,6 +40,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
         _inboxPrefix = inboxPrefix;
         _logger = _connection.Opts.LoggerFactory.CreateLogger<SubscriptionManager>();
         _debug = _logger.IsEnabled(LogLevel.Debug);
+        _trace = _logger.IsEnabled(LogLevel.Trace);
         _cts = new CancellationTokenSource();
         _cleanupInterval = _connection.Opts.SubscriptionCleanUpInterval;
         _timer = Task.Run(CleanupAsync);
@@ -90,6 +92,11 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
 
     public ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
     {
+        if (_trace)
+        {
+            _logger.LogTrace(NatsLogEvents.Subscription, "Received subscription data for {Subject}/{Sid}", subject, sid);
+        }
+
         int? orphanSid = null;
         lock (_gate)
         {
@@ -97,6 +104,11 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
             {
                 if (sidMetadata.WeakReference.TryGetTarget(out var sub))
                 {
+                    if (_trace)
+                    {
+                        _logger.LogTrace(NatsLogEvents.Subscription, "Found subscription handler for {Subject}/{Sid}", subject, sid);
+                    }
+
                     return sub.ReceiveAsync(subject, replyTo, headersBuffer, payloadBuffer);
                 }
                 else
@@ -182,6 +194,11 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
     /// <returns>Enumerable list of commands</returns>
     public async ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter)
     {
+        if (_debug)
+        {
+            _logger.LogDebug(NatsLogEvents.Subscription, "Reconnect commands requested");
+        }
+
         var subs = new List<(NatsSubBase, int)>();
         lock (_gate)
         {
@@ -191,12 +208,21 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
                 {
                     subs.Add((sub, sid));
                 }
+                else
+                {
+                    _logger.LogError(NatsLogEvents.Subscription, "While reconnecting found subscription GCd but was never disposed {SidMetadataSubject}/{Sid}", sidMetadata.Subject, sid);
+                }
             }
         }
 
         foreach (var (sub, sid) in subs)
         {
             await sub.WriteReconnectCommandsAsync(commandWriter, sid).ConfigureAwait(false);
+
+            if (_debug)
+            {
+                _logger.LogDebug(NatsLogEvents.Subscription, "Wrote reconnect commands for subscription {Subject}", sub.Subject);
+            }
         }
     }
 
