@@ -11,7 +11,7 @@ public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
 
     internal NatsSub(
         NatsConnection connection,
-        ISubscriptionManager manager,
+        INatsSubscriptionManager manager,
         string subject,
         string? queueGroup,
         NatsSubOpts? opts,

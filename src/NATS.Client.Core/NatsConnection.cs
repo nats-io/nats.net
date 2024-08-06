@@ -84,7 +84,7 @@ public partial class NatsConnection : INatsConnection
         Counter = new ConnectionStatsCounter();
         CommandWriter = new CommandWriter("main", this, _pool, Opts, Counter, EnqueuePing);
         InboxPrefix = NewInbox(opts.InboxPrefix);
-        SubscriptionManager = new SubscriptionManager(this, InboxPrefix);
+        SubscriptionManager = new NatsSubscriptionManager(this, InboxPrefix);
         _clientOpts = ClientOpts.Create(Opts);
         HeaderParser = new NatsHeaderParser(opts.HeaderEncoding);
         _defaultSubscriptionChannelOpts = new BoundedChannelOptions(opts.SubPendingChannelCapacity)
@@ -138,7 +138,7 @@ public partial class NatsConnection : INatsConnection
 
     internal NatsHeaderParser HeaderParser { get; }
 
-    internal SubscriptionManager SubscriptionManager { get; }
+    internal NatsSubscriptionManager SubscriptionManager { get; }
 
     internal CommandWriter CommandWriter { get; }
 

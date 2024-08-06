@@ -30,7 +30,7 @@ public abstract class NatsSubBase
     private readonly ILogger _logger;
     private readonly object _gate = new();
     private readonly bool _debug;
-    private readonly ISubscriptionManager _manager;
+    private readonly INatsSubscriptionManager _manager;
     private readonly Timer? _timeoutTimer;
     private readonly Timer? _idleTimeoutTimer;
     private readonly TimeSpan _idleTimeout;
@@ -48,7 +48,7 @@ public abstract class NatsSubBase
 
     internal NatsSubBase(
         NatsConnection connection,
-        ISubscriptionManager manager,
+        INatsSubscriptionManager manager,
         string subject,
         string? queueGroup,
         NatsSubOpts? opts,

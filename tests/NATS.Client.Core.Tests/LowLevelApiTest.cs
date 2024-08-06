@@ -44,7 +44,7 @@ public class LowLevelApiTest
         private readonly NatsSubCustomTestBuilder _builder;
         private readonly ITestOutputHelper _output;
 
-        public NatsSubTest(string subject, NatsConnection connection, NatsSubCustomTestBuilder builder, ITestOutputHelper output, ISubscriptionManager manager)
+        public NatsSubTest(string subject, NatsConnection connection, NatsSubCustomTestBuilder builder, ITestOutputHelper output, INatsSubscriptionManager manager)
         : base(connection, manager, subject, default, default)
         {
             _builder = builder;
@@ -110,7 +110,7 @@ public class LowLevelApiTest
             }
         }
 
-        public NatsSubTest Build(string subject, NatsSubOpts? opts, NatsConnection connection, ISubscriptionManager manager)
+        public NatsSubTest Build(string subject, NatsSubOpts? opts, NatsConnection connection, INatsSubscriptionManager manager)
         {
             return new NatsSubTest(subject, connection, builder: this, _output, manager);
         }
