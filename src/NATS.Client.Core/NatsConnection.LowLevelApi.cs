@@ -2,7 +2,8 @@ namespace NATS.Client.Core;
 
 public partial class NatsConnection
 {
-    public ValueTask SubAsync(NatsSubBase sub, CancellationToken cancellationToken = default) =>
+    /// <inheritdoc />
+    public ValueTask AddSubAsync(NatsSubBase sub, CancellationToken cancellationToken = default) =>
         ConnectionState != NatsConnectionState.Open
             ? ConnectAndSubAsync(sub, cancellationToken)
             : _subscriptionManager.SubscribeAsync(sub, cancellationToken);

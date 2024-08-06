@@ -357,7 +357,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
         }
 
         _sub = new NatsKVWatchSub<T>(_context, _commandChannel, _serializer, _subOpts, _cancellationToken);
-        await _context.Connection.SubAsync(_sub, _cancellationToken).ConfigureAwait(false);
+        await _context.Connection.AddSubAsync(_sub, _cancellationToken).ConfigureAwait(false);
 
         if (_debug)
         {

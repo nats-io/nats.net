@@ -2,7 +2,8 @@ namespace NATS.Client.Core;
 
 public partial class NatsConnection
 {
-    public async ValueTask<NatsSub<TReply>> RequestSubAsync<TRequest, TReply>(
+    /// <inheritdoc />
+    public async ValueTask<NatsSub<TReply>> CreateRequestSubAsync<TRequest, TReply>(
         string subject,
         TRequest? data,
         NatsHeaders? headers = default,
@@ -16,7 +17,7 @@ public partial class NatsConnection
 
         replySerializer ??= Opts.SerializerRegistry.GetDeserializer<TReply>();
         var sub = new NatsSub<TReply>(this, _subscriptionManager.InboxSubBuilder, replyTo, queueGroup: default, replyOpts, replySerializer);
-        await SubAsync(sub, cancellationToken).ConfigureAwait(false);
+        await AddSubAsync(sub, cancellationToken).ConfigureAwait(false);
 
         requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
         await PublishAsync(subject, data, headers, replyTo, requestSerializer, requestOpts, cancellationToken).ConfigureAwait(false);

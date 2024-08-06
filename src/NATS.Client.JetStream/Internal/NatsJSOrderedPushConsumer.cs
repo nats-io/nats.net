@@ -336,7 +336,7 @@ internal class NatsJSOrderedPushConsumer<T>
         }
 
         _sub = new NatsJSOrderedPushConsumerSub<T>(_context, _commandChannel, _serializer, _subOpts, _cancellationToken);
-        await _context.Connection.SubAsync(_sub, _cancellationToken).ConfigureAwait(false);
+        await _context.Connection.AddSubAsync(_sub, _cancellationToken).ConfigureAwait(false);
 
         if (_debug)
         {

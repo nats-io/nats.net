@@ -183,6 +183,7 @@ public partial class NatsConnection : INatsConnection
         await InitialConnectAsync().ConfigureAwait(false);
     }
 
+    /// <inheritdoc />
     public void OnMessageDropped<T>(NatsSubBase natsSub, int pending, NatsMsg<T> msg)
     {
         var subject = msg.Subject;
@@ -190,7 +191,8 @@ public partial class NatsConnection : INatsConnection
         _eventChannel.Writer.TryWrite((NatsEvent.MessageDropped, new NatsMessageDroppedEventArgs(natsSub, pending, subject, msg.ReplyTo, msg.Headers, msg.Data)));
     }
 
-    public BoundedChannelOptions GetChannelOpts(NatsOpts connectionOpts, NatsSubChannelOpts? subChannelOpts)
+    /// <inheritdoc />
+    public BoundedChannelOptions GetBoundedChannelOpts(NatsSubChannelOpts? subChannelOpts)
     {
         if (subChannelOpts is { } overrideOpts)
         {

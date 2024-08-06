@@ -18,7 +18,7 @@ public class LowLevelApiTest
         var subject = "foo.*";
         var builder = new NatsSubCustomTestBuilder(_output);
         var sub = builder.Build(subject, default, nats, nats.SubscriptionManager);
-        await nats.SubAsync(sub);
+        await nats.AddSubAsync(sub);
 
         await Retry.Until(
             "subscription is ready",

@@ -307,7 +307,7 @@ public class NatsJSConsumer : INatsJSConsumer
             notificationHandler: opts.NotificationHandler,
             cancellationToken: cancellationToken);
 
-        await _context.Connection.SubAsync(sub: sub, cancellationToken).ConfigureAwait(false);
+        await _context.Connection.AddSubAsync(sub: sub, cancellationToken).ConfigureAwait(false);
 
         // Start consuming with the first Pull Request
         await sub.CallMsgNextAsync(
@@ -354,7 +354,7 @@ public class NatsJSConsumer : INatsJSConsumer
             idle: timeouts.IdleHeartbeat,
             cancellationToken: cancellationToken);
 
-        await _context.Connection.SubAsync(sub: sub, cancellationToken).ConfigureAwait(false);
+        await _context.Connection.AddSubAsync(sub: sub, cancellationToken).ConfigureAwait(false);
 
         // Start consuming with the first Pull Request
         await sub.CallMsgNextAsync(
@@ -403,7 +403,7 @@ public class NatsJSConsumer : INatsJSConsumer
             idle: timeouts.IdleHeartbeat,
             cancellationToken: cancellationToken);
 
-        await _context.Connection.SubAsync(sub: sub, cancellationToken).ConfigureAwait(false);
+        await _context.Connection.AddSubAsync(sub: sub, cancellationToken).ConfigureAwait(false);
 
         await sub.CallMsgNextAsync(
             opts.NoWait

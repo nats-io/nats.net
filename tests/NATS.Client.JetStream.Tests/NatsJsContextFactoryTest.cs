@@ -146,11 +146,11 @@ public class NatsJSContextFactoryTest
 
         public void OnMessageDropped<T>(NatsSubBase natsSub, int pending, NatsMsg<T> msg) => throw new NotImplementedException();
 
-        public ValueTask SubAsync(NatsSubBase sub, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+        public ValueTask AddSubAsync(NatsSubBase sub, CancellationToken cancellationToken = default) => throw new NotImplementedException();
 
-        public BoundedChannelOptions GetChannelOpts(NatsOpts connectionOpts, NatsSubChannelOpts? subChannelOpts) => throw new NotImplementedException();
+        public BoundedChannelOptions GetBoundedChannelOpts(NatsSubChannelOpts? subChannelOpts) => throw new NotImplementedException();
 
-        public ValueTask<NatsSub<TReply>> RequestSubAsync<TRequest, TReply>(string subject, TRequest? data, NatsHeaders? headers = default, INatsSerialize<TRequest>? requestSerializer = default, INatsDeserialize<TReply>? replySerializer = default, NatsPubOpts? requestOpts = default, NatsSubOpts? replyOpts = default, CancellationToken cancellationToken = default) =>
+        public ValueTask<NatsSub<TReply>> CreateRequestSubAsync<TRequest, TReply>(string subject, TRequest? data, NatsHeaders? headers = default, INatsSerialize<TRequest>? requestSerializer = default, INatsDeserialize<TReply>? replySerializer = default, NatsPubOpts? requestOpts = default, NatsSubOpts? replyOpts = default, CancellationToken cancellationToken = default) =>
             throw new NotImplementedException();
 
         public ValueTask ConnectAsync() => throw new NotImplementedException();

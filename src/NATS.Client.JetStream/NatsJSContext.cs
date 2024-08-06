@@ -119,7 +119,7 @@ public partial class NatsJSContext
 
         for (var i = 0; i < retryMax; i++)
         {
-            await using var sub = await Connection.RequestSubAsync<T, PubAckResponse>(
+            await using var sub = await Connection.CreateRequestSubAsync<T, PubAckResponse>(
                     subject: subject,
                     data: data,
                     headers: headers,
@@ -213,7 +213,7 @@ public partial class NatsJSContext
 
         opts ??= NatsJSPubOpts.Default;
 
-        var sub = await Connection.RequestSubAsync<T, PubAckResponse>(
+        var sub = await Connection.CreateRequestSubAsync<T, PubAckResponse>(
                     subject: subject,
                     data: data,
                     headers: headers,
@@ -289,7 +289,7 @@ public partial class NatsJSContext
             // Validator.ValidateObject(request, new ValidationContext(request));
         }
 
-        await using var sub = await Connection.RequestSubAsync<TRequest, TResponse>(
+        await using var sub = await Connection.CreateRequestSubAsync<TRequest, TResponse>(
                 subject: subject,
                 data: request,
                 headers: default,
