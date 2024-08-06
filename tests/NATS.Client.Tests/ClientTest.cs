@@ -1,5 +1,7 @@
 using System.Text;
 using NATS.Client.Core.Tests;
+using NATS.Client.JetStream;
+using NATS.Client.JetStream.Models;
 
 // ReSharper disable AccessToDisposedClosure
 namespace NATS.Client.Tests;
@@ -9,7 +11,7 @@ public class ClientTest
     [Fact]
     public async Task Client_works_with_all_expected_types_and_falls_back_to_JSON()
     {
-        await using var server = NatsServer.Start();
+        await using var server = NatsServer.StartJS();
         await using var client = new NatsClient(server.ClientUrl);
 
         CancellationTokenSource ctsTestTimeout = new(TimeSpan.FromSeconds(10));
@@ -193,7 +195,13 @@ public class ClientTest
         }
 
         // Use JetStream by referencing NATS.Client.JetStream package
-        // var js = client.GetJetStream();
+        var js = client.CreateJetStreamContext();
+        await js.CreateStreamAsync(new StreamConfig("test", ["test.>"]), ctsTestTimeout.Token);
+        await foreach (var stream in js.ListStreamsAsync(cancellationToken: ctsTestTimeout.Token))
+        {
+            Assert.Equal("test", stream.Info.Config.Name);
+        }
+
         ctsStop.Cancel();
 
         await Task.WhenAll(task1, task2, task3, task4, task5, task6);

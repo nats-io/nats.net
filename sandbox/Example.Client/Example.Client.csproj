@@ -8,6 +8,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\..\src\NATS.Client.JetStream\NATS.Client.JetStream.csproj" />
       <ProjectReference Include="..\..\src\NATS.Client\NATS.Client.csproj" />
     </ItemGroup>
 
