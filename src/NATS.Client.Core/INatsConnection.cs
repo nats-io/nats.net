@@ -5,22 +5,50 @@ namespace NATS.Client.Core;
 
 public interface INatsConnection : INatsClient
 {
+    /// <summary>
+    /// Event that is raised when the connection to the NATS server is disconnected.
+    /// </summary>
     event AsyncEventHandler<NatsEventArgs>? ConnectionDisconnected;
 
+    /// <summary>
+    /// Event that is raised when the connection to the NATS server is opened.
+    /// </summary>
     event AsyncEventHandler<NatsEventArgs>? ConnectionOpened;
 
+    /// <summary>
+    /// Event that is raised when a reconnect attempt is failed.
+    /// </summary>
     event AsyncEventHandler<NatsEventArgs>? ReconnectFailed;
 
+    /// <summary>
+    /// Event that is raised when a message is dropped for a subscription.
+    /// </summary>
     event AsyncEventHandler<NatsMessageDroppedEventArgs>? MessageDropped;
 
+    /// <summary>
+    /// Server information received from the NATS server.
+    /// </summary>
     INatsServerInfo? ServerInfo { get; }
 
+    /// <summary>
+    /// Options used to configure the NATS connection.
+    /// </summary>
     NatsOpts Opts { get; }
 
+    /// <summary>
+    /// Connection state of the NATS connection.
+    /// </summary>
     NatsConnectionState ConnectionState { get; }
 
+    /// <summary>
+    /// Subscription manager used to manage subscriptions for the NATS connection.
+    /// </summary>
     INatsSubscriptionManager SubscriptionManager { get; }
 
+    /// <summary>
+    /// Singleton instance of the NATS header parser used to parse message headers
+    /// used by the NATS connection.
+    /// </summary>
     NatsHeaderParser HeaderParser { get; }
 
     /// <summary>
