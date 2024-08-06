@@ -48,6 +48,7 @@ public partial class NatsConnection : INatsConnection
     private readonly BoundedChannelOptions _defaultSubscriptionChannelOpts;
     private readonly Channel<(NatsEvent, NatsEventArgs)> _eventChannel;
     private readonly ClientOpts _clientOpts;
+    private readonly NatsSubscriptionManager _subscriptionManager;
 
     private int _pongCount;
     private int _connectionState;
@@ -84,7 +85,7 @@ public partial class NatsConnection : INatsConnection
         Counter = new ConnectionStatsCounter();
         CommandWriter = new CommandWriter("main", this, _pool, Opts, Counter, EnqueuePing);
         InboxPrefix = NewInbox(opts.InboxPrefix);
-        SubscriptionManager = new NatsSubscriptionManager(this, InboxPrefix);
+        _subscriptionManager = new NatsSubscriptionManager(this, InboxPrefix);
         _clientOpts = ClientOpts.Create(Opts);
         HeaderParser = new NatsHeaderParser(opts.HeaderEncoding);
         _defaultSubscriptionChannelOpts = new BoundedChannelOptions(opts.SubPendingChannelCapacity)
@@ -138,7 +139,7 @@ public partial class NatsConnection : INatsConnection
 
     internal NatsHeaderParser HeaderParser { get; }
 
-    internal NatsSubscriptionManager SubscriptionManager { get; }
+    internal INatsSubscriptionManager SubscriptionManager => _subscriptionManager;
 
     internal CommandWriter CommandWriter { get; }
 
@@ -199,7 +200,7 @@ public partial class NatsConnection : INatsConnection
 #endif
             }
 
-            await SubscriptionManager.DisposeAsync().ConfigureAwait(false);
+            await _subscriptionManager.DisposeAsync().ConfigureAwait(false);
             await CommandWriter.DisposeAsync().ConfigureAwait(false);
             _waitForOpenConnection.TrySetCanceled();
 #if NET8_0_OR_GREATER
@@ -224,7 +225,7 @@ public partial class NatsConnection : INatsConnection
 
     internal ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
     {
-        return SubscriptionManager.PublishToClientHandlersAsync(subject, replyTo, sid, headersBuffer, payloadBuffer);
+        return _subscriptionManager.PublishToClientHandlersAsync(subject, replyTo, sid, headersBuffer, payloadBuffer);
     }
 
     internal void ResetPongCount()
@@ -465,7 +466,7 @@ public partial class NatsConnection : INatsConnection
                 if (reconnect)
                 {
                     // Reestablish subscriptions and consumers
-                    reconnectTask = SubscriptionManager.WriteReconnectCommandsAsync(priorityCommandWriter.CommandWriter).AsTask();
+                    reconnectTask = _subscriptionManager.WriteReconnectCommandsAsync(priorityCommandWriter.CommandWriter).AsTask();
                 }
 
                 // receive COMMAND response (PONG or ERROR)
