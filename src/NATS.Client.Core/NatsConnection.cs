@@ -48,7 +48,7 @@ public partial class NatsConnection : INatsConnection
     private readonly BoundedChannelOptions _defaultSubscriptionChannelOpts;
     private readonly Channel<(NatsEvent, NatsEventArgs)> _eventChannel;
     private readonly ClientOpts _clientOpts;
-    private readonly NatsSubscriptionManager _subscriptionManager;
+    private readonly SubscriptionManager _subscriptionManager;
 
     private int _pongCount;
     private int _connectionState;
@@ -85,7 +85,7 @@ public partial class NatsConnection : INatsConnection
         Counter = new ConnectionStatsCounter();
         CommandWriter = new CommandWriter("main", this, _pool, Opts, Counter, EnqueuePing);
         InboxPrefix = NewInbox(opts.InboxPrefix);
-        _subscriptionManager = new NatsSubscriptionManager(this, InboxPrefix);
+        _subscriptionManager = new SubscriptionManager(this, InboxPrefix);
         _clientOpts = ClientOpts.Create(Opts);
         HeaderParser = new NatsHeaderParser(opts.HeaderEncoding);
         _defaultSubscriptionChannelOpts = new BoundedChannelOptions(opts.SubPendingChannelCapacity)
