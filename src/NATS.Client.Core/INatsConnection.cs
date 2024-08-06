@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Threading.Channels;
 
 namespace NATS.Client.Core;
 
@@ -17,6 +18,10 @@ public interface INatsConnection : INatsClient
     NatsOpts Opts { get; }
 
     NatsConnectionState ConnectionState { get; }
+
+    INatsSubscriptionManager SubscriptionManager { get; }
+
+    NatsHeaderParser HeaderParser { get; }
 
     /// <summary>
     /// Publishes a serializable message payload to the given subject name, optionally supplying a reply subject.
@@ -79,6 +84,22 @@ public interface INatsConnection : INatsClient
     /// if reply option's timeout is not defined then it will be set to NatsOpts.RequestTimeout.
     /// </remarks>
     IAsyncEnumerable<NatsMsg<TReply>> RequestManyAsync<TRequest, TReply>(
+        string subject,
+        TRequest? data,
+        NatsHeaders? headers = default,
+        INatsSerialize<TRequest>? requestSerializer = default,
+        INatsDeserialize<TReply>? replySerializer = default,
+        NatsPubOpts? requestOpts = default,
+        NatsSubOpts? replyOpts = default,
+        CancellationToken cancellationToken = default);
+
+    void OnMessageDropped<T>(NatsSubBase natsSub, int pending, NatsMsg<T> msg);
+
+    ValueTask SubAsync(NatsSubBase sub, CancellationToken cancellationToken = default);
+
+    BoundedChannelOptions GetChannelOpts(NatsOpts connectionOpts, NatsSubChannelOpts? subChannelOpts);
+
+    ValueTask<NatsSub<TReply>> RequestSubAsync<TRequest, TReply>(
         string subject,
         TRequest? data,
         NatsHeaders? headers = default,

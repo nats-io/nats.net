@@ -52,7 +52,7 @@ internal class NatsJSOrderedPushConsumer<T>
     private readonly NatsJSOrderedPushConsumerOpts _opts;
     private readonly NatsSubOpts? _subOpts;
     private readonly CancellationToken _cancellationToken;
-    private readonly NatsConnection _nats;
+    private readonly INatsConnection _nats;
     private readonly Channel<NatsJSOrderedPushConsumerMsg<T>> _commandChannel;
     private readonly Channel<NatsJSMsg<T>> _msgChannel;
     private readonly Channel<string> _consumerCreateChannel;
@@ -413,7 +413,7 @@ internal class NatsJSOrderedPushConsumerSub<T> : NatsSubBase
 {
     private readonly NatsJSContext _context;
     private readonly CancellationToken _cancellationToken;
-    private readonly NatsConnection _nats;
+    private readonly INatsConnection _nats;
     private readonly NatsHeaderParser _headerParser;
     private readonly INatsDeserialize<T> _serializer;
     private readonly ChannelWriter<NatsJSOrderedPushConsumerMsg<T>> _commands;

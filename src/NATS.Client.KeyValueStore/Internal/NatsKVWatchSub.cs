@@ -9,7 +9,7 @@ internal class NatsKVWatchSub<T> : NatsSubBase
 {
     private readonly NatsJSContext _context;
     private readonly CancellationToken _cancellationToken;
-    private readonly NatsConnection _nats;
+    private readonly INatsConnection _nats;
     private readonly NatsHeaderParser _headerParser;
     private readonly INatsDeserialize<T> _serializer;
     private readonly ChannelWriter<NatsKVWatchCommandMsg<T>> _commands;
