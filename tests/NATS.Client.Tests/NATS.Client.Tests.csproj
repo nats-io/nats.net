@@ -30,7 +30,7 @@
         <Using Include="Xunit"/>
         <Using Include="Xunit.Abstractions"/>
         <Using Include="FluentAssertions"/>
-        <Using Include="NATS.Client"/>
+        <Using Include="NATS.Net"/>
     </ItemGroup>
 
     <ItemGroup>

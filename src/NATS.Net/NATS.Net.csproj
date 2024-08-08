@@ -19,6 +19,7 @@
     <ProjectReference Include="..\NATS.Client.JetStream\NATS.Client.JetStream.csproj" />
     <ProjectReference Include="..\NATS.Client.KeyValueStore\NATS.Client.KeyValueStore.csproj" />
     <ProjectReference Include="..\NATS.Client.ObjectStore\NATS.Client.ObjectStore.csproj" />
+    <ProjectReference Include="..\NATS.Client.Serializers.Json\NATS.Client.Serializers.Json.csproj" />
     <ProjectReference Include="..\NATS.Client.Services\NATS.Client.Services.csproj" />
   </ItemGroup>
 
