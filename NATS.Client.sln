@@ -113,7 +113,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client", "src\NATS.Cli
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.Client", "sandbox\Example.Client\Example.Client.csproj", "{A15CCDD5-B707-4142-B99A-64F0AB62318A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.Tests", "tests\NATS.Client.Tests\NATS.Client.Tests.csproj", "{6DAAAA87-8DDF-4E60-81CE-D8900327DE33}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.Simplified.Tests", "tests\NATS.Client.Simplified.Tests\NATS.Client.Simplified.Tests.csproj", "{6DAAAA87-8DDF-4E60-81CE-D8900327DE33}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.Simplified", "src\NATS.Client.Simplified\NATS.Client.Simplified.csproj", "{A8D357E3-4501-4350-88DA-ECBD63B87E91}"
 EndProject
