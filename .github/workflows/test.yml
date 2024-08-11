@@ -69,6 +69,9 @@ jobs:
       - name: Test OpenTelemetry
         run: dotnet test -c Debug --no-build --logger:"console;verbosity=normal" tests/NATS.Net.OpenTelemetry.Tests/NATS.Net.OpenTelemetry.Tests.csproj
 
+      - name: Compat v1-v2 Test (net8.0)
+        run: dotnet test -c Release --no-build --logger:"console;verbosity=normal" -f net8.0 tests/NATS.Client.Compatv1v2.Tests/NATS.Client.Compatv1v2.Tests.csproj
+
       - name: Check Native AOT
         run: |
           cd tests/NATS.Client.CheckNativeAot
@@ -153,3 +156,5 @@ jobs:
       - name: Platform Test (Windows net481)
         run: dotnet test -c Release --no-build --logger:"console;verbosity=normal" -f net481 .\tests\NATS.Client.Platform.Windows.Tests\NATS.Client.Platform.Windows.Tests.csproj
 
+      - name: Compat v1-v2 Test (Windows net462)
+        run: dotnet test -c Release --no-build --logger:"console;verbosity=normal" -f net462 .\tests\NATS.Client.Compatv1v2.Tests\NATS.Client.Compatv1v2.Tests.csproj

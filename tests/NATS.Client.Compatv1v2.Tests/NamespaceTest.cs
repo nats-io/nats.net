@@ -1,7 +1,7 @@
 using NATS.Client.JetStream;
 using Xunit.Abstractions;
 
-namespace NATS.Client.Compatv1v2;
+namespace NATS.Client.Compatv1v2.Tests;
 
 public class NamespaceTest
 {

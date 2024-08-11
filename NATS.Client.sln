@@ -117,7 +117,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.Simplified.Test
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.Simplified", "src\NATS.Client.Simplified\NATS.Client.Simplified.csproj", "{A8D357E3-4501-4350-88DA-ECBD63B87E91}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.Compatv1v2", "tests\NATS.Client.Compatv1v2\NATS.Client.Compatv1v2.csproj", "{86B9B4E8-F942-45AA-B6B2-3DACB1D24E00}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.Compatv1v2.Tests", "tests\NATS.Client.Compatv1v2.Tests\NATS.Client.Compatv1v2.Tests.csproj", "{86B9B4E8-F942-45AA-B6B2-3DACB1D24E00}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
