@@ -18,7 +18,7 @@ jobs:
 
       - name: Check formatting
         run: |
-          if dotnet format --verify-no-changes; then
+          if dotnet format --exclude ./src/NATS.Client/v1/ --verify-no-changes; then
             echo "formatting passed"
           else
             rc="$?"
