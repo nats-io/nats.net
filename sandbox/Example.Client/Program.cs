@@ -1,7 +1,7 @@
 // See https://aka.ms/new-console-template for more information
 
 using System.Text;
-using NATS.Client;
+using NATS.Net;
 
 CancellationTokenSource cts = new();
 
