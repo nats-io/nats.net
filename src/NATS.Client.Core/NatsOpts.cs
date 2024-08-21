@@ -128,9 +128,10 @@ public sealed record NatsOpts
     /// await using var nats = new NatsConnection(new NatsOpts
     /// {
     ///     Url = "ws://localhost:8080",
-    ///     ConfigureWebSocketOpts = async (serverUri, clientWsOpts, ct) =>
+    ///     ConfigureWebSocketOpts = (serverUri, clientWsOpts, ct) =>
     ///     {
     ///         clientWsOpts.SetRequestHeader("authorization", $"Bearer MY_TOKEN");
+    ///         return ValueTask.CompletedTask;
     ///     },
     /// });
     /// </example>

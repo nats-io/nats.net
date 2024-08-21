@@ -52,19 +52,18 @@ public class WebSocketOptionsTest
         });
 
         var tokenCount = 0;
-#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
         await using var nats = new NatsConnection(new NatsOpts
         {
             Url = wsServer.WebSocketUrl,
             LoggerFactory = testLogger,
-            ConfigureWebSocketOpts = async (serverUri, clientWsOpts, ct) =>
+            ConfigureWebSocketOpts = (serverUri, clientWsOpts, ct) =>
             {
                 tokenCount++;
                 Log($"[C] ConfigureWebSocketOpts {serverUri}, accessToken TOKEN_{tokenCount}");
                 clientWsOpts.SetRequestHeader("authorization", $"Bearer TOKEN_{tokenCount}");
+                return ValueTask.CompletedTask;
             },
         });
-#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
 
         Log($"[C] connect {server.Url}");
         await nats.ConnectAsync();
@@ -210,19 +209,18 @@ public class WebSocketOptionsTest
             Log($"[NC] {m.Message}");
         });
 
-#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
         await using var nats = new NatsConnection(new NatsOpts
         {
             Url = wsServer.WebSocketUrl,
             LoggerFactory = testLogger,
-            ConfigureWebSocketOpts = async (serverUri, clientWsOpts, ct) =>
+            ConfigureWebSocketOpts = (serverUri, clientWsOpts, ct) =>
             {
                 tokenCount++;
                 Log($"[C] ConfigureWebSocketOpts {serverUri}, accessToken TOKEN_{tokenCount}");
                 clientWsOpts.SetRequestHeader("authorization", $"Bearer TOKEN_{tokenCount}");
+                return ValueTask.CompletedTask;
             },
         });
-#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
 
         Log($"[C] connect {server.Url}");
 
@@ -299,17 +297,15 @@ public class WebSocketOptionsTest
             Log($"[NC] {m.Message}");
         });
 
-#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
         await using var nats = new NatsConnection(new NatsOpts
         {
             Url = "ws://localhost:1234",
             LoggerFactory = testLogger,
-            ConfigureWebSocketOpts = async (serverUri, clientWsOpts, ct) =>
+            ConfigureWebSocketOpts = (serverUri, clientWsOpts, ct) =>
             {
                 throw new Exception("Error in callback");
             },
         });
-#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
 
         // expect: NATS.Client.Core.NatsException : can not connect uris: ws://localhost:1234
         var exception = await Assert.ThrowsAsync<NatsException>(async () => await nats.ConnectAsync());
