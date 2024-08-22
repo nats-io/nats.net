@@ -1,11 +1,13 @@
 using System.Net.Security;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
+using X509Certificate = System.Security.Cryptography.X509Certificates.X509Certificate;
 
 namespace NATS.Client.Core.Internal;
 
 internal static class SslClientAuthenticationOptionsExtensions
 {
+#if !NETSTANDARD
     public static SslClientAuthenticationOptions LoadClientCertFromPem(this SslClientAuthenticationOptions options, string certPem, string keyPem, bool offline = false, SslCertificateTrust? trust = null)
     {
         var leafCert = X509Certificate2.CreateFromPem(certPem, keyPem);
@@ -16,7 +18,41 @@ internal static class SslClientAuthenticationOptionsExtensions
             intermediateCerts.RemoveAt(0);
         }
 
-#if NET6_0
+#if !NET8_0_OR_GREATER
+        if (intermediateCerts.Count > 0)
+        {
+            throw new NotSupportedException("Client Certificates with intermediates are only supported in net8.0 and higher");
+        }
+#endif
+
+        // On Windows, ephemeral keys/certificates do not work with schannel. e.g. unless stored in certificate store.
+        // https://github.com/dotnet/runtime/issues/66283#issuecomment-1061014225
+        // https://github.com/dotnet/runtime/blob/380a4723ea98067c28d54f30e1a652483a6a257a/src/libraries/System.Net.Security/tests/FunctionalTests/TestHelper.cs#L192-L197
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            var ephemeral = leafCert;
+            leafCert = new X509Certificate2(leafCert.Export(X509ContentType.Pfx));
+            ephemeral.Dispose();
+        }
+
+        return options.LoadClientCertFromX509(leafCert, intermediateCerts, offline, trust);
+    }
+#endif
+
+    public static SslClientAuthenticationOptions LoadClientCertFromPfxFile(this SslClientAuthenticationOptions options, string certBundleFile, bool offline = false, SslCertificateTrust? trust = null)
+    {
+        var leafCert = new X509Certificate2(certBundleFile);
+        var intermediateCerts = new X509Certificate2Collection();
+        intermediateCerts.Import(certBundleFile);
+
+        // Linux does not include the leaf by default, but Windows does
+        // compare leaf to first intermediate just to be sure to catch all platform differences
+        if (intermediateCerts.Count > 0 && intermediateCerts[0].RawData.SequenceEqual(leafCert.RawData))
+        {
+            intermediateCerts.RemoveAt(0);
+        }
+
+#if !NET8_0_OR_GREATER
         if (intermediateCerts.Count > 0)
         {
             throw new NotSupportedException("Client Certificates with intermediates are only supported in net8.0 and higher");
@@ -36,16 +72,6 @@ internal static class SslClientAuthenticationOptionsExtensions
 
     public static SslClientAuthenticationOptions LoadClientCertFromX509(this SslClientAuthenticationOptions options, X509Certificate2 leafCert, X509Certificate2Collection? intermediateCerts = null, bool offline = false, SslCertificateTrust? trust = null)
     {
-        // On Windows, ephemeral keys/certificates do not work with schannel. e.g. unless stored in certificate store.
-        // https://github.com/dotnet/runtime/issues/66283#issuecomment-1061014225
-        // https://github.com/dotnet/runtime/blob/380a4723ea98067c28d54f30e1a652483a6a257a/src/libraries/System.Net.Security/tests/FunctionalTests/TestHelper.cs#L192-L197
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
-            var ephemeral = leafCert;
-            leafCert = new X509Certificate2(leafCert.Export(X509ContentType.Pfx));
-            ephemeral.Dispose();
-        }
-
 #if NET8_0_OR_GREATER
         options.ClientCertificateContext = SslStreamCertificateContext.Create(leafCert, intermediateCerts, offline, trust);
 #else
@@ -55,7 +81,7 @@ internal static class SslClientAuthenticationOptionsExtensions
 
         return options;
 
-#if NET6_0
+#if !NET8_0_OR_GREATER
         static X509Certificate LcsCbClientCerts(
             object sender,
             string targetHost,
@@ -77,7 +103,7 @@ internal static class SslClientAuthenticationOptionsExtensions
             SslPolicyErrors sslPolicyErrors)
         {
             // validate >=1 ca certs
-            if (!caCerts.Any())
+            if (!caCerts.OfType<X509Certificate2>().Any())
             {
                 return false;
             }
@@ -96,8 +122,8 @@ internal static class SslClientAuthenticationOptionsExtensions
 
             // validate >= 1 chain elements and that last chain element was one of the supplied CA certs
             if (chain == default
-                || !chain.ChainElements.Any()
-                || !caCerts.Any(c => c.RawData.SequenceEqual(chain.ChainElements.Last().Certificate.RawData)))
+                || !chain.ChainElements.OfType<X509ChainElement>().Any()
+                || !caCerts.OfType<X509Certificate2>().Any(c => c.RawData.SequenceEqual(chain.ChainElements.OfType<X509ChainElement>().Last().Certificate.RawData)))
             {
                 sslPolicyErrors |= SslPolicyErrors.RemoteCertificateChainErrors;
             }
@@ -118,3 +144,30 @@ internal static class SslClientAuthenticationOptionsExtensions
             SslPolicyErrors sslPolicyErrors) => true;
     }
 }
+
+#if NETSTANDARD
+internal static class X509Certificate2Helpers
+{
+    public static void ImportFromPem(this X509Certificate2Collection certs, string pem)
+    {
+        var found = false;
+        var splitPems = pem.Split(["-----BEGIN CERTIFICATE-----"], StringSplitOptions.RemoveEmptyEntries);
+        foreach (var splitPem in splitPems)
+        {
+            var b64Cert = splitPem.Split(["-----END CERTIFICATE-----"], StringSplitOptions.None)[0].Trim();
+            if (string.IsNullOrEmpty(b64Cert))
+                continue;
+
+            var bytes = Convert.FromBase64String(b64Cert);
+            var cert = new X509Certificate2(bytes);
+            certs.Add(cert);
+            found = true;
+        }
+
+        if (!found)
+            throw new ArgumentException("No certificates found", nameof(pem));
+    }
+}
+
+internal class SslCertificateTrust;
+#endif

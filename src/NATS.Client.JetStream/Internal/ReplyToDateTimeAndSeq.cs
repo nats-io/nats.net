@@ -22,7 +22,7 @@ internal static class ReplyToDateTimeAndSeq
             return null;
         }
 
-        var originalTokens = reply.Split(".").AsSpan();
+        var originalTokens = reply.Split('.').AsSpan();
         var tokensLength = originalTokens.Length;
 
         // Parsed based on https://github.com/nats-io/nats-architecture-and-design/blob/main/adr/ADR-15.md#jsack

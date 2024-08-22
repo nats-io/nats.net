@@ -1,10 +1,6 @@
-using System.Diagnostics;
 using System.Reflection;
 using System.Text;
 using System.Text.Json.Serialization;
-using System.Text.RegularExpressions;
-using System.Threading.Channels;
-using Xunit.Sdk;
 
 namespace NATS.Client.Core.Tests;
 
@@ -382,6 +378,39 @@ public abstract partial class NatsConnectionTest
 
             interfaceMethods.Select(m => m.Name).Should().Contain(name);
         }
+    }
+
+    [Fact]
+    public void NewInboxEmptyPrefixReturnsNuid()
+    {
+        var opts = NatsOpts.Default with { InboxPrefix = string.Empty };
+        var conn = new NatsConnection(opts);
+
+        var inbox = conn.NewInbox();
+
+        Assert.Matches("[A-z0-9]{22}", inbox);
+    }
+
+    [Fact]
+    public void NewInboxNonEmptyPrefixReturnsPrefixWithNuid()
+    {
+        var opts = NatsOpts.Default with { InboxPrefix = "PREFIX" };
+        var conn = new NatsConnection(opts);
+
+        var inbox = conn.NewInbox();
+
+        Assert.Matches("PREFIX\\.[A-z0-9]{22}", inbox);
+    }
+
+    [Fact]
+    public void NewInboxVeryLongPrefixReturnsPrefixWithNuid()
+    {
+        var opts = NatsOpts.Default with { InboxPrefix = new string('A', 512) };
+        var conn = new NatsConnection(opts);
+
+        var inbox = conn.NewInbox();
+
+        Assert.Matches("A{512}\\.[A-z0-9]{22}", inbox);
     }
 }
 

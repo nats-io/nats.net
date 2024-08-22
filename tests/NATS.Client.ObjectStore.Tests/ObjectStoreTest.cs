@@ -389,6 +389,49 @@ public class ObjectStoreTest
         }
     }
 
+    [Fact]
+    public async Task List_empty_store_for_end_of_data()
+    {
+        var timeout = TimeSpan.FromSeconds(10);
+        var cts = new CancellationTokenSource(timeout);
+        var cancellationToken = cts.Token;
+
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+        var js = new NatsJSContext(nats);
+        var obj = new NatsObjContext(js);
+
+        var store = await obj.CreateObjectStoreAsync(new NatsObjConfig("b1"), cancellationToken);
+
+        var signal = new WaitSignal(timeout);
+        var endOfDataHit = false;
+        var watchTask = Task.Run(
+            async () =>
+            {
+                var opts = new NatsObjListOpts()
+                {
+                    OnNoData = async (_) =>
+                    {
+                        await Task.CompletedTask;
+                        endOfDataHit = true;
+                        signal.Pulse();
+                        return true;
+                    },
+                };
+
+                await foreach (var info in store.ListAsync(opts: opts, cancellationToken: cancellationToken))
+                {
+                }
+            },
+            cancellationToken);
+
+        await signal;
+
+        Assert.True(endOfDataHit, "End of Current Data not set");
+
+        await watchTask;
+    }
+
     [SkipIfNatsServer(versionEarlierThan: "2.10")]
     public async Task Compressed_storage()
     {

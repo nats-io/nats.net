@@ -188,10 +188,8 @@ public class NatsKVStore : INatsKVStore
                 if (headers.Code == 404)
                     throw new NatsKVKeyNotFoundException();
 
-                if (!headers.TryGetValue(NatsSubject, out var subjectValues))
+                if (!headers.TryGetLastValue(NatsSubject, out var subject))
                     throw new NatsKVException("Missing sequence header");
-
-                var subject = subjectValues[^1];
 
                 if (revision != default)
                 {
@@ -201,22 +199,16 @@ public class NatsKVStore : INatsKVStore
                     }
                 }
 
-                if (!headers.TryGetValue(NatsSequence, out var sequenceValues))
+                if (!headers.TryGetLastValue(NatsSequence, out var sequenceValue))
                     throw new NatsKVException("Missing sequence header");
 
-                if (sequenceValues.Count != 1)
-                    throw new NatsKVException("Unexpected number of sequence headers");
-
-                if (!ulong.TryParse(sequenceValues[0], out var sequence))
+                if (!ulong.TryParse(sequenceValue, out var sequence))
                     throw new NatsKVException("Can't parse sequence header");
 
-                if (!headers.TryGetValue(NatsTimeStamp, out var timestampValues))
+                if (!headers.TryGetLastValue(NatsTimeStamp, out var timestampValue))
                     throw new NatsKVException("Missing timestamp header");
 
-                if (timestampValues.Count != 1)
-                    throw new NatsKVException("Unexpected number of timestamp headers");
-
-                if (!DateTimeOffset.TryParse(timestampValues[0], out var timestamp))
+                if (!DateTimeOffset.TryParse(timestampValue, out var timestamp))
                     throw new NatsKVException("Can't parse timestamp header");
 
                 var operation = NatsKVOperation.Put;
@@ -264,38 +256,20 @@ public class NatsKVStore : INatsKVStore
                 }
             }
 
-            if (!DateTimeOffset.TryParse(response.Message.Time, out var created))
-                throw new NatsKVException("Can't parse timestamp message value");
-
             T? data;
             NatsDeserializeException? deserializeException = null;
-            if (response.Message.Data != null)
+            if (response.Message.Data.Length > 0)
             {
-                var bytes = ArrayPool<byte>.Shared.Rent(response.Message.Data.Length);
+                var buffer = new ReadOnlySequence<byte>(response.Message.Data);
+
                 try
                 {
-                    if (Convert.TryFromBase64String(response.Message.Data, bytes, out var written))
-                    {
-                        var buffer = new ReadOnlySequence<byte>(bytes.AsMemory(0, written));
-
-                        try
-                        {
-                            data = serializer.Deserialize(buffer);
-                        }
-                        catch (Exception e)
-                        {
-                            deserializeException = new NatsDeserializeException(buffer.ToArray(), e);
-                            data = default;
-                        }
-                    }
-                    else
-                    {
-                        throw new NatsKVException("Can't decode data message value");
-                    }
+                    data = serializer.Deserialize(buffer);
                 }
-                finally
+                catch (Exception e)
                 {
-                    ArrayPool<byte>.Shared.Return(bytes);
+                    deserializeException = new NatsDeserializeException(buffer.ToArray(), e);
+                    data = default;
                 }
             }
             else
@@ -305,7 +279,7 @@ public class NatsKVStore : INatsKVStore
 
             return new NatsKVEntry<T>(Bucket, key)
             {
-                Created = created,
+                Created = response.Message.Time,
                 Revision = response.Message.Seq,
                 Value = data,
                 UsedDirectGet = false,
@@ -337,6 +311,7 @@ public class NatsKVStore : INatsKVStore
         }
     }
 
+    /// <inheritdoc />
     public async IAsyncEnumerable<NatsKVEntry<T>> HistoryAsync<T>(string key, INatsDeserialize<T>? serializer = default, NatsKVWatchOpts? opts = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         try
@@ -376,6 +351,7 @@ public class NatsKVStore : INatsKVStore
     public IAsyncEnumerable<NatsKVEntry<T>> WatchAsync<T>(INatsDeserialize<T>? serializer = default, NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default) =>
         WatchAsync<T>([">"], serializer, opts, cancellationToken);
 
+    /// <inheritdoc />
     public async ValueTask PurgeDeletesAsync(NatsKVPurgeOpts? opts = default, CancellationToken cancellationToken = default)
     {
         opts ??= NatsKVPurgeOpts.Default;
@@ -421,14 +397,18 @@ public class NatsKVStore : INatsKVStore
     }
 
     /// <inheritdoc />
-    public async IAsyncEnumerable<string> GetKeysAsync(NatsKVWatchOpts? opts = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public IAsyncEnumerable<string> GetKeysAsync(NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default)
+        => GetKeysAsync([">"], opts, cancellationToken);
+
+    /// <inheritdoc />
+    public async IAsyncEnumerable<string> GetKeysAsync(IEnumerable<string> filters, NatsKVWatchOpts? opts = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         opts ??= NatsKVWatchOpts.Default;
 
         opts = opts with { IgnoreDeletes = false, MetaOnly = true, UpdatesOnly = false, };
 
         // Type doesn't matter here, we're just using the watcher to get the keys
-        await using var watcher = await WatchInternalAsync<int>([">"], serializer: default, opts, cancellationToken);
+        await using var watcher = await WatchInternalAsync<int>(filters, serializer: default, opts, cancellationToken);
 
         if (watcher.InitialConsumer.Info.NumPending == 0)
             yield break;
@@ -446,6 +426,8 @@ public class NatsKVStore : INatsKVStore
     {
         opts ??= NatsKVWatchOpts.Default;
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
+
+        opts.ThrowIfInvalid();
 
         var watcher = new NatsKVWatcher<T>(
             context: _context,
@@ -471,7 +453,7 @@ public class NatsKVStore : INatsKVStore
             ThrowNatsKVException("Key cannot be empty");
         }
 
-        if (key.StartsWith('.') || key.EndsWith('.'))
+        if (key.StartsWith(".") || key.EndsWith("."))
         {
             ThrowNatsKVException("Key cannot start or end with a period");
         }

@@ -1,3 +1,9 @@
+### Looking for NATS .NET v1? [Click here](https://github.com/nats-io/nats.net.v1)
+
+Please update your references to the new name. You can also read the [announcement](REPO_RENAME.md) for more information.
+
+---
+
 [![License Apache 2.0](https://img.shields.io/badge/License-Apache2-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![NuGet](https://img.shields.io/nuget/v/NATS.Net.svg?cacheSeconds=3600)](https://www.nuget.org/packages/NATS.Net)
 
@@ -8,7 +14,7 @@ fully supporting all NATS features.
 It integrates seamlessly with modern .NET asynchronous interfaces such as
 async enumerables and channels, and leverages advanced .NET memory, buffer and IO features.
 
-Check out [NATS .NET client library documentation](https://nats-io.github.io/nats.net.v2/) for guides and examples.
+Check out [NATS .NET client library documentation](https://nats-io.github.io/nats.net/) for guides and examples.
 
 ### What is NATS?
 
@@ -62,14 +68,14 @@ await foreach (var jsMsg in consumer.ConsumeAsync<string>())
 }
 ```
 
-See more details, including how to download and start NATS server and JetStream in our [documentation](https://nats-io.github.io/nats.net.v2/documentation/intro.html).
+See more details, including how to download and start NATS server and JetStream in our [documentation](https://nats-io.github.io/nats.net/documentation/intro.html).
 
 **Additionally check out [NATS by example](https://natsbyexample.com) - An evolving collection of runnable, cross-client reference examples for NATS.**
 
 ## NATS .NET Goals
 
 - Only support Async I/O (async/await)
-- Target current .NET LTS releases (currently .NET 6.0 & .NET 8.0)
+- Target .NET Standard 2.0, 2.1, and .NET LTS releases (currently .NET 6.0 & .NET 8.0)
 
 ## Packages
 

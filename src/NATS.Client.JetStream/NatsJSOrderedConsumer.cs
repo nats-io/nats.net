@@ -258,7 +258,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
     /// For ordered consumer this is a no-op.
     /// </summary>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    public ValueTask RefreshAsync(CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
+    public ValueTask RefreshAsync(CancellationToken cancellationToken = default) => default;
 
     private async Task<NatsJSConsumer> RecreateConsumer(string consumer, ulong seq, CancellationToken cancellationToken)
     {

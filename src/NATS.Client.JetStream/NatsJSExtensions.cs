@@ -31,7 +31,11 @@ public static class NatsJSExtensions
     /// <exception cref="ArgumentNullException"><see cref="PubAckResponse"/> is <c>NULL</c>.</exception>
     public static bool IsSuccess(this PubAckResponse ack)
     {
+#if NETSTANDARD
+        ArgumentNullExceptionEx.ThrowIfNull(ack, nameof(ack));
+#else
         ArgumentNullException.ThrowIfNull(ack);
+#endif
         return ack.Error == null && !ack.Duplicate;
     }
 }

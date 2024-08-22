@@ -34,11 +34,11 @@ public sealed class NatsServerException : NatsException
     public NatsServerException(string error)
         : base($"Server error: {error}")
     {
-        Error = error;
-        IsAuthError = Error.Contains("authorization violation", StringComparison.OrdinalIgnoreCase)
-                      || Error.Contains("user authentication expired", StringComparison.OrdinalIgnoreCase)
-                      || Error.Contains("user authentication revoked", StringComparison.OrdinalIgnoreCase)
-                      || Error.Contains("account authentication expired", StringComparison.OrdinalIgnoreCase);
+        Error = error.ToLower();
+        IsAuthError = Error.Contains("authorization violation")
+                      || Error.Contains("user authentication expired")
+                      || Error.Contains("user authentication revoked")
+                      || Error.Contains("account authentication expired");
     }
 
     public string Error { get; }

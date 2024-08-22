@@ -7,7 +7,7 @@ internal sealed class NatsPooledConnection : NatsConnection
     {
     }
 
-    public override ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public override ValueTask DisposeAsync() => default;
 
     internal ValueTask ForceDisposeAsync() => base.DisposeAsync();
 }

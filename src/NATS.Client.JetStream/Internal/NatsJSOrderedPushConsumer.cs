@@ -86,7 +86,7 @@ internal class NatsJSOrderedPushConsumer<T>
         _subOpts = subOpts;
         _cancellationToken = cancellationToken;
         _nats = context.Connection;
-        _hbTimeout = (int)(opts.IdleHeartbeat * 2).TotalMilliseconds;
+        _hbTimeout = (int)new TimeSpan(opts.IdleHeartbeat.Ticks * 2).TotalMilliseconds;
         _consumer = NewNuid();
 
         _nats.ConnectionDisconnected += OnDisconnected;
@@ -141,12 +141,16 @@ internal class NatsJSOrderedPushConsumer<T>
     {
         _nats.ConnectionDisconnected -= OnDisconnected;
 
+        // For correctly Dispose,
+        // first stop the consumer Creation operations and then the command execution operations.
+        // It is necessary that all consumerCreation operations have time to complete before command CommandLoop stop
         _consumerCreateChannel.Writer.TryComplete();
-        _commandChannel.Writer.TryComplete();
-        _msgChannel.Writer.TryComplete();
-
         await _consumerCreateTask;
+
+        _commandChannel.Writer.TryComplete();
         await _commandTask;
+
+        _msgChannel.Writer.TryComplete();
 
         await _context.DeleteConsumerAsync(_stream, Consumer, _cancellationToken);
     }
@@ -219,7 +223,11 @@ internal class NatsJSOrderedPushConsumer<T>
                                         continue;
                                     }
 
+#if NETSTANDARD
+                                    var sequence = InterlockedEx.Increment(ref _sequenceConsumer);
+#else
                                     var sequence = Interlocked.Increment(ref _sequenceConsumer);
+#endif
 
                                     if (sequence != metadata.Sequence.Consumer)
                                     {
@@ -231,7 +239,11 @@ internal class NatsJSOrderedPushConsumer<T>
                                     // Increment the sequence before writing to the channel in case the channel is full
                                     // and the writer is waiting for the reader to read the message. This way the sequence
                                     // will be correctly incremented in case the timeout kicks in and recreated the consumer.
+#if NETSTANDARD
+                                    InterlockedEx.Exchange(ref _sequenceStream, metadata.Sequence.Stream);
+#else
                                     Interlocked.Exchange(ref _sequenceStream, metadata.Sequence.Stream);
+#endif
 
                                     if (!IsDone)
                                     {
@@ -331,7 +343,11 @@ internal class NatsJSOrderedPushConsumer<T>
             _logger.LogDebug(NatsJSLogEvents.NewDeliverySubject, "New delivery subject {Subject}", _sub.Subject);
         }
 
+#if NETSTANDARD
+        InterlockedEx.Exchange(ref _sequenceConsumer, 0);
+#else
         Interlocked.Exchange(ref _sequenceConsumer, 0);
+#endif
 
         var sequence = Volatile.Read(ref _sequenceStream);
 
@@ -376,7 +392,7 @@ internal class NatsJSOrderedPushConsumer<T>
         Span<char> buffer = stackalloc char[22];
         if (NuidWriter.TryWriteNuid(buffer))
         {
-            return new string(buffer);
+            return buffer.ToString();
         }
 
         throw new InvalidOperationException("Internal error: can't generate nuid");

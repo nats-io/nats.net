@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
+using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
 
@@ -13,6 +14,12 @@ namespace NATS.Client.Core;
 /// <typeparam name="T">Serialized object type</typeparam>
 public interface INatsSerializer<T> : INatsSerialize<T>, INatsDeserialize<T>
 {
+    /// <summary>
+    /// Combines the current serializer with the specified serializer.
+    /// </summary>
+    /// <param name="next">The serializer to be combined with.</param>
+    /// <returns>The combined serializer.</returns>
+    INatsSerializer<T> CombineWith(INatsSerializer<T> next);
 }
 
 /// <summary>
@@ -81,7 +88,7 @@ public class NatsDefaultSerializerRegistry : INatsSerializerRegistry
 /// </remarks>
 public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
 {
-    public static readonly NatsUtf8PrimitivesSerializer<T> Default = new(default);
+    public static readonly NatsUtf8PrimitivesSerializer<T> Default = new();
 
     private readonly INatsSerializer<T>? _next;
 
@@ -89,7 +96,10 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
     /// Creates a new instance of <see cref="NatsUtf8PrimitivesSerializer{T}"/>.
     /// </summary>
     /// <param name="next">The next serializer in chain.</param>
-    public NatsUtf8PrimitivesSerializer(INatsSerializer<T>? next) => _next = next;
+    public NatsUtf8PrimitivesSerializer(INatsSerializer<T>? next = default) => _next = next;
+
+    /// <inheritdoc />
+    public INatsSerializer<T> CombineWith(INatsSerializer<T>? next) => new NatsUtf8PrimitivesSerializer<T>(next);
 
     /// <inheritdoc />
     public void Serialize(IBufferWriter<byte> bufferWriter, T value)
@@ -375,7 +385,7 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
             return (T)(object)Encoding.UTF8.GetString(buffer);
         }
 
-        var span = buffer.IsSingleSegment ? buffer.FirstSpan : buffer.ToArray();
+        var span = buffer.IsSingleSegment ? buffer.GetFirstSpan() : buffer.ToArray();
 
         if (typeof(T) == typeof(DateTime) || typeof(T) == typeof(DateTime?))
         {
@@ -594,7 +604,10 @@ public class NatsRawSerializer<T> : INatsSerializer<T>
     /// Creates a new instance of <see cref="NatsRawSerializer{T}"/>.
     /// </summary>
     /// <param name="next">Next serializer in chain.</param>
-    public NatsRawSerializer(INatsSerializer<T>? next) => _next = next;
+    public NatsRawSerializer(INatsSerializer<T>? next = default) => _next = next;
+
+    /// <inheritdoc />
+    public INatsSerializer<T> CombineWith(INatsSerializer<T>? next) => new NatsRawSerializer<T>(next);
 
     /// <inheritdoc />
     public void Serialize(IBufferWriter<byte> bufferWriter, T value)
@@ -621,7 +634,7 @@ public class NatsRawSerializer<T> : INatsSerializer<T>
         {
             if (readOnlySequence.IsSingleSegment)
             {
-                bufferWriter.Write(readOnlySequence.FirstSpan);
+                bufferWriter.Write(readOnlySequence.GetFirstSpan());
             }
             else
             {
@@ -722,8 +735,10 @@ public sealed class NatsJsonContextSerializerRegistry : INatsSerializerRegistry
 /// </summary>
 public sealed class NatsJsonContextSerializer<T> : INatsSerializer<T>
 {
+    // ReSharper disable once StaticMemberInGenericType
     private static readonly JsonWriterOptions JsonWriterOpts = new() { Indented = false, SkipValidation = true };
 
+    // ReSharper disable once StaticMemberInGenericType
     [ThreadStatic]
     private static Utf8JsonWriter? _jsonWriter;
 
@@ -745,6 +760,9 @@ public sealed class NatsJsonContextSerializer<T> : INatsSerializer<T>
         : this(new[] { context }, next)
     {
     }
+
+    /// <inheritdoc />
+    public INatsSerializer<T> CombineWith(INatsSerializer<T> next) => new NatsJsonContextSerializer<T>(_contexts, next);
 
     /// <inheritdoc />
     public void Serialize(IBufferWriter<byte> bufferWriter, T value)
@@ -800,6 +818,46 @@ public sealed class NatsJsonContextSerializer<T> : INatsSerializer<T>
             return _next.Deserialize(buffer);
 
         throw new NatsException($"Can't deserialize {typeof(T)}");
+    }
+}
+
+/// <summary>
+/// Represents a builder for creating a chain of serializers for NATS messages.
+/// </summary>
+/// <typeparam name="T">Serialized object type</typeparam>
+public class NatsSerializerBuilder<T>
+{
+    private readonly List<INatsSerializer<T>> _serializers = new();
+
+    /// <summary>
+    /// Adds a serializer to the chain of serializers for NATS messages.
+    /// </summary>
+    /// <param name="serializer">The serializer to be added.</param>
+    /// <returns>The updated instance of the serializer builder.</returns>
+    public NatsSerializerBuilder<T> Add(INatsSerializer<T> serializer)
+    {
+        _serializers.Add(serializer);
+        return this;
+    }
+
+    /// <summary>
+    /// Builds a chain of serializers for NATS messages based on the added serializers.
+    /// Serializers are combined in the reverse order they were added.
+    /// </summary>
+    /// <returns>The combined serializer chain.</returns>
+    public INatsSerializer<T> Build()
+    {
+        if (_serializers.Count == 0)
+        {
+            return NatsDefaultSerializer<T>.Default;
+        }
+
+        for (var i = _serializers.Count - 1; i > 0; i--)
+        {
+            _serializers[i - 1] = _serializers[i - 1].CombineWith(_serializers[i]);
+        }
+
+        return _serializers[0];
     }
 }
 

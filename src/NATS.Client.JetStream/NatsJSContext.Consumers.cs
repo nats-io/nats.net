@@ -243,13 +243,11 @@ public partial class NatsJSContext : INatsJSContext
         ConsumerCreateAction action,
         CancellationToken cancellationToken)
     {
-        // TODO: Adjust API subject according to server version and filter subject
         var subject = $"{Opts.Prefix}.CONSUMER.CREATE.{stream}";
 
         if (!string.IsNullOrWhiteSpace(config.Name))
         {
             subject += $".{config.Name}";
-            config.Name = default!;
         }
 
         if (!string.IsNullOrWhiteSpace(config.FilterSubject))

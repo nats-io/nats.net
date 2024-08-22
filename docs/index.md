@@ -1,6 +1,6 @@
-# Welcome to NATS.Net
+# Welcome to NATS .NET
 
-NATS.Net is an open source [NATS](https://nats.io) client library for modern [.NET](https://dot.net/). NATS.Net fully supports async programming,
+NATS .NET is an open source [NATS](https://nats.io) client library for modern [.NET](https://dot.net/). NATS .NET fully supports async programming,
 recent APIs like Span, IAsyncEnumerable, Channels and takes advantage of .NET's performance improvements while providing
 a pleasant developer experience.
 

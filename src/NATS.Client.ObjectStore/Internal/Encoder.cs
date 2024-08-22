@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Security.Cryptography;
 
 namespace NATS.Client.ObjectStore.Internal;
@@ -31,7 +32,12 @@ internal static class Base64UrlEncoder
         Span<byte> destination = stackalloc byte[256 / 8];
         using (var sha256 = SHA256.Create())
         {
+#if NETSTANDARD2_0
+            var hash = sha256.ComputeHash(value.ToArray());
+            hash.AsSpan().CopyTo(destination);
+#else
             sha256.TryComputeHash(value, destination, out _);
+#endif
         }
 
         return Encode(destination);

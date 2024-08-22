@@ -64,7 +64,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         _maxBytes = maxBytes;
         _expires = expires;
         _idle = idle;
-        _hbTimeout = (int)(idle * 2).TotalMilliseconds;
+        _hbTimeout = (int)new TimeSpan(idle.Ticks * 2).TotalMilliseconds;
         _pendingMsgs = _maxMsgs;
         _pendingBytes = _maxBytes;
 
@@ -134,14 +134,27 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
             serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
             cancellationToken: cancellationToken);
 
-    public void ResetHeartbeatTimer() => _hbTimer.Change(_hbTimeout, Timeout.Infinite);
+    public void ResetHeartbeatTimer()
+    {
+        // if we don't have an idle timeout, we don't need to reset the timer
+        // because we don't expect any heartbeats.
+        if (_idle == TimeSpan.Zero)
+            return;
+
+        _hbTimer.Change(_hbTimeout, Timeout.Infinite);
+    }
 
     public override async ValueTask DisposeAsync()
     {
         Interlocked.Exchange(ref _disposed, 1);
         await base.DisposeAsync().ConfigureAwait(false);
+#if NETSTANDARD2_0
+        _hbTimer.Dispose();
+        _expiresTimer.Dispose();
+#else
         await _hbTimer.DisposeAsync().ConfigureAwait(false);
         await _expiresTimer.DisposeAsync().ConfigureAwait(false);
+#endif
         if (_notificationChannel != null)
         {
             await _notificationChannel.DisposeAsync();

@@ -39,7 +39,7 @@ jobs:
       - if: ${{ fromJSON(steps.tag.outputs.create) }}
         name: Pack
         # https://learn.microsoft.com/en-us/nuget/create-packages/symbol-packages-snupkg
-        run: dotnet pack -c Release -o dist -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg
+        run: dotnet pack -c Release -o dist -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg -p:ContinuousIntegrationBuild=true
 
       - if: ${{ fromJSON(steps.tag.outputs.create) }}
         name: Push

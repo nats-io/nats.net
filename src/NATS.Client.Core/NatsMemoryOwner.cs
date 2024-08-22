@@ -177,6 +177,9 @@ public struct NatsMemoryOwner<T> : IMemoryOwner<T>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get
         {
+#if NETSTANDARD
+            return _array.AsSpan().Slice(_start, _length);
+#else
             var array = _array;
 
             if (array is null)
@@ -196,9 +199,11 @@ public struct NatsMemoryOwner<T> : IMemoryOwner<T>
             // default Span<T> constructor and paying the cost of the extra conditional branches,
             // especially if T is a value type, in which case the covariance check is JIT removed.
             return MemoryMarshal.CreateSpan(ref r0, _length);
+#endif
         }
     }
 
+#if !NETSTANDARD
     /// <summary>
     /// Returns a reference to the first element within the current instance, with no bounds check.
     /// </summary>
@@ -221,6 +226,7 @@ public struct NatsMemoryOwner<T> : IMemoryOwner<T>
 
         return ref array!.DangerousGetReferenceAt(_start);
     }
+#endif
 
     /// <summary>
     /// Gets an <see cref="ArraySegment{T}"/> instance wrapping the underlying <typeparamref name="T"/> array in use.
@@ -346,6 +352,8 @@ public struct NatsMemoryOwner<T> : IMemoryOwner<T>
     }
 }
 
+#if !NETSTANDARD
+
 internal static class NatsMemoryOwnerArrayExtensions
 {
     /// <summary>
@@ -379,3 +387,5 @@ internal static class NatsMemoryOwnerArrayExtensions
 #pragma warning restore CS8619
     }
 }
+
+#endif

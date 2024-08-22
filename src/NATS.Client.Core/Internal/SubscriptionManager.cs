@@ -18,6 +18,8 @@ internal sealed record SubscriptionMetadata(int Sid);
 internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposable
 {
     private readonly ILogger<SubscriptionManager> _logger;
+    private readonly bool _trace;
+    private readonly bool _debug;
     private readonly object _gate = new();
     private readonly NatsConnection _connection;
     private readonly string _inboxPrefix;
@@ -37,6 +39,8 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
         _connection = connection;
         _inboxPrefix = inboxPrefix;
         _logger = _connection.Opts.LoggerFactory.CreateLogger<SubscriptionManager>();
+        _debug = _logger.IsEnabled(LogLevel.Debug);
+        _trace = _logger.IsEnabled(LogLevel.Trace);
         _cts = new CancellationTokenSource();
         _cleanupInterval = _connection.Opts.SubscriptionCleanUpInterval;
         _timer = Task.Run(CleanupAsync);
@@ -88,6 +92,11 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
 
     public ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
     {
+        if (_trace)
+        {
+            _logger.LogTrace(NatsLogEvents.Subscription, "Received subscription data for {Subject}/{Sid}", subject, sid);
+        }
+
         int? orphanSid = null;
         lock (_gate)
         {
@@ -95,6 +104,11 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
             {
                 if (sidMetadata.WeakReference.TryGetTarget(out var sub))
                 {
+                    if (_trace)
+                    {
+                        _logger.LogTrace(NatsLogEvents.Subscription, "Found subscription handler for {Subject}/{Sid}", subject, sid);
+                    }
+
                     return sub.ReceiveAsync(subject, replyTo, headersBuffer, payloadBuffer);
                 }
                 else
@@ -121,15 +135,15 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
             }
         }
 
-        return ValueTask.CompletedTask;
+        return default;
     }
 
     public async ValueTask DisposeAsync()
     {
-#if NET6_0
-        _cts.Cancel();
-#else
+#if NET8_0_OR_GREATER
         await _cts.CancelAsync().ConfigureAwait(false);
+#else
+        _cts.Cancel();
 #endif
 
         WeakReference<NatsSubBase>[] subRefs;
@@ -148,17 +162,24 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
 
     public ValueTask RemoveAsync(NatsSubBase sub)
     {
-        if (!_bySub.TryGetValue(sub, out var subMetadata))
-        {
-            // this can happen when a call to SubscribeAsync is canceled or timed out before subscribing
-            // in that case, return as there is nothing to unsubscribe
-            return ValueTask.CompletedTask;
-        }
-
+        SubscriptionMetadata? subMetadata;
         lock (_gate)
         {
+            if (!_bySub.TryGetValue(sub, out subMetadata))
+            {
+                // this can happen when a call to SubscribeAsync is canceled or timed out before subscribing
+                // in that case, return as there is nothing to unsubscribe
+                _logger.LogInformation(NatsLogEvents.Subscription, "No need to remove subscription {Subject}", sub.Subject);
+                return default;
+            }
+
             _bySub.Remove(sub);
-            _bySid.Remove(subMetadata.Sid, out _);
+            _bySid.TryRemove(subMetadata.Sid, out _);
+        }
+
+        if (_debug)
+        {
+            _logger.LogDebug(NatsLogEvents.Subscription, "Removing subscription {Subject}/{Sid}", sub.Subject, subMetadata.Sid);
         }
 
         return _connection.UnsubscribeAsync(subMetadata.Sid);
@@ -173,6 +194,11 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
     /// <returns>Enumerable list of commands</returns>
     public async ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter)
     {
+        if (_debug)
+        {
+            _logger.LogDebug(NatsLogEvents.Subscription, "Reconnect commands requested");
+        }
+
         var subs = new List<(NatsSubBase, int)>();
         lock (_gate)
         {
@@ -182,12 +208,21 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
                 {
                     subs.Add((sub, sid));
                 }
+                else
+                {
+                    _logger.LogError(NatsLogEvents.Subscription, "While reconnecting found subscription GCd but was never disposed {SidMetadataSubject}/{Sid}", sidMetadata.Subject, sid);
+                }
             }
         }
 
         foreach (var (sub, sid) in subs)
         {
             await sub.WriteReconnectCommandsAsync(commandWriter, sid).ConfigureAwait(false);
+
+            if (_debug)
+            {
+                _logger.LogDebug(NatsLogEvents.Subscription, "Wrote reconnect commands for subscription {Subject}", sub.Subject);
+            }
         }
     }
 
@@ -234,10 +269,25 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
     private async ValueTask SubscribeInternalAsync(string subject, string? queueGroup, NatsSubOpts? opts, NatsSubBase sub, CancellationToken cancellationToken)
     {
         var sid = GetNextSid();
+
+        if (_debug)
+        {
+            _logger.LogDebug(NatsLogEvents.Subscription, "New subscription {Subject}/{Sid}", sub.Subject, sid);
+        }
+
         lock (_gate)
         {
             _bySid[sid] = new SidMetadata(Subject: subject, WeakReference: new WeakReference<NatsSubBase>(sub));
+#if NETSTANDARD2_0
+            lock (_bySub)
+            {
+                if (_bySub.TryGetValue(sub, out _))
+                    _bySub.Remove(sub);
+                _bySub.Add(sub, new SubscriptionMetadata(Sid: sid));
+            }
+#else
             _bySub.AddOrUpdate(sub, new SubscriptionMetadata(Sid: sid));
+#endif
         }
 
         try
