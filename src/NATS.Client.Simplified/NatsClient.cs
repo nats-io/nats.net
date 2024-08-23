@@ -1,7 +1,7 @@
 using System.Threading.Channels;
 using NATS.Client.Core;
 
-namespace NATS.Client;
+namespace NATS.Net;
 
 /// <summary>
 /// Represents a NATS client that provides methods for interacting with NATS server.

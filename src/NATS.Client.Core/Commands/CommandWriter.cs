@@ -26,7 +26,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     private const int SendMemSize = 8520;
 
     // should be more than SendMemSize
-    // https://github.com/nats-io/nats.net.v2/pull/383#discussion_r1484344102
+    // https://github.com/nats-io/nats.net/pull/383#discussion_r1484344102
     private const int MinSegmentSize = 16384;
 
     private readonly ILogger<CommandWriter> _logger;

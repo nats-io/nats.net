@@ -52,10 +52,14 @@
     "postProcessors": [],
     "keepFileLink": false,
     "disableGitFeatures": false,
-    "sitemap": {
-      "baseUrl": "https://nats-io.github.io/nats.net.v2",
-      "priority": 0.1,
-      "changefreq": "monthly"
+    "markdownEngineName": "markdig",
+    "markdownEngineProperties": {
+        "markdigExtensions": [
+            "abbreviations",
+            "definitionlists",
+            "tasklists",
+            "footnotes"
+        ]
     }
   }
 }

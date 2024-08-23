@@ -1,6 +1,6 @@
 using NATS.Client.Core;
 
-namespace NATS.Client;
+namespace NATS.Net;
 
 /// <summary>
 /// Default implementation of the INatsSerializerRegistry interface.
