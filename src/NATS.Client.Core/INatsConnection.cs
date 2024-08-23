@@ -172,5 +172,9 @@ public interface INatsConnection : INatsClient
     /// <param name="pending">The number of pending messages at the time the drop occurred.</param>
     /// <param name="msg">The dropped message represented by <see cref="NatsMsg{T}"/>.</param>
     /// <typeparam name="T">Specifies the type of data in the dropped message.</typeparam>
+    /// <remarks>
+    /// This method is expected to complete quickly to avoid further delays in processing;
+    /// if complex work is required, it is recommended to offload to a channel or other out-of-band processor.
+    /// </remarks>
     void OnMessageDropped<T>(NatsSubBase natsSub, int pending, NatsMsg<T> msg);
 }
