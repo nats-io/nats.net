@@ -1,3 +1,4 @@
+using System.Net.WebSockets;
 using System.Text;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
@@ -113,6 +114,28 @@ public sealed record NatsOpts
     /// case it might risk server disconnecting the client as a slow consumer.
     /// </remarks>
     public BoundedChannelFullMode SubPendingChannelFullMode { get; init; } = BoundedChannelFullMode.DropNewest;
+
+    /// <summary>
+    /// An optional async callback handler for manipulation of ClientWebSocketOptions used for WebSocket connections.
+    /// </summary>
+    /// <remarks>
+    /// This can be used to set authorization header and other HTTP header values.
+    /// Note: Setting HTTP header values is not supported by Blazor WebAssembly as the underlying browser implementation does not support adding headers to a WebSocket.
+    /// The callback's execution time contributes to the connection establishment subject to the <see cref="ConnectTimeout"/>.
+    /// Implementors should use the passed CancellationToken for async operations called by this handler.
+    /// </remarks>
+    /// <example>
+    /// await using var nats = new NatsConnection(new NatsOpts
+    /// {
+    ///     Url = "ws://localhost:8080",
+    ///     ConfigureWebSocketOpts = (serverUri, clientWsOpts, ct) =>
+    ///     {
+    ///         clientWsOpts.SetRequestHeader("authorization", $"Bearer MY_TOKEN");
+    ///         return ValueTask.CompletedTask;
+    ///     },
+    /// });
+    /// </example>
+    public Func<Uri, ClientWebSocketOptions, CancellationToken, ValueTask>? ConfigureWebSocketOpts { get; init; } = null;
 
     internal NatsUri[] GetSeedUris()
     {
