@@ -6,10 +6,10 @@ using System.Security.Cryptography;
 using Random = NATS.Client.Core.Internal.NetStandardExtensions.Random;
 #endif
 
-namespace NATS.Client.Core.Internal;
+namespace NATS.Client.Core;
 
 [SkipLocalsInit]
-internal sealed class NuidWriter
+public sealed class NuidWriter
 {
     // NuidLength, PrefixLength, SequentialLength were nuint (System.UIntPtr) in the original code
     // however, they were changed to uint to fix the compilation error for IL2CPP Unity projects.
