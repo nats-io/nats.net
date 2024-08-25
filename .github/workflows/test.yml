@@ -24,12 +24,11 @@ jobs:
     steps:
       - name: Install nats-server
         run: |
-          gh_api_url="https://api.github.com/repos/nats-io/nats-server/releases"
           branch="${{ matrix.config.branch }}"
           if [[ $branch == "v"* ]]; then
-            branch=$(curl -H 'Authorization: token ${{ secrets.AUTH_TOKEN_FOR_GITHUB_API }}' -s $gh_api_url | jq -r '.[].tag_name' | grep $branch | sort -V | tail -1)
+            branch=$(curl https://api.mtmk.net/gh/v1/releases/tag/nats-io/nats-server/$branch)
           elif [[ $branch == "latest" ]]; then
-            branch=$(curl -H 'Authorization: token ${{ secrets.AUTH_TOKEN_FOR_GITHUB_API }}' -s $gh_api_url/latest | jq -r .tag_name)
+            branch=$(curl https://api.mtmk.net/gh/v1/releases/tag/nats-io/nats-server/latest)
           fi
           for i in 1 2 3
           do
@@ -119,12 +118,11 @@ jobs:
         shell: bash
         run: |
           mkdir tools-nats-server && cd tools-nats-server
-          gh_api_url="https://api.github.com/repos/nats-io/nats-server/releases"
           branch="${{ matrix.config.branch }}"
           if [[ $branch == "v"* ]]; then
-            branch=$(curl -H 'Authorization: token ${{ secrets.AUTH_TOKEN_FOR_GITHUB_API }}' -s $gh_api_url | jq -r '.[].tag_name' | grep $branch | sort -V | tail -1)
+            branch=$(curl https://api.mtmk.net/gh/v1/releases/tag/nats-io/nats-server/$branch)
           elif [[ $branch == "latest" ]]; then
-            branch=$(curl -H 'Authorization: token ${{ secrets.AUTH_TOKEN_FOR_GITHUB_API }}' -s $gh_api_url/latest | jq -r .tag_name)
+            branch=$(curl https://api.mtmk.net/gh/v1/releases/tag/nats-io/nats-server/latest)
           fi
           for i in 1 2 3
           do
