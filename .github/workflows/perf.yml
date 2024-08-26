@@ -24,11 +24,11 @@ jobs:
     steps:
       - name: Install nats
         run: |
-          rel=$(curl https://api.mtmk.net/gh/v1/releases/tag/nats-io/natscli/latest | sed s/v//)
+          rel=$(curl https://api.mtmk.dev/gh/v1/releases/tag/nats-io/natscli/latest | sed s/v//)
           wget https://github.com/nats-io/natscli/releases/download/v$rel/nats-$rel-linux-amd64.zip
           unzip nats-$rel-linux-amd64.zip
           sudo mv nats-$rel-linux-amd64/nats /usr/local/bin
-          branch=$(curl https://api.mtmk.net/gh/v1/releases/tag/nats-io/nats-server/${{ matrix.config.branch }})
+          branch=$(curl https://api.mtmk.dev/gh/v1/releases/tag/nats-io/nats-server/${{ matrix.config.branch }})
           for i in 1 2 3
           do
             curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@$branch | PREFIX=. sh && break || sleep 30
