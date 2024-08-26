@@ -24,7 +24,7 @@ jobs:
     steps:
       - name: Install nats-server
         run: |
-          branch=$(curl https://api.mtmk.net/gh/v1/releases/tag/nats-io/nats-server/${{ matrix.config.branch }})
+          branch=$(curl https://api.mtmk.dev/gh/v1/releases/tag/nats-io/nats-server/${{ matrix.config.branch }})
           for i in 1 2 3
           do
             curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@$branch | PREFIX=. sh && break || sleep 30
@@ -113,7 +113,7 @@ jobs:
         shell: bash
         run: |
           mkdir tools-nats-server && cd tools-nats-server
-          branch=$(curl https://api.mtmk.net/gh/v1/releases/tag/nats-io/nats-server/${{ matrix.config.branch }})
+          branch=$(curl https://api.mtmk.dev/gh/v1/releases/tag/nats-io/nats-server/${{ matrix.config.branch }})
           for i in 1 2 3
           do
             curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@$branch | PREFIX=. sh && break || sleep 30
