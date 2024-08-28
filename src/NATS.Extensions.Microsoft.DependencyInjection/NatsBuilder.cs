@@ -30,9 +30,10 @@ public class NatsBuilder
 
     public NatsBuilder ConfigureOptions(Func<IServiceProvider, NatsOpts, NatsOpts> optsFactory)
     {
+        Func<IServiceProvider, NatsOpts, NatsOpts>? configure = _configureOpts;
         _configureOpts = (serviceProvider, opts) =>
         {
-            opts = _configureOpts?.Invoke(serviceProvider, opts) ?? opts;
+            opts = configure?.Invoke(serviceProvider, opts) ?? opts;
 
             return optsFactory(serviceProvider, opts);
         };
@@ -45,12 +46,14 @@ public class NatsBuilder
 
     public NatsBuilder ConfigureConnection(Action<IServiceProvider, NatsConnection> configureConnection)
     {
+        Action<IServiceProvider, NatsConnection>? configure = _configureConnection;
         _configureConnection = (serviceProvider, connection) =>
         {
-            _configureConnection?.Invoke(serviceProvider, connection);
+            configure?.Invoke(serviceProvider, connection);
 
             configureConnection(serviceProvider, connection);
         };
+
         return this;
     }
 

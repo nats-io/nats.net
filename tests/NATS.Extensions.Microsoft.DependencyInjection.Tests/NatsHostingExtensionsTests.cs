@@ -86,15 +86,17 @@ public class NatsHostingExtensionsTests
         var services = new ServiceCollection();
         services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
         services.AddSingleton<IMyResolvedService>(new MyResolvedService("url-set"));
-        services.AddNatsClient(nats => nats.ConfigureOptions((serviceProvider, opts) =>
-        {
-            opts = opts with
+        services.AddNatsClient(nats => nats
+            .ConfigureOptions((_, opts) => opts) // Add multiple to test chaining
+            .ConfigureOptions((serviceProvider, opts) =>
             {
-                Url = serviceProvider.GetRequiredService<IMyResolvedService>().GetValue(),
-            };
+                opts = opts with
+                {
+                    Url = serviceProvider.GetRequiredService<IMyResolvedService>().GetValue(),
+                };
 
-            return opts;
-        }));
+                return opts;
+            }));
 
         var provider = services.BuildServiceProvider();
         var nats = provider.GetRequiredService<INatsConnection>();
@@ -110,17 +112,17 @@ public class NatsHostingExtensionsTests
         var services = new ServiceCollection();
         services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
         services.AddSingleton<IMyResolvedService>(new MyResolvedService("url-set"));
-
-        AsyncEventHandler<NatsEventArgs> handler = async (sender, args) => { };
-        services.AddNatsClient(nats => nats.ConfigureConnection((serviceProvider, conn) =>
-        {
-            conn.OnConnectingAsync = async instance =>
+        services.AddNatsClient(nats => nats
+            .ConfigureConnection((_, _) => { }) // Add multiple to test chaining
+            .ConfigureConnection((serviceProvider, conn) =>
             {
-                string resolved = serviceProvider.GetRequiredService<IMyResolvedService>().GetValue();
+                conn.OnConnectingAsync = async instance =>
+                {
+                    string resolved = serviceProvider.GetRequiredService<IMyResolvedService>().GetValue();
 
-                return (resolved, instance.Port);
-            };
-        }));
+                    return (resolved, instance.Port);
+                };
+            }));
 
         var provider = services.BuildServiceProvider();
         var nats = provider.GetRequiredService<NatsConnection>();
