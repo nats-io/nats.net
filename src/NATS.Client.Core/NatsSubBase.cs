@@ -314,7 +314,7 @@ public abstract class NatsSubBase
         if (_startUpTimeoutTimer != null)
         {
             _startUpTimeoutTimer.Change(dueTime: Timeout.InfiniteTimeSpan, period: Timeout.InfiniteTimeSpan);
-            _startUpTimeoutTimer = null;
+            _startUpTimeoutTimer.Dispose();
         }
     }
 

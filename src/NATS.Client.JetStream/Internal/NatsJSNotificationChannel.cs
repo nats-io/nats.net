@@ -2,7 +2,7 @@ using System.Threading.Channels;
 
 namespace NATS.Client.JetStream.Internal;
 
-internal class NatsJSNotificationChannel : IAsyncDisposable
+internal sealed class NatsJSNotificationChannel : IAsyncDisposable
 {
     private readonly Func<INatsJSNotification, CancellationToken, Task> _notificationHandler;
     private readonly Action<Exception> _exceptionHandler;

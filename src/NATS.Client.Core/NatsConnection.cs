@@ -848,7 +848,7 @@ public partial class NatsConnection : INatsConnection
 
         _logger.LogDebug(NatsLogEvents.Connection, "Starting ping timer");
 
-        var periodicTimer = new PeriodicTimer(Opts.PingInterval);
+        using var periodicTimer = new PeriodicTimer(Opts.PingInterval);
         ResetPongCount();
         try
         {
