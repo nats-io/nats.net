@@ -30,18 +30,21 @@ internal static class SslClientAuthenticationOptionsExtensions
         // https://github.com/dotnet/runtime/blob/380a4723ea98067c28d54f30e1a652483a6a257a/src/libraries/System.Net.Security/tests/FunctionalTests/TestHelper.cs#L192-L197
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            var ephemeral = leafCert;
-            leafCert = new X509Certificate2(leafCert.Export(X509ContentType.Pfx));
-            ephemeral.Dispose();
+            var ephemeral = new X509Certificate2(leafCert.Export(X509ContentType.Pfx));
+            leafCert.Dispose();
+            leafCert = ephemeral;
         }
 
-        return options.LoadClientCertFromX509(leafCert, intermediateCerts, offline, trust);
+        var clientCert = options.LoadClientCertFromX509(leafCert, intermediateCerts, offline, trust);
+        leafCert.Dispose();
+
+        return clientCert;
     }
 #endif
 
     public static SslClientAuthenticationOptions LoadClientCertFromPfxFile(this SslClientAuthenticationOptions options, string certBundleFile, bool offline = false, SslCertificateTrust? trust = null)
     {
-        var leafCert = new X509Certificate2(certBundleFile);
+        using var leafCert = new X509Certificate2(certBundleFile);
         var intermediateCerts = new X509Certificate2Collection();
         intermediateCerts.Import(certBundleFile);
 

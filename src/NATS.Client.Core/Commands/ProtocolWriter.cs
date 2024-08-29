@@ -48,7 +48,7 @@ internal sealed class ProtocolWriter
         BinaryPrimitives.WriteUInt64LittleEndian(span, ConnectSpace);
         writer.Advance(ConnectSpaceLength);
 
-        var jsonWriter = new Utf8JsonWriter(writer);
+        using var jsonWriter = new Utf8JsonWriter(writer);
         JsonSerializer.Serialize(jsonWriter, opts, JsonContext.Default.ClientOpts);
 
         span = writer.GetSpan(UInt16Length);
