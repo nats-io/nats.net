@@ -115,11 +115,12 @@ internal sealed class SslStreamConnection : ISocketConnection
     public async Task AuthenticateAsClientAsync(NatsUri uri, TimeSpan timeout)
     {
         var options = await _tlsOpts.AuthenticateAsClientOptionsAsync(uri).ConfigureAwait(true);
-        using var networkStream = new NetworkStream(_socket, true);
-
-        _sslStream?.Dispose();
+        var networkStream = new NetworkStream(_socket, true);
 
 #if NETSTANDARD2_0
+        if (_sslStream != null)
+            _sslStream?.Dispose();
+
         _sslStream = new SslStream(
             innerStream: networkStream,
             leaveInnerStreamOpen: false,
@@ -138,6 +139,9 @@ internal sealed class SslStreamConnection : ISocketConnection
             throw new NatsException($"TLS authentication failed", ex);
         }
 #else
+        if (_sslStream != null)
+            await _sslStream.DisposeAsync().ConfigureAwait(false);
+
         _sslStream = new SslStream(innerStream: networkStream);
         try
         {
