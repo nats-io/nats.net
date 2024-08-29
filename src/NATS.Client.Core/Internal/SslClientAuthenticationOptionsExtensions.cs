@@ -35,16 +35,13 @@ internal static class SslClientAuthenticationOptionsExtensions
             leafCert = ephemeral;
         }
 
-        var clientCert = options.LoadClientCertFromX509(leafCert, intermediateCerts, offline, trust);
-        leafCert.Dispose();
-
-        return clientCert;
+        return options.LoadClientCertFromX509(leafCert, intermediateCerts, offline, trust);
     }
 #endif
 
     public static SslClientAuthenticationOptions LoadClientCertFromPfxFile(this SslClientAuthenticationOptions options, string certBundleFile, bool offline = false, SslCertificateTrust? trust = null)
     {
-        using var leafCert = new X509Certificate2(certBundleFile);
+        var leafCert = new X509Certificate2(certBundleFile);
         var intermediateCerts = new X509Certificate2Collection();
         intermediateCerts.Import(certBundleFile);
 
