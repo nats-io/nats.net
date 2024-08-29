@@ -16,7 +16,7 @@ public class WebSocketOptionsTest
 
         List<string> pubs = new();
         await using var server = new MockServer(
-            handler: (client, cmd) =>
+            (client, cmd) =>
             {
                 if (cmd.Name == "PUB")
                 {
@@ -32,12 +32,12 @@ public class WebSocketOptionsTest
                 return Task.CompletedTask;
             },
             Log,
-            info: $"{{\"max_payload\":{1024 * 4}}}",
-            cancellationToken: cts.Token);
+            $"{{\"max_payload\":{1024 * 4}}}",
+            cts.Token);
 
         await using var wsServer = new WebSocketMockServer(
             server.Url,
-            connectHandler: (httpContext) =>
+            httpContext =>
             {
                 return true;
             },
@@ -56,12 +56,15 @@ public class WebSocketOptionsTest
         {
             Url = wsServer.WebSocketUrl,
             LoggerFactory = testLogger,
-            ConfigureWebSocketOpts = (serverUri, clientWsOpts, ct) =>
+            NatsWebSocketOpts = new NatsWebSocketOpts
             {
-                tokenCount++;
-                Log($"[C] ConfigureWebSocketOpts {serverUri}, accessToken TOKEN_{tokenCount}");
-                clientWsOpts.SetRequestHeader("authorization", $"Bearer TOKEN_{tokenCount}");
-                return ValueTask.CompletedTask;
+                ConfigureWebSocketOpts = (serverUri, clientWsOpts, certificate, remoteCertificateValidationCallback, ct) =>
+                {
+                    tokenCount++;
+                    Log($"[C] ConfigureWebSocketOpts {serverUri}, accessToken TOKEN_{tokenCount}");
+                    clientWsOpts.SetRequestHeader("authorization", $"Bearer TOKEN_{tokenCount}");
+                    return ValueTask.CompletedTask;
+                },
             },
         });
 
@@ -209,18 +212,23 @@ public class WebSocketOptionsTest
             Log($"[NC] {m.Message}");
         });
 
-        await using var nats = new NatsConnection(new NatsOpts
+        var natsOpts = new NatsOpts
         {
             Url = wsServer.WebSocketUrl,
             LoggerFactory = testLogger,
-            ConfigureWebSocketOpts = (serverUri, clientWsOpts, ct) =>
+            NatsWebSocketOpts = new NatsWebSocketOpts()
             {
-                tokenCount++;
-                Log($"[C] ConfigureWebSocketOpts {serverUri}, accessToken TOKEN_{tokenCount}");
-                clientWsOpts.SetRequestHeader("authorization", $"Bearer TOKEN_{tokenCount}");
-                return ValueTask.CompletedTask;
+                ConfigureWebSocketOpts = (serverUri, clientWsOpts, certificateCollection, remoteCertificateValidationCallBack, ct) =>
+                {
+                    tokenCount++;
+                    Log($"[C] ConfigureWebSocketOpts {serverUri}, accessToken TOKEN_{tokenCount}");
+                    clientWsOpts.SetRequestHeader("authorization", $"Bearer TOKEN_{tokenCount}");
+                    return ValueTask.CompletedTask;
+                },
             },
-        });
+        };
+
+        await using var nats = new NatsConnection(natsOpts);
 
         Log($"[C] connect {server.Url}");
 
@@ -297,18 +305,20 @@ public class WebSocketOptionsTest
             Log($"[NC] {m.Message}");
         });
 
-        await using var nats = new NatsConnection(new NatsOpts
+        var natsOpts = new NatsOpts
         {
             Url = "ws://localhost:1234",
             LoggerFactory = testLogger,
-            ConfigureWebSocketOpts = (serverUri, clientWsOpts, ct) =>
+            NatsWebSocketOpts = new NatsWebSocketOpts()
             {
-                throw new Exception("Error in callback");
+                ConfigureWebSocketOpts = (_, _, _, _, _)
+                    => throw new Exception("Error in callback"),
             },
-        });
+        };
+        await using var nats = new NatsConnection(natsOpts);
 
         // expect: NATS.Client.Core.NatsException : can not connect uris: ws://localhost:1234
-        var exception = await Assert.ThrowsAsync<NatsException>(async () => await nats.ConnectAsync());
+        await Assert.ThrowsAsync<NatsException>(async () => await nats.ConnectAsync());
     }
 
     private void Log(string m)

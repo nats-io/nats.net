@@ -1,3 +1,4 @@
+using System.Net.Security;
 using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Runtime.CompilerServices;
@@ -39,13 +40,14 @@ internal sealed class WebSocketConnection : ISocketConnection
     /// <summary>
     /// Connect with Timeout. When failed, Dispose this connection.
     /// </summary>
-    public async ValueTask ConnectAsync(Uri uri, NatsOpts opts)
+    public async ValueTask ConnectAsync(NatsUri uri, NatsOpts opts)
     {
         using var cts = new CancellationTokenSource(opts.ConnectTimeout);
         try
         {
-            await InvokeCallbackForClientWebSocketOptionsAsync(opts, uri, _socket.Options, cts.Token).ConfigureAwait(false);
-            await _socket.ConnectAsync(uri, cts.Token).ConfigureAwait(false);
+            var sslClientAuthenticationOptions = await opts.TlsOpts.AuthenticateAsClientOptionsAsync(uri).ConfigureAwait(true);
+            await InvokeCallbackForClientWebSocketOptionsAsync(opts, uri.Uri, _socket.Options, sslClientAuthenticationOptions, cts.Token).ConfigureAwait(false);
+            await _socket.ConnectAsync(uri.Uri, cts.Token).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -133,11 +135,22 @@ internal sealed class WebSocketConnection : ISocketConnection
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private async Task InvokeCallbackForClientWebSocketOptionsAsync(NatsOpts opts, Uri uri, ClientWebSocketOptions options, CancellationToken token)
+    private async Task InvokeCallbackForClientWebSocketOptionsAsync(NatsOpts opts, Uri uri, ClientWebSocketOptions clientWebSocketOptions, SslClientAuthenticationOptions? sslClientAuthenticationOptions, CancellationToken token)
     {
-        if (opts.ConfigureWebSocketOpts != null)
+        if (opts.NatsWebSocketOpts.ConfigureWebSocketOpts != null)
         {
-            await opts.ConfigureWebSocketOpts(uri, options, token).ConfigureAwait(false);
+            var x509CertificateCollection = sslClientAuthenticationOptions?.ClientCertificates;
+            var remoteCertificateValidationCallback = sslClientAuthenticationOptions?.RemoteCertificateValidationCallback;
+
+            await opts.NatsWebSocketOpts.ConfigureWebSocketOpts(uri, clientWebSocketOptions, token, x509CertificateCollection, remoteCertificateValidationCallback).ConfigureAwait(false);
+        }
+
+        if (opts.NatsWebSocketOpts.RequestHeaders != null)
+        {
+            foreach (var (name, value) in opts.NatsWebSocketOpts.RequestHeaders)
+            {
+                clientWebSocketOptions.SetRequestHeader(name, value);
+            }
         }
     }
 }
