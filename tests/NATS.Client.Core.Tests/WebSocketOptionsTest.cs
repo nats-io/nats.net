@@ -1,5 +1,7 @@
 using System.Net;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Primitives;
 using NATS.Client.TestUtilities;
 
 namespace NATS.Client.Core.Tests;
@@ -319,6 +321,79 @@ public class WebSocketOptionsTest
 
         // expect: NATS.Client.Core.NatsException : can not connect uris: ws://localhost:1234
         await Assert.ThrowsAsync<NatsException>(async () => await nats.ConnectAsync());
+    }
+
+    [Fact]
+    public async Task HttpHeadersWebSocketServer_ShouldBeConsistsOfRequestHeadersHeaders()
+    {
+        var expectedHeaderValue = "HeaderFromDictionary";
+
+        void AssertAction(IHeaderDictionary requestHeaders)
+        {
+            var (_, value) = requestHeaders.Single(h => h.Key == "Header");
+            Assert.Equal(expectedHeaderValue, value);
+        }
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        await using var server = new MockServer(
+            handler: (client, cmd) =>
+            {
+                if (cmd is { Name: "PUB", Subject: "close" })
+                {
+                    client.Close();
+                }
+
+                return Task.CompletedTask;
+            },
+            Log,
+            info: $"{{\"max_payload\":{1024 * 4}}}",
+            cancellationToken: cts.Token);
+
+        await using var wsServer = new WebSocketMockServer(
+            server.Url,
+            connectHandler: (httpContext) =>
+            {
+                AssertAction(httpContext.Request.Headers);
+                return true;
+            },
+            Log,
+            cts.Token);
+
+        var natsOpts = new NatsOpts
+        {
+            Url = wsServer.WebSocketUrl,
+            NatsWebSocketOpts = new NatsWebSocketOpts
+            {
+                RequestHeaders = new Dictionary<string, StringValues> { { "Header", expectedHeaderValue } },
+                ConfigureWebSocketOpts = (_, clientWsOpts, _, _, _) =>
+                {
+                    clientWsOpts.SetRequestHeader("Header", "HeaderFromCallBack");
+                    return ValueTask.CompletedTask;
+                },
+            },
+        };
+        await using var nats = new NatsConnection(natsOpts);
+
+        // expect: NATS.Client.Core.NatsException : can not connect uris: ws://localhost:1234
+        await nats.ConnectAsync();
+
+        await nats.PublishAsync("close", "x", cancellationToken: cts.Token);
+
+        for (var i = 1; i <= 10; i++)
+        {
+            try
+            {
+                await nats.PingAsync(cts.Token);
+                break;
+            }
+            catch (OperationCanceledException)
+            {
+                if (i == 10)
+                    throw;
+                await Task.Delay(100 * i, cts.Token);
+            }
+        }
     }
 
     private void Log(string m)
