@@ -118,7 +118,7 @@ public class NatsHostingExtensionsTests
             {
                 conn.OnConnectingAsync = async instance =>
                 {
-                    string resolved = serviceProvider.GetRequiredService<IMyResolvedService>().GetValue();
+                    var resolved = serviceProvider.GetRequiredService<IMyResolvedService>().GetValue();
 
                     return (resolved, instance.Port);
                 };
@@ -127,7 +127,7 @@ public class NatsHostingExtensionsTests
         var provider = services.BuildServiceProvider();
         var nats = provider.GetRequiredService<NatsConnection>();
 
-        (string host, int _) = await nats.OnConnectingAsync!((Host: "host", Port: 123));
+        (var host, var _) = await nats.OnConnectingAsync!((Host: "host", Port: 123));
         Assert.Equal("url-set", host);
     }
 

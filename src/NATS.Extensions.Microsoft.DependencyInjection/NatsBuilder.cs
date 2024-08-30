@@ -30,7 +30,7 @@ public class NatsBuilder
 
     public NatsBuilder ConfigureOptions(Func<IServiceProvider, NatsOpts, NatsOpts> optsFactory)
     {
-        Func<IServiceProvider, NatsOpts, NatsOpts>? configure = _configureOpts;
+        var configure = _configureOpts;
         _configureOpts = (serviceProvider, opts) =>
         {
             opts = configure?.Invoke(serviceProvider, opts) ?? opts;
@@ -46,7 +46,7 @@ public class NatsBuilder
 
     public NatsBuilder ConfigureConnection(Action<IServiceProvider, NatsConnection> configureConnection)
     {
-        Action<IServiceProvider, NatsConnection>? configure = _configureConnection;
+        var configure = _configureConnection;
         _configureConnection = (serviceProvider, connection) =>
         {
             configure?.Invoke(serviceProvider, connection);
@@ -63,7 +63,7 @@ public class NatsBuilder
     public NatsBuilder AddJsonSerialization(Func<IServiceProvider, JsonSerializerContext> contextFactory)
         => ConfigureOptions((serviceProvider, opts) =>
         {
-            JsonSerializerContext context = contextFactory(serviceProvider);
+            var context = contextFactory(serviceProvider);
             NatsJsonContextSerializerRegistry jsonRegistry = new(context);
 
             return opts with { SerializerRegistry = jsonRegistry };
