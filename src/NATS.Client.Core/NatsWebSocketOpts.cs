@@ -1,4 +1,4 @@
-﻿using System.Net.Security;
+using System.Net.Security;
 using System.Net.WebSockets;
 using System.Security.Cryptography.X509Certificates;
 using Microsoft.Extensions.Primitives;
