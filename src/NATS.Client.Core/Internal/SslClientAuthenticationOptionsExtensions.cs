@@ -30,9 +30,9 @@ internal static class SslClientAuthenticationOptionsExtensions
         // https://github.com/dotnet/runtime/blob/380a4723ea98067c28d54f30e1a652483a6a257a/src/libraries/System.Net.Security/tests/FunctionalTests/TestHelper.cs#L192-L197
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            var ephemeral = new X509Certificate2(leafCert.Export(X509ContentType.Pfx));
-            leafCert.Dispose();
-            leafCert = ephemeral;
+            var ephemeral = leafCert;
+            leafCert = new X509Certificate2(leafCert.Export(X509ContentType.Pfx));
+            ephemeral.Dispose();
         }
 
         return options.LoadClientCertFromX509(leafCert, intermediateCerts, offline, trust);
