@@ -119,7 +119,7 @@ internal sealed class SslStreamConnection : ISocketConnection
 
 #if NETSTANDARD2_0
         if (_sslStream != null)
-            _sslStream?.Dispose();
+            _sslStream.Dispose();
 
         _sslStream = new SslStream(
             innerStream: networkStream,
