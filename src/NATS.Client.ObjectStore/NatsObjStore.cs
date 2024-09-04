@@ -707,7 +707,7 @@ public class NatsObjStore : INatsObjStore
     private string NewNuid()
     {
         Span<char> buffer = stackalloc char[22];
-        if (NuidWriter.TryWriteNuid(buffer))
+        if (Nuid.TryWriteNuid(buffer))
         {
             return buffer.ToString();
         }

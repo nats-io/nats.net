@@ -611,7 +611,7 @@ public class KeyValueStoreTest
     [Fact]
     public async Task TestDirectMessageRepublishedSubject()
     {
-        var streamBucketName = "sb-" + NuidWriter.NewNuid();
+        var streamBucketName = "sb-" + Nuid.NewNuid();
         var subject = "test";
         var streamSubject = subject + ".>";
         var publishSubject1 = subject + ".one";

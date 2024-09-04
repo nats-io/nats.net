@@ -6,10 +6,17 @@ using System.Security.Cryptography;
 using Random = NATS.Client.Core.Internal.NetStandardExtensions.Random;
 #endif
 
-namespace NATS.Client.Core.Internal;
+namespace NATS.Client.Core;
 
+/// <summary>
+/// Represents a unique identifier generator.
+/// </summary>
+/// <remarks>
+/// The <c>Nuid</c> class generates unique identifiers that can be used
+/// to ensure uniqueness in distributed systems.
+/// </remarks>
 [SkipLocalsInit]
-internal sealed class NuidWriter
+public sealed class Nuid
 {
     // NuidLength, PrefixLength, SequentialLength were nuint (System.UIntPtr) in the original code
     // however, they were changed to uint to fix the compilation error for IL2CPP Unity projects.
@@ -25,13 +32,13 @@ internal sealed class NuidWriter
     private const int MaxIncrement = 333;
 
     [ThreadStatic]
-    private static NuidWriter? _writer;
+    private static Nuid? _writer;
 
     private char[] _prefix;
     private ulong _increment;
     private ulong _sequential;
 
-    private NuidWriter()
+    private Nuid()
     {
         Refresh(out _);
     }
@@ -42,7 +49,23 @@ internal sealed class NuidWriter
     private static ReadOnlySpan<char> Digits => "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 #endif
 
-    public static bool TryWriteNuid(Span<char> nuidBuffer)
+    /// <summary>
+    /// Generates a new NATS unique identifier (NUID).
+    /// </summary>
+    /// <returns>A new NUID as a string.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when unable to generate the NUID.</exception>
+    public static string NewNuid()
+    {
+        Span<char> buffer = stackalloc char[(int)NuidLength];
+        if (TryWriteNuid(buffer))
+        {
+            return buffer.ToString();
+        }
+
+        throw new InvalidOperationException("Internal error: can't generate nuid");
+    }
+
+    internal static bool TryWriteNuid(Span<char> nuidBuffer)
     {
         if (_writer is not null)
         {
@@ -50,17 +73,6 @@ internal sealed class NuidWriter
         }
 
         return InitAndWrite(nuidBuffer);
-    }
-
-    public static string NewNuid()
-    {
-        Span<char> buffer = stackalloc char[22];
-        if (TryWriteNuid(buffer))
-        {
-            return buffer.ToString();
-        }
-
-        throw new InvalidOperationException("Internal error: can't generate nuid");
     }
 
     private static bool TryWriteNuidCore(Span<char> buffer, Span<char> prefix, ulong sequential)
@@ -140,7 +152,7 @@ internal sealed class NuidWriter
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static bool InitAndWrite(Span<char> span)
     {
-        _writer = new NuidWriter();
+        _writer = new Nuid();
         return _writer.TryWriteNuidCore(span);
     }
 
