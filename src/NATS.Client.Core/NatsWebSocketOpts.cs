@@ -1,7 +1,6 @@
-using System.Net.Security;
 using System.Net.WebSockets;
-using System.Security.Cryptography.X509Certificates;
 using Microsoft.Extensions.Primitives;
+using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
 
@@ -13,16 +12,54 @@ public sealed record NatsWebSocketOpts
     public static readonly NatsWebSocketOpts Default = new();
 
     /// <summary>
-    /// An optional, HTTP headers adding to clientWebSocketOptions
+    /// An optional dictionary of HTTP request headers to be sent with the WebSocket request.
     /// </summary>
     /// <remarks>
-    /// Note: Setting HTTP header values is not supported by Blazor WebAssembly as the underlying browser implementation does not support adding headers to a WebSocket.
+    /// Note: this setting will be ignored when running in the Browser, such as when using Blazor WebAssembly,
+    /// as the underlying Browser implementation does not support adding headers to a WebSocket.
     /// </remarks>
-    public Dictionary<string, StringValues>? RequestHeaders { get; init; }
+    public IDictionary<string, StringValues>? RequestHeaders { get; init; }
 
     /// <summary>
-    /// An optional, async callback handler for manipulation of ClientWebSocketOptions used for WebSocket connections.
+    /// An optional async callback handler for manipulation of ClientWebSocketOptions used for WebSocket connections.
     /// Implementors should use the passed CancellationToken for async operations called by this handler.
     /// </summary>
-    public Func<Uri, ClientWebSocketOptions, CancellationToken, X509CertificateCollection?, RemoteCertificateValidationCallback?, ValueTask>? ConfigureWebSocketOpts { get; init; } = null;
+    public Func<Uri, ClientWebSocketOptions, CancellationToken, ValueTask>? ConfigureClientWebSocketOptions { get; init; } = null;
+
+    internal async ValueTask ApplyClientWebSocketOptionsAsync(
+        ClientWebSocketOptions clientWebSocketOptions,
+        NatsUri uri,
+        NatsTlsOpts tlsOpts,
+        CancellationToken cancellationToken)
+    {
+        // todo: test that this doesn't throw in Blazor, otherwise we need a way to detect Blazor and skip
+        if (RequestHeaders != null)
+        {
+            foreach (var entry in RequestHeaders)
+            {
+                foreach (var value in entry.Value)
+                {
+                    clientWebSocketOptions.SetRequestHeader(entry.Key, value);
+                }
+            }
+        }
+
+        if (tlsOpts.TryTls(uri))
+        {
+            var authenticateAsClientOptions = await tlsOpts.AuthenticateAsClientOptionsAsync(uri).ConfigureAwait(false);
+            if (authenticateAsClientOptions.ClientCertificates != null)
+            {
+                clientWebSocketOptions.ClientCertificates = authenticateAsClientOptions.ClientCertificates;
+            }
+
+#if !NETSTANDARD2_0
+            clientWebSocketOptions.RemoteCertificateValidationCallback = authenticateAsClientOptions.RemoteCertificateValidationCallback;
+#endif
+        }
+
+        if (ConfigureClientWebSocketOptions != null)
+        {
+            await ConfigureClientWebSocketOptions(uri.Uri, clientWebSocketOptions, cancellationToken).ConfigureAwait(false);
+        }
+    }
 }

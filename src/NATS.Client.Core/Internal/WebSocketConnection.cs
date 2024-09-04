@@ -45,8 +45,7 @@ internal sealed class WebSocketConnection : ISocketConnection
         using var cts = new CancellationTokenSource(opts.ConnectTimeout);
         try
         {
-            var sslClientAuthenticationOptions = await opts.TlsOpts.AuthenticateAsClientOptionsAsync(uri).ConfigureAwait(true);
-            await InvokeCallbackForClientWebSocketOptionsAsync(opts, uri.Uri, _socket.Options, sslClientAuthenticationOptions, cts.Token).ConfigureAwait(false);
+            await opts.WebSocketOpts.ApplyClientWebSocketOptionsAsync(_socket.Options, uri, opts.TlsOpts, cts.Token).ConfigureAwait(false);
             await _socket.ConnectAsync(uri.Uri, cts.Token).ConfigureAwait(false);
         }
         catch (Exception ex)
@@ -132,25 +131,5 @@ internal sealed class WebSocketConnection : ISocketConnection
     public void SignalDisconnected(Exception exception)
     {
         _waitForClosedSource.TrySetResult(exception);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private async Task InvokeCallbackForClientWebSocketOptionsAsync(NatsOpts opts, Uri uri, ClientWebSocketOptions clientWebSocketOptions, SslClientAuthenticationOptions? sslClientAuthenticationOptions, CancellationToken token)
-    {
-        if (opts.NatsWebSocketOpts.ConfigureWebSocketOpts != null)
-        {
-            var x509CertificateCollection = sslClientAuthenticationOptions?.ClientCertificates;
-            var remoteCertificateValidationCallback = sslClientAuthenticationOptions?.RemoteCertificateValidationCallback;
-
-            await opts.NatsWebSocketOpts.ConfigureWebSocketOpts(uri, clientWebSocketOptions, token, x509CertificateCollection, remoteCertificateValidationCallback).ConfigureAwait(false);
-        }
-
-        if (opts.NatsWebSocketOpts.RequestHeaders != null)
-        {
-            foreach (var (name, value) in opts.NatsWebSocketOpts.RequestHeaders)
-            {
-                clientWebSocketOptions.SetRequestHeader(name, value);
-            }
-        }
     }
 }

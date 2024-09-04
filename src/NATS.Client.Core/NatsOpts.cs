@@ -28,6 +28,8 @@ public sealed record NatsOpts
 
     public NatsTlsOpts TlsOpts { get; init; } = NatsTlsOpts.Default;
 
+    public NatsWebSocketOpts WebSocketOpts { get; init; } = NatsWebSocketOpts.Default;
+
     public INatsSerializerRegistry SerializerRegistry { get; init; } = NatsDefaultSerializerRegistry.Default;
 
     public ILoggerFactory LoggerFactory { get; init; } = NullLoggerFactory.Instance;
@@ -114,8 +116,6 @@ public sealed record NatsOpts
     /// case it might risk server disconnecting the client as a slow consumer.
     /// </remarks>
     public BoundedChannelFullMode SubPendingChannelFullMode { get; init; } = BoundedChannelFullMode.DropNewest;
-
-    public NatsWebSocketOpts NatsWebSocketOpts { get; init; } = NatsWebSocketOpts.Default;
 
     internal NatsUri[] GetSeedUris()
     {

@@ -58,9 +58,9 @@ public class WebSocketOptionsTest
         {
             Url = wsServer.WebSocketUrl,
             LoggerFactory = testLogger,
-            NatsWebSocketOpts = new NatsWebSocketOpts
+            WebSocketOpts = new NatsWebSocketOpts
             {
-                ConfigureWebSocketOpts = (serverUri, clientWsOpts, certificate, remoteCertificateValidationCallback, ct) =>
+                ConfigureClientWebSocketOptions = (serverUri, clientWsOpts, _) =>
                 {
                     tokenCount++;
                     Log($"[C] ConfigureWebSocketOpts {serverUri}, accessToken TOKEN_{tokenCount}");
@@ -218,9 +218,9 @@ public class WebSocketOptionsTest
         {
             Url = wsServer.WebSocketUrl,
             LoggerFactory = testLogger,
-            NatsWebSocketOpts = new NatsWebSocketOpts()
+            WebSocketOpts = new NatsWebSocketOpts()
             {
-                ConfigureWebSocketOpts = (serverUri, clientWsOpts, certificateCollection, remoteCertificateValidationCallBack, ct) =>
+                ConfigureClientWebSocketOptions = (serverUri, clientWsOpts, _) =>
                 {
                     tokenCount++;
                     Log($"[C] ConfigureWebSocketOpts {serverUri}, accessToken TOKEN_{tokenCount}");
@@ -311,9 +311,9 @@ public class WebSocketOptionsTest
         {
             Url = "ws://localhost:1234",
             LoggerFactory = testLogger,
-            NatsWebSocketOpts = new NatsWebSocketOpts()
+            WebSocketOpts = new NatsWebSocketOpts()
             {
-                ConfigureWebSocketOpts = (_, _, _, _, _)
+                ConfigureClientWebSocketOptions = (_, _, _)
                     => throw new Exception("Error in callback"),
             },
         };
@@ -363,10 +363,10 @@ public class WebSocketOptionsTest
         var natsOpts = new NatsOpts
         {
             Url = wsServer.WebSocketUrl,
-            NatsWebSocketOpts = new NatsWebSocketOpts
+            WebSocketOpts = new NatsWebSocketOpts
             {
                 RequestHeaders = new Dictionary<string, StringValues> { { "Header", expectedHeaderValue } },
-                ConfigureWebSocketOpts = (_, clientWsOpts, _, _, _) =>
+                ConfigureClientWebSocketOptions = (_, clientWsOpts, _) =>
                 {
                     clientWsOpts.SetRequestHeader("Header", "HeaderFromCallBack");
                     return ValueTask.CompletedTask;
