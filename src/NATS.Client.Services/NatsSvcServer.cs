@@ -34,7 +34,7 @@ public class NatsSvcServer : INatsSvcServer
     public NatsSvcServer(NatsConnection nats, NatsSvcConfig config, CancellationToken cancellationToken)
     {
         _logger = nats.Opts.LoggerFactory.CreateLogger<NatsSvcServer>();
-        _id = NuidWriter.NewNuid();
+        _id = Nuid.NewNuid();
         _nats = nats;
         _config = config;
         _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);

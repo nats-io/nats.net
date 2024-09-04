@@ -228,7 +228,7 @@ public partial class NatsJSContext : INatsJSContext
             request.Config.FilterSubjects = opts.FilterSubjects;
         }
 
-        var name = NuidWriter.NewNuid();
+        var name = Nuid.NewNuid();
         var subject = $"{Opts.Prefix}.CONSUMER.CREATE.{stream}.{name}";
 
         return JSRequestResponseAsync<ConsumerCreateRequest, ConsumerInfo>(
