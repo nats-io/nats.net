@@ -141,6 +141,12 @@ internal class NatsJSOrderedPushConsumer<T>
     {
         _nats.ConnectionDisconnected -= OnDisconnected;
 
+#if NETSTANDARD2_0
+        _timer.Dispose();
+#else
+        await _timer.DisposeAsync().ConfigureAwait(false);
+#endif
+
         // For correctly Dispose,
         // first stop the consumer Creation operations and then the command execution operations.
         // It is necessary that all consumerCreation operations have time to complete before command CommandLoop stop
