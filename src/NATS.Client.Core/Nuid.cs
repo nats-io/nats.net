@@ -56,7 +56,7 @@ public sealed class Nuid
     /// <exception cref="InvalidOperationException">Thrown when unable to generate the NUID.</exception>
     public static string NewNuid()
     {
-        Span<char> buffer = stackalloc char[NuidLength];
+        Span<char> buffer = stackalloc char[(int)NuidLength];
         if (TryWriteNuid(buffer))
         {
             return buffer.ToString();
