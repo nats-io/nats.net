@@ -115,14 +115,13 @@ internal sealed class SslStreamConnection : ISocketConnection
     public async Task AuthenticateAsClientAsync(NatsUri uri, TimeSpan timeout)
     {
         var options = await _tlsOpts.AuthenticateAsClientOptionsAsync(uri).ConfigureAwait(true);
-        var networkStream = new NetworkStream(_socket, true);
 
 #if NETSTANDARD2_0
         if (_sslStream != null)
             _sslStream.Dispose();
 
         _sslStream = new SslStream(
-            innerStream: networkStream,
+            innerStream: new NetworkStream(_socket, true),
             leaveInnerStreamOpen: false,
             userCertificateSelectionCallback: options.LocalCertificateSelectionCallback,
             userCertificateValidationCallback: options.RemoteCertificateValidationCallback);
@@ -142,7 +141,7 @@ internal sealed class SslStreamConnection : ISocketConnection
         if (_sslStream != null)
             await _sslStream.DisposeAsync().ConfigureAwait(false);
 
-        _sslStream = new SslStream(innerStream: networkStream);
+        _sslStream = new SslStream(innerStream: new NetworkStream(_socket, true));
         try
         {
             using var cts = new CancellationTokenSource(timeout);
