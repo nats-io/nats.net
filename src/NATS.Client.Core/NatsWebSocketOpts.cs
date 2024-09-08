@@ -1,4 +1,5 @@
 using System.Net.WebSockets;
+using System.Runtime.InteropServices;
 using Microsoft.Extensions.Primitives;
 using NATS.Client.Core.Internal;
 
@@ -32,8 +33,7 @@ public sealed record NatsWebSocketOpts
         NatsTlsOpts tlsOpts,
         CancellationToken cancellationToken)
     {
-        // todo: test that this doesn't throw in Blazor, otherwise we need a way to detect Blazor and skip
-        if (RequestHeaders != null)
+        if (RequestHeaders != null && !RuntimeInformation.IsOSPlatform(DotnetRuntimeConstants.BrowserPlatform))
         {
             foreach (var entry in RequestHeaders)
             {
