@@ -37,10 +37,10 @@ public sealed record NatsWebSocketOpts
         {
             foreach (var entry in RequestHeaders)
             {
-                foreach (var value in entry.Value)
-                {
-                    clientWebSocketOptions.SetRequestHeader(entry.Key, value);
-                }
+                // SetRequestHeader overwrites if called multiple times;
+                // RFC7230 Section 3.2.2 allows for combining them with a comma
+                // https://www.rfc-editor.org/rfc/rfc7230#section-3.2.2
+                clientWebSocketOptions.SetRequestHeader(entry.Key, string.Join(",", entry.Value));
             }
         }
 
