@@ -107,7 +107,7 @@ public sealed record NatsTlsOpts
 
     internal TlsMode EffectiveMode(NatsUri uri) => Mode switch
     {
-        TlsMode.Auto => HasTlsCerts || uri.Uri.Scheme.ToLower() == "tls" || uri.Uri.Scheme.ToLower() == "wss" ? TlsMode.Require : TlsMode.Prefer,
+        TlsMode.Auto => HasTlsCerts || uri.Uri.Scheme.ToLower() == "tls" ? TlsMode.Require : TlsMode.Prefer,
         _ => Mode,
     };
 

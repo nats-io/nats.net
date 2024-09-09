@@ -1,4 +1,5 @@
 using System.Net.WebSockets;
+using System.Security.Cryptography.X509Certificates;
 using Microsoft.Extensions.Primitives;
 using NATS.Client.Core.Internal;
 
@@ -15,7 +16,7 @@ public sealed record NatsWebSocketOpts
     /// An optional dictionary of HTTP request headers to be sent with the WebSocket request.
     /// </summary>
     /// <remarks>
-    /// Note: this setting will be ignored when running in the Browser, such as when using Blazor WebAssembly,
+    /// Not supported when running in the Browser, such as when using Blazor WebAssembly,
     /// as the underlying Browser implementation does not support adding headers to a WebSocket.
     /// </remarks>
     public IDictionary<string, StringValues>? RequestHeaders { get; init; }
@@ -32,7 +33,6 @@ public sealed record NatsWebSocketOpts
         NatsTlsOpts tlsOpts,
         CancellationToken cancellationToken)
     {
-        // todo: test that this doesn't throw in Blazor, otherwise we need a way to detect Blazor and skip
         if (RequestHeaders != null)
         {
             foreach (var entry in RequestHeaders)
@@ -44,12 +44,42 @@ public sealed record NatsWebSocketOpts
             }
         }
 
-        if (tlsOpts.TryTls(uri))
+        if (tlsOpts.HasTlsCerts)
         {
             var authenticateAsClientOptions = await tlsOpts.AuthenticateAsClientOptionsAsync(uri).ConfigureAwait(false);
+            var collection = new X509CertificateCollection();
+
+            // must match LoadClientCertFromX509 method in SslClientAuthenticationOptions.cs
+#if NET8_0_OR_GREATER
+            if (authenticateAsClientOptions.ClientCertificateContext != null)
+            {
+                collection.Add(authenticateAsClientOptions.ClientCertificateContext.TargetCertificate);
+            }
+#else
+
+/* Unmerged change from project 'NATS.Client.Core(netstandard2.1)'
+Before:
+            if (authenticateAsClientOptions.ClientCertificates != null) {
+After:
             if (authenticateAsClientOptions.ClientCertificates != null)
             {
-                clientWebSocketOptions.ClientCertificates = authenticateAsClientOptions.ClientCertificates;
+*/
+
+/* Unmerged change from project 'NATS.Client.Core(net6.0)'
+Before:
+            if (authenticateAsClientOptions.ClientCertificates != null) {
+After:
+            if (authenticateAsClientOptions.ClientCertificates != null)
+            {
+*/
+            if (authenticateAsClientOptions.ClientCertificates != null)
+            {
+                collection.AddRange(authenticateAsClientOptions.ClientCertificates);
+            }
+#endif
+            if (collection.Count > 0)
+            {
+                clientWebSocketOptions.ClientCertificates = collection;
             }
 
 #if !NETSTANDARD2_0
