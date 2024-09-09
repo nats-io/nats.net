@@ -30,7 +30,7 @@ public partial class NatsJSContext
         _logger = connection.Opts.LoggerFactory.CreateLogger<NatsJSContext>();
     }
 
-    internal INatsConnection Connection { get; }
+    public INatsConnection Connection { get; }
 
     internal NatsJSOpts Opts { get; }
 
