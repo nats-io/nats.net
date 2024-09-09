@@ -81,6 +81,7 @@ public class NatsServer : IAsyncDisposable
         TransportType.Tcp => $"nats://127.0.0.1:{Opts.ServerPort}",
         TransportType.Tls => $"tls://127.0.0.1:{Opts.ServerPort}",
         TransportType.WebSocket => $"ws://127.0.0.1:{Opts.WebSocketPort}",
+        TransportType.WebSocketSecure => $"wss://127.0.0.1:{Opts.WebSocketPort}",
         _ => throw new ArgumentOutOfRangeException(),
     };
 
@@ -88,7 +89,7 @@ public class NatsServer : IAsyncDisposable
     {
         get
         {
-            if (_transportType == TransportType.WebSocket && ServerVersions.V2_9_19 <= Version)
+            if (_transportType is TransportType.WebSocket or TransportType.WebSocketSecure && ServerVersions.V2_9_19 <= Version)
             {
                 return Opts.WebSocketPort!.Value;
             }

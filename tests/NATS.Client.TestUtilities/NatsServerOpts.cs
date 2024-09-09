@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net.NetworkInformation;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace NATS.Client.Core.Tests;
 
@@ -9,6 +10,7 @@ public enum TransportType
     Tcp,
     Tls,
     WebSocket,
+    WebSocketSecure,
 }
 
 public sealed class NatsServerOptsBuilder
@@ -77,7 +79,7 @@ public sealed class NatsServerOptsBuilder
             throw new Exception("tlsFirst is only valid for TLS transport");
         }
 
-        if (transportType == TransportType.Tls)
+        if (transportType is TransportType.Tls or TransportType.WebSocketSecure)
         {
             _enableTls = true;
             _tlsServerCertFile = "resources/certs/server-cert.pem";
@@ -93,7 +95,8 @@ public sealed class NatsServerOptsBuilder
             _tlsFirst = tlsFirst;
             _tlsVerify = tlsVerify;
         }
-        else if (transportType == TransportType.WebSocket)
+
+        if (transportType is TransportType.WebSocket or TransportType.WebSocketSecure)
         {
             _enableWebSocket = true;
         }
@@ -214,15 +217,47 @@ public sealed class NatsServerOpts : IDisposable
 
             if (Trace)
             {
-                sb.AppendLine($"trace: true");
-                sb.AppendLine($"debug: true");
+                sb.AppendLine("trace: true");
+                sb.AppendLine("debug: true");
+            }
+
+            string? tls = null;
+            if (EnableTls)
+            {
+                if (TlsServerCertFile == default || TlsServerKeyFile == default)
+                {
+                    throw new Exception("TLS is enabled but cert or key missing");
+                }
+
+                var tlsSb = new StringBuilder();
+                tlsSb.AppendLine("tls {");
+                tlsSb.AppendLine($"  cert_file: {TlsServerCertFile}");
+                tlsSb.AppendLine($"  key_file: {TlsServerKeyFile}");
+                if (TlsCaFile != default)
+                {
+                    tlsSb.AppendLine($"  ca_file: {TlsCaFile}");
+                }
+
+                if (TlsFirst)
+                {
+                    tlsSb.AppendLine("  handshake_first: true");
+                }
+
+                if (TlsVerify)
+                {
+                    tlsSb.AppendLine($"  verify_and_map: true");
+                }
+
+                tlsSb.Append("}");
+                tls = tlsSb.ToString();
+                sb.AppendLine(tls);
             }
 
             if (EnableWebSocket)
             {
                 sb.AppendLine("websocket {");
-                sb.AppendLine($"  port: {WebSocketPort}");
-                sb.AppendLine("  no_tls: true");
+                sb.AppendLine($"  listen: {ServerHost}:{WebSocketPort}");
+                sb.AppendLine(tls != null ? Regex.Replace(tls, "^", "  ", RegexOptions.Multiline) : "  no_tls: true");
                 sb.AppendLine("}");
             }
 
@@ -232,34 +267,6 @@ public sealed class NatsServerOpts : IDisposable
                 sb.AppendLine("  name: nats");
                 sb.AppendLine($"  listen: {ServerHost}:{ClusteringPort}");
                 sb.AppendLine($"  routes: [{_routes}]");
-                sb.AppendLine("}");
-            }
-
-            if (EnableTls)
-            {
-                if (TlsServerCertFile == default || TlsServerKeyFile == default)
-                {
-                    throw new Exception("TLS is enabled but cert or key missing");
-                }
-
-                sb.AppendLine("tls {");
-                sb.AppendLine($"  cert_file: {TlsServerCertFile}");
-                sb.AppendLine($"  key_file: {TlsServerKeyFile}");
-                if (TlsCaFile != default)
-                {
-                    sb.AppendLine($"  ca_file: {TlsCaFile}");
-                }
-
-                if (TlsFirst)
-                {
-                    sb.AppendLine($"  handshake_first: true");
-                }
-
-                if (TlsVerify)
-                {
-                    sb.AppendLine($"  verify_and_map: true");
-                }
-
                 sb.AppendLine("}");
             }
 
