@@ -443,4 +443,61 @@ public class ConsumerConsumeTest
             break;
         }
     }
+
+    [Fact]
+    public async Task Consume_right_amount_of_messages()
+    {
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var js = new NatsJSContext(nats);
+        await js.CreateStreamAsync("s1", ["s1.*"], cts.Token);
+
+        var payload = new byte[1024];
+        for (var i = 0; i < 50; i++)
+        {
+            var ack = await js.PublishAsync("s1.foo", payload, cancellationToken: cts.Token);
+            ack.EnsureSuccess();
+        }
+
+        // Max messages
+        {
+            var consumer = await js.CreateOrUpdateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+            var opts = new NatsJSConsumeOpts { MaxMsgs = 10, };
+            var count = 0;
+            await foreach (var msg in consumer.ConsumeAsync<byte[]>(opts: opts, cancellationToken: cts.Token))
+            {
+                await msg.AckAsync(cancellationToken: cts.Token);
+                if (++count == 4)
+                    break;
+            }
+
+            await Retry.Until("consumer stats updated", async () =>
+            {
+                var info = (await js.GetConsumerAsync("s1", "c1", cts.Token)).Info;
+                return info is { NumAckPending: 6, NumPending: 40 };
+            });
+        }
+
+        // Max bytes
+        {
+            var consumer = await js.CreateOrUpdateConsumerAsync("s1", "c2", cancellationToken: cts.Token);
+            var opts = new NatsJSConsumeOpts { MaxBytes = 10 * (1024 + 50), };
+            var count = 0;
+            await foreach (var msg in consumer.ConsumeAsync<byte[]>(opts: opts, cancellationToken: cts.Token))
+            {
+                await msg.AckAsync(cancellationToken: cts.Token);
+                if (++count == 4)
+                    break;
+            }
+
+            await Retry.Until("consumer stats updated", async () =>
+            {
+                var info = (await js.GetConsumerAsync("s1", "c2", cts.Token)).Info;
+                return info is { NumAckPending: 6, NumPending: 40 };
+            });
+        }
+    }
 }
