@@ -321,7 +321,7 @@ public partial class NatsConnection : INatsConnection
                 if (uri.IsWebSocket)
                 {
                     var conn = new WebSocketConnection();
-                    await conn.ConnectAsync(uri.Uri, Opts.ConnectTimeout).ConfigureAwait(false);
+                    await conn.ConnectAsync(uri.Uri, Opts).ConfigureAwait(false);
                     _socket = conn;
                 }
                 else
@@ -609,7 +609,7 @@ public partial class NatsConnection : INatsConnection
                     {
                         _logger.LogDebug(NatsLogEvents.Connection, "Trying to reconnect using WebSocket {Url} [{ReconnectCount}]", url, reconnectCount);
                         var conn = new WebSocketConnection();
-                        await conn.ConnectAsync(url.Uri, Opts.ConnectTimeout).ConfigureAwait(false);
+                        await conn.ConnectAsync(url.Uri, Opts).ConfigureAwait(false);
                         _socket = conn;
                     }
                     else
@@ -851,7 +851,7 @@ public partial class NatsConnection : INatsConnection
 
         _logger.LogDebug(NatsLogEvents.Connection, "Starting ping timer");
 
-        var periodicTimer = new PeriodicTimer(Opts.PingInterval);
+        using var periodicTimer = new PeriodicTimer(Opts.PingInterval);
         ResetPongCount();
         try
         {

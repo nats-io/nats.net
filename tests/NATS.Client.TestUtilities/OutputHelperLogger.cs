@@ -41,7 +41,12 @@ public class OutputHelperLoggerFactory : ILoggerFactory
             _natsServer = natsServer;
         }
 
+#if NET8_0_OR_GREATER
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull
+#else
         public IDisposable BeginScope<TState>(TState state)
+#endif
         {
             return NullDisposable.Instance;
         }

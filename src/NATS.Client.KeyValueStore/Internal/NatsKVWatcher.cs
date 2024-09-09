@@ -24,7 +24,7 @@ internal readonly struct NatsKVWatchCommandMsg<T>
     public NatsJSMsg<T> Msg { get; init; } = default;
 }
 
-internal class NatsKVWatcher<T> : IAsyncDisposable
+internal sealed class NatsKVWatcher<T> : IAsyncDisposable
 {
     private readonly ILogger _logger;
     private readonly bool _debug;
@@ -143,6 +143,12 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
         {
             await _sub.DisposeAsync();
         }
+
+#if NETSTANDARD2_0
+        _timer.Dispose();
+#else
+        await _timer.DisposeAsync().ConfigureAwait(false);
+#endif
 
         _consumerCreateChannel.Writer.TryComplete();
         _commandChannel.Writer.TryComplete();
@@ -444,7 +450,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
     private string NewNuid()
     {
         Span<char> buffer = stackalloc char[22];
-        if (NuidWriter.TryWriteNuid(buffer))
+        if (Nuid.TryWriteNuid(buffer))
         {
             return buffer.ToString();
         }

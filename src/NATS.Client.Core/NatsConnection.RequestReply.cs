@@ -112,12 +112,12 @@ public partial class NatsConnection
             state.prefix.AsSpan().CopyTo(buffer);
             buffer[state.prefix.Length] = '.';
             var remaining = buffer.Slice(state.pfxLen);
-            var didWrite = NuidWriter.TryWriteNuid(remaining);
+            var didWrite = Nuid.TryWriteNuid(remaining);
             Debug.Assert(didWrite, "didWrite");
         }
 
         var separatorLength = prefix.Length > 0 ? 1 : 0;
-        var totalLength = prefix.Length + (int)NuidWriter.NuidLength + separatorLength;
+        var totalLength = prefix.Length + (int)Nuid.NuidLength + separatorLength;
         var totalPrefixLength = prefix.Length + separatorLength;
 
 #if NET6_0_OR_GREATER || NETSTANDARD2_1

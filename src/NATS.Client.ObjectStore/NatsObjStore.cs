@@ -52,7 +52,7 @@ public class NatsObjStore : INatsObjStore
     /// <returns>Object value as a byte array.</returns>
     public async ValueTask<byte[]> GetBytesAsync(string key, CancellationToken cancellationToken = default)
     {
-        var memoryStream = new MemoryStream();
+        using var memoryStream = new MemoryStream();
         await GetAsync(key, memoryStream, cancellationToken: cancellationToken).ConfigureAwait(false);
         return memoryStream.ToArray();
     }
@@ -707,7 +707,7 @@ public class NatsObjStore : INatsObjStore
     private string NewNuid()
     {
         Span<char> buffer = stackalloc char[22];
-        if (NuidWriter.TryWriteNuid(buffer))
+        if (Nuid.TryWriteNuid(buffer))
         {
             return buffer.ToString();
         }
