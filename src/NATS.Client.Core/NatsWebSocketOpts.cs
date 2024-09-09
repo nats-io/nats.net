@@ -56,22 +56,6 @@ public sealed record NatsWebSocketOpts
                 collection.Add(authenticateAsClientOptions.ClientCertificateContext.TargetCertificate);
             }
 #else
-
-/* Unmerged change from project 'NATS.Client.Core(netstandard2.1)'
-Before:
-            if (authenticateAsClientOptions.ClientCertificates != null) {
-After:
-            if (authenticateAsClientOptions.ClientCertificates != null)
-            {
-*/
-
-/* Unmerged change from project 'NATS.Client.Core(net6.0)'
-Before:
-            if (authenticateAsClientOptions.ClientCertificates != null) {
-After:
-            if (authenticateAsClientOptions.ClientCertificates != null)
-            {
-*/
             if (authenticateAsClientOptions.ClientCertificates != null)
             {
                 collection.AddRange(authenticateAsClientOptions.ClientCertificates);
