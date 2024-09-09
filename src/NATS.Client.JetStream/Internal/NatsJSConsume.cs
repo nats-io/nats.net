@@ -112,7 +112,8 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
 
                 if (self.Connection.ConnectionState == NatsConnectionState.Open)
                 {
-                    self.CheckPending("heartbeat-timeout");
+                    self.Pull("heartbeat-timeout", self._maxMsgs, self._maxBytes);
+                    self.ResetPending();
                     if (self._debug)
                     {
                         self._logger.LogDebug(

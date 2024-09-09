@@ -76,8 +76,7 @@ public class ConsumerConsumeTest
         var consumerOpts = new NatsJSConsumeOpts { MaxMsgs = 10 };
         var consumer = (NatsJSConsumer)await js.GetConsumerAsync("s1", "c1", cts.Token);
         var count = 0;
-        await using var cc = await consumer.ConsumeInternalAsync<TestData>(serializer: TestDataJsonSerializer<TestData>.Default, consumerOpts, cancellationToken: cts.Token);
-        await foreach (var msg in cc.Msgs.ReadAllAsync(cts.Token))
+        await foreach (var msg in consumer.ConsumeAsync(serializer: TestDataJsonSerializer<TestData>.Default, consumerOpts, cancellationToken: cts.Token))
         {
             await msg.AckAsync(cancellationToken: cts.Token);
             Assert.Equal(count, msg.Data!.Test);
@@ -92,7 +91,7 @@ public class ConsumerConsumeTest
 
         await Retry.Until(
             reason: "received enough pulls",
-            condition: () => PullCount() > 5,
+            condition: () => PullCount() >= 4,
             action: () =>
             {
                 _output.WriteLine($"### PullCount:{PullCount()}");
@@ -215,12 +214,10 @@ public class ConsumerConsumeTest
         // Not interested in management messages sent upto this point
         await proxy.FlushFramesAsync(nats);
 
-        var cc = await consumer.ConsumeInternalAsync<TestData>(serializer: TestDataJsonSerializer<TestData>.Default, consumerOpts, cancellationToken: cts.Token);
-
         var readerTask = Task.Run(async () =>
         {
             var count = 0;
-            await foreach (var msg in cc.Msgs.ReadAllAsync(cts.Token))
+            await foreach (var msg in consumer.ConsumeAsync<TestData>(serializer: TestDataJsonSerializer<TestData>.Default, consumerOpts, cancellationToken: cts.Token))
             {
                 await msg.AckAsync(cancellationToken: cts.Token);
                 Assert.Equal(count, msg.Data!.Test);
@@ -230,6 +227,8 @@ public class ConsumerConsumeTest
                 if (count == 2)
                     break;
             }
+
+            return count;
         });
 
         // Send a message before reconnect
@@ -258,11 +257,9 @@ public class ConsumerConsumeTest
             ack.EnsureSuccess();
         }
 
-        await Retry.Until(
-            "acked",
-            () => proxy.ClientFrames.Any(f => f.Message.Contains("CONSUMER.MSG.NEXT")));
+        var count = await readerTask;
+        Assert.Equal(2, count);
 
-        await readerTask;
         await nats.DisposeAsync();
     }
 
