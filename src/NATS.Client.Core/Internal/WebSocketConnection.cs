@@ -1,3 +1,4 @@
+using System.Net.Security;
 using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Runtime.CompilerServices;
@@ -39,13 +40,13 @@ internal sealed class WebSocketConnection : ISocketConnection
     /// <summary>
     /// Connect with Timeout. When failed, Dispose this connection.
     /// </summary>
-    public async ValueTask ConnectAsync(Uri uri, NatsOpts opts)
+    public async ValueTask ConnectAsync(NatsUri uri, NatsOpts opts)
     {
         using var cts = new CancellationTokenSource(opts.ConnectTimeout);
         try
         {
-            await InvokeCallbackForClientWebSocketOptionsAsync(opts, uri, _socket.Options, cts.Token).ConfigureAwait(false);
-            await _socket.ConnectAsync(uri, cts.Token).ConfigureAwait(false);
+            await opts.WebSocketOpts.ApplyClientWebSocketOptionsAsync(_socket.Options, uri, opts.TlsOpts, cts.Token).ConfigureAwait(false);
+            await _socket.ConnectAsync(uri.Uri, cts.Token).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -130,14 +131,5 @@ internal sealed class WebSocketConnection : ISocketConnection
     public void SignalDisconnected(Exception exception)
     {
         _waitForClosedSource.TrySetResult(exception);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private async Task InvokeCallbackForClientWebSocketOptionsAsync(NatsOpts opts, Uri uri, ClientWebSocketOptions options, CancellationToken token)
-    {
-        if (opts.ConfigureWebSocketOpts != null)
-        {
-            await opts.ConfigureWebSocketOpts(uri, options, token).ConfigureAwait(false);
-        }
     }
 }
