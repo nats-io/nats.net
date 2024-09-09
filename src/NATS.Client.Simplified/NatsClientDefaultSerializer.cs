@@ -1,7 +1,7 @@
 using NATS.Client.Core;
 using NATS.Client.Serializers.Json;
 
-namespace NATS.Client;
+namespace NATS.Net;
 
 /// <summary>
 /// Default serializer interface for NATS messages.

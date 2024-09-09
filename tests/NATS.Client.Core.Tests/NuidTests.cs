@@ -5,13 +5,13 @@ using System.Text.RegularExpressions;
 
 namespace NATS.Client.Core.Tests;
 
-public class NuidWriterTests
+public class NuidTests
 {
     private static readonly Regex NuidRegex = new("[A-z0-9]{22}");
 
     private readonly ITestOutputHelper _outputHelper;
 
-    public NuidWriterTests(ITestOutputHelper outputHelper)
+    public NuidTests(ITestOutputHelper outputHelper)
     {
         _outputHelper = outputHelper;
     }
@@ -42,7 +42,7 @@ public class NuidWriterTests
         Span<char> buffer = stackalloc char[44];
 
         // Act
-        var result = NuidWriter.TryWriteNuid(buffer);
+        var result = Nuid.TryWriteNuid(buffer);
 
         // Assert
         ReadOnlySpan<char> lower = buffer.Slice(0, 22);
@@ -59,10 +59,10 @@ public class NuidWriterTests
     public void GetNextNuid_BufferToShort_False_Char()
     {
         // Arrange
-        Span<char> nuid = stackalloc char[(int)NuidWriter.NuidLength - 1];
+        Span<char> nuid = stackalloc char[(int)Nuid.NuidLength - 1];
 
         // Act
-        var result = NuidWriter.TryWriteNuid(nuid);
+        var result = Nuid.TryWriteNuid(nuid);
 
         // Assert
         Assert.False(result);
@@ -77,8 +77,8 @@ public class NuidWriterTests
         Span<char> secondNuid = stackalloc char[22];
 
         // Act
-        var result = NuidWriter.TryWriteNuid(firstNuid);
-        result &= NuidWriter.TryWriteNuid(secondNuid);
+        var result = Nuid.TryWriteNuid(firstNuid);
+        result &= Nuid.TryWriteNuid(secondNuid);
 
         // Assert
         Assert.False(firstNuid.SequenceEqual(secondNuid));
@@ -93,8 +93,8 @@ public class NuidWriterTests
         Span<char> secondNuid = stackalloc char[22];
 
         // Act
-        var result = NuidWriter.TryWriteNuid(firstNuid);
-        result &= NuidWriter.TryWriteNuid(secondNuid);
+        var result = Nuid.TryWriteNuid(firstNuid);
+        result &= Nuid.TryWriteNuid(secondNuid);
 
         // Assert
         Assert.True(result);
@@ -108,7 +108,7 @@ public class NuidWriterTests
         Span<char> nuid = stackalloc char[22];
 
         // Act
-        var result = NuidWriter.TryWriteNuid(nuid);
+        var result = Nuid.TryWriteNuid(nuid);
 
         // Assert
         Assert.True(result);
@@ -129,8 +129,8 @@ public class NuidWriterTests
             var maxSequential = 839299365868340224ul - increment - 1;
             SetSequentialAndIncrement(maxSequential, increment);
 
-            result = NuidWriter.TryWriteNuid(firstNuid);
-            result &= NuidWriter.TryWriteNuid(secondNuid);
+            result = Nuid.TryWriteNuid(firstNuid);
+            result &= Nuid.TryWriteNuid(secondNuid);
         });
 
         executionThread.Start();
@@ -148,7 +148,7 @@ public class NuidWriterTests
         var rngBytes = new byte[12] { 0, 1, 2, 3, 4, 5, 6, 7, 11, 253, 254, 255 };
         DeterministicRng rng = new(new Queue<byte[]>(new[] { rngBytes, rngBytes }));
 
-        var mi = typeof(NuidWriter).GetMethod("GetPrefix", BindingFlags.Static | BindingFlags.NonPublic);
+        var mi = typeof(Nuid).GetMethod("GetPrefix", BindingFlags.Static | BindingFlags.NonPublic);
         var mGetPrefix = mi!.CreateDelegate<Func<RandomNumberGenerator, char[]>>();
 
         // Act
@@ -166,7 +166,7 @@ public class NuidWriterTests
         Thread t = new(() =>
         {
             var buffer = new char[22];
-            var didWrite = NuidWriter.TryWriteNuid(buffer);
+            var didWrite = Nuid.TryWriteNuid(buffer);
 
             var isMatch = NuidRegex.IsMatch(new string(buffer));
             Volatile.Write(ref completedSuccessfully, didWrite && isMatch);
@@ -192,7 +192,7 @@ public class NuidWriterTests
             Thread t = new(() =>
             {
                 var buffer = new char[22];
-                NuidWriter.TryWriteNuid(buffer);
+                Nuid.TryWriteNuid(buffer);
                 nuids.Enqueue((buffer, Environment.CurrentManagedThreadId));
             });
             t.Start();
@@ -226,7 +226,7 @@ public class NuidWriterTests
 
         for (var i = 0; i < count; i++)
         {
-            var didWrite = NuidWriter.TryWriteNuid(buffer);
+            var didWrite = Nuid.TryWriteNuid(buffer);
 
             if (!didWrite)
             {
@@ -259,7 +259,7 @@ public class NuidWriterTests
 
                     for (var i = 0; i < 2048; i++)
                     {
-                        if (!NuidWriter.TryWriteNuid(buffer))
+                        if (!Nuid.TryWriteNuid(buffer))
                         {
                             writeFailed = true;
                             return;
@@ -301,7 +301,7 @@ public class NuidWriterTests
             Span<char> buffer = new char[22];
             for (var i = 0; i < 100_000_000; i++)
             {
-                if (!NuidWriter.TryWriteNuid(buffer))
+                if (!Nuid.TryWriteNuid(buffer))
                 {
                     writeFailed = true;
                     return;
@@ -333,11 +333,11 @@ public class NuidWriterTests
         const int tail = 4;
         const int head = 22 - tail;
 
-        var nuid1 = NuidWriter.NewNuid();
+        var nuid1 = Nuid.NewNuid();
         var head1 = nuid1.Substring(0, head);
         var tail1 = nuid1.Substring(head, tail);
 
-        var nuid2 = NuidWriter.NewNuid();
+        var nuid2 = Nuid.NewNuid();
         var head2 = nuid2.Substring(0, head);
         var tail2 = nuid2.Substring(head, tail);
 
@@ -350,17 +350,17 @@ public class NuidWriterTests
     // on separate threads (distinct NuidWriter instances) only.
     private static void SetSequentialAndIncrement(ulong sequential, ulong increment)
     {
-        var didWrite = NuidWriter.TryWriteNuid(new char[128]);
+        var didWrite = Nuid.TryWriteNuid(new char[128]);
 
         Assert.True(didWrite, "didWrite");
 
-        var fInstance = typeof(NuidWriter).GetField("_writer", BindingFlags.Static | BindingFlags.NonPublic);
+        var fInstance = typeof(Nuid).GetField("_writer", BindingFlags.Static | BindingFlags.NonPublic);
         var instance = fInstance!.GetValue(null);
 
-        var fSequential = typeof(NuidWriter).GetField("_sequential", BindingFlags.Instance | BindingFlags.NonPublic);
+        var fSequential = typeof(Nuid).GetField("_sequential", BindingFlags.Instance | BindingFlags.NonPublic);
         fSequential!.SetValue(instance, sequential);
 
-        var fIncrement = typeof(NuidWriter).GetField("_increment", BindingFlags.Instance | BindingFlags.NonPublic);
+        var fIncrement = typeof(Nuid).GetField("_increment", BindingFlags.Instance | BindingFlags.NonPublic);
         fIncrement!.SetValue(instance, increment);
     }
 

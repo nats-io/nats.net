@@ -72,6 +72,7 @@ public class NKeyPair : IDisposable
     public void Dispose()
     {
         Dispose(true);
+        GC.SuppressFinalize(this);
     }
 
     /// <summary>
@@ -269,7 +270,7 @@ public class NKeys
         if (src.Length != 32)
             throw new NatsException("Invalid seed size");
 
-        var stream = new MemoryStream();
+        using var stream = new MemoryStream();
 
         if (seed)
         {

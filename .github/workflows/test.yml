@@ -24,13 +24,7 @@ jobs:
     steps:
       - name: Install nats-server
         run: |
-          gh_api_url="https://api.github.com/repos/nats-io/nats-server/releases"
-          branch="${{ matrix.config.branch }}"
-          if [[ $branch == "v"* ]]; then
-            branch=$(curl -s $gh_api_url | jq -r '.[].tag_name' | grep $branch | sort -V | tail -1)
-          elif [[ $branch == "latest" ]]; then
-            branch=$(curl -s $gh_api_url/latest | jq -r .tag_name)
-          fi
+          branch=$(curl https://api.mtmk.dev/gh/v1/releases/tag/nats-io/nats-server/${{ matrix.config.branch }})
           for i in 1 2 3
           do
             curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@$branch | PREFIX=. sh && break || sleep 30
@@ -119,13 +113,7 @@ jobs:
         shell: bash
         run: |
           mkdir tools-nats-server && cd tools-nats-server
-          gh_api_url="https://api.github.com/repos/nats-io/nats-server/releases"
-          branch="${{ matrix.config.branch }}"
-          if [[ $branch == "v"* ]]; then
-            branch=$(curl -s $gh_api_url | jq -r '.[].tag_name' | grep $branch | sort -V | tail -1)
-          elif [[ $branch == "latest" ]]; then
-            branch=$(curl -s $gh_api_url/latest | jq -r .tag_name)
-          fi
+          branch=$(curl https://api.mtmk.dev/gh/v1/releases/tag/nats-io/nats-server/${{ matrix.config.branch }})
           for i in 1 2 3
           do
             curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@$branch | PREFIX=. sh && break || sleep 30

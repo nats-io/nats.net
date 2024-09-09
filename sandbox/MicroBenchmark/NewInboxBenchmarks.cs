@@ -25,14 +25,14 @@ public class NewInboxBenchmarks
     [GlobalSetup]
     public void Setup()
     {
-        NuidWriter.TryWriteNuid(new char[100]);
+        Nuid.TryWriteNuid(new char[100]);
     }
 
     [Benchmark(Baseline = true)]
     [SkipLocalsInit]
     public bool TryWriteNuid()
     {
-        return NuidWriter.TryWriteNuid(_buf);
+        return Nuid.TryWriteNuid(_buf);
     }
 
     [Benchmark]

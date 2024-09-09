@@ -1,8 +1,9 @@
 using System.Text;
 using NATS.Client.Core.Tests;
+using NATS.Net;
 
 // ReSharper disable AccessToDisposedClosure
-namespace NATS.Client.Tests;
+namespace NATS.Client.Simplified.Tests;
 
 public class ClientTest
 {
