@@ -164,8 +164,6 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
 
     public void ResetHeartbeatTimer() => _timer.Change(_hbTimeout, _hbTimeout);
 
-
-
     public void Delivered(int msgSize)
     {
         lock (_pendingGate)
