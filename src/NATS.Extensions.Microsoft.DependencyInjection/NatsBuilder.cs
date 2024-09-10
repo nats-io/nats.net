@@ -9,9 +9,10 @@ namespace NATS.Extensions.Microsoft.DependencyInjection;
 public class NatsBuilder
 {
     private readonly IServiceCollection _services;
+
     private int _poolSize = 1;
-    private Func<NatsOpts, NatsOpts>? _configureOpts;
-    private Action<NatsConnection>? _configureConnection;
+    private Func<IServiceProvider, NatsOpts, NatsOpts>? _configureOpts;
+    private Action<IServiceProvider, NatsConnection>? _configureConnection;
     private object? _diKey = null;
 
     public NatsBuilder(IServiceCollection services)
@@ -20,36 +21,51 @@ public class NatsBuilder
     public NatsBuilder WithPoolSize(int size)
     {
         _poolSize = Math.Max(size, 1);
+
         return this;
     }
 
-    public NatsBuilder ConfigureOptions(Func<NatsOpts, NatsOpts> optsFactory)
-    {
-        var previousFactory = _configureOpts;
-        _configureOpts = opts =>
-        {
-            // Apply the previous configurator if it exists.
-            if (previousFactory != null)
-            {
-                opts = previousFactory(opts);
-            }
+    public NatsBuilder ConfigureOptions(Func<NatsOpts, NatsOpts> optsFactory) =>
+        ConfigureOptions((_, opts) => optsFactory(opts));
 
-            // Then apply the new configurator.
-            return optsFactory(opts);
+    public NatsBuilder ConfigureOptions(Func<IServiceProvider, NatsOpts, NatsOpts> optsFactory)
+    {
+        var configure = _configureOpts;
+        _configureOpts = (serviceProvider, opts) =>
+        {
+            opts = configure?.Invoke(serviceProvider, opts) ?? opts;
+
+            return optsFactory(serviceProvider, opts);
         };
+
         return this;
     }
 
-    public NatsBuilder ConfigureConnection(Action<NatsConnection> connectionOpts)
+    public NatsBuilder ConfigureConnection(Action<NatsConnection> configureConnection) =>
+        ConfigureConnection((_, con) => configureConnection(con));
+
+    public NatsBuilder ConfigureConnection(Action<IServiceProvider, NatsConnection> configureConnection)
     {
-        _configureConnection = connectionOpts;
+        var configure = _configureConnection;
+        _configureConnection = (serviceProvider, connection) =>
+        {
+            configure?.Invoke(serviceProvider, connection);
+
+            configureConnection(serviceProvider, connection);
+        };
+
         return this;
     }
 
-    public NatsBuilder AddJsonSerialization(JsonSerializerContext context)
-        => ConfigureOptions(opts =>
+    public NatsBuilder AddJsonSerialization(JsonSerializerContext context) =>
+        AddJsonSerialization(_ => context);
+
+    public NatsBuilder AddJsonSerialization(Func<IServiceProvider, JsonSerializerContext> contextFactory)
+        => ConfigureOptions((serviceProvider, opts) =>
         {
-            var jsonRegistry = new NatsJsonContextSerializerRegistry(context);
+            var context = contextFactory(serviceProvider);
+            NatsJsonContextSerializerRegistry jsonRegistry = new(context);
+
             return opts with { SerializerRegistry = jsonRegistry };
         });
 
@@ -57,6 +73,7 @@ public class NatsBuilder
     public NatsBuilder WithKey(object key)
     {
         _diKey = key;
+
         return this;
     }
 #endif
@@ -117,18 +134,18 @@ public class NatsBuilder
     private NatsConnectionPool PoolFactory(IServiceProvider provider, object? diKey = null)
     {
         var options = NatsOpts.Default with { LoggerFactory = provider.GetRequiredService<ILoggerFactory>() };
-        options = _configureOpts?.Invoke(options) ?? options;
+        options = _configureOpts?.Invoke(provider, options) ?? options;
 
-        return new NatsConnectionPool(_poolSize, options, _configureConnection ?? (_ => { }));
+        return new NatsConnectionPool(_poolSize, options, con => _configureConnection?.Invoke(provider, con));
     }
 
     private NatsConnection SingleConnectionFactory(IServiceProvider provider, object? diKey = null)
     {
         var options = NatsOpts.Default with { LoggerFactory = provider.GetRequiredService<ILoggerFactory>() };
-        options = _configureOpts?.Invoke(options) ?? options;
+        options = _configureOpts?.Invoke(provider, options) ?? options;
 
         var conn = new NatsConnection(options);
-        _configureConnection?.Invoke(conn);
+        _configureConnection?.Invoke(provider, conn);
 
         return conn;
     }

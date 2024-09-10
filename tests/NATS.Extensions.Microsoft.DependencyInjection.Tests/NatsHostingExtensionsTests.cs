@@ -80,6 +80,57 @@ public class NatsHostingExtensionsTests
         return Task.CompletedTask;
     }
 
+    [Fact]
+    public Task AddNatsClient_ConfigureOptionsSetsUrlResolvesServices()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
+        services.AddSingleton<IMyResolvedService>(new MyResolvedService("url-set"));
+        services.AddNatsClient(nats => nats
+            .ConfigureOptions((_, opts) => opts) // Add multiple to test chaining
+            .ConfigureOptions((serviceProvider, opts) =>
+            {
+                opts = opts with
+                {
+                    Url = serviceProvider.GetRequiredService<IMyResolvedService>().GetValue(),
+                };
+
+                return opts;
+            }));
+
+        var provider = services.BuildServiceProvider();
+        var nats = provider.GetRequiredService<INatsConnection>();
+
+        Assert.Equal("url-set", nats.Opts.Url);
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task AddNatsClient_ConfigureConnectionResolvesServices()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
+        services.AddSingleton<IMyResolvedService>(new MyResolvedService("url-set"));
+        services.AddNatsClient(nats => nats
+            .ConfigureConnection((_, _) => { }) // Add multiple to test chaining
+            .ConfigureConnection((serviceProvider, conn) =>
+            {
+                conn.OnConnectingAsync = async instance =>
+                {
+                    var resolved = serviceProvider.GetRequiredService<IMyResolvedService>().GetValue();
+
+                    return (resolved, instance.Port);
+                };
+            }));
+
+        var provider = services.BuildServiceProvider();
+        var nats = provider.GetRequiredService<NatsConnection>();
+
+        (var host, var _) = await nats.OnConnectingAsync!((Host: "host", Port: 123));
+        Assert.Equal("url-set", host);
+    }
+
 #if NET8_0_OR_GREATER
     [Fact]
     public void AddNats_RegistersKeyedNatsConnection_WhenKeyIsProvided()
