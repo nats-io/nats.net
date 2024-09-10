@@ -164,6 +164,26 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
 
     public void ResetHeartbeatTimer() => _timer.Change(_hbTimeout, _hbTimeout);
 
+
+
+    public void Delivered(int msgSize)
+    {
+        lock (_pendingGate)
+        {
+            if (_pendingMsgs > 0)
+                _pendingMsgs--;
+
+            if (_maxBytes > 0)
+            {
+                _pendingBytes -= msgSize;
+                if (_pendingBytes < 0)
+                    _pendingBytes = 0;
+            }
+
+            CheckPending();
+        }
+    }
+
     public override async ValueTask DisposeAsync()
     {
         Interlocked.Exchange(ref _disposed, 1);
@@ -183,26 +203,48 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
     internal override async ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter, int sid)
     {
         await base.WriteReconnectCommandsAsync(commandWriter, sid);
-        ResetPending();
-
-        var request = new ConsumerGetnextRequest
-        {
-            Batch = _maxMsgs,
-            MaxBytes = _maxBytes,
-            IdleHeartbeat = _idle,
-            Expires = _expires,
-        };
 
         if (_cancellationToken.IsCancellationRequested)
             return;
 
-        await commandWriter.PublishAsync(
-            subject: $"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
-            value: request,
-            headers: default,
-            replyTo: Subject,
-            serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
-            cancellationToken: CancellationToken.None);
+        long maxMsgs = 0;
+        long maxBytes = 0;
+
+        // We have to do the pending check here because we can't access
+        // the publish method here since the connection state is not open yet
+        // and we're just writing the reconnect commands.
+        lock (_pendingGate)
+        {
+            if (_maxBytes > 0 && _pendingBytes <= _thresholdBytes)
+            {
+                maxBytes = _maxBytes - _pendingBytes;
+            }
+            else if (_maxBytes == 0 && _pendingMsgs <= _thresholdMsgs && _pendingMsgs < _maxMsgs)
+            {
+                maxMsgs = _maxMsgs - _pendingMsgs;
+            }
+        }
+
+        if (maxMsgs > 0 || maxBytes > 0)
+        {
+            var request = new ConsumerGetnextRequest
+            {
+                Batch = maxMsgs,
+                MaxBytes = maxBytes,
+                IdleHeartbeat = _idle,
+                Expires = _expires,
+            };
+
+            await commandWriter.PublishAsync(
+                subject: $"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
+                value: request,
+                headers: default,
+                replyTo: Subject,
+                serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
+                cancellationToken: CancellationToken.None);
+
+            ResetPending();
+        }
     }
 
     protected override async ValueTask ReceiveInternalAsync(
@@ -323,6 +365,8 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
             {
                 throw new NatsJSException("No header found");
             }
+
+            CheckPending();
         }
         else
         {
@@ -337,23 +381,6 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                     _serializer),
                 _context);
 
-            lock (_pendingGate)
-            {
-                if (_pendingMsgs > 0)
-                    _pendingMsgs--;
-            }
-
-            if (_maxBytes > 0)
-            {
-                if (_debug)
-                    _logger.LogDebug(NatsJSLogEvents.MessageProperty, "Message size {Size}", msg.Size);
-
-                lock (_pendingGate)
-                {
-                    _pendingBytes -= msg.Size;
-                }
-            }
-
             // Stop feeding the user if we are disposed.
             // We need to exit as soon as possible.
             if (Volatile.Read(ref _disposed) == 0)
@@ -364,8 +391,6 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                 await _userMsgs.Writer.WriteAsync(msg).ConfigureAwait(false);
             }
         }
-
-        CheckPending();
     }
 
     protected override void TryComplete()
