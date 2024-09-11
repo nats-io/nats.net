@@ -96,6 +96,7 @@ public class NatsJSConsumer : INatsJSConsumer
                     break;
 
                 yield return jsMsg;
+                cc.Delivered(jsMsg.Size);
             }
         }
     }

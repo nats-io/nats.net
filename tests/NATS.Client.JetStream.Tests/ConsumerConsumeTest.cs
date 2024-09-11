@@ -53,17 +53,12 @@ public class ConsumerConsumeTest
     [Fact]
     public async Task Consume_msgs_test()
     {
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-
-        await using var server = NatsServer.Start(
-            outputHelper: _output,
-            opts: new NatsServerOptsBuilder()
-                .UseTransport(TransportType.Tcp)
-                .Trace()
-                .UseJetStream()
-                .Build());
+        await using var server = NatsServer.StartJS();
         var (nats, proxy) = server.CreateProxiedClientConnection();
         var js = new NatsJSContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
         await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
         await js.CreateOrUpdateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
 
@@ -76,8 +71,7 @@ public class ConsumerConsumeTest
         var consumerOpts = new NatsJSConsumeOpts { MaxMsgs = 10 };
         var consumer = (NatsJSConsumer)await js.GetConsumerAsync("s1", "c1", cts.Token);
         var count = 0;
-        await using var cc = await consumer.ConsumeInternalAsync<TestData>(serializer: TestDataJsonSerializer<TestData>.Default, consumerOpts, cancellationToken: cts.Token);
-        await foreach (var msg in cc.Msgs.ReadAllAsync(cts.Token))
+        await foreach (var msg in consumer.ConsumeAsync(serializer: TestDataJsonSerializer<TestData>.Default, consumerOpts, cancellationToken: cts.Token))
         {
             await msg.AckAsync(cancellationToken: cts.Token);
             Assert.Equal(count, msg.Data!.Test);
@@ -92,7 +86,7 @@ public class ConsumerConsumeTest
 
         await Retry.Until(
             reason: "received enough pulls",
-            condition: () => PullCount() > 5,
+            condition: () => PullCount() > 4,
             action: () =>
             {
                 _output.WriteLine($"### PullCount:{PullCount()}");
@@ -215,12 +209,10 @@ public class ConsumerConsumeTest
         // Not interested in management messages sent upto this point
         await proxy.FlushFramesAsync(nats);
 
-        var cc = await consumer.ConsumeInternalAsync<TestData>(serializer: TestDataJsonSerializer<TestData>.Default, consumerOpts, cancellationToken: cts.Token);
-
         var readerTask = Task.Run(async () =>
         {
             var count = 0;
-            await foreach (var msg in cc.Msgs.ReadAllAsync(cts.Token))
+            await foreach (var msg in consumer.ConsumeAsync<TestData>(serializer: TestDataJsonSerializer<TestData>.Default, consumerOpts, cancellationToken: cts.Token))
             {
                 await msg.AckAsync(cancellationToken: cts.Token);
                 Assert.Equal(count, msg.Data!.Test);
@@ -230,6 +222,8 @@ public class ConsumerConsumeTest
                 if (count == 2)
                     break;
             }
+
+            return count;
         });
 
         // Send a message before reconnect
@@ -258,11 +252,9 @@ public class ConsumerConsumeTest
             ack.EnsureSuccess();
         }
 
-        await Retry.Until(
-            "acked",
-            () => proxy.ClientFrames.Any(f => f.Message.Contains("CONSUMER.MSG.NEXT")));
+        var count = await readerTask;
+        Assert.Equal(2, count);
 
-        await readerTask;
         await nats.DisposeAsync();
     }
 
@@ -445,5 +437,98 @@ public class ConsumerConsumeTest
 
             break;
         }
+    }
+
+    [Fact]
+    public async Task Consume_right_amount_of_messages()
+    {
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var js = new NatsJSContext(nats);
+        await js.CreateStreamAsync("s1", ["s1.*"], cts.Token);
+
+        var payload = new byte[1024];
+        for (var i = 0; i < 50; i++)
+        {
+            var ack = await js.PublishAsync("s1.foo", payload, cancellationToken: cts.Token);
+            ack.EnsureSuccess();
+        }
+
+        // Max messages
+        {
+            var consumer = await js.CreateOrUpdateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+            var opts = new NatsJSConsumeOpts { MaxMsgs = 10, };
+            var count = 0;
+            await foreach (var msg in consumer.ConsumeAsync<byte[]>(opts: opts, cancellationToken: cts.Token))
+            {
+                await msg.AckAsync(cancellationToken: cts.Token);
+                if (++count == 4)
+                    break;
+            }
+
+            await Retry.Until("consumer stats updated", async () =>
+            {
+                var info = (await js.GetConsumerAsync("s1", "c1", cts.Token)).Info;
+                return info is { NumAckPending: 6, NumPending: 40 };
+            });
+        }
+
+        // Max bytes
+        {
+            var consumer = await js.CreateOrUpdateConsumerAsync("s1", "c2", cancellationToken: cts.Token);
+            var opts = new NatsJSConsumeOpts { MaxBytes = 10 * (1024 + 50), };
+            var count = 0;
+            await foreach (var msg in consumer.ConsumeAsync<byte[]>(opts: opts, cancellationToken: cts.Token))
+            {
+                await msg.AckAsync(cancellationToken: cts.Token);
+                if (++count == 4)
+                    break;
+            }
+
+            await Retry.Until("consumer stats updated", async () =>
+            {
+                var info = (await js.GetConsumerAsync("s1", "c2", cts.Token)).Info;
+                return info is { NumAckPending: 6, NumPending: 40 };
+            });
+        }
+    }
+
+    [Fact]
+    public async Task Consume_right_amount_of_messages_when_ack_wait_exceeded()
+    {
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+
+        var js = new NatsJSContext(nats);
+        await js.CreateStreamAsync("email-queue", ["email.>"], cts.Token);
+        await js.PublishAsync("email.queue", "1", cancellationToken: cts.Token);
+        await js.PublishAsync("email.queue", "2", cancellationToken: cts.Token);
+        var consumer = await js.CreateOrUpdateConsumerAsync(
+            stream: "email-queue",
+            new ConsumerConfig("email-queue-consumer") { AckWait = TimeSpan.FromSeconds(10) },
+            cancellationToken: cts.Token);
+        var count = 0;
+        await foreach (var msg in consumer.ConsumeAsync<string>(opts: new NatsJSConsumeOpts { MaxMsgs = 1 }, cancellationToken: cts.Token))
+        {
+            _output.WriteLine($"Received: {msg.Data}");
+
+            // Only wait for the first couple of messages
+            // to get close to the ack wait time
+            if (count < 2)
+                await Task.Delay(TimeSpan.FromSeconds(6), cts.Token);
+
+            // Since we're pulling one message at a time,
+            // we should not exceed the ack wait time
+            await msg.AckAsync(cancellationToken: cts.Token);
+            count++;
+        }
+
+        // Should not have redeliveries
+        Assert.Equal(2, count);
     }
 }
