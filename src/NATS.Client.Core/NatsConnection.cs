@@ -1,10 +1,11 @@
 using System.Buffers;
 using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
 using NATS.Client.Core.Internal;
+using static NATS.Client.Core.Internal.NatsMetrics;
+
 #if NETSTANDARD
 using Random = NATS.Client.Core.Internal.NetStandardExtensions.Random;
 #endif
@@ -35,12 +36,12 @@ public partial class NatsConnection : INatsConnection
     /// </summary>
     public Func<(string Host, int Port), ValueTask<(string Host, int Port)>>? OnConnectingAsync;
 
-    internal readonly ConnectionStatsCounter Counter; // allow to call from external sources
     internal volatile ServerInfo? WritableServerInfo;
 
 #pragma warning restore SA1401
     private readonly object _gate = new object();
     private readonly ILogger<NatsConnection> _logger;
+    internal readonly NatsMetrics Metrics;
     private readonly ObjectPool _pool;
     private readonly CancellationTokenSource _disposedCancellationTokenSource;
     private readonly string _name;
@@ -81,8 +82,8 @@ public partial class NatsConnection : INatsConnection
         _disposedCancellationTokenSource = new CancellationTokenSource();
         _pool = new ObjectPool(opts.ObjectPoolSize);
         _name = opts.Name;
-        Counter = new ConnectionStatsCounter();
-        CommandWriter = new CommandWriter("main", this, _pool, Opts, Counter, EnqueuePing);
+        Metrics = new NatsMetrics(new DummyMeterFactory());
+        CommandWriter = new CommandWriter("main", this, _pool, Opts, Metrics, EnqueuePing);
         InboxPrefix = NewInbox(opts.InboxPrefix);
         SubscriptionManager = new SubscriptionManager(this, InboxPrefix);
         _clientOpts = ClientOpts.Create(Opts);
@@ -219,8 +220,6 @@ public partial class NatsConnection : INatsConnection
         var tokens = subject.Split('.');
         return tokens.Length < 2 ? subject : $"{tokens[0]}.{tokens[1]}";
     }
-
-    internal NatsStats GetStats() => Counter.ToStats();
 
     internal ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
     {
@@ -455,7 +454,7 @@ public partial class NatsConnection : INatsConnection
             // Authentication
             _userCredentials?.Authenticate(_clientOpts, WritableServerInfo);
 
-            await using (var priorityCommandWriter = new PriorityCommandWriter(this, _pool, _socket!, Opts, Counter, EnqueuePing))
+            await using (var priorityCommandWriter = new PriorityCommandWriter(this, _pool, _socket!, Opts, Metrics, EnqueuePing))
             {
                 // add CONNECT and PING command to priority lane
                 await priorityCommandWriter.CommandWriter.ConnectAsync(_clientOpts, CancellationToken.None).ConfigureAwait(false);

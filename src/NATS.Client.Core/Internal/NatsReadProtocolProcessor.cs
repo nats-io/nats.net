@@ -21,6 +21,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
     private readonly Task _infoParsed; // wait for an upgrade
     private readonly ConcurrentQueue<PingCommand> _pingCommands; // wait for pong
     private readonly ILogger<NatsReadProtocolProcessor> _logger;
+    private readonly NatsMetrics _metrics;
     private readonly bool _trace;
     private int _disposed;
 
@@ -33,7 +34,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         _waitForPongOrErrorSignal = waitForPongOrErrorSignal;
         _infoParsed = infoParsed;
         _pingCommands = new ConcurrentQueue<PingCommand>();
-        _socketReader = new SocketReader(socketConnection, connection.Opts.ReaderBufferSize, connection.Counter, connection.Opts.LoggerFactory);
+        _socketReader = new SocketReader(socketConnection, connection.Opts.ReaderBufferSize, _connection.Metrics, connection.Opts.LoggerFactory);
         _readLoop = Task.Run(ReadLoopAsync);
     }
 
@@ -156,7 +157,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                         code = GetCode(buffer);
                     }
 
-                    Interlocked.Increment(ref _connection.Counter.ReceivedMessages);
+                    _metrics.AddReceivedMessages(1);
 
                     // Optimize for Msg parsing, Inline async code
                     if (code == ServerOpCodes.Msg)
@@ -443,7 +444,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         {
             // reaches invalid line, log warn and try to get newline and go to nextloop.
             _logger.LogWarning(NatsLogEvents.Protocol, "Reached invalid line");
-            Interlocked.Decrement(ref _connection.Counter.ReceivedMessages);
+            _metrics.AddReceivedMessages(-1);
 
             var position = buffer.PositionOf((byte)'\n');
             if (position == null)

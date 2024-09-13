@@ -37,7 +37,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     private readonly int _arrayPoolInitialSize;
     private readonly object _lock = new();
     private readonly CancellationTokenSource _cts;
-    private readonly ConnectionStatsCounter _counter;
+    private readonly NatsMetrics _metrics;
     private readonly Memory<byte> _consolidateMem = new byte[SendMemSize].AsMemory();
     private readonly TimeSpan _defaultCommandTimeout;
     private readonly Action<PingCommand> _enqueuePing;
@@ -55,7 +55,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     private CancellationTokenSource? _ctsReader;
     private volatile bool _disposed;
 
-    public CommandWriter(string name, NatsConnection connection, ObjectPool pool, NatsOpts opts, ConnectionStatsCounter counter, Action<PingCommand> enqueuePing, TimeSpan? overrideCommandTimeout = default)
+    public CommandWriter(string name, NatsConnection connection, ObjectPool pool, NatsOpts opts, NatsMetrics metrics, Action<PingCommand> enqueuePing, TimeSpan? overrideCommandTimeout = default)
     {
         _logger = opts.LoggerFactory.CreateLogger<CommandWriter>();
         _trace = _logger.IsEnabled(LogLevel.Trace);
@@ -67,7 +67,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         // avoid defining another option.
         _arrayPoolInitialSize = opts.WriterBufferSize / 256;
 
-        _counter = counter;
+        _metrics = metrics;
         _defaultCommandTimeout = overrideCommandTimeout ?? opts.CommandTimeout;
         _enqueuePing = enqueuePing;
         _protocolWriter = new ProtocolWriter(opts.SubjectEncoding);
@@ -693,7 +693,7 @@ internal sealed class CommandWriter : IAsyncDisposable
             return;
         }
 
-        Interlocked.Add(ref _counter.PendingMessages, 1);
+        _metrics.AddPendingMessages(1);
 
         _channelSize.Writer.TryWrite(size);
         var flush = _pipeWriter.FlushAsync();

@@ -9,7 +9,7 @@ namespace NATS.Client.Core.Internal;
 internal sealed class SocketReader
 {
     private readonly int _minimumBufferSize;
-    private readonly ConnectionStatsCounter _counter;
+    private readonly NatsMetrics _metrics;
     private readonly SeqeunceBuilder _seqeunceBuilder = new SeqeunceBuilder();
     private readonly Stopwatch _stopwatch = new Stopwatch();
     private readonly ILogger<SocketReader> _logger;
@@ -18,11 +18,11 @@ internal sealed class SocketReader
 
     private Memory<byte> _availableMemory;
 
-    public SocketReader(ISocketConnection socketConnection, int minimumBufferSize, ConnectionStatsCounter counter, ILoggerFactory loggerFactory)
+    public SocketReader(ISocketConnection socketConnection, int minimumBufferSize, NatsMetrics metrics, ILoggerFactory loggerFactory)
     {
         _socketConnection = socketConnection;
         _minimumBufferSize = minimumBufferSize;
-        _counter = counter;
+        _metrics = metrics;
         _logger = loggerFactory.CreateLogger<SocketReader>();
         _isTraceLogging = _logger.IsEnabled(LogLevel.Trace);
     }
@@ -66,7 +66,7 @@ internal sealed class SocketReader
             }
 
             totalRead += read;
-            Interlocked.Add(ref _counter.ReceivedBytes, read);
+            _metrics.AddReceivedBytes(read);
             _seqeunceBuilder.Append(_availableMemory.Slice(0, read));
             _availableMemory = _availableMemory.Slice(read);
         }
@@ -112,7 +112,7 @@ internal sealed class SocketReader
                 throw ex;
             }
 
-            Interlocked.Add(ref _counter.ReceivedBytes, read);
+            _metrics.AddReceivedBytes(read);
             var appendMemory = _availableMemory.Slice(0, read);
             _seqeunceBuilder.Append(appendMemory);
             _availableMemory = _availableMemory.Slice(read);
