@@ -37,7 +37,6 @@ internal sealed class CommandWriter : IAsyncDisposable
     private readonly int _arrayPoolInitialSize;
     private readonly object _lock = new();
     private readonly CancellationTokenSource _cts;
-    private readonly NatsMetrics _metrics;
     private readonly Memory<byte> _consolidateMem = new byte[SendMemSize].AsMemory();
     private readonly TimeSpan _defaultCommandTimeout;
     private readonly Action<PingCommand> _enqueuePing;
@@ -55,7 +54,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     private CancellationTokenSource? _ctsReader;
     private volatile bool _disposed;
 
-    public CommandWriter(string name, NatsConnection connection, ObjectPool pool, NatsOpts opts, NatsMetrics metrics, Action<PingCommand> enqueuePing, TimeSpan? overrideCommandTimeout = default)
+    public CommandWriter(string name, NatsConnection connection, ObjectPool pool, NatsOpts opts, Action<PingCommand> enqueuePing, TimeSpan? overrideCommandTimeout = default)
     {
         _logger = opts.LoggerFactory.CreateLogger<CommandWriter>();
         _trace = _logger.IsEnabled(LogLevel.Trace);
@@ -67,7 +66,6 @@ internal sealed class CommandWriter : IAsyncDisposable
         // avoid defining another option.
         _arrayPoolInitialSize = opts.WriterBufferSize / 256;
 
-        _metrics = metrics;
         _defaultCommandTimeout = overrideCommandTimeout ?? opts.CommandTimeout;
         _enqueuePing = enqueuePing;
         _protocolWriter = new ProtocolWriter(opts.SubjectEncoding);
@@ -693,11 +691,20 @@ internal sealed class CommandWriter : IAsyncDisposable
             return;
         }
 
-        _metrics.AddPendingMessages(1);
+        NatsMetrics.AddPendingMessages(1);
 
         _channelSize.Writer.TryWrite(size);
         var flush = _pipeWriter.FlushAsync();
-        _flushTask = flush.IsCompletedSuccessfully ? null : flush.AsTask();
+
+        if (flush.IsCompletedSuccessfully)
+        {
+            _flushTask = null;
+            NatsMetrics.AddPendingMessages(-1);
+        }
+        else
+        {
+            _flushTask = flush.AsTask();
+        }
     }
 
     private async ValueTask ConnectStateMachineAsync(bool lockHeld, ClientOpts connectOpts, CancellationToken cancellationToken)

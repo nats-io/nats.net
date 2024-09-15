@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
-using NATS.Client.Core.Internal;
 
 namespace NATS.Extensions.Microsoft.DependencyInjection;
 
@@ -98,8 +97,6 @@ public class NatsBuilder
 #endif
             }
         }
-
-        _services.AddSingleton<NatsMetrics>();
 
         return _services;
     }

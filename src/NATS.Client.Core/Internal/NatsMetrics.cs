@@ -2,73 +2,93 @@ using System.Diagnostics.Metrics;
 
 namespace NATS.Client.Core.Internal;
 
-public sealed class NatsMetrics
+public class NatsMetrics
 {
     public const string MeterName = "NATS.Client";
+    public const string PendingMessagesInstrumentName = $"{InstrumentPrefix}.pending.messages";
+    public const string SentBytesInstrumentName = $"{InstrumentPrefix}.sent.bytes";
+    public const string ReceivedBytesInstrumentName = $"{InstrumentPrefix}.received.bytes";
+    public const string SentMessagesInstrumentName = $"{InstrumentPrefix}.sent.messages";
+    public const string ReceivedMessagesInstrumentName = $"{InstrumentPrefix}.received.messages";
+    public const string SubscriptionInstrumentName = $"{InstrumentPrefix}.subscription.count";
 
-    private readonly Meter _meter;
+    private const string InstrumentPrefix = "nats.client";
 
-    private readonly Counter<long> _subscriptionCounter;
-    private readonly Counter<long> _sentBytesCounter;
-    private readonly Counter<long> _receivedBytesCounter;
-    private readonly Counter<long> _pendingMessagesCounter;
-    private readonly Counter<long> _sentMessagesCounter;
-    private readonly Counter<long> _receivedMessagesCounter;
+    private static readonly Meter _meter;
+    private static readonly Counter<long> _subscriptionCounter;
+    private static readonly Counter<long> _pendingMessagesCounter;
+    private static readonly Counter<long> _sentBytesCounter;
+    private static readonly Counter<long> _receivedBytesCounter;
+    private static readonly Counter<long> _sentMessagesCounter;
+    private static readonly Counter<long> _receivedMessagesCounter;
 
-    public NatsMetrics(IMeterFactory meterFactory)
+    static NatsMetrics()
     {
-        _meter = meterFactory.Create(MeterName);
+        _meter = new Meter(MeterName);
 
         _subscriptionCounter = _meter.CreateCounter<long>(
-            "nats.client.subscription.count",
+            SubscriptionInstrumentName,
             unit: "{subscriptions}",
             description: "Number of subscriptions");
 
+        _pendingMessagesCounter = _meter.CreateCounter<long>(
+            PendingMessagesInstrumentName,
+            unit: "{messages}",
+            description: "Number of pending messages");
+
         _sentBytesCounter = _meter.CreateCounter<long>(
-            "nats.client.sent.bytes",
-            unit: "bytes",
+            SentBytesInstrumentName,
+            unit: "{bytes}",
             description: "Number of bytes sent");
 
         _receivedBytesCounter = _meter.CreateCounter<long>(
-            "nats.client.received.bytes",
-            unit: "bytes",
+            ReceivedBytesInstrumentName,
+            unit: "{bytes}",
             description: "Number of bytes received");
 
-        _pendingMessagesCounter = _meter.CreateCounter<long>(
-            "nats.client.pending.messages",
-            unit: "messages",
-            description: "Number of pending messages");
-
         _sentMessagesCounter = _meter.CreateCounter<long>(
-            "nats.client.sent.messages",
-            unit: "messages",
+            SentMessagesInstrumentName,
+            unit: "{messages}",
             description: "Number of messages sent");
 
         _receivedMessagesCounter = _meter.CreateCounter<long>(
-            "nats.client.received.messages",
-            unit: "messages",
+            ReceivedMessagesInstrumentName,
+            unit: "{messages}",
             description: "Number of messages received");
     }
 
-    public void IncrementSubscriptionCount() => _subscriptionCounter.Add(1);
-
-    public void DecrementSubscriptionCount() => _subscriptionCounter.Add(-1);
-
-    public void AddSentBytes(long bytes) => _sentBytesCounter.Add(bytes);
-
-    public void AddReceivedBytes(long bytes) => _receivedBytesCounter.Add(bytes);
-
-    public void AddPendingMessages(long messages) => _pendingMessagesCounter.Add(messages);
-
-    public void AddSentMessages(long messages) => _sentMessagesCounter.Add(messages);
-
-    public void AddReceivedMessages(long messages) => _receivedMessagesCounter.Add(messages);
-
-    // This factory used when type is created without DI.
-    internal sealed class DummyMeterFactory : IMeterFactory
+    public static void IncrementSubscriptionCount()
     {
-        public Meter Create(MeterOptions options) => new(options);
+        _subscriptionCounter.Add(1);
+    }
 
-        public void Dispose() { }
+    public static void DecrementSubscriptionCount()
+    {
+        _subscriptionCounter.Add(-1);
+    }
+
+    public static void AddPendingMessages(long messages)
+    {
+        _pendingMessagesCounter.Add(messages);
+    }
+
+    public static void AddSentBytes(long bytes)
+    {
+        _sentBytesCounter.Add(bytes);
+    }
+
+    public static void AddReceivedBytes(long bytes)
+    {
+        _receivedBytesCounter.Add(bytes);
+    }
+
+    public static void AddSentMessages(long messages)
+    {
+        _sentMessagesCounter.Add(messages);
+    }
+
+    public static void AddReceivedMessages(long messages)
+    {
+        _receivedMessagesCounter.Add(messages);
     }
 }

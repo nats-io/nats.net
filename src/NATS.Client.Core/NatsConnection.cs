@@ -4,7 +4,6 @@ using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
 using NATS.Client.Core.Internal;
-using static NATS.Client.Core.Internal.NatsMetrics;
 
 #if NETSTANDARD
 using Random = NATS.Client.Core.Internal.NetStandardExtensions.Random;
@@ -41,7 +40,6 @@ public partial class NatsConnection : INatsConnection
 #pragma warning restore SA1401
     private readonly object _gate = new object();
     private readonly ILogger<NatsConnection> _logger;
-    internal readonly NatsMetrics Metrics;
     private readonly ObjectPool _pool;
     private readonly CancellationTokenSource _disposedCancellationTokenSource;
     private readonly string _name;
@@ -82,8 +80,7 @@ public partial class NatsConnection : INatsConnection
         _disposedCancellationTokenSource = new CancellationTokenSource();
         _pool = new ObjectPool(opts.ObjectPoolSize);
         _name = opts.Name;
-        Metrics = new NatsMetrics(new DummyMeterFactory());
-        CommandWriter = new CommandWriter("main", this, _pool, Opts, Metrics, EnqueuePing);
+        CommandWriter = new CommandWriter("main", this, _pool, Opts, EnqueuePing);
         InboxPrefix = NewInbox(opts.InboxPrefix);
         SubscriptionManager = new SubscriptionManager(this, InboxPrefix);
         _clientOpts = ClientOpts.Create(Opts);
@@ -454,7 +451,7 @@ public partial class NatsConnection : INatsConnection
             // Authentication
             _userCredentials?.Authenticate(_clientOpts, WritableServerInfo);
 
-            await using (var priorityCommandWriter = new PriorityCommandWriter(this, _pool, _socket!, Opts, Metrics, EnqueuePing))
+            await using (var priorityCommandWriter = new PriorityCommandWriter(this, _pool, _socket!, Opts, EnqueuePing))
             {
                 // add CONNECT and PING command to priority lane
                 await priorityCommandWriter.CommandWriter.ConnectAsync(_clientOpts, CancellationToken.None).ConfigureAwait(false);
