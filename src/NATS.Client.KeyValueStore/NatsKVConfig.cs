@@ -1,3 +1,5 @@
+using NATS.Client.JetStream.Models;
+
 namespace NATS.Client.KeyValueStore;
 
 /// <summary>
@@ -61,12 +63,15 @@ public record NatsKVConfig
     /// </summary>
     public bool Compression { get; init; }
 
-    // TODO: Bucket mirror configuration.
-    // pub mirror: Option<Source>,
-    // Bucket sources configuration.
-    // pub sources: Option<Vec<Source>>,
-    // Allow mirrors using direct API.
-    // pub mirror_direct: bool,
+    /// <summary>
+    /// Mirror defines the configuration for mirroring another KeyValue store
+    /// </summary>
+    public StreamSource? Mirror { get; init; }
+
+    /// <summary>
+    /// Sources defines the configuration for sources of a KeyValue store.
+    /// </summary>
+    public ICollection<StreamSource>? Sources { get; set; }
 }
 
 /// <summary>

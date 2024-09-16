@@ -54,4 +54,7 @@ public record StreamSource
     [System.Text.Json.Serialization.JsonPropertyName("external")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public ExternalStreamSource? External { get; set; }
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string? Domain { get; set; }
 }
