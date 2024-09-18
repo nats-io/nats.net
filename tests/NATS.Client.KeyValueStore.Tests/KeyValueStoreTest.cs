@@ -664,8 +664,8 @@ public class KeyValueStoreTest
         var storeCombined = await kv.CreateStoreAsync(new NatsKVConfig("combined")
         {
             Sources = [
-                        new StreamSource { Name = "source1" },
-                        new StreamSource { Name = "source2" }
+                new StreamSource { Name = "source1" },
+                new StreamSource { Name = "source2" }
             ],
         });
 
@@ -673,7 +673,7 @@ public class KeyValueStoreTest
         await storeSource2.PutAsync("ss2_b", "b_fromStore2");
 
         // ensure any async replication
-        await Task.Delay(1000);
+        await Task.Delay(500);
 
         var entryA = await storeCombined.GetEntryAsync<string>("ss1_a");
         var entryB = await storeCombined.GetEntryAsync<string>("ss2_b");
