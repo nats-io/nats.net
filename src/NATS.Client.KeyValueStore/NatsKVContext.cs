@@ -209,8 +209,7 @@ public class NatsKVContext : INatsKVContext
         {
             mirror = new StreamSource
             {
-                Name = config.Mirror.Name.StartsWith(KvStreamNamePrefix) ? config.Mirror.Name : BucketToStream(config.Mirror.Name),
-                Domain = config.Mirror.Domain,
+                Name = config.Mirror.Name.StartsWith(KvStreamNamePrefix) ? config.Mirror.Name : BucketToStream(config.Mirror.Name),                
                 External = config.Mirror.External,
                 OptStartSeq = config.Mirror.OptStartSeq,
                 OptStartTime = config.Mirror.OptStartTime,
