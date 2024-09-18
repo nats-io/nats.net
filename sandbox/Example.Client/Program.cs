@@ -1,6 +1,7 @@
 // See https://aka.ms/new-console-template for more information
 
 using System.Text;
+using NATS.Client.JetStream;
 using NATS.Net;
 
 CancellationTokenSource cts = new();
@@ -88,7 +89,12 @@ for (var i = 0; i < 3; i++)
 }
 
 // Use JetStream by referencing NATS.Client.JetStream package
-// var js = client.GetJetStream();
+var js = client.CreateJetStreamContext();
+await foreach (var stream in js.ListStreamsAsync())
+{
+    Console.WriteLine($"JetStream Stream: {stream.Info.Config.Name}");
+}
+
 await cts.CancelAsync();
 
 await Task.WhenAll(tasks);

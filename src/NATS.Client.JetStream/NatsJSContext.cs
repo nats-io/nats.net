@@ -12,8 +12,8 @@ public partial class NatsJSContext
 {
     private readonly ILogger _logger;
 
-    /// <inheritdoc cref="NatsJSContext(NATS.Client.Core.NatsConnection,NATS.Client.JetStream.NatsJSOpts)"/>>
-    public NatsJSContext(NatsConnection connection)
+    /// <inheritdoc cref="NatsJSContext(NATS.Client.Core.INatsConnection,NATS.Client.JetStream.NatsJSOpts)"/>>
+    public NatsJSContext(INatsConnection connection)
         : this(connection, new NatsJSOpts(connection.Opts))
     {
     }
@@ -23,14 +23,14 @@ public partial class NatsJSContext
     /// </summary>
     /// <param name="connection">A NATS server connection <see cref="NatsConnection"/> to access the JetStream APIs, publishers and consumers.</param>
     /// <param name="opts">Context wide <see cref="NatsJSOpts"/> JetStream options.</param>
-    public NatsJSContext(NatsConnection connection, NatsJSOpts opts)
+    public NatsJSContext(INatsConnection connection, NatsJSOpts opts)
     {
         Connection = connection;
         Opts = opts;
         _logger = connection.Opts.LoggerFactory.CreateLogger<NatsJSContext>();
     }
 
-    internal NatsConnection Connection { get; }
+    public INatsConnection Connection { get; }
 
     internal NatsJSOpts Opts { get; }
 
@@ -119,7 +119,7 @@ public partial class NatsJSContext
 
         for (var i = 0; i < retryMax; i++)
         {
-            await using var sub = await Connection.RequestSubAsync<T, PubAckResponse>(
+            await using var sub = await Connection.CreateRequestSubAsync<T, PubAckResponse>(
                     subject: subject,
                     data: data,
                     headers: headers,
@@ -213,7 +213,7 @@ public partial class NatsJSContext
 
         opts ??= NatsJSPubOpts.Default;
 
-        var sub = await Connection.RequestSubAsync<T, PubAckResponse>(
+        var sub = await Connection.CreateRequestSubAsync<T, PubAckResponse>(
                     subject: subject,
                     data: data,
                     headers: headers,
@@ -289,7 +289,7 @@ public partial class NatsJSContext
             // Validator.ValidateObject(request, new ValidationContext(request));
         }
 
-        await using var sub = await Connection.RequestSubAsync<TRequest, TResponse>(
+        await using var sub = await Connection.CreateRequestSubAsync<TRequest, TResponse>(
                 subject: subject,
                 data: request,
                 headers: default,

@@ -10,8 +10,8 @@ public partial class NatsConnection
     {
         serializer ??= Opts.SerializerRegistry.GetDeserializer<T>();
 
-        await using var sub = new NatsSub<T>(this, SubscriptionManager.GetManagerFor(subject), subject, queueGroup, opts, serializer, cancellationToken);
-        await SubAsync(sub, cancellationToken: cancellationToken).ConfigureAwait(false);
+        await using var sub = new NatsSub<T>(this, _subscriptionManager.GetManagerFor(subject), subject, queueGroup, opts, serializer, cancellationToken);
+        await AddSubAsync(sub, cancellationToken: cancellationToken).ConfigureAwait(false);
 
         // We don't cancel the channel reader here because we want to keep reading until the subscription
         // channel writer completes so that messages left in the channel can be consumed before exit the loop.
@@ -25,8 +25,8 @@ public partial class NatsConnection
     public async ValueTask<INatsSub<T>> SubscribeCoreAsync<T>(string subject, string? queueGroup = default, INatsDeserialize<T>? serializer = default, NatsSubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         serializer ??= Opts.SerializerRegistry.GetDeserializer<T>();
-        var sub = new NatsSub<T>(this, SubscriptionManager.GetManagerFor(subject), subject, queueGroup, opts, serializer, cancellationToken);
-        await SubAsync(sub, cancellationToken).ConfigureAwait(false);
+        var sub = new NatsSub<T>(this, _subscriptionManager.GetManagerFor(subject), subject, queueGroup, opts, serializer, cancellationToken);
+        await AddSubAsync(sub, cancellationToken).ConfigureAwait(false);
         return sub;
     }
 }

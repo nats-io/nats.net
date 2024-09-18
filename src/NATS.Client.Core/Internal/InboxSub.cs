@@ -15,7 +15,7 @@ internal class InboxSub : NatsSubBase
         string subject,
         NatsSubOpts? opts,
         NatsConnection connection,
-        ISubscriptionManager manager)
+        INatsSubscriptionManager manager)
     : base(connection, manager, subject, queueGroup: default, opts)
     {
         _inbox = inbox;
@@ -35,7 +35,7 @@ internal class InboxSub : NatsSubBase
     }
 }
 
-internal class InboxSubBuilder : ISubscriptionManager
+internal class InboxSubBuilder : INatsSubscriptionManager
 {
     private readonly ILogger<InboxSubBuilder> _logger;
 #if NETSTANDARD2_0
@@ -46,7 +46,7 @@ internal class InboxSubBuilder : ISubscriptionManager
 
     public InboxSubBuilder(ILogger<InboxSubBuilder> logger) => _logger = logger;
 
-    public InboxSub Build(string subject, NatsSubOpts? opts, NatsConnection connection, ISubscriptionManager manager)
+    public InboxSub Build(string subject, NatsSubOpts? opts, NatsConnection connection, INatsSubscriptionManager manager)
     {
         return new InboxSub(this, subject, opts, connection, manager);
     }
