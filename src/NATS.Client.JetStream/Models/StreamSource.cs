@@ -1,3 +1,5 @@
+using System.Diagnostics.Metrics;
+
 namespace NATS.Client.JetStream.Models;
 
 /// <summary>
@@ -54,4 +56,13 @@ public record StreamSource
     [System.Text.Json.Serialization.JsonPropertyName("external")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public ExternalStreamSource? External { get; set; }
+
+    /// <summary>
+    /// This field is a convenience for setting up an ExternalStream.
+    /// If set, the value here is used to calculate the JetStreamAPI prefix.
+    /// This field is never serialized to the server.This value cannot be set
+    /// external is set.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string? Domain { get; set; }
 }

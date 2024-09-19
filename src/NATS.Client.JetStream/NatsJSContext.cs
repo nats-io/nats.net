@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using System.Xml.Schema;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.JetStream.Internal;
@@ -325,6 +326,21 @@ public partial class NatsJSContext
         }
 
         throw new NatsJSApiNoResponseException();
+    }
+
+    private static void ConvertDomain(StreamSource streamSource)
+    {
+        if (string.IsNullOrEmpty(streamSource.Domain))
+        {
+            return;
+        }
+
+        if (streamSource.External != null)
+        {
+            throw new ArgumentException("Both domain and external are set");
+        }
+
+        streamSource.External = new ExternalStreamSource { Api = $"$JS.{streamSource.Domain}.API" };
     }
 
     [DoesNotReturn]

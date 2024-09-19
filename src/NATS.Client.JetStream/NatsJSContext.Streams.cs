@@ -20,6 +20,53 @@ public partial class NatsJSContext
         CancellationToken cancellationToken = default)
     {
         ThrowIfInvalidStreamName(config.Name, nameof(config.Name));
+
+        // If we have a mirror and an external domain, convert to ext.APIPrefix.
+        if (config.Mirror != null && !string.IsNullOrEmpty(config.Mirror.Domain))
+        {
+            config.Mirror = new StreamSource
+            {
+                Name = config.Mirror.Name,
+                Domain = config.Mirror.Domain,
+                External = config.Mirror.External,
+                FilterSubject = config.Mirror.FilterSubject,
+                OptStartSeq = config.Mirror.OptStartSeq,
+                OptStartTime = config.Mirror.OptStartTime,
+                SubjectTransforms = config.Mirror.SubjectTransforms,
+            };
+            ConvertDomain(config.Mirror);
+        }
+
+        // Check sources for the same.
+        if (config.Sources != null && config.Sources.Count > 0)
+        {
+            ICollection<StreamSource>? sources = [];
+            foreach (var ss in config.Sources)
+            {
+                if (!string.IsNullOrEmpty(ss.Domain))
+                {
+                    var remappedDomainSource = new StreamSource
+                    {
+                        Name = ss.Name,
+                        Domain = ss.Domain,
+                        External = ss.External,
+                        FilterSubject = ss.FilterSubject,
+                        OptStartSeq = ss.OptStartSeq,
+                        OptStartTime = ss.OptStartTime,
+                        SubjectTransforms = ss.SubjectTransforms,
+                    };
+                    ConvertDomain(remappedDomainSource);
+                    sources.Add(remappedDomainSource);
+                }
+                else
+                {
+                    sources.Add(ss);
+                }
+            }
+
+            config.Sources = sources;
+        }
+
         var response = await JSRequestResponseAsync<StreamConfig, StreamInfo>(
             subject: $"{Opts.Prefix}.STREAM.CREATE.{config.Name}",
             config,

@@ -215,6 +215,7 @@ public class NatsKVContext : INatsKVContext
                 OptStartTime = config.Mirror.OptStartTime,
                 SubjectTransforms = config.Mirror.SubjectTransforms,
                 FilterSubject = config.Mirror.FilterSubject,
+                Domain = config.Mirror.Domain,
             };
             mirrorDirect = true;
         }
@@ -246,6 +247,8 @@ public class NatsKVContext : INatsKVContext
 
                 sources.Add(ss);
             }
+
+            config.Sources = sources;
 
             subjects = [$"$KV.{config.Bucket}.>"];
         }
