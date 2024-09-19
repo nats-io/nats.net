@@ -18,7 +18,7 @@ namespace NATS.Client.Core;
 [SkipLocalsInit]
 public sealed class Nuid
 {
-    // NuidLength, PrefixLength, SequentialLength were nuint (System.UIntPtr) in the original code
+    // NuidLength, PrefixLength, SequentialLength were nuint (System.UIntPtr) in the original code,
     // however, they were changed to uint to fix the compilation error for IL2CPP Unity projects.
     // With nuint, the following error occurs in Unity Linux IL2CPP builds:
     //   Error: IL2CPP error for method 'System.Char[] NATS.Client.Core.Internal.NuidWriter::Refresh(System.UInt64&)'

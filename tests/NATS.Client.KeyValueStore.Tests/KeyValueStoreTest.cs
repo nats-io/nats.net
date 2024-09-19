@@ -672,8 +672,22 @@ public class KeyValueStoreTest
         await storeSource1.PutAsync("ss1_a", "a_fromStore1");
         await storeSource2.PutAsync("ss2_b", "b_fromStore2");
 
-        // ensure any async replication
-        await Task.Delay(500);
+        await Retry.Until(
+            "async replication is completed",
+            async () =>
+            {
+                try
+                {
+                    await storeCombined.GetEntryAsync<string>("ss1_a");
+                    await storeCombined.GetEntryAsync<string>("ss2_b");
+                }
+                catch (NatsKVKeyNotFoundException)
+                {
+                    return false;
+                }
+
+                return true;
+            });
 
         var entryA = await storeCombined.GetEntryAsync<string>("ss1_a");
         var entryB = await storeCombined.GetEntryAsync<string>("ss2_b");
