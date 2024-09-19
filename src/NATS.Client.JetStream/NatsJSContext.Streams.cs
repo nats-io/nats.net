@@ -21,19 +21,13 @@ public partial class NatsJSContext
     {
         ThrowIfInvalidStreamName(config.Name, nameof(config.Name));
 
+        // keep caller's config intact.
+        config = config.ShallowCopy();
+
         // If we have a mirror and an external domain, convert to ext.APIPrefix.
         if (config.Mirror != null && !string.IsNullOrEmpty(config.Mirror.Domain))
         {
-            config.Mirror = new StreamSource
-            {
-                Name = config.Mirror.Name,
-                Domain = config.Mirror.Domain,
-                External = config.Mirror.External,
-                FilterSubject = config.Mirror.FilterSubject,
-                OptStartSeq = config.Mirror.OptStartSeq,
-                OptStartTime = config.Mirror.OptStartTime,
-                SubjectTransforms = config.Mirror.SubjectTransforms,
-            };
+            config.Mirror = config.Mirror.ShallowCopy();
             ConvertDomain(config.Mirror);
         }
 
@@ -45,16 +39,7 @@ public partial class NatsJSContext
             {
                 if (!string.IsNullOrEmpty(ss.Domain))
                 {
-                    var remappedDomainSource = new StreamSource
-                    {
-                        Name = ss.Name,
-                        Domain = ss.Domain,
-                        External = ss.External,
-                        FilterSubject = ss.FilterSubject,
-                        OptStartSeq = ss.OptStartSeq,
-                        OptStartTime = ss.OptStartTime,
-                        SubjectTransforms = ss.SubjectTransforms,
-                    };
+                    var remappedDomainSource = ss.ShallowCopy();
                     ConvertDomain(remappedDomainSource);
                     sources.Add(remappedDomainSource);
                 }
