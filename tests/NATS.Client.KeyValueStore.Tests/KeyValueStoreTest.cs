@@ -649,7 +649,7 @@ public class KeyValueStoreTest
         Assert.Equal("tres", kve3.Value);
     }
 
-    [Fact]
+    [SkipIfNatsServer(versionEarlierThan: "2.10")]
     public async Task Test_CombinedSources()
     {
         await using var server = NatsServer.StartJS();
@@ -687,9 +687,7 @@ public class KeyValueStoreTest
                 }
 
                 return true;
-            },
-            retryDelay: TimeSpan.FromSeconds(3),
-            timeout: TimeSpan.FromSeconds(30));
+            });
 
         var entryA = await storeCombined.GetEntryAsync<string>("ss1_a");
         var entryB = await storeCombined.GetEntryAsync<string>("ss2_b");
