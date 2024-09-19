@@ -207,16 +207,10 @@ public class NatsKVContext : INatsKVContext
 
         if (config.Mirror != null)
         {
-            mirror = new StreamSource
-            {
-                Name = config.Mirror.Name.StartsWith(KvStreamNamePrefix) ? config.Mirror.Name : BucketToStream(config.Mirror.Name),
-                External = config.Mirror.External,
-                OptStartSeq = config.Mirror.OptStartSeq,
-                OptStartTime = config.Mirror.OptStartTime,
-                SubjectTransforms = config.Mirror.SubjectTransforms,
-                FilterSubject = config.Mirror.FilterSubject,
-                Domain = config.Mirror.Domain,
-            };
+            mirror = config.Mirror.ShallowCopy();
+            mirror.Name = config.Mirror.Name.StartsWith(KvStreamNamePrefix)
+                ? config.Mirror.Name
+                : BucketToStream(config.Mirror.Name);
             mirrorDirect = true;
             subjects = default;
             sources = default;
@@ -226,7 +220,7 @@ public class NatsKVContext : INatsKVContext
             sources = [];
             foreach (var ss in config.Sources)
             {
-                string? sourceBucketName = default;
+                string? sourceBucketName;
                 if (ss.Name.StartsWith(KvStreamNamePrefix))
                 {
                     sourceBucketName = ss.Name.Substring(KvStreamNamePrefixLen);
