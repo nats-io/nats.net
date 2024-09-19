@@ -215,7 +215,7 @@ public class NatsKVContext : INatsKVContext
             subjects = default;
             sources = default;
         }
-        else if (config.Sources != null && config.Sources.Count > 0)
+        else if (config.Sources is { Count: > 0 })
         {
             sources = [];
             foreach (var ss in config.Sources)
