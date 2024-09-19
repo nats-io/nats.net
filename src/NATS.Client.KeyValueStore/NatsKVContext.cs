@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using NATS.Client.JetStream;
@@ -201,10 +200,11 @@ public class NatsKVContext : INatsKVContext
 
         var replicas = config.NumberOfReplicas > 0 ? config.NumberOfReplicas : 1;
 
-        string[]? subjects = default;
-        StreamSource? mirror = default;
-        ICollection<StreamSource>? sources = default;
-        var mirrorDirect = false;
+        string[]? subjects;
+        StreamSource? mirror;
+        ICollection<StreamSource>? sources;
+        bool mirrorDirect;
+
         if (config.Mirror != null)
         {
             mirror = new StreamSource
@@ -218,6 +218,8 @@ public class NatsKVContext : INatsKVContext
                 Domain = config.Mirror.Domain,
             };
             mirrorDirect = true;
+            subjects = default;
+            sources = default;
         }
         else if (config.Sources != null && config.Sources.Count > 0)
         {
@@ -237,24 +239,29 @@ public class NatsKVContext : INatsKVContext
 
                 if (ss.External == null || sourceBucketName != config.Bucket)
                 {
-                    ss.SubjectTransforms = [new SubjectTransform
-                    {
-                        Src = $"$KV.{sourceBucketName}.>",
-                        Dest = $"$KV.{config.Bucket}.>",
-                    }
+                    ss.SubjectTransforms =
+                    [
+                        new SubjectTransform
+                        {
+                            Src = $"$KV.{sourceBucketName}.>",
+                            Dest = $"$KV.{config.Bucket}.>",
+                        }
                     ];
                 }
 
                 sources.Add(ss);
             }
 
-            config.Sources = sources;
-
             subjects = [$"$KV.{config.Bucket}.>"];
+            mirror = default;
+            mirrorDirect = false;
         }
         else
         {
             subjects = [$"$KV.{config.Bucket}.>"];
+            mirror = default;
+            sources = default;
+            mirrorDirect = false;
         }
 
         var streamConfig = new StreamConfig
