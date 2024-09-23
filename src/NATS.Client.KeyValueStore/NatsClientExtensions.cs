@@ -1,4 +1,4 @@
-﻿using NATS.Client.Core;
+using NATS.Client.Core;
 using NATS.Client.JetStream;
 
 namespace NATS.Client.KeyValueStore;
