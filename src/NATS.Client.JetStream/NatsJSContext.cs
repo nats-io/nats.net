@@ -32,7 +32,8 @@ public partial class NatsJSContext
 
     public INatsConnection Connection { get; }
 
-    internal NatsJSOpts Opts { get; }
+    /// <inheritdoc />
+    public NatsJSOpts Opts { get; }
 
     /// <summary>
     /// Calls JetStream Account Info API.
@@ -238,6 +239,22 @@ public partial class NatsJSContext
         return new NatsJSPublishConcurrentFuture(sub);
     }
 
+    /// <inheritdoc />
+    public string NewBaseInbox() => NatsConnection.NewInbox(Connection.Opts.InboxPrefix);
+
+    /// <inheritdoc />
+    public async ValueTask<TResponse> JSRequestResponseAsync<TRequest, TResponse>(
+        string subject,
+        TRequest? request,
+        CancellationToken cancellationToken = default)
+        where TRequest : class
+        where TResponse : class
+    {
+        var response = await JSRequestAsync<TRequest, TResponse>(subject, request, cancellationToken);
+        response.EnsureSuccess();
+        return response.Response!;
+    }
+
     internal static void ThrowIfInvalidStreamName([NotNull] string? name, [CallerArgumentExpression("name")] string? paramName = null)
     {
 #if NETSTANDARD
@@ -260,20 +277,6 @@ public partial class NatsJSContext
         {
             ThrowInvalidStreamNameException(paramName);
         }
-    }
-
-    internal string NewInbox() => NatsConnection.NewInbox(Connection.Opts.InboxPrefix);
-
-    internal async ValueTask<TResponse> JSRequestResponseAsync<TRequest, TResponse>(
-        string subject,
-        TRequest? request,
-        CancellationToken cancellationToken = default)
-        where TRequest : class
-        where TResponse : class
-    {
-        var response = await JSRequestAsync<TRequest, TResponse>(subject, request, cancellationToken);
-        response.EnsureSuccess();
-        return response.Response!;
     }
 
     internal async ValueTask<NatsJSResponse<TResponse>> JSRequestAsync<TRequest, TResponse>(

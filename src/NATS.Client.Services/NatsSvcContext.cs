@@ -7,13 +7,13 @@ namespace NATS.Client.Services;
 /// </summary>
 public class NatsSvcContext : INatsSvcContext
 {
-    private readonly NatsConnection _nats;
+    private readonly INatsConnection _nats;
 
     /// <summary>
     /// Creates a new instance of <see cref="NatsSvcContext"/>.
     /// </summary>
     /// <param name="nats">NATS connection.</param>
-    public NatsSvcContext(NatsConnection nats) => _nats = nats;
+    public NatsSvcContext(INatsConnection nats) => _nats = nats;
 
     /// <summary>
     /// Adds a new service.

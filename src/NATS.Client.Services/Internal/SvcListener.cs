@@ -7,7 +7,7 @@ namespace NATS.Client.Services.Internal;
 internal class SvcListener : IAsyncDisposable
 {
     private readonly ILogger _logger;
-    private readonly NatsConnection _nats;
+    private readonly INatsConnection _nats;
     private readonly Channel<SvcMsg> _channel;
     private readonly SvcMsgType _type;
     private readonly string _subject;
@@ -16,7 +16,7 @@ internal class SvcListener : IAsyncDisposable
     private INatsSub<NatsMemoryOwner<byte>>? _sub;
     private Task? _readLoop;
 
-    public SvcListener(ILogger logger, NatsConnection nats, Channel<SvcMsg> channel, SvcMsgType type, string subject, string? queueGroup, CancellationToken cancellationToken)
+    public SvcListener(ILogger logger, INatsConnection nats, Channel<SvcMsg> channel, SvcMsgType type, string subject, string? queueGroup, CancellationToken cancellationToken)
     {
         _logger = logger;
         _nats = nats;

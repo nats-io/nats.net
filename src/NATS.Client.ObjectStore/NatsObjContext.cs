@@ -12,13 +12,13 @@ public class NatsObjContext : INatsObjContext
 {
     private static readonly Regex ValidBucketRegex = new(pattern: @"\A[a-zA-Z0-9_-]+\z", RegexOptions.Compiled);
 
-    private readonly NatsJSContext _context;
+    private readonly INatsJSContext _context;
 
     /// <summary>
     /// Create a new object store context.
     /// </summary>
     /// <param name="context">JetStream context.</param>
-    public NatsObjContext(NatsJSContext context) => _context = context;
+    public NatsObjContext(INatsJSContext context) => _context = context;
 
     /// <summary>
     /// Create a new object store.

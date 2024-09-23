@@ -44,10 +44,10 @@ public class NatsKVStore : INatsKVStore
     private const string NatsSequence = "Nats-Sequence";
     private const string NatsTimeStamp = "Nats-Time-Stamp";
     private static readonly Regex ValidKeyRegex = new(pattern: @"\A[-/_=\.a-zA-Z0-9]+\z", RegexOptions.Compiled);
-    private readonly NatsJSContext _context;
+    private readonly INatsJSContext _context;
     private readonly INatsJSStream _stream;
 
-    internal NatsKVStore(string bucket, NatsJSContext context, INatsJSStream stream)
+    internal NatsKVStore(string bucket, INatsJSContext context, INatsJSStream stream)
     {
         Bucket = bucket;
         _context = context;

@@ -28,10 +28,10 @@ public class NatsObjStore : INatsObjStore
     private static readonly NatsHeaders NatsRollupHeaders = new() { { NatsRollup, RollupSubject } };
 
     private readonly NatsObjContext _objContext;
-    private readonly NatsJSContext _context;
+    private readonly INatsJSContext _context;
     private readonly INatsJSStream _stream;
 
-    internal NatsObjStore(NatsObjConfig config, NatsObjContext objContext, NatsJSContext context, INatsJSStream stream)
+    internal NatsObjStore(NatsObjConfig config, NatsObjContext objContext, INatsJSContext context, INatsJSStream stream)
     {
         Bucket = config.Bucket;
         _objContext = objContext;

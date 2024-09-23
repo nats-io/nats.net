@@ -45,7 +45,7 @@ internal class NatsJSOrderedPushConsumer<T>
 {
     private readonly ILogger _logger;
     private readonly bool _debug;
-    private readonly NatsJSContext _context;
+    private readonly INatsJSContext _context;
     private readonly string _stream;
     private readonly string _filter;
     private readonly INatsDeserialize<T> _serializer;
@@ -68,7 +68,7 @@ internal class NatsJSOrderedPushConsumer<T>
     private int _done;
 
     public NatsJSOrderedPushConsumer(
-        NatsJSContext context,
+        INatsJSContext context,
         string stream,
         string filter,
         INatsDeserialize<T> serializer,
@@ -417,7 +417,7 @@ internal class NatsJSOrderedPushConsumer<T>
 
 internal class NatsJSOrderedPushConsumerSub<T> : NatsSubBase
 {
-    private readonly NatsJSContext _context;
+    private readonly INatsJSContext _context;
     private readonly CancellationToken _cancellationToken;
     private readonly INatsConnection _nats;
     private readonly NatsHeaderParser _headerParser;
@@ -425,7 +425,7 @@ internal class NatsJSOrderedPushConsumerSub<T> : NatsSubBase
     private readonly ChannelWriter<NatsJSOrderedPushConsumerMsg<T>> _commands;
 
     public NatsJSOrderedPushConsumerSub(
-        NatsJSContext context,
+        INatsJSContext context,
         Channel<NatsJSOrderedPushConsumerMsg<T>> commandChannel,
         INatsDeserialize<T> serializer,
         NatsSubOpts? opts,
@@ -433,7 +433,7 @@ internal class NatsJSOrderedPushConsumerSub<T> : NatsSubBase
         : base(
             connection: context.Connection,
             manager: context.Connection.SubscriptionManager,
-            subject: context.NewInbox(),
+            subject: context.NewBaseInbox(),
             queueGroup: default,
             opts)
     {

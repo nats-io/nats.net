@@ -23,13 +23,13 @@ public class NatsKVContext : INatsKVContext
     private static readonly int KvStreamNamePrefixLen = KvStreamNamePrefix.Length;
     private static readonly Regex ValidBucketRegex = new(pattern: @"\A[a-zA-Z0-9_-]+\z", RegexOptions.Compiled);
 
-    private readonly NatsJSContext _context;
+    private readonly INatsJSContext _context;
 
     /// <summary>
     /// Create a new Key Value Store context
     /// </summary>
     /// <param name="context">JetStream context</param>
-    public NatsKVContext(NatsJSContext context) => _context = context;
+    public NatsKVContext(INatsJSContext context) => _context = context;
 
     /// <summary>
     /// Create a new Key Value Store or get an existing one

@@ -49,6 +49,7 @@ public class NatsObjContextFactoryTest
     public class MockJsContext : INatsJSContext
     {
         public INatsConnection Connection { get; } = new NatsConnection();
+        public NatsJSOpts Opts { get; }
 
         public ValueTask<INatsJSConsumer> CreateOrderedConsumerAsync(string stream, NatsJSOrderedConsumerOpts? opts = default, CancellationToken cancellationToken = default) => throw new NotImplementedException();
 
@@ -91,5 +92,9 @@ public class NatsObjContextFactoryTest
         public IAsyncEnumerable<string> ListStreamNamesAsync(string? subject = default, CancellationToken cancellationToken = default) => throw new NotImplementedException();
 
         public ValueTask<NatsJSPublishConcurrentFuture> PublishConcurrentAsync<T>(string subject, T? data, INatsSerialize<T>? serializer = default, NatsJSPubOpts? opts = default, NatsHeaders? headers = default, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+
+        public string NewBaseInbox() => throw new NotImplementedException();
+
+        public ValueTask<TResponse> JSRequestResponseAsync<TRequest, TResponse>(string subject, TRequest? request, CancellationToken cancellationToken = default) where TRequest : class where TResponse : class => throw new NotImplementedException();
     }
 }
