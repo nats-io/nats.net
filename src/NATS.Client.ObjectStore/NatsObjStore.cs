@@ -28,16 +28,18 @@ public class NatsObjStore : INatsObjStore
     private static readonly NatsHeaders NatsRollupHeaders = new() { { NatsRollup, RollupSubject } };
 
     private readonly NatsObjContext _objContext;
-    private readonly INatsJSContext _context;
     private readonly INatsJSStream _stream;
 
     internal NatsObjStore(NatsObjConfig config, NatsObjContext objContext, INatsJSContext context, INatsJSStream stream)
     {
         Bucket = config.Bucket;
         _objContext = objContext;
-        _context = context;
+        Context = context;
         _stream = stream;
     }
+
+    /// <inheritdoc />
+    public INatsJSContext Context { get; }
 
     /// <summary>
     /// Object store bucket name.
@@ -84,7 +86,7 @@ public class NatsObjStore : INatsObjStore
         }
 
         await using var pushConsumer = new NatsJSOrderedPushConsumer<NatsMemoryOwner<byte>>(
-            context: _context,
+            context: Context,
             stream: $"OBJ_{Bucket}",
             filter: GetChunkSubject(info.Nuid),
             serializer: NatsDefaultSerializer<NatsMemoryOwner<byte>>.Default,
@@ -294,7 +296,7 @@ public class NatsObjStore : INatsObjStore
                     var buffer = memoryOwner.Slice(0, currentChunkSize);
 
                     // Chunks
-                    var ack = await _context.PublishAsync(GetChunkSubject(nuid), buffer, serializer: NatsRawSerializer<NatsMemoryOwner<byte>>.Default, cancellationToken: cancellationToken);
+                    var ack = await Context.PublishAsync(GetChunkSubject(nuid), buffer, serializer: NatsRawSerializer<NatsMemoryOwner<byte>>.Default, cancellationToken: cancellationToken);
                     ack.EnsureSuccess();
 
                     if (eof)
@@ -320,8 +322,8 @@ public class NatsObjStore : INatsObjStore
         {
             try
             {
-                await _context.JSRequestResponseAsync<StreamPurgeRequest, StreamPurgeResponse>(
-                    subject: $"{_context.Opts.Prefix}.STREAM.PURGE.OBJ_{Bucket}",
+                await Context.JSRequestResponseAsync<StreamPurgeRequest, StreamPurgeResponse>(
+                    subject: $"{Context.Opts.Prefix}.STREAM.PURGE.OBJ_{Bucket}",
                     request: new StreamPurgeRequest
                     {
                         Filter = GetChunkSubject(info.Nuid),
@@ -495,16 +497,16 @@ public class NatsObjStore : INatsObjStore
     /// <exception cref="NatsObjException">Update operation failed</exception>
     public async ValueTask SealAsync(CancellationToken cancellationToken = default)
     {
-        var info = await _context.JSRequestResponseAsync<object, StreamInfoResponse>(
-            subject: $"{_context.Opts.Prefix}.STREAM.INFO.{_stream.Info.Config.Name}",
+        var info = await Context.JSRequestResponseAsync<object, StreamInfoResponse>(
+            subject: $"{Context.Opts.Prefix}.STREAM.INFO.{_stream.Info.Config.Name}",
             request: null,
             cancellationToken).ConfigureAwait(false);
 
         var config = info.Config;
         config.Sealed = true;
 
-        var response = await _context.JSRequestResponseAsync<StreamConfig, StreamUpdateResponse>(
-            subject: $"{_context.Opts.Prefix}.STREAM.UPDATE.{_stream.Info.Config.Name}",
+        var response = await Context.JSRequestResponseAsync<StreamConfig, StreamUpdateResponse>(
+            subject: $"{Context.Opts.Prefix}.STREAM.UPDATE.{_stream.Info.Config.Name}",
             request: config,
             cancellationToken);
 
@@ -616,7 +618,7 @@ public class NatsObjStore : INatsObjStore
         }
 
         await using var pushConsumer = new NatsJSOrderedPushConsumer<NatsMemoryOwner<byte>>(
-            context: _context,
+            context: Context,
             stream: $"OBJ_{Bucket}",
             filter: $"$O.{Bucket}.M.>",
             serializer: NatsDefaultSerializer<NatsMemoryOwner<byte>>.Default,
@@ -696,7 +698,7 @@ public class NatsObjStore : INatsObjStore
 
     private async ValueTask PublishMeta(ObjectMetadata meta, CancellationToken cancellationToken)
     {
-        var ack = await _context.PublishAsync(GetMetaSubject(meta.Name), meta, serializer: NatsObjJsonSerializer<ObjectMetadata>.Default, headers: NatsRollupHeaders, cancellationToken: cancellationToken);
+        var ack = await Context.PublishAsync(GetMetaSubject(meta.Name), meta, serializer: NatsObjJsonSerializer<ObjectMetadata>.Default, headers: NatsRollupHeaders, cancellationToken: cancellationToken);
         ack.EnsureSuccess();
     }
 

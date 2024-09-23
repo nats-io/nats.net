@@ -5,6 +5,11 @@ namespace NATS.Client.KeyValueStore;
 public interface INatsKVContext
 {
     /// <summary>
+    /// Provides access to the JetStream context associated with the Key-Value Store operations.
+    /// </summary>
+    INatsJSContext Context { get; }
+
+    /// <summary>
     /// Create a new Key Value Store or get an existing one
     /// </summary>
     /// <param name="bucket">Name of the bucket</param>

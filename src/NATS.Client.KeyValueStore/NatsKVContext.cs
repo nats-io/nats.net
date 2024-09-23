@@ -23,13 +23,14 @@ public class NatsKVContext : INatsKVContext
     private static readonly int KvStreamNamePrefixLen = KvStreamNamePrefix.Length;
     private static readonly Regex ValidBucketRegex = new(pattern: @"\A[a-zA-Z0-9_-]+\z", RegexOptions.Compiled);
 
-    private readonly INatsJSContext _context;
-
     /// <summary>
     /// Create a new Key Value Store context
     /// </summary>
     /// <param name="context">JetStream context</param>
-    public NatsKVContext(INatsJSContext context) => _context = context;
+    public NatsKVContext(INatsJSContext context) => Context = context;
+
+    /// <inheritdoc />
+    public INatsJSContext Context { get; }
 
     /// <summary>
     /// Create a new Key Value Store or get an existing one
@@ -57,9 +58,9 @@ public class NatsKVContext : INatsKVContext
 
         var streamConfig = NatsKVContext.CreateStreamConfig(config);
 
-        var stream = await _context.CreateStreamAsync(streamConfig, cancellationToken);
+        var stream = await Context.CreateStreamAsync(streamConfig, cancellationToken);
 
-        return new NatsKVStore(config.Bucket, _context, stream);
+        return new NatsKVStore(config.Bucket, Context, stream);
     }
 
     /// <summary>
@@ -75,7 +76,7 @@ public class NatsKVContext : INatsKVContext
     {
         ValidateBucketName(bucket);
 
-        var stream = await _context.GetStreamAsync(BucketToStream(bucket), cancellationToken: cancellationToken);
+        var stream = await Context.GetStreamAsync(BucketToStream(bucket), cancellationToken: cancellationToken);
 
         if (stream.Info.Config.MaxMsgsPerSubject < 1)
         {
@@ -83,7 +84,7 @@ public class NatsKVContext : INatsKVContext
         }
 
         // TODO: KV mirror
-        return new NatsKVStore(bucket, _context, stream);
+        return new NatsKVStore(bucket, Context, stream);
     }
 
     /// <summary>
@@ -101,9 +102,9 @@ public class NatsKVContext : INatsKVContext
 
         var streamConfig = NatsKVContext.CreateStreamConfig(config);
 
-        var stream = await _context.UpdateStreamAsync(streamConfig, cancellationToken);
+        var stream = await Context.UpdateStreamAsync(streamConfig, cancellationToken);
 
-        return new NatsKVStore(config.Bucket, _context, stream);
+        return new NatsKVStore(config.Bucket, Context, stream);
     }
 
     /// <summary>
@@ -117,7 +118,7 @@ public class NatsKVContext : INatsKVContext
     public ValueTask<bool> DeleteStoreAsync(string bucket, CancellationToken cancellationToken = default)
     {
         ValidateBucketName(bucket);
-        return _context.DeleteStreamAsync(BucketToStream(bucket), cancellationToken);
+        return Context.DeleteStreamAsync(BucketToStream(bucket), cancellationToken);
     }
 
     /// <summary>
@@ -129,7 +130,7 @@ public class NatsKVContext : INatsKVContext
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     public async IAsyncEnumerable<string> GetBucketNamesAsync([EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        await foreach (var name in _context.ListStreamNamesAsync(cancellationToken: cancellationToken))
+        await foreach (var name in Context.ListStreamNamesAsync(cancellationToken: cancellationToken))
         {
             if (!name.StartsWith(KvStreamNamePrefix))
             {
@@ -149,9 +150,9 @@ public class NatsKVContext : INatsKVContext
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     public async IAsyncEnumerable<NatsKVStatus> GetStatusesAsync([EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        await foreach (var name in _context.ListStreamNamesAsync(cancellationToken: cancellationToken))
+        await foreach (var name in Context.ListStreamNamesAsync(cancellationToken: cancellationToken))
         {
-            var stream = await _context.GetStreamAsync(name, cancellationToken: cancellationToken);
+            var stream = await Context.GetStreamAsync(name, cancellationToken: cancellationToken);
             var isCompressed = stream.Info.Config.Compression != StreamConfigCompression.None;
             yield return new NatsKVStatus(name, isCompressed, stream.Info);
         }

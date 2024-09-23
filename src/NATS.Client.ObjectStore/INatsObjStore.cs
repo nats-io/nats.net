@@ -9,6 +9,11 @@ namespace NATS.Client.ObjectStore;
 public interface INatsObjStore
 {
     /// <summary>
+    /// Provides access to the JetStream context associated with the Object Store operations.
+    /// </summary>
+    INatsJSContext Context { get; }
+
+    /// <summary>
     /// Object store bucket name.
     /// </summary>
     string Bucket { get; }

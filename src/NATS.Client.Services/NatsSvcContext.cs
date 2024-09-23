@@ -7,13 +7,14 @@ namespace NATS.Client.Services;
 /// </summary>
 public class NatsSvcContext : INatsSvcContext
 {
-    private readonly INatsConnection _nats;
-
     /// <summary>
     /// Creates a new instance of <see cref="NatsSvcContext"/>.
     /// </summary>
     /// <param name="nats">NATS connection.</param>
-    public NatsSvcContext(INatsConnection nats) => _nats = nats;
+    public NatsSvcContext(INatsConnection nats) => Connection = nats;
+
+    /// <inheritdoc/>
+    public INatsConnection Connection { get; }
 
     /// <summary>
     /// Adds a new service.
@@ -34,7 +35,7 @@ public class NatsSvcContext : INatsSvcContext
     /// <returns>NATS Service instance.</returns>
     public async ValueTask<INatsSvcServer> AddServiceAsync(NatsSvcConfig config, CancellationToken cancellationToken = default)
     {
-        var service = new NatsSvcServer(_nats, config, cancellationToken);
+        var service = new NatsSvcServer(Connection, config, cancellationToken);
         await service.StartAsync().ConfigureAwait(false);
         return service;
     }
