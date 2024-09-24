@@ -11,7 +11,7 @@ public static class NatsClientExtensions
     /// <param name="client">The NATS client instance.</param>
     /// <returns>An instance of <see cref="INatsKVContext"/> which can be used to interact with the Key-Value Store.</returns>
     public static INatsKVContext CreateKeyValueStoreContext(this INatsClient client)
-        => CreateKeyValueStoreContext(client.Connection);
+        => CreateKeyValueStoreContext(client.CreateJetStreamContext());
 
     /// <summary>
     /// Creates a NATS Key-Value Store context using the specified NATS connection.
@@ -19,7 +19,7 @@ public static class NatsClientExtensions
     /// <param name="connection">The NATS connection instance.</param>
     /// <returns>An instance of <see cref="INatsKVContext"/> which can be used to interact with the Key-Value Store.</returns>
     public static INatsKVContext CreateKeyValueStoreContext(this INatsConnection connection)
-        => CreateKeyValueStoreContext(new NatsJSContext(connection));
+        => CreateKeyValueStoreContext(connection.CreateJetStreamContext());
 
     /// <summary>
     /// Creates a NATS Key-Value Store context using the specified NATS JetStream context.

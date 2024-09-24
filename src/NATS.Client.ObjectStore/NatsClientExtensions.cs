@@ -11,7 +11,7 @@ public static class NatsClientExtensions
     /// <param name="client">The NATS client instance.</param>
     /// <returns>An instance of <see cref="INatsObjContext"/> used for interacting with the NATS Object Store.</returns>
     public static INatsObjContext CreateObjectStoreContext(this INatsClient client)
-        => CreateObjectStoreContext(client.Connection);
+        => CreateObjectStoreContext(client.CreateJetStreamContext());
 
     /// <summary>
     /// Creates a NATS Object Store context for the given NATS connection.
@@ -19,7 +19,7 @@ public static class NatsClientExtensions
     /// <param name="connection">The NATS connection instance.</param>
     /// <returns>An instance of <see cref="INatsObjContext"/> used for interacting with the NATS Object Store.</returns>
     public static INatsObjContext CreateObjectStoreContext(this INatsConnection connection)
-        => CreateObjectStoreContext(new NatsJSContext(connection));
+        => CreateObjectStoreContext(connection.CreateJetStreamContext());
 
     /// <summary>
     /// Creates a NATS Object Store context for the given NATS JetStream context.
