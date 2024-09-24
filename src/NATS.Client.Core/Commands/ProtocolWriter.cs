@@ -48,7 +48,7 @@ internal sealed class ProtocolWriter
         BinaryPrimitives.WriteUInt64LittleEndian(span, ConnectSpace);
         writer.Advance(ConnectSpaceLength);
 
-        var jsonWriter = new Utf8JsonWriter(writer);
+        using var jsonWriter = new Utf8JsonWriter(writer);
         JsonSerializer.Serialize(jsonWriter, opts, JsonContext.Default.ClientOpts);
 
         span = writer.GetSpan(UInt16Length);
@@ -184,7 +184,7 @@ internal sealed class ProtocolWriter
         writer.Advance(size);
     }
 
-    // optimization detailed here: https://github.com/nats-io/nats.net.v2/issues/320#issuecomment-1886165748
+    // optimization detailed here: https://github.com/nats-io/nats.net/issues/320#issuecomment-1886165748
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void ThrowOnUtf8FormatFail() => throw new NatsException("Can not format integer.");
 

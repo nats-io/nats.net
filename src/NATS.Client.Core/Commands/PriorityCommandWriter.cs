@@ -8,7 +8,7 @@ internal sealed class PriorityCommandWriter : IAsyncDisposable
 
     public PriorityCommandWriter(NatsConnection connection, ObjectPool pool, ISocketConnection socketConnection, NatsOpts opts, ConnectionStatsCounter counter, Action<PingCommand> enqueuePing)
     {
-        CommandWriter = new CommandWriter(connection, pool, opts, counter, enqueuePing, overrideCommandTimeout: Timeout.InfiniteTimeSpan);
+        CommandWriter = new CommandWriter("init", connection, pool, opts, counter, enqueuePing);
         CommandWriter.Reset(socketConnection);
     }
 

@@ -23,3 +23,11 @@ public class NatsConnectionTestWs : NatsConnectionTest
     {
     }
 }
+
+public class NatsConnectionTestWss : NatsConnectionTest
+{
+    public NatsConnectionTestWss(ITestOutputHelper output)
+        : base(output, TransportType.WebSocketSecure)
+    {
+    }
+}

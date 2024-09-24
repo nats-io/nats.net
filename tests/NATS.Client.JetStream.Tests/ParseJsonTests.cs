@@ -25,4 +25,16 @@ public class ParseJsonTests
         Assert.Null(result.Cluster);
         Assert.Null(result.Tags);
     }
+
+    [Fact]
+    public void Default_consumer_ack_policy_should_be_explicit()
+    {
+        var serializer = NatsJSJsonSerializer<ConsumerConfig>.Default;
+
+        var bw = new NatsBufferWriter<byte>();
+        serializer.Serialize(bw, new ConsumerConfig());
+
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan);
+        Assert.Matches("\"ack_policy\":\"explicit\"", json);
+    }
 }

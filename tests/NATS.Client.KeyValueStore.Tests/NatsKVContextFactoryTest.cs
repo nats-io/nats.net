@@ -48,9 +48,15 @@ public class NatsKVContextFactoryTest
 
     public class MockJsContext : INatsJSContext
     {
+        public INatsConnection Connection { get; } = new NatsConnection();
+
         public ValueTask<INatsJSConsumer> CreateOrderedConsumerAsync(string stream, NatsJSOrderedConsumerOpts? opts = default, CancellationToken cancellationToken = default) => throw new NotImplementedException();
 
         public ValueTask<INatsJSConsumer> CreateOrUpdateConsumerAsync(string stream, ConsumerConfig config, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+
+        public ValueTask<INatsJSConsumer> CreateConsumerAsync(string stream, ConsumerConfig config, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+
+        public ValueTask<INatsJSConsumer> UpdateConsumerAsync(string stream, ConsumerConfig config, CancellationToken cancellationToken = default) => throw new NotImplementedException();
 
         public ValueTask<INatsJSConsumer> GetConsumerAsync(string stream, string consumer, CancellationToken cancellationToken = default) => throw new NotImplementedException();
 
@@ -83,5 +89,7 @@ public class NatsKVContextFactoryTest
         public IAsyncEnumerable<INatsJSStream> ListStreamsAsync(string? subject = default, CancellationToken cancellationToken = default) => throw new NotImplementedException();
 
         public IAsyncEnumerable<string> ListStreamNamesAsync(string? subject = default, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+
+        public ValueTask<NatsJSPublishConcurrentFuture> PublishConcurrentAsync<T>(string subject, T? data, INatsSerialize<T>? serializer = default, NatsJSPubOpts? opts = default, NatsHeaders? headers = default, CancellationToken cancellationToken = default) => throw new NotImplementedException();
     }
 }

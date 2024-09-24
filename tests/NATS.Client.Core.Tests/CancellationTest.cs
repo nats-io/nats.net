@@ -10,7 +10,7 @@ public class CancellationTest
     [Fact]
     public async Task CommandTimeoutTest()
     {
-        var server = NatsServer.Start(_output, TransportType.Tcp);
+        await using var server = NatsServer.Start();
 
         await using var conn = server.CreateClientConnection(NatsOpts.Default with { CommandTimeout = TimeSpan.FromMilliseconds(1) });
         await conn.ConnectAsync();
@@ -19,7 +19,8 @@ public class CancellationTest
         var cancellationToken = cts.Token;
 
         // stall the flush task
-        var stallTask = conn.CommandWriter.TestStallFlushAsync(TimeSpan.FromSeconds(1));
+        var stopToken = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var stallTask = conn.CommandWriter.TestStallFlushAsync(TimeSpan.FromSeconds(10), stopToken.Token);
 
         // commands that call ConnectAsync throw OperationCanceledException
         await Assert.ThrowsAsync<OperationCanceledException>(() => conn.PingAsync(cancellationToken).AsTask());
@@ -31,6 +32,7 @@ public class CancellationTest
             }
         });
 
+        stopToken.Cancel();
         await stallTask;
     }
 
@@ -79,23 +81,5 @@ public class CancellationTest
             {
             }
         });
-    }
-
-    [Fact]
-    public async Task Cancellation_timer()
-    {
-        var objectPool = new ObjectPool(10);
-        var cancellationTimerPool = new CancellationTimerPool(objectPool, CancellationToken.None);
-        var cancellationTimer = cancellationTimerPool.Start(TimeSpan.FromSeconds(2), CancellationToken.None);
-
-        try
-        {
-            await Task.Delay(TimeSpan.FromSeconds(4), cancellationTimer.Token);
-            _output.WriteLine($"delayed 4 seconds");
-        }
-        catch (Exception e)
-        {
-            _output.WriteLine($"Exception: {e.GetType().Name}");
-        }
     }
 }

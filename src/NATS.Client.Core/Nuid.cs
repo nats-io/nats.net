@@ -2,35 +2,70 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+#if NETSTANDARD
+using Random = NATS.Client.Core.Internal.NetStandardExtensions.Random;
+#endif
 
-namespace NATS.Client.Core.Internal;
+namespace NATS.Client.Core;
 
+/// <summary>
+/// Represents a unique identifier generator.
+/// </summary>
+/// <remarks>
+/// The <c>Nuid</c> class generates unique identifiers that can be used
+/// to ensure uniqueness in distributed systems.
+/// </remarks>
 [SkipLocalsInit]
-internal sealed class NuidWriter
+public sealed class Nuid
 {
-    internal const nuint NuidLength = PrefixLength + SequentialLength;
-    private const nuint Base = 62;
+    // NuidLength, PrefixLength, SequentialLength were nuint (System.UIntPtr) in the original code
+    // however, they were changed to uint to fix the compilation error for IL2CPP Unity projects.
+    // With nuint, the following error occurs in Unity Linux IL2CPP builds:
+    //   Error: IL2CPP error for method 'System.Char[] NATS.Client.Core.Internal.NuidWriter::Refresh(System.UInt64&)'
+    //   System.ArgumentOutOfRangeException: Cannot create a constant value for types of System.UIntPtr
+    internal const uint NuidLength = PrefixLength + SequentialLength;
+    private const uint Base = 62;
     private const ulong MaxSequential = 839299365868340224; // 62^10
     private const uint PrefixLength = 12;
-    private const nuint SequentialLength = 10;
+    private const uint SequentialLength = 10;
     private const int MinIncrement = 33;
     private const int MaxIncrement = 333;
 
     [ThreadStatic]
-    private static NuidWriter? _writer;
+    private static Nuid? _writer;
 
     private char[] _prefix;
     private ulong _increment;
     private ulong _sequential;
 
-    private NuidWriter()
+    private Nuid()
     {
         Refresh(out _);
     }
 
+#if NETSTANDARD2_0
+    private static ReadOnlySpan<char> Digits => "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".AsSpan();
+#else
     private static ReadOnlySpan<char> Digits => "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+#endif
 
-    public static bool TryWriteNuid(Span<char> nuidBuffer)
+    /// <summary>
+    /// Generates a new NATS unique identifier (NUID).
+    /// </summary>
+    /// <returns>A new NUID as a string.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when unable to generate the NUID.</exception>
+    public static string NewNuid()
+    {
+        Span<char> buffer = stackalloc char[(int)NuidLength];
+        if (TryWriteNuid(buffer))
+        {
+            return buffer.ToString();
+        }
+
+        throw new InvalidOperationException("Internal error: can't generate nuid");
+    }
+
+    internal static bool TryWriteNuid(Span<char> nuidBuffer)
     {
         if (_writer is not null)
         {
@@ -38,17 +73,6 @@ internal sealed class NuidWriter
         }
 
         return InitAndWrite(nuidBuffer);
-    }
-
-    public static string NewNuid()
-    {
-        Span<char> buffer = stackalloc char[22];
-        if (TryWriteNuid(buffer))
-        {
-            return new string(buffer);
-        }
-
-        throw new InvalidOperationException("Internal error: can't generate nuid");
     }
 
     private static bool TryWriteNuidCore(Span<char> buffer, Span<char> prefix, ulong sequential)
@@ -63,8 +87,10 @@ internal sealed class NuidWriter
         // NOTE: We must never write to digitsPtr!
         ref var digitsPtr = ref MemoryMarshal.GetReference(Digits);
 
-        for (nuint i = PrefixLength; i < NuidLength; i++)
+        // write backwards so the last two characters change the fastest
+        for (var i = NuidLength; i > PrefixLength;)
         {
+            i--;
             var digitIndex = (nuint)(sequential % Base);
             Unsafe.Add(ref buffer[0], i) = Unsafe.Add(ref digitsPtr, digitIndex);
             sequential /= Base;
@@ -85,13 +111,28 @@ internal sealed class NuidWriter
 
     private static char[] GetPrefix(RandomNumberGenerator? rng = null)
     {
-        Span<byte> randomBytes = stackalloc byte[(int)PrefixLength];
+#if NET8_0_OR_GREATER
+        if (rng == null)
+        {
+            return RandomNumberGenerator.GetItems(Digits, (int)PrefixLength);
+        }
+#endif
 
-        // TODO: For .NET 8+, use GetItems for better distribution
+#if NETSTANDARD2_0
+        var randomBytes = new byte[(int)PrefixLength];
+
+        if (rng == null)
+        {
+            using var randomNumberGenerator = RandomNumberGenerator.Create();
+            randomNumberGenerator.GetBytes(randomBytes);
+        }
+#else
+        Span<byte> randomBytes = stackalloc byte[(int)PrefixLength];
         if (rng == null)
         {
             RandomNumberGenerator.Fill(randomBytes);
         }
+#endif
         else
         {
             rng.GetBytes(randomBytes);
@@ -111,7 +152,7 @@ internal sealed class NuidWriter
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static bool InitAndWrite(Span<char> span)
     {
-        _writer = new NuidWriter();
+        _writer = new Nuid();
         return _writer.TryWriteNuidCore(span);
     }
 

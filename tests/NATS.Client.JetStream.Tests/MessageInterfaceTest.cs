@@ -18,7 +18,7 @@ public class MessageInterfaceTest
         var ack = await js.PublishAsync("s1.foo", "test_msg", cancellationToken: cts.Token);
         ack.EnsureSuccess();
 
-        var consumer = await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+        var consumer = await js.CreateOrUpdateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
 
         await foreach (var natsJSMsg in consumer.ConsumeAsync<string>(cancellationToken: cts.Token))
         {

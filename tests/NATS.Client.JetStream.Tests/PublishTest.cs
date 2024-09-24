@@ -20,7 +20,7 @@ public class PublishTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
         await js.CreateStreamAsync("s1", new[] { "s1.>" }, cts.Token);
-        await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+        await js.CreateOrUpdateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
 
         // Publish
         {
@@ -36,6 +36,7 @@ public class PublishTest
             Assert.Equal(1, (int)ack.Seq);
             Assert.Equal("s1", ack.Stream);
             Assert.False(ack.Duplicate);
+            Assert.True(ack.IsSuccess());
         }
 
         // Duplicate
@@ -49,6 +50,7 @@ public class PublishTest
             Assert.Null(ack1.Error);
             Assert.Equal(2, (int)ack1.Seq);
             Assert.False(ack1.Duplicate);
+            Assert.True(ack1.IsSuccess());
 
             var ack2 = await js.PublishAsync(
                 subject: "s1.foo",
@@ -58,6 +60,7 @@ public class PublishTest
                 cancellationToken: cts.Token);
             Assert.Null(ack2.Error);
             Assert.True(ack2.Duplicate);
+            Assert.False(ack2.IsSuccess());
         }
 
         // ExpectedStream
@@ -77,6 +80,7 @@ public class PublishTest
             Assert.Equal(400, ack2.Error?.Code);
             Assert.Equal(10060, ack2.Error?.ErrCode);
             Assert.Equal("expected stream does not match", ack2.Error?.Description);
+            Assert.False(ack2.IsSuccess());
         }
 
         // ExpectedLastSequence
@@ -197,7 +201,7 @@ public class PublishTest
         await using var nats0 = server.CreateClientConnection();
         var js0 = new NatsJSContext(nats0);
         await js0.CreateStreamAsync("s1", new[] { "s1.>" }, cts.Token);
-        await js0.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+        await js0.CreateOrUpdateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
 
         var js = new NatsJSContext(nats);
 

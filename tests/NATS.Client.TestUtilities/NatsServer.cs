@@ -81,6 +81,7 @@ public class NatsServer : IAsyncDisposable
         TransportType.Tcp => $"nats://127.0.0.1:{Opts.ServerPort}",
         TransportType.Tls => $"tls://127.0.0.1:{Opts.ServerPort}",
         TransportType.WebSocket => $"ws://127.0.0.1:{Opts.WebSocketPort}",
+        TransportType.WebSocketSecure => $"wss://127.0.0.1:{Opts.WebSocketPort}",
         _ => throw new ArgumentOutOfRangeException(),
     };
 
@@ -88,7 +89,7 @@ public class NatsServer : IAsyncDisposable
     {
         get
         {
-            if (_transportType == TransportType.WebSocket && ServerVersions.V2_9_19 <= Version)
+            if (_transportType is TransportType.WebSocket or TransportType.WebSocketSecure && ServerVersions.V2_9_19 <= Version)
             {
                 return Opts.WebSocketPort!.Value;
             }
@@ -562,7 +563,7 @@ public sealed class SkipIfNatsServer : FactAttribute
 
     static SkipIfNatsServer() => SupportsTlsFirst = NatsServer.SupportsTlsFirst();
 
-    public SkipIfNatsServer(bool doesNotSupportTlsFirst = false, string? versionEarlierThan = default)
+    public SkipIfNatsServer(bool doesNotSupportTlsFirst = false, string? versionEarlierThan = default, string? versionLaterThan = default)
     {
         if (doesNotSupportTlsFirst && !SupportsTlsFirst)
         {
@@ -572,6 +573,11 @@ public sealed class SkipIfNatsServer : FactAttribute
         if (versionEarlierThan != null && new Version(versionEarlierThan) > NatsServer.Version)
         {
             Skip = $"NATS server version ({NatsServer.Version}) is earlier than {versionEarlierThan}";
+        }
+
+        if (versionLaterThan != null && new Version(versionLaterThan) < NatsServer.Version)
+        {
+            Skip = $"NATS server version ({NatsServer.Version}) is later than {versionLaterThan}";
         }
     }
 }

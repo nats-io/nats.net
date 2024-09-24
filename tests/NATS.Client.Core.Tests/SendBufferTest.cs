@@ -116,11 +116,9 @@ public class SendBufferTest
 
         Log("__________________________________");
 
-        var testLogger = new InMemoryTestLoggerFactory(LogLevel.Error, m =>
+        var testLogger = new InMemoryTestLoggerFactory(LogLevel.Warning, m =>
         {
             Log($"[NC] {m.Message}");
-            if (m.Exception is not SocketException)
-                _output.WriteLine($"ERROR: {m.Exception}");
         });
 
         await using var nats = new NatsConnection(new NatsOpts
@@ -166,8 +164,9 @@ public class SendBufferTest
         Log($"[C] flush...");
         await nats.PingAsync(cts.Token);
 
-        Assert.Equal(2, testLogger.Logs.Count);
-        foreach (var log in testLogger.Logs)
+        var logs = testLogger.Logs.Where(x => x.Category == "NATS.Client.Core.Commands.CommandWriter").ToList();
+        Assert.Equal(2, logs.Count);
+        foreach (var log in logs)
         {
             Assert.True(log.Exception is SocketException, "Socket exception expected");
             var socketErrorCode = (log.Exception as SocketException)!.SocketErrorCode;

@@ -364,6 +364,9 @@ public class KeyValueStoreTest
 
         _output.WriteLine($"COUNT={count}");
         Assert.Equal(0, count);
+
+        _output.WriteLine("PURGE ALL DELETES ON EMPTY BUCKET");
+        await store.PurgeDeletesAsync(opts: new NatsKVPurgeOpts { DeleteMarkersThreshold = TimeSpan.Zero }, cancellationToken: cancellationToken);
     }
 
     [Fact]
@@ -550,5 +553,99 @@ public class KeyValueStoreTest
         Assert.Equal("kv2", status2.Bucket);
         Assert.Equal("KV_kv2", status2.Info.Config.Name);
         Assert.Equal(StreamConfigCompression.S2, status2.Info.Config.Compression);
+    }
+
+    [Fact]
+    public async Task Validate_keys()
+    {
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var store = await kv.CreateStoreAsync("b1");
+
+        string[] validKeys = [
+            "k.1",
+            "=",
+            "_",
+            "-",
+            "123",
+            "Abc",
+        ];
+
+        foreach (var key in validKeys)
+        {
+            var rev = await store.PutAsync(key, "value1");
+            await store.UpdateAsync(key, "value2", rev);
+            var entry = await store.GetEntryAsync<string>(key);
+            Assert.Equal("value2", entry.Value);
+            await store.DeleteAsync(key);
+        }
+
+        string[] invalidKeys = [
+            null!,
+            string.Empty,
+            ".k",
+            "k.",
+            "k$",
+            "k%",
+            "k*",
+            "k>",
+            "k\n",
+            "k\r",
+        ];
+
+        foreach (var key in invalidKeys)
+        {
+            await Assert.ThrowsAsync<NatsKVException>(async () => await store.CreateAsync(key, "value"));
+            await Assert.ThrowsAsync<NatsKVException>(async () => await store.PutAsync(key, "value"));
+            await Assert.ThrowsAsync<NatsKVException>(async () => await store.UpdateAsync(key, "value", 1));
+            await Assert.ThrowsAsync<NatsKVException>(async () => await store.GetEntryAsync<string>(key));
+            await Assert.ThrowsAsync<NatsKVException>(async () => await store.DeleteAsync(key));
+            await Assert.ThrowsAsync<NatsKVException>(async () => await store.PurgeAsync(key));
+        }
+    }
+
+    [Fact]
+    public async Task TestDirectMessageRepublishedSubject()
+    {
+        var streamBucketName = "sb-" + Nuid.NewNuid();
+        var subject = "test";
+        var streamSubject = subject + ".>";
+        var publishSubject1 = subject + ".one";
+        var publishSubject2 = subject + ".two";
+        var publishSubject3 = subject + ".three";
+        var republishDest = "$KV." + streamBucketName + ".>";
+
+        var streamConfig = new StreamConfig(streamBucketName, new[] { streamSubject }) { Republish = new Republish { Src = ">", Dest = republishDest } };
+
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var store = await kv.CreateStoreAsync(streamBucketName);
+        await js.CreateStreamAsync(streamConfig);
+
+        await nats.PublishAsync<string>(publishSubject1, "uno");
+        await js.PublishAsync<string>(publishSubject2, "dos");
+        await store.PutAsync(publishSubject3, "tres");
+
+        var kve1 = await store.GetEntryAsync<string>(publishSubject1);
+        Assert.Equal(streamBucketName, kve1.Bucket);
+        Assert.Equal(publishSubject1, kve1.Key);
+        Assert.Equal("uno", kve1.Value);
+
+        var kve2 = await store.GetEntryAsync<string>(publishSubject2);
+        Assert.Equal(streamBucketName, kve2.Bucket);
+        Assert.Equal(publishSubject2, kve2.Key);
+        Assert.Equal("dos", kve2.Value);
+
+        var kve3 = await store.GetEntryAsync<string>(publishSubject3);
+        Assert.Equal(streamBucketName, kve3.Bucket);
+        Assert.Equal(publishSubject3, kve3.Key);
+        Assert.Equal("tres", kve3.Value);
     }
 }

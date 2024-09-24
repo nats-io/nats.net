@@ -7,9 +7,7 @@ using NATS.Client.Core.Internal;
 namespace MicroBenchmark;
 
 [MemoryDiagnoser]
-[SimpleJob(RuntimeMoniker.Net60)]
-[SimpleJob(RuntimeMoniker.Net70, baseline: true)]
-[SimpleJob(RuntimeMoniker.Net80)]
+[SimpleJob(RuntimeMoniker.Net80, baseline: true)]
 [SimpleJob(RuntimeMoniker.NativeAot80)]
 public class NewInboxBenchmarks
 {
@@ -27,14 +25,14 @@ public class NewInboxBenchmarks
     [GlobalSetup]
     public void Setup()
     {
-        NuidWriter.TryWriteNuid(new char[100]);
+        Nuid.TryWriteNuid(new char[100]);
     }
 
     [Benchmark(Baseline = true)]
     [SkipLocalsInit]
     public bool TryWriteNuid()
     {
-        return NuidWriter.TryWriteNuid(_buf);
+        return Nuid.TryWriteNuid(_buf);
     }
 
     [Benchmark]

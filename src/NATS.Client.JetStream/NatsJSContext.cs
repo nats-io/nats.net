@@ -12,8 +12,8 @@ public partial class NatsJSContext
 {
     private readonly ILogger _logger;
 
-    /// <inheritdoc cref="NatsJSContext(NATS.Client.Core.NatsConnection,NATS.Client.JetStream.NatsJSOpts)"/>>
-    public NatsJSContext(NatsConnection connection)
+    /// <inheritdoc cref="NatsJSContext(NATS.Client.Core.INatsConnection,NATS.Client.JetStream.NatsJSOpts)"/>>
+    public NatsJSContext(INatsConnection connection)
         : this(connection, new NatsJSOpts(connection.Opts))
     {
     }
@@ -23,14 +23,14 @@ public partial class NatsJSContext
     /// </summary>
     /// <param name="connection">A NATS server connection <see cref="NatsConnection"/> to access the JetStream APIs, publishers and consumers.</param>
     /// <param name="opts">Context wide <see cref="NatsJSOpts"/> JetStream options.</param>
-    public NatsJSContext(NatsConnection connection, NatsJSOpts opts)
+    public NatsJSContext(INatsConnection connection, NatsJSOpts opts)
     {
         Connection = connection;
         Opts = opts;
         _logger = connection.Opts.LoggerFactory.CreateLogger<NatsJSContext>();
     }
 
-    internal NatsConnection Connection { get; }
+    public INatsConnection Connection { get; }
 
     internal NatsJSOpts Opts { get; }
 
@@ -119,7 +119,7 @@ public partial class NatsJSContext
 
         for (var i = 0; i < retryMax; i++)
         {
-            await using var sub = await Connection.RequestSubAsync<T, PubAckResponse>(
+            await using var sub = await Connection.CreateRequestSubAsync<T, PubAckResponse>(
                     subject: subject,
                     data: data,
                     headers: headers,
@@ -144,17 +144,14 @@ public partial class NatsJSContext
 
             try
             {
-                while (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+                await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
                 {
-                    while (sub.Msgs.TryRead(out var msg))
+                    if (msg.Data == null)
                     {
-                        if (msg.Data == null)
-                        {
-                            throw new NatsJSException("No response data received");
-                        }
-
-                        return msg.Data;
+                        throw new NatsJSException("No response data received");
                     }
+
+                    return msg.Data;
                 }
             }
             catch (NatsNoRespondersException)
@@ -173,17 +170,93 @@ public partial class NatsJSContext
         throw new NatsJSPublishNoResponseException();
     }
 
+    public async ValueTask<NatsJSPublishConcurrentFuture> PublishConcurrentAsync<T>(
+        string subject,
+        T? data,
+        INatsSerialize<T>? serializer = default,
+        NatsJSPubOpts? opts = default,
+        NatsHeaders? headers = default,
+        CancellationToken cancellationToken = default)
+    {
+        if (opts != null)
+        {
+            if (opts.MsgId != null)
+            {
+                headers ??= new NatsHeaders();
+                headers["Nats-Msg-Id"] = opts.MsgId;
+            }
+
+            if (opts.ExpectedLastMsgId != null)
+            {
+                headers ??= new NatsHeaders();
+                headers["Nats-Expected-Last-Msg-Id"] = opts.ExpectedLastMsgId;
+            }
+
+            if (opts.ExpectedStream != null)
+            {
+                headers ??= new NatsHeaders();
+                headers["Nats-Expected-Stream"] = opts.ExpectedStream;
+            }
+
+            if (opts.ExpectedLastSequence != null)
+            {
+                headers ??= new NatsHeaders();
+                headers["Nats-Expected-Last-Sequence"] = opts.ExpectedLastSequence.ToString();
+            }
+
+            if (opts.ExpectedLastSubjectSequence != null)
+            {
+                headers ??= new NatsHeaders();
+                headers["Nats-Expected-Last-Subject-Sequence"] = opts.ExpectedLastSubjectSequence.ToString();
+            }
+        }
+
+        opts ??= NatsJSPubOpts.Default;
+
+        var sub = await Connection.CreateRequestSubAsync<T, PubAckResponse>(
+                    subject: subject,
+                    data: data,
+                    headers: headers,
+                    requestSerializer: serializer,
+                    replySerializer: NatsJSJsonSerializer<PubAckResponse>.Default,
+                    requestOpts: opts,
+                    replyOpts: new NatsSubOpts
+                    {
+                        // It's important to set the timeout here so that the subscription can be
+                        // stopped if the server doesn't respond or more likely case is that if there
+                        // is a reconnect to the cluster between the request and waiting for a response,
+                        // without the timeout the publish call will hang forever since the server
+                        // which received the request won't be there to respond anymore.
+                        Timeout = Connection.Opts.RequestTimeout,
+
+                        // If JetStream is disabled, a no responders error will be returned
+                        // No responders error might also happen when reconnecting to cluster
+                        ThrowIfNoResponders = true,
+                    },
+                    cancellationToken)
+                .ConfigureAwait(false);
+        return new NatsJSPublishConcurrentFuture(sub);
+    }
+
     internal static void ThrowIfInvalidStreamName([NotNull] string? name, [CallerArgumentExpression("name")] string? paramName = null)
     {
+#if NETSTANDARD
+        ArgumentNullExceptionEx.ThrowIfNull(name, paramName);
+#else
         ArgumentNullException.ThrowIfNull(name, paramName);
+#endif
 
         if (name.Length == 0)
         {
             ThrowEmptyException(paramName);
         }
 
+#if NETSTANDARD2_0
+        if (name.Contains(" ."))
+#else
         var nameSpan = name.AsSpan();
         if (nameSpan.IndexOfAny(" .") >= 0)
+#endif
         {
             ThrowInvalidStreamNameException(paramName);
         }
@@ -216,7 +289,7 @@ public partial class NatsJSContext
             // Validator.ValidateObject(request, new ValidationContext(request));
         }
 
-        await using var sub = await Connection.RequestSubAsync<TRequest, TResponse>(
+        await using var sub = await Connection.CreateRequestSubAsync<TRequest, TResponse>(
                 subject: subject,
                 data: request,
                 headers: default,
@@ -226,27 +299,24 @@ public partial class NatsJSContext
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
-        if (await sub.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+        await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
-            if (sub.Msgs.TryRead(out var msg))
+            if (msg.Error is { } error)
             {
-                if (msg.Error is { } error)
+                if (error.InnerException is NatsJSApiErrorException jsError)
                 {
-                    if (error.InnerException is NatsJSApiErrorException jsError)
-                    {
-                        return new NatsJSResponse<TResponse>(default, jsError.Error);
-                    }
-
-                    throw error;
+                    return new NatsJSResponse<TResponse>(default, jsError.Error);
                 }
 
-                if (msg.Data == null)
-                {
-                    throw new NatsJSException("No response data received");
-                }
-
-                return new NatsJSResponse<TResponse>(msg.Data, default);
+                throw error;
             }
+
+            if (msg.Data == null)
+            {
+                throw new NatsJSException("No response data received");
+            }
+
+            return new NatsJSResponse<TResponse>(msg.Data, default);
         }
 
         if (sub is NatsSubBase { EndReason: NatsSubEndReason.Exception, Exception: not null } sb)

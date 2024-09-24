@@ -1,5 +1,7 @@
 using System.Buffers;
+using System.Diagnostics;
 using System.IO.Pipelines;
+using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
@@ -24,10 +26,12 @@ internal sealed class CommandWriter : IAsyncDisposable
     private const int SendMemSize = 8520;
 
     // should be more than SendMemSize
-    // https://github.com/nats-io/nats.net.v2/pull/383#discussion_r1484344102
+    // https://github.com/nats-io/nats.net/pull/383#discussion_r1484344102
     private const int MinSegmentSize = 16384;
 
     private readonly ILogger<CommandWriter> _logger;
+    private readonly bool _trace;
+    private readonly string _name;
     private readonly NatsConnection _connection;
     private readonly ObjectPool _pool;
     private readonly int _arrayPoolInitialSize;
@@ -51,9 +55,11 @@ internal sealed class CommandWriter : IAsyncDisposable
     private CancellationTokenSource? _ctsReader;
     private volatile bool _disposed;
 
-    public CommandWriter(NatsConnection connection, ObjectPool pool, NatsOpts opts, ConnectionStatsCounter counter, Action<PingCommand> enqueuePing, TimeSpan? overrideCommandTimeout = default)
+    public CommandWriter(string name, NatsConnection connection, ObjectPool pool, NatsOpts opts, ConnectionStatsCounter counter, Action<PingCommand> enqueuePing, TimeSpan? overrideCommandTimeout = default)
     {
         _logger = opts.LoggerFactory.CreateLogger<CommandWriter>();
+        _trace = _logger.IsEnabled(LogLevel.Trace);
+        _name = name;
         _connection = connection;
         _pool = pool;
 
@@ -77,10 +83,14 @@ internal sealed class CommandWriter : IAsyncDisposable
             useSynchronizationContext: false));
         _pipeReader = pipe.Reader;
         _pipeWriter = pipe.Writer;
+
+        _logger.LogDebug(NatsLogEvents.Buffer, "Created {Name}", _name);
     }
 
     public void Reset(ISocketConnection socketConnection)
     {
+        _logger.LogDebug(NatsLogEvents.Buffer, "Resetting {Name}", _name);
+
         lock (_lock)
         {
             _socketConnection = socketConnection;
@@ -103,6 +113,8 @@ internal sealed class CommandWriter : IAsyncDisposable
 
     public async Task CancelReaderLoopAsync()
     {
+        _logger.LogDebug(NatsLogEvents.Buffer, "Canceling reader loop");
+
         CancellationTokenSource? cts;
         Task? readerTask;
         lock (_lock)
@@ -113,19 +125,30 @@ internal sealed class CommandWriter : IAsyncDisposable
 
         if (cts != null)
         {
-#if NET6_0
-            cts.Cancel();
-#else
+#if NET8_0_OR_GREATER
             await cts.CancelAsync().ConfigureAwait(false);
+#else
+            cts.Cancel();
 #endif
         }
 
         if (readerTask != null)
-            await readerTask.WaitAsync(TimeSpan.FromSeconds(3), _cts.Token).ConfigureAwait(false);
+        {
+            // We have to wait for the reader loop to finish before we can reuse the pipe.
+            // Setting a timeout here is not practical, as we won't be able to recover from a timeout.
+            // The reader loop should finish quickly, as it will be canceled by the reader cancellation token.
+            // If it doesn't, the only potential blocker would be the socket connection, which should be
+            // closed by the time we get here or soon after.
+            await readerTask.WaitAsync(_cts.Token).ConfigureAwait(false);
+        }
+
+        _logger.LogDebug(NatsLogEvents.Buffer, "Cancelled reader loop successfully");
     }
 
     public async ValueTask DisposeAsync()
     {
+        _logger.LogDebug(NatsLogEvents.Buffer, "Disposing {Name}", _name);
+
         if (_disposed)
         {
             return;
@@ -133,10 +156,10 @@ internal sealed class CommandWriter : IAsyncDisposable
 
         _disposed = true;
 
-#if NET6_0
-        _cts.Cancel();
-#else
+#if NET8_0_OR_GREATER
         await _cts.CancelAsync().ConfigureAwait(false);
+#else
+        _cts.Cancel();
 #endif
 
         _channelLock.Writer.TryComplete();
@@ -155,6 +178,11 @@ internal sealed class CommandWriter : IAsyncDisposable
 
     public ValueTask ConnectAsync(ClientOpts connectOpts, CancellationToken cancellationToken)
     {
+        if (_trace)
+        {
+            _logger.LogTrace(NatsLogEvents.Protocol, "CONNECT");
+        }
+
 #pragma warning disable CA2016
 #pragma warning disable VSTHRD103
         if (!_semLock.Wait(0))
@@ -164,7 +192,7 @@ internal sealed class CommandWriter : IAsyncDisposable
             return ConnectStateMachineAsync(false, connectOpts, cancellationToken);
         }
 
-        if (_flushTask is { IsCompletedSuccessfully: false })
+        if (_flushTask.IsNotCompletedSuccessfully())
         {
             return ConnectStateMachineAsync(true, connectOpts, cancellationToken);
         }
@@ -184,11 +212,16 @@ internal sealed class CommandWriter : IAsyncDisposable
             _semLock.Release();
         }
 
-        return ValueTask.CompletedTask;
+        return default;
     }
 
     public ValueTask PingAsync(PingCommand pingCommand, CancellationToken cancellationToken)
     {
+        if (_trace)
+        {
+            _logger.LogTrace(NatsLogEvents.Protocol, "PING");
+        }
+
 #pragma warning disable CA2016
 #pragma warning disable VSTHRD103
         if (!_semLock.Wait(0))
@@ -198,7 +231,7 @@ internal sealed class CommandWriter : IAsyncDisposable
             return PingStateMachineAsync(false, pingCommand, cancellationToken);
         }
 
-        if (_flushTask is { IsCompletedSuccessfully: false })
+        if (_flushTask.IsNotCompletedSuccessfully())
         {
             return PingStateMachineAsync(true, pingCommand, cancellationToken);
         }
@@ -219,11 +252,16 @@ internal sealed class CommandWriter : IAsyncDisposable
             _semLock.Release();
         }
 
-        return ValueTask.CompletedTask;
+        return default;
     }
 
     public ValueTask PongAsync(CancellationToken cancellationToken = default)
     {
+        if (_trace)
+        {
+            _logger.LogTrace(NatsLogEvents.Protocol, "PONG");
+        }
+
 #pragma warning disable CA2016
 #pragma warning disable VSTHRD103
         if (!_semLock.Wait(0))
@@ -233,7 +271,7 @@ internal sealed class CommandWriter : IAsyncDisposable
             return PongStateMachineAsync(false, cancellationToken);
         }
 
-        if (_flushTask is { IsCompletedSuccessfully: false })
+        if (_flushTask.IsNotCompletedSuccessfully())
         {
             return PongStateMachineAsync(true, cancellationToken);
         }
@@ -253,11 +291,16 @@ internal sealed class CommandWriter : IAsyncDisposable
             _semLock.Release();
         }
 
-        return ValueTask.CompletedTask;
+        return default;
     }
 
     public ValueTask PublishAsync<T>(string subject, T? value, NatsHeaders? headers, string? replyTo, INatsSerialize<T> serializer, CancellationToken cancellationToken)
     {
+        if (_trace)
+        {
+            _logger.LogTrace(NatsLogEvents.Protocol, "PUB {Subject} {ReplyTo}", subject, replyTo);
+        }
+
         NatsPooledBufferWriter<byte>? headersBuffer = null;
         if (headers != null)
         {
@@ -306,7 +349,7 @@ internal sealed class CommandWriter : IAsyncDisposable
             return PublishStateMachineAsync(false, subject, replyTo, headersBuffer, payloadBuffer, cancellationToken);
         }
 
-        if (_flushTask is { IsCompletedSuccessfully: false })
+        if (_flushTask.IsNotCompletedSuccessfully())
         {
             return PublishStateMachineAsync(true, subject, replyTo, headersBuffer, payloadBuffer, cancellationToken);
         }
@@ -335,11 +378,16 @@ internal sealed class CommandWriter : IAsyncDisposable
             }
         }
 
-        return ValueTask.CompletedTask;
+        return default;
     }
 
     public ValueTask SubscribeAsync(int sid, string subject, string? queueGroup, int? maxMsgs, CancellationToken cancellationToken)
     {
+        if (_trace)
+        {
+            _logger.LogTrace(NatsLogEvents.Protocol, "SUB {Subject} {QueueGroup} {MaxMsgs}", subject, queueGroup, maxMsgs);
+        }
+
 #pragma warning disable CA2016
 #pragma warning disable VSTHRD103
         if (!_semLock.Wait(0))
@@ -349,7 +397,7 @@ internal sealed class CommandWriter : IAsyncDisposable
             return SubscribeStateMachineAsync(false, sid, subject, queueGroup, maxMsgs, cancellationToken);
         }
 
-        if (_flushTask is { IsCompletedSuccessfully: false })
+        if (_flushTask.IsNotCompletedSuccessfully())
         {
             return SubscribeStateMachineAsync(true, sid, subject, queueGroup, maxMsgs, cancellationToken);
         }
@@ -369,11 +417,16 @@ internal sealed class CommandWriter : IAsyncDisposable
             _semLock.Release();
         }
 
-        return ValueTask.CompletedTask;
+        return default;
     }
 
     public ValueTask UnsubscribeAsync(int sid, int? maxMsgs, CancellationToken cancellationToken)
     {
+        if (_trace)
+        {
+            _logger.LogTrace(NatsLogEvents.Protocol, "UNSUB {Sid} {MaxMsgs}", sid, maxMsgs);
+        }
+
 #pragma warning disable CA2016
 #pragma warning disable VSTHRD103
         if (!_semLock.Wait(0))
@@ -383,7 +436,7 @@ internal sealed class CommandWriter : IAsyncDisposable
             return UnsubscribeStateMachineAsync(false, sid, maxMsgs, cancellationToken);
         }
 
-        if (_flushTask is { IsCompletedSuccessfully: false })
+        if (_flushTask.IsNotCompletedSuccessfully())
         {
             return UnsubscribeStateMachineAsync(true, sid, maxMsgs, cancellationToken);
         }
@@ -403,22 +456,22 @@ internal sealed class CommandWriter : IAsyncDisposable
             _semLock.Release();
         }
 
-        return ValueTask.CompletedTask;
+        return default;
     }
 
     // only used for internal testing
-    internal async Task TestStallFlushAsync(TimeSpan timeSpan)
+    internal async Task TestStallFlushAsync(TimeSpan timeSpan, CancellationToken cancellationToken)
     {
         await _semLock.WaitAsync().ConfigureAwait(false);
 
         try
         {
-            if (_flushTask is { IsCompletedSuccessfully: false })
+            if (_flushTask.IsNotCompletedSuccessfully())
             {
-                await _flushTask.ConfigureAwait(false);
+                await _flushTask!.ConfigureAwait(false);
             }
 
-            _flushTask = Task.Delay(timeSpan);
+            _flushTask = Task.Delay(timeSpan, cancellationToken);
         }
         finally
         {
@@ -437,6 +490,10 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         try
         {
+            var trace = logger.IsEnabled(LogLevel.Trace);
+            logger.LogDebug(NatsLogEvents.Buffer, "Starting send buffer reader loop");
+
+            var stopwatch = Stopwatch.StartNew();
             var examinedOffset = 0;
             var pending = 0;
             while (true)
@@ -473,7 +530,18 @@ internal sealed class CommandWriter : IAsyncDisposable
                         Exception? sendEx = null;
                         try
                         {
+                            if (trace)
+                            {
+                                stopwatch.Restart();
+                            }
+
                             sent = await connection.SendAsync(sendMem).ConfigureAwait(false);
+
+                            if (trace)
+                            {
+                                stopwatch.Stop();
+                                logger.LogTrace(NatsLogEvents.Buffer, "Socket.SendAsync Size: {Sent}/{Size} Elapsed: {ElapsedMs}ms", sent, sendMem.Length, stopwatch.Elapsed.TotalMilliseconds);
+                            }
                         }
                         catch (Exception ex)
                         {
@@ -581,15 +649,34 @@ internal sealed class CommandWriter : IAsyncDisposable
         catch (OperationCanceledException)
         {
             // Expected during shutdown
+            logger.LogDebug(NatsLogEvents.Buffer, "Operation canceled in send buffer reader loop (expected during shutdown)");
         }
         catch (ObjectDisposedException)
         {
             // Expected during shutdown
+            logger.LogDebug(NatsLogEvents.Buffer, "Object disposed in send buffer reader loop (expected during shutdown)");
+        }
+        catch (SocketException e)
+        {
+            logger.LogWarning(NatsLogEvents.Buffer, e, "Socket error in send buffer reader loop");
+            try
+            {
+                // We signal the connection to disconnect, which will trigger a reconnect
+                // in the connection loop.  This is necessary because the connection may
+                // be half-open, and we can't rely on the reader loop to detect that.
+                connection.SignalDisconnected(e);
+            }
+            catch (Exception e1)
+            {
+                logger.LogWarning(NatsLogEvents.Buffer, e1, "Error when signaling disconnect");
+            }
         }
         catch (Exception e)
         {
             logger.LogError(NatsLogEvents.Buffer, e, "Unexpected error in send buffer reader loop");
         }
+
+        logger.LogDebug(NatsLogEvents.Buffer, "Exiting send buffer reader loop");
     }
 
     /// <summary>
@@ -630,9 +717,9 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
-            if (_flushTask is { IsCompletedSuccessfully: false })
+            if (_flushTask.IsNotCompletedSuccessfully())
             {
-                await _flushTask.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
+                await _flushTask!.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
             }
 
             _protocolWriter.WriteConnect(_pipeWriter, connectOpts);
@@ -667,9 +754,9 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
-            if (_flushTask is { IsCompletedSuccessfully: false })
+            if (_flushTask.IsNotCompletedSuccessfully())
             {
-                await _flushTask.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
+                await _flushTask!.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
             }
 
             _protocolWriter.WritePing(_pipeWriter);
@@ -705,9 +792,9 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
-            if (_flushTask is { IsCompletedSuccessfully: false })
+            if (_flushTask.IsNotCompletedSuccessfully())
             {
-                await _flushTask.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
+                await _flushTask!.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
             }
 
             _protocolWriter.WritePong(_pipeWriter);
@@ -725,7 +812,9 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
     }
 
+#if !NETSTANDARD
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
+#endif
     private async ValueTask PublishStateMachineAsync(bool lockHeld, string subject, string? replyTo, NatsPooledBufferWriter<byte>? headersBuffer, NatsPooledBufferWriter<byte> payloadBuffer, CancellationToken cancellationToken)
     {
         try
@@ -745,9 +834,9 @@ internal sealed class CommandWriter : IAsyncDisposable
                     throw new ObjectDisposedException(nameof(CommandWriter));
                 }
 
-                if (_flushTask is { IsCompletedSuccessfully: false })
+                if (_flushTask.IsNotCompletedSuccessfully())
                 {
-                    await _flushTask.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
+                    await _flushTask!.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
                 }
 
                 _protocolWriter.WritePublish(_pipeWriter, subject, replyTo, headersBuffer?.WrittenMemory, payloadBuffer.WrittenMemory);
@@ -794,9 +883,9 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
-            if (_flushTask is { IsCompletedSuccessfully: false })
+            if (_flushTask.IsNotCompletedSuccessfully())
             {
-                await _flushTask.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
+                await _flushTask!.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
             }
 
             _protocolWriter.WriteSubscribe(_pipeWriter, sid, subject, queueGroup, maxMsgs);
@@ -831,9 +920,9 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
-            if (_flushTask is { IsCompletedSuccessfully: false })
+            if (_flushTask.IsNotCompletedSuccessfully())
             {
-                await _flushTask.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
+                await _flushTask!.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
             }
 
             _protocolWriter.WriteUnsubscribe(_pipeWriter, sid, maxMsgs);

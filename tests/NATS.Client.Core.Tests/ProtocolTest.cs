@@ -334,7 +334,7 @@ public class ProtocolTest
 
         var sync = 0;
         await using var sub = new NatsSubReconnectTest(nats, subject, i => Interlocked.Exchange(ref sync, i));
-        await nats.SubAsync(sub);
+        await nats.AddSubAsync(sub);
 
         await Retry.Until(
             "subscribed",

@@ -24,7 +24,7 @@ internal readonly struct NatsKVWatchCommandMsg<T>
     public NatsJSMsg<T> Msg { get; init; } = default;
 }
 
-internal class NatsKVWatcher<T> : IAsyncDisposable
+internal sealed class NatsKVWatcher<T> : IAsyncDisposable
 {
     private readonly ILogger _logger;
     private readonly bool _debug;
@@ -35,8 +35,8 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
     private readonly NatsSubOpts? _subOpts;
     private readonly CancellationToken _cancellationToken;
     private readonly string _keyBase;
-    private readonly string _filter;
-    private readonly NatsConnection _nats;
+    private readonly string[] _filters;
+    private readonly INatsConnection _nats;
     private readonly Channel<NatsKVWatchCommandMsg<T>> _commandChannel;
     private readonly Channel<NatsKVEntry<T>> _entryChannel;
     private readonly Channel<string> _consumerCreateChannel;
@@ -55,7 +55,7 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
     public NatsKVWatcher(
         NatsJSContext context,
         string bucket,
-        string key,
+        IEnumerable<string> keys,
         INatsDeserialize<T> serializer,
         NatsKVWatchOpts opts,
         NatsSubOpts? subOpts,
@@ -69,11 +69,19 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
         _opts = opts;
         _subOpts = subOpts;
         _keyBase = $"$KV.{_bucket}.";
-        _filter = $"{_keyBase}{key}";
+        _filters = keys.Select(key => $"{_keyBase}{key}").ToArray();
+
+        if (_filters.Length == 0)
+        {
+            // Without this check we'd get an error from the server:
+            // 'consumer delivery policy is deliver last per subject, but optional filter subject is not set'
+            throw new ArgumentException("At least one key must be provided", nameof(keys));
+        }
+
         _cancellationToken = cancellationToken;
         _nats = context.Connection;
         _stream = $"KV_{_bucket}";
-        _hbTimeout = (int)(opts.IdleHeartbeat * 2).TotalMilliseconds;
+        _hbTimeout = (int)new TimeSpan(opts.IdleHeartbeat.Ticks * 2).TotalMilliseconds;
         _consumer = NewNuid();
 
         _nats.ConnectionDisconnected += OnDisconnected;
@@ -135,6 +143,12 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
         {
             await _sub.DisposeAsync();
         }
+
+#if NETSTANDARD2_0
+        _timer.Dispose();
+#else
+        await _timer.DisposeAsync().ConfigureAwait(false);
+#endif
 
         _consumerCreateChannel.Writer.TryComplete();
         _commandChannel.Writer.TryComplete();
@@ -230,7 +244,11 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
                                         continue;
                                     }
 
+#if NETSTANDARD
+                                    var sequence = InterlockedEx.Increment(ref _sequenceConsumer);
+#else
                                     var sequence = Interlocked.Increment(ref _sequenceConsumer);
+#endif
 
                                     if (sequence != metadata.Sequence.Consumer)
                                     {
@@ -259,7 +277,11 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
                                     // Increment the sequence before writing to the channel in case the channel is full
                                     // and the writer is waiting for the reader to read the message. This way the sequence
                                     // will be correctly incremented in case the timeout kicks in and recreated the consumer.
+#if NETSTANDARD
+                                    InterlockedEx.Exchange(ref _sequenceStream, metadata.Sequence.Stream);
+#else
                                     Interlocked.Exchange(ref _sequenceStream, metadata.Sequence.Stream);
+#endif
 
                                     await _entryChannel.Writer.WriteAsync(entry, _cancellationToken);
                                 }
@@ -341,14 +363,18 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
         }
 
         _sub = new NatsKVWatchSub<T>(_context, _commandChannel, _serializer, _subOpts, _cancellationToken);
-        await _context.Connection.SubAsync(_sub, _cancellationToken).ConfigureAwait(false);
+        await _context.Connection.AddSubAsync(_sub, _cancellationToken).ConfigureAwait(false);
 
         if (_debug)
         {
             _logger.LogDebug(NatsKVLogEvents.NewDeliverySubject, "New delivery subject {Subject}", _sub.Subject);
         }
 
+#if NETSTANDARD
+        InterlockedEx.Exchange(ref _sequenceConsumer, 0);
+#else
         Interlocked.Exchange(ref _sequenceConsumer, 0);
+#endif
 
         var sequence = Volatile.Read(ref _sequenceStream);
 
@@ -358,7 +384,6 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
             DeliverPolicy = ConsumerConfigDeliverPolicy.All,
             AckPolicy = ConsumerConfigAckPolicy.None,
             DeliverSubject = _sub.Subject,
-            FilterSubject = _filter,
             FlowControl = true,
             IdleHeartbeat = _opts.IdleHeartbeat,
             AckWait = TimeSpan.FromHours(22),
@@ -367,6 +392,20 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
             NumReplicas = 1,
             ReplayPolicy = ConsumerConfigReplayPolicy.Instant,
         };
+
+        // Use FilterSubject (singular) when there is only one filter
+        // This is for compatibility with older NATS servers (<2.10)
+        if (_filters.Length == 1)
+        {
+            config.FilterSubject = _filters[0];
+        }
+
+        // Use FilterSubjects (plural) when there are multiple filters
+        // This is for compatibility with newer NATS servers (>=2.10)
+        if (_filters.Length > 1)
+        {
+            config.FilterSubjects = _filters;
+        }
 
         if (!_opts.IncludeHistory)
         {
@@ -383,10 +422,16 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
             config.HeadersOnly = true;
         }
 
+        // Resume from a specific revision ?
         if (sequence > 0)
         {
             config.DeliverPolicy = ConsumerConfigDeliverPolicy.ByStartSequence;
             config.OptStartSeq = sequence + 1;
+        }
+        else if (_opts.ResumeAtRevision > 0)
+        {
+            config.DeliverPolicy = ConsumerConfigDeliverPolicy.ByStartSequence;
+            config.OptStartSeq = _opts.ResumeAtRevision;
         }
 
         var consumer = await _context.CreateOrUpdateConsumerAsync(
@@ -405,9 +450,9 @@ internal class NatsKVWatcher<T> : IAsyncDisposable
     private string NewNuid()
     {
         Span<char> buffer = stackalloc char[22];
-        if (NuidWriter.TryWriteNuid(buffer))
+        if (Nuid.TryWriteNuid(buffer))
         {
-            return new string(buffer);
+            return buffer.ToString();
         }
 
         throw new InvalidOperationException("Internal error: can't generate nuid");

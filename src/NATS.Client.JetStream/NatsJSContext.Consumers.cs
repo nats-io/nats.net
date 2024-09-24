@@ -1,6 +1,5 @@
 using System.Runtime.CompilerServices;
-using NATS.Client.Core.Internal;
-using NATS.Client.JetStream.Internal;
+using NATS.Client.Core;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
@@ -33,31 +32,25 @@ public partial class NatsJSContext : INatsJSContext
         CancellationToken cancellationToken = default)
     {
         ThrowIfInvalidStreamName(stream);
+        return await CreateOrUpdateConsumerInternalAsync(stream, config, default, cancellationToken);
+    }
 
-        // TODO: Adjust API subject according to server version and filter subject
-        var subject = $"{Opts.Prefix}.CONSUMER.CREATE.{stream}";
+    public async ValueTask<INatsJSConsumer> CreateConsumerAsync(
+        string stream,
+        ConsumerConfig config,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfInvalidStreamName(stream);
+        return await CreateOrUpdateConsumerInternalAsync(stream, config, ConsumerCreateAction.Create, cancellationToken);
+    }
 
-        if (!string.IsNullOrWhiteSpace(config.Name))
-        {
-            subject += $".{config.Name}";
-            config.Name = default!;
-        }
-
-        if (!string.IsNullOrWhiteSpace(config.FilterSubject))
-        {
-            subject += $".{config.FilterSubject}";
-        }
-
-        var response = await JSRequestResponseAsync<ConsumerCreateRequest, ConsumerInfo>(
-            subject: subject,
-            new ConsumerCreateRequest
-            {
-                StreamName = stream,
-                Config = config,
-            },
-            cancellationToken);
-
-        return new NatsJSConsumer(this, response);
+    public async ValueTask<INatsJSConsumer> UpdateConsumerAsync(
+        string stream,
+        ConsumerConfig config,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfInvalidStreamName(stream);
+        return await CreateOrUpdateConsumerInternalAsync(stream, config, ConsumerCreateAction.Update, cancellationToken);
     }
 
     /// <summary>
@@ -212,6 +205,7 @@ public partial class NatsJSContext : INatsJSContext
                 NumReplicas = 1,
                 MemStorage = true,
             },
+            Action = ConsumerCreateAction.Create,
         };
 
         if (opts.OptStartSeq > 0)
@@ -234,12 +228,43 @@ public partial class NatsJSContext : INatsJSContext
             request.Config.FilterSubjects = opts.FilterSubjects;
         }
 
-        var name = NuidWriter.NewNuid();
+        var name = Nuid.NewNuid();
         var subject = $"{Opts.Prefix}.CONSUMER.CREATE.{stream}.{name}";
 
         return JSRequestResponseAsync<ConsumerCreateRequest, ConsumerInfo>(
             subject: subject,
             request,
             cancellationToken);
+    }
+
+    private async ValueTask<NatsJSConsumer> CreateOrUpdateConsumerInternalAsync(
+        string stream,
+        ConsumerConfig config,
+        ConsumerCreateAction action,
+        CancellationToken cancellationToken)
+    {
+        var subject = $"{Opts.Prefix}.CONSUMER.CREATE.{stream}";
+
+        if (!string.IsNullOrWhiteSpace(config.Name))
+        {
+            subject += $".{config.Name}";
+        }
+
+        if (!string.IsNullOrWhiteSpace(config.FilterSubject))
+        {
+            subject += $".{config.FilterSubject}";
+        }
+
+        var response = await JSRequestResponseAsync<ConsumerCreateRequest, ConsumerInfo>(
+            subject: subject,
+            new ConsumerCreateRequest
+            {
+                StreamName = stream,
+                Config = config,
+                Action = action,
+            },
+            cancellationToken);
+
+        return new NatsJSConsumer(this, response);
     }
 }

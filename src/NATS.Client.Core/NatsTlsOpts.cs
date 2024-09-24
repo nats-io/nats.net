@@ -1,5 +1,10 @@
-using System.Security.Cryptography.X509Certificates;
+using System.Net.Security;
+using System.Security.Authentication;
 using NATS.Client.Core.Internal;
+
+#if NETSTANDARD2_0
+using System.Security.Cryptography.X509Certificates;
+#endif
 
 namespace NATS.Client.Core;
 
@@ -43,66 +48,61 @@ public sealed record NatsTlsOpts
 {
     public static readonly NatsTlsOpts Default = new();
 
+#if !NETSTANDARD
     /// <summary>
-    /// String or file path to PEM-encoded X509 Certificate
+    /// File path to PEM-encoded X509 Client Certificate
     /// </summary>
     /// <remarks>
     /// Must be used in conjunction with <see cref="KeyFile"/>.
+    /// Exclusive of <see cref="CertBundleFile"/>.
     /// </remarks>
     public string? CertFile { get; init; }
 
     /// <summary>
-    /// String or file path to PEM-encoded Private Key
+    /// File path to PEM-encoded Private Key
     /// </summary>
-    /// /// <remarks>
+    /// <remarks>
+    /// Key should not be password protected
     /// Must be used in conjunction with <see cref="CertFile"/>.
     /// </remarks>
     public string? KeyFile { get; init; }
+#endif
 
     /// <summary>
-    /// Callback that loads Client Certificate
+    /// File path to PKCS#12 bundle containing X509 Client Certificate and Private Key
     /// </summary>
-    public Func<ValueTask<X509Certificate2>>? LoadClientCert { get; init; }
+    /// <remarks>
+    /// Bundle should not be password protected
+    /// </remarks>
+    public string? CertBundleFile { get; init; }
+
+    /// <summary>
+    /// Callback to configure <see cref="SslClientAuthenticationOptions"/>
+    /// </summary>
+    public Func<SslClientAuthenticationOptions, ValueTask>? ConfigureClientAuthentication { get; init; }
 
     /// <summary>
     /// String or file path to PEM-encoded X509 CA Certificate
     /// </summary>
     public string? CaFile { get; init; }
 
-    /// <summary>
-    /// Callback that loads CA Certificates
-    /// </summary>
-    public Func<ValueTask<X509Certificate2Collection>>? LoadCaCerts { get; init; }
-
     /// <summary>When true, skip remote certificate verification and accept any server certificate</summary>
     public bool InsecureSkipVerify { get; init; }
-
-    /// <summary>Certificate revocation mode for certificate validation.</summary>
-    /// <value>One of the values in <see cref="T:System.Security.Cryptography.X509Certificates.X509RevocationMode" />. The default is <see langword="NoCheck" />.</value>
-    public X509RevocationMode CertificateRevocationCheckMode { get; init; }
 
     /// <summary>TLS mode to use during connection</summary>
     public TlsMode Mode { get; init; }
 
-    internal bool HasTlsCerts => CertFile != default || KeyFile != default || LoadClientCert != default || CaFile != default || LoadCaCerts != default;
-
-    /// <summary>
-    /// Helper method to load a Client Certificate from a pem-encoded string
-    /// </summary>
-    public static Func<ValueTask<X509Certificate2>> LoadClientCertFromPem(string certPem, string keyPem)
+    internal bool HasTlsCerts
     {
-        var clientCert = X509Certificate2.CreateFromPem(certPem, keyPem);
-        return () => ValueTask.FromResult(clientCert);
-    }
-
-    /// <summary>
-    /// Helper method to load CA Certificates from a pem-encoded string
-    /// </summary>
-    public static Func<ValueTask<X509Certificate2Collection>> LoadCaCertsFromPem(string caPem)
-    {
-        var caCerts = new X509Certificate2Collection();
-        caCerts.ImportFromPem(caPem);
-        return () => ValueTask.FromResult(caCerts);
+        get
+        {
+#if NETSTANDARD
+            const bool certOrKeyFile = false;
+#else
+            var certOrKeyFile = CertFile != default || KeyFile != default;
+#endif
+            return certOrKeyFile || CertBundleFile != default || CaFile != default || ConfigureClientAuthentication != default;
+        }
     }
 
     internal TlsMode EffectiveMode(NatsUri uri) => Mode switch
@@ -116,4 +116,86 @@ public sealed record NatsTlsOpts
         var effectiveMode = EffectiveMode(uri);
         return effectiveMode is TlsMode.Require or TlsMode.Prefer;
     }
+
+    internal async ValueTask<SslClientAuthenticationOptions> AuthenticateAsClientOptionsAsync(NatsUri uri)
+    {
+        if (EffectiveMode(uri) == TlsMode.Disable)
+        {
+            throw new InvalidOperationException("TLS is not permitted when TlsMode is set to Disable");
+        }
+
+        var options = new SslClientAuthenticationOptions
+        {
+            TargetHost = uri.Host,
+#if NETSTANDARD
+            EnabledSslProtocols = SslProtocols.Tls12,
+#else
+            EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
+#endif
+        };
+
+        // validation
+#if !NETSTANDARD
+        switch (this)
+        {
+            case { CertFile: not null, KeyFile: null } or { KeyFile: not null, CertFile: null }:
+                throw new ArgumentException("NatsTlsOpts.CertFile and NatsTlsOpts.KeyFile must both be set");
+            case { CertFile: not null, CertBundleFile: not null }:
+                throw new ArgumentException("NatsTlsOpts.CertFile and NatsTlsOpts.CertFileBundle are mutually exclusive");
+        }
+#endif
+
+        if (CaFile != null)
+        {
+#if NETSTANDARD2_0
+            var caPem = File.ReadAllText(CaFile);
+#else
+            var caPem = await File.ReadAllTextAsync(CaFile).ConfigureAwait(false);
+#endif
+            options.LoadCaCertsFromPem(caPem);
+        }
+
+#if !NETSTANDARD
+        if (CertFile != null && KeyFile != null)
+        {
+            options.LoadClientCertFromPem(
+                await File.ReadAllTextAsync(CertFile).ConfigureAwait(false),
+                await File.ReadAllTextAsync(KeyFile).ConfigureAwait(false));
+        }
+#endif
+
+        if (CertBundleFile != null)
+        {
+            options.LoadClientCertFromPfxFile(CertBundleFile);
+        }
+
+        if (InsecureSkipVerify)
+        {
+            options.InsecureSkipVerify();
+        }
+
+        if (ConfigureClientAuthentication != null)
+        {
+            await ConfigureClientAuthentication(options).ConfigureAwait(false);
+        }
+
+        return options;
+    }
 }
+
+#if NETSTANDARD2_0
+public class SslClientAuthenticationOptions
+{
+    public string? TargetHost { get; set; }
+
+    public SslProtocols EnabledSslProtocols { get; set; }
+
+    public X509CertificateCollection? ClientCertificates { get; set; }
+
+    public X509RevocationMode CertificateRevocationCheckMode { get; set; }
+
+    public RemoteCertificateValidationCallback? RemoteCertificateValidationCallback { get; set; }
+
+    public LocalCertificateSelectionCallback? LocalCertificateSelectionCallback { get; set; }
+}
+#endif

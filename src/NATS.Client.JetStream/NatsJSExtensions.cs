@@ -22,4 +22,20 @@ public static class NatsJSExtensions
         if (ack.Duplicate)
             throw new NatsJSDuplicateMessageException(ack.Seq);
     }
+
+    /// <summary>
+    /// Checks if there are no errors and message is not a duplicate.
+    /// </summary>
+    /// <param name="ack">ACK response.</param>
+    /// <returns>True if there are no errors and message is not a duplicate.</returns>
+    /// <exception cref="ArgumentNullException"><see cref="PubAckResponse"/> is <c>NULL</c>.</exception>
+    public static bool IsSuccess(this PubAckResponse ack)
+    {
+#if NETSTANDARD
+        ArgumentNullExceptionEx.ThrowIfNull(ack, nameof(ack));
+#else
+        ArgumentNullException.ThrowIfNull(ack);
+#endif
+        return ack.Error == null && !ack.Duplicate;
+    }
 }

@@ -9,7 +9,7 @@ namespace NATS.Extensions.Microsoft.DependencyInjection.Tests;
 public class NatsHostingExtensionsTests
 {
     [Fact]
-    public void AddNats_RegistersNatsConnectionAsSingleton_WhenPoolSizeIsOne()
+    public void AddNatsClient_RegistersNatsConnectionAsSingleton_WhenPoolSizeIsOne()
     {
         var services = new ServiceCollection();
         services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
@@ -24,11 +24,11 @@ public class NatsHostingExtensionsTests
     }
 
     [Fact]
-    public void AddNats_RegistersNatsConnectionAsTransient_WhenPoolSizeIsGreaterThanOne()
+    public void AddNatsClient_RegistersNatsConnectionAsTransient_WhenPoolSizeIsGreaterThanOne()
     {
         var services = new ServiceCollection();
         services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
-        services.AddNatsClient(builder => builder.WithPoolSize(2));
+        services.AddNatsClient(nats => nats.WithPoolSize(2));
 
         var provider = services.BuildServiceProvider();
         var natsConnection1 = provider.GetRequiredService<INatsConnection>();
@@ -39,16 +39,16 @@ public class NatsHostingExtensionsTests
     }
 
     [Fact]
-    public async Task AddNats_WithJsonSerializer()
+    public async Task AddNatsClient_WithJsonSerializer()
     {
         await using var server = NatsServer.Start();
 
         var services = new ServiceCollection();
         services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
-        services.AddNatsClient(builder =>
+        services.AddNatsClient(nats =>
         {
-            builder.ConfigureOptions(opts => server.ClientOpts(opts));
-            builder.AddJsonSerialization(MyJsonContext.Default);
+            nats.ConfigureOptions(opts => server.ClientOpts(opts));
+            nats.AddJsonSerialization(MyJsonContext.Default);
         });
 
         var provider = services.BuildServiceProvider();
@@ -63,6 +63,72 @@ public class NatsHostingExtensionsTests
 
         var msg = await sub.Msgs.ReadAsync(cancellationToken);
         Assert.Equal("bar", msg.Data?.Name);
+    }
+
+    [Fact]
+    public Task AddNatsClient_ConfigureOptionsSetsUrl()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
+        services.AddNatsClient(nats => nats.ConfigureOptions(opts => opts with { Url = "url-set" }));
+
+        var provider = services.BuildServiceProvider();
+        var nats = provider.GetRequiredService<INatsConnection>();
+
+        Assert.Equal("url-set", nats.Opts.Url);
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task AddNatsClient_ConfigureOptionsSetsUrlResolvesServices()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
+        services.AddSingleton<IMyResolvedService>(new MyResolvedService("url-set"));
+        services.AddNatsClient(nats => nats
+            .ConfigureOptions((_, opts) => opts) // Add multiple to test chaining
+            .ConfigureOptions((serviceProvider, opts) =>
+            {
+                opts = opts with
+                {
+                    Url = serviceProvider.GetRequiredService<IMyResolvedService>().GetValue(),
+                };
+
+                return opts;
+            }));
+
+        var provider = services.BuildServiceProvider();
+        var nats = provider.GetRequiredService<INatsConnection>();
+
+        Assert.Equal("url-set", nats.Opts.Url);
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task AddNatsClient_ConfigureConnectionResolvesServices()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
+        services.AddSingleton<IMyResolvedService>(new MyResolvedService("url-set"));
+        services.AddNatsClient(nats => nats
+            .ConfigureConnection((_, _) => { }) // Add multiple to test chaining
+            .ConfigureConnection((serviceProvider, conn) =>
+            {
+                conn.OnConnectingAsync = async instance =>
+                {
+                    var resolved = serviceProvider.GetRequiredService<IMyResolvedService>().GetValue();
+
+                    return (resolved, instance.Port);
+                };
+            }));
+
+        var provider = services.BuildServiceProvider();
+        var nats = provider.GetRequiredService<NatsConnection>();
+
+        (var host, var _) = await nats.OnConnectingAsync!((Host: "host", Port: 123));
+        Assert.Equal("url-set", host);
     }
 
 #if NET8_0_OR_GREATER

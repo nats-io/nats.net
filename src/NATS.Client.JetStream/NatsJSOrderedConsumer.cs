@@ -80,9 +80,6 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
 
                 await using (var cc = await consumer.OrderedConsumeInternalAsync(serializer, opts, cancellationToken))
                 {
-                    // Keep subscription alive (since it's a wek ref in subscription manager) until we're done.
-                    using var anchor = _context.Connection.RegisterSubAnchor(cc);
-
                     while (true)
                     {
                         // We have to check every call to WaitToReadAsync and TryRead for
@@ -261,7 +258,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
     /// For ordered consumer this is a no-op.
     /// </summary>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    public ValueTask RefreshAsync(CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
+    public ValueTask RefreshAsync(CancellationToken cancellationToken = default) => default;
 
     private async Task<NatsJSConsumer> RecreateConsumer(string consumer, ulong seq, CancellationToken cancellationToken)
     {

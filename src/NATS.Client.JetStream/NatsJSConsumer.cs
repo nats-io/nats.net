@@ -62,9 +62,6 @@ public class NatsJSConsumer : INatsJSConsumer
         opts ??= _context.Opts.DefaultConsumeOpts;
         await using var cc = await ConsumeInternalAsync<T>(serializer, opts, cancellationToken).ConfigureAwait(false);
 
-        // Keep subscription alive (since it's a weak ref in subscription manager) until we're done.
-        using var anchor = _context.Connection.RegisterSubAnchor(cc);
-
         while (!cancellationToken.IsCancellationRequested)
         {
             // We have to check calls individually since we can't use yield return in try-catch blocks.
@@ -99,6 +96,7 @@ public class NatsJSConsumer : INatsJSConsumer
                     break;
 
                 yield return jsMsg;
+                cc.Delivered(jsMsg.Size);
             }
         }
     }
@@ -151,9 +149,6 @@ public class NatsJSConsumer : INatsJSConsumer
             serializer,
             cancellationToken: cancellationToken).ConfigureAwait(false);
 
-        // Keep subscription alive (since it's a weak ref in subscription manager) until we're done.
-        using var anchor = _context.Connection.RegisterSubAnchor(f);
-
         await foreach (var natsJSMsg in f.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
             return natsJSMsg;
@@ -172,9 +167,6 @@ public class NatsJSConsumer : INatsJSConsumer
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
         await using var fc = await FetchInternalAsync<T>(opts, serializer, cancellationToken).ConfigureAwait(false);
-
-        // Keep subscription alive (since it's a weak ref in subscription manager) until we're done.
-        using var anchor = _context.Connection.RegisterSubAnchor(fc);
 
         while (!cancellationToken.IsCancellationRequested)
         {
@@ -316,7 +308,7 @@ public class NatsJSConsumer : INatsJSConsumer
             notificationHandler: opts.NotificationHandler,
             cancellationToken: cancellationToken);
 
-        await _context.Connection.SubAsync(sub: sub, cancellationToken).ConfigureAwait(false);
+        await _context.Connection.AddSubAsync(sub: sub, cancellationToken).ConfigureAwait(false);
 
         // Start consuming with the first Pull Request
         await sub.CallMsgNextAsync(
@@ -363,7 +355,7 @@ public class NatsJSConsumer : INatsJSConsumer
             idle: timeouts.IdleHeartbeat,
             cancellationToken: cancellationToken);
 
-        await _context.Connection.SubAsync(sub: sub, cancellationToken).ConfigureAwait(false);
+        await _context.Connection.AddSubAsync(sub: sub, cancellationToken).ConfigureAwait(false);
 
         // Start consuming with the first Pull Request
         await sub.CallMsgNextAsync(
@@ -412,7 +404,7 @@ public class NatsJSConsumer : INatsJSConsumer
             idle: timeouts.IdleHeartbeat,
             cancellationToken: cancellationToken);
 
-        await _context.Connection.SubAsync(sub: sub, cancellationToken).ConfigureAwait(false);
+        await _context.Connection.AddSubAsync(sub: sub, cancellationToken).ConfigureAwait(false);
 
         await sub.CallMsgNextAsync(
             opts.NoWait

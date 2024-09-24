@@ -86,9 +86,9 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
 
     private static int GetInt32(in ReadOnlySequence<byte> sequence)
     {
-        if (sequence.IsSingleSegment || sequence.FirstSpan.Length <= 10)
+        if (sequence.IsSingleSegment || sequence.GetFirstSpan().Length <= 10)
         {
-            return GetInt32(sequence.FirstSpan);
+            return GetInt32(sequence.GetFirstSpan());
         }
 
         Span<byte> buf = stackalloc byte[Math.Min((int)sequence.Length, 10)];
@@ -163,6 +163,10 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                     {
                         // https://docs.nats.io/reference/reference-protocols/nats-protocol#msg
                         // MSG <subject> <sid> [reply-to] <#bytes>\r\n[payload]
+                        if (_trace)
+                        {
+                            _logger.LogTrace(NatsLogEvents.Protocol, "MSG");
+                        }
 
                         // Try to find before \n
                         var positionBeforePayload = buffer.PositionOf((byte)'\n');
@@ -220,6 +224,10 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                     {
                         // https://docs.nats.io/reference/reference-protocols/nats-protocol#hmsg
                         // HMSG <subject> <sid> [reply-to] <#header bytes> <#total bytes>\r\n[headers]\r\n\r\n[payload]\r\n
+                        if (_trace)
+                        {
+                            _logger.LogTrace(NatsLogEvents.Protocol, "HMSG");
+                        }
 
                         // Find the end of 'HMSG' first message line
                         var positionBeforeNatsHeader = buffer.PositionOf((byte)'\n');
@@ -300,13 +308,20 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         }
     }
 
+#if !NETSTANDARD
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
+#endif
     private async ValueTask<ReadOnlySequence<byte>> DispatchCommandAsync(int code, ReadOnlySequence<byte> buffer)
     {
         var length = (int)buffer.Length;
 
         if (code == ServerOpCodes.Ping)
         {
+            if (_trace)
+            {
+                _logger.LogTrace(NatsLogEvents.Protocol, "PING");
+            }
+
             const int PingSize = 6; // PING\r\n
 
             await _connection.PongAsync().ConfigureAwait(false); // return pong to server
@@ -322,6 +337,11 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         }
         else if (code == ServerOpCodes.Pong)
         {
+            if (_trace)
+            {
+                _logger.LogTrace(NatsLogEvents.Protocol, "PONG");
+            }
+
             const int PongSize = 6; // PONG\r\n
 
             _connection.ResetPongCount(); // reset count for PingTimer
@@ -343,6 +363,11 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         }
         else if (code == ServerOpCodes.Error)
         {
+            if (_trace)
+            {
+                _logger.LogTrace(NatsLogEvents.Protocol, "ERR");
+            }
+
             // try to get \n.
             var position = buffer.PositionOf((byte)'\n');
             if (position == null)
@@ -365,6 +390,11 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         }
         else if (code == ServerOpCodes.Ok)
         {
+            if (_trace)
+            {
+                _logger.LogTrace(NatsLogEvents.Protocol, "OK");
+            }
+
             const int OkSize = 5; // +OK\r\n
 
             if (length < OkSize)
@@ -378,6 +408,11 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         }
         else if (code == ServerOpCodes.Info)
         {
+            if (_trace)
+            {
+                _logger.LogTrace(NatsLogEvents.Protocol, "INFO");
+            }
+
             // try to get \n.
             var position = buffer.PositionOf((byte)'\n');
 
@@ -458,7 +493,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
     {
         if (msgHeader.IsSingleSegment)
         {
-            return ParseMessageHeader(msgHeader.FirstSpan);
+            return ParseMessageHeader(msgHeader.GetFirstSpan());
         }
 
         // header parsing use Slice frequently so ReadOnlySequence is high cost, should use Span.
@@ -519,7 +554,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
     {
         if (msgHeader.IsSingleSegment)
         {
-            return ParseHMessageHeader(msgHeader.FirstSpan);
+            return ParseHMessageHeader(msgHeader.GetFirstSpan());
         }
 
         // header parsing use Slice frequently so ReadOnlySequence is high cost, should use Span.

@@ -12,16 +12,13 @@ public class NatsConsumeTests
     [Test]
     public void Subscription_should_not_be_collected_when_in_consume_async_enumerator()
     {
-        Console.WriteLine(">>> STARTING: MEM CONSUMER TEST");
-
-        var server = NatsServer.StartJSWithTrace(new TestTextWriterOutput(Console.Out));
+        var server = NatsServer.StartJS();
         try
         {
             var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
             var js = new NatsJSContext(nats);
 
-            var rtt = nats.PingAsync().AsTask().GetAwaiter().GetResult();
-            Console.WriteLine($">>> RTT: {rtt.TotalMilliseconds}ms");
+            nats.PingAsync().AsTask().GetAwaiter().GetResult();
 
             var sync = new TaskCompletionSource();
 
@@ -29,7 +26,7 @@ public class NatsConsumeTests
             {
                 await js.CreateStreamAsync(new StreamConfig { Name = "s1", Subjects = new[] { "s1.*" } });
 
-                var consumer = await js.CreateOrUpdateConsumerAsync("s1", new ConsumerConfig { Name = "c1", DurableName = "c1", AckPolicy = ConsumerConfigAckPolicy.Explicit });
+                var consumer = await js.CreateOrUpdateConsumerAsync("s1", new ConsumerConfig { Name = "c1", DurableName = "c1" });
 
                 var count = 0;
                 await foreach (var msg in consumer.ConsumeAsync<int>(opts: new NatsJSConsumeOpts { MaxMsgs = 100 }))
@@ -107,16 +104,13 @@ public class NatsConsumeTests
     [Test]
     public void Subscription_should_not_be_collected_when_in_ordered_consume_async_enumerator()
     {
-        Console.WriteLine(">>> STARTING: MEM ORDERED CONSUMER TEST");
-
-        var server = NatsServer.StartJSWithTrace(new TestTextWriterOutput(Console.Out));
+        var server = NatsServer.StartJS();
         try
         {
             var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
             var js = new NatsJSContext(nats);
 
-            var rtt = nats.PingAsync().AsTask().GetAwaiter().GetResult();
-            Console.WriteLine($">>> RTT: {rtt.TotalMilliseconds}ms");
+            nats.PingAsync().AsTask().GetAwaiter().GetResult();
 
             var sync = new TaskCompletionSource();
 

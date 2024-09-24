@@ -66,7 +66,7 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
         _thresholdBytes = thresholdBytes;
         _expires = expires;
         _idle = idle;
-        _hbTimeout = (int)(idle * 2).TotalMilliseconds;
+        _hbTimeout = (int)new TimeSpan(idle.Ticks * 2).TotalMilliseconds;
 
         if (_debug)
         {
@@ -95,7 +95,7 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
 
         // This channel is used to pass messages to the user from the subscription.
         _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg>>(
-            Connection.GetChannelOpts(Connection.Opts, opts?.ChannelOpts),
+            Connection.GetBoundedChannelOpts(opts?.ChannelOpts),
             msg => Connection.OnMessageDropped(this, _userMsgs?.Reader.Count ?? 0, msg.Msg));
         Msgs = _userMsgs.Reader;
 
@@ -139,13 +139,17 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
 
         await base.DisposeAsync().ConfigureAwait(false);
         await _pullTask.ConfigureAwait(false);
+#if NETSTANDARD2_0
+        _timer.Dispose();
+#else
         await _timer.DisposeAsync().ConfigureAwait(false);
+#endif
     }
 
     internal override ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter, int sid)
     {
         // Override normal subscription behavior to resubscribe on reconnect
-        return ValueTask.CompletedTask;
+        return default;
     }
 
     protected override async ValueTask ReceiveInternalAsync(

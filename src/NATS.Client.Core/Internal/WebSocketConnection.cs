@@ -1,6 +1,10 @@
+using System.Net.Security;
 using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Runtime.CompilerServices;
+#if NETSTANDARD
+using System.Runtime.InteropServices;
+#endif
 
 namespace NATS.Client.Core.Internal;
 
@@ -36,12 +40,13 @@ internal sealed class WebSocketConnection : ISocketConnection
     /// <summary>
     /// Connect with Timeout. When failed, Dispose this connection.
     /// </summary>
-    public async ValueTask ConnectAsync(Uri uri, TimeSpan timeout)
+    public async ValueTask ConnectAsync(NatsUri uri, NatsOpts opts)
     {
-        using var cts = new CancellationTokenSource(timeout);
+        using var cts = new CancellationTokenSource(opts.ConnectTimeout);
         try
         {
-            await _socket.ConnectAsync(uri, cts.Token).ConfigureAwait(false);
+            await opts.WebSocketOpts.ApplyClientWebSocketOptionsAsync(_socket.Options, uri, opts.TlsOpts, cts.Token).ConfigureAwait(false);
+            await _socket.ConnectAsync(uri.Uri, cts.Token).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -60,14 +65,32 @@ internal sealed class WebSocketConnection : ISocketConnection
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public async ValueTask<int> SendAsync(ReadOnlyMemory<byte> buffer)
     {
+#if NETSTANDARD
+        if (MemoryMarshal.TryGetArray(buffer, out var segment) == false)
+        {
+            segment = new ArraySegment<byte>(buffer.ToArray());
+        }
+
+        await _socket.SendAsync(segment, WebSocketMessageType.Binary, true, CancellationToken.None).ConfigureAwait(false);
+#else
         await _socket.SendAsync(buffer, WebSocketMessageType.Binary, WebSocketMessageFlags.EndOfMessage, CancellationToken.None).ConfigureAwait(false);
+#endif
         return buffer.Length;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public async ValueTask<int> ReceiveAsync(Memory<byte> buffer)
     {
+#if NETSTANDARD2_0
+        if (MemoryMarshal.TryGetArray(buffer, out ArraySegment<byte> segment) == false)
+        {
+            ThrowHelper.ThrowInvalidOperationException("Can't get underlying array");
+        }
+
+        var wsRead = await _socket.ReceiveAsync(segment, CancellationToken.None).ConfigureAwait(false);
+#else
         var wsRead = await _socket.ReceiveAsync(buffer, CancellationToken.None).ConfigureAwait(false);
+#endif
         return wsRead.Count;
     }
 

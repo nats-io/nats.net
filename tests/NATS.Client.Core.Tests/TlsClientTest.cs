@@ -11,13 +11,15 @@ public class TlsClientTest
 
     public TlsClientTest(ITestOutputHelper output) => _output = output;
 
-    [Fact]
-    public async Task Client_connect_using_certificate()
+    [Theory]
+    [InlineData(TransportType.Tls)]
+    [InlineData(TransportType.WebSocketSecure)]
+    public async Task Client_connect_using_certificate(TransportType transportType)
     {
         await using var server = NatsServer.Start(
             new NullOutputHelper(),
             new NatsServerOptsBuilder()
-                .UseTransport(TransportType.Tls, tlsVerify: true)
+                .UseTransport(transportType, tlsVerify: true)
                 .Build());
 
         var clientOpts = server.ClientOpts(NatsOpts.Default with { Name = "tls-test-client" });
@@ -37,7 +39,17 @@ public class TlsClientTest
                 .Build());
 
         var clientOpts = server.ClientOpts(NatsOpts.Default with { Name = "tls-test-client" });
-        clientOpts = clientOpts with { TlsOpts = clientOpts.TlsOpts with { CertificateRevocationCheckMode = X509RevocationMode.Online } };
+        clientOpts = clientOpts with
+        {
+            TlsOpts = clientOpts.TlsOpts with
+            {
+                ConfigureClientAuthentication = options =>
+                {
+                    options.CertificateRevocationCheckMode = X509RevocationMode.Online;
+                    return default;
+                },
+            },
+        };
         await using var nats = new NatsConnection(clientOpts);
 
         // At the moment I don't know of a good way of checking if the revocation check is working
@@ -46,13 +58,15 @@ public class TlsClientTest
         Assert.Contains("remote certificate was rejected", exception.InnerException!.InnerException!.Message);
     }
 
-    [Fact]
-    public async Task Client_cannot_connect_without_certificate()
+    [Theory]
+    [InlineData(TransportType.Tls)]
+    [InlineData(TransportType.WebSocketSecure)]
+    public async Task Client_cannot_connect_without_certificate(TransportType transportType)
     {
         await using var server = NatsServer.Start(
             new NullOutputHelper(),
             new NatsServerOptsBuilder()
-                .UseTransport(TransportType.Tls, tlsVerify: true)
+                .UseTransport(transportType, tlsVerify: true)
                 .Build());
 
         var clientOpts = server.ClientOpts(NatsOpts.Default);

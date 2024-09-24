@@ -17,6 +17,7 @@ public interface INatsKVStore
     /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <typeparam name="T">Serialized value type</typeparam>
+    /// <returns>Revision number</returns>
     ValueTask<ulong> PutAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -82,6 +83,18 @@ public interface INatsKVStore
     IAsyncEnumerable<NatsKVEntry<T>> WatchAsync<T>(string key, INatsDeserialize<T>? serializer = default, NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Start a watcher for specific keys
+    /// </summary>
+    /// <param name="keys">Keys to watch (subject-based wildcards may be used)</param>
+    /// <param name="serializer">Serializer to use for the message type.</param>
+    /// <param name="opts">Watch options</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <typeparam name="T">Serialized value type</typeparam>
+    /// <returns>An asynchronous enumerable which can be used in <c>await foreach</c> loops</returns>
+    /// <exception cref="InvalidOperationException">There was a conflict in options, e.g. IncludeHistory and UpdatesOnly are only valid when ResumeAtRevision is not set.</exception>
+    IAsyncEnumerable<NatsKVEntry<T>> WatchAsync<T>(IEnumerable<string> keys, INatsDeserialize<T>? serializer = default, NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Start a watcher for all the keys in the bucket
     /// </summary>
     /// <param name="serializer">Serializer to use for the message type.</param>
@@ -100,6 +113,7 @@ public interface INatsKVStore
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <typeparam name="T">Serialized value type</typeparam>
     /// <returns>An async enumerable of entries to be used in an <c>await foreach</c></returns>
+    /// <exception cref="InvalidOperationException">There was a conflict in options, e.g. IncludeHistory and UpdatesOnly are only valid when ResumeAtRevision is not set.</exception>
     IAsyncEnumerable<NatsKVEntry<T>> HistoryAsync<T>(string key, INatsDeserialize<T>? serializer = default, NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -122,5 +136,16 @@ public interface INatsKVStore
     /// <param name="opts">Watch options</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>An async enumerable of keys to be used in an <c>await foreach</c></returns>
+    /// <exception cref="InvalidOperationException">There was a conflict in options, e.g. IncludeHistory and UpdatesOnly are only valid when ResumeAtRevision is not set.</exception>
     IAsyncEnumerable<string> GetKeysAsync(NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get a filtered set of keys in the bucket
+    /// </summary>
+    /// <param name="filters">Subject-based wildcard filters to filter on</param>
+    /// <param name="opts">Watch options</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>An async enumerable of keys to be used in an <c>await foreach</c></returns>
+    /// <exception cref="InvalidOperationException">There was a conflict in options, e.g. IncludeHistory and UpdatesOnly are only valid when ResumeAtRevision is not set.</exception>
+    IAsyncEnumerable<string> GetKeysAsync(IEnumerable<string> filters, NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default);
 }

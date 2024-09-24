@@ -70,7 +70,6 @@ public class ManagingPage
             {
                 Name = "durable_processor",
                 DurableName = "durable_processor",
-                AckPolicy = ConsumerConfigAckPolicy.Explicit,
             };
 
             var consumer = await js.CreateOrUpdateConsumerAsync(stream: "orders", durableConfig);

@@ -3,9 +3,9 @@ using System.Text.Json.Serialization;
 using NATS.Client.Core;
 using NATS.Client.JetStream.Models;
 
-namespace NATS.Client.JetStream.Internal;
+namespace NATS.Client.JetStream;
 
-internal static class NatsJSJsonSerializer<T>
+public static class NatsJSJsonSerializer<T>
 {
 #if NET6_0
     public static readonly INatsSerializer<T> Default = new NatsJsonContextSerializer<T>(NatsJSJsonSerializerContext.Default);
@@ -21,6 +21,7 @@ internal static class NatsJSJsonSerializer<T>
             new JsonStringEnumConverter<StreamConfigDiscard>(JsonNamingPolicy.SnakeCaseLower),
             new JsonStringEnumConverter<StreamConfigRetention>(JsonNamingPolicy.SnakeCaseLower),
             new JsonStringEnumConverter<StreamConfigStorage>(JsonNamingPolicy.SnakeCaseLower),
+            new JsonStringEnumConverter<ConsumerCreateAction>(JsonNamingPolicy.SnakeCaseLower),
         },
     }));
 #endif
@@ -207,6 +208,19 @@ internal class NatsJSJsonStringEnumConverter<TEnum> : JsonConverter<TEnum>
             }
         }
 
+        if (typeToConvert == typeof(ConsumerCreateAction))
+        {
+            switch (stringValue)
+            {
+            case "create":
+                return (TEnum)(object)ConsumerCreateAction.Create;
+            case "update":
+                return (TEnum)(object)ConsumerCreateAction.Update;
+            default:
+                return (TEnum)(object)ConsumerCreateAction.CreateOrUpdate;
+            }
+        }
+
         throw new InvalidOperationException($"Reading unknown enum type {typeToConvert.Name} or value {stringValue}");
     }
 
@@ -311,6 +325,21 @@ internal class NatsJSJsonStringEnumConverter<TEnum> : JsonConverter<TEnum>
                 return;
             case StreamConfigStorage.Memory:
                 writer.WriteStringValue("memory");
+                return;
+            }
+        }
+        else if (value is ConsumerCreateAction consumerCreateRequestAction)
+        {
+            switch (consumerCreateRequestAction)
+            {
+            case ConsumerCreateAction.CreateOrUpdate:
+                // ignore default value
+                return;
+            case ConsumerCreateAction.Create:
+                writer.WriteStringValue("create");
+                return;
+            case ConsumerCreateAction.Update:
+                writer.WriteStringValue("update");
                 return;
             }
         }

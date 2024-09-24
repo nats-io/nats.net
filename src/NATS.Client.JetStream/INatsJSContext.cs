@@ -7,6 +7,11 @@ namespace NATS.Client.JetStream;
 public interface INatsJSContext
 {
     /// <summary>
+    /// Connection to the NATS server.
+    /// </summary>
+    INatsConnection Connection { get; }
+
+    /// <summary>
     /// Creates new ordered consumer.
     /// </summary>
     /// <param name="stream">Stream name to create the consumer under.</param>
@@ -23,7 +28,7 @@ public interface INatsJSContext
     /// <summary>
     /// Creates new consumer if it doesn't exists or updates an existing one with the same name.
     /// </summary>
-    /// <param name="stream">Name of the stream to create consumer under.</param>
+    /// <param name="stream">Name of the stream to create or update consumer under.</param>
     /// <param name="config">Consumer configuration.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>The NATS JetStream consumer object which can be used retrieving data from the stream.</returns>
@@ -32,6 +37,38 @@ public interface INatsJSContext
     /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
     /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
     ValueTask<INatsJSConsumer> CreateOrUpdateConsumerAsync(
+        string stream,
+        ConsumerConfig config,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Creates new consumer if it doesn't exists.
+    /// </summary>
+    /// <param name="stream">Name of the stream to create consumer under.</param>
+    /// <param name="config">Consumer configuration.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>The NATS JetStream consumer object which can be used retrieving data from the stream.</returns>
+    /// <exception cref="NatsJSException">Ack policy is set to <c>none</c> or there was an issue retrieving the response.</exception>
+    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
+    /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
+    ValueTask<INatsJSConsumer> CreateConsumerAsync(
+        string stream,
+        ConsumerConfig config,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Update consumer exists consumer
+    /// </summary>
+    /// <param name="stream">Name of the stream to update consumer under.</param>
+    /// <param name="config">Consumer configuration.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>The NATS JetStream consumer object which can be used retrieving data from the stream.</returns>
+    /// <exception cref="NatsJSException">Ack policy is set to <c>none</c> or there was an issue retrieving the response.</exception>
+    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
+    /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
+    ValueTask<INatsJSConsumer> UpdateConsumerAsync(
         string stream,
         ConsumerConfig config,
         CancellationToken cancellationToken = default);
@@ -251,4 +288,12 @@ public interface INatsJSContext
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>Async enumerable list of stream names to be used in a <c>await foreach</c> loop.</returns>
     IAsyncEnumerable<string> ListStreamNamesAsync(string? subject = default, CancellationToken cancellationToken = default);
+
+    ValueTask<NatsJSPublishConcurrentFuture> PublishConcurrentAsync<T>(
+        string subject,
+        T? data,
+        INatsSerialize<T>? serializer = default,
+        NatsJSPubOpts? opts = default,
+        NatsHeaders? headers = default,
+        CancellationToken cancellationToken = default);
 }

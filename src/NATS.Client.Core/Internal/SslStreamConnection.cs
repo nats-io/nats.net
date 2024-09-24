@@ -1,27 +1,32 @@
 using System.Net.Security;
+using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 using Microsoft.Extensions.Logging;
+
+#if NETSTANDARD2_0
+using System.Runtime.InteropServices;
+#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
+#endif
 
 namespace NATS.Client.Core.Internal;
 
 internal sealed class SslStreamConnection : ISocketConnection
 {
     private readonly ILogger _logger;
-    private readonly SslStream _sslStream;
+    private readonly Socket _socket;
     private readonly TaskCompletionSource<Exception> _waitForClosedSource;
     private readonly NatsTlsOpts _tlsOpts;
-    private readonly TlsCerts? _tlsCerts;
     private readonly CancellationTokenSource _closeCts = new();
     private int _disposed;
+    private SslStream? _sslStream;
 
-    public SslStreamConnection(ILogger logger, SslStream sslStream, NatsTlsOpts tlsOpts, TlsCerts? tlsCerts, TaskCompletionSource<Exception> waitForClosedSource)
+    public SslStreamConnection(ILogger logger, Socket socket, NatsTlsOpts tlsOpts, TaskCompletionSource<Exception> waitForClosedSource)
     {
         _logger = logger;
-        _sslStream = sslStream;
+        _socket = socket;
         _tlsOpts = tlsOpts;
-        _tlsCerts = tlsCerts;
         _waitForClosedSource = waitForClosedSource;
     }
 
@@ -33,39 +38,72 @@ internal sealed class SslStreamConnection : ISocketConnection
         {
             try
             {
-#if NET6_0
-                _closeCts.Cancel();
-#else
+#if NET8_0_OR_GREATER
                 await _closeCts.CancelAsync().ConfigureAwait(false);
+#else
+                _closeCts.Cancel();
 #endif
                 _waitForClosedSource.TrySetCanceled();
             }
             catch
             {
+                // ignored
             }
 
-            await _sslStream.DisposeAsync().ConfigureAwait(false);
+            if (_sslStream != null)
+            {
+#if NETSTANDARD2_0
+                _sslStream.Dispose();
+#else
+                await _sslStream.DisposeAsync().ConfigureAwait(false);
+#endif
+            }
         }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public async ValueTask<int> SendAsync(ReadOnlyMemory<byte> buffer)
     {
-        await _sslStream.WriteAsync(buffer, _closeCts.Token).ConfigureAwait(false);
+#if NETSTANDARD2_0
+        if (MemoryMarshal.TryGetArray(buffer, out var segment) == false)
+        {
+            segment = new ArraySegment<byte>(buffer.ToArray());
+        }
+
+        await _sslStream!.WriteAsync(segment.Array, segment.Offset, segment.Count, _closeCts.Token).ConfigureAwait(false);
+#else
+        await _sslStream!.WriteAsync(buffer, _closeCts.Token).ConfigureAwait(false);
+#endif
         return buffer.Length;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ValueTask<int> ReceiveAsync(Memory<byte> buffer)
     {
-        return _sslStream.ReadAsync(buffer, _closeCts.Token);
+#if NETSTANDARD2_0
+        if (MemoryMarshal.TryGetArray(buffer, out ArraySegment<byte> segment) == false)
+        {
+            ThrowHelper.ThrowInvalidOperationException("Can't get underlying array");
+        }
+
+        return new ValueTask<int>(_sslStream!.ReadAsync(segment.Array!, segment.Offset, segment.Count, _closeCts.Token));
+#else
+        return _sslStream!.ReadAsync(buffer, _closeCts.Token);
+#endif
     }
 
     public async ValueTask AbortConnectionAsync(CancellationToken cancellationToken)
     {
         // SslStream.ShutdownAsync() doesn't accept a cancellation token, so check at the beginning of this method
         cancellationToken.ThrowIfCancellationRequested();
-        await _sslStream.ShutdownAsync().ConfigureAwait(false);
+        if (_sslStream != null)
+        {
+#if NETSTANDARD2_0
+            _sslStream.Close();
+#else
+            await _sslStream.ShutdownAsync().ConfigureAwait(false);
+#endif
+        }
     }
 
     // when catch SocketClosedException, call this method.
@@ -76,7 +114,34 @@ internal sealed class SslStreamConnection : ISocketConnection
 
     public async Task AuthenticateAsClientAsync(NatsUri uri, TimeSpan timeout)
     {
-        var options = SslClientAuthenticationOptions(uri);
+        var options = await _tlsOpts.AuthenticateAsClientOptionsAsync(uri).ConfigureAwait(true);
+
+#if NETSTANDARD2_0
+        if (_sslStream != null)
+            _sslStream.Dispose();
+
+        _sslStream = new SslStream(
+            innerStream: new NetworkStream(_socket, true),
+            leaveInnerStreamOpen: false,
+            userCertificateSelectionCallback: options.LocalCertificateSelectionCallback,
+            userCertificateValidationCallback: options.RemoteCertificateValidationCallback);
+        try
+        {
+            await _sslStream.AuthenticateAsClientAsync(
+                targetHost: options.TargetHost,
+                clientCertificates: options.ClientCertificates,
+                enabledSslProtocols: options.EnabledSslProtocols,
+                checkCertificateRevocation: options.CertificateRevocationCheckMode != X509RevocationMode.NoCheck).ConfigureAwait(false);
+        }
+        catch (AuthenticationException ex)
+        {
+            throw new NatsException($"TLS authentication failed", ex);
+        }
+#else
+        if (_sslStream != null)
+            await _sslStream.DisposeAsync().ConfigureAwait(false);
+
+        _sslStream = new SslStream(innerStream: new NetworkStream(_socket, true));
         try
         {
             using var cts = new CancellationTokenSource(timeout);
@@ -90,96 +155,6 @@ internal sealed class SslStreamConnection : ISocketConnection
         {
             throw new NatsException($"TLS authentication failed", ex);
         }
-    }
-
-    private static X509Certificate LcsCbClientCerts(
-        object sender,
-        string targetHost,
-        X509CertificateCollection localCertificates,
-        X509Certificate? remoteCertificate,
-        string[] acceptableIssuers) => localCertificates[0];
-
-    private static bool RcsCbInsecureSkipVerify(
-        object sender,
-        X509Certificate? certificate,
-        X509Chain? chain,
-        SslPolicyErrors sslPolicyErrors) => true;
-
-    private bool RcsCbCaCertChain(
-        object sender,
-        X509Certificate? certificate,
-        X509Chain? chain,
-        SslPolicyErrors sslPolicyErrors)
-    {
-        // validate >=1 ca certs
-        if (_tlsCerts?.CaCerts == null || !_tlsCerts.CaCerts.Any())
-        {
-            return false;
-        }
-
-        if ((sslPolicyErrors & SslPolicyErrors.RemoteCertificateChainErrors) != 0
-            && chain != default
-            && certificate != default)
-        {
-            chain.ChainPolicy.VerificationFlags = X509VerificationFlags.AllowUnknownCertificateAuthority;
-            chain.ChainPolicy.ExtraStore.AddRange(_tlsCerts.CaCerts);
-            if (chain.Build((X509Certificate2)certificate))
-            {
-                sslPolicyErrors &= ~SslPolicyErrors.RemoteCertificateChainErrors;
-            }
-        }
-
-        // validate >= 1 chain elements and that last chain element was one of the supplied CA certs
-        if (chain == default
-            || !chain.ChainElements.Any()
-            || !_tlsCerts.CaCerts.Any(c => c.RawData.SequenceEqual(chain.ChainElements.Last().Certificate.RawData)))
-        {
-            sslPolicyErrors |= SslPolicyErrors.RemoteCertificateChainErrors;
-        }
-
-        var success = sslPolicyErrors == SslPolicyErrors.None;
-
-        if (!success)
-        {
-            _logger.LogError(NatsLogEvents.Security, "TLS certificate validation failed: {SslPolicyErrors}", sslPolicyErrors);
-        }
-
-        return success;
-    }
-
-    private SslClientAuthenticationOptions SslClientAuthenticationOptions(NatsUri uri)
-    {
-        if (_tlsOpts.EffectiveMode(uri) == TlsMode.Disable)
-        {
-            throw new InvalidOperationException("TLS is not permitted when TlsMode is set to Disable");
-        }
-
-        LocalCertificateSelectionCallback? lcsCb = default;
-        if (_tlsCerts?.ClientCerts != default && _tlsCerts.ClientCerts.Any())
-        {
-            lcsCb = LcsCbClientCerts;
-        }
-
-        RemoteCertificateValidationCallback? rcsCb = default;
-        if (_tlsOpts.InsecureSkipVerify)
-        {
-            rcsCb = RcsCbInsecureSkipVerify;
-        }
-        else if (_tlsCerts?.CaCerts != default && _tlsCerts.CaCerts.Any())
-        {
-            rcsCb = RcsCbCaCertChain;
-        }
-
-        var options = new SslClientAuthenticationOptions
-        {
-            TargetHost = uri.Host,
-            EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
-            ClientCertificates = _tlsCerts?.ClientCerts,
-            LocalCertificateSelectionCallback = lcsCb,
-            RemoteCertificateValidationCallback = rcsCb,
-            CertificateRevocationCheckMode = _tlsOpts.CertificateRevocationCheckMode,
-        };
-
-        return options;
+#endif
     }
 }

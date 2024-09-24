@@ -1,3 +1,4 @@
+using System.Net.WebSockets;
 using System.Text;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
@@ -15,7 +16,7 @@ public sealed record NatsOpts
 
     public string Url { get; init; } = "nats://localhost:4222";
 
-    public string Name { get; init; } = "NATS .Net Client";
+    public string Name { get; init; } = "NATS .NET Client";
 
     public bool Echo { get; init; } = true;
 
@@ -26,6 +27,8 @@ public sealed record NatsOpts
     public NatsAuthOpts AuthOpts { get; init; } = NatsAuthOpts.Default;
 
     public NatsTlsOpts TlsOpts { get; init; } = NatsTlsOpts.Default;
+
+    public NatsWebSocketOpts WebSocketOpts { get; init; } = NatsWebSocketOpts.Default;
 
     public INatsSerializerRegistry SerializerRegistry { get; init; } = NatsDefaultSerializerRegistry.Default;
 

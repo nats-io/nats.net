@@ -10,6 +10,10 @@ using NATS.Client.JetStream.Models;
 using NATS.Client.ObjectStore.Internal;
 using NATS.Client.ObjectStore.Models;
 
+#if NETSTANDARD2_0
+using System.Runtime.InteropServices;
+#endif
+
 namespace NATS.Client.ObjectStore;
 
 /// <summary>
@@ -48,7 +52,7 @@ public class NatsObjStore : INatsObjStore
     /// <returns>Object value as a byte array.</returns>
     public async ValueTask<byte[]> GetBytesAsync(string key, CancellationToken cancellationToken = default)
     {
-        var memoryStream = new MemoryStream();
+        using var memoryStream = new MemoryStream();
         await GetAsync(key, memoryStream, cancellationToken: cancellationToken).ConfigureAwait(false);
         return memoryStream.ToArray();
     }
@@ -95,7 +99,11 @@ public class NatsObjStore : INatsObjStore
         var size = 0;
         using (var sha256 = SHA256.Create())
         {
+#if NETSTANDARD2_0
+            using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Write))
+#else
             await using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Write, leaveOpen))
+#endif
             {
                 await foreach (var msg in pushConsumer.Msgs.ReadAllAsync(cancellationToken))
                 {
@@ -113,7 +121,12 @@ public class NatsObjStore : INatsObjStore
                         using var memoryOwner = msg.Data;
                         chunks++;
                         size += memoryOwner.Memory.Length;
+#if NETSTANDARD2_0
+                        var segment = memoryOwner.DangerousGetArray();
+                        await hashedStream.WriteAsync(segment.Array, segment.Offset, segment.Count, cancellationToken);
+#else
                         await hashedStream.WriteAsync(memoryOwner.Memory, cancellationToken);
+#endif
                     }
 
                     var p = msg.Metadata?.NumPending;
@@ -213,7 +226,11 @@ public class NatsObjStore : INatsObjStore
         string digest;
         using (var sha256 = SHA256.Create())
         {
+#if NETSTANDARD2_0
+            using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Read))
+#else
             await using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Read, leaveOpen))
+#endif
             {
                 while (true)
                 {
@@ -226,7 +243,30 @@ public class NatsObjStore : INatsObjStore
                     // Fill a chunk
                     while (true)
                     {
+#if NETSTANDARD2_0
+                        int read;
+                        if (MemoryMarshal.TryGetArray((ReadOnlyMemory<byte>)memory, out var segment) == false)
+                        {
+                            read = await hashedStream.ReadAsync(segment.Array!, segment.Offset, segment.Count, cancellationToken);
+                        }
+                        else
+                        {
+                            var bytes = ArrayPool<byte>.Shared.Rent(memory.Length);
+                            try
+                            {
+                                segment = new ArraySegment<byte>(bytes, 0, memory.Length);
+                                read = await hashedStream.ReadAsync(segment.Array!, segment.Offset, segment.Count, cancellationToken);
+                                segment.Array.AsMemory(0, read).CopyTo(memory);
+                            }
+                            finally
+                            {
+                                ArrayPool<byte>.Shared.Return(bytes);
+                            }
+                        }
+
+#else
                         var read = await hashedStream.ReadAsync(memory, cancellationToken);
+#endif
 
                         // End of stream
                         if (read == 0)
@@ -490,17 +530,19 @@ public class NatsObjStore : INatsObjStore
         {
             LastBySubj = GetMetaSubject(key),
         };
+
         try
         {
             var response = await _stream.GetAsync(request, cancellationToken);
-
-            if (response.Message.Data == null)
+            if (response.Message.Data.Length == 0)
             {
                 throw new NatsObjException("Can't decode data message value");
             }
 
-            var base64String = Convert.FromBase64String(response.Message.Data);
-            var data = NatsObjJsonSerializer<ObjectMetadata>.Default.Deserialize(new ReadOnlySequence<byte>(base64String)) ?? throw new NatsObjException("Can't deserialize object metadata");
+            var buffer = new ReadOnlySequence<byte>(response.Message.Data);
+            var data = NatsObjJsonSerializer<ObjectMetadata>.Default.Deserialize(buffer) ?? throw new NatsObjException("Can't deserialize object metadata");
+
+            data.MTime = response.Message.Time;
 
             if (!showDeleted && data.Deleted)
             {
@@ -534,6 +576,7 @@ public class NatsObjStore : INatsObjStore
             InitialSetOnly = true,
             UpdatesOnly = false,
             IgnoreDeletes = !opts.ShowDeleted,
+            OnNoData = opts.OnNoData,
         };
         return WatchAsync(watchOpts, cancellationToken);
     }
@@ -582,6 +625,14 @@ public class NatsObjStore : INatsObjStore
             cancellationToken: cancellationToken);
 
         pushConsumer.Init();
+
+        if (pushConsumer.Msgs.Count == 0 && opts.OnNoData != null)
+        {
+            if (await opts.OnNoData(cancellationToken))
+            {
+                yield break;
+            }
+        }
 
         await foreach (var msg in pushConsumer.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
@@ -656,9 +707,9 @@ public class NatsObjStore : INatsObjStore
     private string NewNuid()
     {
         Span<char> buffer = stackalloc char[22];
-        if (NuidWriter.TryWriteNuid(buffer))
+        if (Nuid.TryWriteNuid(buffer))
         {
-            return new string(buffer);
+            return buffer.ToString();
         }
 
         throw new InvalidOperationException("Internal error: can't generate nuid");
@@ -685,11 +736,21 @@ public record NatsObjWatchOpts
     /// Only return the initial set of objects and don't watch for further updates.
     /// </summary>
     public bool InitialSetOnly { get; init; }
+
+    /// <summary>
+    /// Async function called when the enumerator reaches the end of data. Return True to break the async enumeration, False to allow the enumeration to continue.
+    /// </summary>
+    public Func<CancellationToken, ValueTask<bool>>? OnNoData { get; init; }
 }
 
 public record NatsObjListOpts
 {
     public bool ShowDeleted { get; init; }
+
+    /// <summary>
+    /// Async function called when the enumerator reaches the end of data. Return True to break the async enumeration, False to allow the enumeration to continue.
+    /// </summary>
+    public Func<CancellationToken, ValueTask<bool>>? OnNoData { get; init; }
 }
 
 public record NatsObjStatus(string Bucket, bool IsCompressed, StreamInfo Info);

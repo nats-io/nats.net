@@ -6,7 +6,9 @@ namespace NATS.Client.Core;
 public partial class NatsConnection
 {
     /// <inheritdoc />
+#if !NETSTANDARD
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
+#endif
     public async ValueTask<TimeSpan> PingAsync(CancellationToken cancellationToken = default)
     {
         if (ConnectionState != NatsConnectionState.Open)
@@ -38,5 +40,5 @@ public partial class NatsConnection
     private ValueTask PingOnlyAsync(CancellationToken cancellationToken = default) =>
         ConnectionState == NatsConnectionState.Open
             ? CommandWriter.PingAsync(new PingCommand(_pool), cancellationToken)
-            : ValueTask.CompletedTask;
+            : default;
 }

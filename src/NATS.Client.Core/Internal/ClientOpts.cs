@@ -68,7 +68,7 @@ internal sealed class ClientOpts
 
     /// <summary>The implementation language of the client.</summary>
     [JsonPropertyName("lang")]
-    public string ClientLang { get; init; } = "C#";
+    public string ClientLang { get; init; } = ".NET";
 
     /// <summary>The version of the client.</summary>
     [JsonPropertyName("version")]
@@ -97,20 +97,13 @@ internal sealed class ClientOpts
 
     private static string GetAssemblyVersion()
     {
-        var asm = typeof(ClientOpts);
-        var version = "1.0.0";
-        var infoVersion = asm!.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
-        if (infoVersion != null)
+        var asm = typeof(ClientOpts).Assembly;
+        var version = "2.0.0";
+
+        var attrInformationalVersion = asm!.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
+        if (attrInformationalVersion != null)
         {
-            version = infoVersion.InformationalVersion;
-        }
-        else
-        {
-            var asmVersion = asm!.GetCustomAttribute<AssemblyVersionAttribute>();
-            if (asmVersion != null)
-            {
-                version = asmVersion.Version;
-            }
+            version = attrInformationalVersion.InformationalVersion.Split('\n')[0];
         }
 
         return version;

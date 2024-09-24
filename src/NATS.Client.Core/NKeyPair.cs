@@ -72,6 +72,7 @@ public class NKeyPair : IDisposable
     public void Dispose()
     {
         Dispose(true);
+        GC.SuppressFinalize(this);
     }
 
     /// <summary>
@@ -269,7 +270,7 @@ public class NKeys
         if (src.Length != 32)
             throw new NatsException("Invalid seed size");
 
-        var stream = new MemoryStream();
+        using var stream = new MemoryStream();
 
         if (seed)
         {
@@ -377,6 +378,10 @@ internal static class Crc16
 // Borrowed from:  https://stackoverflow.com/a/7135008
 internal class Base32
 {
+#if NETSTANDARD2_0
+    public static byte[] Decode(string input) => Decode(input.AsSpan());
+#endif
+
     public static byte[] Decode(ReadOnlySpan<char> input)
     {
         if (input == null || input.Length == 0)

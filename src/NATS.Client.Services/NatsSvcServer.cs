@@ -34,7 +34,7 @@ public class NatsSvcServer : INatsSvcServer
     public NatsSvcServer(NatsConnection nats, NatsSvcConfig config, CancellationToken cancellationToken)
     {
         _logger = nats.Opts.LoggerFactory.CreateLogger<NatsSvcServer>();
-        _id = NuidWriter.NewNuid();
+        _id = Nuid.NewNuid();
         _nats = nats;
         _config = config;
         _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -111,7 +111,7 @@ public class NatsSvcServer : INatsSvcServer
     public ValueTask<Group> AddGroupAsync(string name, string? queueGroup = default, CancellationToken cancellationToken = default)
     {
         var group = new Group(this, name, queueGroup, cancellationToken);
-        return ValueTask.FromResult(group);
+        return new ValueTask<Group>(group);
     }
 
     /// <inheritdoc />
@@ -198,7 +198,7 @@ public class NatsSvcServer : INatsSvcServer
             foreach (var subject in new[] { $"$SRV.{type}", $"$SRV.{type}.{name}", $"$SRV.{type}.{name}.{_id}" })
             {
                 // for discovery subjects do not use a queue group
-                var svcListener = new SvcListener(_nats, _channel, svcType, subject, default, _cts.Token);
+                var svcListener = new SvcListener(_logger, _nats, _channel, svcType, subject, default, _cts.Token);
                 await svcListener.StartAsync();
                 _svcListeners.Add(svcListener);
             }

@@ -80,4 +80,40 @@ public class GetKeysTest
 
         Assert.Equal(3, count);
     }
+
+    [SkipIfNatsServer(versionEarlierThan: "2.10")]
+    public async Task Get_filtered_keys()
+    {
+        const string bucket = "b1";
+        var config = new NatsKVConfig(bucket);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        await using var server = NatsServer.StartJS();
+        await using var nats1 = server.CreateClientConnection();
+        var js1 = new NatsJSContext(nats1);
+        var kv1 = new NatsKVContext(js1);
+        var store1 = await kv1.CreateStoreAsync(config, cancellationToken: cancellationToken);
+
+        await store1.PutAsync("a.1", 1, cancellationToken: cancellationToken);
+        await store1.PutAsync("a.2", 2, cancellationToken: cancellationToken);
+        await store1.PutAsync("b.1", 1, cancellationToken: cancellationToken);
+        await store1.PutAsync("b.2", 2, cancellationToken: cancellationToken);
+        await store1.PutAsync("c.1", 1, cancellationToken: cancellationToken);
+        await store1.PutAsync("c.2", 2, cancellationToken: cancellationToken);
+        await store1.PutAsync("d", 2, cancellationToken: cancellationToken);
+
+        var ks1 = new List<string>();
+
+        // Multiple keys are only supported in NATS Server 2.10 and later
+        await foreach (var k in store1.GetKeysAsync(new string[] { "d", "a.>", "c.>" }, cancellationToken: cancellationToken))
+        {
+            ks1.Add(k);
+        }
+
+        ks1.Sort();
+
+        Assert.Equal(new List<string> { "a.1", "a.2", "c.1", "c.2", "d" }, ks1);
+    }
 }

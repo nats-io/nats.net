@@ -23,7 +23,7 @@ public class CustomSerializerTest
         await js.PublishAsync("s1.1", new byte[] { 0 }, cancellationToken: cts.Token);
         await js.PublishAsync("s1.2", new byte[] { 0 }, cancellationToken: cts.Token);
 
-        var consumer = await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+        var consumer = await js.CreateOrUpdateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
 
         // single ack
         {
@@ -67,6 +67,8 @@ public class CustomSerializerTest
         }
 
         public T Deserialize(in ReadOnlySequence<byte> buffer) => (T)(object)new byte[] { 42 };
+
+        public INatsSerializer<T> CombineWith(INatsSerializer<T> next) => throw new NotImplementedException();
     }
 
     private class Level42SerializerRegistry : INatsSerializerRegistry

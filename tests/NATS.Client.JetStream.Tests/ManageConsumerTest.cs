@@ -47,9 +47,9 @@ public class ManageConsumerTest
         var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
-        await js.CreateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
-        await js.CreateConsumerAsync("s1", "c2", cancellationToken: cts.Token);
-        await js.CreateConsumerAsync("s1", "c3", cancellationToken: cts.Token);
+        await js.CreateOrUpdateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+        await js.CreateOrUpdateConsumerAsync("s1", "c2", cancellationToken: cts.Token);
+        await js.CreateOrUpdateConsumerAsync("s1", "c3", cancellationToken: cts.Token);
 
         // List
         {
@@ -116,6 +116,54 @@ public class ManageConsumerTest
             var consumerInfo = await js.GetConsumerAsync("s1", "c1", cts.Token);
             Assert.False(consumerInfo.Info.IsPaused);
             Assert.Null(consumerInfo.Info.Config.PauseUntil);
+        }
+    }
+
+    [SkipIfNatsServer(versionEarlierThan: "2.10")]
+    public async Task Consumer_create_update_action()
+    {
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+        var js = new NatsJSContext(nats);
+
+        var streamConfig = new StreamConfig { Name = "s1" };
+        await js.CreateStreamAsync(streamConfig);
+
+        // Create consumer
+        {
+            var consumerConfig = new ConsumerConfig { Name = "c1" };
+
+            await js.CreateConsumerAsync("s1", consumerConfig);
+        }
+
+        // Try to create when consumer exactly
+        {
+            var changedConsumerConfig = new ConsumerConfig { Name = "c1", AckWait = TimeSpan.FromSeconds(10) };
+            var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () => await js.CreateConsumerAsync("s1", changedConsumerConfig));
+
+            Assert.Equal("consumer already exists", exception.Message);
+            Assert.Equal(10148, exception.Error.ErrCode);
+        }
+
+        // Update consumer
+        {
+            var c1 = await js.GetConsumerAsync("s1", "c1");
+            Assert.Equal(TimeSpan.FromSeconds(30), c1.Info.Config.AckWait);
+
+            var changedConsumerConfig = new ConsumerConfig { Name = "c1", AckWait = TimeSpan.FromSeconds(10) };
+            await js.UpdateConsumerAsync("s1", changedConsumerConfig);
+
+            var c2 = await js.GetConsumerAsync("s1", "c1");
+            Assert.Equal(TimeSpan.FromSeconds(10), c2.Info.Config.AckWait);
+        }
+
+        // Try to update when consumer does not exist
+        {
+            var notExistConsumerConfig = new ConsumerConfig { Name = "c2", AckWait = TimeSpan.FromSeconds(10) };
+            var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () => await js.UpdateConsumerAsync("s1", notExistConsumerConfig));
+
+            Assert.Equal("consumer does not exist", exception.Message);
+            Assert.Equal(10149, exception.Error.ErrCode);
         }
     }
 }
