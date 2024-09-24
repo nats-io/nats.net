@@ -135,7 +135,7 @@ public class NatsServerProcess : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        for (int i = 0; i < 10; i++)
+        for (var i = 0; i < 10; i++)
         {
             try
             {
