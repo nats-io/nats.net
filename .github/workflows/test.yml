@@ -48,6 +48,12 @@ jobs:
       - name: Test Core
         run: dotnet test -c Debug --no-build --logger:"console;verbosity=normal" tests/NATS.Client.Core.Tests/NATS.Client.Core.Tests.csproj
 
+      - name: Test Core2
+        run: dotnet test -c Debug --no-build --logger:"console;verbosity=normal" tests/NATS.Client.Core2.Tests/NATS.Client.Core2.Tests.csproj
+
+      - name: Test CoreUnit
+        run: dotnet test -c Debug --no-build --logger:"console;verbosity=normal" tests/NATS.Client.CoreUnit.Tests/NATS.Client.CoreUnit.Tests.csproj
+
       - name: Test JetStream
         run: dotnet test -c Debug --no-build --logger:"console;verbosity=normal" tests/NATS.Client.JetStream.Tests/NATS.Client.JetStream.Tests.csproj
 
@@ -141,9 +147,20 @@ jobs:
       - name: Platform Test (Windows net481)
         run: dotnet test -c Release --no-build --logger:"console;verbosity=normal" -f net481 .\tests\NATS.Client.Platform.Windows.Tests\NATS.Client.Platform.Windows.Tests.csproj
 
-
       - name: Test Core (net6.0)
         run: dotnet test -c Debug -f net6.0 --no-build --logger:"console;verbosity=normal" tests/NATS.Client.Core.Tests/NATS.Client.Core.Tests.csproj
 
       - name: Test Core (net8.0)
         run: dotnet test -c Debug -f net8.0 --no-build --logger:"console;verbosity=normal" tests/NATS.Client.Core.Tests/NATS.Client.Core.Tests.csproj
+
+      - name: Test Core2 (net6.0)
+        run: dotnet test -c Debug -f net6.0 --no-build --logger:"console;verbosity=normal" tests/NATS.Client.Core2.Tests/NATS.Client.Core2.Tests.csproj
+
+      - name: Test Core2 (net8.0)
+        run: dotnet test -c Debug -f net8.0 --no-build --logger:"console;verbosity=normal" tests/NATS.Client.Core2.Tests/NATS.Client.Core2.Tests.csproj
+
+      - name: Test CoreUnit (net6.0)
+        run: dotnet test -c Debug -f net6.0 --no-build --logger:"console;verbosity=normal" tests/NATS.Client.CoreUnit.Tests/NATS.Client.CoreUnit.Tests.csproj
+
+      - name: Test CoreUnit (net8.0)
+        run: dotnet test -c Debug -f net8.0 --no-build --logger:"console;verbosity=normal" tests/NATS.Client.CoreUnit.Tests/NATS.Client.CoreUnit.Tests.csproj

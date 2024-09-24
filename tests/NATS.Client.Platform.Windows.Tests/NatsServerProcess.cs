@@ -21,18 +21,23 @@ public class NatsServerProcess : IAsyncDisposable
     private readonly Action<string> _logger;
     private readonly Process _process;
     private readonly string _scratch;
+    private readonly bool _withJs;
 
-    private NatsServerProcess(Action<string> logger, Process process, string url, string scratch)
+    private NatsServerProcess(Action<string> logger, Process process, string url, string scratch, bool withJs)
     {
         Url = url;
         _logger = logger;
         _process = process;
         _scratch = scratch;
+        _withJs = withJs;
     }
 
     public string Url { get; }
 
-    public static async ValueTask<NatsServerProcess> StartAsync(Action<string>? logger = null, string? config = null)
+    public static ValueTask<NatsServerProcess> StartAsync(Action<string>? logger = null, string? config = null, bool withJs = true)
+        => new(Start(logger, config, withJs));
+
+    public static NatsServerProcess Start(Action<string>? logger = null, string? config = null, bool withJs = true)
     {
         var isLoggingEnabled = logger != null;
         var log = logger ?? (_ => { });
@@ -42,36 +47,56 @@ public class NatsServerProcess : IAsyncDisposable
         var portsFileDir = Path.Combine(scratch, "port");
         Directory.CreateDirectory(portsFileDir);
 
-        var sd = Path.Combine(scratch, "data");
-        Directory.CreateDirectory(sd);
+        var isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
 
-        var natsServerExe = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "nats-server.exe" : "nats-server";
+        var natsServerExe = isWindows ? "nats-server.exe" : "nats-server";
         var configFlag = config == null ? string.Empty : $"-c \"{config}\"";
         var portsFileDirEsc = portsFileDir.Replace(@"\", @"\\");
-        var sdEsc = sd.Replace(@"\", @"\\");
+
+        string? sdEsc = null;
+        if (withJs)
+        {
+            var sd = Path.Combine(scratch, "data");
+            Directory.CreateDirectory(sd);
+            sdEsc = sd.Replace(@"\", @"\\");
+        }
+
         var info = new ProcessStartInfo
         {
             FileName = natsServerExe,
-            Arguments = $"{configFlag} -a 127.0.0.1 -p -1 -js -sd \"{sdEsc}\" --ports_file_dir \"{portsFileDirEsc}\"",
+            Arguments = withJs
+                ? $"{configFlag} -a 127.0.0.1 -p -1 -js -sd \"{sdEsc}\" --ports_file_dir \"{portsFileDirEsc}\""
+                : $"{configFlag} -a 127.0.0.1 -p -1 --ports_file_dir \"{portsFileDirEsc}\"",
             UseShellExecute = false,
             CreateNoWindow = false,
-            RedirectStandardError = isLoggingEnabled,
-            RedirectStandardOutput = isLoggingEnabled,
+
+            // RedirectStandardError = isLoggingEnabled,
+            // RedirectStandardOutput = isLoggingEnabled,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
         };
         var process = new Process { StartInfo = info, };
 
         if (isLoggingEnabled)
         {
+#pragma warning disable CS8604 // Possible null reference argument.
             DataReceivedEventHandler outputHandler = (_, e) => log(e.Data);
+#pragma warning restore CS8604 // Possible null reference argument.
             process.OutputDataReceived += outputHandler;
             process.ErrorDataReceived += outputHandler;
+        }
+        else
+        {
+            process.OutputDataReceived += (_, e) => { };
+            process.ErrorDataReceived += (_, e) => { };
         }
 
         process.Start();
 
-        ChildProcessTracker.AddProcess(process);
+        if (isWindows)
+            ChildProcessTracker.AddProcess(process);
 
-        if (isLoggingEnabled)
+        // if (isLoggingEnabled)
         {
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
@@ -92,7 +117,7 @@ public class NatsServerProcess : IAsyncDisposable
             catch (Exception e)
             {
                 exception = e;
-                await Task.Delay(100 + (500 * i));
+                Thread.Sleep(100 + (500 * i));
             }
         }
 
@@ -105,18 +130,24 @@ public class NatsServerProcess : IAsyncDisposable
         log($"ports={ports}");
         log($"url={url}");
 
-        return new NatsServerProcess(log, process, url, scratch);
+        return new NatsServerProcess(log, process, url, scratch, withJs);
     }
 
     public async ValueTask DisposeAsync()
     {
-        try
+        for (int i = 0; i < 10; i++)
         {
-            _process.Kill();
-        }
-        catch
-        {
-            // best effort
+            try
+            {
+                _process.Kill();
+            }
+            catch
+            {
+                // best effort
+            }
+
+            if (_process.WaitForExit(1_000))
+                break;
         }
 
         for (var i = 0; i < 3; i++)

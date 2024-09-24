@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Text;
+using NATS.Client.Platform.Windows.Tests;
 
 namespace NATS.Client.Core.Tests;
 
@@ -12,8 +13,8 @@ public class RequestReplyTest
     [Fact]
     public async Task Simple_request_reply_test()
     {
-        await using var server = NatsServer.Start();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
 
         const string subject = "foo";
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -41,12 +42,13 @@ public class RequestReplyTest
     [Fact]
     public async Task Request_reply_command_timeout_test()
     {
-        await using var server = NatsServer.Start();
+        await using var server = await NatsServerProcess.StartAsync();
 
         // Request timeout as default timeout
         {
-            await using var nats = server.CreateClientConnection(NatsOpts.Default with
+            await using var nats = new NatsConnection(new NatsOpts
             {
+                Url = server.Url,
                 RequestTimeout = TimeSpan.FromSeconds(1),
             });
 
@@ -66,7 +68,7 @@ public class RequestReplyTest
 
         // Cancellation token usage
         {
-            await using var nats = server.CreateClientConnection();
+            await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
 
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
             var sub = await nats.SubscribeCoreAsync<int>("foo");
@@ -89,11 +91,11 @@ public class RequestReplyTest
     [Fact]
     public async Task Request_reply_no_responders_test()
     {
-        await using var server = NatsServer.Start();
+        await using var server = await NatsServerProcess.StartAsync();
 
         // Enable no responders, and do not set a timeout. We should get a response with a 503 header code.
         {
-            await using var nats = server.CreateClientConnection();
+            await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
             await Assert.ThrowsAsync<NatsNoRespondersException>(async () => await nats.RequestAsync<int, int>(Guid.NewGuid().ToString(), 0));
         }
     }
@@ -103,8 +105,8 @@ public class RequestReplyTest
     {
         const int msgs = 10;
 
-        await using var server = NatsServer.Start();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
 
         var sub = await nats.SubscribeCoreAsync<int>("foo");
         var reg = sub.Register(async msg =>
@@ -135,8 +137,8 @@ public class RequestReplyTest
     [Fact]
     public async Task Request_reply_many_test_overall_timeout()
     {
-        await using var server = NatsServer.Start();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
 
         var sub = await nats.SubscribeCoreAsync<int>("foo");
         var reg = sub.Register(async msg =>
@@ -166,8 +168,8 @@ public class RequestReplyTest
     [Fact]
     public async Task Request_reply_many_test_idle_timeout()
     {
-        await using var server = NatsServer.Start();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
 
         var sub = await nats.SubscribeCoreAsync<int>("foo");
         var reg = sub.Register(async msg =>
@@ -200,8 +202,8 @@ public class RequestReplyTest
     [Fact]
     public async Task Request_reply_many_test_start_up_timeout()
     {
-        await using var server = NatsServer.Start();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
 
         var sub = await nats.SubscribeCoreAsync<int>("foo");
         var reg = sub.Register(async msg =>
@@ -230,8 +232,8 @@ public class RequestReplyTest
     [Fact]
     public async Task Request_reply_many_test_max_count()
     {
-        await using var server = NatsServer.Start();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
 
         var sub = await nats.SubscribeCoreAsync<int>("foo");
         var reg = sub.Register(async msg =>
@@ -263,8 +265,8 @@ public class RequestReplyTest
     [Fact]
     public async Task Request_reply_many_test_sentinel()
     {
-        await using var server = NatsServer.Start();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
 
         var sub = await nats.SubscribeCoreAsync<int>("foo");
         var reg = sub.Register(async msg =>
@@ -297,10 +299,11 @@ public class RequestReplyTest
             return Encoding.ASCII.GetString(input.Span);
         }
 
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-        await using var server = NatsServer.Start();
-        await using var nats = server.CreateClientConnection();
         await using var sub = await nats.SubscribeCoreAsync<string>("foo", cancellationToken: cts.Token);
         var reg = sub.Register(async m =>
         {
@@ -329,8 +332,8 @@ public class RequestReplyTest
     [Fact]
     public async Task Request_reply_many_multiple_with_timeout_test()
     {
-        await using var server = NatsServer.Start();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
 
         // connect to avoid race to subscribe and publish
         await nats.ConnectAsync();
@@ -396,8 +399,8 @@ public class RequestReplyTest
     [Fact]
     public async Task Simple_empty_request_reply_test()
     {
-        await using var server = NatsServer.Start();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
 
         const string subject = "foo";
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));

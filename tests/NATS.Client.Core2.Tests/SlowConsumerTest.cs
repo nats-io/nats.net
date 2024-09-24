@@ -1,3 +1,5 @@
+using NATS.Client.Platform.Windows.Tests;
+
 namespace NATS.Client.Core.Tests;
 
 public class SlowConsumerTest
@@ -9,8 +11,12 @@ public class SlowConsumerTest
     [Fact]
     public async Task Slow_consumer()
     {
-        await using var server = NatsServer.Start();
-        var nats = server.CreateClientConnection(new NatsOpts { SubPendingChannelCapacity = 3 });
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts
+        {
+            Url = server.Url,
+            SubPendingChannelCapacity = 3,
+        });
 
         var lost = 0;
         nats.MessageDropped += (_, e) =>

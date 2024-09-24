@@ -1,3 +1,5 @@
+using NATS.Client.Platform.Windows.Tests;
+
 namespace NATS.Client.Core.Tests;
 
 public class MessageInterfaceTest
@@ -5,8 +7,8 @@ public class MessageInterfaceTest
     [Fact]
     public async Task Sub_custom_builder_test()
     {
-        await using var server = NatsServer.Start();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
 
         var sync = 0;
         var sub = Task.Run(async () =>

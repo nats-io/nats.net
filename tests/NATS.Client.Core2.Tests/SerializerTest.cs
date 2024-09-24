@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Text;
+using NATS.Client.Platform.Windows.Tests;
 
 // ReSharper disable RedundantTypeArgumentsOfMethod
 // ReSharper disable ReturnTypeCanBeNotNullable
@@ -10,8 +11,8 @@ public class SerializerTest
     [Fact]
     public async Task Serializer_exceptions()
     {
-        await using var server = NatsServer.Start();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
 
         await Assert.ThrowsAsync<TestSerializerException>(() =>
             nats.PublishAsync(
@@ -35,8 +36,8 @@ public class SerializerTest
     [Fact]
     public async Task NatsMemoryOwner_empty_payload_should_not_throw()
     {
-        await using var server = NatsServer.Start();
-        var nats = server.CreateClientConnection();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
@@ -226,8 +227,8 @@ public class SerializerTest
     [Fact]
     public async Task Deserialize_with_empty_should_still_go_through_the_deserializer()
     {
-        await using var server = NatsServer.Start();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
@@ -252,9 +253,10 @@ public class SerializerTest
     [Fact]
     public async Task Deserialize_chained_with_empty()
     {
-        await using var server = NatsServer.Start();
-        await using var nats = server.CreateClientConnection(new NatsOpts
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts
         {
+            Url = server.Url,
             SerializerRegistry = new TestSerializerRegistry(),
         });
 
