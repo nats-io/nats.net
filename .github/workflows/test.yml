@@ -159,11 +159,11 @@ jobs:
       # - name: Test Core (net8.0)
       #   run: dotnet test -c Debug -f net8.0 --no-build --logger:"console;verbosity=normal" tests/NATS.Client.Core.Tests/NATS.Client.Core.Tests.csproj
 
-      - name: Test Core2 (net6.0)
+      - name: Test Core2 (net481)
         run: |
             tasklist | grep -i nats-server && taskkill -F -IM nats-server.exe
             nats-server.exe -v
-            dotnet test -c Release -f net6.0 --no-build --logger:"console;verbosity=normal" tests/NATS.Client.Core2.Tests/NATS.Client.Core2.Tests.csproj
+            dotnet test -c Release -f net481 --no-build --logger:"console;verbosity=normal" tests/NATS.Client.Core2.Tests/NATS.Client.Core2.Tests.csproj
 
       - name: Test Core2 (net8.0)
         run: |
@@ -171,11 +171,11 @@ jobs:
             nats-server.exe -v
             dotnet test -c Release -f net8.0 --no-build --logger:"console;verbosity=normal" tests/NATS.Client.Core2.Tests/NATS.Client.Core2.Tests.csproj
 
-      - name: Test CoreUnit (net6.0)
+      - name: Test CoreUnit (net481)
         run: |
             tasklist | grep -i nats-server && taskkill -F -IM nats-server.exe
             nats-server.exe -v
-            dotnet test -c Release -f net6.0 --no-build --logger:"console;verbosity=normal" tests/NATS.Client.CoreUnit.Tests/NATS.Client.CoreUnit.Tests.csproj
+            dotnet test -c Release -f net481 --no-build --logger:"console;verbosity=normal" tests/NATS.Client.CoreUnit.Tests/NATS.Client.CoreUnit.Tests.csproj
 
       - name: Test CoreUnit (net8.0)
         run: |
