@@ -157,7 +157,11 @@ jobs:
       #   run: dotnet test -c Debug -f net8.0 --no-build --logger:"console;verbosity=normal" tests/NATS.Client.Core.Tests/NATS.Client.Core.Tests.csproj
 
       - name: Test Core2 (net6.0)
-        run: dotnet test -c Release -f net6.0 --no-build --logger:"console;verbosity=normal" tests/NATS.Client.Core2.Tests/NATS.Client.Core2.Tests.csproj
+        run: |
+            taskkill -F -IM nats-server.exe
+            tasklist | grep -i nats
+            nats-server.exe -v
+            dotnet test -c Release -f net6.0 --no-build --logger:"console;verbosity=normal" tests/NATS.Client.Core2.Tests/NATS.Client.Core2.Tests.csproj
 
 #      - name: Test Core2 (net8.0)
 #        run: dotnet test -c Release -f net8.0 --no-build --logger:"console;verbosity=normal" tests/NATS.Client.Core2.Tests/NATS.Client.Core2.Tests.csproj
