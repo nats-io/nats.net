@@ -3,7 +3,6 @@ using System.Diagnostics;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
-using Microsoft.VisualStudio.TestPlatform.CommunicationUtilities.Interfaces;
 using Exception = System.Exception;
 
 #pragma warning disable VSTHRD103
