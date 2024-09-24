@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using Exception = System.Exception;
@@ -129,6 +130,28 @@ public class NatsServerProcess : IAsyncDisposable
         var url = Regex.Match(ports, @"\w+://[\d\.]+:\d+").Groups[0].Value;
         log($"ports={ports}");
         log($"url={url}");
+
+        for (var i = 0; i < 10; i++)
+        {
+            try
+            {
+                using var tcpClient = new TcpClient();
+                tcpClient.Connect("127.0.0.1", new Uri(url).Port);
+                using var networkStream = tcpClient.GetStream();
+                using var streamReader = new StreamReader(networkStream);
+                var readLine = streamReader.ReadLine();
+                if (readLine == null || !readLine.StartsWith("INFO", StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new Exception("Failed to connect to server.");
+                }
+
+                break;
+            }
+            catch
+            {
+                Thread.Sleep(1_000);
+            }
+        }
 
         return new NatsServerProcess(log, process, url, scratch, withJs);
     }
