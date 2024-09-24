@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
+using Microsoft.VisualStudio.TestPlatform.CommunicationUtilities.Interfaces;
 using Exception = System.Exception;
 
 #pragma warning disable VSTHRD103
@@ -142,18 +143,18 @@ public class NatsServerProcess : IAsyncDisposable
                 var readLine = streamReader.ReadLine();
                 if (readLine == null || !readLine.StartsWith("INFO", StringComparison.OrdinalIgnoreCase))
                 {
-                    throw new Exception("Failed to connect to server.");
+                    continue;
                 }
 
-                break;
+                return new NatsServerProcess(log, process, url, scratch, withJs);
             }
             catch
             {
-                Thread.Sleep(1_000);
+                Thread.Sleep(1_000 + (i * 500));
             }
         }
 
-        return new NatsServerProcess(log, process, url, scratch, withJs);
+        throw new Exception("Failed to setup the server.");
     }
 
     public async ValueTask DisposeAsync()
