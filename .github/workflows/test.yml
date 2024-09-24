@@ -96,9 +96,9 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - branch: 'v2.9'
+          # - branch: 'v2.9'
           - branch: 'latest'
-          - branch: 'main'
+          # - branch: 'main'
     runs-on: windows-latest
     env:
       DOTNET_CLI_TELEMETRY_OPTOUT: 1
