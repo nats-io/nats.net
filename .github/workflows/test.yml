@@ -146,8 +146,12 @@ jobs:
 #      - name: Memory Test (net6.0)
 #        run: dotMemoryUnit $env:userprofile\.dotnet\tools\nunit.exe --propagate-exit-code -- .\tests\NATS.Client.Core.MemoryTests\bin\Release\net6.0\NATS.Client.Core.MemoryTests.dll
 
-#      - name: Platform Test (Windows net481)
-#        run: dotnet test -c Release --no-build --logger:"console;verbosity=normal" -f net481 .\tests\NATS.Client.Platform.Windows.Tests\NATS.Client.Platform.Windows.Tests.csproj
+      - name: Platform Test (Windows net481)
+        run: |
+            taskkill -F -IM nats-server.exe
+            tasklist | grep -i nats
+            nats-server.exe -v
+            dotnet test -c Release --no-build --logger:"console;verbosity=normal" -f net481 .\tests\NATS.Client.Platform.Windows.Tests\NATS.Client.Platform.Windows.Tests.csproj
 
       # Not working on Windows reliably
       # - name: Test Core (net6.0)
@@ -163,11 +167,23 @@ jobs:
             nats-server.exe -v
             dotnet test -c Release -f net6.0 --no-build --logger:"console;verbosity=normal" tests/NATS.Client.Core2.Tests/NATS.Client.Core2.Tests.csproj
 
-#      - name: Test Core2 (net8.0)
-#        run: dotnet test -c Release -f net8.0 --no-build --logger:"console;verbosity=normal" tests/NATS.Client.Core2.Tests/NATS.Client.Core2.Tests.csproj
+      - name: Test Core2 (net8.0)
+        run: |
+            taskkill -F -IM nats-server.exe
+            tasklist | grep -i nats
+            nats-server.exe -v
+            dotnet test -c Release -f net8.0 --no-build --logger:"console;verbosity=normal" tests/NATS.Client.Core2.Tests/NATS.Client.Core2.Tests.csproj
 
-#      - name: Test CoreUnit (net6.0)
-#        run: dotnet test -c Release -f net6.0 --no-build --logger:"console;verbosity=normal" tests/NATS.Client.CoreUnit.Tests/NATS.Client.CoreUnit.Tests.csproj
+      - name: Test CoreUnit (net6.0)
+        run: |
+            taskkill -F -IM nats-server.exe
+            tasklist | grep -i nats
+            nats-server.exe -v
+            dotnet test -c Release -f net6.0 --no-build --logger:"console;verbosity=normal" tests/NATS.Client.CoreUnit.Tests/NATS.Client.CoreUnit.Tests.csproj
 
-#      - name: Test CoreUnit (net8.0)
-#        run: dotnet test -c Release -f net8.0 --no-build --logger:"console;verbosity=normal" tests/NATS.Client.CoreUnit.Tests/NATS.Client.CoreUnit.Tests.csproj
+      - name: Test CoreUnit (net8.0)
+        run: |
+            taskkill -F -IM nats-server.exe
+            tasklist | grep -i nats
+            nats-server.exe -v
+            dotnet test -c Release -f net8.0 --no-build --logger:"console;verbosity=normal" tests/NATS.Client.CoreUnit.Tests/NATS.Client.CoreUnit.Tests.csproj
