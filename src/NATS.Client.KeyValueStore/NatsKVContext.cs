@@ -207,10 +207,12 @@ public class NatsKVContext : INatsKVContext
 
         if (config.Mirror != null)
         {
-            mirror = config.Mirror.ShallowCopy();
-            mirror.Name = config.Mirror.Name.StartsWith(KvStreamNamePrefix)
-                ? config.Mirror.Name
-                : BucketToStream(config.Mirror.Name);
+            mirror = config.Mirror with
+            {
+                Name = config.Mirror.Name.StartsWith(KvStreamNamePrefix)
+                    ? config.Mirror.Name
+                    : BucketToStream(config.Mirror.Name),
+            };
             mirrorDirect = true;
             subjects = default;
             sources = default;

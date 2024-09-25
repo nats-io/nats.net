@@ -245,12 +245,4 @@ public record StreamConfig
     [System.Text.Json.Serialization.JsonPropertyName("metadata")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public IDictionary<string, string>? Metadata { get; set; }
-
-    /// <summary>
-    /// Creates a shallow copy of the current StreamConfig instance using the MemberwiseClone method.
-    /// </summary>
-    /// <return>
-    /// A shallow copy of the current StreamConfig.
-    /// </return>
-    public StreamConfig ShallowCopy() => (StreamConfig)MemberwiseClone();
 }

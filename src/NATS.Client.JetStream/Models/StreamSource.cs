@@ -63,12 +63,4 @@ public record StreamSource
     /// </summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public string? Domain { get; set; }
-
-    /// <summary>
-    /// Creates a shallow copy of the current StreamSource instance using the MemberwiseClone method.
-    /// </summary>
-    /// <return>
-    /// A shallow copy of the current StreamSource.
-    /// </return>
-    public StreamSource ShallowCopy() => (StreamSource)MemberwiseClone();
 }
