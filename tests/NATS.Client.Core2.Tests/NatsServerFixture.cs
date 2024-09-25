@@ -1,4 +1,4 @@
-﻿using NATS.Client.Platform.Windows.Tests;
+using NATS.Client.Platform.Windows.Tests;
 
 namespace NATS.Client.Core2.Tests;
 
