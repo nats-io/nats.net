@@ -21,21 +21,11 @@ public class NatsObjContext : INatsObjContext
     /// <inheritdoc />
     public INatsJSContext JetStreamContext { get; }
 
-    /// <summary>
-    /// Create a new object store.
-    /// </summary>
-    /// <param name="bucket">Bucket name.</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <returns>Object store object.</returns>
+    /// <inheritdoc />
     public ValueTask<INatsObjStore> CreateObjectStoreAsync(string bucket, CancellationToken cancellationToken = default) =>
         CreateObjectStoreAsync(new NatsObjConfig(bucket), cancellationToken);
 
-    /// <summary>
-    /// Create a new object store.
-    /// </summary>
-    /// <param name="config">Object store configuration.</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <returns>Object store object.</returns>
+    /// <inheritdoc />
     public async ValueTask<INatsObjStore> CreateObjectStoreAsync(NatsObjConfig config, CancellationToken cancellationToken = default)
     {
         ValidateBucketName(config.Bucket);
@@ -66,12 +56,7 @@ public class NatsObjContext : INatsObjContext
         return new NatsObjStore(config, this, JetStreamContext, stream);
     }
 
-    /// <summary>
-    /// Get an existing object store.
-    /// </summary>
-    /// <param name="bucket">Bucket name</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <returns>The Object Store object</returns>
+    /// <inheritdoc />
     public async ValueTask<INatsObjStore> GetObjectStoreAsync(string bucket, CancellationToken cancellationToken = default)
     {
         ValidateBucketName(bucket);
@@ -79,12 +64,7 @@ public class NatsObjContext : INatsObjContext
         return new NatsObjStore(new NatsObjConfig(bucket), this, JetStreamContext, stream);
     }
 
-    /// <summary>
-    /// Delete an object store.
-    /// </summary>
-    /// <param name="bucket">Name of the bucket.</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <returns>Whether delete was successful or not.</returns>
+    /// <inheritdoc />
     public ValueTask<bool> DeleteObjectStore(string bucket, CancellationToken cancellationToken)
     {
         ValidateBucketName(bucket);

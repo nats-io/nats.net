@@ -53,8 +53,10 @@ public class NatsKVStore : INatsKVStore
         _stream = stream;
     }
 
+    /// <inheritdoc />
     public INatsJSContext JetStreamContext { get; }
 
+    /// <inheritdoc />
     public string Bucket { get; }
 
     /// <inheritdoc />
@@ -158,6 +160,7 @@ public class NatsKVStore : INatsKVStore
         }
     }
 
+    /// <inheritdoc />
     public ValueTask PurgeAsync(string key, NatsKVDeleteOpts? opts = default, CancellationToken cancellationToken = default) =>
         DeleteAsync(key, (opts ?? new NatsKVDeleteOpts()) with { Purge = true }, cancellationToken);
 
