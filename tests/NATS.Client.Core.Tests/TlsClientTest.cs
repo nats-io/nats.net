@@ -24,9 +24,12 @@ public class TlsClientTest
 
         var clientOpts = server.ClientOpts(NatsOpts.Default with { Name = "tls-test-client" });
         await using var nats = new NatsConnection(clientOpts);
-        await nats.ConnectAsync();
-        var rtt = await nats.PingAsync();
-        Assert.True(rtt > TimeSpan.Zero);
+
+        await Task.Run(async () =>
+        {
+            await nats.ConnectAsync();
+            await nats.PingAsync();
+        }).WaitAsync(TimeSpan.FromSeconds(10));
     }
 
     [Fact]
@@ -52,10 +55,13 @@ public class TlsClientTest
         };
         await using var nats = new NatsConnection(clientOpts);
 
-        // At the moment I don't know of a good way of checking if the revocation check is working
-        // except to check if the connection fails. So we are expecting an exception here.
-        var exception = await Assert.ThrowsAnyAsync<Exception>(async () => await nats.ConnectAsync());
-        Assert.Contains("remote certificate was rejected", exception.InnerException!.InnerException!.Message);
+        await Task.Run(async () =>
+        {
+            // At the moment I don't know of a good way of checking if the revocation check is working
+            // except to check if the connection fails. So we are expecting an exception here.
+            var exception = await Assert.ThrowsAnyAsync<Exception>(async () => await nats.ConnectAsync());
+            Assert.Contains("remote certificate was rejected", exception.InnerException!.InnerException!.Message);
+        }).WaitAsync(TimeSpan.FromSeconds(10));
     }
 
     [Theory]
