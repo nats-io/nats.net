@@ -27,10 +27,10 @@ public class NatsKVContext : INatsKVContext
     /// Create a new Key Value Store context
     /// </summary>
     /// <param name="context">JetStream context</param>
-    public NatsKVContext(INatsJSContext context) => Context = context;
+    public NatsKVContext(INatsJSContext context) => JetStreamContext = context;
 
     /// <inheritdoc />
-    public INatsJSContext Context { get; }
+    public INatsJSContext JetStreamContext { get; }
 
     /// <summary>
     /// Create a new Key Value Store or get an existing one
@@ -58,9 +58,9 @@ public class NatsKVContext : INatsKVContext
 
         var streamConfig = NatsKVContext.CreateStreamConfig(config);
 
-        var stream = await Context.CreateStreamAsync(streamConfig, cancellationToken);
+        var stream = await JetStreamContext.CreateStreamAsync(streamConfig, cancellationToken);
 
-        return new NatsKVStore(config.Bucket, Context, stream);
+        return new NatsKVStore(config.Bucket, JetStreamContext, stream);
     }
 
     /// <summary>
@@ -76,7 +76,7 @@ public class NatsKVContext : INatsKVContext
     {
         ValidateBucketName(bucket);
 
-        var stream = await Context.GetStreamAsync(BucketToStream(bucket), cancellationToken: cancellationToken);
+        var stream = await JetStreamContext.GetStreamAsync(BucketToStream(bucket), cancellationToken: cancellationToken);
 
         if (stream.Info.Config.MaxMsgsPerSubject < 1)
         {
@@ -84,7 +84,7 @@ public class NatsKVContext : INatsKVContext
         }
 
         // TODO: KV mirror
-        return new NatsKVStore(bucket, Context, stream);
+        return new NatsKVStore(bucket, JetStreamContext, stream);
     }
 
     /// <summary>
@@ -102,9 +102,9 @@ public class NatsKVContext : INatsKVContext
 
         var streamConfig = NatsKVContext.CreateStreamConfig(config);
 
-        var stream = await Context.UpdateStreamAsync(streamConfig, cancellationToken);
+        var stream = await JetStreamContext.UpdateStreamAsync(streamConfig, cancellationToken);
 
-        return new NatsKVStore(config.Bucket, Context, stream);
+        return new NatsKVStore(config.Bucket, JetStreamContext, stream);
     }
 
     /// <summary>
@@ -118,7 +118,7 @@ public class NatsKVContext : INatsKVContext
     public ValueTask<bool> DeleteStoreAsync(string bucket, CancellationToken cancellationToken = default)
     {
         ValidateBucketName(bucket);
-        return Context.DeleteStreamAsync(BucketToStream(bucket), cancellationToken);
+        return JetStreamContext.DeleteStreamAsync(BucketToStream(bucket), cancellationToken);
     }
 
     /// <summary>
@@ -130,7 +130,7 @@ public class NatsKVContext : INatsKVContext
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     public async IAsyncEnumerable<string> GetBucketNamesAsync([EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        await foreach (var name in Context.ListStreamNamesAsync(cancellationToken: cancellationToken))
+        await foreach (var name in JetStreamContext.ListStreamNamesAsync(cancellationToken: cancellationToken))
         {
             if (!name.StartsWith(KvStreamNamePrefix))
             {
@@ -150,9 +150,9 @@ public class NatsKVContext : INatsKVContext
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     public async IAsyncEnumerable<NatsKVStatus> GetStatusesAsync([EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        await foreach (var name in Context.ListStreamNamesAsync(cancellationToken: cancellationToken))
+        await foreach (var name in JetStreamContext.ListStreamNamesAsync(cancellationToken: cancellationToken))
         {
-            var stream = await Context.GetStreamAsync(name, cancellationToken: cancellationToken);
+            var stream = await JetStreamContext.GetStreamAsync(name, cancellationToken: cancellationToken);
             var isCompressed = stream.Info.Config.Compression != StreamConfigCompression.None;
             yield return new NatsKVStatus(name, isCompressed, stream.Info);
         }

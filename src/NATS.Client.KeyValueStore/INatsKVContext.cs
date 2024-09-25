@@ -7,7 +7,7 @@ public interface INatsKVContext
     /// <summary>
     /// Provides access to the JetStream context associated with the Key-Value Store operations.
     /// </summary>
-    INatsJSContext Context { get; }
+    INatsJSContext JetStreamContext { get; }
 
     /// <summary>
     /// Create a new Key Value Store or get an existing one

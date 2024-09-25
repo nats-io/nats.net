@@ -11,7 +11,7 @@ public interface INatsObjStore
     /// <summary>
     /// Provides access to the JetStream context associated with the Object Store operations.
     /// </summary>
-    INatsJSContext Context { get; }
+    INatsJSContext JetStreamContext { get; }
 
     /// <summary>
     /// Object store bucket name.

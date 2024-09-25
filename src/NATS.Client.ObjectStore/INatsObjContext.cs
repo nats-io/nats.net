@@ -1,3 +1,5 @@
+using NATS.Client.JetStream;
+
 namespace NATS.Client.ObjectStore;
 
 /// <summary>
@@ -5,6 +7,11 @@ namespace NATS.Client.ObjectStore;
 /// </summary>
 public interface INatsObjContext
 {
+    /// <summary>
+    /// Provides access to the JetStream context associated with the Object Store operations.
+    /// </summary>
+    INatsJSContext JetStreamContext { get; }
+
     /// <summary>
     /// Create a new object store.
     /// </summary>

@@ -12,13 +12,14 @@ public class NatsObjContext : INatsObjContext
 {
     private static readonly Regex ValidBucketRegex = new(pattern: @"\A[a-zA-Z0-9_-]+\z", RegexOptions.Compiled);
 
-    private readonly INatsJSContext _context;
-
     /// <summary>
     /// Create a new object store context.
     /// </summary>
     /// <param name="context">JetStream context.</param>
-    public NatsObjContext(INatsJSContext context) => _context = context;
+    public NatsObjContext(INatsJSContext context) => JetStreamContext = context;
+
+    /// <inheritdoc />
+    public INatsJSContext JetStreamContext { get; }
 
     /// <summary>
     /// Create a new object store.
@@ -61,8 +62,8 @@ public class NatsObjContext : INatsObjContext
             Compression = config.Compression ? StreamConfigCompression.S2 : StreamConfigCompression.None,
         };
 
-        var stream = await _context.CreateStreamAsync(streamConfig, cancellationToken);
-        return new NatsObjStore(config, this, _context, stream);
+        var stream = await JetStreamContext.CreateStreamAsync(streamConfig, cancellationToken);
+        return new NatsObjStore(config, this, JetStreamContext, stream);
     }
 
     /// <summary>
@@ -74,8 +75,8 @@ public class NatsObjContext : INatsObjContext
     public async ValueTask<INatsObjStore> GetObjectStoreAsync(string bucket, CancellationToken cancellationToken = default)
     {
         ValidateBucketName(bucket);
-        var stream = await _context.GetStreamAsync($"OBJ_{bucket}", cancellationToken: cancellationToken);
-        return new NatsObjStore(new NatsObjConfig(bucket), this, _context, stream);
+        var stream = await JetStreamContext.GetStreamAsync($"OBJ_{bucket}", cancellationToken: cancellationToken);
+        return new NatsObjStore(new NatsObjConfig(bucket), this, JetStreamContext, stream);
     }
 
     /// <summary>
@@ -87,7 +88,7 @@ public class NatsObjContext : INatsObjContext
     public ValueTask<bool> DeleteObjectStore(string bucket, CancellationToken cancellationToken)
     {
         ValidateBucketName(bucket);
-        return _context.DeleteStreamAsync($"OBJ_{bucket}", cancellationToken);
+        return JetStreamContext.DeleteStreamAsync($"OBJ_{bucket}", cancellationToken);
     }
 
     private void ValidateBucketName(string bucket)

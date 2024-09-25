@@ -44,15 +44,16 @@ public class NatsKVStore : INatsKVStore
     private const string NatsSequence = "Nats-Sequence";
     private const string NatsTimeStamp = "Nats-Time-Stamp";
     private static readonly Regex ValidKeyRegex = new(pattern: @"\A[-/_=\.a-zA-Z0-9]+\z", RegexOptions.Compiled);
-    private readonly INatsJSContext _context;
     private readonly INatsJSStream _stream;
 
     internal NatsKVStore(string bucket, INatsJSContext context, INatsJSStream stream)
     {
         Bucket = bucket;
-        _context = context;
+        JetStreamContext = context;
         _stream = stream;
     }
+
+    public INatsJSContext JetStreamContext { get; }
 
     public string Bucket { get; }
 
@@ -60,7 +61,7 @@ public class NatsKVStore : INatsKVStore
     public async ValueTask<ulong> PutAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
         ValidateKey(key);
-        var ack = await _context.PublishAsync($"$KV.{Bucket}.{key}", value, serializer: serializer, cancellationToken: cancellationToken);
+        var ack = await JetStreamContext.PublishAsync($"$KV.{Bucket}.{key}", value, serializer: serializer, cancellationToken: cancellationToken);
         ack.EnsureSuccess();
         return ack.Seq;
     }
@@ -100,7 +101,7 @@ public class NatsKVStore : INatsKVStore
 
         try
         {
-            var ack = await _context.PublishAsync($"$KV.{Bucket}.{key}", value, headers: headers, serializer: serializer, cancellationToken: cancellationToken);
+            var ack = await JetStreamContext.PublishAsync($"$KV.{Bucket}.{key}", value, headers: headers, serializer: serializer, cancellationToken: cancellationToken);
             ack.EnsureSuccess();
 
             return ack.Seq;
@@ -143,7 +144,7 @@ public class NatsKVStore : INatsKVStore
 
         try
         {
-            var ack = await _context.PublishAsync<object?>(subject, null, headers: headers, cancellationToken: cancellationToken);
+            var ack = await JetStreamContext.PublishAsync<object?>(subject, null, headers: headers, cancellationToken: cancellationToken);
             ack.EnsureSuccess();
         }
         catch (NatsJSApiException e)
@@ -164,7 +165,7 @@ public class NatsKVStore : INatsKVStore
     public async ValueTask<NatsKVEntry<T>> GetEntryAsync<T>(string key, ulong revision = default, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
         ValidateKey(key);
-        serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
+        serializer ??= JetStreamContext.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
         var request = new StreamMsgGetRequest();
         var keySubject = $"$KV.{Bucket}.{key}";
@@ -425,12 +426,12 @@ public class NatsKVStore : INatsKVStore
     internal async ValueTask<NatsKVWatcher<T>> WatchInternalAsync<T>(IEnumerable<string> keys, INatsDeserialize<T>? serializer = default, NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default)
     {
         opts ??= NatsKVWatchOpts.Default;
-        serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
+        serializer ??= JetStreamContext.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
         opts.ThrowIfInvalid();
 
         var watcher = new NatsKVWatcher<T>(
-            context: _context,
+            context: JetStreamContext,
             bucket: Bucket,
             keys: keys,
             opts: opts,
