@@ -1,28 +1,36 @@
 using NATS.Client.Core.Tests;
+using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Tests;
 
+[Collection("nats-server")]
 public class ErrorHandlerTest
 {
     private readonly ITestOutputHelper _output;
+    private readonly NatsServerFixture _server;
 
-    public ErrorHandlerTest(ITestOutputHelper output) => _output = output;
+    public ErrorHandlerTest(ITestOutputHelper output, NatsServerFixture server)
+    {
+        _output = output;
+        _server = server;
+    }
 
     [Fact]
     public async Task Consumer_fetch_error_handling()
     {
-        await using var server = NatsServer.StartJS();
-        var (nats1, proxy) = server.CreateProxiedClientConnection();
-        await using var nats = nats1;
+        var proxy = new NatsProxy(_server.Port);
+        await using var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}", ConnectTimeout = TimeSpan.FromSeconds(10) });
+        var prefix = _server.GetNextId();
+
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
-        var stream = await js.CreateStreamAsync(new StreamConfig("s1", new[] { "s1.*" }), cts.Token);
-        var consumer = await stream.CreateOrUpdateConsumerAsync(new ConsumerConfig("c1"), cts.Token);
+        var stream = await js.CreateStreamAsync(new StreamConfig($"{prefix}s1", new[] { $"{prefix}s1.*" }), cts.Token);
+        var consumer = await stream.CreateOrUpdateConsumerAsync(new ConsumerConfig($"{prefix}c1"), cts.Token);
 
-        (await js.PublishAsync("s1.1", 1, cancellationToken: cts.Token)).EnsureSuccess();
+        (await js.PublishAsync($"{prefix}s1.1", 1, cancellationToken: cts.Token)).EnsureSuccess();
 
         var timeoutNotifications = 0;
         var opts = new NatsJSNextOpts
@@ -44,7 +52,7 @@ public class ErrorHandlerTest
         var next = await consumer.NextAsync<int>(opts: opts, cancellationToken: cts.Token);
         if (next is { } msg)
         {
-            msg.Subject.Should().Be("s1.1");
+            msg.Subject.Should().Be($"{prefix}s1.1");
             msg.Data.Should().Be(1);
             await msg.AckAsync(cancellationToken: cts.Token);
         }
@@ -57,8 +65,8 @@ public class ErrorHandlerTest
         proxy.ServerInterceptors.Add(m => m?.Contains("Idle Heartbeat") ?? false ? null : m);
 
         // Create an empty stream to potentially reduce the chance of having a message.
-        var stream2 = await js.CreateStreamAsync(new StreamConfig("s2", new[] { "s2.*" }), cts.Token);
-        var consumer2 = await stream2.CreateOrUpdateConsumerAsync(new ConsumerConfig("c2"), cts.Token);
+        var stream2 = await js.CreateStreamAsync(new StreamConfig($"{prefix}s2", new[] { $"{prefix}s2.*" }), cts.Token);
+        var consumer2 = await stream2.CreateOrUpdateConsumerAsync(new ConsumerConfig($"{prefix}c2"), cts.Token);
 
         // reduce heartbeat time out to increase the chance of receiving notification.
         var opts2 = new NatsJSNextOpts
@@ -84,17 +92,18 @@ public class ErrorHandlerTest
     [Fact]
     public async Task Consumer_consume_handling()
     {
-        await using var server = NatsServer.StartJS();
-        var (nats1, proxy) = server.CreateProxiedClientConnection();
-        await using var nats = nats1;
+        var proxy = new NatsProxy(_server.Port);
+        await using var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}", ConnectTimeout = TimeSpan.FromSeconds(10) });
+        var prefix = _server.GetNextId();
+
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
-        var stream = await js.CreateStreamAsync(new StreamConfig("s1", new[] { "s1.*" }), cts.Token);
-        var consumer = await stream.CreateOrUpdateConsumerAsync(new ConsumerConfig("c1"), cts.Token);
+        var stream = await js.CreateStreamAsync(new StreamConfig($"{prefix}s1", new[] { $"{prefix}s1.*" }), cts.Token);
+        var consumer = await stream.CreateOrUpdateConsumerAsync(new ConsumerConfig($"{prefix}c1"), cts.Token);
 
-        (await js.PublishAsync("s1.1", 1, cancellationToken: cts.Token)).EnsureSuccess();
+        (await js.PublishAsync($"{prefix}s1.1", 1, cancellationToken: cts.Token)).EnsureSuccess();
 
         var timeoutNotifications = 0;
         var opts = new NatsJSConsumeOpts
@@ -116,7 +125,7 @@ public class ErrorHandlerTest
         await foreach (var msg in consumer.ConsumeAsync<int>(opts: opts, cancellationToken: cts.Token))
         {
             msg.Data.Should().Be(1);
-            msg.Subject.Should().Be("s1.1");
+            msg.Subject.Should().Be($"{prefix}s1.1");
             await msg.AckAsync(cancellationToken: cts.Token);
             break;
         }
@@ -149,17 +158,18 @@ public class ErrorHandlerTest
     [Fact]
     public async Task Ordered_consumer_fetch_error_handling()
     {
-        await using var server = NatsServer.StartJS();
-        var (nats1, proxy) = server.CreateProxiedClientConnection();
-        await using var nats = nats1;
+        var proxy = new NatsProxy(_server.Port);
+        await using var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}", ConnectTimeout = TimeSpan.FromSeconds(10) });
+        var prefix = _server.GetNextId();
+
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
-        var stream = await js.CreateStreamAsync(new StreamConfig("s1", new[] { "s1.*" }), cts.Token);
+        var stream = await js.CreateStreamAsync(new StreamConfig($"{prefix}s1", new[] { $"{prefix}s1.*" }), cts.Token);
         var consumer = (NatsJSOrderedConsumer)await stream.CreateOrderedConsumerAsync(cancellationToken: cts.Token);
 
-        (await js.PublishAsync("s1.1", 1, cancellationToken: cts.Token)).EnsureSuccess();
+        (await js.PublishAsync($"{prefix}s1.1", 1, cancellationToken: cts.Token)).EnsureSuccess();
 
         var timeoutNotifications = 0;
         var opts = new NatsJSFetchOpts
@@ -181,7 +191,7 @@ public class ErrorHandlerTest
         var count1 = 0;
         await foreach (var msg in consumer.FetchAsync<int>(opts: opts, cancellationToken: cts.Token))
         {
-            msg.Subject.Should().Be("s1.1");
+            msg.Subject.Should().Be($"{prefix}s1.1");
             msg.Data.Should().Be(1);
             await msg.AckAsync(cancellationToken: cts.Token);
             count1++;
@@ -193,7 +203,7 @@ public class ErrorHandlerTest
         proxy.ServerInterceptors.Add(m => m?.Contains("Idle Heartbeat") ?? false ? null : m);
 
         // Create an empty stream since ordered consumer will pick up messages from beginning everytime.
-        var stream2 = await js.CreateStreamAsync(new StreamConfig("s2", new[] { "s2.*" }), cts.Token);
+        var stream2 = await js.CreateStreamAsync(new StreamConfig($"{prefix}s2", new[] { $"{prefix}s2.*" }), cts.Token);
         var consumer2 = (NatsJSOrderedConsumer)await stream2.CreateOrderedConsumerAsync(cancellationToken: cts.Token);
 
         // reduce heartbeat time out to increase the chance of receiving notification.
@@ -226,17 +236,18 @@ public class ErrorHandlerTest
     [Fact]
     public async Task Ordered_consumer_consume_handling()
     {
-        await using var server = NatsServer.StartJS();
-        var (nats1, proxy) = server.CreateProxiedClientConnection();
-        await using var nats = nats1;
+        var proxy = new NatsProxy(_server.Port);
+        await using var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}", ConnectTimeout = TimeSpan.FromSeconds(10) });
+        var prefix = _server.GetNextId();
+
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
-        var stream = await js.CreateStreamAsync(new StreamConfig("s1", new[] { "s1.*" }), cts.Token);
+        var stream = await js.CreateStreamAsync(new StreamConfig($"{prefix}s1", new[] { $"{prefix}s1.*" }), cts.Token);
         var consumer = (NatsJSOrderedConsumer)await stream.CreateOrderedConsumerAsync(cancellationToken: cts.Token);
 
-        (await js.PublishAsync("s1.1", 1, cancellationToken: cts.Token)).EnsureSuccess();
+        (await js.PublishAsync($"{prefix}s1.1", 1, cancellationToken: cts.Token)).EnsureSuccess();
 
         var timeoutNotifications = 0;
         var opts = new NatsJSConsumeOpts
@@ -258,7 +269,7 @@ public class ErrorHandlerTest
         await foreach (var msg in consumer.ConsumeAsync<int>(opts: opts, cancellationToken: cts.Token))
         {
             msg.Data.Should().Be(1);
-            msg.Subject.Should().Be("s1.1");
+            msg.Subject.Should().Be($"{prefix}s1.1");
             break;
         }
 
@@ -304,14 +315,15 @@ public class ErrorHandlerTest
     [Fact]
     public async Task Exception_propagation_handling()
     {
-        await using var server = NatsServer.StartJS();
-        var (nats1, proxy) = server.CreateProxiedClientConnection();
-        await using var nats = nats1;
+        var proxy = new NatsProxy(_server.Port);
+        await using var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}", ConnectTimeout = TimeSpan.FromSeconds(10) });
+        var prefix = _server.GetNextId();
+
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
-        var stream = await js.CreateStreamAsync(new StreamConfig("s1", new[] { "s1.*" }), cts.Token);
+        var stream = await js.CreateStreamAsync(new StreamConfig($"{prefix}s1", new[] { $"{prefix}s1.*" }), cts.Token);
 
         // reduce heartbeat time out to increase the chance of receiving notification.
         var opts = new NatsJSConsumeOpts
@@ -327,7 +339,7 @@ public class ErrorHandlerTest
 
         try
         {
-            var consumer = await stream.CreateOrUpdateConsumerAsync(new ConsumerConfig("c1"), cts.Token);
+            var consumer = await stream.CreateOrUpdateConsumerAsync(new ConsumerConfig($"{prefix}c1"), cts.Token);
             await foreach (var unused in consumer.ConsumeAsync<int>(opts: opts, cancellationToken: cts.Token))
             {
             }
