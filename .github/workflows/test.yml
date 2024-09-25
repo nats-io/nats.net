@@ -46,12 +46,11 @@ jobs:
         run: dotnet build -c Release
 
       - name: Test Core
-        # run: dotnet test -c Release --no-build --logger:"console;verbosity=normal" tests/NATS.Client.Core.Tests/NATS.Client.Core.Tests.csproj
         run: |
           killall nats-server 2> /dev/null | echo -n
           nats-server -v
           cd tests/NATS.Client.Core.Tests
-          dotnet test -c Release --no-build
+          dotnet test -c Release --no-build --logger:"console;verbosity=normal"
 
       - name: Test Core2
         run: |
@@ -99,7 +98,7 @@ jobs:
         run: |
           killall nats-server 2> /dev/null | echo -n
           nats-server -v
-          cd tests/NATS.Client.OpenTelemetry.Tests
+          cd tests/NATS.Net.OpenTelemetry.Tests
           dotnet test -c Release --no-build
 
       - name: Check Native AOT
