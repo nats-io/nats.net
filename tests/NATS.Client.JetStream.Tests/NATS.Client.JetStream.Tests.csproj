@@ -33,4 +33,8 @@
     <ProjectReference Include="..\NATS.Client.TestUtilities\NATS.Client.TestUtilities.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\NATS.Client.Core2.Tests\NatsServerFixture.cs" />
+  </ItemGroup>
+
 </Project>
