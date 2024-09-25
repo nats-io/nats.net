@@ -1,4 +1,7 @@
 using System.Runtime.CompilerServices;
+#if !NET6_0_OR_GREATER
+using NATS.Client.Core.Internal.NetStandardExtensions;
+#endif
 
 namespace NATS.Client.Core.Tests;
 
@@ -134,6 +137,20 @@ public class WaitSignal<T>
 
     public TaskAwaiter<T> GetAwaiter()
     {
-        return _tcs.Task.WaitAsync(_timeout).GetAwaiter();
+        var timeoutTask = Task.Delay(_timeout);
+        return Task.WhenAny(_tcs.Task, timeoutTask).ContinueWith(
+#pragma warning restore VSTHRD105
+            // ReSharper disable once ParameterOnlyUsedForPreconditionCheck.Local
+            completedTask =>
+            {
+#pragma warning disable VSTHRD103
+                if (completedTask.Result == timeoutTask)
+#pragma warning restore VSTHRD103
+                {
+                    throw new TimeoutException("The operation has timed out.");
+                }
+
+                return _tcs.Task;
+            }).Unwrap().GetAwaiter();
     }
 }

@@ -1,6 +1,9 @@
 using System.Buffers;
 using System.Text;
 using NATS.Client.Platform.Windows.Tests;
+#if !NET6_0_OR_GREATER
+using NATS.Client.Core.Internal.NetStandardExtensions;
+#endif
 
 namespace NATS.Client.Core.Tests;
 
@@ -93,7 +96,7 @@ public class RequestReplyTest
     {
         await using var server = await NatsServerProcess.StartAsync();
 
-        // Enable no responders, and do not set a timeout. We should get a response with a 503 header code.
+        // Enable no responders, and do not set a timeout. We should get a response with a 503-header code.
         {
             await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
             await Assert.ThrowsAsync<NatsNoRespondersException>(async () => await nats.RequestAsync<int, int>(Guid.NewGuid().ToString(), 0));
@@ -296,7 +299,7 @@ public class RequestReplyTest
     {
         static string ToStr(ReadOnlyMemory<byte> input)
         {
-            return Encoding.ASCII.GetString(input.Span);
+            return Encoding.ASCII.GetString(input.Span.ToArray());
         }
 
         await using var server = await NatsServerProcess.StartAsync();
@@ -316,7 +319,7 @@ public class RequestReplyTest
             }
         });
 
-        var writer = new ArrayBufferWriter<byte>();
+        var writer = new NatsBufferWriter<byte>();
         await foreach (var msg in nats.RequestManyAsync<string, string>("foo", "1", cancellationToken: cts.Token))
         {
             writer.Write(Encoding.UTF8.GetBytes(msg.Data!));

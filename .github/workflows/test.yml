@@ -150,7 +150,8 @@ jobs:
         run: |
             tasklist | grep -i nats-server && taskkill -F -IM nats-server.exe
             nats-server.exe -v
-            dotnet test -c Release --no-build --logger:"console;verbosity=normal" -f net481 .\tests\NATS.Client.Platform.Windows.Tests\NATS.Client.Platform.Windows.Tests.csproj
+            cd tests\NATS.Client.Platform.Windows.Tests
+            dotnet test -c Release --no-build --logger:"console;verbosity=normal" -f net481
 
       # Not working on Windows reliably
       # - name: Test Core (net6.0)
@@ -163,22 +164,26 @@ jobs:
         run: |
             tasklist | grep -i nats-server && taskkill -F -IM nats-server.exe
             nats-server.exe -v
-            dotnet test -c Release -f net481 --no-build --logger:"console;verbosity=normal" tests/NATS.Client.Core2.Tests/NATS.Client.Core2.Tests.csproj
+            cd tests/NATS.Client.Core2.Tests
+            dotnet test -c Release -f net481 --no-build --logger:"console;verbosity=normal"
 
       - name: Test Core2 (net8.0)
         run: |
             tasklist | grep -i nats-server && taskkill -F -IM nats-server.exe
             nats-server.exe -v
-            dotnet test -c Release -f net8.0 --no-build --logger:"console;verbosity=normal" tests/NATS.Client.Core2.Tests/NATS.Client.Core2.Tests.csproj
+            cd tests/NATS.Client.Core2.Tests
+            dotnet test -c Release -f net8.0 --no-build --logger:"console;verbosity=normal"
 
       - name: Test CoreUnit (net481)
         run: |
             tasklist | grep -i nats-server && taskkill -F -IM nats-server.exe
             nats-server.exe -v
-            dotnet test -c Release -f net481 --no-build --logger:"console;verbosity=normal" tests/NATS.Client.CoreUnit.Tests/NATS.Client.CoreUnit.Tests.csproj
+            cd tests/NATS.Client.CoreUnit.Tests
+            dotnet test -c Release -f net481 --no-build --logger:"console;verbosity=normal"
 
       - name: Test CoreUnit (net8.0)
         run: |
             tasklist | grep -i nats-server && taskkill -F -IM nats-server.exe
             nats-server.exe -v
-            dotnet test -c Release -f net8.0 --no-build --logger:"console;verbosity=normal" tests/NATS.Client.CoreUnit.Tests/NATS.Client.CoreUnit.Tests.csproj
+            cd tests/NATS.Client.CoreUnit.Tests
+            dotnet test -c Release -f net8.0 --no-build --logger:"console;verbosity=normal"

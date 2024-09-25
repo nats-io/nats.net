@@ -145,8 +145,6 @@ public class NatsServerProcess : IAsyncDisposable
                     continue;
                 }
 
-                Console.WriteLine($">>> CONNECTED: {readLine}");
-
                 return new NatsServerProcess(log, process, url, scratch, withJs);
             }
             catch
