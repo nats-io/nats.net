@@ -1,20 +1,25 @@
-using NATS.Client.Platform.Windows.Tests;
+using NATS.Client.Core2.Tests;
 
 namespace NATS.Client.Core.Tests;
 
+[Collection("nats-server")]
 public class SlowConsumerTest
 {
     private readonly ITestOutputHelper _output;
+    private readonly NatsServerFixture _server;
 
-    public SlowConsumerTest(ITestOutputHelper output) => _output = output;
+    public SlowConsumerTest(ITestOutputHelper output, NatsServerFixture server)
+    {
+        _output = output;
+        _server = server;
+    }
 
     [Fact]
     public async Task Slow_consumer()
     {
-        await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts
         {
-            Url = server.Url,
+            Url = _server.Url,
             SubPendingChannelCapacity = 3,
         });
 

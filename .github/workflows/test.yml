@@ -104,6 +104,7 @@ jobs:
       DOTNET_CLI_TELEMETRY_OPTOUT: 1
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
       NUGET_XMLDOC_MODE: skip
+      MSYS_NO_PATHCONV: 1
     steps:
       - name: Checkout
         uses: actions/checkout@v3

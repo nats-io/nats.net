@@ -17,7 +17,7 @@ using Exception = System.Exception;
 
 namespace NATS.Client.Platform.Windows.Tests;
 
-public class NatsServerProcess : IAsyncDisposable
+public class NatsServerProcess : IAsyncDisposable, IDisposable
 {
     private readonly Action<string> _logger;
     private readonly Process _process;
@@ -156,7 +156,13 @@ public class NatsServerProcess : IAsyncDisposable
         throw new Exception("Failed to setup the server.");
     }
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
+    {
+        Dispose();
+        return default;
+    }
+
+    public void Dispose()
     {
         for (var i = 0; i < 10; i++)
         {
@@ -182,7 +188,7 @@ public class NatsServerProcess : IAsyncDisposable
             }
             catch
             {
-                await Task.Delay(100);
+                Thread.Sleep(100);
             }
         }
 
