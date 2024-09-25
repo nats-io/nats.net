@@ -2,6 +2,7 @@ using NATS.Client.Platform.Windows.Tests;
 
 namespace NATS.Client.Core2.Tests;
 
+// https://xunit.net/docs/shared-context#collection-fixture
 public class NatsServerFixture : IDisposable
 {
     public NatsServerFixture()

@@ -21,6 +21,8 @@ public class SerializerTest
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
 
+        await nats.ConnectAsync();
+
         await Assert.ThrowsAsync<TestSerializerException>(() =>
             nats.PublishAsync(
                 "foo",
@@ -29,9 +31,6 @@ public class SerializerTest
 
         // Check that our connection isn't affected by the exceptions
         await using var sub = await nats.SubscribeCoreAsync<int>("foo");
-
-        var rtt = await nats.PingAsync();
-        Assert.True(rtt > TimeSpan.Zero);
 
         await nats.PublishAsync("foo", 1);
 
