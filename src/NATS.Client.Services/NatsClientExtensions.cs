@@ -1,6 +1,8 @@
 using NATS.Client.Core;
+using NATS.Client.Services;
 
-namespace NATS.Client.Services;
+// ReSharper disable once CheckNamespace
+namespace NATS.Net;
 
 public static class NatsClientExtensions
 {
