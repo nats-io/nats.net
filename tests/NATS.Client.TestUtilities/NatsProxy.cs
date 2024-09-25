@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
@@ -8,7 +9,7 @@ namespace NATS.Client.Core.Tests;
 
 public class NatsProxy : IDisposable
 {
-    private readonly ITestOutputHelper _outputHelper;
+    private readonly ITestOutputHelper? _outputHelper;
     private readonly bool _trace;
     private readonly TcpListener _tcpListener;
     private readonly List<TcpClient> _clients = new();
@@ -16,7 +17,7 @@ public class NatsProxy : IDisposable
     private readonly Stopwatch _watch = new();
     private int _syncCount;
 
-    public NatsProxy(int port, ITestOutputHelper outputHelper, bool trace)
+    public NatsProxy(int port, ITestOutputHelper? outputHelper = null, bool trace = false)
     {
         _outputHelper = outputHelper;
         _trace = trace;
@@ -262,7 +263,23 @@ public class NatsProxy : IDisposable
             var span = buffer.AsSpan();
             while (true)
             {
+                #if !NET6_0_OR_GREATER
+                var bytes = ArrayPool<char>.Shared.Rent(span.Length);
+                var read = sr.Read(bytes, 0, span.Length);
+
+                if (read > 0)
+                {
+                    for (var i = 0; i < read; i++)
+                    {
+                        span[i] = bytes[i];
+                    }
+                }
+
+                ArrayPool<char>.Shared.Return(bytes);
+                #else
                 var read = sr.Read(span);
+                #endif
+
                 if (read == 0)
                     break;
                 if (read == -1)
@@ -301,7 +318,7 @@ public class NatsProxy : IDisposable
             _frames.Add(frame);
     }
 
-    private void Log(string text) => _outputHelper.WriteLine($"[PROXY] {DateTime.Now:HH:mm:ss.fff} {text}");
+    private void Log(string text) => _outputHelper?.WriteLine($"[PROXY] {DateTime.Now:HH:mm:ss.fff} {text}");
 
     public record Frame(TimeSpan Timestamp, int Client, string Origin, string Message);
 }

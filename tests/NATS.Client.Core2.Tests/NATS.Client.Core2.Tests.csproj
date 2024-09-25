@@ -52,14 +52,11 @@
     
     <ItemGroup>
       <Compile Include="..\NATS.Client.Platform.Windows.Tests\NatsServerProcess.cs" />
-      <Compile Include="..\NATS.Client.TestUtilities\InMemoryTestLoggerFactory.cs">
-        <Link>InMemoryTestLoggerFactory.cs</Link>
-      </Compile>
+      <Compile Include="..\NATS.Client.TestUtilities\InMemoryTestLoggerFactory.cs" />
       <Compile Include="..\NATS.Client.TestUtilities\MockServer.cs" />
+      <Compile Include="..\NATS.Client.TestUtilities\NatsProxy.cs" />
       <Compile Include="..\NATS.Client.TestUtilities\Utils.cs" />
-      <Compile Include="..\NATS.Client.TestUtilities\WaitSignal.cs">
-        <Link>WaitSignal.cs</Link>
-      </Compile>
+      <Compile Include="..\NATS.Client.TestUtilities\WaitSignal.cs" />
     </ItemGroup>
 
 </Project>
