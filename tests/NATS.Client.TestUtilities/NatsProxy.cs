@@ -263,7 +263,7 @@ public class NatsProxy : IDisposable
             var span = buffer.AsSpan();
             while (true)
             {
-                #if !NET6_0_OR_GREATER
+#if !NET6_0_OR_GREATER
                 var bytes = ArrayPool<char>.Shared.Rent(span.Length);
                 var read = sr.Read(bytes, 0, span.Length);
 
@@ -276,9 +276,9 @@ public class NatsProxy : IDisposable
                 }
 
                 ArrayPool<char>.Shared.Return(bytes);
-                #else
+#else
                 var read = sr.Read(span);
-                #endif
+#endif
 
                 if (read == 0)
                     break;
