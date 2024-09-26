@@ -1,4 +1,4 @@
-﻿namespace NATS.Client.Platform.Windows.Tests;
+namespace NATS.Client.Platform.Windows.Tests;
 
 public class BaseNatsServerFixture : IDisposable
 {
