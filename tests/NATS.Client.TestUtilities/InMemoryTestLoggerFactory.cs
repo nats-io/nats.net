@@ -48,7 +48,9 @@ public class InMemoryTestLoggerFactory(LogLevel level, Action<InMemoryTestLogger
         public bool IsEnabled(LogLevel logLevel) => logLevel >= level;
 
 #if NET8_0_OR_GREATER
-        public IDisposable? BeginScope<TState>(TState state)
+#pragma warning disable CS8633 // Nullability in constraints for type parameter doesn't match the constraints for type parameter in implicitly implemented interface method'.
+        public IDisposable BeginScope<TState>(TState state)
+#pragma warning restore CS8633 // Nullability in constraints for type parameter doesn't match the constraints for type parameter in implicitly implemented interface method'.
             where TState : notnull => new NullDisposable();
 #else
         public IDisposable BeginScope<TState>(TState state) => new NullDisposable();

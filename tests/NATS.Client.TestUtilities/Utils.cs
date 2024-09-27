@@ -2,6 +2,9 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+#if !NET6_0_OR_GREATER
+using NATS.Client.Core.Internal.NetStandardExtensions;
+#endif
 
 namespace NATS.Client.Core.Tests;
 
@@ -136,7 +139,7 @@ public static class ServiceUtils
         {
             var count = 0;
 
-            // nats cli sends an empty JSON object '{}' as the request payload so we do the same here
+            // NATS cli sends an empty JSON object '{}' as the request payload, so we do the same here
             await foreach (var msg in nats.RequestManyAsync<string, T>(subject, "{}", replySerializer: serializer, replyOpts: replyOpts, cancellationToken: ct).ConfigureAwait(false))
             {
                 if (++count == limit)

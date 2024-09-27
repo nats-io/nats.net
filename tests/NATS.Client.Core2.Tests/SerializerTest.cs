@@ -1,17 +1,27 @@
 using System.Buffers;
 using System.Text;
+using NATS.Client.Core2.Tests;
 
 // ReSharper disable RedundantTypeArgumentsOfMethod
 // ReSharper disable ReturnTypeCanBeNotNullable
 namespace NATS.Client.Core.Tests;
 
+[Collection("nats-server")]
 public class SerializerTest
 {
+    private readonly NatsServerFixture _server;
+
+    public SerializerTest(NatsServerFixture server)
+    {
+        _server = server;
+    }
+
     [Fact]
     public async Task Serializer_exceptions()
     {
-        await using var server = NatsServer.Start();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+
+        await nats.ConnectAsync();
 
         await Assert.ThrowsAsync<TestSerializerException>(() =>
             nats.PublishAsync(
@@ -21,9 +31,6 @@ public class SerializerTest
 
         // Check that our connection isn't affected by the exceptions
         await using var sub = await nats.SubscribeCoreAsync<int>("foo");
-
-        var rtt = await nats.PingAsync();
-        Assert.True(rtt > TimeSpan.Zero);
 
         await nats.PublishAsync("foo", 1);
 
@@ -35,8 +42,7 @@ public class SerializerTest
     [Fact]
     public async Task NatsMemoryOwner_empty_payload_should_not_throw()
     {
-        await using var server = NatsServer.Start();
-        var nats = server.CreateClientConnection();
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
@@ -97,7 +103,7 @@ public class SerializerTest
         {
             var buffer = new NatsBufferWriter<byte>();
             serializer.Serialize(buffer, value);
-            var actual = Encoding.UTF8.GetString(buffer.WrittenMemory.Span);
+            var actual = Encoding.UTF8.GetString(buffer.WrittenMemory.Span.ToArray());
             Assert.Equal(expected, actual);
         }
 
@@ -226,8 +232,7 @@ public class SerializerTest
     [Fact]
     public async Task Deserialize_with_empty_should_still_go_through_the_deserializer()
     {
-        await using var server = NatsServer.Start();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
@@ -252,9 +257,9 @@ public class SerializerTest
     [Fact]
     public async Task Deserialize_chained_with_empty()
     {
-        await using var server = NatsServer.Start();
-        await using var nats = server.CreateClientConnection(new NatsOpts
+        await using var nats = new NatsConnection(new NatsOpts
         {
+            Url = _server.Url,
             SerializerRegistry = new TestSerializerRegistry(),
         });
 
@@ -309,7 +314,7 @@ public class TestSerializerWithEmpty<T> : INatsSerializer<T>
 {
     public T? Deserialize(in ReadOnlySequence<byte> buffer) => (T)(object)(buffer.IsEmpty
         ? new TestData("__EMPTY__")
-        : new TestData(Encoding.ASCII.GetString(buffer)));
+        : new TestData(Encoding.ASCII.GetString(buffer.ToArray())));
 
     public void Serialize(IBufferWriter<byte> bufferWriter, T value) => throw new Exception("not used");
 

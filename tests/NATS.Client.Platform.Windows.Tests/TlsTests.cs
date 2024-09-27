@@ -4,17 +4,21 @@ using Xunit.Abstractions;
 
 namespace NATS.Client.Platform.Windows.Tests;
 
-public class TlsTests
+public class TlsTests : IClassFixture<TlsTestsNatsServerFixture>
 {
     private readonly ITestOutputHelper _output;
+    private readonly TlsTestsNatsServerFixture _server;
 
-    public TlsTests(ITestOutputHelper output) => _output = output;
+    public TlsTests(ITestOutputHelper output, TlsTestsNatsServerFixture server)
+    {
+        _output = output;
+        _server = server;
+    }
 
     [Fact]
     public async Task Tls_fails_without_certificates()
     {
-        await using var server = await NatsServerProcess.StartAsync(config: "resources/configs/tls.conf");
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
 
         var exception = await Assert.ThrowsAsync<NatsException>(async () => await nats.ConnectAsync());
         Assert.Contains("TLS authentication failed", exception.InnerException?.Message);
@@ -26,6 +30,7 @@ public class TlsTests
     {
         const string caCertFile = "resources/certs/ca-cert.pem";
         const string clientCertBundleFile = "resources/certs/client-cert-bundle.pfx";
+        var prefix = _server.GetNextId();
 
         var tlsOpts = new NatsTlsOpts
         {
@@ -33,16 +38,17 @@ public class TlsTests
             CertBundleFile = clientCertBundleFile,
         };
 
-        await using var server = await NatsServerProcess.StartAsync(config: "resources/configs/tls.conf");
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, TlsOpts = tlsOpts });
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, TlsOpts = tlsOpts });
 
         await nats.PingAsync();
 
-        await using var sub = await nats.SubscribeCoreAsync<int>("foo");
+        await using var sub = await nats.SubscribeCoreAsync<int>($"{prefix}.foo");
         for (var i = 0; i < 64; i++)
         {
-            await nats.PublishAsync("foo", i);
+            await nats.PublishAsync($"{prefix}.foo", i);
             Assert.Equal(i, (await sub.Msgs.ReadAsync()).Data);
         }
     }
 }
+
+public class TlsTestsNatsServerFixture() : BaseNatsServerFixture("resources/configs/tls.conf");

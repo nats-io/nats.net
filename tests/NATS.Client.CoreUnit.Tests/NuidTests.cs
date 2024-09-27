@@ -46,7 +46,7 @@ public class NuidTests
 
         // Assert
         ReadOnlySpan<char> lower = buffer.Slice(0, 22);
-        string resultAsString = new(lower);
+        string resultAsString = new(lower.ToArray());
         ReadOnlySpan<char> upper = buffer.Slice(22);
 
         Assert.True(result);
@@ -112,7 +112,7 @@ public class NuidTests
 
         // Assert
         Assert.True(result);
-        string resultAsString = new(nuid);
+        string resultAsString = new(nuid.ToArray());
         Assert.Matches("[A-z0-9]{22}", resultAsString);
     }
 
@@ -149,7 +149,7 @@ public class NuidTests
         DeterministicRng rng = new(new Queue<byte[]>(new[] { rngBytes, rngBytes }));
 
         var mi = typeof(Nuid).GetMethod("GetPrefix", BindingFlags.Static | BindingFlags.NonPublic);
-        var mGetPrefix = mi!.CreateDelegate<Func<RandomNumberGenerator, char[]>>();
+        var mGetPrefix = (Func<RandomNumberGenerator, char[]>)mi!.CreateDelegate(typeof(Func<RandomNumberGenerator, char[]>));
 
         // Act
         var prefix = mGetPrefix(rng);
@@ -207,7 +207,7 @@ public class NuidTests
 
         foreach (var (nuid, threadId) in nuids.ToList())
         {
-            var prefix = new string(nuid.AsSpan(0, prefixLength));
+            var prefix = new string(nuid.AsSpan(0, prefixLength).ToArray());
             Assert.True(uniquePrefixes.Add(prefix), $"Unique prefix {prefix}");
             Assert.True(uniqueThreadIds.Add(threadId), $"Unique thread id {threadId}");
         }
@@ -265,7 +265,7 @@ public class NuidTests
                             return;
                         }
 
-                        var nuid = new string(buffer);
+                        var nuid = new string(buffer.ToArray());
 
                         if (!nuids.Add(nuid))
                         {
@@ -307,7 +307,7 @@ public class NuidTests
                     return;
                 }
 
-                var nuid = new string(buffer);
+                var nuid = new string(buffer.ToArray());
 
                 if (!nuids.Add(nuid))
                 {
