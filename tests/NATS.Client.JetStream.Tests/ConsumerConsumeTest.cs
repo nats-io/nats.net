@@ -1,15 +1,22 @@
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Tests;
+using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Tests;
 
+[Collection("nats-server")]
 public class ConsumerConsumeTest
 {
     private readonly ITestOutputHelper _output;
+    private readonly NatsServerFixture _server;
 
-    public ConsumerConsumeTest(ITestOutputHelper output) => _output = output;
+    public ConsumerConsumeTest(ITestOutputHelper output, NatsServerFixture server)
+    {
+        _output = output;
+        _server = server;
+    }
 
     [Theory]
     [InlineData("Invalid.DotName")]
@@ -261,14 +268,14 @@ public class ConsumerConsumeTest
     [Fact]
     public async Task Consume_dispose_test()
     {
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 
         var js = new NatsJSContext(nats);
-        var stream = await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
-        var consumer = (NatsJSConsumer)await js.CreateOrUpdateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+        var stream = await js.CreateStreamAsync($"{prefix}s1", new[] { $"{prefix}s1.*" }, cts.Token);
+        var consumer = (NatsJSConsumer)await js.CreateOrUpdateConsumerAsync($"{prefix}s1", $"{prefix}c1", cancellationToken: cts.Token);
 
         var consumerOpts = new NatsJSConsumeOpts
         {
@@ -279,7 +286,7 @@ public class ConsumerConsumeTest
 
         for (var i = 0; i < 10; i++)
         {
-            var ack = await js.PublishAsync("s1.foo", new TestData { Test = i }, serializer: TestDataJsonSerializer<TestData>.Default, cancellationToken: cts.Token);
+            var ack = await js.PublishAsync($"{prefix}s1.foo", new TestData { Test = i }, serializer: TestDataJsonSerializer<TestData>.Default, cancellationToken: cts.Token);
             ack.EnsureSuccess();
         }
 
@@ -310,7 +317,7 @@ public class ConsumerConsumeTest
             "ack pending 9",
             async () =>
             {
-                var c = await js.GetConsumerAsync("s1", "c1", cts.Token);
+                var c = await js.GetConsumerAsync($"{prefix}s1", $"{prefix}c1", cts.Token);
                 return c.Info.NumAckPending == 9;
             },
             retryDelay: TimeSpan.FromSeconds(1),
@@ -326,7 +333,7 @@ public class ConsumerConsumeTest
             "ack pending 0",
             async () =>
             {
-                var c = await js.GetConsumerAsync("s1", "c1", cts.Token);
+                var c = await js.GetConsumerAsync($"{prefix}s1", $"{prefix}c1", cts.Token);
                 return c.Info.NumAckPending == 0;
             },
             retryDelay: TimeSpan.FromSeconds(1),

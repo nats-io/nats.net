@@ -1,3 +1,4 @@
+using System.Text;
 using NATS.Client.Core.NaCl;
 
 namespace NATS.Client.Core.Tests;
@@ -15,12 +16,12 @@ public class NKeyTests
         var nKey = NKeys.FromSeed(seed);
 
         // Sanity check public key
-        var actualPublicKey = Convert.ToHexString(nKey.PublicKey);
+        var actualPublicKey = ToHexString(nKey.PublicKey);
         Assert.Equal(expectedPublicKey, actualPublicKey);
 
         // Sign and verify
         var signedData = nKey.Sign(dataToSign.ToArray());
-        var actual = Convert.ToHexString(signedData);
+        var actual = ToHexString(signedData);
 
         Assert.Equal(expectedSignedResult, actual);
     }
@@ -32,8 +33,19 @@ public class NKeyTests
         const string ExpectedHash = "B8B57504AD522AC43AF52CB86BB10D315840C7D1B80BDF3A2524654F7C2C3B07C601ADD320E9F870A6FA8DA3003CFA1BE330133D0ABED7CE49F9251D2BB97421";
 
         var dataArray = dataToHash.ToArray();
-        var actual = Convert.ToHexString(Sha512.Hash(dataArray, 0, dataArray.Length));
+        var actual = ToHexString(Sha512.Hash(dataArray, 0, dataArray.Length));
 
         Assert.Equal(ExpectedHash, actual);
+    }
+
+    private static string ToHexString(byte[] bytes)
+    {
+        var hex = new StringBuilder(bytes.Length * 2);
+        foreach (var b in bytes)
+        {
+            hex.Append($"{b:X2}");
+        }
+
+        return hex.ToString();
     }
 }

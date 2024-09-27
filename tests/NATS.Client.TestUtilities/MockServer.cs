@@ -3,6 +3,10 @@ using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
 
+#if !NET6_0_OR_GREATER
+using NATS.Client.Core.Internal.NetStandardExtensions;
+#endif
+
 namespace NATS.Client.TestUtilities;
 
 public class MockServer : IAsyncDisposable
@@ -32,7 +36,11 @@ public class MockServer : IAsyncDisposable
                 var n = 0;
                 while (!cancellationToken.IsCancellationRequested)
                 {
+#if NET6_0_OR_GREATER
                     var tcpClient = await _server.AcceptTcpClientAsync(cancellationToken);
+#else
+                    var tcpClient = await _server.AcceptTcpClientAsync();
+#endif
                     var client = new Client(this, tcpClient);
                     n++;
                     Log($"[S] [{n}] New client connected");
@@ -148,6 +156,9 @@ public class MockServer : IAsyncDisposable
         {
         }
         catch (IOException)
+        {
+        }
+        catch (ObjectDisposedException)
         {
         }
     }
