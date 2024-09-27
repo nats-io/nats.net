@@ -1,23 +1,29 @@
+using NATS.Client.Core2.Tests;
 using NATS.Client.Serializers.Json;
 
 namespace NATS.Client.Core.Tests;
 
+[Collection("nats-server")]
 public class JsonSerializerTests
 {
     private readonly ITestOutputHelper _output;
+    private readonly NatsServerFixture _server;
 
-    public JsonSerializerTests(ITestOutputHelper output) => _output = output;
+    public JsonSerializerTests(ITestOutputHelper output, NatsServerFixture server)
+    {
+        _output = output;
+        _server = server;
+    }
 
     [Fact]
     public async Task Serialize_any_type()
     {
         var natsOpts = NatsOpts.Default with
         {
+            Url = _server.Url,
             SerializerRegistry = NatsJsonSerializerRegistry.Default,
         };
-
-        await using var server = NatsServer.Start();
-        await using var nats = server.CreateClientConnection(natsOpts);
+        await using var nats = new NatsConnection(natsOpts);
 
         // in local runs server start is taking too long when running
         // the whole suite.
@@ -32,7 +38,7 @@ public class JsonSerializerTests
         Assert.Equal("bar", msg.Data?.Name);
 
         // Default serializer won't work with random types
-        await using var nats1 = server.CreateClientConnection();
+        await using var nats1 = new NatsConnection(new NatsOpts { Url = _server.Url });
 
         var exception = await Assert.ThrowsAsync<NatsException>(() => nats1.PublishAsync(
             subject: "would.not.work",

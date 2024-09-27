@@ -48,6 +48,8 @@ public class NatsKVContextFactoryTest
 
     public class MockJsContext : INatsJSContext
     {
+        public INatsConnection Connection { get; } = new NatsConnection();
+
         public ValueTask<INatsJSConsumer> CreateOrderedConsumerAsync(string stream, NatsJSOrderedConsumerOpts? opts = default, CancellationToken cancellationToken = default) => throw new NotImplementedException();
 
         public ValueTask<INatsJSConsumer> CreateOrUpdateConsumerAsync(string stream, ConsumerConfig config, CancellationToken cancellationToken = default) => throw new NotImplementedException();

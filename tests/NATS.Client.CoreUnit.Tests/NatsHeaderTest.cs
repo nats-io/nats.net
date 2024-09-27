@@ -31,7 +31,7 @@ public class NatsHeaderTest
         await pipe.Writer.FlushAsync();
         var result = await pipe.Reader.ReadAtLeastAsync((int)written);
         Assert.True(expected.ToSpan().SequenceEqual(result.Buffer.ToSpan()));
-        _output.WriteLine($"Buffer:\n{result.Buffer.FirstSpan.Dump()}");
+        _output.WriteLine($"Buffer:\n{result.Buffer.First.Span.Dump()}");
     }
 
     [Fact]
@@ -49,7 +49,7 @@ public class NatsHeaderTest
         await pipe.Writer.FlushAsync();
         var result = await pipe.Reader.ReadAtLeastAsync((int)written);
         Assert.True(expected.ToSpan().SequenceEqual(result.Buffer.ToSpan()));
-        _output.WriteLine($"Buffer:\n{result.Buffer.FirstSpan.Dump()}");
+        _output.WriteLine($"Buffer:\n{result.Buffer.First.Span.Dump()}");
     }
 
     [Fact]

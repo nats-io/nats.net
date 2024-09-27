@@ -178,7 +178,7 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
     internal override void SetLastError(string error) => Interlocked.Exchange(ref _lastError, error);
 
     internal ValueTask StartAsync(CancellationToken cancellationToken) =>
-        _nats.SubAsync(this, cancellationToken);
+        _nats.AddSubAsync(this, cancellationToken);
 
     protected override ValueTask ReceiveInternalAsync(
         string subject,

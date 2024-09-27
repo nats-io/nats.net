@@ -1,22 +1,55 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Threading.Channels;
 
 namespace NATS.Client.Core;
 
 public interface INatsConnection : INatsClient
 {
+    /// <summary>
+    /// Event that is raised when the connection to the NATS server is disconnected.
+    /// </summary>
     event AsyncEventHandler<NatsEventArgs>? ConnectionDisconnected;
 
+    /// <summary>
+    /// Event that is raised when the connection to the NATS server is opened.
+    /// </summary>
     event AsyncEventHandler<NatsEventArgs>? ConnectionOpened;
 
+    /// <summary>
+    /// Event that is raised when a reconnect attempt is failed.
+    /// </summary>
     event AsyncEventHandler<NatsEventArgs>? ReconnectFailed;
 
+    /// <summary>
+    /// Event that is raised when a message is dropped for a subscription.
+    /// </summary>
     event AsyncEventHandler<NatsMessageDroppedEventArgs>? MessageDropped;
 
+    /// <summary>
+    /// Server information received from the NATS server.
+    /// </summary>
     INatsServerInfo? ServerInfo { get; }
 
+    /// <summary>
+    /// Options used to configure the NATS connection.
+    /// </summary>
     NatsOpts Opts { get; }
 
+    /// <summary>
+    /// Connection state of the NATS connection.
+    /// </summary>
     NatsConnectionState ConnectionState { get; }
+
+    /// <summary>
+    /// Subscription manager used to manage subscriptions for the NATS connection.
+    /// </summary>
+    INatsSubscriptionManager SubscriptionManager { get; }
+
+    /// <summary>
+    /// Singleton instance of the NATS header parser used to parse message headers
+    /// used by the NATS connection.
+    /// </summary>
+    NatsHeaderParser HeaderParser { get; }
 
     /// <summary>
     /// Publishes a serializable message payload to the given subject name, optionally supplying a reply subject.
@@ -87,4 +120,61 @@ public interface INatsConnection : INatsClient
         NatsPubOpts? requestOpts = default,
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Adds a subscription to the NATS connection for a given <see cref="NatsSubBase"/> object.
+    /// Subscriptions are managed by the connection and are automatically removed when the connection is closed.
+    /// </summary>
+    /// <param name="sub">The <see cref="NatsSubBase"/> object representing the subscription details.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the operation.</param>
+    /// <returns>A <see cref="ValueTask"/> that represents the asynchronous subscription operation.</returns>
+    ValueTask AddSubAsync(NatsSubBase sub, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Creates a subscription with appropriate request and reply subjects publishing the request.
+    /// It's the caller's responsibility to retrieve the reply messages and complete the subscription.
+    /// </summary>
+    /// <typeparam name="TRequest">The type of the request data.</typeparam>
+    /// <typeparam name="TReply">The type of the expected reply.</typeparam>
+    /// <param name="subject">The subject to subscribe to.</param>
+    /// <param name="data">The optional request data.</param>
+    /// <param name="headers">The optional headers to include with the request.</param>
+    /// <param name="requestSerializer">The optional serializer for the request data.</param>
+    /// <param name="replySerializer">The optional deserializer for the reply data.</param>
+    /// <param name="requestOpts">The optional publishing options for the request.</param>
+    /// <param name="replyOpts">The optional subscription options for the reply.</param>
+    /// <param name="cancellationToken">The optional cancellation token.</param>
+    /// <returns>A <see cref="ValueTask{T}"/> representing the asynchronous operation of creating the request subscription.</returns>
+    ValueTask<NatsSub<TReply>> CreateRequestSubAsync<TRequest, TReply>(
+        string subject,
+        TRequest? data,
+        NatsHeaders? headers = default,
+        INatsSerialize<TRequest>? requestSerializer = default,
+        INatsDeserialize<TReply>? replySerializer = default,
+        NatsPubOpts? requestOpts = default,
+        NatsSubOpts? replyOpts = default,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves the bounded channel options for creating a channel used by a subscription.
+    /// Options are built from the connection's configuration and the subscription channel options.
+    /// Used to aid in custom message handling when building a subscription channel.
+    /// </summary>
+    /// <param name="subChannelOpts">The options for configuring the subscription channel.</param>
+    /// <returns>The bounded channel options used for creating the subscription channel.</returns>
+    BoundedChannelOptions GetBoundedChannelOpts(NatsSubChannelOpts? subChannelOpts);
+
+    /// <summary>
+    /// Called when a message is dropped for a subscription.
+    /// Used to aid in custom message handling when a subscription's message channel is full.
+    /// </summary>
+    /// <param name="natsSub">The <see cref="NatsSubBase"/> representing the subscription.</param>
+    /// <param name="pending">The number of pending messages at the time the drop occurred.</param>
+    /// <param name="msg">The dropped message represented by <see cref="NatsMsg{T}"/>.</param>
+    /// <typeparam name="T">Specifies the type of data in the dropped message.</typeparam>
+    /// <remarks>
+    /// This method is expected to complete quickly to avoid further delays in processing;
+    /// if complex work is required, it is recommended to offload to a channel or other out-of-band processor.
+    /// </remarks>
+    void OnMessageDropped<T>(NatsSubBase natsSub, int pending, NatsMsg<T> msg);
 }

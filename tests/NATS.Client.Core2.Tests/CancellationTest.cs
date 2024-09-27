@@ -1,18 +1,25 @@
+using NATS.Client.Core2.Tests;
+using NATS.Client.Platform.Windows.Tests;
+
 namespace NATS.Client.Core.Tests;
 
+[Collection("nats-server")]
 public class CancellationTest
 {
     private readonly ITestOutputHelper _output;
+    private readonly NatsServerFixture _server;
 
-    public CancellationTest(ITestOutputHelper output) => _output = output;
+    public CancellationTest(ITestOutputHelper output, NatsServerFixture server)
+    {
+        _output = output;
+        _server = server;
+    }
 
     // check CommandTimeout
     [Fact]
     public async Task CommandTimeoutTest()
     {
-        await using var server = NatsServer.Start();
-
-        await using var conn = server.CreateClientConnection(NatsOpts.Default with { CommandTimeout = TimeSpan.FromMilliseconds(1) });
+        await using var conn = new NatsConnection(NatsOpts.Default with { Url = _server.Url, CommandTimeout = TimeSpan.FromMilliseconds(1) });
         await conn.ConnectAsync();
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -40,9 +47,9 @@ public class CancellationTest
     [Fact]
     public async Task CommandConnectCancellationTest()
     {
-        var server = NatsServer.Start(_output, TransportType.Tcp);
+        var server = await NatsServerProcess.StartAsync();
 
-        await using var conn = server.CreateClientConnection();
+        await using var conn = new NatsConnection(new NatsOpts { Url = server.Url });
         await conn.ConnectAsync();
 
         // kill the server

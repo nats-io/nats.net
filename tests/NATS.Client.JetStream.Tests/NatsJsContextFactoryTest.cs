@@ -1,3 +1,5 @@
+using System.Text;
+using System.Threading.Channels;
 using NATS.Client.Core.Tests;
 
 namespace NATS.Client.JetStream.Tests;
@@ -100,6 +102,10 @@ public class NatsJSContextFactoryTest
 
         public NatsConnectionState ConnectionState { get; } = NatsConnectionState.Closed;
 
+        public INatsSubscriptionManager SubscriptionManager { get; } = new TestSubscriptionManager();
+
+        public NatsHeaderParser HeaderParser { get; } = new NatsHeaderParser(Encoding.UTF8);
+
         public ValueTask<TimeSpan> PingAsync(CancellationToken cancellationToken = default) => throw new NotImplementedException();
 
         public ValueTask PublishAsync<T>(string subject, T data, NatsHeaders? headers = default, string? replyTo = default, INatsSerialize<T>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default) => throw new NotImplementedException();
@@ -138,8 +144,22 @@ public class NatsJSContextFactoryTest
             CancellationToken cancellationToken = default)
             => throw new NotImplementedException();
 
+        public void OnMessageDropped<T>(NatsSubBase natsSub, int pending, NatsMsg<T> msg) => throw new NotImplementedException();
+
+        public ValueTask AddSubAsync(NatsSubBase sub, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+
+        public BoundedChannelOptions GetBoundedChannelOpts(NatsSubChannelOpts? subChannelOpts) => throw new NotImplementedException();
+
+        public ValueTask<NatsSub<TReply>> CreateRequestSubAsync<TRequest, TReply>(string subject, TRequest? data, NatsHeaders? headers = default, INatsSerialize<TRequest>? requestSerializer = default, INatsDeserialize<TReply>? replySerializer = default, NatsPubOpts? requestOpts = default, NatsSubOpts? replyOpts = default, CancellationToken cancellationToken = default) =>
+            throw new NotImplementedException();
+
         public ValueTask ConnectAsync() => throw new NotImplementedException();
 
         public ValueTask DisposeAsync() => throw new NotImplementedException();
     }
+}
+
+public class TestSubscriptionManager : INatsSubscriptionManager
+{
+    public ValueTask RemoveAsync(NatsSubBase sub) => throw new NotImplementedException();
 }

@@ -1,12 +1,22 @@
+using NATS.Client.Core2.Tests;
+using NATS.Client.Platform.Windows.Tests;
+
 namespace NATS.Client.Core.Tests;
 
+[Collection("nats-server")]
 public class MessageInterfaceTest
 {
+    private readonly NatsServerFixture _server;
+
+    public MessageInterfaceTest(NatsServerFixture server)
+    {
+        _server = server;
+    }
+
     [Fact]
     public async Task Sub_custom_builder_test()
     {
-        await using var server = NatsServer.Start();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
 
         var sync = 0;
         var sub = Task.Run(async () =>

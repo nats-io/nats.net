@@ -9,9 +9,9 @@ public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
 {
     private readonly Channel<NatsMsg<T>> _msgs;
 
-    internal NatsSub(
-        NatsConnection connection,
-        ISubscriptionManager manager,
+    public NatsSub(
+        INatsConnection connection,
+        INatsSubscriptionManager manager,
         string subject,
         string? queueGroup,
         NatsSubOpts? opts,
@@ -20,7 +20,7 @@ public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
         : base(connection, manager, subject, queueGroup, opts, cancellationToken)
     {
         _msgs = Channel.CreateBounded<NatsMsg<T>>(
-            connection.GetChannelOpts(connection.Opts, opts?.ChannelOpts),
+            connection.GetBoundedChannelOpts(opts?.ChannelOpts),
             msg => Connection.OnMessageDropped(this, _msgs?.Reader.Count ?? 0, msg));
 
         Msgs = new ActivityEndingMsgReader<T>(_msgs.Reader, this);

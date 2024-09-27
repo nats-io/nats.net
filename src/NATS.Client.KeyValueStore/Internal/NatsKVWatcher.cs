@@ -36,7 +36,7 @@ internal sealed class NatsKVWatcher<T> : IAsyncDisposable
     private readonly CancellationToken _cancellationToken;
     private readonly string _keyBase;
     private readonly string[] _filters;
-    private readonly NatsConnection _nats;
+    private readonly INatsConnection _nats;
     private readonly Channel<NatsKVWatchCommandMsg<T>> _commandChannel;
     private readonly Channel<NatsKVEntry<T>> _entryChannel;
     private readonly Channel<string> _consumerCreateChannel;
@@ -363,7 +363,7 @@ internal sealed class NatsKVWatcher<T> : IAsyncDisposable
         }
 
         _sub = new NatsKVWatchSub<T>(_context, _commandChannel, _serializer, _subOpts, _cancellationToken);
-        await _context.Connection.SubAsync(_sub, _cancellationToken).ConfigureAwait(false);
+        await _context.Connection.AddSubAsync(_sub, _cancellationToken).ConfigureAwait(false);
 
         if (_debug)
         {

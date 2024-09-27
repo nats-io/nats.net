@@ -6,16 +6,11 @@ using NATS.Client.Core.Commands;
 
 namespace NATS.Client.Core.Internal;
 
-internal interface ISubscriptionManager
-{
-    public ValueTask RemoveAsync(NatsSubBase sub);
-}
-
 internal record struct SidMetadata(string Subject, WeakReference<NatsSubBase> WeakReference);
 
 internal sealed record SubscriptionMetadata(int Sid);
 
-internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposable
+internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisposable
 {
     private readonly ILogger<SubscriptionManager> _logger;
     private readonly bool _trace;
@@ -192,7 +187,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
     /// Commands returned form all the subscriptions will be run as a priority right after reconnection is established.
     /// </remarks>
     /// <returns>Enumerable list of commands</returns>
-    public async ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter)
+    internal async ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter)
     {
         if (_debug)
         {
@@ -226,7 +221,7 @@ internal sealed class SubscriptionManager : ISubscriptionManager, IAsyncDisposab
         }
     }
 
-    public ISubscriptionManager GetManagerFor(string subject)
+    internal INatsSubscriptionManager GetManagerFor(string subject)
     {
         if (IsInboxSubject(subject))
             return InboxSubBuilder;

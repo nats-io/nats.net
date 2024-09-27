@@ -1,7 +1,8 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
+        <TargetFrameworks Condition="'$(OS)' == 'Windows_NT'">$(TargetFrameworks);net481</TargetFrameworks>
         <Nullable>enable</Nullable>
         <IsPackable>false</IsPackable>
         <NoWarn>$(NoWarn);CS8002</NoWarn>
@@ -24,19 +25,26 @@
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
         <PackageReference Include="Xunit.SkippableFact" Version="1.4.13" />
+        <PackageReference Include="System.Net.Http" Version="4.3.4" />
+        <PackageReference Include="System.Text.RegularExpressions" Version="4.3.1" />
     </ItemGroup>
 
     <ItemGroup>
         <Using Include="Xunit"/>
         <Using Include="Xunit.Abstractions"/>
         <Using Include="FluentAssertions"/>
-        <Using Include="NATS.Client"/>
+        <Using Include="NATS.Client.Core"/>
+        <Using Include="NATS.Client.Core.Internal"/>
+        <Using Include="NATS.Client.Core.Commands"/>
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\src\NATS.Client.JetStream\NATS.Client.JetStream.csproj" />
-        <ProjectReference Include="..\NATS.Client.TestUtilities\NATS.Client.TestUtilities.csproj"/>
-        <ProjectReference Include="..\..\src\NATS.Client.Simplified\NATS.Client.Simplified.csproj"/>
+        <ProjectReference Include="..\..\src\NATS.Client.Serializers.Json\NATS.Client.Serializers.Json.csproj" />
+        <ProjectReference Include="..\..\src\NATS.Client.Core\NATS.Client.Core.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+      <Compile Include="..\NATS.Client.TestUtilities\FluentAssertionsExtension.cs" />
     </ItemGroup>
 
 </Project>

@@ -116,11 +116,11 @@ public class NatsHostingExtensionsTests
             .ConfigureConnection((_, _) => { }) // Add multiple to test chaining
             .ConfigureConnection((serviceProvider, conn) =>
             {
-                conn.OnConnectingAsync = async instance =>
+                conn.OnConnectingAsync = instance =>
                 {
                     var resolved = serviceProvider.GetRequiredService<IMyResolvedService>().GetValue();
 
-                    return (resolved, instance.Port);
+                    return new ValueTask<(string Host, int Port)>((resolved, instance.Port));
                 };
             }));
 

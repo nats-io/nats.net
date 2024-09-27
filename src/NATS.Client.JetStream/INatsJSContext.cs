@@ -7,6 +7,11 @@ namespace NATS.Client.JetStream;
 public interface INatsJSContext
 {
     /// <summary>
+    /// Connection to the NATS server.
+    /// </summary>
+    INatsConnection Connection { get; }
+
+    /// <summary>
     /// Creates new ordered consumer.
     /// </summary>
     /// <param name="stream">Stream name to create the consumer under.</param>

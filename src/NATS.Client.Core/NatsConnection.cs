@@ -48,6 +48,7 @@ public partial class NatsConnection : INatsConnection
     private readonly BoundedChannelOptions _defaultSubscriptionChannelOpts;
     private readonly Channel<(NatsEvent, NatsEventArgs)> _eventChannel;
     private readonly ClientOpts _clientOpts;
+    private readonly SubscriptionManager _subscriptionManager;
 
     private int _pongCount;
     private int _connectionState;
@@ -84,7 +85,7 @@ public partial class NatsConnection : INatsConnection
         Counter = new ConnectionStatsCounter();
         CommandWriter = new CommandWriter("main", this, _pool, Opts, Counter, EnqueuePing);
         InboxPrefix = NewInbox(opts.InboxPrefix);
-        SubscriptionManager = new SubscriptionManager(this, InboxPrefix);
+        _subscriptionManager = new SubscriptionManager(this, InboxPrefix);
         _clientOpts = ClientOpts.Create(Opts);
         HeaderParser = new NatsHeaderParser(opts.HeaderEncoding);
         _defaultSubscriptionChannelOpts = new BoundedChannelOptions(opts.SubPendingChannelCapacity)
@@ -130,15 +131,15 @@ public partial class NatsConnection : INatsConnection
 
     public INatsServerInfo? ServerInfo => WritableServerInfo; // server info is set when received INFO
 
+    public INatsSubscriptionManager SubscriptionManager => _subscriptionManager;
+
+    public NatsHeaderParser HeaderParser { get; }
+
     internal bool IsDisposed
     {
         get => Interlocked.CompareExchange(ref _isDisposed, 0, 0) == 1;
         private set => Interlocked.Exchange(ref _isDisposed, value ? 1 : 0);
     }
-
-    internal NatsHeaderParser HeaderParser { get; }
-
-    internal SubscriptionManager SubscriptionManager { get; }
 
     internal CommandWriter CommandWriter { get; }
 
@@ -182,6 +183,36 @@ public partial class NatsConnection : INatsConnection
         await InitialConnectAsync().ConfigureAwait(false);
     }
 
+    /// <inheritdoc />
+    public void OnMessageDropped<T>(NatsSubBase natsSub, int pending, NatsMsg<T> msg)
+    {
+        var subject = msg.Subject;
+        _logger.LogWarning("Dropped message from {Subject} with {Pending} pending messages", subject, pending);
+        _eventChannel.Writer.TryWrite((NatsEvent.MessageDropped, new NatsMessageDroppedEventArgs(natsSub, pending, subject, msg.ReplyTo, msg.Headers, msg.Data)));
+    }
+
+    /// <inheritdoc />
+    public BoundedChannelOptions GetBoundedChannelOpts(NatsSubChannelOpts? subChannelOpts)
+    {
+        if (subChannelOpts is { } overrideOpts)
+        {
+            return new BoundedChannelOptions(overrideOpts.Capacity ??
+                                             _defaultSubscriptionChannelOpts.Capacity)
+            {
+                AllowSynchronousContinuations =
+                    _defaultSubscriptionChannelOpts.AllowSynchronousContinuations,
+                FullMode =
+                    overrideOpts.FullMode ?? _defaultSubscriptionChannelOpts.FullMode,
+                SingleWriter = _defaultSubscriptionChannelOpts.SingleWriter,
+                SingleReader = _defaultSubscriptionChannelOpts.SingleReader,
+            };
+        }
+        else
+        {
+            return _defaultSubscriptionChannelOpts;
+        }
+    }
+
     public virtual async ValueTask DisposeAsync()
     {
         if (!IsDisposed)
@@ -199,7 +230,7 @@ public partial class NatsConnection : INatsConnection
 #endif
             }
 
-            await SubscriptionManager.DisposeAsync().ConfigureAwait(false);
+            await _subscriptionManager.DisposeAsync().ConfigureAwait(false);
             await CommandWriter.DisposeAsync().ConfigureAwait(false);
             _waitForOpenConnection.TrySetCanceled();
 #if NET8_0_OR_GREATER
@@ -224,7 +255,7 @@ public partial class NatsConnection : INatsConnection
 
     internal ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
     {
-        return SubscriptionManager.PublishToClientHandlersAsync(subject, replyTo, sid, headersBuffer, payloadBuffer);
+        return _subscriptionManager.PublishToClientHandlersAsync(subject, replyTo, sid, headersBuffer, payloadBuffer);
     }
 
     internal void ResetPongCount()
@@ -256,34 +287,6 @@ public partial class NatsConnection : INatsConnection
         }
 
         return default;
-    }
-
-    internal void OnMessageDropped<T>(NatsSubBase natsSub, int pending, NatsMsg<T> msg)
-    {
-        var subject = msg.Subject;
-        _logger.LogWarning("Dropped message from {Subject} with {Pending} pending messages", subject, pending);
-        _eventChannel.Writer.TryWrite((NatsEvent.MessageDropped, new NatsMessageDroppedEventArgs(natsSub, pending, subject, msg.ReplyTo, msg.Headers, msg.Data)));
-    }
-
-    internal BoundedChannelOptions GetChannelOpts(NatsOpts connectionOpts, NatsSubChannelOpts? subChannelOpts)
-    {
-        if (subChannelOpts is { } overrideOpts)
-        {
-            return new BoundedChannelOptions(overrideOpts.Capacity ??
-                                             _defaultSubscriptionChannelOpts.Capacity)
-            {
-                AllowSynchronousContinuations =
-                    _defaultSubscriptionChannelOpts.AllowSynchronousContinuations,
-                FullMode =
-                    overrideOpts.FullMode ?? _defaultSubscriptionChannelOpts.FullMode,
-                SingleWriter = _defaultSubscriptionChannelOpts.SingleWriter,
-                SingleReader = _defaultSubscriptionChannelOpts.SingleReader,
-            };
-        }
-        else
-        {
-            return _defaultSubscriptionChannelOpts;
-        }
     }
 
     private async ValueTask InitialConnectAsync()
@@ -465,7 +468,7 @@ public partial class NatsConnection : INatsConnection
                 if (reconnect)
                 {
                     // Reestablish subscriptions and consumers
-                    reconnectTask = SubscriptionManager.WriteReconnectCommandsAsync(priorityCommandWriter.CommandWriter).AsTask();
+                    reconnectTask = _subscriptionManager.WriteReconnectCommandsAsync(priorityCommandWriter.CommandWriter).AsTask();
                 }
 
                 // receive COMMAND response (PONG or ERROR)

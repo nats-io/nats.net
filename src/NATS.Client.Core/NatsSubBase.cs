@@ -24,13 +24,16 @@ public enum NatsSubEndReason
     JetStreamError,
 }
 
+/// <summary>
+/// The base class for NATS subscriptions.
+/// </summary>
 public abstract class NatsSubBase
 {
     private static readonly byte[] NoRespondersHeaderSequence = { (byte)' ', (byte)'5', (byte)'0', (byte)'3' };
     private readonly ILogger _logger;
     private readonly object _gate = new();
     private readonly bool _debug;
-    private readonly ISubscriptionManager _manager;
+    private readonly INatsSubscriptionManager _manager;
     private readonly Timer? _timeoutTimer;
     private readonly Timer? _idleTimeoutTimer;
     private readonly TimeSpan _idleTimeout;
@@ -46,9 +49,18 @@ public abstract class NatsSubBase
     private int _pendingMsgs;
     private Exception? _exception;
 
-    internal NatsSubBase(
-        NatsConnection connection,
-        ISubscriptionManager manager,
+    /// <summary>
+    /// Creates a new instance of <see cref="NatsSubBase"/>.
+    /// </summary>
+    /// <param name="connection">NATS connection.</param>
+    /// <param name="manager">Subscription manager.</param>
+    /// <param name="subject">Subject to subscribe to.</param>
+    /// <param name="queueGroup">Queue group name.</param>
+    /// <param name="opts">Subscription options.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    protected NatsSubBase(
+        INatsConnection connection,
+        INatsSubscriptionManager manager,
         string subject,
         string? queueGroup,
         NatsSubOpts? opts,
@@ -131,18 +143,32 @@ public abstract class NatsSubBase
     /// </summary>
     public string? QueueGroup { get; }
 
+    /// <summary>
+    /// Represents an exception that occurs during the execution of a NATS subscription.
+    /// </summary>
     public Exception? Exception => Volatile.Read(ref _exception);
 
     // Hide from public API using explicit interface implementations
     // since INatsSub is marked as internal.
     public int? PendingMsgs => _pendingMsgs == -1 ? null : Volatile.Read(ref _pendingMsgs);
 
+    /// <summary>
+    /// The reason for the subscription ending.
+    /// </summary>
     public NatsSubEndReason EndReason => (NatsSubEndReason)Volatile.Read(ref _endReasonRaw);
 
     internal NatsSubOpts? Opts { get; private set; }
 
-    protected NatsConnection Connection { get; }
+    /// <summary>
+    /// Represents a connection to the NATS server.
+    /// </summary>
+    protected INatsConnection Connection { get; }
 
+    /// <summary>
+    /// Signals that the subscription is ready to receive messages.
+    /// Override this method to perform any initialization logic.
+    /// </summary>
+    /// <returns>A <see cref="ValueTask"/> that represents the asynchronous operation.</returns>
     public virtual ValueTask ReadyAsync()
     {
         // Let idle timer start with the first message, in case
@@ -191,6 +217,11 @@ public abstract class NatsSubBase
         return _manager.RemoveAsync(this);
     }
 
+    /// <summary>
+    /// Disposes the instance asynchronously.
+    /// </summary>
+    /// <returns>A <see cref="ValueTask"/> representing the asynchronous disposal operation.</returns>
+    /// <exception cref="Exception">Thrown when an exception occurs during disposal.</exception>
     public virtual ValueTask DisposeAsync()
     {
         lock (_gate)
@@ -223,6 +254,14 @@ public abstract class NatsSubBase
         return unsubscribeAsync;
     }
 
+    /// <summary>
+    /// Called when a message is received for the subscription.
+    /// Calls <see cref="ReceiveInternalAsync"/> to process the message handling any exceptions.
+    /// </summary>
+    /// <param name="subject">Subject received for this subscription.</param>
+    /// <param name="replyTo">Reply subject received for this subscription.</param>
+    /// <param name="headersBuffer">Headers buffer received for this subscription.</param>
+    /// <param name="payloadBuffer">Payload buffer received for this subscription.</param>
     public virtual async ValueTask ReceiveAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
     {
         ResetIdleTimeout();
@@ -300,12 +339,19 @@ public abstract class NatsSubBase
     /// <returns></returns>
     protected abstract ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer);
 
+    /// <summary>
+    /// Sets the exception that caused the subscription to end.
+    /// </summary>
+    /// <param name="exception">Exception that caused the subscription to end.</param>
     protected void SetException(Exception exception)
     {
         Interlocked.Exchange(ref _exception, exception);
         EndSubscription(NatsSubEndReason.Exception);
     }
 
+    /// <summary>
+    /// Resets the idle timeout timer.
+    /// </summary>
     protected void ResetIdleTimeout()
     {
         _idleTimeoutTimer?.Change(dueTime: _idleTimeout, period: Timeout.InfiniteTimeSpan);
@@ -318,6 +364,9 @@ public abstract class NatsSubBase
         }
     }
 
+    /// <summary>
+    /// Decrements the maximum number of messages.
+    /// </summary>
     protected void DecrementMaxMsgs()
     {
         if (!_countPendingMsgs)
@@ -337,6 +386,10 @@ public abstract class NatsSubBase
     /// </remarks>
     protected abstract void TryComplete();
 
+    /// <summary>
+    /// Ends the subscription with the specified reason.
+    /// </summary>
+    /// <param name="reason">Reason for ending the subscription.</param>
     protected void EndSubscription(NatsSubEndReason reason)
     {
         if (_debug)
