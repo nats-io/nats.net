@@ -94,6 +94,13 @@ jobs:
           cd tests/NATS.Client.Services.Tests
           dotnet test -c Release --no-build
 
+      - name: Test Simplified
+        run: |
+            killall nats-server 2> /dev/null | echo -n
+            nats-server -v
+            cd tests/NATS.Client.Simplified.Tests
+            dotnet test -c Release --no-build
+
       - name: Test OpenTelemetry
         run: |
           killall nats-server 2> /dev/null | echo -n
