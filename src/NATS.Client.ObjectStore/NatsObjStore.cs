@@ -94,65 +94,74 @@ public class NatsObjStore : INatsObjStore
 
         pushConsumer.Init();
 
-        string digest;
-        var chunks = 0;
-        var size = 0;
-        using (var sha256 = SHA256.Create())
+        var digest = NatsMemoryOwner<char>.Empty;
+        try
         {
-#if NETSTANDARD2_0
-            using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Write))
-#else
-            await using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Write, leaveOpen))
-#endif
+            var chunks = 0;
+            var size = 0;
+            using (var sha256 = SHA256.Create())
             {
-                await foreach (var msg in pushConsumer.Msgs.ReadAllAsync(cancellationToken))
-                {
-                    // We have to make sure to carry on consuming the channel to avoid any blocking:
-                    // e.g. if the channel is full, we would be blocking the reads off the socket (this was intentionally
-                    // done ot avoid bloating the memory with a large backlog of messages or dropping messages at this level
-                    // and signal the server that we are a slow consumer); then when we make an request-reply API call to
-                    // delete the consumer, the socket would be blocked trying to send the response back to us; so we need to
-                    // keep consuming the channel to avoid this.
-                    if (pushConsumer.IsDone)
-                        continue;
-
-                    if (msg.Data.Length > 0)
-                    {
-                        using var memoryOwner = msg.Data;
-                        chunks++;
-                        size += memoryOwner.Memory.Length;
 #if NETSTANDARD2_0
-                        var segment = memoryOwner.DangerousGetArray();
-                        await hashedStream.WriteAsync(segment.Array, segment.Offset, segment.Count, cancellationToken);
+                using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Write))
 #else
-                        await hashedStream.WriteAsync(memoryOwner.Memory, cancellationToken);
+                await using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Write, leaveOpen))
 #endif
-                    }
-
-                    var p = msg.Metadata?.NumPending;
-                    if (p is 0)
+                {
+                    await foreach (var msg in pushConsumer.Msgs.ReadAllAsync(cancellationToken))
                     {
-                        pushConsumer.Done();
+                        // We have to make sure to carry on consuming the channel to avoid any blocking:
+                        // e.g. if the channel is full, we would be blocking the reads off the socket (this was intentionally
+                        // done ot avoid bloating the memory with a large backlog of messages or dropping messages at this level
+                        // and signal the server that we are a slow consumer); then when we make an request-reply API call to
+                        // delete the consumer, the socket would be blocked trying to send the response back to us; so we need to
+                        // keep consuming the channel to avoid this.
+                        if (pushConsumer.IsDone)
+                            continue;
+
+                        if (msg.Data.Length > 0)
+                        {
+                            using var memoryOwner = msg.Data;
+                            chunks++;
+                            size += memoryOwner.Memory.Length;
+#if NETSTANDARD2_0
+                            var segment = memoryOwner.DangerousGetArray();
+                            await hashedStream.WriteAsync(segment.Array, segment.Offset, segment.Count, cancellationToken);
+#else
+                            await hashedStream.WriteAsync(memoryOwner.Memory, cancellationToken);
+#endif
+                        }
+
+                        var p = msg.Metadata?.NumPending;
+                        if (p is 0)
+                        {
+                            pushConsumer.Done();
+                        }
                     }
                 }
+
+                digest = Base64UrlEncoder.EncodeToMemoryOwner(sha256.Hash);
             }
 
-            digest = Base64UrlEncoder.Encode(sha256.Hash);
-        }
+            if (info.Digest == null
+                || info.Digest.StartsWith("SHA-256=") == false
+                || info.Digest.AsSpan().Slice("SHA-256=".Length).SequenceEqual(digest.Span) == false)
+            {
+                throw new NatsObjException("SHA-256 digest mismatch");
+            }
 
-        if ($"SHA-256={digest}" != info.Digest)
-        {
-            throw new NatsObjException("SHA-256 digest mismatch");
-        }
+            if (chunks != info.Chunks)
+            {
+                throw new NatsObjException("Chunks mismatch");
+            }
 
-        if (chunks != info.Chunks)
-        {
-            throw new NatsObjException("Chunks mismatch");
+            if (size != info.Size)
+            {
+                throw new NatsObjException("Size mismatch");
+            }
         }
-
-        if (size != info.Size)
+        finally
         {
-            throw new NatsObjException("Size mismatch");
+            digest.Dispose();
         }
 
         return info;
@@ -223,116 +232,120 @@ public class NatsObjStore : INatsObjStore
         var chunks = 0;
         var chunkSize = meta.Options.MaxChunkSize.Value;
 
-        string digest;
-        using (var sha256 = SHA256.Create())
+        var digest = NatsMemoryOwner<char>.Empty;
+        try
         {
-#if NETSTANDARD2_0
-            using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Read))
-#else
-            await using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Read, leaveOpen))
-#endif
+            using (var sha256 = SHA256.Create())
             {
-                while (true)
+#if NETSTANDARD2_0
+                using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Read))
+#else
+                await using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Read, leaveOpen))
+#endif
                 {
-                    var memoryOwner = NatsMemoryOwner<byte>.Allocate(chunkSize);
-
-                    var memory = memoryOwner.Memory;
-                    var currentChunkSize = 0;
-                    var eof = false;
-
-                    // Fill a chunk
                     while (true)
                     {
+                        var memoryOwner = NatsMemoryOwner<byte>.Allocate(chunkSize);
+
+                        var memory = memoryOwner.Memory;
+                        var currentChunkSize = 0;
+                        var eof = false;
+
+                        // Fill a chunk
+                        while (true)
+                        {
 #if NETSTANDARD2_0
-                        int read;
-                        if (MemoryMarshal.TryGetArray((ReadOnlyMemory<byte>)memory, out var segment) == false)
-                        {
-                            read = await hashedStream.ReadAsync(segment.Array!, segment.Offset, segment.Count, cancellationToken);
-                        }
-                        else
-                        {
-                            var bytes = ArrayPool<byte>.Shared.Rent(memory.Length);
-                            try
+                            int read;
+                            if (MemoryMarshal.TryGetArray((ReadOnlyMemory<byte>)memory, out var segment) == false)
                             {
-                                segment = new ArraySegment<byte>(bytes, 0, memory.Length);
                                 read = await hashedStream.ReadAsync(segment.Array!, segment.Offset, segment.Count, cancellationToken);
-                                segment.Array.AsMemory(0, read).CopyTo(memory);
                             }
-                            finally
+                            else
                             {
-                                ArrayPool<byte>.Shared.Return(bytes);
+                                var bytes = ArrayPool<byte>.Shared.Rent(memory.Length);
+                                try
+                                {
+                                    segment = new ArraySegment<byte>(bytes, 0, memory.Length);
+                                    read = await hashedStream.ReadAsync(segment.Array!, segment.Offset, segment.Count, cancellationToken);
+                                    segment.Array.AsMemory(0, read).CopyTo(memory);
+                                }
+                                finally
+                                {
+                                    ArrayPool<byte>.Shared.Return(bytes);
+                                }
                             }
-                        }
 
 #else
-                        var read = await hashedStream.ReadAsync(memory, cancellationToken);
+                            var read = await hashedStream.ReadAsync(memory, cancellationToken);
 #endif
 
-                        // End of stream
-                        if (read == 0)
-                        {
-                            eof = true;
-                            break;
+                            // End of stream
+                            if (read == 0)
+                            {
+                                eof = true;
+                                break;
+                            }
+
+                            memory = memory.Slice(read);
+                            currentChunkSize += read;
+
+                            // Chunk filled
+                            if (memory.IsEmpty)
+                            {
+                                break;
+                            }
                         }
 
-                        memory = memory.Slice(read);
-                        currentChunkSize += read;
-
-                        // Chunk filled
-                        if (memory.IsEmpty)
+                        if (currentChunkSize > 0)
                         {
-                            break;
+                            size += currentChunkSize;
+                            chunks++;
                         }
+
+                        var buffer = memoryOwner.Slice(0, currentChunkSize);
+
+                        // Chunks
+                        var ack = await _context.PublishAsync(GetChunkSubject(nuid), buffer, serializer: NatsRawSerializer<NatsMemoryOwner<byte>>.Default, cancellationToken: cancellationToken);
+                        ack.EnsureSuccess();
+
+                        if (eof)
+                            break;
                     }
+                }
 
-                    if (currentChunkSize > 0)
-                    {
-                        size += currentChunkSize;
-                        chunks++;
-                    }
+                if (sha256.Hash == null)
+                    throw new NatsObjException("Can't compute SHA256 hash");
 
-                    var buffer = memoryOwner.Slice(0, currentChunkSize);
+                digest = Base64UrlEncoder.EncodeToMemoryOwner(sha256.Hash);
+            }
 
-                    // Chunks
-                    var ack = await _context.PublishAsync(GetChunkSubject(nuid), buffer, serializer: NatsRawSerializer<NatsMemoryOwner<byte>>.Default, cancellationToken: cancellationToken);
-                    ack.EnsureSuccess();
+            meta.Chunks = chunks;
+            meta.Size = size;
+            meta.Digest = $"SHA-256={digest}";
 
-                    if (eof)
-                        break;
+            // Metadata
+            await PublishMeta(meta, cancellationToken);
+
+            // Delete the old object
+            if (info?.Nuid != null && info.Nuid != nuid)
+            {
+                try
+                {
+                    await _context.JSRequestResponseAsync<StreamPurgeRequest, StreamPurgeResponse>(
+                        subject: $"{_context.Opts.Prefix}.STREAM.PURGE.OBJ_{Bucket}",
+                        request: new StreamPurgeRequest { Filter = GetChunkSubject(info.Nuid), },
+                        cancellationToken);
+                }
+                catch (NatsJSApiException e)
+                {
+                    if (e.Error.Code != 404)
+                        throw;
                 }
             }
-
-            if (sha256.Hash == null)
-                throw new NatsObjException("Can't compute SHA256 hash");
-
-            digest = Base64UrlEncoder.Encode(sha256.Hash);
         }
-
-        meta.Chunks = chunks;
-        meta.Size = size;
-        meta.Digest = $"SHA-256={digest}";
-
-        // Metadata
-        await PublishMeta(meta, cancellationToken);
-
-        // Delete the old object
-        if (info?.Nuid != null && info.Nuid != nuid)
+        finally
         {
-            try
-            {
-                await _context.JSRequestResponseAsync<StreamPurgeRequest, StreamPurgeResponse>(
-                    subject: $"{_context.Opts.Prefix}.STREAM.PURGE.OBJ_{Bucket}",
-                    request: new StreamPurgeRequest
-                    {
-                        Filter = GetChunkSubject(info.Nuid),
-                    },
-                    cancellationToken);
-            }
-            catch (NatsJSApiException e)
-            {
-                if (e.Error.Code != 404)
-                    throw;
-            }
+            digest.Dispose();
         }
 
         return meta;

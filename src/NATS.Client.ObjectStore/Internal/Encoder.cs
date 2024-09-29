@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Security.Cryptography;
+using NATS.Client.Core;
 
 namespace NATS.Client.ObjectStore.Internal;
 
@@ -69,17 +70,32 @@ internal static class Base64UrlEncoder
     /// <exception cref="ArgumentOutOfRangeException">offset or length is negative OR offset plus length is greater than the length of inArray.</exception>
     public static string Encode(Span<byte> inArray, bool raw = false)
     {
+        using (var owner = EncodeToMemoryOwner(inArray, raw))
+        {
+            var segment = owner.DangerousGetArray();
+            if (segment.Array == null || segment.Array.Length == 0)
+            {
+                return string.Empty;
+            }
+
+            return new string(segment.Array, segment.Offset, segment.Count);
+        }
+    }
+
+    public static NatsMemoryOwner<char> EncodeToMemoryOwner(Span<byte> inArray, bool raw = false)
+    {
         var offset = 0;
         var length = inArray.Length;
 
         if (length == 0)
-            return string.Empty;
+            return NatsMemoryOwner<char>.Empty;
 
         var lengthMod3 = length % 3;
         var limit = length - lengthMod3;
-        var output = new char[(length + 2) / 3 * 4];
+        var owner = NatsMemoryOwner<char>.Allocate((length + 2) / 3 * 4);
         var table = SBase64Table;
         int i, j = 0;
+        var output = owner.Span;
 
         // takes 3 bytes from inArray and insert 4 bytes into output
         for (i = offset; i < limit; i += 3)
@@ -128,14 +144,14 @@ internal static class Base64UrlEncoder
         }
 
         if (raw)
-            return new string(output, 0, j);
+            return owner.Slice(0, j);
 
         for (var k = j; k < output.Length; k++)
         {
             output[k] = Base64PadCharacter;
         }
 
-        return new string(output);
+        return owner;
     }
 
     /// <summary>
