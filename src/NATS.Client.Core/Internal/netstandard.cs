@@ -10,9 +10,11 @@
 #pragma warning disable SA1204
 #pragma warning disable SA1405
 
-#if NETSTANDARD
-
 // Enable init only setters
+#if NET5_0_OR_GREATER
+[assembly: System.Runtime.CompilerServices.TypeForwardedTo(typeof(System.Runtime.CompilerServices.IsExternalInit))]
+#elif NETSTANDARD
+
 namespace System.Runtime.CompilerServices
 {
     internal static class IsExternalInit
@@ -33,7 +35,9 @@ namespace System.Runtime.CompilerServices
     {
     }
 }
+#endif
 
+#if NETSTANDARD
 namespace System.Diagnostics
 {
     internal sealed class StackTraceHiddenAttribute : Attribute
