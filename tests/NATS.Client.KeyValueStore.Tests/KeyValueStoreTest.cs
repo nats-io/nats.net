@@ -648,4 +648,51 @@ public class KeyValueStoreTest
         Assert.Equal(publishSubject3, kve3.Key);
         Assert.Equal("tres", kve3.Value);
     }
+
+    [SkipIfNatsServer(versionEarlierThan: "2.10")]
+    public async Task Test_CombinedSources()
+    {
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var storeSource1 = await kv.CreateStoreAsync("source1");
+        var storeSource2 = await kv.CreateStoreAsync("source2");
+
+        var storeCombined = await kv.CreateStoreAsync(new NatsKVConfig("combined")
+        {
+            Sources = [
+                new StreamSource { Name = "source1" },
+                new StreamSource { Name = "source2" }
+            ],
+        });
+
+        await storeSource1.PutAsync("ss1_a", "a_fromStore1");
+        await storeSource2.PutAsync("ss2_b", "b_fromStore2");
+
+        await Retry.Until(
+            "async replication is completed",
+            async () =>
+            {
+                try
+                {
+                    await storeCombined.GetEntryAsync<string>("ss1_a");
+                    await storeCombined.GetEntryAsync<string>("ss2_b");
+                }
+                catch (NatsKVKeyNotFoundException)
+                {
+                    return false;
+                }
+
+                return true;
+            });
+
+        var entryA = await storeCombined.GetEntryAsync<string>("ss1_a");
+        var entryB = await storeCombined.GetEntryAsync<string>("ss2_b");
+
+        Assert.Equal("a_fromStore1", entryA.Value);
+        Assert.Equal("b_fromStore2", entryB.Value);
+    }
 }

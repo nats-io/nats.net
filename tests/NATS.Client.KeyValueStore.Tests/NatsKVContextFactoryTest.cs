@@ -50,6 +50,8 @@ public class NatsKVContextFactoryTest
     {
         public INatsConnection Connection { get; } = new NatsConnection();
 
+        public NatsJSOpts Opts { get; } = new(new NatsOpts());
+
         public ValueTask<INatsJSConsumer> CreateOrderedConsumerAsync(string stream, NatsJSOrderedConsumerOpts? opts = default, CancellationToken cancellationToken = default) => throw new NotImplementedException();
 
         public ValueTask<INatsJSConsumer> CreateOrUpdateConsumerAsync(string stream, ConsumerConfig config, CancellationToken cancellationToken = default) => throw new NotImplementedException();

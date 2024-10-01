@@ -20,6 +20,38 @@ public partial class NatsJSContext
         CancellationToken cancellationToken = default)
     {
         ThrowIfInvalidStreamName(config.Name, nameof(config.Name));
+
+        // keep caller's config intact.
+        config = config with { };
+
+        // If we have a mirror and an external domain, convert to ext.APIPrefix.
+        if (config.Mirror != null && !string.IsNullOrEmpty(config.Mirror.Domain))
+        {
+            config.Mirror = config.Mirror with { };
+            ConvertDomain(config.Mirror);
+        }
+
+        // Check sources for the same.
+        if (config.Sources != null && config.Sources.Count > 0)
+        {
+            ICollection<StreamSource>? sources = [];
+            foreach (var ss in config.Sources)
+            {
+                if (!string.IsNullOrEmpty(ss.Domain))
+                {
+                    var remappedDomainSource = ss with { };
+                    ConvertDomain(remappedDomainSource);
+                    sources.Add(remappedDomainSource);
+                }
+                else
+                {
+                    sources.Add(ss);
+                }
+            }
+
+            config.Sources = sources;
+        }
+
         var response = await JSRequestResponseAsync<StreamConfig, StreamInfo>(
             subject: $"{Opts.Prefix}.STREAM.CREATE.{config.Name}",
             config,

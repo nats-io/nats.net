@@ -173,9 +173,6 @@ public class NatsKVContext : INatsKVContext
 
     private static StreamConfig CreateStreamConfig(NatsKVConfig config)
     {
-        // TODO: KV Mirrors
-        var subjects = new[] { $"$KV.{config.Bucket}.>" };
-
         long history;
         if (config.History > 0)
         {
@@ -203,6 +200,66 @@ public class NatsKVContext : INatsKVContext
 
         var replicas = config.NumberOfReplicas > 0 ? config.NumberOfReplicas : 1;
 
+        string[]? subjects;
+        StreamSource? mirror;
+        ICollection<StreamSource>? sources;
+        bool mirrorDirect;
+
+        if (config.Mirror != null)
+        {
+            mirror = config.Mirror with
+            {
+                Name = config.Mirror.Name.StartsWith(KvStreamNamePrefix)
+                    ? config.Mirror.Name
+                    : BucketToStream(config.Mirror.Name),
+            };
+            mirrorDirect = true;
+            subjects = default;
+            sources = default;
+        }
+        else if (config.Sources is { Count: > 0 })
+        {
+            sources = [];
+            foreach (var ss in config.Sources)
+            {
+                string? sourceBucketName;
+                if (ss.Name.StartsWith(KvStreamNamePrefix))
+                {
+                    sourceBucketName = ss.Name.Substring(KvStreamNamePrefixLen);
+                }
+                else
+                {
+                    sourceBucketName = ss.Name;
+                    ss.Name = BucketToStream(ss.Name);
+                }
+
+                if (ss.External == null || sourceBucketName != config.Bucket)
+                {
+                    ss.SubjectTransforms =
+                    [
+                        new SubjectTransform
+                        {
+                            Src = $"$KV.{sourceBucketName}.>",
+                            Dest = $"$KV.{config.Bucket}.>",
+                        }
+                    ];
+                }
+
+                sources.Add(ss);
+            }
+
+            subjects = [$"$KV.{config.Bucket}.>"];
+            mirror = default;
+            mirrorDirect = false;
+        }
+        else
+        {
+            subjects = [$"$KV.{config.Bucket}.>"];
+            mirror = default;
+            sources = default;
+            mirrorDirect = false;
+        }
+
         var streamConfig = new StreamConfig
         {
             Name = BucketToStream(config.Bucket),
@@ -221,10 +278,9 @@ public class NatsKVContext : INatsKVContext
             AllowDirect = true,
             NumReplicas = replicas,
             Discard = StreamConfigDiscard.New,
-
-            // TODO: KV mirrors
-            // MirrorDirect =
-            // Mirror =
+            Mirror = mirror,
+            MirrorDirect = mirrorDirect,
+            Sources = sources,
             Retention = StreamConfigRetention.Limits, // from ADR-8
         };
 

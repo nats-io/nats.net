@@ -327,6 +327,21 @@ public partial class NatsJSContext
         throw new NatsJSApiNoResponseException();
     }
 
+    private static void ConvertDomain(StreamSource streamSource)
+    {
+        if (string.IsNullOrEmpty(streamSource.Domain))
+        {
+            return;
+        }
+
+        if (streamSource.External != null)
+        {
+            throw new ArgumentException("Both domain and external are set");
+        }
+
+        streamSource.External = new ExternalStreamSource { Api = $"$JS.{streamSource.Domain}.API" };
+    }
+
     [DoesNotReturn]
     private static void ThrowInvalidStreamNameException(string? paramName) =>
         throw new ArgumentException("Stream name cannot contain ' ', '.'", paramName);

@@ -18,7 +18,7 @@ namespace NATS.Client.Core;
 [SkipLocalsInit]
 public sealed class Nuid
 {
-    // NuidLength, PrefixLength, SequentialLength were nuint (System.UIntPtr) in the original code
+    // NuidLength, PrefixLength, SequentialLength were nuint (System.UIntPtr) in the original code,
     // however, they were changed to uint to fix the compilation error for IL2CPP Unity projects.
     // With nuint, the following error occurs in Unity Linux IL2CPP builds:
     //   Error: IL2CPP error for method 'System.Char[] NATS.Client.Core.Internal.NuidWriter::Refresh(System.UInt64&)'
@@ -88,7 +88,7 @@ public sealed class Nuid
         ref var digitsPtr = ref MemoryMarshal.GetReference(Digits);
 
         // write backwards so the last two characters change the fastest
-        for (var i = NuidLength; i > PrefixLength;)
+        for (nuint i = NuidLength; i > PrefixLength;)
         {
             i--;
             var digitIndex = (nuint)(sequential % Base);
