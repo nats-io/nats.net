@@ -1,11 +1,11 @@
-﻿using NATS.Client.Core;
+using NATS.Client.Core;
 
 var nc = new NatsConnection();
 
 List<Task> tasks = new();
 
 var bytes = new byte[1024];
-for (int i = 0; i < 10; i++)
+for (var i = 0; i < 10; i++)
 {
     tasks.Add(Task.Run(async () =>
     {
