@@ -2,6 +2,9 @@
 
 using System.Text;
 using NATS.Client.JetStream;
+using NATS.Client.KeyValueStore;
+using NATS.Client.ObjectStore;
+using NATS.Client.Services;
 using NATS.Net;
 
 CancellationTokenSource cts = new();
@@ -94,6 +97,22 @@ await foreach (var stream in js.ListStreamsAsync())
 {
     Console.WriteLine($"JetStream Stream: {stream.Info.Config.Name}");
 }
+
+// Use KeyValueStore by referencing NATS.Client.KeyValueStore package
+var kv1 = client.CreateKeyValueStoreContext();
+var kv2 = js.CreateKeyValueStoreContext();
+await kv1.CreateStoreAsync("store1");
+await kv2.CreateStoreAsync("store1");
+
+// Use ObjectStore by referencing NATS.Client.ObjectStore package
+var obj1 = client.CreateObjectStoreContext();
+var obj2 = js.CreateObjectStoreContext();
+await obj1.CreateObjectStoreAsync("store1");
+await obj2.CreateObjectStoreAsync("store1");
+
+// Use Services by referencing NATS.Client.Services package
+var svc = client.CreateServicesContext();
+await svc.AddServiceAsync("service1", "1.0.0");
 
 await cts.CancelAsync();
 

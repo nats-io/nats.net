@@ -12,6 +12,11 @@ public interface INatsJSContext
     INatsConnection Connection { get; }
 
     /// <summary>
+    /// Provides configuration options for the JetStream context.
+    /// </summary>
+    NatsJSOpts Opts { get; }
+
+    /// <summary>
     /// Creates new ordered consumer.
     /// </summary>
     /// <param name="stream">Stream name to create the consumer under.</param>
@@ -296,4 +301,26 @@ public interface INatsJSContext
         NatsJSPubOpts? opts = default,
         NatsHeaders? headers = default,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Generates a new base inbox string using the connection's inbox prefix.
+    /// </summary>
+    /// <returns>A new inbox string.</returns>
+    string NewBaseInbox();
+
+    /// <summary>
+    /// Sends a request message to a JetStream subject and waits for a response.
+    /// </summary>
+    /// <param name="subject">The JetStream API subject to send the request to.</param>
+    /// <param name="request">The request message object.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <typeparam name="TRequest">The type of the request message.</typeparam>
+    /// <typeparam name="TResponse">The type of the response message.</typeparam>
+    /// <returns>A task representing the asynchronous operation, with a result of type <typeparamref name="TResponse"/>.</returns>
+    ValueTask<TResponse> JSRequestResponseAsync<TRequest, TResponse>(
+        string subject,
+        TRequest? request,
+        CancellationToken cancellationToken = default)
+        where TRequest : class
+        where TResponse : class;
 }

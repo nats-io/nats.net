@@ -14,13 +14,9 @@ public static class NatsClientDefaultSerializer<T>
     /// </summary>
     public static readonly INatsSerializer<T> Default;
 
-    static NatsClientDefaultSerializer()
-    {
-        Default = new NatsSerializerBuilder<T>()
-            .Add(new NatsRawSerializer<T>())
-            .Add(new NatsUtf8PrimitivesSerializer<T>())
-            .Add(new NatsJsonSerializer<T>())
-            .Build();
-        Console.WriteLine($"Default serializer for {typeof(T).Name} is {Default.GetType().Name}");
-    }
+    static NatsClientDefaultSerializer() => Default = new NatsSerializerBuilder<T>()
+        .Add(new NatsRawSerializer<T>())
+        .Add(new NatsUtf8PrimitivesSerializer<T>())
+        .Add(new NatsJsonSerializer<T>())
+        .Build();
 }

@@ -7,7 +7,7 @@ namespace NATS.Client.KeyValueStore.Internal;
 
 internal class NatsKVWatchSub<T> : NatsSubBase
 {
-    private readonly NatsJSContext _context;
+    private readonly INatsJSContext _context;
     private readonly CancellationToken _cancellationToken;
     private readonly INatsConnection _nats;
     private readonly NatsHeaderParser _headerParser;
@@ -15,7 +15,7 @@ internal class NatsKVWatchSub<T> : NatsSubBase
     private readonly ChannelWriter<NatsKVWatchCommandMsg<T>> _commands;
 
     public NatsKVWatchSub(
-        NatsJSContext context,
+        INatsJSContext context,
         Channel<NatsKVWatchCommandMsg<T>> commandChannel,
         INatsDeserialize<T> serializer,
         NatsSubOpts? opts,
@@ -23,7 +23,7 @@ internal class NatsKVWatchSub<T> : NatsSubBase
         : base(
             connection: context.Connection,
             manager: context.Connection.SubscriptionManager,
-            subject: context.NewInbox(),
+            subject: context.NewBaseInbox(),
             queueGroup: default,
             opts)
     {

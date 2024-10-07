@@ -140,11 +140,11 @@ public interface INatsJSMsg<out T>
 /// <typeparam name="T">User message type</typeparam>
 public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
 {
-    private readonly NatsJSContext _context;
+    private readonly INatsJSContext _context;
     private readonly NatsMsg<T> _msg;
     private readonly Lazy<NatsJSMsgMetadata?> _replyToDateTimeAndSeq;
 
-    public NatsJSMsg(NatsMsg<T> msg, NatsJSContext context)
+    public NatsJSMsg(NatsMsg<T> msg, INatsJSContext context)
     {
         _msg = msg;
         _context = context;

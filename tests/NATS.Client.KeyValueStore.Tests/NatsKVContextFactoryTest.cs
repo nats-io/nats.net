@@ -93,5 +93,12 @@ public class NatsKVContextFactoryTest
         public IAsyncEnumerable<string> ListStreamNamesAsync(string? subject = default, CancellationToken cancellationToken = default) => throw new NotImplementedException();
 
         public ValueTask<NatsJSPublishConcurrentFuture> PublishConcurrentAsync<T>(string subject, T? data, INatsSerialize<T>? serializer = default, NatsJSPubOpts? opts = default, NatsHeaders? headers = default, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+
+        public string NewBaseInbox() => throw new NotImplementedException();
+
+        public ValueTask<TResponse> JSRequestResponseAsync<TRequest, TResponse>(string subject, TRequest? request, CancellationToken cancellationToken = default)
+            where TRequest : class
+            where TResponse : class
+            => throw new NotImplementedException();
     }
 }

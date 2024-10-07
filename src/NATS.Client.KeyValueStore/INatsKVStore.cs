@@ -1,9 +1,15 @@
 using NATS.Client.Core;
+using NATS.Client.JetStream;
 
 namespace NATS.Client.KeyValueStore;
 
 public interface INatsKVStore
 {
+    /// <summary>
+    /// Provides access to the JetStream context associated with the Object Store operations.
+    /// </summary>
+    INatsJSContext JetStreamContext { get; }
+
     /// <summary>
     /// Name of the Key Value Store bucket
     /// </summary>

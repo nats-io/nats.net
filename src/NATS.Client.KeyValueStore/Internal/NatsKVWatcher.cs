@@ -28,7 +28,7 @@ internal sealed class NatsKVWatcher<T> : IAsyncDisposable
 {
     private readonly ILogger _logger;
     private readonly bool _debug;
-    private readonly NatsJSContext _context;
+    private readonly INatsJSContext _context;
     private readonly string _bucket;
     private readonly INatsDeserialize<T> _serializer;
     private readonly NatsKVWatchOpts _opts;
@@ -53,7 +53,7 @@ internal sealed class NatsKVWatcher<T> : IAsyncDisposable
     private INatsJSConsumer? _initialConsumer;
 
     public NatsKVWatcher(
-        NatsJSContext context,
+        INatsJSContext context,
         string bucket,
         IEnumerable<string> keys,
         INatsDeserialize<T> serializer,

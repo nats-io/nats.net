@@ -16,7 +16,7 @@ public class NatsSvcServer : INatsSvcServer
 {
     private readonly ILogger _logger;
     private readonly string _id;
-    private readonly NatsConnection _nats;
+    private readonly INatsConnection _nats;
     private readonly NatsSvcConfig _config;
     private readonly Channel<SvcMsg> _channel;
     private readonly Task _taskMsgLoop;
@@ -31,7 +31,7 @@ public class NatsSvcServer : INatsSvcServer
     /// <param name="nats">NATS connection.</param>
     /// <param name="config">Service configuration.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the service creation requests.</param>
-    public NatsSvcServer(NatsConnection nats, NatsSvcConfig config, CancellationToken cancellationToken)
+    public NatsSvcServer(INatsConnection nats, NatsSvcConfig config, CancellationToken cancellationToken)
     {
         _logger = nats.Opts.LoggerFactory.CreateLogger<NatsSvcServer>();
         _id = Nuid.NewNuid();

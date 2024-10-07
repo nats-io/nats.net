@@ -1,3 +1,5 @@
+using NATS.Client.Core;
+
 namespace NATS.Client.Services;
 
 /// <summary>
@@ -5,6 +7,11 @@ namespace NATS.Client.Services;
 /// </summary>
 public interface INatsSvcContext
 {
+    /// <summary>
+    /// Gets the associated NATS connection.
+    /// </summary>
+    INatsConnection Connection { get; }
+
     /// <summary>
     /// Adds a new service.
     /// </summary>

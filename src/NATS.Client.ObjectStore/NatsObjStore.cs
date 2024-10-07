@@ -28,28 +28,23 @@ public class NatsObjStore : INatsObjStore
     private static readonly NatsHeaders NatsRollupHeaders = new() { { NatsRollup, RollupSubject } };
 
     private readonly NatsObjContext _objContext;
-    private readonly NatsJSContext _context;
     private readonly INatsJSStream _stream;
 
-    internal NatsObjStore(NatsObjConfig config, NatsObjContext objContext, NatsJSContext context, INatsJSStream stream)
+    internal NatsObjStore(NatsObjConfig config, NatsObjContext objContext, INatsJSContext context, INatsJSStream stream)
     {
         Bucket = config.Bucket;
         _objContext = objContext;
-        _context = context;
+        JetStreamContext = context;
         _stream = stream;
     }
 
-    /// <summary>
-    /// Object store bucket name.
-    /// </summary>
+    /// <inheritdoc />
+    public INatsJSContext JetStreamContext { get; }
+
+    /// <inheritdoc />
     public string Bucket { get; }
 
-    /// <summary>
-    /// Get object by key.
-    /// </summary>
-    /// <param name="key">Object key.</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <returns>Object value as a byte array.</returns>
+    /// <inheritdoc />
     public async ValueTask<byte[]> GetBytesAsync(string key, CancellationToken cancellationToken = default)
     {
         using var memoryStream = new MemoryStream();
@@ -57,15 +52,7 @@ public class NatsObjStore : INatsObjStore
         return memoryStream.ToArray();
     }
 
-    /// <summary>
-    /// Get object by key.
-    /// </summary>
-    /// <param name="key">Object key.</param>
-    /// <param name="stream">Stream to write the object value to.</param>
-    /// <param name="leaveOpen"><c>true</c> to not close the underlying stream when async method returns; otherwise, <c>false</c></param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <returns>Object metadata.</returns>
-    /// <exception cref="NatsObjException">Metadata didn't match the value retrieved e.g. the SHA digest.</exception>
+    /// <inheritdoc />
     public async ValueTask<ObjectMetadata> GetAsync(string key, Stream stream, bool leaveOpen = false, CancellationToken cancellationToken = default)
     {
         ValidateObjectName(key);
@@ -84,7 +71,7 @@ public class NatsObjStore : INatsObjStore
         }
 
         await using var pushConsumer = new NatsJSOrderedPushConsumer<NatsMemoryOwner<byte>>(
-            context: _context,
+            context: JetStreamContext,
             stream: $"OBJ_{Bucket}",
             filter: GetChunkSubject(info.Nuid),
             serializer: NatsDefaultSerializer<NatsMemoryOwner<byte>>.Default,
@@ -158,39 +145,15 @@ public class NatsObjStore : INatsObjStore
         return info;
     }
 
-    /// <summary>
-    /// Put an object by key.
-    /// </summary>
-    /// <param name="key">Object key.</param>
-    /// <param name="value">Object value as a byte array.</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <returns>Object metadata.</returns>
+    /// <inheritdoc />
     public ValueTask<ObjectMetadata> PutAsync(string key, byte[] value, CancellationToken cancellationToken = default) =>
         PutAsync(new ObjectMetadata { Name = key }, new MemoryStream(value), cancellationToken: cancellationToken);
 
-    /// <summary>
-    /// Put an object by key.
-    /// </summary>
-    /// <param name="key">Object key.</param>
-    /// <param name="stream">Stream to read the value from.</param>
-    /// <param name="leaveOpen"><c>true</c> to not close the underlying stream when async method returns; otherwise, <c>false</c></param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <returns>Object metadata.</returns>
-    /// <exception cref="NatsObjException">There was an error calculating SHA digest.</exception>
-    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <inheritdoc />
     public ValueTask<ObjectMetadata> PutAsync(string key, Stream stream, bool leaveOpen = false, CancellationToken cancellationToken = default) =>
         PutAsync(new ObjectMetadata { Name = key }, stream, leaveOpen, cancellationToken);
 
-    /// <summary>
-    /// Put an object by key.
-    /// </summary>
-    /// <param name="meta">Object metadata.</param>
-    /// <param name="stream">Stream to read the value from.</param>
-    /// <param name="leaveOpen"><c>true</c> to not close the underlying stream when async method returns; otherwise, <c>false</c></param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <returns>Object metadata.</returns>
-    /// <exception cref="NatsObjException">There was an error calculating SHA digest.</exception>
-    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <inheritdoc />
     public async ValueTask<ObjectMetadata> PutAsync(ObjectMetadata meta, Stream stream, bool leaveOpen = false, CancellationToken cancellationToken = default)
     {
         ValidateObjectName(meta.Name);
@@ -294,7 +257,7 @@ public class NatsObjStore : INatsObjStore
                     var buffer = memoryOwner.Slice(0, currentChunkSize);
 
                     // Chunks
-                    var ack = await _context.PublishAsync(GetChunkSubject(nuid), buffer, serializer: NatsRawSerializer<NatsMemoryOwner<byte>>.Default, cancellationToken: cancellationToken);
+                    var ack = await JetStreamContext.PublishAsync(GetChunkSubject(nuid), buffer, serializer: NatsRawSerializer<NatsMemoryOwner<byte>>.Default, cancellationToken: cancellationToken);
                     ack.EnsureSuccess();
 
                     if (eof)
@@ -320,8 +283,8 @@ public class NatsObjStore : INatsObjStore
         {
             try
             {
-                await _context.JSRequestResponseAsync<StreamPurgeRequest, StreamPurgeResponse>(
-                    subject: $"{_context.Opts.Prefix}.STREAM.PURGE.OBJ_{Bucket}",
+                await JetStreamContext.JSRequestResponseAsync<StreamPurgeRequest, StreamPurgeResponse>(
+                    subject: $"{JetStreamContext.Opts.Prefix}.STREAM.PURGE.OBJ_{Bucket}",
                     request: new StreamPurgeRequest
                     {
                         Filter = GetChunkSubject(info.Nuid),
@@ -338,14 +301,7 @@ public class NatsObjStore : INatsObjStore
         return meta;
     }
 
-    /// <summary>
-    /// Update object metadata
-    /// </summary>
-    /// <param name="key">Object key</param>
-    /// <param name="meta">Object metadata</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <returns>Object metadata</returns>
-    /// <exception cref="NatsObjException">There is already an object with the same name</exception>
+    /// <inheritdoc />
     public async ValueTask<ObjectMetadata> UpdateMetaAsync(string key, ObjectMetadata meta, CancellationToken cancellationToken = default)
     {
         ValidateObjectName(meta.Name);
@@ -375,23 +331,11 @@ public class NatsObjStore : INatsObjStore
         return info;
     }
 
-    /// <summary>
-    /// Add a link to another object
-    /// </summary>
-    /// <param name="link">Link name</param>
-    /// <param name="target">Target object's name</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <returns>Metadata of the new link object</returns>
+    /// <inheritdoc />
     public ValueTask<ObjectMetadata> AddLinkAsync(string link, string target, CancellationToken cancellationToken = default) =>
         AddLinkAsync(link, new ObjectMetadata { Name = target, Bucket = Bucket }, cancellationToken);
 
-    /// <summary>
-    /// Add a link to another object
-    /// </summary>
-    /// <param name="link">Link name</param>
-    /// <param name="target">Target object's metadata</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <returns>Metadata of the new link object</returns>
+    /// <inheritdoc />
     public async ValueTask<ObjectMetadata> AddLinkAsync(string link, ObjectMetadata target, CancellationToken cancellationToken = default)
     {
         ValidateObjectName(link);
@@ -444,14 +388,7 @@ public class NatsObjStore : INatsObjStore
         return info;
     }
 
-    /// <summary>
-    /// Add a link to another object store
-    /// </summary>
-    /// <param name="link">Object's name to be linked</param>
-    /// <param name="target">Target object store</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <returns>Metadata of the new link object</returns>
-    /// <exception cref="NatsObjException">Object with the same name already exists</exception>
+    /// <inheritdoc />
     public async ValueTask<ObjectMetadata> AddBucketLinkAsync(string link, INatsObjStore target, CancellationToken cancellationToken = default)
     {
         ValidateObjectName(link);
@@ -488,23 +425,19 @@ public class NatsObjStore : INatsObjStore
         return info;
     }
 
-    /// <summary>
-    /// Seal the object store. No further modifications will be allowed.
-    /// </summary>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <exception cref="NatsObjException">Update operation failed</exception>
+    /// <inheritdoc />
     public async ValueTask SealAsync(CancellationToken cancellationToken = default)
     {
-        var info = await _context.JSRequestResponseAsync<object, StreamInfoResponse>(
-            subject: $"{_context.Opts.Prefix}.STREAM.INFO.{_stream.Info.Config.Name}",
+        var info = await JetStreamContext.JSRequestResponseAsync<object, StreamInfoResponse>(
+            subject: $"{JetStreamContext.Opts.Prefix}.STREAM.INFO.{_stream.Info.Config.Name}",
             request: null,
             cancellationToken).ConfigureAwait(false);
 
         var config = info.Config;
         config.Sealed = true;
 
-        var response = await _context.JSRequestResponseAsync<StreamConfig, StreamUpdateResponse>(
-            subject: $"{_context.Opts.Prefix}.STREAM.UPDATE.{_stream.Info.Config.Name}",
+        var response = await JetStreamContext.JSRequestResponseAsync<StreamConfig, StreamUpdateResponse>(
+            subject: $"{JetStreamContext.Opts.Prefix}.STREAM.UPDATE.{_stream.Info.Config.Name}",
             request: config,
             cancellationToken);
 
@@ -514,14 +447,7 @@ public class NatsObjStore : INatsObjStore
         }
     }
 
-    /// <summary>
-    /// Get object metadata by key.
-    /// </summary>
-    /// <param name="key">Object key.</param>
-    /// <param name="showDeleted">Also retrieve deleted objects.</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <returns>Object metadata.</returns>
-    /// <exception cref="NatsObjException">Object was not found.</exception>
+    /// <inheritdoc />
     public async ValueTask<ObjectMetadata> GetInfoAsync(string key, bool showDeleted = false, CancellationToken cancellationToken = default)
     {
         ValidateObjectName(key);
@@ -562,12 +488,7 @@ public class NatsObjStore : INatsObjStore
         }
     }
 
-    /// <summary>
-    /// List all the objects in this store.
-    /// </summary>
-    /// <param name="opts">List options</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <returns>An async enumerable object metadata to be used in an <c>await foreach</c></returns>
+    /// <inheritdoc />
     public IAsyncEnumerable<ObjectMetadata> ListAsync(NatsObjListOpts? opts = default, CancellationToken cancellationToken = default)
     {
         opts ??= new NatsObjListOpts();
@@ -581,11 +502,7 @@ public class NatsObjStore : INatsObjStore
         return WatchAsync(watchOpts, cancellationToken);
     }
 
-    /// <summary>
-    /// Retrieves run-time status about the backing store of the bucket.
-    /// </summary>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <returns>Object store status</returns>
+    /// <inheritdoc />
     public async ValueTask<NatsObjStatus> GetStatusAsync(CancellationToken cancellationToken = default)
     {
         await _stream.RefreshAsync(cancellationToken);
@@ -593,12 +510,7 @@ public class NatsObjStore : INatsObjStore
         return new NatsObjStatus(Bucket, isCompressed, _stream.Info);
     }
 
-    /// <summary>
-    /// Watch for changes in the underlying store and receive meta information updates.
-    /// </summary>
-    /// <param name="opts">Watch options</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <returns>An async enumerable object metadata to be used in an <c>await foreach</c></returns>
+    /// <inheritdoc />
     public async IAsyncEnumerable<ObjectMetadata> WatchAsync(NatsObjWatchOpts? opts = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         opts ??= new NatsObjWatchOpts();
@@ -616,7 +528,7 @@ public class NatsObjStore : INatsObjStore
         }
 
         await using var pushConsumer = new NatsJSOrderedPushConsumer<NatsMemoryOwner<byte>>(
-            context: _context,
+            context: JetStreamContext,
             stream: $"OBJ_{Bucket}",
             filter: $"$O.{Bucket}.M.>",
             serializer: NatsDefaultSerializer<NatsMemoryOwner<byte>>.Default,
@@ -662,12 +574,7 @@ public class NatsObjStore : INatsObjStore
         }
     }
 
-    /// <summary>
-    /// Delete an object by key.
-    /// </summary>
-    /// <param name="key">Object key.</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <exception cref="NatsObjException">Object metadata was invalid or chunks can't be purged.</exception>
+    /// <inheritdoc />
     public async ValueTask DeleteAsync(string key, CancellationToken cancellationToken = default)
     {
         ValidateObjectName(key);
@@ -696,7 +603,7 @@ public class NatsObjStore : INatsObjStore
 
     private async ValueTask PublishMeta(ObjectMetadata meta, CancellationToken cancellationToken)
     {
-        var ack = await _context.PublishAsync(GetMetaSubject(meta.Name), meta, serializer: NatsObjJsonSerializer<ObjectMetadata>.Default, headers: NatsRollupHeaders, cancellationToken: cancellationToken);
+        var ack = await JetStreamContext.PublishAsync(GetMetaSubject(meta.Name), meta, serializer: NatsObjJsonSerializer<ObjectMetadata>.Default, headers: NatsRollupHeaders, cancellationToken: cancellationToken);
         ack.EnsureSuccess();
     }
 

@@ -284,7 +284,7 @@ public class NatsJSConsumer : INatsJSConsumer
 
         opts ??= new NatsJSConsumeOpts();
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
-        var inbox = _context.NewInbox();
+        var inbox = _context.NewBaseInbox();
 
         var max = NatsJSOptsDefaults.SetMax(opts.MaxMsgs, opts.MaxBytes, opts.ThresholdMsgs, opts.ThresholdBytes);
         var timeouts = NatsJSOptsDefaults.SetTimeouts(opts.Expires, opts.IdleHeartbeat);
@@ -332,7 +332,7 @@ public class NatsJSConsumer : INatsJSConsumer
         ThrowIfDeleted();
 
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
-        var inbox = _context.NewInbox();
+        var inbox = _context.NewBaseInbox();
 
         var max = NatsJSOptsDefaults.SetMax(opts.MaxMsgs, opts.MaxBytes, opts.ThresholdMsgs, opts.ThresholdBytes);
         var timeouts = NatsJSOptsDefaults.SetTimeouts(opts.Expires, opts.IdleHeartbeat);
@@ -382,7 +382,7 @@ public class NatsJSConsumer : INatsJSConsumer
         ThrowIfDeleted();
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
-        var inbox = _context.NewInbox();
+        var inbox = _context.NewBaseInbox();
 
         var max = NatsJSOptsDefaults.SetMax(opts.MaxMsgs, opts.MaxBytes);
         var timeouts = NatsJSOptsDefaults.SetTimeouts(opts.Expires, opts.IdleHeartbeat);

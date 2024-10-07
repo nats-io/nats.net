@@ -23,59 +23,37 @@ public class NatsKVContext : INatsKVContext
     private static readonly int KvStreamNamePrefixLen = KvStreamNamePrefix.Length;
     private static readonly Regex ValidBucketRegex = new(pattern: @"\A[a-zA-Z0-9_-]+\z", RegexOptions.Compiled);
 
-    private readonly NatsJSContext _context;
-
     /// <summary>
     /// Create a new Key Value Store context
     /// </summary>
     /// <param name="context">JetStream context</param>
-    public NatsKVContext(NatsJSContext context) => _context = context;
+    public NatsKVContext(INatsJSContext context) => JetStreamContext = context;
 
-    /// <summary>
-    /// Create a new Key Value Store or get an existing one
-    /// </summary>
-    /// <param name="bucket">Name of the bucket</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <returns>Key Value Store</returns>
-    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
-    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <inheritdoc />
+    public INatsJSContext JetStreamContext { get; }
+
+    /// <inheritdoc />
     public ValueTask<INatsKVStore> CreateStoreAsync(string bucket, CancellationToken cancellationToken = default)
         => CreateStoreAsync(new NatsKVConfig(bucket), cancellationToken);
 
-    /// <summary>
-    /// Create a new Key Value Store or get an existing one
-    /// </summary>
-    /// <param name="config">Key Value Store configuration</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <returns>Key Value Store</returns>
-    /// <exception cref="NatsKVException">There was an issue with configuration</exception>
-    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
-    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <inheritdoc />
     public async ValueTask<INatsKVStore> CreateStoreAsync(NatsKVConfig config, CancellationToken cancellationToken = default)
     {
         ValidateBucketName(config.Bucket);
 
         var streamConfig = NatsKVContext.CreateStreamConfig(config);
 
-        var stream = await _context.CreateStreamAsync(streamConfig, cancellationToken);
+        var stream = await JetStreamContext.CreateStreamAsync(streamConfig, cancellationToken);
 
-        return new NatsKVStore(config.Bucket, _context, stream);
+        return new NatsKVStore(config.Bucket, JetStreamContext, stream);
     }
 
-    /// <summary>
-    /// Get a Key Value Store
-    /// </summary>
-    /// <param name="bucket">Name of the bucjet</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <returns>Key Value Store</returns>
-    /// <exception cref="NatsKVException">There was an issue with configuration</exception>
-    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
-    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <inheritdoc />
     public async ValueTask<INatsKVStore> GetStoreAsync(string bucket, CancellationToken cancellationToken = default)
     {
         ValidateBucketName(bucket);
 
-        var stream = await _context.GetStreamAsync(BucketToStream(bucket), cancellationToken: cancellationToken);
+        var stream = await JetStreamContext.GetStreamAsync(BucketToStream(bucket), cancellationToken: cancellationToken);
 
         if (stream.Info.Config.MaxMsgsPerSubject < 1)
         {
@@ -83,53 +61,32 @@ public class NatsKVContext : INatsKVContext
         }
 
         // TODO: KV mirror
-        return new NatsKVStore(bucket, _context, stream);
+        return new NatsKVStore(bucket, JetStreamContext, stream);
     }
 
-    /// <summary>
-    /// Update a key value store configuration. Storage type cannot change.
-    /// </summary>
-    /// <param name="config">Key Value Store configuration</param>
-    /// <param name="cancellationToken"> used to cancel the API call.</param>
-    /// <returns>Key Value Store</returns>
-    /// <exception cref="NatsKVException">There was an issue with configuration</exception>
-    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
-    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <inheritdoc />
     public async ValueTask<INatsKVStore> UpdateStoreAsync(NatsKVConfig config, CancellationToken cancellationToken = default)
     {
         ValidateBucketName(config.Bucket);
 
         var streamConfig = NatsKVContext.CreateStreamConfig(config);
 
-        var stream = await _context.UpdateStreamAsync(streamConfig, cancellationToken);
+        var stream = await JetStreamContext.UpdateStreamAsync(streamConfig, cancellationToken);
 
-        return new NatsKVStore(config.Bucket, _context, stream);
+        return new NatsKVStore(config.Bucket, JetStreamContext, stream);
     }
 
-    /// <summary>
-    /// Delete a Key Value Store
-    /// </summary>
-    /// <param name="bucket">Name of the bucket</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <returns>True for success</returns>
-    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
-    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <inheritdoc />
     public ValueTask<bool> DeleteStoreAsync(string bucket, CancellationToken cancellationToken = default)
     {
         ValidateBucketName(bucket);
-        return _context.DeleteStreamAsync(BucketToStream(bucket), cancellationToken);
+        return JetStreamContext.DeleteStreamAsync(BucketToStream(bucket), cancellationToken);
     }
 
-    /// <summary>
-    /// Get a list of bucket names
-    /// </summary>
-    /// <param name="cancellationToken"> used to cancel the API call.</param>
-    /// <returns>Async enumerable of bucket names. Can be used in a <c>await foreach</c> loop.</returns>
-    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
-    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <inheritdoc />
     public async IAsyncEnumerable<string> GetBucketNamesAsync([EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        await foreach (var name in _context.ListStreamNamesAsync(cancellationToken: cancellationToken))
+        await foreach (var name in JetStreamContext.ListStreamNamesAsync(cancellationToken: cancellationToken))
         {
             if (!name.StartsWith(KvStreamNamePrefix))
             {
@@ -140,18 +97,12 @@ public class NatsKVContext : INatsKVContext
         }
     }
 
-    /// <summary>
-    /// Gets the status for all buckets
-    /// </summary>
-    /// <param name="cancellationToken"> used to cancel the API call.</param>
-    /// <returns>Async enumerable of Key/Value statuses. Can be used in a <c>await foreach</c> loop.</returns>
-    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
-    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <inheritdoc />
     public async IAsyncEnumerable<NatsKVStatus> GetStatusesAsync([EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        await foreach (var name in _context.ListStreamNamesAsync(cancellationToken: cancellationToken))
+        await foreach (var name in JetStreamContext.ListStreamNamesAsync(cancellationToken: cancellationToken))
         {
-            var stream = await _context.GetStreamAsync(name, cancellationToken: cancellationToken);
+            var stream = await JetStreamContext.GetStreamAsync(name, cancellationToken: cancellationToken);
             var isCompressed = stream.Info.Config.Compression != StreamConfigCompression.None;
             yield return new NatsKVStatus(name, isCompressed, stream.Info);
         }
