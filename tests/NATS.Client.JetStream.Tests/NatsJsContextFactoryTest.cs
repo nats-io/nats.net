@@ -105,6 +105,8 @@ public class NatsJSContextFactoryTest
         public INatsSubscriptionManager SubscriptionManager { get; } = new TestSubscriptionManager();
 
         public NatsHeaderParser HeaderParser { get; } = new NatsHeaderParser(Encoding.UTF8);
+        public Func<(string Host, int Port), ValueTask<(string Host, int Port)>>? OnConnectingAsync { get; set; }
+        public Func<ISocketConnection, ValueTask<ISocketConnection>>? OnSocketAvailableAsync { get; set; }
 
         public ValueTask<TimeSpan> PingAsync(CancellationToken cancellationToken = default) => throw new NotImplementedException();
 
