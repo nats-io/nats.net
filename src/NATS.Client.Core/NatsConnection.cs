@@ -34,6 +34,7 @@ public partial class NatsConnection : INatsConnection
     /// Hook before TCP connection open.
     /// </summary>
     public Func<(string Host, int Port), ValueTask<(string Host, int Port)>>? OnConnectingAsync;
+    public Func<ISocketConnection, Task>? OnSocketAvailableAsync;
 
     internal readonly ConnectionStatsCounter Counter; // allow to call from external sources
     internal volatile ServerInfo? WritableServerInfo;
@@ -339,6 +340,12 @@ public partial class NatsConnection : INatsConnection
                     }
                 }
 
+                if (OnSocketAvailableAsync != null)
+                {
+                    _logger.LogInformation(NatsLogEvents.Connection, "Try to invoke OnSocketAvailable");
+                    await OnSocketAvailableAsync(_socket).ConfigureAwait(false);
+                }
+
                 _currentConnectUri = uri;
                 break;
             }
@@ -627,6 +634,12 @@ public partial class NatsConnection : INatsConnection
                             await sslConnection.AuthenticateAsClientAsync(FixTlsHost(url), Opts.ConnectTimeout).ConfigureAwait(false);
                             _socket = sslConnection;
                         }
+                    }
+
+                    if (OnSocketAvailableAsync != null)
+                    {
+                        _logger.LogInformation(NatsLogEvents.Connection, "Try to invoke OnSocketAvailable");
+                        await OnSocketAvailableAsync(_socket).ConfigureAwait(false);
                     }
 
                     _currentConnectUri = url;
