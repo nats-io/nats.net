@@ -704,7 +704,9 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         if (!lockHeld)
         {
-            await _semLock.Writer.WriteAsync(0, cancellationToken).AsTask().WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
+            using var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cancellationTokenSource.CancelAfter(_defaultCommandTimeout);
+            await _semLock.Writer.WriteAsync(0, cancellationTokenSource.Token).ConfigureAwait(false);
         }
 
         try
@@ -738,7 +740,9 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         if (!lockHeld)
         {
-            await _semLock.Writer.WriteAsync(0, cancellationToken).AsTask().WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
+            using var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cancellationTokenSource.CancelAfter(_defaultCommandTimeout);
+            await _semLock.Writer.WriteAsync(0, cancellationTokenSource.Token).ConfigureAwait(false);
         }
 
         try
@@ -773,7 +777,9 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         if (!lockHeld)
         {
-            await _semLock.Writer.WriteAsync(0, cancellationToken).AsTask().WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
+            using var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cancellationTokenSource.CancelAfter(_defaultCommandTimeout);
+            await _semLock.Writer.WriteAsync(0, cancellationTokenSource.Token).ConfigureAwait(false);
         }
 
         try
@@ -812,7 +818,9 @@ internal sealed class CommandWriter : IAsyncDisposable
         {
             if (!lockHeld)
             {
-                await _semLock.Writer.WriteAsync(0, cancellationToken).AsTask().WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
+                using var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                cancellationTokenSource.CancelAfter(_defaultCommandTimeout);
+                await _semLock.Writer.WriteAsync(0, cancellationTokenSource.Token).ConfigureAwait(false);
             }
 
             try
@@ -858,7 +866,9 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         if (!lockHeld)
         {
-            await _semLock.Writer.WriteAsync(0, cancellationToken).AsTask().WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
+            using var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cancellationTokenSource.CancelAfter(_defaultCommandTimeout);
+            await _semLock.Writer.WriteAsync(0, cancellationTokenSource.Token).ConfigureAwait(false);
         }
 
         try
@@ -892,7 +902,9 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         if (!lockHeld)
         {
-            await _semLock.Writer.WriteAsync(0, cancellationToken).AsTask().WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
+            using var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cancellationTokenSource.CancelAfter(_defaultCommandTimeout);
+            await _semLock.Writer.WriteAsync(0, cancellationTokenSource.Token).ConfigureAwait(false);
         }
 
         try
