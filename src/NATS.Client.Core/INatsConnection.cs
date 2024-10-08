@@ -1,10 +1,21 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Threading.Channels;
+using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
 
 public interface INatsConnection : INatsClient
 {
+    /// <summary>
+    /// Hook before TCP connection open.
+    /// </summary>
+    Func<(string Host, int Port), ValueTask<(string Host, int Port)>>? OnConnectingAsync { get; set; }
+
+    /// <summary>
+    /// Hook when socket is available.
+    /// </summary>
+    Func<ISocketConnection, ValueTask<ISocketConnection>>? OnSocketAvailableAsync { get; set; }
+
     /// <summary>
     /// Event that is raised when the connection to the NATS server is disconnected.
     /// </summary>
