@@ -59,6 +59,11 @@ public record NatsKVConfig
     public NatsKVRepublish? Republish { get; init; }
 
     /// <summary>
+    /// Placement requirements for a key-value store stream.
+    /// </summary>
+    public Placement? Placement { get; init; }
+
+    /// <summary>
     /// Use compressed storage.
     /// </summary>
     public bool Compression { get; init; }
