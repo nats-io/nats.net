@@ -223,6 +223,7 @@ public class NatsKVContext : INatsKVContext
             Compression = config.Compression ? StreamConfigCompression.S2 : StreamConfigCompression.None,
             Storage = storage,
             Republish = republish!,
+            Placement = config.Placement,
             AllowRollupHdrs = true,
             DenyDelete = true,
             DenyPurge = false,
