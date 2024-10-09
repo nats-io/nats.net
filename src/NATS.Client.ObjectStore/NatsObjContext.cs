@@ -43,7 +43,7 @@ public class NatsObjContext : INatsObjContext
             MaxBytes = config.MaxBytes ?? -1,
             Storage = storage,
             NumReplicas = config.NumberOfReplicas,
-            /* TODO: Placement = */
+            Placement = config.Placement,
             Discard = StreamConfigDiscard.New,
             AllowRollupHdrs = true,
             AllowDirect = true,

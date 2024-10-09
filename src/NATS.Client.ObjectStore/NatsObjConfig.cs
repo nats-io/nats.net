@@ -1,3 +1,5 @@
+using NATS.Client.JetStream.Models;
+
 namespace NATS.Client.ObjectStore;
 
 /// <summary>
@@ -39,6 +41,11 @@ public record NatsObjConfig(string Bucket)
     /// How many replicas to keep for each key.
     /// </summary>
     public int NumberOfReplicas { get; init; } = 1;
+
+    /// <summary>
+    /// Placement requirements for a object store stream.
+    /// </summary>
+    public Placement? Placement { get; init; }
 
     /// <summary>
     /// Additional metadata for the bucket.
