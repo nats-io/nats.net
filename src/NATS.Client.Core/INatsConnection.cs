@@ -52,6 +52,16 @@ public interface INatsConnection : INatsClient
     NatsHeaderParser HeaderParser { get; }
 
     /// <summary>
+    /// Hook before TCP connection open.
+    /// </summary>
+    Func<(string Host, int Port), ValueTask<(string Host, int Port)>>? OnConnectingAsync { get; set; }
+
+    /// <summary>
+    /// Hook when socket is available.
+    /// </summary>
+    Func<ISocketConnection, ValueTask<ISocketConnection>>? OnSocketAvailableAsync { get; set; }
+
+    /// <summary>
     /// Publishes a serializable message payload to the given subject name, optionally supplying a reply subject.
     /// </summary>
     /// <param name="msg">A <see cref="NatsMsg{T}"/> representing message details.</param>
