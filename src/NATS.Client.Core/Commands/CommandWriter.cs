@@ -47,7 +47,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     private readonly Channel<int> _channelSize;
     private readonly PipeReader _pipeReader;
     private readonly PipeWriter _pipeWriter;
-    private readonly SemaphoreSlim _semLock = new(1);
+    private readonly Channel<int> _semLock = Channel.CreateBounded<int>(1);
     private readonly PartialSendFailureCounter _partialSendFailureCounter = new();
     private ISocketConnection? _socketConnection;
     private Task? _flushTask;
@@ -185,7 +185,7 @@ internal sealed class CommandWriter : IAsyncDisposable
 
 #pragma warning disable CA2016
 #pragma warning disable VSTHRD103
-        if (!_semLock.Wait(0))
+        if (!_semLock.Writer.TryWrite(0))
 #pragma warning restore VSTHRD103
 #pragma warning restore CA2016
         {
@@ -209,7 +209,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            _semLock.Release();
+            _semLock.Reader.TryRead(out _);
         }
 
         return default;
@@ -224,7 +224,7 @@ internal sealed class CommandWriter : IAsyncDisposable
 
 #pragma warning disable CA2016
 #pragma warning disable VSTHRD103
-        if (!_semLock.Wait(0))
+        if (!_semLock.Writer.TryWrite(0))
 #pragma warning restore VSTHRD103
 #pragma warning restore CA2016
         {
@@ -249,7 +249,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            _semLock.Release();
+            _semLock.Reader.TryRead(out _);
         }
 
         return default;
@@ -264,7 +264,7 @@ internal sealed class CommandWriter : IAsyncDisposable
 
 #pragma warning disable CA2016
 #pragma warning disable VSTHRD103
-        if (!_semLock.Wait(0))
+        if (!_semLock.Writer.TryWrite(0))
 #pragma warning restore VSTHRD103
 #pragma warning restore CA2016
         {
@@ -288,7 +288,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            _semLock.Release();
+            _semLock.Reader.TryRead(out _);
         }
 
         return default;
@@ -342,7 +342,7 @@ internal sealed class CommandWriter : IAsyncDisposable
 
 #pragma warning disable CA2016
 #pragma warning disable VSTHRD103
-        if (!_semLock.Wait(0))
+        if (!_semLock.Writer.TryWrite(0))
 #pragma warning restore VSTHRD103
 #pragma warning restore CA2016
         {
@@ -366,7 +366,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            _semLock.Release();
+            _semLock.Reader.TryRead(out _);
 
             payloadBuffer.Reset();
             _pool.Return(payloadBuffer);
@@ -390,7 +390,7 @@ internal sealed class CommandWriter : IAsyncDisposable
 
 #pragma warning disable CA2016
 #pragma warning disable VSTHRD103
-        if (!_semLock.Wait(0))
+        if (!_semLock.Writer.TryWrite(0))
 #pragma warning restore VSTHRD103
 #pragma warning restore CA2016
         {
@@ -414,7 +414,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            _semLock.Release();
+            _semLock.Reader.TryRead(out _);
         }
 
         return default;
@@ -429,7 +429,7 @@ internal sealed class CommandWriter : IAsyncDisposable
 
 #pragma warning disable CA2016
 #pragma warning disable VSTHRD103
-        if (!_semLock.Wait(0))
+        if (!_semLock.Writer.TryWrite(0))
 #pragma warning restore VSTHRD103
 #pragma warning restore CA2016
         {
@@ -453,7 +453,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            _semLock.Release();
+            _semLock.Reader.TryRead(out _);
         }
 
         return default;
@@ -462,7 +462,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     // only used for internal testing
     internal async Task TestStallFlushAsync(TimeSpan timeSpan, CancellationToken cancellationToken)
     {
-        await _semLock.WaitAsync().ConfigureAwait(false);
+        await _semLock.Writer.WriteAsync(0, cancellationToken).ConfigureAwait(false);
 
         try
         {
@@ -475,7 +475,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            _semLock.Release();
+            _semLock.Reader.TryRead(out _);
         }
     }
 
@@ -704,10 +704,9 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         if (!lockHeld)
         {
-            if (!await _semLock.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
-            {
-                throw new OperationCanceledException();
-            }
+            using var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cancellationTokenSource.CancelAfter(_defaultCommandTimeout);
+            await _semLock.Writer.WriteAsync(0, cancellationTokenSource.Token).ConfigureAwait(false);
         }
 
         try
@@ -733,7 +732,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            _semLock.Release();
+            _semLock.Reader.TryRead(out _);
         }
     }
 
@@ -741,10 +740,9 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         if (!lockHeld)
         {
-            if (!await _semLock.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
-            {
-                throw new OperationCanceledException();
-            }
+            using var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cancellationTokenSource.CancelAfter(_defaultCommandTimeout);
+            await _semLock.Writer.WriteAsync(0, cancellationTokenSource.Token).ConfigureAwait(false);
         }
 
         try
@@ -771,7 +769,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            _semLock.Release();
+            _semLock.Reader.TryRead(out _);
         }
     }
 
@@ -779,10 +777,9 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         if (!lockHeld)
         {
-            if (!await _semLock.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
-            {
-                throw new OperationCanceledException();
-            }
+            using var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cancellationTokenSource.CancelAfter(_defaultCommandTimeout);
+            await _semLock.Writer.WriteAsync(0, cancellationTokenSource.Token).ConfigureAwait(false);
         }
 
         try
@@ -808,7 +805,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            _semLock.Release();
+            _semLock.Reader.TryRead(out _);
         }
     }
 
@@ -821,10 +818,9 @@ internal sealed class CommandWriter : IAsyncDisposable
         {
             if (!lockHeld)
             {
-                if (!await _semLock.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
-                {
-                    throw new OperationCanceledException();
-                }
+                using var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                cancellationTokenSource.CancelAfter(_defaultCommandTimeout);
+                await _semLock.Writer.WriteAsync(0, cancellationTokenSource.Token).ConfigureAwait(false);
             }
 
             try
@@ -850,7 +846,7 @@ internal sealed class CommandWriter : IAsyncDisposable
             }
             finally
             {
-                _semLock.Release();
+                _semLock.Reader.TryRead(out _);
             }
         }
         finally
@@ -870,10 +866,9 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         if (!lockHeld)
         {
-            if (!await _semLock.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
-            {
-                throw new OperationCanceledException();
-            }
+            using var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cancellationTokenSource.CancelAfter(_defaultCommandTimeout);
+            await _semLock.Writer.WriteAsync(0, cancellationTokenSource.Token).ConfigureAwait(false);
         }
 
         try
@@ -899,7 +894,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            _semLock.Release();
+            _semLock.Reader.TryRead(out _);
         }
     }
 
@@ -907,10 +902,9 @@ internal sealed class CommandWriter : IAsyncDisposable
     {
         if (!lockHeld)
         {
-            if (!await _semLock.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
-            {
-                throw new OperationCanceledException();
-            }
+            using var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cancellationTokenSource.CancelAfter(_defaultCommandTimeout);
+            await _semLock.Writer.WriteAsync(0, cancellationTokenSource.Token).ConfigureAwait(false);
         }
 
         try
@@ -936,7 +930,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
         finally
         {
-            _semLock.Release();
+            _semLock.Reader.TryRead(out _);
         }
     }
 
