@@ -88,7 +88,7 @@ public static class NatsJSJsonSerializer<T>
 internal partial class NatsJSJsonSerializerContext : JsonSerializerContext
 {
 #if NET6_0
-    internal static readonly NatsJSJsonSerializerContext DefaultContext = NatsJSJsonSerializerContext.Default;
+    internal static readonly NatsJSJsonSerializerContext DefaultContext = new NatsJSJsonSerializerContext(new JsonSerializerOptions());
 #else
     internal static readonly NatsJSJsonSerializerContext DefaultContext = new NatsJSJsonSerializerContext(new JsonSerializerOptions
     {

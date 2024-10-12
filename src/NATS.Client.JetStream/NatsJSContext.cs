@@ -347,7 +347,7 @@ public partial class NatsJSContext
                 return (default, new NatsJSException($"Unknown response type {typeof(TResponse)}"));
             }
 
-            var response = (TResponse?)errorElement.Deserialize(jsonTypeInfo);
+            var response = (TResponse?)jsonDocument.RootElement.Deserialize(jsonTypeInfo);
 
             if (msg.Error is { } messageError)
             {
