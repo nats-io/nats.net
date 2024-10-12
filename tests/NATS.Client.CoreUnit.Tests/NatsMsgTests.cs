@@ -22,6 +22,57 @@ public class NatsMsgTests
     [Fact]
     public void Check_struct_size()
     {
+        // Using https://github.com/SergeyTeplyakov/ObjectLayoutInspector
+        /* Size: 48 bytes. Paddings: 4 bytes (%8 of empty space)
+        |==============================================================|
+        |   0-7: String <Subject>k__BackingField (8 bytes)             |
+        |--------------------------------------------------------------|
+        |  8-15: String <ReplyTo>k__BackingField (8 bytes)             |
+        |--------------------------------------------------------------|
+        | 16-23: NatsHeaders <Headers>k__BackingField (8 bytes)        |
+        |--------------------------------------------------------------|
+        | 24-31: String <Data>k__BackingField (8 bytes)                |
+        |--------------------------------------------------------------|
+        | 32-39: INatsConnection <Connection>k__BackingField (8 bytes) |
+        |--------------------------------------------------------------|
+        | 40-43: UInt32 _flagsAndSize (4 bytes)                        |
+        |--------------------------------------------------------------|
+        | 44-47: padding (4 bytes)                                     |
+        |==============================================================| */
         Assert.Equal(48, Unsafe.SizeOf<NatsMsg<string>>());
+
+        /* Size: 40 bytes. Paddings: 0 bytes (%0 of empty space)
+        |==============================================================|
+        |   0-7: String <Subject>k__BackingField (8 bytes)             |
+        |--------------------------------------------------------------|
+        |  8-15: String <ReplyTo>k__BackingField (8 bytes)             |
+        |--------------------------------------------------------------|
+        | 16-23: NatsHeaders <Headers>k__BackingField (8 bytes)        |
+        |--------------------------------------------------------------|
+        | 24-31: INatsConnection <Connection>k__BackingField (8 bytes) |
+        |--------------------------------------------------------------|
+        | 32-35: UInt32 _flagsAndSize (4 bytes)                        |
+        |--------------------------------------------------------------|
+        | 36-39: Int32 <Data>k__BackingField (4 bytes)                 |
+        |==============================================================| */
+        Assert.Equal(40, Unsafe.SizeOf<NatsMsg<int>>());
+
+        /* Size: 40 bytes. Paddings: 3 bytes (%7 of empty space)
+        |==============================================================|
+        |   0-7: String <Subject>k__BackingField (8 bytes)             |
+        |--------------------------------------------------------------|
+        |  8-15: String <ReplyTo>k__BackingField (8 bytes)             |
+        |--------------------------------------------------------------|
+        | 16-23: NatsHeaders <Headers>k__BackingField (8 bytes)        |
+        |--------------------------------------------------------------|
+        | 24-31: INatsConnection <Connection>k__BackingField (8 bytes) |
+        |--------------------------------------------------------------|
+        | 32-35: UInt32 _flagsAndSize (4 bytes)                        |
+        |--------------------------------------------------------------|
+        |    36: Byte <Data>k__BackingField (1 byte)                   |
+        |--------------------------------------------------------------|
+        | 37-39: padding (3 bytes)                                     |
+        |==============================================================| */
+        Assert.Equal(40, Unsafe.SizeOf<NatsMsg<byte>>());
     }
 }

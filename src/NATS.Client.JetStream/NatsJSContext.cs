@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.JetStream.Internal;
@@ -286,48 +287,87 @@ public partial class NatsJSContext
         where TRequest : class
         where TResponse : class
     {
+        var (response, exception) = await TryJSRequestAsync<TRequest, TResponse>(subject, request, cancellationToken).ConfigureAwait(false);
+        if (exception != null)
+        {
+            throw exception;
+        }
+
+        if (response != null)
+            return response.Value;
+
+        throw new Exception("State error: No response received");
+    }
+
+    internal async ValueTask<(NatsJSResponse<TResponse>?, Exception?)> TryJSRequestAsync<TRequest, TResponse>(
+        string subject,
+        TRequest? request,
+        CancellationToken cancellationToken = default)
+        where TRequest : class
+        where TResponse : class
+    {
         if (request != null)
         {
             // TODO: Can't validate using JSON serializer context at the moment.
             // Validator.ValidateObject(request, new ValidationContext(request));
         }
 
-        await using var sub = await Connection.CreateRequestSubAsync<TRequest, TResponse>(
+        await using var sub = await Connection.CreateRequestSubAsync<TRequest, JsonDocument>(
                 subject: subject,
                 data: request,
                 headers: default,
                 replyOpts: new NatsSubOpts { Timeout = Connection.Opts.RequestTimeout },
                 requestSerializer: NatsJSJsonSerializer<TRequest>.Default,
-                replySerializer: NatsJSErrorAwareJsonSerializer<TResponse>.Default,
+                replySerializer: NatsJSForcedJsonDocumentSerializer<JsonDocument>.Default,
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
         await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
-            if (msg.Error is { } error)
-            {
-                if (error.InnerException is NatsJSApiErrorException jsError)
-                {
-                    return new NatsJSResponse<TResponse>(default, jsError.Error);
-                }
-
-                throw error;
-            }
-
+            // We need to determine what type we're deserializing into
+            // .NET 6 new APIs to the rescue: we can read the buffer once
+            // by deserializing into a document, inspect and using the new
+            // API deserialize to the final type from the document.
             if (msg.Data == null)
             {
-                throw new NatsJSException("No response data received");
+                return (default, new NatsJSException("No response data received"));
             }
 
-            return new NatsJSResponse<TResponse>(msg.Data, default);
+            var jsonDocument = msg.Data;
+
+            if (jsonDocument.RootElement.TryGetProperty("error", out var errorElement))
+            {
+                var error = errorElement.Deserialize(JetStream.NatsJSJsonSerializerContext.Default.ApiError) ?? throw new NatsJSException("Can't parse JetStream error JSON payload");
+                return (new NatsJSResponse<TResponse>(default, error), default);
+            }
+
+            var jsonTypeInfo = NatsJSJsonSerializerContext.DefaultContext.GetTypeInfo(typeof(TResponse));
+            if (jsonTypeInfo == null)
+            {
+                return (default, new NatsJSException($"Unknown response type {typeof(TResponse)}"));
+            }
+
+            var response = (TResponse?)errorElement.Deserialize(jsonTypeInfo);
+
+            if (msg.Error is { } messageError)
+            {
+                return (default, messageError);
+            }
+
+            return (new NatsJSResponse<TResponse>(response, default), default);
         }
 
         if (sub is NatsSubBase { EndReason: NatsSubEndReason.Exception, Exception: not null } sb)
         {
-            throw sb.Exception;
+            return (default, sb.Exception);
         }
 
-        throw new NatsJSApiNoResponseException();
+        if (sub.EndReason != NatsSubEndReason.None)
+        {
+            return (default, new NatsJSApiNoResponseException(sub.EndReason));
+        }
+
+        return (default, new NatsJSApiNoResponseException());
     }
 
     private static void ConvertDomain(StreamSource streamSource)
@@ -352,4 +392,12 @@ public partial class NatsJSContext
     [DoesNotReturn]
     private static void ThrowEmptyException(string? paramName) =>
         throw new ArgumentException("The value cannot be an empty string.", paramName);
+    //
+    // [DoesNotReturn]
+    // private static void ThrowNoResponseDataReceived() =>
+    //     throw new NatsJSException("No response data received");
+    //
+    // [DoesNotReturn]
+    // private static void ThrowUnknownResponseType<TResponse>() =>
+    //     throw new NatsJSException($"Unknown response type {typeof(TResponse)}");
 }
