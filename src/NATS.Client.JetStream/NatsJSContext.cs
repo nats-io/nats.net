@@ -392,12 +392,4 @@ public partial class NatsJSContext
     [DoesNotReturn]
     private static void ThrowEmptyException(string? paramName) =>
         throw new ArgumentException("The value cannot be an empty string.", paramName);
-    //
-    // [DoesNotReturn]
-    // private static void ThrowNoResponseDataReceived() =>
-    //     throw new NatsJSException("No response data received");
-    //
-    // [DoesNotReturn]
-    // private static void ThrowUnknownResponseType<TResponse>() =>
-    //     throw new NatsJSException($"Unknown response type {typeof(TResponse)}");
 }
