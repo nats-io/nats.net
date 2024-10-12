@@ -123,6 +123,20 @@ public interface INatsMsg<T>
 /// </remarks>
 public readonly record struct NatsMsg<T> : INatsMsg<T>
 {
+    /*
+          2               30
+        +--+------------------------------+
+        |EN|          Message Size        |
+        +--+------------------------------+
+        E: Empty flag
+        N: No responders flag
+
+        # Size is 30 bits:
+        Max Size: 1,073,741,823 (0x3FFFFFFF / 00111111111111111111111111111111)
+        Uint.Max: 4,294,967,295
+         Int.Max: 2,147,483,647
+             8mb:     8,388,608
+     */
     private readonly uint _flagsAndSize;
 
     /// <summary>
