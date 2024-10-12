@@ -326,30 +326,26 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
         if (payloadBuffer.Length == 0)
         {
             flags |= NatsMsgFlags.Empty;
-        }
-
-        if (headersBuffer != null)
-        {
             if (NatsSubBase.IsHeader503(headersBuffer))
             {
                 flags |= NatsMsgFlags.NoResponders;
             }
-            else
-            {
-                headers = new NatsHeaders();
+        }
 
-                try
+        if (headersBuffer != null)
+        {
+            headers = new NatsHeaders();
+            try
+            {
+                // Parsing can also throw an exception.
+                if (!headerParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), headers))
                 {
-                    // Parsing can also throw an exception.
-                    if (!headerParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), headers))
-                    {
-                        throw new NatsException("Error parsing headers");
-                    }
+                    throw new NatsException("Error parsing headers");
                 }
-                catch (Exception e)
-                {
-                    headers.Error ??= new NatsHeaderParseException(headersBuffer.Value.ToArray(), e);
-                }
+            }
+            catch (Exception e)
+            {
+                headers.Error ??= new NatsHeaderParseException(headersBuffer.Value.ToArray(), e);
             }
         }
 
