@@ -149,7 +149,6 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
     /// <param name="data">Serializable data object.</param>
     /// <param name="connection">NATS connection this message is associated to.</param>
     /// <param name="flags">Message flags to indicate no responders and empty payloads.</param>
-    /// <typeparam name="T">Specifies the type of data that may be sent to the NATS Server.</typeparam>
     /// <remarks>
     /// <para>Connection property is used to provide reply functionality.</para>
     /// <para>
