@@ -169,8 +169,7 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
     {
         Subject = subject;
         ReplyTo = replyTo;
-        Size = size;
-        Flags = flags;
+        _flagsAndSize = ((uint)flags << 30) | (uint)(size & 0x3FFFFFFF);
         Headers = headers;
         Data = data;
         Connection = connection;

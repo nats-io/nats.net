@@ -10,13 +10,34 @@ public class NatsMsgTests
     [InlineData(42, NatsMsgFlags.NoResponders, false, true)]
     [InlineData(42, NatsMsgFlags.Empty | NatsMsgFlags.NoResponders, true, true)]
     [InlineData(1024 * 1024 * 128, NatsMsgFlags.Empty, true, false)]
+    [InlineData(1024 * 1024 * 1000, NatsMsgFlags.Empty, true, false)]
+    [InlineData(0b00111111111111111111111111111111, NatsMsgFlags.Empty, true, false)]
     public void Size_and_flags(int size, NatsMsgFlags flags, bool isEmpty, bool hasNoResponders)
     {
-        var msg = new NatsMsg<string> { Size = size, Flags = flags };
-        Assert.Equal(size, msg.Size);
-        Assert.Equal(flags, msg.Flags);
-        Assert.Equal(isEmpty, msg.IsEmpty);
-        Assert.Equal(hasNoResponders, msg.HasNoResponders);
+        AssertSizeAndFlags(new NatsMsg<string>
+        {
+            Size = size,
+            Flags = flags,
+        });
+
+        AssertSizeAndFlags(new NatsMsg<string>(
+            subject: "x",
+            replyTo: null,
+            size: size,
+            headers: null,
+            data: null,
+            connection: null,
+            flags: flags));
+
+        return;
+
+        void AssertSizeAndFlags(NatsMsg<string> msg)
+        {
+            Assert.Equal(size, msg.Size);
+            Assert.Equal(flags, msg.Flags);
+            Assert.Equal(isEmpty, msg.IsEmpty);
+            Assert.Equal(hasNoResponders, msg.HasNoResponders);
+        }
     }
 
     [Fact]
