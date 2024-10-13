@@ -287,19 +287,16 @@ public partial class NatsJSContext
         where TRequest : class
         where TResponse : class
     {
-        var (response, exception) = await TryJSRequestAsync<TRequest, TResponse>(subject, request, cancellationToken).ConfigureAwait(false);
-        if (exception != null)
+        var result = await TryJSRequestAsync<TRequest, TResponse>(subject, request, cancellationToken).ConfigureAwait(false);
+        if (!result.Success)
         {
-            throw exception;
+            throw result.Error;
         }
 
-        if (response != null)
-            return response.Value;
-
-        throw new Exception("State error: No response received");
+        return result.Value;
     }
 
-    internal async ValueTask<(NatsJSResponse<TResponse>?, Exception?)> TryJSRequestAsync<TRequest, TResponse>(
+    internal async ValueTask<NatsResult<NatsJSResponse<TResponse>>> TryJSRequestAsync<TRequest, TResponse>(
         string subject,
         TRequest? request,
         CancellationToken cancellationToken = default)
@@ -330,7 +327,7 @@ public partial class NatsJSContext
             // API deserialize to the final type from the document.
             if (msg.Data == null)
             {
-                return (default, new NatsJSException("No response data received"));
+                return new NatsJSException("No response data received");
             }
 
             var jsonDocument = msg.Data;
@@ -338,36 +335,36 @@ public partial class NatsJSContext
             if (jsonDocument.RootElement.TryGetProperty("error", out var errorElement))
             {
                 var error = errorElement.Deserialize(JetStream.NatsJSJsonSerializerContext.Default.ApiError) ?? throw new NatsJSException("Can't parse JetStream error JSON payload");
-                return (new NatsJSResponse<TResponse>(default, error), default);
+                return new NatsJSResponse<TResponse>(default, error);
             }
 
             var jsonTypeInfo = NatsJSJsonSerializerContext.DefaultContext.GetTypeInfo(typeof(TResponse));
             if (jsonTypeInfo == null)
             {
-                return (default, new NatsJSException($"Unknown response type {typeof(TResponse)}"));
+                return new NatsJSException($"Unknown response type {typeof(TResponse)}");
             }
 
             var response = (TResponse?)jsonDocument.RootElement.Deserialize(jsonTypeInfo);
 
             if (msg.Error is { } messageError)
             {
-                return (default, messageError);
+                return messageError;
             }
 
-            return (new NatsJSResponse<TResponse>(response, default), default);
+            return new NatsJSResponse<TResponse>(response, default);
         }
 
         if (sub is NatsSubBase { EndReason: NatsSubEndReason.Exception, Exception: not null } sb)
         {
-            return (default, sb.Exception);
+            return sb.Exception;
         }
 
         if (sub.EndReason != NatsSubEndReason.None)
         {
-            return (default, new NatsJSApiNoResponseException(sub.EndReason));
+            return new NatsJSApiNoResponseException(sub.EndReason);
         }
 
-        return (default, new NatsJSApiNoResponseException());
+        return new NatsJSApiNoResponseException();
     }
 
     private static void ConvertDomain(StreamSource streamSource)
