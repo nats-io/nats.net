@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
+using System.Xml.Linq;
 using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
@@ -225,9 +226,9 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
     /// <summary>NATS connection this message is associated to.</summary>
     public INatsConnection? Connection { get; init; }
 
-    public bool IsEmpty => (Flags & NatsMsgFlags.Empty) == NatsMsgFlags.Empty;
+    public bool IsEmpty => (_flagsAndSize & 0x40000000) != 0;
 
-    public bool HasNoResponders => (Flags & NatsMsgFlags.NoResponders) == NatsMsgFlags.NoResponders;
+    public bool HasNoResponders => (_flagsAndSize & 0x80000000) != 0;
 
     /// <inheritdoc />
     public void EnsureSuccess()

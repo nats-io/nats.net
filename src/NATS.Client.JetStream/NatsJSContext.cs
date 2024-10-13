@@ -321,15 +321,20 @@ public partial class NatsJSContext
 
         await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
-            // We need to determine what type we're deserializing into
-            // .NET 6 new APIs to the rescue: we can read the buffer once
-            // by deserializing into a document, inspect and using the new
-            // API deserialize to the final type from the document.
+            if (msg.HasNoResponders)
+            {
+                return new NatsNoRespondersException();
+            }
+
             if (msg.Data == null)
             {
                 return new NatsJSException("No response data received");
             }
 
+            // We need to determine what type we're deserializing into
+            // .NET 6 new APIs to the rescue: we can read the buffer once
+            // by deserializing into a document, inspect and using the new
+            // API deserialize to the final type from the document.
             var jsonDocument = msg.Data;
 
             if (jsonDocument.RootElement.TryGetProperty("error", out var errorElement))
