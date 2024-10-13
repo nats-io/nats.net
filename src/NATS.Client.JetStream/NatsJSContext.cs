@@ -315,7 +315,7 @@ public partial class NatsJSContext
                 headers: default,
                 replyOpts: new NatsSubOpts { Timeout = Connection.Opts.RequestTimeout },
                 requestSerializer: NatsJSJsonSerializer<TRequest>.Default,
-                replySerializer: NatsJSForcedJsonDocumentSerializer<JsonDocument>.Default,
+                replySerializer: NatsJSJsonDocumentSerializer.Default,
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
