@@ -1,4 +1,4 @@
-﻿// ReSharper disable RedundantTypeArgumentsOfMethod
+// ReSharper disable RedundantTypeArgumentsOfMethod
 // ReSharper disable SuggestVarOrType_SimpleTypes
 // ReSharper disable SuggestVarOrType_Elsewhere
 #pragma warning disable SA1123
