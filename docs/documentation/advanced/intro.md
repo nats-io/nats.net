@@ -1,18 +1,14 @@
 ﻿# Advanced Options
 
 For more advanced configuration, you can use the [`NatsOpts`](xref:NATS.Client.Core.NatsOpts)
-class to configure the connection to the NATS server. You can create a new instance of `NatsOpts` and pass it to the
-[`NatsConnection`](xref:NATS.Client.Core.NatsConnection) constructor. `NatsConnection` is the class underlying
-[`NatsClient`](xref:NATS.Net.NatsClient) and is responsible for managing the connection to the NATS server.
+class to configure the connection to the NATS server.
 
-For example, you can hook your logger to `NatsConnection` to make sure all is working as expected or
+For example, you can hook your logger to `NatsClient` to make sure all is working as expected or
 to get help diagnosing any issues you might have:
 
 (For this example, you need to add [Microsoft.Extensions.Logging.Console](https://www.nuget.org/packages/Microsoft.Extensions.Logging.Console) from Nuget.)
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Advanced/IntroPage.cs#logging)]
 
-`NatsConnection` also implements [`INatsClient`](xref:NATS.Client.Core.INatsClient) as well as additional
-advance APIs, which means you can use it as a `NatsClient` instance without any changes to your code.
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Advanced/IntroPage.cs#logging)]
 
 ## NatsClient vs NatsConnection
 
@@ -36,9 +32,21 @@ instantiate a `NatsConnection` with default options, you would only have basic s
 for `int`, `string`, and `byte[]` types, and you would need to set up the serializers for your data classes
 if you want to use e.g., JSON serialization.
 
+The other difference is that `NatsClient` sets `SubPendingChannelFullMode` internal channel option to
+`BoundedChannelFullMode.Wait` to avoid dropping messages when the subscriber's internal channel is full.
+This is a good default for most cases, but you can change it by setting the `SubPendingChannelFullMode` option
+in `NatsClient` constructor.
+
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Advanced/IntroPage.cs#opts)]
+
+You can also use the `NatsConnection` class directly.
+
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Advanced/IntroPage.cs#opts2)]
+
 **Which One Should I Use?**
 
-If you are new to NATS, you should use `NatsClient` as it provides a more user-friendly interface.
+If you are new to NATS, you should use `NatsClient` as it provides a more user-friendly interface
+with sensible defaults especially for serialization.
 If you need more control over the connection options, AOT deployments, or custom serializers,
 you should use `NatsConnection`.
 

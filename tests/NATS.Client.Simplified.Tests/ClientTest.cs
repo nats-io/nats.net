@@ -1,7 +1,10 @@
 using System.Text;
+using System.Threading.Channels;
+using NATS.Client.Core;
 using NATS.Client.Core.Tests;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Models;
+using NATS.Client.Serializers.Json;
 using NATS.Net;
 
 // ReSharper disable AccessToDisposedClosure
@@ -206,6 +209,35 @@ public class ClientTest
         ctsStop.Cancel();
 
         await Task.WhenAll(task1, task2, task3, task4, task5, task6);
+    }
+
+    [Fact]
+    public void Client_opts_default_regitry()
+    {
+        var client = new NatsClient(new NatsOpts());
+        Assert.Equal(NatsClientDefaultSerializerRegistry.Default, client.Connection.Opts.SerializerRegistry);
+    }
+
+    [Fact]
+    public void Client_opts_custom_registry()
+    {
+        var registry = new NatsJsonSerializerRegistry();
+        var client = new NatsClient(new NatsOpts { SerializerRegistry = registry });
+        Assert.Equal(registry, client.Connection.Opts.SerializerRegistry);
+    }
+
+    [Fact]
+    public void Client_opts_default_pending()
+    {
+        var client = new NatsClient(new NatsOpts());
+        Assert.Equal(BoundedChannelFullMode.Wait, client.Connection.Opts.SubPendingChannelFullMode);
+    }
+
+    [Fact]
+    public void Client_opts_set_pending()
+    {
+        var client = new NatsClient(new NatsOpts(), pending: BoundedChannelFullMode.DropNewest);
+        Assert.Equal(BoundedChannelFullMode.DropNewest, client.Connection.Opts.SubPendingChannelFullMode);
     }
 
     private record MyData(int Id, string Name);

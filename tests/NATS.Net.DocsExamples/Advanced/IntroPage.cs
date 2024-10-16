@@ -7,6 +7,7 @@
 #pragma warning disable IDE0007
 #pragma warning disable IDE0008
 
+using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 
@@ -68,6 +69,37 @@ public class IntroPage
             using var loggerFactory = LoggerFactory.Create(configure: builder => builder.AddConsole());
 
             var opts = new NatsOpts { LoggerFactory = loggerFactory };
+
+            await using var nc = new NatsClient(opts);
+            #endregion
+        }
+
+        {
+            #region opts
+
+            var opts = new NatsOpts
+            {
+                // You need to set pending in the constructor and not use
+                // the option here, as it will be ignored.
+                SubPendingChannelFullMode = BoundedChannelFullMode.DropOldest,
+
+                // Your custom options
+                SerializerRegistry = new MyProtoBufSerializerRegistry(),
+
+                // ...
+            };
+
+            await using var nc = new NatsClient(opts, pending: BoundedChannelFullMode.DropNewest);
+            #endregion
+        }
+
+        {
+            #region opts2
+
+            var opts = new NatsOpts
+            {
+                // Your custom options
+            };
 
             await using var nc = new NatsConnection(opts);
             #endregion

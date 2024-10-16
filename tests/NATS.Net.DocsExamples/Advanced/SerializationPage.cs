@@ -10,17 +10,12 @@
 #pragma warning disable SA1515
 #pragma warning disable SA1202
 
-#region using-json
-
 using System.Buffers;
 using System.Text;
 using System.Text.Json.Serialization;
 using Google.Protobuf;
 using Google.Protobuf.Reflection;
 using NATS.Client.Core;
-using NATS.Client.Serializers.Json;
-
-#endregion
 
 namespace NATS.Net.DocsExamples.Advanced;
 
@@ -35,45 +30,10 @@ public class SerializationPage
             Console.WriteLine("  #region default");
 
             #region default
-            // Same as not specifying a serializer.
-            var natsOpts = NatsOpts.Default with { SerializerRegistry = NatsDefaultSerializerRegistry.Default };
+            // Set your custom serializer registry as the default for the connection.
+            var opts = NatsOpts.Default with { SerializerRegistry = new MyProtoBufSerializerRegistry() };
 
-            await using var nats = new NatsConnection(natsOpts);
-
-            var subscriber = Task.Run(async () =>
-            {
-                // The default serializer knows how to deal with UTF8 strings, numbers, and binary data.
-                await foreach (var msg in nats.SubscribeAsync<string>("foo"))
-                {
-                    // Check for the end of messages.
-                    if (msg.Data == null)
-                        break;
-
-                    // Outputs 'Hello World'
-                    Console.WriteLine(msg.Data);
-                }
-            });
-
-            // Give subscriber a chance to connect.
-            await Task.Delay(1000);
-
-            // The default serializer knows how to deal with UTF8 strings, numbers, and binary data.
-            await nats.PublishAsync<string>(subject: "foo", data: "Hello World");
-
-            // Signal the end of messages by sending an empty payload.
-            await nats.PublishAsync(subject: "foo");
-
-            await subscriber;
-            #endregion
-        }
-
-        {
-            Console.WriteLine("  #region json");
-
-            #region json
-            var natsOpts = NatsOpts.Default with { SerializerRegistry = NatsJsonSerializerRegistry.Default };
-
-            await using var nats = new NatsConnection(natsOpts);
+            await using var nc = new NatsClient(opts);
             #endregion
         }
 
@@ -84,13 +44,13 @@ public class SerializationPage
             // Set the custom serializer registry as the default for the connection.
             var myRegistry = new NatsJsonContextSerializerRegistry(MyJsonContext.Default, OtherJsonContext.Default);
 
-            var natsOpts = NatsOpts.Default with { SerializerRegistry = myRegistry };
+            var opts = new NatsOpts { SerializerRegistry = myRegistry };
 
-            await using var nats = new NatsConnection(natsOpts);
+            await using var nc = new NatsClient(opts);
 
             var subscriber = Task.Run(async () =>
             {
-                await foreach (var msg in nats.SubscribeAsync<MyData>("foo"))
+                await foreach (var msg in nc.SubscribeAsync<MyData>("foo"))
                 {
                     // Outputs 'MyData { Id = 1, Name = bar }'
                     Console.WriteLine(msg.Data);
@@ -101,7 +61,7 @@ public class SerializationPage
             // Give subscriber a chance to connect.
             await Task.Delay(1000);
 
-            await nats.PublishAsync<MyData>(subject: "foo", data: new MyData { Id = 1, Name = "bar" });
+            await nc.PublishAsync<MyData>(subject: "foo", data: new MyData { Id = 1, Name = "bar" });
 
             await subscriber;
             #endregion
@@ -111,13 +71,13 @@ public class SerializationPage
             Console.WriteLine("  #region my-data-publish");
 
             #region my-data-publish
-            await using var nats = new NatsConnection();
+            await using var nc = new NatsClient();
 
             var serializer = new NatsJsonContextSerializer<MyData>(MyJsonContext.Default);
 
             var subscriber = Task.Run(async () =>
             {
-                await foreach (var msg in nats.SubscribeAsync<MyData>("foo", serializer: serializer))
+                await foreach (var msg in nc.SubscribeAsync<MyData>("foo", serializer: serializer))
                 {
                     // Outputs 'MyData { Id = 1, Name = bar }'
                     Console.WriteLine(msg.Data);
@@ -128,7 +88,7 @@ public class SerializationPage
             // Give subscriber a chance to connect.
             await Task.Delay(1000);
 
-            await nats.PublishAsync<MyData>(subject: "foo", data: new MyData { Id = 1, Name = "bar" }, serializer: serializer);
+            await nc.PublishAsync<MyData>(subject: "foo", data: new MyData { Id = 1, Name = "bar" }, serializer: serializer);
 
             await subscriber;
             #endregion
@@ -138,13 +98,13 @@ public class SerializationPage
             Console.WriteLine("  #region custom");
 
             #region custom
-            var natsOpts = NatsOpts.Default with { SerializerRegistry = new MyProtoBufSerializerRegistry() };
+            var opts = new NatsOpts { SerializerRegistry = new MyProtoBufSerializerRegistry() };
 
-            await using var nats = new NatsConnection(natsOpts);
+            await using var nc = new NatsClient(opts);
 
             var subscriber = Task.Run(async () =>
             {
-                await foreach (var msg in nats.SubscribeAsync<Greeting>("foo"))
+                await foreach (var msg in nc.SubscribeAsync<Greeting>("foo"))
                 {
                     // Outputs '{ "id": 42, "name": "Marvin" }'
                     Console.WriteLine(msg.Data);
@@ -155,7 +115,7 @@ public class SerializationPage
             // Give subscriber a chance to connect.
             await Task.Delay(1000);
 
-            await nats.PublishAsync(subject: "foo", data: new Greeting { Id = 42, Name = "Marvin" });
+            await nc.PublishAsync(subject: "foo", data: new Greeting { Id = 42, Name = "Marvin" });
 
             await subscriber;
             #endregion
@@ -165,13 +125,13 @@ public class SerializationPage
             Console.WriteLine("  #region chain");
 
             #region chain
-            var natsOpts = NatsOpts.Default with { SerializerRegistry = new MixedSerializerRegistry() };
+            var opts = new NatsOpts { SerializerRegistry = new MixedSerializerRegistry() };
 
-            await using var nats = new NatsConnection(natsOpts);
+            await using var nc = new NatsClient(opts);
 
             var subscriber1 = Task.Run(async () =>
             {
-                await foreach (var msg in nats.SubscribeAsync<Greeting>("greet"))
+                await foreach (var msg in nc.SubscribeAsync<Greeting>("greet"))
                 {
                     // Outputs '{ "id": 42, "name": "Marvin" }'
                     Console.WriteLine(msg.Data);
@@ -181,7 +141,7 @@ public class SerializationPage
 
             var subscriber2 = Task.Run(async () =>
             {
-                await foreach (var msg in nats.SubscribeAsync<MyData>("data"))
+                await foreach (var msg in nc.SubscribeAsync<MyData>("data"))
                 {
                     // Outputs 'MyData { Id = 1, Name = bar }'
                     Console.WriteLine(msg.Data);
@@ -192,8 +152,8 @@ public class SerializationPage
             // Give subscribers a chance to connect.
             await Task.Delay(1000);
 
-            await nats.PublishAsync(subject: "greet", data: new Greeting { Id = 42, Name = "Marvin" });
-            await nats.PublishAsync(subject: "data", data: new MyData { Id = 1, Name = "Bob" });
+            await nc.PublishAsync(subject: "greet", data: new Greeting { Id = 42, Name = "Marvin" });
+            await nc.PublishAsync(subject: "data", data: new MyData { Id = 1, Name = "Bob" });
 
             await Task.WhenAll(subscriber1, subscriber2);
 
@@ -204,15 +164,14 @@ public class SerializationPage
             Console.WriteLine("  #region buffers");
 
             #region buffers
-            // Same as not specifying a serializer.
-            var natsOpts = NatsOpts.Default with { SerializerRegistry = NatsDefaultSerializerRegistry.Default };
-
-            await using var nats = new NatsConnection(natsOpts);
+            // The default serializer knows how to deal with binary data types like NatsMemoryOwner<byte>.
+            // So, you can use it without specifying a serializer.
+            await using var nc = new NatsClient();
 
             var subscriber = Task.Run(async () =>
             {
                 // The default serializer knows how to deal with binary data types like NatsMemoryOwner<byte>.
-                await foreach (var msg in nats.SubscribeAsync<NatsMemoryOwner<byte>>("foo"))
+                await foreach (var msg in nc.SubscribeAsync<NatsMemoryOwner<byte>>("foo"))
                 {
                     // Check for the end of messages.
                     if (msg.Data.Length == 0)
@@ -238,10 +197,10 @@ public class SerializationPage
             bw.Advance(2);
 
             // Default serializer knows how to deal with binary data types like NatsBufferWriter<byte>.
-            await nats.PublishAsync(subject: "foo", data: bw);
+            await nc.PublishAsync(subject: "foo", data: bw);
 
             // Signal the end of messages by sending an empty payload.
-            await nats.PublishAsync(subject: "foo");
+            await nc.PublishAsync(subject: "foo");
 
             await subscriber;
             #endregion
