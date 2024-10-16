@@ -4,6 +4,8 @@
 #pragma warning disable SA1123
 #pragma warning disable SA1124
 #pragma warning disable SA1509
+#pragma warning disable IDE0007
+#pragma warning disable IDE0008
 
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
