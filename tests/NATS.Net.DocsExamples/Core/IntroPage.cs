@@ -47,6 +47,12 @@ public class IntroPage
 
             await nc.PublishAsync("bar.exit");
             #endregion
+
+            for (var i = 0; i < 3; i++)
+            {
+                await Task.Delay(250);
+                await nc.PublishAsync("bar.exit");
+            }
         }
 
         await subscription;
