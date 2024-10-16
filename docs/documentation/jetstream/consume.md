@@ -5,12 +5,7 @@ You can access these methods from the consumer object created using JetStream co
 
 Install [NATS.Net](https://www.nuget.org/packages/NATS.Net) from Nuget.
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/IntroPage.cs#serializer)]
-
 [!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/ConsumePage.cs#js)]
-
-> [!NOTE]
-> See also [Serialization](../serialization.md) section for more information about different serialization options.
 
 ## Next Method
 
@@ -57,7 +52,3 @@ will be created eventually:
 
 Depending on your application you should configure streams and consumers with appropriate settings so that the
 messages are processed and stored based on your requirements.
-
-> [!NOTE]
-> This example used generated JSON serializer suitable for native AOT deployments.
-> See also [Serialization](../serialization.md) section for more details.

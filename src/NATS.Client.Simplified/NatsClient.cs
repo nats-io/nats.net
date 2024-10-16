@@ -31,6 +31,31 @@ public class NatsClient : INatsClient
         Connection = new NatsConnection(opts);
     }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="NatsClient"/> class.
+    /// </summary>
+    /// <param name="opts">NATS client options.</param>
+    /// <param name="pending">Sets `SubPendingChannelFullMode` option. (default: wait)</param>
+    /// <remarks>
+    /// By default, the <paramref name="opts"/> will be merged with the default options
+    /// overriding SerializationRegistry with <see cref="NatsClientDefaultSerializerRegistry.Default"/>
+    /// and SubPendingChannelFullMode with <see cref="BoundedChannelFullMode.Wait"/>.
+    /// </remarks>
+    public NatsClient(NatsOpts opts, BoundedChannelFullMode pending = BoundedChannelFullMode.Wait)
+    {
+        if (ReferenceEquals(opts.SerializerRegistry, NatsOpts.Default.SerializerRegistry))
+        {
+            opts = opts with
+            {
+                SerializerRegistry = NatsClientDefaultSerializerRegistry.Default,
+            };
+        }
+
+        opts = opts with { SubPendingChannelFullMode = pending };
+
+        Connection = new NatsConnection(opts);
+    }
+
     /// <inheritdoc />
     public INatsConnection Connection { get; }
 

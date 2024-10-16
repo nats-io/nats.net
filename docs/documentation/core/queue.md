@@ -38,3 +38,12 @@ Stopping...
 [1] Done
 All done
 ```
+
+In the example above, three subscribers are created, each of which is part of the same queue group.
+The publisher sends 10 messages, which are randomly distributed among the subscribers.
+Each subscriber processes the message and sends a response back to the publisher.
+
+The queue group feature is useful when you want to distribute messages among a group of subscribers
+in a load-balanced manner.
+Combined with other messaging patterns, such as scatter-gather,
+queue groups can be used to create highly scalable and fault-tolerant systems.

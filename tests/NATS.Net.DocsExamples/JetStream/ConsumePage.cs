@@ -25,7 +25,7 @@ public class ConsumerPage
         {
             await using var nats1 = new NatsConnection();
             var js1 = new NatsJSContext(nats1);
-            await js1.DeleteStreamAsync("orders");
+            await js1.DeleteStreamAsync("ORDERS");
             await Task.Delay(1000);
         }
         catch (NatsJSApiException)
@@ -36,7 +36,7 @@ public class ConsumerPage
         {
             await using var nats1 = new NatsConnection();
             var js1 = new NatsJSContext(nats1);
-            await js1.DeleteStreamAsync("shop_orders");
+            await js1.DeleteStreamAsync("SHOP_ORDERS");
             await Task.Delay(1000);
         }
         catch (NatsJSApiException)
@@ -44,27 +44,30 @@ public class ConsumerPage
         }
 
         #region js
-        await using var nats = new NatsConnection();
-        var js = new NatsJSContext(nats);
+        await using var nc = new NatsClient();
+        var js = nc.CreateJetStreamContext();
 
-        await js.CreateStreamAsync(new StreamConfig(name: "orders", subjects: new[] { "orders.>" }));
+        await js.CreateStreamAsync(new StreamConfig(name: "ORDERS", subjects: ["orders.>"]));
 
-        var consumer = await js.CreateOrUpdateConsumerAsync(stream: "orders", new ConsumerConfig("order_processor"));
-
-        // Use generated JSON serializer
-        var orderSerializer = new NatsJsonContextSerializer<Order>(OrderJsonSerializerContext.Default);
+        var consumer = await js.CreateOrUpdateConsumerAsync(stream: "ORDERS", new ConsumerConfig("order_processor"));
 
         // Publish new order messages
-        await nats.PublishAsync(subject: "orders.new.1", data: new Order(OrderId: 1), serializer: orderSerializer);
+        var ack = await js.PublishAsync(subject: "orders.new.1", data: new Order { Id = 1 });
+
+        // If you want exceptions to be thrown, you can use EnsureSuccess() method instead
+        if (!ack.IsSuccess())
+        {
+            // handle error
+        }
         #endregion
 
         {
             #region consumer-next
-            var next = await consumer.NextAsync<Order>(serializer: orderSerializer);
+            var next = await consumer.NextAsync<Order>();
 
             if (next is { } msg)
             {
-                Console.WriteLine($"Processing {msg.Subject}: {msg.Data.OrderId}...");
+                Console.WriteLine($"Processing {msg.Subject}: {msg.Data.Id}...");
                 await msg.AckAsync();
             }
             #endregion
@@ -74,7 +77,7 @@ public class ConsumerPage
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
             var cancellationToken = cts.Token;
             #region consumer-fetch
-            await foreach (var msg in consumer.FetchAsync<Order>(new NatsJSFetchOpts { MaxMsgs = 1000 }, serializer: orderSerializer).WithCancellation(cancellationToken))
+            await foreach (var msg in consumer.FetchAsync<Order>(new NatsJSFetchOpts { MaxMsgs = 1000 }).WithCancellation(cancellationToken))
             {
                 // Process message
                 await msg.AckAsync();
@@ -89,7 +92,7 @@ public class ConsumerPage
             var cancellationToken = cts.Token;
             #region consumer-consume
             // Continuously consume a batch of messages (1000 by default)
-            await foreach (var msg in consumer.ConsumeAsync<Order>(serializer: orderSerializer).WithCancellation(cancellationToken))
+            await foreach (var msg in consumer.ConsumeAsync<Order>().WithCancellation(cancellationToken))
             {
                 // Process message
                 await msg.AckAsync();
@@ -102,6 +105,7 @@ public class ConsumerPage
         {
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
             var cancellationToken = cts.Token;
+
             #region consumer-consume-error
             while (!cancellationToken.IsCancellationRequested)
             {
@@ -109,7 +113,7 @@ public class ConsumerPage
                 {
                     await consumer.RefreshAsync(cancellationToken); // or try to recreate consumer
 
-                    await foreach (var msg in consumer.ConsumeAsync<Order>(serializer: orderSerializer).WithCancellation(cancellationToken))
+                    await foreach (var msg in consumer.ConsumeAsync<Order>().WithCancellation(cancellationToken))
                     {
                         // Process message
                         await msg.AckAsync(cancellationToken: cancellationToken);

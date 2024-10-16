@@ -27,6 +27,8 @@ jobs:
         with:
           dotnet-version: '8.x'
 
+      - run: dotnet build
+
       - run: dotnet tool update -g docfx
 
       - run: docfx docs/docfx.json

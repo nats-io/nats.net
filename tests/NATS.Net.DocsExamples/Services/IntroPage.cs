@@ -25,8 +25,8 @@ public class IntroPage
         Console.WriteLine("NATS.Net.DocsExamples.Services.IntroPage");
 
         #region svc
-        await using var nats = new NatsConnection();
-        var svc = new NatsSvcContext(nats);
+        await using var nc = new NatsClient();
+        var svc = nc.CreateServicesContext();
         #endregion
 
         #region add
@@ -36,6 +36,14 @@ public class IntroPage
         #region endpoint
         await testService.AddEndpointAsync<int>(name: "divide42", handler: async m =>
         {
+            // Handle exceptions which may occur during message processing,
+            // usually due to serialization errors
+            if (m.Exception != null)
+            {
+                await m.ReplyErrorAsync(500, m.Exception.Message);
+                return;
+            }
+
             if (m.Data == 0)
             {
                 await m.ReplyErrorAsync(400, "Division by zero");
