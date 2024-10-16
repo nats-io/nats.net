@@ -1,7 +1,6 @@
 // ReSharper disable RedundantAssignment
 // ReSharper disable SuggestVarOrType_Elsewhere
 
-using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Models;
 
@@ -19,14 +18,14 @@ public class ManagingPage
         Console.WriteLine("NATS.Net.DocsExamples.JetStream.ManagingPage");
 
         #region js
-        await using var nats = new NatsConnection();
+        await using var nc = new NatsClient();
 
-        var js = new NatsJSContext(nats);
+        var js = nc.CreateJetStreamContext();
         #endregion
 
         try
         {
-            await js.DeleteStreamAsync("shop_orders");
+            await js.DeleteStreamAsync("SHOP_ORDERS");
             await Task.Delay(1000);
         }
         catch (NatsJSApiException)
@@ -35,7 +34,7 @@ public class ManagingPage
 
         try
         {
-            await js.DeleteStreamAsync("orders");
+            await js.DeleteStreamAsync("ORDERS");
             await Task.Delay(1000);
         }
         catch (NatsJSApiException)
@@ -43,20 +42,20 @@ public class ManagingPage
         }
 
         #region stream
-        await js.CreateStreamAsync(new StreamConfig(name: "orders", subjects: new[] { "orders.>" }));
+        await js.CreateStreamAsync(new StreamConfig(name: "ORDERS", subjects: new[] { "orders.>" }));
         #endregion
 
         {
             #region consumer-create
             // Create or get a consumer
-            var consumer = await js.CreateOrUpdateConsumerAsync(stream: "orders", new ConsumerConfig("order_processor"));
+            var consumer = await js.CreateOrUpdateConsumerAsync(stream: "ORDERS", new ConsumerConfig("order_processor"));
             #endregion
         }
 
         {
             #region consumer-get
             // Get an existing consumer
-            var consumer = await js.GetConsumerAsync(stream: "orders", consumer: "order_processor");
+            var consumer = await js.GetConsumerAsync(stream: "ORDERS", consumer: "order_processor");
             #endregion
         }
 
@@ -72,7 +71,7 @@ public class ManagingPage
                 DurableName = "durable_processor",
             };
 
-            var consumer = await js.CreateOrUpdateConsumerAsync(stream: "orders", durableConfig);
+            var consumer = await js.CreateOrUpdateConsumerAsync(stream: "ORDERS", durableConfig);
 
             Console.WriteLine($"Consumer Name: {consumer.Info.Name}"); // durable_processor
             Console.WriteLine($"Consumer DurableName: {consumer.Info.Config.DurableName}"); // durable_processor
@@ -84,7 +83,7 @@ public class ManagingPage
             // Create an ephemeral consumer by not setting durable name
             var ephemeralConfig = new ConsumerConfig();
 
-            var consumer = await js.CreateOrUpdateConsumerAsync(stream: "orders", ephemeralConfig);
+            var consumer = await js.CreateOrUpdateConsumerAsync(stream: "ORDERS", ephemeralConfig);
 
             Console.WriteLine($"Consumer Name: {consumer.Info.Name}"); // e.g. Z8YlwrP9 (server assigned random name)
             #endregion

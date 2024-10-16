@@ -10,7 +10,7 @@ The subject must be configured on a stream to be persisted:
 or using the nats cli:
 
 ```shell
-$ nats stream create orders --subjects 'orders.>'
+$ nats stream create ORDERS --subjects 'orders.>'
 ```
 
 Then you can publish to subjects captured by the stream:
@@ -27,6 +27,3 @@ by ignoring duplicate messages as indicated by the message ID. Message ID is not
 as metadata, part of the message headers.
 
 [!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/PublishPage.cs#publish-duplicate)]
-
-> [!NOTE]
-> See also [Serialization](../serialization.md) section for more information about different serialization options.

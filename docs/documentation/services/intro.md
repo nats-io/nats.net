@@ -29,7 +29,7 @@ line client](https://github.com/nats-io/natscli) (make sure you have at least v0
 
 ```shell
 $ nats --version
-0.1.1
+0.1.4
 ```
 
 ```shell
@@ -77,7 +77,3 @@ as well as an optional common subject prefix for all endpoints.
 You can group your endpoints optionally in different [queue groups](https://docs.nats.io/nats-concepts/core-nats/queue):
 
 [!code-csharp[](../../../tests/NATS.Net.DocsExamples/Services/IntroPage.cs#grp)]
-
-> [!NOTE]
-> Examples in this page uses primitive types for simplicity. See [Serialization](../serialization.md) section for more
-> information about different serialization options.

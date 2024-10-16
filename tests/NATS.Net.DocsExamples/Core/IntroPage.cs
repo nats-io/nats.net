@@ -20,12 +20,9 @@ public class IntroPage
             subscription = Task.Run(async () =>
             {
                 #region sub
-                // required to serialize ad-hoc types
-                var opts = new NatsOpts { SerializerRegistry = NatsJsonSerializerRegistry.Default };
+                await using var nc = new NatsClient();
 
-                await using var nats = new NatsConnection(opts);
-
-                await foreach (var msg in nats.SubscribeAsync<Bar>("bar.>"))
+                await foreach (var msg in nc.SubscribeAsync<Bar>("bar.>"))
                 {
                     if (msg.Subject == "bar.exit")
                         break;
@@ -40,30 +37,19 @@ public class IntroPage
 
         {
             #region pub
-            var opts = new NatsOpts { SerializerRegistry = NatsJsonSerializerRegistry.Default };
-            await using var nats = new NatsConnection(opts);
+            await using var nc = new NatsClient();
 
             for (var i = 0; i < 10; i++)
             {
                 Console.WriteLine($" Publishing {i}...");
-                await nats.PublishAsync<Bar>($"bar.baz.{i}", new Bar(Id: i, Name: "Baz"));
+                await nc.PublishAsync<Bar>($"bar.baz.{i}", new Bar(Id: i, Name: "Baz"));
             }
 
-            await nats.PublishAsync("bar.exit");
+            await nc.PublishAsync("bar.exit");
             #endregion
         }
 
         await subscription;
-
-        {
-            #region logging
-            using var loggerFactory = LoggerFactory.Create(configure: builder => builder.AddConsole());
-
-            var opts = new NatsOpts { LoggerFactory = loggerFactory };
-
-            await using var nats = new NatsConnection(opts);
-            #endregion
-        }
     }
 }
 

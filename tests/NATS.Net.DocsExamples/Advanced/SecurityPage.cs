@@ -3,10 +3,8 @@
 #pragma warning disable SA1509
 
 using NATS.Client.Core;
-using NATS.Client.JetStream;
-using NATS.Client.JetStream.Models;
 
-namespace NATS.Net.DocsExamples;
+namespace NATS.Net.DocsExamples.Advanced;
 
 public class SecurityPage
 {

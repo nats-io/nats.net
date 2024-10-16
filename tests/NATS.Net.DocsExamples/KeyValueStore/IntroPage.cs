@@ -22,18 +22,13 @@ public class IntroPage
         Console.WriteLine("NATS.Net.DocsExamples.KeyValueStore.IntroPage");
 
         #region kv
-        // required to serialize ad-hoc types
-        var opts = new NatsOpts { SerializerRegistry = NatsJsonSerializerRegistry.Default };
-
-        await using var nats = new NatsConnection(opts);
-
-        var js = new NatsJSContext(nats);
-        var kv = new NatsKVContext(js);
+        await using var nc = new NatsClient();
+        var kv = nc.CreateKeyValueStoreContext();
         #endregion
 
         try
         {
-            await kv.DeleteStoreAsync("shop_orders");
+            await kv.DeleteStoreAsync("SHOP_ORDERS");
             await Task.Delay(1000);
         }
         catch (NatsJSApiException)
@@ -41,7 +36,7 @@ public class IntroPage
         }
 
         #region store
-        var store = await kv.CreateStoreAsync("shop_orders");
+        var store = await kv.CreateStoreAsync("SHOP_ORDERS");
         #endregion
 
         {

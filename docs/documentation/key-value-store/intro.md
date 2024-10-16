@@ -16,11 +16,7 @@ To be able to use KV you need to enable JetStream by running the server with `-j
 $ nats-server -js
 ```
 
-Install [NATS.Net](https://www.nuget.org/packages/NATS.Net)
-and [NATS.Client.Serializers.Json](https://www.nuget.org/packages/NATS.Client.Serializers.Json) from Nuget.
-
-> [!NOTE]
-> See also [Serialization](../serialization.md) section for more information about different serialization options.
+Install [NATS.Net](https://www.nuget.org/packages/NATS.Net) from Nuget.
 
 Before we can do anything, we need a Key/Value Store context:
 
@@ -40,7 +36,7 @@ $ nats kv ls
 ├─────────────┬─────────────┬─────────────────────┬──────┬────────┬─────────────┤
 │ Bucket      │ Description │ Created             │ Size │ Values │ Last Update │
 ├─────────────┼─────────────┼─────────────────────┼──────┼────────┼─────────────┤
-│ shop_orders │             │ 2023-10-12 15:29:40 │ 0 B  │ 0      │ never       │
+│ SHOP_ORDERS │             │ 2023-10-12 15:29:40 │ 0 B  │ 0      │ never       │
 ╰─────────────┴─────────────┴─────────────────────┴──────┴────────┴─────────────╯
 ```
 
@@ -53,8 +49,8 @@ saved value by its key:
 We can also confirm that our value is persisted by using the NATS command line:
 
 ```shell
-$ nats kv get shop_orders order-1
-shop_orders > order-1 created @ 12 Oct 23 15:31 UTC
+$ nats kv get SHOP_ORDERS order-1
+SHOP_ORDERS > order-1 created @ 12 Oct 23 15:31 UTC
 
 {"Id":1}
 ```

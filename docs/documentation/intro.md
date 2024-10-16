@@ -1,12 +1,22 @@
 # Introduction
 
-NATS.Net is a .NET client for the open source [Connective Technology for Adaptive Edge & Distributed Systems - NATS](https://nats.io/)!
-It's build on top of the modern .NET platform, taking advantage of all the high performance features and
+NATS .NET is a .NET client for the open source [NATS](https://nats.io/) messaging system.
+It's built on top of the modern .NET platform, taking advantage of the high performance features and
 asynchronous programming model.
 
-NATS.Net, just like NATS, is open source as is this documentation.
-Please [let us know](https://natsio.slack.com/channels/dotnet) if you have updates or suggestions for
+NATS .NET, just like NATS, is open source as is this documentation.
+Please [let us know](https://slack.nats.io) if you have updates or suggestions for
 these docs. You can also create a Pull Request in GitHub using the _Edit this page_ link on each page.
+
+> [!NOTE]
+> **Don't confuse NuGet packages!**
+> NATS .NET package on NuGet is called [NATS.Net](https://www.nuget.org/packages/NATS.Net).
+> There is another package called `NATS.Client` which is the older version of the client library
+> and will be deprecated eventually.
+
+> [!TIP]
+> NATS .NET now supports **.NET Standard** 2.0 and 2.1 along with .NET 6.0 and 8.0,
+> which means you can also use it with **.NET Framework** 4.6.2+ and **Unity** 2018.1+.
 
 ## Quick Start
 
@@ -22,27 +32,31 @@ also enable [JetStream](https://docs.nats.io/nats-concepts/jetstream) by passing
 persistence and other advanced features.
 
 If you prefer using containers, you can also run the latest
-[NATS server image](https://docs.nats.io/running-a-nats-service/nats_docker) using Docker:
+[NATS server image](https://docs.nats.io/running-a-nats-service/nats_docker) using Docker or Podman, for example:
 
 ```shell
 $ docker run nats
 ```
 
-Here are some quick examples to get you started with NATS.Net:
+Here are quick examples to get you started with NATS .NET:
 
 # [Core NATS](#tab/core-nats)
 
 Core NATS is the basic messaging functionality. Messages can be published to a subject and received by one or more
-subscribers listening to the same subject only when they are running. There is no persistence and messages are
-not stored anywhere.
+subscribers listening to the same subject only when they are running.
+Messages are not stored anywhere.
 
 Start NATS server with default options:
 
 ```shell
 $ nats-server
 ```
+or
+```shell
+$ docker run nats
+```
 
-Reference [NATS.Net](https://www.nuget.org/packages/NATS.Net) NuGet package in your project:
+Reference [NATS.Net NuGet package](https://www.nuget.org/packages/NATS.Net) in your project:
 
 [!code-csharp[](../../tests/NATS.Net.DocsExamples/IntroPage.cs#core-nats)]
 
@@ -56,6 +70,10 @@ Start NATS server with JetStream enabled:
 ```shell
 $ nats-server -js
 ```
+or
+```shell
+$ docker run nats -js
+```
 
 Reference [NATS.Net NuGet package](https://www.nuget.org/packages/NATS.Net/) in your project:
 
@@ -63,16 +81,7 @@ Reference [NATS.Net NuGet package](https://www.nuget.org/packages/NATS.Net/) in 
 
 ---
 
-> [!NOTE]
-> Every [`NatsConnection`](xref:NATS.Client.Core.NatsConnection) instance is a TCP connection to a NATS server.
-> Typically an application will only need one
-> connection and many subscriptions and publishers would share that same connection. Connections are relatively
-> heavyweight and expensive to create while
-> subscriptions and publishers are lightweight internal NATS protocol handlers.
-> NATS.Net should be able to handle large numbers of subscriptions
-> and publishers per connection.
-
-Now you should be able to run NATS server on your machine and use the above code samples to see the basics of
+Now you should be able to run the NATS server on your machine and use the above code samples to see the basics of
 NATS messaging and persistence.
 
 ## What's Next
@@ -85,4 +94,4 @@ NATS messaging and persistence.
 
 [Object Store](object-store/intro.md) is the built-in distributed persistent objects of arbitrary size built on top of JetStream.
 
-[Services](services/intro.md) is the services protocol built on top of core NATS enabling discovery and monitoring of services you develop.
+[Services](services/intro.md) is the Service Protocol built on top of core NATS enabling discovery and monitoring of services you develop.

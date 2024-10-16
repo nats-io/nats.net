@@ -1,3 +1,5 @@
+// ReSharper disable MethodSupportsCancellation
+// ReSharper disable AccessToDisposedClosure
 // ReSharper disable SuggestVarOrType_Elsewhere
 #pragma warning disable SA1123
 #pragma warning disable SA1124
@@ -15,10 +17,12 @@ public class QueuePage
         Console.WriteLine("NATS.Net.DocsExamples.Core.QueuePage");
 
         #region queue
-        await using var nats = new NatsConnection();
+        await using var nc = new NatsClient();
+
+        // Create a cancellation token source to stop the subscriptions
+        using var cts = new CancellationTokenSource();
 
         var replyTasks = new List<Task>();
-        var cts = new CancellationTokenSource();
 
         for (var i = 0; i < 3; i++)
         {
@@ -28,7 +32,7 @@ public class QueuePage
             replyTasks.Add(Task.Run(async () =>
             {
                 // Retrieve messages until unsubscribed
-                await foreach (var msg in nats.SubscribeAsync<int>("math.double", queueGroup: "maths-service", cancellationToken: cts.Token))
+                await foreach (var msg in nc.SubscribeAsync<int>("math.double", queueGroup: "maths-service", cancellationToken: cts.Token))
                 {
                     Console.WriteLine($"[{replyTaskId}] Received request: {msg.Data}");
                     await msg.ReplyAsync($"Answer is: {2 * msg.Data}");
@@ -44,14 +48,14 @@ public class QueuePage
         // Send a few requests
         for (var i = 0; i < 10; i++)
         {
-            var reply = await nats.RequestAsync<int, string>("math.double", i);
+            NatsMsg<string> reply = await nc.RequestAsync<int, string>("math.double", i);
             Console.WriteLine($"Reply: '{reply.Data}'");
         }
 
         Console.WriteLine("Stopping...");
 
         // Cancellation token will unsubscribe and complete the message loops
-        cts.Cancel();
+        await cts.CancelAsync();
 
         // Make sure all tasks finished cleanly
         await Task.WhenAll(replyTasks);

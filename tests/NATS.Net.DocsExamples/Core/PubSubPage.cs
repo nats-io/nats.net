@@ -16,11 +16,11 @@ public class PubSubPage
 
         {
             #region pubsub
-            await using var nats = new NatsConnection();
+            await using var nc = new NatsClient();
 
             var subscription = Task.Run(async () =>
             {
-                await foreach (var msg in nats.SubscribeAsync<int>("foo"))
+                await foreach (var msg in nc.SubscribeAsync<int>("foo"))
                 {
                     Console.WriteLine($"Received {msg.Subject}: {msg.Data}\n");
 
@@ -35,48 +35,14 @@ public class PubSubPage
             for (var i = 0; i < 10; i++)
             {
                 Console.WriteLine($" Publishing {i}...");
-                await nats.PublishAsync<int>("foo", i);
+                await nc.PublishAsync<int>("foo", i);
             }
 
             // Signal subscription to stop
-            await nats.PublishAsync<int>("foo", -1);
+            await nc.PublishAsync<int>("foo", -1);
 
             // Make sure subscription completes cleanly
             await subscription;
-            #endregion
-        }
-
-        {
-            #region lowlevel
-            await using var nats = new NatsConnection();
-
-            // Connections are lazy, so we need to connect explicitly
-            // to avoid any races between subscription and publishing.
-            await nats.ConnectAsync();
-
-            await using var sub = await nats.SubscribeCoreAsync<int>("foo");
-
-            for (var i = 0; i < 10; i++)
-            {
-                Console.WriteLine($" Publishing {i}...");
-                await nats.PublishAsync<int>("foo", i);
-            }
-
-            // Signal subscription to stop
-            await nats.PublishAsync<int>("foo", -1);
-
-            // Messages have been collected in the subscription internal channel
-            // now we can drain them
-            await foreach (var msg in sub.Msgs.ReadAllAsync())
-            {
-                Console.WriteLine($"Received {msg.Subject}: {msg.Data}\n");
-                if (msg.Data == -1)
-                    break;
-            }
-
-            // We can unsubscribe from the subscription explicitly
-            // (otherwise dispose will do it for us)
-            await sub.UnsubscribeAsync();
             #endregion
         }
     }

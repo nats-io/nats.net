@@ -132,6 +132,14 @@ jobs:
 
           ./NATS.Client.CheckNativeAot
 
+      - name: Check Documentation Examples
+        run: |
+            killall nats-server 2> /dev/null | echo -n
+            nats-server -v
+            nats-server -js &
+            cd tests/NATS.Net.DocsExamples
+            dotnet run
+
   windows_test:
     name: Windows
     strategy:

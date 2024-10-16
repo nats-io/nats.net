@@ -10,18 +10,19 @@
 #pragma warning disable SA1515
 #pragma warning disable SA1202
 
+#region using-json
+
 using System.Buffers;
 using System.Text;
 using System.Text.Json.Serialization;
 using Google.Protobuf;
 using Google.Protobuf.Reflection;
 using NATS.Client.Core;
-
-#region using-json
 using NATS.Client.Serializers.Json;
+
 #endregion
 
-namespace NATS.Net.DocsExamples;
+namespace NATS.Net.DocsExamples.Advanced;
 
 public class SerializationPage
 {
@@ -41,7 +42,7 @@ public class SerializationPage
 
             var subscriber = Task.Run(async () =>
             {
-                // Default serializer knows how to deal with UTF8 strings, numbers and binary data.
+                // The default serializer knows how to deal with UTF8 strings, numbers, and binary data.
                 await foreach (var msg in nats.SubscribeAsync<string>("foo"))
                 {
                     // Check for the end of messages.
@@ -56,7 +57,7 @@ public class SerializationPage
             // Give subscriber a chance to connect.
             await Task.Delay(1000);
 
-            // Default serializer knows how to deal with UTF8 strings, numbers and binary data.
+            // The default serializer knows how to deal with UTF8 strings, numbers, and binary data.
             await nats.PublishAsync<string>(subject: "foo", data: "Hello World");
 
             // Signal the end of messages by sending an empty payload.
@@ -210,7 +211,7 @@ public class SerializationPage
 
             var subscriber = Task.Run(async () =>
             {
-                // Default serializer knows how to deal with binary data types like NatsMemoryOwner<byte>.
+                // The default serializer knows how to deal with binary data types like NatsMemoryOwner<byte>.
                 await foreach (var msg in nats.SubscribeAsync<NatsMemoryOwner<byte>>("foo"))
                 {
                     // Check for the end of messages.
@@ -229,7 +230,7 @@ public class SerializationPage
             await Task.Delay(1000);
 
             // Don't reuse NatsBufferWriter, it's disposed and returned to the pool
-            // by the publisher after being written to network.
+            // by the publisher after being written to the network.
             var bw = new NatsBufferWriter<byte>();
             var memory = bw.GetMemory(2);
             memory.Span[0] = (byte)'H';
@@ -319,7 +320,7 @@ public class MixedSerializerRegistry : INatsSerializerRegistry
 #endregion
 
 // Fake protobuf message.
-// Normally this would be generated using protobuf compiler.
+// Normally, this would be generated using protobuf compiler.
 public class Greeting : IBufferMessage
 {
     public int Id { get; set; }
