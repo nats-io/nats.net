@@ -271,7 +271,7 @@ public abstract class NatsSubBase
         {
             switch (Opts)
             {
-            case { ThrowIfNoResponders: true } when headersBuffer is { Length: >= 12 } && headersBuffer.Value.Slice(8, 4).ToSpan().SequenceEqual(NoRespondersHeaderSequence):
+            case { ThrowIfNoResponders: true } when IsHeader503(headersBuffer):
                 SetException(new NatsNoRespondersException());
                 return;
             case { StopOnEmptyMsg: true }:
@@ -310,6 +310,10 @@ public abstract class NatsSubBase
             Telemetry.SetException(Activity.Current, e);
         }
     }
+
+    internal static bool IsHeader503(ReadOnlySequence<byte>? headersBuffer) =>
+        headersBuffer is { Length: >= 12 }
+        && headersBuffer.Value.Slice(8, 4).ToSpan().SequenceEqual(NoRespondersHeaderSequence);
 
     internal void ClearException() => Interlocked.Exchange(ref _exception, null);
 
