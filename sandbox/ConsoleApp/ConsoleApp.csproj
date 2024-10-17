@@ -12,7 +12,7 @@
     <ItemGroup>
         <PackageReference Include="ConsoleAppFramework" Version="4.0.6" />
         <PackageReference Include="JetBrains.Profiler.Api" Version="1.1.8" />
-        <PackageReference Include="MessagePack" Version="2.3.85" />
+        <PackageReference Include="MessagePack" Version="2.5.187" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="6.0.0" />
         <PackageReference Include="ZLogger" Version="1.6.1" />
         <PackageReference Include="ProcessX" Version="1.5.4" />
