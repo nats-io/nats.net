@@ -23,19 +23,12 @@
       <ProjectReference Include="..\..\src\NATS.Client.ObjectStore\NATS.Client.ObjectStore.csproj" />
       <ProjectReference Include="..\..\src\NATS.Client.Services\NATS.Client.Services.csproj" />
       <ProjectReference Include="..\NATS.Client.TestUtilities\NATS.Client.TestUtilities.csproj" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <None Remove="dist\testhost.exe" />
-      <None Remove="dist\testhost.dll" />
-      <None Remove="dist\NATS.Client.TestUtilities.runtimeconfig.json" />
-      <None Remove="dist\NATS.Client.Services.xml" />
-      <None Remove="dist\NATS.Client.ObjectStore.xml" />
-      <None Remove="dist\NATS.Client.KeyValueStore.xml" />
-      <None Remove="dist\NATS.Client.JetStream.xml" />
-      <None Remove="dist\NATS.Client.Hosting.xml" />
-      <None Remove="dist\NATS.Client.Core.xml" />
-      <None Remove="dist\NATS.Client.CheckNativeAot.exe" />
+      <TrimmerRootAssembly Include="NATS.Client.Core" />
+      <TrimmerRootAssembly Include="NATS.Client.Hosting" />
+      <TrimmerRootAssembly Include="NATS.Client.JetStream" />
+      <TrimmerRootAssembly Include="NATS.Client.KeyValueStore" />
+      <TrimmerRootAssembly Include="NATS.Client.ObjectStore" />
+      <TrimmerRootAssembly Include="NATS.Client.Services" />
     </ItemGroup>
 
 </Project>
