@@ -35,6 +35,7 @@ public record StreamSource
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("opt_start_time")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonDateTimeOffsetConverter))]
     public DateTimeOffset OptStartTime { get; set; }
 
     /// <summary>
