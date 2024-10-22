@@ -32,6 +32,12 @@ Head over to [NATS documentation](https://docs.nats.io/nats-concepts/overview) f
 
 ## Quick Start
 
+Install the [NATS.Net](https://www.nuget.org/packages/NATS.Net) package from NuGet:
+
+```bash
+dotnet add package NATS.Net
+```
+
 Basic messaging:
 
 ```csharp
@@ -48,9 +54,10 @@ await foreach (var msg in nc.SubscribeAsync<string>(subject: "foo"))
 await nc.PublishAsync(subject: "foo", data: "Hello, World!");
 ```
 
-Persistance with JetStream:
+Persistence with JetStream:
 
 ```csharp
+// NATS JetStream basic publish-consume example
 await using var nc = new NatsClient();
 var js = nc.CreateJetStreamContext();
 

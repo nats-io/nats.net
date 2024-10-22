@@ -6,7 +6,7 @@
   homepage: api/index.md
 
 - name: GitHub
-  href: https://github.com/nats-io/nats.net.v2
+  href: https://github.com/nats-io/nats.net
 
 - name: Slack
-  href: https://natsio.slack.com/channels/dotnet
+  href: https://slack.nats.io
