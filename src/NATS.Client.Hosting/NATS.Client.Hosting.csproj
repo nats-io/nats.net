@@ -16,6 +16,10 @@
     <IsTrimmable>true</IsTrimmable>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <isAotCompatible>true</isAotCompatible>
+  </PropertyGroup>
+
   <ItemGroup Condition="'$(TargetFramework)' != 'net8.0'">
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="6.0.0"/>
   </ItemGroup>
