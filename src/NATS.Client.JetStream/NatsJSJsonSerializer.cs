@@ -1,3 +1,4 @@
+using System.Buffers.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using NATS.Client.Core;
@@ -391,5 +392,26 @@ internal class NatsJSJsonNullableNanosecondsConverter : JsonConverter<TimeSpan?>
         {
             _converter.Write(writer, value.Value, options);
         }
+    }
+}
+
+internal class NatsJSJsonDateTimeOffsetConverter : JsonConverter<DateTimeOffset>
+{
+    public override DateTimeOffset Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.Null)
+        {
+            return default;
+        }
+
+        return reader.GetDateTimeOffset();
+    }
+
+    public override void Write(Utf8JsonWriter writer, DateTimeOffset value, JsonSerializerOptions options)
+    {
+        // Write the date time in the format e.g. "2024-01-01T00:00:00Z"
+        // instead of the default DateTimeOffset format e.g. "2024-01-01T00:00:00+00:00"
+        // which is confusing the server.
+        writer.WriteStringValue(value.UtcDateTime);
     }
 }
