@@ -68,8 +68,9 @@ public class SerializerTest
     public void Utf8_serializer()
     {
         SerializeDeserialize<string>("foo", "foo");
-        SerializeDeserialize<DateTime>(DateTime.MinValue, "01/01/0001 00:00:00");
-        SerializeDeserialize<DateTimeOffset>(DateTimeOffset.MinValue, "01/01/0001 00:00:00 +00:00");
+        SerializeDeserialize<DateTime>(new DateTime(1970, 12, 31, 23, 42, 2, DateTimeKind.Utc), "1970-12-31T23:42:02.0000000Z");
+        SerializeDeserialize<DateTimeOffset>(new DateTimeOffset(1970, 12, 31, 23, 42, 2, TimeSpan.Zero), "1970-12-31T23:42:02.0000000Z");
+        SerializeDeserialize<DateTimeOffset>(new DateTimeOffset(1970, 12, 31, 23, 42, 2, TimeSpan.FromHours(1)), "1970-12-31T23:42:02.0000000+01:00");
         SerializeDeserialize<Guid>(Guid.Empty, "00000000-0000-0000-0000-000000000000");
         SerializeDeserialize<TimeSpan>(TimeSpan.Zero, "00:00:00");
         SerializeDeserialize<bool>(true, "True");

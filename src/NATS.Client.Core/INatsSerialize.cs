@@ -116,7 +116,7 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
         {
             if (value is DateTime input)
             {
-                if (Utf8Formatter.TryFormat(input, span, out var written))
+                if (Utf8Formatter.TryFormat(input, span, out var written, new StandardFormat('O')))
                 {
                     bufferWriter.Advance(written);
                 }
@@ -133,7 +133,19 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
         {
             if (value is DateTimeOffset input)
             {
-                if (Utf8Formatter.TryFormat(input, span, out var written))
+                bool result;
+                int written;
+                if (input.Offset == TimeSpan.Zero)
+                {
+                    // This will make it place `Z` instead of `+00:00` at the end
+                    result = Utf8Formatter.TryFormat(input.UtcDateTime, span, out written, new StandardFormat('O'));
+                }
+                else
+                {
+                    result = Utf8Formatter.TryFormat(input, span, out written, new StandardFormat('O'));
+                }
+
+                if (result)
                 {
                     bufferWriter.Advance(written);
                 }
@@ -392,7 +404,7 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
             if (buffer.Length == 0)
                 return default;
 
-            if (Utf8Parser.TryParse(span, out DateTime value, out _))
+            if (Utf8Parser.TryParse(span, out DateTime value, out _, 'O'))
             {
                 return (T)(object)value;
             }
@@ -405,7 +417,7 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
             if (buffer.Length == 0)
                 return default;
 
-            if (Utf8Parser.TryParse(span, out DateTimeOffset value, out _))
+            if (Utf8Parser.TryParse(span, out DateTimeOffset value, out _, 'O'))
             {
                 return (T)(object)value;
             }
