@@ -530,4 +530,3 @@ public class SampleClass : IEquatable<SampleClass>
         return $"{Id}-{Name}";
     }
 }
-
