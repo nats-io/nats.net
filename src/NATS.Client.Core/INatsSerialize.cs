@@ -116,7 +116,7 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
         {
             if (value is DateTime input)
             {
-                if (Utf8Formatter.TryFormat(input, span, out var written, new StandardFormat('O')))
+                if (Utf8Formatter.TryFormat(input, span, out var written, Formats.DateTimeIsoFormat))
                 {
                     bufferWriter.Advance(written);
                 }
@@ -138,11 +138,11 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
                 if (input.Offset == TimeSpan.Zero)
                 {
                     // This will make it place `Z` instead of `+00:00` at the end
-                    result = Utf8Formatter.TryFormat(input.UtcDateTime, span, out written, new StandardFormat('O'));
+                    result = Utf8Formatter.TryFormat(input.UtcDateTime, span, out written, Formats.DateTimeIsoFormat);
                 }
                 else
                 {
-                    result = Utf8Formatter.TryFormat(input, span, out written, new StandardFormat('O'));
+                    result = Utf8Formatter.TryFormat(input, span, out written, Formats.DateTimeIsoFormat);
                 }
 
                 if (result)
@@ -871,6 +871,11 @@ public class NatsSerializerBuilder<T>
 
         return _serializers[0];
     }
+}
+
+internal static class Formats
+{
+    public static readonly StandardFormat DateTimeIsoFormat = new(symbol: 'O');
 }
 
 internal sealed class NullBufferWriter : IBufferWriter<byte>
