@@ -295,6 +295,9 @@ public partial class NatsConnection : INatsConnection
         var natsUris = opts.GetSeedUris(suppressRandomization: true);
         var maskedUris = new List<string>(natsUris.Length);
 
+        var usesPasswordInUrl = false;
+        var usesTokenInUrl = false;
+
         foreach (var natsUri in natsUris)
         {
             var uriBuilder = new UriBuilder(natsUri.Uri);
@@ -306,6 +309,7 @@ public partial class NatsConnection : INatsConnection
                     if (first)
                     {
                         first = false;
+                        usesPasswordInUrl = true;
 
                         opts = opts with
                         {
@@ -324,6 +328,7 @@ public partial class NatsConnection : INatsConnection
                     if (first)
                     {
                         first = false;
+                        usesTokenInUrl = true;
 
                         opts = opts with
                         {
@@ -336,6 +341,16 @@ public partial class NatsConnection : INatsConnection
 
                     uriBuilder.UserName = "***"; // to redact the token from logs
                 }
+            }
+
+            if (usesPasswordInUrl)
+            {
+                uriBuilder.UserName = opts.AuthOpts.Username; // show actual used user name in logs
+            }
+            else if (usesTokenInUrl)
+            {
+                uriBuilder.UserName = "***"; // to redact the token from logs
+                uriBuilder.Password = null; // when token is used remove password
             }
 
             maskedUris.Add(uriBuilder.ToString().TrimEnd('/'));
