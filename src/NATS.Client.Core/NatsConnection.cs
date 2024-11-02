@@ -302,9 +302,9 @@ public partial class NatsConnection : INatsConnection
         {
             var uriBuilder = new UriBuilder(natsUri.Uri);
 
-            if (uriBuilder.UserName is { Length: > 0 } username)
+            if (uriBuilder.UserName is { Length: > 0 })
             {
-                if (uriBuilder.Password is { Length: > 0 } password)
+                if (uriBuilder.Password is { Length: > 0 })
                 {
                     if (first)
                     {
@@ -317,11 +317,10 @@ public partial class NatsConnection : INatsConnection
                             {
                                 Username = uriBuilder.UserName,
                                 Password = uriBuilder.Password,
+                                Token = null, // override token in case it was set
                             },
                         };
                     }
-
-                    uriBuilder.Password = "***"; // to redact the password from logs
                 }
                 else
                 {
@@ -335,17 +334,18 @@ public partial class NatsConnection : INatsConnection
                             AuthOpts = opts.AuthOpts with
                             {
                                 Token = uriBuilder.UserName,
+                                Username = null, // override user-password in case it was set
+                                Password = null,
                             },
                         };
                     }
-
-                    uriBuilder.UserName = "***"; // to redact the token from logs
                 }
             }
 
             if (usesPasswordInUrl)
             {
-                uriBuilder.UserName = opts.AuthOpts.Username; // show actual used user name in logs
+                uriBuilder.UserName = opts.AuthOpts.Username; // show actual used username in logs
+                uriBuilder.Password = "***"; // to redact the password from logs
             }
             else if (usesTokenInUrl)
             {

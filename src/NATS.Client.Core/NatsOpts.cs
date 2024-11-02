@@ -14,6 +14,28 @@ public sealed record NatsOpts
 {
     public static readonly NatsOpts Default = new();
 
+    /// <summary>
+    /// NATS server URL to connect to. (default: nats://localhost:4222)
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// You can set more than one server as seed servers in a comma-separated list.
+    /// The client will randomly select a server from the list to connect to unless
+    /// <see cref="NoRandomize"/> (which is <c>false</c> by default) is set to <c>true</c>.
+    /// </para>
+    /// <para>
+    /// User-password or token authentication can be set in the URL.
+    /// For example, <c>nats://derek:s3cr3t@localhost:4222</c> or <c>nats://token@localhost:4222</c>.
+    /// You can also set the username and password or token separately using <see cref="AuthOpts"/>;
+    /// however, if both are set, the URL will take precedence.
+    /// You should URL-encode the username and password or token if they contain special characters.
+    /// </para>
+    /// <para>
+    /// If multiple servers are specified and user-password or token authentication is used in the URL,
+    /// only the credentials in the first server URL will be used; credentials in the remaining server
+    /// URLs will be ignored.
+    /// </para>
+    /// </remarks>
     public string Url { get; init; } = "nats://localhost:4222";
 
     public string Name { get; init; } = "NATS .NET Client";

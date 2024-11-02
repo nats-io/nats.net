@@ -112,7 +112,7 @@ public abstract partial class NatsConnectionTest
 
         if (useAuthInUrl)
         {
-            serverOptsBuilder.WithClientUrlAuthentication(auth.UrlAuth);
+            serverOptsBuilder.WithClientUrlAuthentication(auth.UrlAuth!);
         }
 
         var serverOpts = serverOptsBuilder.Build();
@@ -187,7 +187,7 @@ public abstract partial class NatsConnectionTest
 
     public class Auth
     {
-        public Auth(string name, string serverConfig, NatsOpts clientOpts, string urlAuth = null)
+        public Auth(string name, string serverConfig, NatsOpts clientOpts, string? urlAuth = null)
         {
             Name = name;
             ServerConfig = serverConfig;
@@ -201,7 +201,7 @@ public abstract partial class NatsConnectionTest
 
         public NatsOpts ClientOpts { get; }
 
-        public string UrlAuth { get; }
+        public string? UrlAuth { get; }
 
         public override string ToString() => Name;
     }
