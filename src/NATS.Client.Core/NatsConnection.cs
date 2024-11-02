@@ -289,7 +289,6 @@ public partial class NatsConnection : INatsConnection
         return default;
     }
 
-
     private static NatsOpts ReadUserInfoFromConnectionString(NatsOpts opts)
     {
         var first = true;
@@ -326,14 +325,13 @@ public partial class NatsConnection : INatsConnection
                         {
                             AuthOpts = opts.AuthOpts with
                             {
-                               Token = uriBuilder.UserName,
+                                Token = uriBuilder.UserName,
                             },
                         };
 
                         uriBuilder.UserName = "***"; // to redact the token from logs
                     }
                 }
-
             }
 
             maskedUris.Add(uriBuilder.ToString().TrimEnd('/'));

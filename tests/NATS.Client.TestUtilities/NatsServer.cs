@@ -452,15 +452,6 @@ public class NatsServer : IAsyncDisposable
 
         var cmd = $"{NatsServerPath} -c {configFileName}";
 
-        //var cmdBuilder = new StringBuilder($"{NatsServerPath} -c {configFileName}");
-
-        //if (!string.IsNullOrEmpty(opts.UserName) && !string.IsNullOrEmpty(opts.Password))
-        //{
-        //    cmdBuilder.Append($" --user {opts.UserName} --pass {opts.Password}");
-        //}
-
-        //var cmd = cmdBuilder.ToString();
-
         return (configFileName, config, cmd);
     }
 
