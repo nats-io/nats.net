@@ -160,7 +160,7 @@ public class NatsServer : IAsyncDisposable
             {
                 server = new NatsServer(outputHelper, opts);
                 server.StartServerProcess();
-                nats = server.CreateClientConnection(clientOpts ?? GetDefaultClientOpts(server), reTryCount: 3, useAuthInUrl: useAuthInUrl);
+                nats = server.CreateClientConnection(clientOpts ?? NatsOpts.Default, reTryCount: 3, useAuthInUrl: useAuthInUrl);
 #pragma warning disable CA2012
                 return server;
             }
@@ -176,11 +176,6 @@ public class NatsServer : IAsyncDisposable
         }
 
         throw new Exception("Can't start nats-server and connect to it");
-    }
-
-    private static NatsOpts GetDefaultClientOpts(NatsServer server)
-    {
-        return NatsOpts.Default/* with { Url = server.ClientUrl }*/;
     }
 
     public void StartServerProcess()
@@ -362,7 +357,7 @@ public class NatsServer : IAsyncDisposable
         {
             try
             {
-                var nats = new NatsConnection(ClientOpts(options ?? GetDefaultClientOpts(this), testLogger: testLogger, useAuthInUrl: useAuthInUrl));
+                var nats = new NatsConnection(ClientOpts(options ?? NatsOpts.Default, testLogger: testLogger, useAuthInUrl: useAuthInUrl));
 
                 try
                 {
@@ -390,7 +385,7 @@ public class NatsServer : IAsyncDisposable
         throw new Exception("Can't create a connection to nats-server");
     }
 
-    public NatsConnectionPool CreatePooledClientConnection() => CreatePooledClientConnection(GetDefaultClientOpts(this));
+    public NatsConnectionPool CreatePooledClientConnection() => CreatePooledClientConnection(NatsOpts.Default);
 
     public NatsConnectionPool CreatePooledClientConnection(NatsOpts opts)
     {
