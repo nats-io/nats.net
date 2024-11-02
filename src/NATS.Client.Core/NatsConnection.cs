@@ -292,7 +292,7 @@ public partial class NatsConnection : INatsConnection
     {
         var first = true;
 
-        var natsUris = opts.GetSeedUris();
+        var natsUris = opts.GetSeedUris(suppressRandomization: true);
         var maskedUris = new List<string>(natsUris.Length);
 
         foreach (var natsUri in natsUris)
