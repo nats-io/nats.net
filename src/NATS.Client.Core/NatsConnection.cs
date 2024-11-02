@@ -1,6 +1,5 @@
 using System.Buffers;
 using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
@@ -302,12 +301,12 @@ public partial class NatsConnection : INatsConnection
 
             if (uriBuilder.UserName is { Length: > 0 } username)
             {
-                if (first)
+                if (uriBuilder.Password is { Length: > 0 } password)
                 {
-                    first = false;
-
-                    if (uriBuilder.Password is { Length: > 0 } password)
+                    if (first)
                     {
+                        first = false;
+
                         opts = opts with
                         {
                             AuthOpts = opts.AuthOpts with
@@ -316,11 +315,16 @@ public partial class NatsConnection : INatsConnection
                                 Password = uriBuilder.Password,
                             },
                         };
-
-                        uriBuilder.Password = "***"; // to redact the password from logs
                     }
-                    else
+
+                    uriBuilder.Password = "***"; // to redact the password from logs
+                }
+                else
+                {
+                    if (first)
                     {
+                        first = false;
+
                         opts = opts with
                         {
                             AuthOpts = opts.AuthOpts with
@@ -328,9 +332,9 @@ public partial class NatsConnection : INatsConnection
                                 Token = uriBuilder.UserName,
                             },
                         };
-
-                        uriBuilder.UserName = "***"; // to redact the token from logs
                     }
+
+                    uriBuilder.UserName = "***"; // to redact the token from logs
                 }
             }
 

@@ -117,10 +117,10 @@ public sealed record NatsOpts
     /// </remarks>
     public BoundedChannelFullMode SubPendingChannelFullMode { get; init; } = BoundedChannelFullMode.DropNewest;
 
-    internal NatsUri[] GetSeedUris()
+    internal NatsUri[] GetSeedUris(bool suppressRandomization = false)
     {
         var urls = Url.Split(',');
-        return NoRandomize
+        return NoRandomize || suppressRandomization
             ? urls.Select(x => new NatsUri(x, true)).Distinct().ToArray()
             : urls.Select(x => new NatsUri(x, true)).OrderBy(_ => Guid.NewGuid()).Distinct().ToArray();
     }
