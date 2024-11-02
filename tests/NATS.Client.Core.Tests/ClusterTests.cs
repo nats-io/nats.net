@@ -2,23 +2,43 @@ namespace NATS.Client.Core.Tests;
 
 public class ClusterTests(ITestOutputHelper output)
 {
-    [Fact]
-    public async Task Seed_urls_on_retry()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Seed_urls_on_retry(bool userAuthInUrl)
     {
         await using var cluster1 = new NatsCluster(
             new NullOutputHelper(),
             TransportType.Tcp,
-            (i, b) => b.WithServerName($"c1n{i}"));
+            (i, b) =>
+            {
+                b.WithServerName($"c1n{i}");
+                if (userAuthInUrl)
+                {
+                    b.AddServerConfig("resources/configs/auth/password.conf");
+                    b.WithClientUrlAuthentication("a", "b");
+                }
+            },
+            userAuthInUrl);
 
         await using var cluster2 = new NatsCluster(
             new NullOutputHelper(),
             TransportType.Tcp,
-            (i, b) => b.WithServerName($"c2n{i}"));
+            (i, b) =>
+            {
+                b.WithServerName($"c2n{i}");
+                if (userAuthInUrl)
+                {
+                    b.AddServerConfig("resources/configs/auth/password.conf");
+                    b.WithClientUrlAuthentication("a", "b");
+                }
+            },
+            userAuthInUrl);
 
         // Use the first node from each cluster as the seed
         // so that we can confirm seeds are used on retry
-        var url1 = cluster1.Server1.ClientUrl;
-        var url2 = cluster2.Server1.ClientUrl;
+        var url1 = userAuthInUrl ? cluster1.Server1.ClientUrlWithAuth : cluster1.Server1.ClientUrl;
+        var url2 = userAuthInUrl ? cluster2.Server1.ClientUrlWithAuth : cluster2.Server1.ClientUrl;
 
         await using var nats = new NatsConnection(new NatsOpts
         {

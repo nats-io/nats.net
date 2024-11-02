@@ -31,6 +31,8 @@ public sealed class NatsServerOptsBuilder
     private bool _serverDisposeReturnsPorts;
     private bool _enableClustering;
     private bool _trace;
+    private string? _clientUrlUserName;
+    private string? _clientUrlPassword;
 
     public NatsServerOpts Build() => new()
     {
@@ -40,6 +42,8 @@ public sealed class NatsServerOptsBuilder
         TlsVerify = _tlsVerify,
         EnableJetStream = _enableJetStream,
         ServerName = _serverName,
+        ClientUrlUserName = _clientUrlUserName,
+        ClientUrlPassword = _clientUrlPassword,
         TlsServerCertFile = _tlsServerCertFile,
         TlsServerKeyFile = _tlsServerKeyFile,
         TlsClientCertFile = _tlsClientCertFile,
@@ -110,6 +114,21 @@ public sealed class NatsServerOptsBuilder
         return this;
     }
 
+    public NatsServerOptsBuilder WithClientUrlAuthentication(string userName, string password)
+    {
+        _clientUrlUserName = userName;
+        _clientUrlPassword = password;
+        return this;
+    }
+
+    public NatsServerOptsBuilder WithClientUrlAuthentication(string authInfo)
+    {
+        var infoParts = authInfo.Split(':');
+        _clientUrlUserName = infoParts.FirstOrDefault();
+        _clientUrlPassword = infoParts.ElementAtOrDefault(1);
+        return this;
+    }
+
     public NatsServerOptsBuilder UseJetStream()
     {
         _enableJetStream = true;
@@ -175,6 +194,10 @@ public sealed class NatsServerOpts : IDisposable
     public string? JetStreamStoreDir { get; set; }
 
     public bool ServerDisposeReturnsPorts { get; init; } = true;
+
+    public string? ClientUrlUserName { get; set; }
+
+    public string? ClientUrlPassword { get; set; }
 
     public string? TlsClientCertFile { get; init; }
 

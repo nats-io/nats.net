@@ -76,7 +76,7 @@ public partial class NatsConnection : INatsConnection
     public NatsConnection(NatsOpts opts)
     {
         _logger = opts.LoggerFactory.CreateLogger<NatsConnection>();
-        Opts = opts;
+        Opts = ReadUserInfoFromConnectionString(opts);
         ConnectionState = NatsConnectionState.Closed;
         _waitForOpenConnection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         _disposedCancellationTokenSource = new CancellationTokenSource();
@@ -287,6 +287,62 @@ public partial class NatsConnection : INatsConnection
         }
 
         return default;
+    }
+
+
+    private static NatsOpts ReadUserInfoFromConnectionString(NatsOpts opts)
+    {
+        var first = true;
+
+        var natsUris = opts.GetSeedUris();
+        var maskedUris = new List<string>(natsUris.Length);
+
+        foreach (var natsUri in natsUris)
+        {
+            var uriBuilder = new UriBuilder(natsUri.Uri);
+
+            if (uriBuilder.UserName is { Length: > 0 } username)
+            {
+                if (first)
+                {
+                    first = false;
+
+                    if (uriBuilder.Password is { Length: > 0 } password)
+                    {
+                        opts = opts with
+                        {
+                            AuthOpts = opts.AuthOpts with
+                            {
+                                Username = uriBuilder.UserName,
+                                Password = uriBuilder.Password,
+                            },
+                        };
+
+                        uriBuilder.Password = "***"; // to redact the password from logs
+                    }
+                    else
+                    {
+                        opts = opts with
+                        {
+                            AuthOpts = opts.AuthOpts with
+                            {
+                               Token = uriBuilder.UserName,
+                            },
+                        };
+
+                        uriBuilder.UserName = "***"; // to redact the token from logs
+                    }
+                }
+
+            }
+
+            maskedUris.Add(uriBuilder.ToString().TrimEnd('/'));
+        }
+
+        var combinedUri = string.Join(",", maskedUris);
+        opts = opts with { Url = combinedUri };
+
+        return opts;
     }
 
     private async ValueTask InitialConnectAsync()
