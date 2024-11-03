@@ -47,9 +47,9 @@ public class OptsUrlTests
     }
 
     [Theory]
-    [InlineData("u:p@host1:1234", "nats://u:***@host1:1234", "u", "p", null)]
-    [InlineData("t@host1:1234", "nats://***@host1:1234", null, null, "t")]
-    public void URL_should_not_override_auth_options(string url, string expected, string? user, string? pass, string? token)
+    [InlineData("u:p@host1:1234", "nats://u:***@host1:1234")]
+    [InlineData("t@host1:1234", "nats://***@host1:1234")]
+    public void URL_should_not_override_auth_options(string url, string expected)
     {
         var opts = new NatsConnection(new NatsOpts
         {
