@@ -27,7 +27,7 @@ public sealed record NatsOpts
     /// User-password or token authentication can be set in the URL.
     /// For example, <c>nats://derek:s3cr3t@localhost:4222</c> or <c>nats://token@localhost:4222</c>.
     /// You can also set the username and password or token separately using <see cref="AuthOpts"/>;
-    /// however, if both are set, the URL will take precedence.
+    /// however, if both are set, the <see cref="AuthOpts"/> will take precedence.
     /// You should URL-encode the username and password or token if they contain special characters.
     /// </para>
     /// <para>

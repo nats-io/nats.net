@@ -290,74 +290,41 @@ public partial class NatsConnection : INatsConnection
 
     private static NatsOpts ReadUserInfoFromConnectionString(NatsOpts opts)
     {
-        var first = true;
-
-        var natsUris = opts.GetSeedUris(suppressRandomization: true);
-        var maskedUris = new List<string>(natsUris.Length);
-
-        var usesPasswordInUrl = false;
-        var usesTokenInUrl = false;
-
-        foreach (var natsUri in natsUris)
+        // Setting credentials in options takes precedence over URL credentials
+        if (opts.AuthOpts.Username is { Length: > 0 } || opts.AuthOpts.Password is { Length: > 0 } || opts.AuthOpts.Token is { Length: > 0 })
         {
-            var uriBuilder = new UriBuilder(natsUri.Uri);
-
-            if (uriBuilder.UserName is { Length: > 0 })
-            {
-                if (uriBuilder.Password is { Length: > 0 })
-                {
-                    if (first)
-                    {
-                        first = false;
-                        usesPasswordInUrl = true;
-
-                        opts = opts with
-                        {
-                            AuthOpts = opts.AuthOpts with
-                            {
-                                Username = Uri.UnescapeDataString(uriBuilder.UserName),
-                                Password = Uri.UnescapeDataString(uriBuilder.Password),
-                                Token = null, // override token in case it was set
-                            },
-                        };
-                    }
-                }
-                else
-                {
-                    if (first)
-                    {
-                        first = false;
-                        usesTokenInUrl = true;
-
-                        opts = opts with
-                        {
-                            AuthOpts = opts.AuthOpts with
-                            {
-                                Token = Uri.UnescapeDataString(uriBuilder.UserName),
-                                Username = null, // override user-password in case it was set
-                                Password = null,
-                            },
-                        };
-                    }
-                }
-            }
-
-            if (usesPasswordInUrl)
-            {
-                uriBuilder.UserName = Uri.EscapeDataString(opts.AuthOpts.Username!); // show actual used username in logs
-                uriBuilder.Password = "***"; // to redact the password from logs
-            }
-            else if (usesTokenInUrl)
-            {
-                uriBuilder.UserName = "***"; // to redact the token from logs
-                uriBuilder.Password = null; // when token is used remove password
-            }
-
-            maskedUris.Add(uriBuilder.ToString().TrimEnd('/'));
+            return opts;
         }
 
-        var combinedUri = string.Join(",", maskedUris);
-        opts = opts with { Url = combinedUri };
+        var natsUri = opts.GetSeedUris(suppressRandomization: true).First();
+        var uriBuilder = new UriBuilder(natsUri.Uri);
+
+        if (uriBuilder.UserName is not { Length: > 0 })
+        {
+            return opts;
+        }
+
+        if (uriBuilder.Password is { Length: > 0 })
+        {
+            opts = opts with
+            {
+                AuthOpts = opts.AuthOpts with
+                {
+                    Username = Uri.UnescapeDataString(uriBuilder.UserName),
+                    Password = Uri.UnescapeDataString(uriBuilder.Password),
+                },
+            };
+        }
+        else
+        {
+            opts = opts with
+            {
+                AuthOpts = opts.AuthOpts with
+                {
+                    Token = Uri.UnescapeDataString(uriBuilder.UserName),
+                },
+            };
+        }
 
         return opts;
     }
