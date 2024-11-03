@@ -50,4 +50,44 @@ public class OptsUrlTests
         Assert.Equal(pass, opts.AuthOpts.Password);
         Assert.Equal(token, opts.AuthOpts.Token);
     }
+
+    [Fact]
+    public void URL_escape_user_password()
+    {
+        var opts = new NatsConnection(new NatsOpts { Url = "nats://u%2C:p%2C@host1,host2" }).Opts;
+        Assert.Equal("nats://u%2C:***@host1:4222,nats://u%2C:***@host2:4222", opts.Url);
+        Assert.Equal("u,", opts.AuthOpts.Username);
+        Assert.Equal("p,", opts.AuthOpts.Password);
+        Assert.Null(opts.AuthOpts.Token);
+
+        var uris = opts.GetSeedUris(true);
+        uris[0].Uri.Scheme.Should().Be("nats");
+        uris[0].Uri.Host.Should().Be("host1");
+        uris[0].Uri.Port.Should().Be(4222);
+        uris[0].Uri.UserInfo.Should().Be("u%2C:***");
+        uris[1].Uri.Scheme.Should().Be("nats");
+        uris[1].Uri.Host.Should().Be("host2");
+        uris[1].Uri.Port.Should().Be(4222);
+        uris[1].Uri.UserInfo.Should().Be("u%2C:***");
+    }
+
+    [Fact]
+    public void URL_escape_token()
+    {
+        var opts = new NatsConnection(new NatsOpts { Url = "nats://t%2C@host1,nats://t%2C@host2" }).Opts;
+        Assert.Equal("nats://***@host1:4222,nats://***@host2:4222", opts.Url);
+        Assert.Null(opts.AuthOpts.Username);
+        Assert.Null(opts.AuthOpts.Password);
+        Assert.Equal("t,", opts.AuthOpts.Token);
+
+        var uris = opts.GetSeedUris(true);
+        uris[0].Uri.Scheme.Should().Be("nats");
+        uris[0].Uri.Host.Should().Be("host1");
+        uris[0].Uri.Port.Should().Be(4222);
+        uris[0].Uri.UserInfo.Should().Be("***");
+        uris[1].Uri.Scheme.Should().Be("nats");
+        uris[1].Uri.Host.Should().Be("host2");
+        uris[1].Uri.Port.Should().Be(4222);
+        uris[1].Uri.UserInfo.Should().Be("***");
+    }
 }

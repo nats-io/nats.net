@@ -315,8 +315,8 @@ public partial class NatsConnection : INatsConnection
                         {
                             AuthOpts = opts.AuthOpts with
                             {
-                                Username = uriBuilder.UserName,
-                                Password = uriBuilder.Password,
+                                Username = Uri.UnescapeDataString(uriBuilder.UserName),
+                                Password = Uri.UnescapeDataString(uriBuilder.Password),
                                 Token = null, // override token in case it was set
                             },
                         };
@@ -333,7 +333,7 @@ public partial class NatsConnection : INatsConnection
                         {
                             AuthOpts = opts.AuthOpts with
                             {
-                                Token = uriBuilder.UserName,
+                                Token = Uri.UnescapeDataString(uriBuilder.UserName),
                                 Username = null, // override user-password in case it was set
                                 Password = null,
                             },
@@ -344,7 +344,7 @@ public partial class NatsConnection : INatsConnection
 
             if (usesPasswordInUrl)
             {
-                uriBuilder.UserName = opts.AuthOpts.Username; // show actual used username in logs
+                uriBuilder.UserName = Uri.EscapeDataString(opts.AuthOpts.Username!); // show actual used username in logs
                 uriBuilder.Password = "***"; // to redact the password from logs
             }
             else if (usesTokenInUrl)
