@@ -4,7 +4,7 @@ internal sealed class NatsUri : IEquatable<NatsUri>
 {
     public const string DefaultScheme = "nats";
 
-    private readonly Uri _redactedUri;
+    private readonly string _redacted;
 
     public NatsUri(string urlString, bool isSeed, string defaultScheme = DefaultScheme)
     {
@@ -41,6 +41,7 @@ internal sealed class NatsUri : IEquatable<NatsUri>
 
         Uri = uriBuilder.Uri;
 
+        // Redact user/password or token from the URI string for logging
         if (uriBuilder.UserName is { Length: > 0 })
         {
             if (uriBuilder.Password is { Length: > 0 })
@@ -53,7 +54,7 @@ internal sealed class NatsUri : IEquatable<NatsUri>
             }
         }
 
-        _redactedUri = uriBuilder.Uri;
+        _redacted = IsWebSocket && Uri.AbsolutePath != "/" ? uriBuilder.Uri.ToString() : uriBuilder.Uri.ToString().Trim('/');
     }
 
     public Uri Uri { get; }
@@ -79,10 +80,7 @@ internal sealed class NatsUri : IEquatable<NatsUri>
         return new NatsUri(newUri, IsSeed);
     }
 
-    public override string ToString()
-    {
-        return IsWebSocket && Uri.AbsolutePath != "/" ? _redactedUri.ToString() : _redactedUri.ToString().Trim('/');
-    }
+    public override string ToString() => _redacted;
 
     public override int GetHashCode() => Uri.GetHashCode();
 
