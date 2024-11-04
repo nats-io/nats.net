@@ -146,4 +146,43 @@ public sealed record NatsOpts
             ? urls.Select(x => new NatsUri(x, true)).Distinct().ToArray()
             : urls.Select(x => new NatsUri(x, true)).OrderBy(_ => Guid.NewGuid()).Distinct().ToArray();
     }
+
+    internal NatsOpts ReadUserInfoFromConnectionString()
+    {
+        // Setting credentials in options takes precedence over URL credentials
+        if (AuthOpts.Username is { Length: > 0 } || AuthOpts.Password is { Length: > 0 } || AuthOpts.Token is { Length: > 0 })
+        {
+            return this;
+        }
+
+        var natsUri = GetSeedUris(suppressRandomization: true).First();
+        var uriBuilder = new UriBuilder(natsUri.Uri);
+
+        if (uriBuilder.UserName is not { Length: > 0 })
+        {
+            return this;
+        }
+
+        if (uriBuilder.Password is { Length: > 0 })
+        {
+            return this with
+            {
+                AuthOpts = AuthOpts with
+                {
+                    Username = Uri.UnescapeDataString(uriBuilder.UserName),
+                    Password = Uri.UnescapeDataString(uriBuilder.Password),
+                },
+            };
+        }
+        else
+        {
+            return this with
+            {
+                AuthOpts = AuthOpts with
+                {
+                    Token = Uri.UnescapeDataString(uriBuilder.UserName),
+                },
+            };
+        }
+    }
 }

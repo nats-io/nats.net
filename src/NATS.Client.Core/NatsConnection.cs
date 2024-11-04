@@ -75,7 +75,7 @@ public partial class NatsConnection : INatsConnection
     public NatsConnection(NatsOpts opts)
     {
         _logger = opts.LoggerFactory.CreateLogger<NatsConnection>();
-        Opts = ReadUserInfoFromConnectionString(opts);
+        Opts = opts.ReadUserInfoFromConnectionString();
         ConnectionState = NatsConnectionState.Closed;
         _waitForOpenConnection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         _disposedCancellationTokenSource = new CancellationTokenSource();
@@ -286,47 +286,6 @@ public partial class NatsConnection : INatsConnection
         }
 
         return default;
-    }
-
-    private static NatsOpts ReadUserInfoFromConnectionString(NatsOpts opts)
-    {
-        // Setting credentials in options takes precedence over URL credentials
-        if (opts.AuthOpts.Username is { Length: > 0 } || opts.AuthOpts.Password is { Length: > 0 } || opts.AuthOpts.Token is { Length: > 0 })
-        {
-            return opts;
-        }
-
-        var natsUri = opts.GetSeedUris(suppressRandomization: true).First();
-        var uriBuilder = new UriBuilder(natsUri.Uri);
-
-        if (uriBuilder.UserName is not { Length: > 0 })
-        {
-            return opts;
-        }
-
-        if (uriBuilder.Password is { Length: > 0 })
-        {
-            opts = opts with
-            {
-                AuthOpts = opts.AuthOpts with
-                {
-                    Username = Uri.UnescapeDataString(uriBuilder.UserName),
-                    Password = Uri.UnescapeDataString(uriBuilder.Password),
-                },
-            };
-        }
-        else
-        {
-            opts = opts with
-            {
-                AuthOpts = opts.AuthOpts with
-                {
-                    Token = Uri.UnescapeDataString(uriBuilder.UserName),
-                },
-            };
-        }
-
-        return opts;
     }
 
     private async ValueTask InitialConnectAsync()
