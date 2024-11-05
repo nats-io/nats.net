@@ -1,6 +1,5 @@
 using System.Buffers;
 using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
@@ -76,7 +75,7 @@ public partial class NatsConnection : INatsConnection
     public NatsConnection(NatsOpts opts)
     {
         _logger = opts.LoggerFactory.CreateLogger<NatsConnection>();
-        Opts = opts;
+        Opts = opts.ReadUserInfoFromConnectionString();
         ConnectionState = NatsConnectionState.Closed;
         _waitForOpenConnection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         _disposedCancellationTokenSource = new CancellationTokenSource();

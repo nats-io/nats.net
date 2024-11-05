@@ -15,12 +15,30 @@ public abstract partial class NatsConnectionTest
         yield return new object[]
         {
             new Auth(
+                "TOKEN_IN_CONNECTIONSTRING",
+                "resources/configs/auth/token.conf",
+                NatsOpts.Default,
+                urlAuth: "s3cr3t"),
+        };
+
+        yield return new object[]
+        {
+            new Auth(
                 "USER-PASSWORD",
                 "resources/configs/auth/password.conf",
                 NatsOpts.Default with
                 {
                     AuthOpts = NatsAuthOpts.Default with { Username = "a", Password = "b", },
                 }),
+        };
+
+        yield return new object[]
+        {
+            new Auth(
+                "USER-PASSWORD_IN_CONNECTIONSTRING",
+                "resources/configs/auth/password.conf",
+                NatsOpts.Default,
+                urlAuth: "a:b"),
         };
 
         yield return new object[]
@@ -84,15 +102,22 @@ public abstract partial class NatsConnectionTest
         var name = auth.Name;
         var serverConfig = auth.ServerConfig;
         var clientOpts = auth.ClientOpts;
+        var useAuthInUrl = !string.IsNullOrEmpty(auth.UrlAuth);
 
         _output.WriteLine($"AUTH TEST {name}");
 
-        var serverOpts = new NatsServerOptsBuilder()
+        var serverOptsBuilder = new NatsServerOptsBuilder()
             .UseTransport(_transportType)
-            .AddServerConfig(serverConfig)
-            .Build();
+            .AddServerConfig(serverConfig);
 
-        await using var server = NatsServer.Start(_output, serverOpts, clientOpts);
+        if (useAuthInUrl)
+        {
+            serverOptsBuilder.WithClientUrlAuthentication(auth.UrlAuth!);
+        }
+
+        var serverOpts = serverOptsBuilder.Build();
+
+        await using var server = NatsServer.Start(_output, serverOpts, clientOpts, useAuthInUrl);
 
         var subject = Guid.NewGuid().ToString("N");
 
@@ -104,8 +129,8 @@ public abstract partial class NatsConnectionTest
             Assert.Contains("Authorization Violation", natsException.GetBaseException().Message);
         }
 
-        await using var subConnection = server.CreateClientConnection(clientOpts);
-        await using var pubConnection = server.CreateClientConnection(clientOpts);
+        await using var subConnection = server.CreateClientConnection(clientOpts, useAuthInUrl: useAuthInUrl);
+        await using var pubConnection = server.CreateClientConnection(clientOpts, useAuthInUrl: useAuthInUrl);
 
         var signalComplete1 = new WaitSignal();
         var signalComplete2 = new WaitSignal();
@@ -141,7 +166,7 @@ public abstract partial class NatsConnectionTest
         await disconnectSignal2;
 
         _output.WriteLine("START NEW SERVER");
-        await using var newServer = NatsServer.Start(_output, serverOpts, clientOpts);
+        await using var newServer = NatsServer.Start(_output, serverOpts, clientOpts, useAuthInUrl);
         await subConnection.ConnectAsync(); // wait open again
         await pubConnection.ConnectAsync(); // wait open again
 
@@ -162,11 +187,12 @@ public abstract partial class NatsConnectionTest
 
     public class Auth
     {
-        public Auth(string name, string serverConfig, NatsOpts clientOpts)
+        public Auth(string name, string serverConfig, NatsOpts clientOpts, string? urlAuth = null)
         {
             Name = name;
             ServerConfig = serverConfig;
             ClientOpts = clientOpts;
+            UrlAuth = urlAuth;
         }
 
         public string Name { get; }
@@ -174,6 +200,8 @@ public abstract partial class NatsConnectionTest
         public string ServerConfig { get; }
 
         public NatsOpts ClientOpts { get; }
+
+        public string? UrlAuth { get; }
 
         public override string ToString() => Name;
     }
