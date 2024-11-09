@@ -1,11 +1,11 @@
 using System.Buffers;
-using System.IO.Pipelines;
 using System.Text;
 using NATS.Client.Core.Commands;
+using NATS.Client.Core.Internal;
 
-namespace NATS.Client.Core.Internal;
+namespace NATS.Client.Core;
 
-internal class HeaderWriter
+public class HeaderWriter
 {
     private const byte ByteCr = (byte)'\r';
     private const byte ByteLf = (byte)'\n';
@@ -20,6 +20,37 @@ internal class HeaderWriter
     private static ReadOnlySpan<byte> CrLf => new[] { ByteCr, ByteLf };
 
     private static ReadOnlySpan<byte> ColonSpace => new[] { ByteColon, ByteSpace };
+
+    public long GetBytesLength(NatsHeaders headers)
+    {
+        var len = CommandConstants.NatsHeaders10NewLine.Length;
+        foreach (var kv in headers)
+        {
+            foreach (var value in kv.Value)
+            {
+                if (value != null)
+                {
+                    // key length
+                    var keyLength = _encoding.GetByteCount(kv.Key);
+                    len += keyLength;
+
+                    // colon space length
+                    len += ColonSpace.Length;
+
+                    // value length
+                    var valueLength = _encoding.GetByteCount(value);
+                    len += valueLength;
+
+                    // CrLf length
+                    len += CrLf.Length;
+                }
+            }
+        }
+
+        // CrLf length for empty headers
+        len += CrLf.Length;
+        return len;
+    }
 
     internal long Write(IBufferWriter<byte> bufferWriter, NatsHeaders headers)
     {
@@ -53,9 +84,7 @@ internal class HeaderWriter
                     var valueSpan = bufferWriter.GetSpan(valueLength);
                     _encoding.GetBytes(value, valueSpan);
                     if (!ValidateValue(valueSpan.Slice(0, valueLength)))
-                    {
                         throw new NatsException($"Invalid header value for key '{kv.Key}': contains CRLF");
-                    }
 
                     bufferWriter.Advance(valueLength);
                     len += valueLength;
@@ -81,9 +110,7 @@ internal class HeaderWriter
         foreach (var b in span)
         {
             if (b <= ByteSpace || b == ByteColon || b >= ByteDel)
-            {
                 return false;
-            }
         }
 
         return true;
@@ -96,15 +123,11 @@ internal class HeaderWriter
         {
             var pos = span.IndexOf(ByteCr);
             if (pos == -1 || pos == span.Length - 1)
-            {
                 return true;
-            }
 
             pos += 1;
             if (span[pos] == ByteLf)
-            {
                 return false;
-            }
 
             span = span[pos..];
         }
