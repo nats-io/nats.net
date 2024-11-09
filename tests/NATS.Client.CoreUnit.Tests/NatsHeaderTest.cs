@@ -195,4 +195,23 @@ public class NatsHeaderTest
         Assert.Equal(result, expectedResult);
         Assert.Equal(lastValue, expectedLastValue);
     }
+
+    [Fact]
+    public void GetBytesLengthTest()
+    {
+        var headers = new NatsHeaders
+        {
+            ["k1"] = "v1",
+            ["k2"] = new[] { "v2-0", "v2-1" },
+            ["a-long-header-key"] = "value",
+            ["key"] = "a-long-header-value",
+        };
+        var writer = new HeaderWriter(Encoding.UTF8);
+        var bytesLength = writer.GetBytesLength(headers);
+
+        var text = "NATS/1.0\r\nk1: v1\r\nk2: v2-0\r\nk2: v2-1\r\na-long-header-key: value\r\nkey: a-long-header-value\r\n\r\n";
+        var expected = new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(text));
+
+        Assert.Equal(expected.Length, bytesLength);
+    }
 }
