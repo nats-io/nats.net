@@ -295,6 +295,16 @@ public class NatsHeaders : IDictionary<string, StringValues>
     }
 
     /// <summary>
+    /// Returns the bytes length of the header
+    /// </summary>
+    /// <param name="headerWriter">an instance of headerWriter</param>
+    /// <returns>bytes length of th header</returns>
+    public long GetBytesLength(HeaderWriter headerWriter)
+    {
+        return headerWriter.GetBytesLength(this);
+    }
+
+    /// <summary>
     /// Removes the given item from the the collection.
     /// </summary>
     /// <param name="item">The item.</param>
