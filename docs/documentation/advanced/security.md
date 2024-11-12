@@ -5,7 +5,7 @@ All you need to do is to pass your credentials to the connection.
 
 [!code-csharp[](../../../tests/NATS.Net.DocsExamples/Advanced/SecurityPage.cs#user-pass)]
 
-See also [user authentication tests](https://github.com/nats-io/nats.net.v2/blob/main/tests/NATS.Client.Core.Tests/NatsConnectionTest.Auth.cs) for more examples.
+See also [user authentication tests](https://github.com/nats-io/nats.net/blob/main/tests/NATS.Client.Core.Tests/NatsConnectionTest.Auth.cs) for more examples.
 
 ## Implicit TLS Connections
 
