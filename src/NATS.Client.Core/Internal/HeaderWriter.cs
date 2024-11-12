@@ -1,11 +1,10 @@
 using System.Buffers;
 using System.Text;
 using NATS.Client.Core.Commands;
-using NATS.Client.Core.Internal;
 
-namespace NATS.Client.Core;
+namespace NATS.Client.Core.Internal;
 
-public class HeaderWriter
+internal class HeaderWriter
 {
     private const byte ByteCr = (byte)'\r';
     private const byte ByteLf = (byte)'\n';
@@ -21,7 +20,7 @@ public class HeaderWriter
 
     private static ReadOnlySpan<byte> ColonSpace => new[] { ByteColon, ByteSpace };
 
-    public long GetBytesLength(NatsHeaders headers)
+    internal static long GetBytesLength(NatsHeaders headers, Encoding encoding)
     {
         var len = CommandConstants.NatsHeaders10NewLine.Length;
         foreach (var kv in headers)
@@ -31,14 +30,14 @@ public class HeaderWriter
                 if (value != null)
                 {
                     // key length
-                    var keyLength = _encoding.GetByteCount(kv.Key);
+                    var keyLength = encoding.GetByteCount(kv.Key);
                     len += keyLength;
 
                     // colon space length
                     len += ColonSpace.Length;
 
                     // value length
-                    var valueLength = _encoding.GetByteCount(value);
+                    var valueLength = encoding.GetByteCount(value);
                     len += valueLength;
 
                     // CrLf length
@@ -68,10 +67,7 @@ public class HeaderWriter
                     var keySpan = bufferWriter.GetSpan(keyLength);
                     _encoding.GetBytes(kv.Key, keySpan);
                     if (!ValidateKey(keySpan.Slice(0, keyLength)))
-                    {
-                        throw new NatsException(
-                            $"Invalid header key '{kv.Key}': contains colon, space, or other non-printable ASCII characters");
-                    }
+                        throw new NatsException($"Invalid header key '{kv.Key}': contains colon, space, or other non-printable ASCII characters");
 
                     bufferWriter.Advance(keyLength);
                     len += keyLength;
