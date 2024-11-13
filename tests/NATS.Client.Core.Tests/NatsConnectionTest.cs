@@ -412,6 +412,60 @@ public abstract partial class NatsConnectionTest
 
         Assert.Matches("A{512}\\.[A-z0-9]{22}", inbox);
     }
+
+    [Fact]
+    public async Task OnSocketAvailableAsync_ShouldBeInvokedOnInitialConnection()
+    {
+        // Arrange
+        await using var server = NatsServer.Start();
+        var clientOpts = server.ClientOpts(NatsOpts.Default);
+
+        var wasInvoked = false;
+        var nats = new NatsConnection(clientOpts);
+        nats.OnSocketAvailableAsync = async socket =>
+        {
+            wasInvoked = true;
+            await Task.Delay(10);
+            return socket;
+        };
+
+        // Act
+        await nats.ConnectAsync();
+
+        // Assert
+        Assert.True(wasInvoked, "OnSocketAvailableAsync should be invoked on initial connection.");
+    }
+
+    [Fact]
+    public async Task OnSocketAvailableAsync_ShouldBeInvokedOnReconnection()
+    {
+        // Arrange
+        await using var server = NatsServer.Start();
+        var clientOpts = server.ClientOpts(NatsOpts.Default);
+
+        var invocationCount = 0;
+        var nats = new NatsConnection(clientOpts);
+        nats.OnSocketAvailableAsync = async socket =>
+        {
+            invocationCount++;
+            await Task.Delay(10);
+            return socket;
+        };
+
+        // Simulate initial connection
+        await nats.ConnectAsync();
+
+        // Simulate disconnection
+        await server.StopAsync();
+
+        // Act
+        // Simulate reconnection
+        server.StartServerProcess();
+        await nats.ConnectAsync();
+
+        // Assert
+        Assert.Equal(2, invocationCount);
+    }
 }
 
 [JsonSerializable(typeof(SampleClass))]
