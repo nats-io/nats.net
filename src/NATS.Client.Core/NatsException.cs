@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 namespace NATS.Client.Core;
 
 public class NatsException : Exception
@@ -11,6 +13,9 @@ public class NatsException : Exception
         : base(message, exception)
     {
     }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static void Throw(string message) => throw new NatsException(message);
 }
 
 public sealed class NatsNoReplyException : NatsException

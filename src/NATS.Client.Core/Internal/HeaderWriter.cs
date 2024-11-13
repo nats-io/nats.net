@@ -67,7 +67,9 @@ internal class HeaderWriter
                     var keySpan = bufferWriter.GetSpan(keyLength);
                     _encoding.GetBytes(kv.Key, keySpan);
                     if (!ValidateKey(keySpan.Slice(0, keyLength)))
-                        throw new NatsException($"Invalid header key '{kv.Key}': contains colon, space, or other non-printable ASCII characters");
+                    {
+                        NatsException.Throw($"Invalid header key '{kv.Key}': contains colon, space, or other non-printable ASCII characters");
+                    }
 
                     bufferWriter.Advance(keyLength);
                     len += keyLength;
@@ -80,7 +82,9 @@ internal class HeaderWriter
                     var valueSpan = bufferWriter.GetSpan(valueLength);
                     _encoding.GetBytes(value, valueSpan);
                     if (!ValidateValue(valueSpan.Slice(0, valueLength)))
-                        throw new NatsException($"Invalid header value for key '{kv.Key}': contains CRLF");
+                    {
+                        NatsException.Throw($"Invalid header value for key '{kv.Key}': contains CRLF");
+                    }
 
                     bufferWriter.Advance(valueLength);
                     len += valueLength;
