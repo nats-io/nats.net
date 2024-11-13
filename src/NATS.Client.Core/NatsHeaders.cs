@@ -1,7 +1,9 @@
 using System.Collections;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Text;
 using Microsoft.Extensions.Primitives;
+using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
 
@@ -292,6 +294,20 @@ public class NatsHeaders : IDictionary<string, StringValues>
             array[arrayIndex] = item;
             arrayIndex++;
         }
+    }
+
+    /// <summary>
+    /// Returns the bytes length of the header
+    /// </summary>
+    /// <param name="encoding">Encoding used.  Default to utf8 if not provided</param>
+    /// <returns>Bytes length of the header</returns>
+    public long GetBytesLength(Encoding? encoding = null)
+    {
+        // if null set to utf-8
+        encoding = encoding ?? Encoding.UTF8;
+
+        var len = HeaderWriter.GetBytesLength(this, encoding);
+        return len;
     }
 
     /// <summary>
