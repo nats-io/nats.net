@@ -25,8 +25,6 @@ public class NatsObjStore : INatsObjStore
     private const string NatsRollup = "Nats-Rollup";
     private const string RollupSubject = "sub";
 
-    private static readonly NatsHeaders NatsRollupHeaders = new() { { NatsRollup, RollupSubject } };
-
     private readonly NatsObjContext _objContext;
     private readonly INatsJSStream _stream;
 
@@ -603,7 +601,8 @@ public class NatsObjStore : INatsObjStore
 
     private async ValueTask PublishMeta(ObjectMetadata meta, CancellationToken cancellationToken)
     {
-        var ack = await JetStreamContext.PublishAsync(GetMetaSubject(meta.Name), meta, serializer: NatsObjJsonSerializer<ObjectMetadata>.Default, headers: NatsRollupHeaders, cancellationToken: cancellationToken);
+        var natsRollupHeaders = new NatsHeaders { { NatsRollup, RollupSubject } };
+        var ack = await JetStreamContext.PublishAsync(GetMetaSubject(meta.Name), meta, serializer: NatsObjJsonSerializer<ObjectMetadata>.Default, headers: natsRollupHeaders, cancellationToken: cancellationToken);
         ack.EnsureSuccess();
     }
 
