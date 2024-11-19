@@ -112,5 +112,15 @@ public interface INatsJSStream
 
     ValueTask<NatsMsg<T>> GetDirectAsync<T>(StreamMsgGetRequest request, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Request a direct batch message
+    /// </summary>
+    /// <param name="request">Batch message request.</param>
+    /// <param name="serializer">Serializer to use for the message type.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <typeparam name="T"></typeparam>
+    /// <returns></returns>
+    IAsyncEnumerable<NatsMsg<T>> GetBatchDirectAsync<T>(StreamMsgBatchGetRequest request, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default);
+
     ValueTask<StreamMsgGetResponse> GetAsync(StreamMsgGetRequest request, CancellationToken cancellationToken = default);
 }
