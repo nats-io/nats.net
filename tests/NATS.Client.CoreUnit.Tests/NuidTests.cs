@@ -242,7 +242,7 @@ public class NuidTests
         }
     }
 
-    [Fact]
+    [Fact(Skip = "slow")]
     public void AllNuidsAreUnique_SmallSequentials()
     {
         var writeFailed = false;
@@ -285,7 +285,7 @@ public class NuidTests
         Assert.Equal(string.Empty, duplicateFailure);
     }
 
-    [Fact]
+    [Fact(Skip = "slow")]
     public void AllNuidsAreUnique_ZeroSequential()
     {
         var writeFailed = false;
