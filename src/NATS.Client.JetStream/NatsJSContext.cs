@@ -335,7 +335,7 @@ public partial class NatsJSContext
             // .NET 6 new APIs to the rescue: we can read the buffer once
             // by deserializing into a document, inspect and using the new
             // API deserialize to the final type from the document.
-            var jsonDocument = msg.Data;
+            using var jsonDocument = msg.Data;
 
             if (jsonDocument.RootElement.TryGetProperty("error", out var errorElement))
             {
