@@ -14,7 +14,11 @@ dotnet tool update -g docfx
 
 Generate API documentation and run local server:
 ```
-$ git clone https://github.com/nats-io/nats.net.git
-$ cd nats.net/docs
-$ docfx docfx.json --serve
+git clone https://github.com/nats-io/nats.net.git
+cd nats.net/docs
+docfx docfx.json --serve
 ```
+
+You might not be a .NET developer, but still want to contribute to the documentation.
+You can install the .NET SDK and use the `docfx` tool to generate the documentation.
+Download the .NET SDK from [dot.net](https://dot.net).

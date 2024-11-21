@@ -23,9 +23,8 @@ public class IntroPage
         Console.WriteLine("NATS.Net.DocsExamples.ObjectStore.IntroPage");
 
         #region obj
-        await using var nats = new NatsConnection();
-        var js = new NatsJSContext(nats);
-        var obj = new NatsObjContext(js);
+        await using var nc = new NatsClient();
+        var obj = nc.CreateObjectStoreContext();
         #endregion
 
         try

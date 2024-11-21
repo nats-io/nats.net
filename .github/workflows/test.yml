@@ -115,7 +115,9 @@ jobs:
 
           cd tests/NATS.Client.CheckNativeAot
           rm -rf bin obj
-          dotnet publish -r linux-x64 -c Release -o dist | tee output.txt
+
+          # temporarily ignore MsQuicApi warnings
+          dotnet publish -r linux-x64 -c Release -o dist | grep -v MsQuicApi | tee output.txt
 
           # check for warnings
           grep -i warning output.txt && exit 1
@@ -131,6 +133,14 @@ jobs:
           ls --size NATS.Client.CheckNativeAot | perl -lne'/(\d+)/; exit(1) if $1 < 1024' || exit 1
 
           ./NATS.Client.CheckNativeAot
+
+      - name: Check Documentation Examples
+        run: |
+            killall nats-server 2> /dev/null | echo -n
+            nats-server -v
+            nats-server -js &
+            cd tests/NATS.Net.DocsExamples
+            dotnet run
 
   windows_test:
     name: Windows

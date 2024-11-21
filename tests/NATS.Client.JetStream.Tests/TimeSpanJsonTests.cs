@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Text;
+using System.Text.Json;
 using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
 
@@ -7,6 +8,20 @@ namespace NATS.Client.JetStream.Tests;
 
 public class TimeSpanJsonTests
 {
+    [Fact]
+    public void NatsJSJsonDateTimeOffsetConverter_serialize_UTC_offset_as_Z()
+    {
+        var streamSource = new StreamSource
+        {
+            Name = "events",
+            OptStartTime = DateTimeOffset.Parse("2024-01-01T00:00:00+00:00"),
+        };
+
+        var json = JsonSerializer.Serialize(streamSource, NatsJSJsonSerializerContext.Default.StreamSource);
+
+        Assert.Equal("""{"name":"events","opt_start_time":"2024-01-01T00:00:00Z"}""", json);
+    }
+
     [Theory]
     [InlineData("00:00:00.001", "\"ack_wait\":1000000\\b")]
     [InlineData("00:00:01.000", "\"ack_wait\":1000000000\\b")]

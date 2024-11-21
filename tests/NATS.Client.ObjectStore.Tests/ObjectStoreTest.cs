@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using NATS.Client.Core.Tests;
@@ -483,5 +484,71 @@ public class ObjectStoreTest
 
         var info = await store.GetInfoAsync("k1", cancellationToken: cancellationToken);
         Assert.Equal("k1", info.Name);
+    }
+
+    [Fact]
+    public async Task Put_with_activity()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        using var activitySource = new ActivitySource($"NATS-debug-{nameof(Put_with_activity)}");
+        using var activityListener = new ActivityListener
+        {
+            ShouldListenTo = _ => true,
+            SampleUsingParentId = (ref ActivityCreationOptions<string> _) => ActivitySamplingResult.AllData,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+        };
+        using var activity = activitySource.StartActivity(ActivityKind.Client);
+        ActivitySource.AddActivityListener(activityListener);
+
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+        var js = new NatsJSContext(nats);
+        var obj = new NatsObjContext(js);
+
+        var store = await obj.CreateObjectStoreAsync(new NatsObjConfig("b1"), cancellationToken);
+
+        var data = new byte[1024];
+        Random.Shared.NextBytes(data);
+
+        const string filename = $"_tmp_test_file_{nameof(Put_with_activity)}.bin";
+        await File.WriteAllBytesAsync(filename, data, cancellationToken);
+
+        await store.PutAsync("my/random/data_1.bin", File.OpenRead(filename), cancellationToken: cancellationToken);
+    }
+
+    [Fact]
+    public async Task Put_multiple_times_with_activity()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        using var activitySource = new ActivitySource($"NATS-debug-{nameof(Put_multiple_times_with_activity)}");
+        using var activityListener = new ActivityListener
+        {
+            ShouldListenTo = _ => true,
+            SampleUsingParentId = (ref ActivityCreationOptions<string> _) => ActivitySamplingResult.AllData,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+        };
+        using var activity = activitySource.StartActivity(ActivityKind.Client);
+        ActivitySource.AddActivityListener(activityListener);
+
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+        var js = new NatsJSContext(nats);
+        var obj = new NatsObjContext(js);
+
+        var store = await obj.CreateObjectStoreAsync(new NatsObjConfig("b1"), cancellationToken);
+
+        var data = new byte[1024];
+        Random.Shared.NextBytes(data);
+
+        const string filename = $"_tmp_test_file_{nameof(Put_multiple_times_with_activity)}.bin";
+        await File.WriteAllBytesAsync(filename, data, cancellationToken);
+
+        await store.PutAsync("my/random/data_1.bin", File.OpenRead(filename), cancellationToken: cancellationToken);
+        await store.PutAsync("my/random/data_2.bin", File.OpenRead(filename), cancellationToken: cancellationToken);
+        await store.PutAsync("my/random/data_3.bin", File.OpenRead(filename), cancellationToken: cancellationToken);
     }
 }

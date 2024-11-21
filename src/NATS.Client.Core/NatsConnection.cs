@@ -1,6 +1,5 @@
 using System.Buffers;
 using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
@@ -30,11 +29,6 @@ internal enum NatsEvent
 public partial class NatsConnection : INatsConnection
 {
 #pragma warning disable SA1401
-    /// <summary>
-    /// Hook before TCP connection open.
-    /// </summary>
-    public Func<(string Host, int Port), ValueTask<(string Host, int Port)>>? OnConnectingAsync;
-
     internal readonly ConnectionStatsCounter Counter; // allow to call from external sources
     internal volatile ServerInfo? WritableServerInfo;
 
@@ -76,7 +70,7 @@ public partial class NatsConnection : INatsConnection
     public NatsConnection(NatsOpts opts)
     {
         _logger = opts.LoggerFactory.CreateLogger<NatsConnection>();
-        Opts = opts;
+        Opts = opts.ReadUserInfoFromConnectionString();
         ConnectionState = NatsConnectionState.Closed;
         _waitForOpenConnection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         _disposedCancellationTokenSource = new CancellationTokenSource();
@@ -134,6 +128,11 @@ public partial class NatsConnection : INatsConnection
     public INatsSubscriptionManager SubscriptionManager => _subscriptionManager;
 
     public NatsHeaderParser HeaderParser { get; }
+
+    // Hooks
+    public Func<(string Host, int Port), ValueTask<(string Host, int Port)>>? OnConnectingAsync { get; set; }
+
+    public Func<ISocketConnection, ValueTask<ISocketConnection>>? OnSocketAvailableAsync { get; set; }
 
     internal bool IsDisposed
     {
@@ -337,6 +336,12 @@ public partial class NatsConnection : INatsConnection
                         await sslConnection.AuthenticateAsClientAsync(uri, Opts.ConnectTimeout).ConfigureAwait(false);
                         _socket = sslConnection;
                     }
+                }
+
+                if (OnSocketAvailableAsync != null)
+                {
+                    _logger.LogInformation(NatsLogEvents.Connection, "Try to invoke OnSocketAvailable");
+                    _socket = await OnSocketAvailableAsync(_socket).ConfigureAwait(false);
                 }
 
                 _currentConnectUri = uri;
@@ -627,6 +632,12 @@ public partial class NatsConnection : INatsConnection
                             await sslConnection.AuthenticateAsClientAsync(FixTlsHost(url), Opts.ConnectTimeout).ConfigureAwait(false);
                             _socket = sslConnection;
                         }
+                    }
+
+                    if (OnSocketAvailableAsync != null)
+                    {
+                        _logger.LogInformation(NatsLogEvents.Connection, "Try to invoke OnSocketAvailable");
+                        _socket = await OnSocketAvailableAsync(_socket).ConfigureAwait(false);
                     }
 
                     _currentConnectUri = url;

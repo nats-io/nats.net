@@ -30,11 +30,15 @@
 - name: Services
   href: services/intro.md
 
-- name: Serialization
-  href: serialization.md
-
-- name: Security
-  href: security.md
+- name: Advanced Options
+  href: advanced/intro.md
+  items:
+    - name: Serialization
+      href: advanced/serialization.md
+    - name: Security
+      href: advanced/security.md
+    - name: AOT Deployments
+      href: advanced/aot.md
 
 - name: Updating Documentation
   href: update-docs.md

@@ -33,6 +33,10 @@ stream and will keep track of which messages were delivered and acknowledged by 
 ```shell
 $ nats-server -js
 ```
+or
+```shell
+$ docker run nats -js
+```
 
 Install [NATS.Net](https://www.nuget.org/packages/NATS.Net) from Nuget.
 
@@ -50,11 +54,9 @@ our case, meaning any subject prefixed with `orders.` e.g. `orders.new.123`. Hav
 
 Given that we have a record `Order`, we can publish and consume stream of `Order` objects:
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/IntroPage.cs#serializer)]
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/IntroPage.cs#order-class)]
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/IntroPage.cs#js-serializer)]
-
-We can publish to the `shop_orders` stream and receive a confirmation that our message is persisted:
+We can publish to `SHOP_ORDERS` stream and receive a confirmation that our message is persisted:
 
 [!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/IntroPage.cs#js-publish)]
 
@@ -68,24 +70,22 @@ $ nats stream ls
 ├─────────────┬─────────────┬─────────────────────┬──────────┬───────┬──────────────┤
 │ Name        │ Description │ Created             │ Messages │ Size  │ Last Message │
 ├─────────────┼─────────────┼─────────────────────┼──────────┼───────┼──────────────┤
-│ shop_orders │             │ 2023-09-12 10:25:52 │ 10       │ 600 B │ 10.41s       │
+│ SHOP_ORDERS │             │ 2023-09-12 10:25:52 │ 10       │ 600 B │ 10.41s       │
 ╰─────────────┴─────────────┴─────────────────────┴──────────┴───────┴──────────────╯
 ```
 
 We need one more JetStream construct before we can start consuming our messages: a *consumer*:
 
-```csharp
-var consumer = await js.CreateConsumerAsync(stream: "shop_orders", consumer: "order_processor");
-```
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/IntroPage.cs#js-consumer)]
 
 In JetStream, consumers are stored on the server. Clients don't need to worry about maintaining state separately.
 You can think of JetStream consumers as pointers to messages in streams stored on the NATS JetStream server. Let's
 see what our consumer's state is:
 
 ```shell
-$ nats consumer report shop_orders
+$ nats consumer report SHOP_ORDERS
 ╭────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│                                Consumer report for shop_orders with 1 consumers                                │
+│                                Consumer report for SHOP_ORDERS with 1 consumers                                │
 ├─────────────────┬──────┬────────────┬──────────┬─────────────┬─────────────┬─────────────┬───────────┬─────────┤
 │ Consumer        │ Mode │ Ack Policy │ Ack Wait │ Ack Pending │ Redelivered │ Unprocessed │ Ack Floor │ Cluster │
 ├─────────────────┼──────┼────────────┼──────────┼─────────────┼─────────────┼─────────────┼───────────┼─────────┤
@@ -95,17 +95,9 @@ $ nats consumer report shop_orders
 
 Check out [JetStream documentation](https://docs.nats.io/nats-concepts/jetstream) for more information on streams and consumers.
 
-Finally, we're ready to consume the messages we persisted in `shop_orders` stream:
+Finally, we're ready to consume the messages we persisted in `SHOP_ORDERS` stream:
 
 [!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/IntroPage.cs#consumer-consume)]
-
-## Logging
-
-You should also hook your logger to `NatsConnection` to make sure all is working as expected or
-to get help diagnosing any issues you might have:
-
-(For this example you need to add [Microsoft.Extensions.Logging.Console](https://www.nuget.org/packages/Microsoft.Extensions.Logging.Console) from Nuget.)
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Core/IntroPage.cs#logging)]
 
 ## What's Next
 

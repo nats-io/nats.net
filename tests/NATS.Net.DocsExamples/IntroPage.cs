@@ -17,15 +17,16 @@ public class IntroPage
 
         {
             #region core-nats
-            await using var nats = new NatsConnection();
+            await using var nc = new NatsClient();
 
-            var cts = new CancellationTokenSource();
+            // We will use a cancellation token to stop the subscription
+            using var cts = new CancellationTokenSource();
 
             var subscription = Task.Run(async () =>
             {
-                await foreach (var msg in nats.SubscribeAsync<string>(subject: "foo").WithCancellation(cts.Token))
+                await foreach (var msg in nc.SubscribeAsync<string>(subject: "greet.*", cancellationToken: cts.Token))
                 {
-                    Console.WriteLine($"Received: {msg.Data}");
+                    Console.WriteLine($"Received: {msg.Subject}: {msg.Data}");
                 }
             });
 
@@ -34,14 +35,14 @@ public class IntroPage
 
             for (var i = 0; i < 10; i++)
             {
-                await nats.PublishAsync(subject: "foo", data: $"Hello, World! {i}");
+                await nc.PublishAsync(subject: $"greet.{i}", data: $"Hello, World! {i}");
             }
 
-            // Give subscription time to receive messages
+            // Give subscription task time to receive messages
             await Task.Delay(1000);
 
             // Unsubscribe
-            cts.Cancel();
+            await cts.CancelAsync();
 
             await subscription;
             #endregion
@@ -62,7 +63,7 @@ public class IntroPage
         {
             await using var nats = new NatsConnection();
             var js = new NatsJSContext(nats);
-            await js.DeleteStreamAsync("orders");
+            await js.DeleteStreamAsync("ORDERS");
             await Task.Delay(1000);
         }
         catch (NatsJSApiException)
@@ -71,34 +72,35 @@ public class IntroPage
 
         {
             #region jetstream
-            await using var nats = new NatsConnection();
-            var js = new NatsJSContext(nats);
+            await using var nc = new NatsClient();
+            var js = nc.CreateJetStreamContext();
 
-            // Create a stream to store the messages
-            await js.CreateStreamAsync(new StreamConfig(name: "orders", subjects: new[] { "orders.*" }));
+            // Create a stream to store the messages those subjects start with "orders."
+            await js.CreateStreamAsync(new StreamConfig(name: "ORDERS", subjects: ["orders.>"]));
 
             for (var i = 0; i < 10; i++)
             {
                 // Publish a message to the stream. The message will be stored in the stream
                 // because the published subject matches one of the the stream's subjects.
-                var ack = await js.PublishAsync(subject: "orders.new", data: $"order {i}");
+                var ack = await js.PublishAsync(subject: $"orders.new.{i}", data: $"order {i}");
+
+                // Ensure the message is stored in the stream.
+                // Returned ack makes the JetStream publish different from the core publish.
                 ack.EnsureSuccess();
             }
 
             // Create a consumer to receive the messages
-            var consumer = await js.CreateOrUpdateConsumerAsync("orders", new ConsumerConfig("order_processor"));
+            var consumer = await js.CreateOrUpdateConsumerAsync("ORDERS", new ConsumerConfig("order_processor"));
 
-            await foreach (var jsMsg in consumer.ConsumeAsync<string>())
+            // We will use a cancellation token to stop the consume loop
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+
+            await foreach (var jsMsg in consumer.ConsumeAsync<string>(cancellationToken: cts.Token))
             {
-                Console.WriteLine($"Processed: {jsMsg.Data}");
-                await jsMsg.AckAsync();
+                Console.WriteLine($"Processed: {jsMsg.Subject}: {jsMsg.Data} ({jsMsg.Metadata?.Sequence.Stream}/{jsMsg.Metadata?.NumPending})");
 
-                // Process only 10 messages
-                // (message order might be different in different scenarios)
-                if (jsMsg.Data == "order 9")
-                {
-                    break;
-                }
+                // Acknowledge the message is processed and the consumer can move to the next message
+                await jsMsg.AckAsync(cancellationToken: cts.Token);
             }
             #endregion
         }

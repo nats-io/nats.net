@@ -3,10 +3,8 @@
 #pragma warning disable SA1509
 
 using NATS.Client.Core;
-using NATS.Client.JetStream;
-using NATS.Client.JetStream.Models;
 
-namespace NATS.Net.DocsExamples;
+namespace NATS.Net.DocsExamples.Advanced;
 
 public class SecurityPage
 {
@@ -17,7 +15,7 @@ public class SecurityPage
 
         {
             #region user-pass
-            var opts = NatsOpts.Default with
+            var opts = new NatsOpts
             {
                 AuthOpts = NatsAuthOpts.Default with
                 {
@@ -26,13 +24,13 @@ public class SecurityPage
                 },
             };
 
-            await using var nats = new NatsConnection(opts);
+            await using var nats = new NatsClient(opts);
             #endregion
         }
 
         {
             #region tls-implicit
-            var opts = NatsOpts.Default with
+            var opts = new NatsOpts
             {
                 TlsOpts = new NatsTlsOpts
                 {
@@ -40,13 +38,13 @@ public class SecurityPage
                 },
             };
 
-            await using var nats = new NatsConnection(opts);
+            await using var nats = new NatsClient(opts);
             #endregion
         }
 
         {
             #region tls-mutual
-            var opts = NatsOpts.Default with
+            var opts = new NatsOpts
             {
                 TlsOpts = new NatsTlsOpts
                 {
@@ -56,7 +54,7 @@ public class SecurityPage
                 },
             };
 
-            await using var nats = new NatsConnection(opts);
+            await using var nats = new NatsClient(opts);
             #endregion
         }
     }

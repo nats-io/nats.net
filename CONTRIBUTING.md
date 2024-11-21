@@ -1,6 +1,6 @@
 ﻿# Contributing
 
-Thanks for your interest in contributing! This document contains `nats-io/nats.net.v2` specific contributing details. If you are a first-time contributor, please refer to the general [NATS Contributor Guide](https://nats.io/contributing/) to get a comprehensive overview of contributing to the NATS project.
+Thanks for your interest in contributing! This document contains `nats-io/nats.net` specific contributing details. If you are a first-time contributor, please refer to the general [NATS Contributor Guide](https://nats.io/contributing/) to get a comprehensive overview of contributing to the NATS project.
 
 ## Getting started
 
@@ -10,7 +10,7 @@ There are three general ways you can contribute to this repo:
 - Reporting a bug or regression
 - Contributing changes to the source code
 
-For the first two, refer to the [GitHub Issues](https://github.com/nats-io/nats.net.v2/issues/new/choose) which guides you through the available options along with the needed information to collect.
+For the first two, refer to the [GitHub Issues](https://github.com/nats-io/nats.net/issues/new/choose) which guides you through the available options along with the needed information to collect.
 
 ## Contributing Changes
 
@@ -34,4 +34,4 @@ A good pull request includes:
 
 ## Get Help
 
-If you have questions about the contribution process, please start a [GitHub discussion](https://github.com/nats-io/nats.net.v2/discussions) or join the [NATS Slack](https://slack.nats.io/).
+If you have questions about the contribution process, please start a [GitHub discussion](https://github.com/nats-io/nats.net/discussions) or join the [NATS Slack](https://slack.nats.io/).

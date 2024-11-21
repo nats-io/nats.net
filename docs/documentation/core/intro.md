@@ -9,14 +9,17 @@ pub/sub functionality and the concept of [Subject-Based Messaging](https://docs.
 ## Quick Start
 
 [Download the latest](https://nats.io/download/) `nats-server` for your platform and run it without any arguments. `nats-server` will listen
-on its default TCP port 4222.
+on its default TCP port 4222. You can also use a containerized version of the NATS server:
 
 ```shell
 $ nats-server
 ```
+or
+```shell
+$ docker run nats
+```
 
-Install [NATS.Net](https://www.nuget.org/packages/NATS.Net)
-and [NATS.Client.Serializers.Json](https://www.nuget.org/packages/NATS.Client.Serializers.Json) from Nuget.
+Install [NATS.Net](https://www.nuget.org/packages/NATS.Net) from Nuget.
 
 Given that we have a plain class `Bar`, we can publish and subscribe to our `nats-server` sending
 and receiving `Bar` objects:
@@ -29,14 +32,6 @@ Subscribe to all `bar` [related subjects](https://docs.nats.io/nats-concepts/sub
 
 Publish `Bar` objects to related `bar` [subjects](https://docs.nats.io/nats-concepts/subjects):
 [!code-csharp[](../../../tests/NATS.Net.DocsExamples/Core/IntroPage.cs#pub)]
-
-## Logging
-
-You should also hook your logger to `NatsConnection` to make sure all is working as expected or
-to get help diagnosing any issues you might have:
-
-(For this example you need to add [Microsoft.Extensions.Logging.Console](https://www.nuget.org/packages/Microsoft.Extensions.Logging.Console) from Nuget.)
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Core/IntroPage.cs#logging)]
 
 ## What's Next
 

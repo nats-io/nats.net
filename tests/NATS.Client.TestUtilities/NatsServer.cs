@@ -85,6 +85,22 @@ public class NatsServer : IAsyncDisposable
         _ => throw new ArgumentOutOfRangeException(),
     };
 
+    public string ClientUrlWithAuth
+    {
+        get
+        {
+            if (!string.IsNullOrEmpty(Opts.ClientUrlUserName))
+            {
+                var uriBuilder = new UriBuilder(ClientUrl);
+                uriBuilder.UserName = Opts.ClientUrlUserName;
+                uriBuilder.Password = Opts.ClientUrlPassword;
+                return uriBuilder.ToString().TrimEnd('/');
+            }
+
+            return ClientUrl;
+        }
+    }
+
     public int ConnectionPort
     {
         get
@@ -134,7 +150,7 @@ public class NatsServer : IAsyncDisposable
     public static NatsServer Start(ITestOutputHelper outputHelper, TransportType transportType) =>
         Start(outputHelper, new NatsServerOptsBuilder().UseTransport(transportType).Build());
 
-    public static NatsServer Start(ITestOutputHelper outputHelper, NatsServerOpts opts, NatsOpts? clientOpts = default)
+    public static NatsServer Start(ITestOutputHelper outputHelper, NatsServerOpts opts, NatsOpts? clientOpts = default, bool useAuthInUrl = false)
     {
         NatsServer? server = null;
         NatsConnection? nats = null;
@@ -144,7 +160,7 @@ public class NatsServer : IAsyncDisposable
             {
                 server = new NatsServer(outputHelper, opts);
                 server.StartServerProcess();
-                nats = server.CreateClientConnection(clientOpts ?? NatsOpts.Default, reTryCount: 3);
+                nats = server.CreateClientConnection(clientOpts ?? NatsOpts.Default, reTryCount: 3, useAuthInUrl: useAuthInUrl);
 #pragma warning disable CA2012
                 return server;
             }
@@ -335,13 +351,13 @@ public class NatsServer : IAsyncDisposable
         return (client, proxy);
     }
 
-    public NatsConnection CreateClientConnection(NatsOpts? options = default, int reTryCount = 10, bool ignoreAuthorizationException = false, bool testLogger = true)
+    public NatsConnection CreateClientConnection(NatsOpts? options = default, int reTryCount = 10, bool ignoreAuthorizationException = false, bool testLogger = true, bool useAuthInUrl = false)
     {
         for (var i = 0; i < reTryCount; i++)
         {
             try
             {
-                var nats = new NatsConnection(ClientOpts(options ?? NatsOpts.Default, testLogger: testLogger));
+                var nats = new NatsConnection(ClientOpts(options ?? NatsOpts.Default, testLogger: testLogger, useAuthInUrl: useAuthInUrl));
 
                 try
                 {
@@ -376,7 +392,7 @@ public class NatsServer : IAsyncDisposable
         return new NatsConnectionPool(4, ClientOpts(opts));
     }
 
-    public NatsOpts ClientOpts(NatsOpts opts, bool testLogger = true)
+    public NatsOpts ClientOpts(NatsOpts opts, bool testLogger = true, bool useAuthInUrl = false)
     {
         var natsTlsOpts = Opts.EnableTls
             ? opts.TlsOpts with
@@ -392,7 +408,7 @@ public class NatsServer : IAsyncDisposable
         {
             LoggerFactory = testLogger ? _loggerFactory : opts.LoggerFactory,
             TlsOpts = natsTlsOpts,
-            Url = ClientUrl,
+            Url = useAuthInUrl ? ClientUrlWithAuth : ClientUrl,
         };
     }
 
@@ -464,7 +480,7 @@ public class NatsCluster : IAsyncDisposable
 {
     private readonly ITestOutputHelper _outputHelper;
 
-    public NatsCluster(ITestOutputHelper outputHelper, TransportType transportType, Action<int, NatsServerOptsBuilder>? configure = default)
+    public NatsCluster(ITestOutputHelper outputHelper, TransportType transportType, Action<int, NatsServerOptsBuilder>? configure = default, bool useAuthInUrl = false)
     {
         _outputHelper = outputHelper;
 
@@ -516,13 +532,13 @@ public class NatsCluster : IAsyncDisposable
         }
 
         _outputHelper.WriteLine($"Starting server 1...");
-        Server1 = NatsServer.Start(outputHelper, opts1);
+        Server1 = NatsServer.Start(outputHelper, opts1, useAuthInUrl: useAuthInUrl);
 
         _outputHelper.WriteLine($"Starting server 2...");
-        Server2 = NatsServer.Start(outputHelper, opts2);
+        Server2 = NatsServer.Start(outputHelper, opts2, useAuthInUrl: useAuthInUrl);
 
         _outputHelper.WriteLine($"Starting server 3...");
-        Server3 = NatsServer.Start(outputHelper, opts3);
+        Server3 = NatsServer.Start(outputHelper, opts3, useAuthInUrl: useAuthInUrl);
     }
 
     public NatsServer Server1 { get; }

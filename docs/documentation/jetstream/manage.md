@@ -24,7 +24,7 @@ However, in practice streams are usually managed separately from the application
 line client](https://github.com/nats-io/natscli) you can create a stream interactively:
 
 ```shell
-$ nats stream create my_events --subjects 'events.*'
+$ nats stream create ORDERS --subjects 'orders.>'
 ? Storage  [Use arrows to move, type to filter, ? for more help]
 > file
   memory
