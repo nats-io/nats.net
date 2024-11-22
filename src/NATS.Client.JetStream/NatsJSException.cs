@@ -106,6 +106,12 @@ public class NatsJSApiNoResponseException : NatsJSException
         : base("No API response received from the server")
     {
     }
+
+    public NatsJSApiNoResponseException(NatsSubEndReason reason)
+        : base($"No API response received from the server: {reason}") =>
+        Reason = reason;
+
+    public NatsSubEndReason Reason { get; }
 }
 
 public class NatsJSTimeoutException : NatsJSException

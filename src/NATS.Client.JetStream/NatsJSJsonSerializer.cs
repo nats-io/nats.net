@@ -8,24 +8,7 @@ namespace NATS.Client.JetStream;
 
 public static class NatsJSJsonSerializer<T>
 {
-#if NET6_0
-    public static readonly INatsSerializer<T> Default = new NatsJsonContextSerializer<T>(NatsJSJsonSerializerContext.Default);
-#else
-    public static readonly INatsSerializer<T> Default = new NatsJsonContextSerializer<T>(new NatsJSJsonSerializerContext(new JsonSerializerOptions
-    {
-        Converters =
-        {
-            new JsonStringEnumConverter<ConsumerConfigDeliverPolicy>(JsonNamingPolicy.SnakeCaseLower),
-            new JsonStringEnumConverter<ConsumerConfigAckPolicy>(JsonNamingPolicy.SnakeCaseLower),
-            new JsonStringEnumConverter<ConsumerConfigReplayPolicy>(JsonNamingPolicy.SnakeCaseLower),
-            new JsonStringEnumConverter<StreamConfigCompression>(JsonNamingPolicy.SnakeCaseLower),
-            new JsonStringEnumConverter<StreamConfigDiscard>(JsonNamingPolicy.SnakeCaseLower),
-            new JsonStringEnumConverter<StreamConfigRetention>(JsonNamingPolicy.SnakeCaseLower),
-            new JsonStringEnumConverter<StreamConfigStorage>(JsonNamingPolicy.SnakeCaseLower),
-            new JsonStringEnumConverter<ConsumerCreateAction>(JsonNamingPolicy.SnakeCaseLower),
-        },
-    }));
-#endif
+    public static readonly INatsSerializer<T> Default = new NatsJsonContextSerializer<T>(NatsJSJsonSerializerContext.DefaultContext);
 }
 
 [JsonSerializable(typeof(AccountInfoResponse))]
@@ -105,6 +88,24 @@ public static class NatsJSJsonSerializer<T>
 [JsonSerializable(typeof(Tier))]
 internal partial class NatsJSJsonSerializerContext : JsonSerializerContext
 {
+#if NET6_0
+    internal static readonly NatsJSJsonSerializerContext DefaultContext = new NatsJSJsonSerializerContext(new JsonSerializerOptions());
+#else
+    internal static readonly NatsJSJsonSerializerContext DefaultContext = new NatsJSJsonSerializerContext(new JsonSerializerOptions
+    {
+        Converters =
+        {
+            new JsonStringEnumConverter<ConsumerConfigDeliverPolicy>(JsonNamingPolicy.SnakeCaseLower),
+            new JsonStringEnumConverter<ConsumerConfigAckPolicy>(JsonNamingPolicy.SnakeCaseLower),
+            new JsonStringEnumConverter<ConsumerConfigReplayPolicy>(JsonNamingPolicy.SnakeCaseLower),
+            new JsonStringEnumConverter<StreamConfigCompression>(JsonNamingPolicy.SnakeCaseLower),
+            new JsonStringEnumConverter<StreamConfigDiscard>(JsonNamingPolicy.SnakeCaseLower),
+            new JsonStringEnumConverter<StreamConfigRetention>(JsonNamingPolicy.SnakeCaseLower),
+            new JsonStringEnumConverter<StreamConfigStorage>(JsonNamingPolicy.SnakeCaseLower),
+            new JsonStringEnumConverter<ConsumerCreateAction>(JsonNamingPolicy.SnakeCaseLower),
+        },
+    });
+#endif
 }
 
 #if NET6_0
