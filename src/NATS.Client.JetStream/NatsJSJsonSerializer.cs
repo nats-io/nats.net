@@ -78,6 +78,7 @@ public static class NatsJSJsonSerializer<T>
 [JsonSerializable(typeof(StreamMsgDeleteResponse))]
 [JsonSerializable(typeof(StreamMsgGetRequest))]
 [JsonSerializable(typeof(StreamMsgGetResponse))]
+[JsonSerializable(typeof(StreamMsgBatchGetRequest))]
 [JsonSerializable(typeof(StreamNamesRequest))]
 [JsonSerializable(typeof(StreamNamesResponse))]
 [JsonSerializable(typeof(StreamPurgeRequest))]

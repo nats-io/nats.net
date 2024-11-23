@@ -37,8 +37,7 @@ public record StreamMsgBatchGetRequest
     /// </summary>
     [JsonPropertyName("start_time")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    [Range(ulong.MinValue, ulong.MaxValue)]
-    public DateTime StartTime { get; set; }
+    public DateTimeOffset StartTime { get; set; }
 
     /// <summary>
     /// The subject used filter messages that should be returned
@@ -60,7 +59,6 @@ public record StreamMsgBatchGetRequest
     /// </summary>
     [JsonPropertyName("multi_last")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    [Range(ulong.MinValue, ulong.MaxValue)]
     public string[] LastBySubjects { get; set; } = [];
 
     /// <summary>
