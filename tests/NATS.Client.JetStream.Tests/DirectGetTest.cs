@@ -1,11 +1,11 @@
-﻿using NATS.Client.Core.Tests;
+using NATS.Client.Core.Tests;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Tests;
 
 public class DirectGetTest
 {
-    [Fact]
+    [SkipIfNatsServer(versionEarlierThan: "2.11")]
     public async Task Direct_get_when_stream_disable()
     {
         await using var server = NatsServer.StartJS();
@@ -29,7 +29,7 @@ public class DirectGetTest
         await Assert.ThrowsAsync<InvalidOperationException>(GetBatchAction);
     }
 
-    [Fact]
+    [SkipIfNatsServer(versionEarlierThan: "2.11")]
     public async Task Direct_get_when_stream_enable()
     {
         var testDataList = new List<TestData?>();
@@ -57,7 +57,7 @@ public class DirectGetTest
         Assert.Single(testDataList);
     }
 
-    [Fact]
+    [SkipIfNatsServer(versionEarlierThan: "2.11")]
     public async Task Direct_get_with_eobCode()
     {
         var testDataList = new List<TestData?>();
@@ -85,7 +85,7 @@ public class DirectGetTest
         Assert.Equal(2, testDataList.Count);
     }
 
-    [Fact]
+    [SkipIfNatsServer(versionEarlierThan: "2.11")]
     public async Task Direct_get_min_sequence()
     {
         var testDataList = new List<TestData?>();
