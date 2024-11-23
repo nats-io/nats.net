@@ -117,10 +117,10 @@ public interface INatsJSStream
     /// </summary>
     /// <param name="request">Batch message request.</param>
     /// <param name="serializer">Serializer to use for the message type.</param>
+    /// <param name="includeEob"><c>true</c> to send the last empty message with eobCode in the header; otherwise <c>false</c></param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <typeparam name="T"></typeparam>
-    /// <returns></returns>
-    IAsyncEnumerable<NatsMsg<T>> GetBatchDirectAsync<T>(StreamMsgBatchGetRequest request, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default);
+    /// <exception cref="InvalidOperationException">There was an issue, stream must have allow direct set.</exception>
+    IAsyncEnumerable<NatsMsg<T>> GetBatchDirectAsync<T>(StreamMsgBatchGetRequest request, INatsDeserialize<T>? serializer = default, bool includeEob = false, CancellationToken cancellationToken = default);
 
     ValueTask<StreamMsgGetResponse> GetAsync(StreamMsgGetRequest request, CancellationToken cancellationToken = default);
 }
