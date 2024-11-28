@@ -115,4 +115,12 @@ public interface INatsClient : IAsyncDisposable
         INatsDeserialize<TReply>? replySerializer = default,
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Force a reconnection to the NATS server.
+    /// </summary>
+    /// <remarks>
+    /// This method doesn't wait for the connection to be established.
+    /// </remarks>
+    ValueTask ReconnectAsync();
 }

@@ -159,6 +159,8 @@ public class NatsJSContextFactoryTest
 
         public ValueTask ConnectAsync() => throw new NotImplementedException();
 
+        public ValueTask ReconnectAsync() => throw new NotImplementedException();
+
         public ValueTask DisposeAsync() => throw new NotImplementedException();
     }
 }
