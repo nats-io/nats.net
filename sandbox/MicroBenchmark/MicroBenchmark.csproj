@@ -20,6 +20,7 @@
     <ItemGroup>
         <ProjectReference Include="..\..\src\NATS.Client.Core\NATS.Client.Core.csproj" />
         <ProjectReference Include="..\..\src\NATS.Client.JetStream\NATS.Client.JetStream.csproj" />
+        <ProjectReference Include="..\..\src\NATS.Client.KeyValueStore\NATS.Client.KeyValueStore.csproj" />
     </ItemGroup>
 
 </Project>

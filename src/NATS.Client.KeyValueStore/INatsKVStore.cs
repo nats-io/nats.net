@@ -77,6 +77,8 @@ public interface INatsKVStore
     /// <exception cref="NatsKVException">There was an error with metadata</exception>
     ValueTask<NatsKVEntry<T>> GetEntryAsync<T>(string key, ulong revision = default, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default);
 
+    ValueTask<NatsResult<NatsKVEntry<T>>> TryGetEntryAsync<T>(string key, ulong revision = default, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Start a watcher for specific keys
     /// </summary>
