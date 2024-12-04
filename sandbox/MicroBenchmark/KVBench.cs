@@ -1,7 +1,9 @@
-﻿using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Attributes;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.KeyValueStore;
+
+#pragma warning disable CS8618
 
 namespace MicroBenchmark;
 
@@ -13,7 +15,7 @@ public class KVBench
     private NatsConnection _nats;
     private NatsJSContext _js;
     private NatsKVContext _kv;
-    private INatsKVStore _store;
+    private NatsKVStore _store;
 
     [Params(64, 512, 1024)]
     public int Iter { get; set; }
@@ -24,7 +26,7 @@ public class KVBench
         _nats = new NatsConnection();
         _js = new NatsJSContext(_nats);
         _kv = new NatsKVContext(_js);
-        _store = await _kv.CreateStoreAsync("benchmark");
+        _store = (NatsKVStore)(await _kv.CreateStoreAsync("benchmark"));
     }
 
     [Benchmark]
@@ -33,9 +35,26 @@ public class KVBench
         var total = 0;
         for (var i = 0; i < Iter; i++)
         {
+            var result = await _store.TryGetEntryAsync<int>("does.not.exist");
+            if (result is { Success: false, Error: NatsKVKeyNotFoundException })
+                total++;
+        }
+
+        if (total != Iter)
+            throw new Exception();
+
+        return total;
+    }
+
+    [Benchmark]
+    public async ValueTask<int> GetAsyncNew()
+    {
+        var total = 0;
+        for (var i = 0; i < Iter; i++)
+        {
             try
             {
-                await _store.GetEntryAsync<int>("does.not.exist");
+                await _store.GetEntryAsyncNew<int>("does.not.exist");
             }
             catch (NatsKVKeyNotFoundException)
             {

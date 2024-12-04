@@ -292,6 +292,141 @@ public class NatsKVStore : INatsKVStore
         }
     }
 
+    public async ValueTask<NatsKVEntry<T>> GetEntryAsyncNew<T>(string key, ulong revision = default, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
+    {
+        var result = await TryGetEntryAsync(key, revision, serializer, cancellationToken);
+        result.EnsureSuccess();
+        return result.Value;
+    }
+
+    /// <inheritdoc />
+    public async ValueTask<NatsResult<NatsKVEntry<T>>> TryGetEntryAsync<T>(string key, ulong revision = default, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
+    {
+        ValidateKey(key);
+        serializer ??= JetStreamContext.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
+
+        var request = new StreamMsgGetRequest();
+        var keySubject = $"$KV.{Bucket}.{key}";
+
+        if (revision == default)
+        {
+            request.LastBySubj = keySubject;
+        }
+        else
+        {
+            request.Seq = revision;
+            request.NextBySubj = keySubject;
+        }
+
+        if (_stream.Info.Config.AllowDirect)
+        {
+            var direct = await _stream.GetDirectAsync<T>(request, serializer, cancellationToken);
+
+            if (direct is { Headers: { } headers } msg)
+            {
+                if (headers.Code == 404)
+                    return NatsKVKeyNotFoundException.Default;
+
+                if (!headers.TryGetLastValue(NatsSubject, out var subject))
+                    return new NatsKVException("Missing sequence header");
+
+                if (revision != default)
+                {
+                    if (!string.Equals(subject, keySubject, StringComparison.Ordinal))
+                    {
+                        return new NatsKVException("Unexpected subject");
+                    }
+                }
+
+                if (!headers.TryGetLastValue(NatsSequence, out var sequenceValue))
+                    return new NatsKVException("Missing sequence header");
+
+                if (!ulong.TryParse(sequenceValue, out var sequence))
+                    return new NatsKVException("Can't parse sequence header");
+
+                if (!headers.TryGetLastValue(NatsTimeStamp, out var timestampValue))
+                    return new NatsKVException("Missing timestamp header");
+
+                if (!DateTimeOffset.TryParse(timestampValue, out var timestamp))
+                    return new NatsKVException("Can't parse timestamp header");
+
+                var operation = NatsKVOperation.Put;
+                if (headers.TryGetValue(KVOperation, out var operationValues))
+                {
+                    if (operationValues.Count != 1)
+                        return new NatsKVException("Unexpected number of operation headers");
+
+                    if (!Enum.TryParse(operationValues[0], ignoreCase: true, out operation))
+                        return new NatsKVException("Can't parse operation header");
+                }
+
+                if (operation is NatsKVOperation.Del or NatsKVOperation.Purge)
+                {
+                    return new NatsKVKeyDeletedException(sequence);
+                }
+
+                return new NatsKVEntry<T>(Bucket, key)
+                {
+                    Bucket = Bucket,
+                    Key = key,
+                    Created = timestamp,
+                    Revision = sequence,
+                    Operation = operation,
+                    Value = msg.Data,
+                    Delta = 0,
+                    UsedDirectGet = true,
+                    Error = msg.Error,
+                };
+            }
+            else
+            {
+                return new NatsKVException("Missing headers");
+            }
+        }
+        else
+        {
+            var response = await _stream.GetAsync(request, cancellationToken);
+
+            if (revision != default)
+            {
+                if (string.Equals(response.Message.Subject, keySubject, StringComparison.Ordinal))
+                {
+                    return new NatsKVException("Unexpected subject");
+                }
+            }
+
+            T? data;
+            NatsDeserializeException? deserializeException = null;
+            if (response.Message.Data.Length > 0)
+            {
+                var buffer = new ReadOnlySequence<byte>(response.Message.Data);
+
+                try
+                {
+                    data = serializer.Deserialize(buffer);
+                }
+                catch (Exception e)
+                {
+                    deserializeException = new NatsDeserializeException(buffer.ToArray(), e);
+                    data = default;
+                }
+            }
+            else
+            {
+                data = default;
+            }
+
+            return new NatsKVEntry<T>(Bucket, key)
+            {
+                Created = response.Message.Time,
+                Revision = response.Message.Seq,
+                Value = data,
+                UsedDirectGet = false,
+                Error = deserializeException,
+            };
+        }
+    }
+
     /// <inheritdoc />
     public IAsyncEnumerable<NatsKVEntry<T>> WatchAsync<T>(string key, INatsDeserialize<T>? serializer = default, NatsKVWatchOpts? opts = default, CancellationToken cancellationToken = default)
         => WatchAsync<T>([key], serializer, opts, cancellationToken);
