@@ -102,5 +102,8 @@ public class NatsClient : INatsClient
         => Connection.RequestAsync(subject, replySerializer, replyOpts, cancellationToken);
 
     /// <inheritdoc />
+    public ValueTask ReconnectAsync() => Connection.ReconnectAsync();
+
+    /// <inheritdoc />
     public ValueTask DisposeAsync() => Connection.DisposeAsync();
 }

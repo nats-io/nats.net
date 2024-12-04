@@ -466,6 +466,45 @@ public abstract partial class NatsConnectionTest
         // Assert
         Assert.Equal(2, invocationCount);
     }
+
+    [Fact]
+    public async Task ReconnectOnOpenConnection_ShouldDisconnectAndOpenNewConnection()
+    {
+        // Arrange
+        await using var server = NatsServer.Start(_output, _transportType);
+        await using var connection = server.CreateClientConnection();
+        await connection.ConnectAsync(); // wait first connection open
+
+        var openedCount = 0;
+        var disconnectedCount = 0;
+
+        var openSignal = new WaitSignal();
+        var disconnectSignal = new WaitSignal();
+
+        connection.ConnectionOpened += (_, _) =>
+        {
+            Interlocked.Increment(ref openedCount);
+            openSignal.Pulse();
+            return default;
+        };
+        connection.ConnectionDisconnected += (_, _) =>
+        {
+            Interlocked.Increment(ref disconnectedCount);
+            disconnectSignal.Pulse();
+            return default;
+        };
+
+        // Act
+        await connection.ReconnectAsync();
+        await disconnectSignal;
+        await openSignal;
+
+        // Assert
+        // First connection is not taken into account, so one invocation of
+        // disconnected event and open connection event are expected
+        openedCount.ShouldBe(1);
+        disconnectedCount.ShouldBe(1);
+    }
 }
 
 [JsonSerializable(typeof(SampleClass))]
