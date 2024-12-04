@@ -38,28 +38,36 @@ Install the [NATS.Net](https://www.nuget.org/packages/NATS.Net) package from NuG
 dotnet add package NATS.Net
 ```
 
+Run a local [`nats-server`](https://nats-io.github.io/nats.net/documentation/intro.html?tabs=core-nats#quick-start) to use or connect to the demo server if you're not behind a firewall:
+
+```csharp
+await using var client = new NatsClient("demo.nats.io");
+```
+
 Basic messaging:
 
 ```csharp
 // NATS core M:N messaging example
-await using var nc = new NatsClient();
+await using var client = new NatsClient();
 
 // Subscribe on one terminal
-await foreach (var msg in nc.SubscribeAsync<string>(subject: "foo"))
+await foreach (var msg in client.SubscribeAsync<string>(subject: "foo"))
 {
     Console.WriteLine($"Received: {msg.Data}");
 }
 
 // Start publishing to the same subject on a second terminal
-await nc.PublishAsync(subject: "foo", data: "Hello, World!");
+await client.PublishAsync(subject: "foo", data: "Hello, World!");
 ```
 
 Persistence with JetStream:
 
+For this you need to [run the server with JetStream](https://nats-io.github.io/nats.net/documentation/jetstream/intro.html#jetstream-quick-start) enabled if you're using a local server.
+
 ```csharp
 // NATS JetStream basic publish-consume example
-await using var nc = new NatsClient();
-var js = nc.CreateJetStreamContext();
+await using var client = new NatsClient();
+var js = client.CreateJetStreamContext();
 
 // Create a stream to store the messages
 await js.CreateStreamAsync(new StreamConfig(name: "ORDERS", subjects: new[] { "orders.*" }));
