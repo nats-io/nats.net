@@ -37,21 +37,6 @@ public class KVBench
         return 0;
     }
 
-    [Benchmark]
-    public async ValueTask<int> GetAsyncNew()
-    {
-        try
-        {
-            await _store.GetEntryAsyncNew<int>("does.not.exist");
-        }
-        catch (NatsKVKeyNotFoundException)
-        {
-            return 1;
-        }
-
-        return 0;
-    }
-
     [Benchmark(Baseline = true)]
     public async ValueTask<int> GetAsync()
     {
