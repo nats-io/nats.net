@@ -34,7 +34,6 @@ public enum NatsKVOperation
 /// </summary>
 public class NatsKVStore : INatsKVStore
 {
-
     private const string NatsExpectedLastSubjectSequence = "Nats-Expected-Last-Subject-Sequence";
     private const string KVOperation = "KV-Operation";
     private const string NatsRollup = "Nats-Rollup";
