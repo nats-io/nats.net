@@ -8,7 +8,6 @@ using NATS.Client.KeyValueStore;
 namespace MicroBenchmark;
 
 [MemoryDiagnoser]
-[ShortRunJob]
 [PlainExporter]
 public class KVBench
 {
@@ -16,9 +15,6 @@ public class KVBench
     private NatsJSContext _js;
     private NatsKVContext _kv;
     private NatsKVStore _store;
-
-    [Params(64, 512, 1024)]
-    public int Iter { get; set; }
 
     [GlobalSetup]
     public async Task SetupAsync()
@@ -32,61 +28,42 @@ public class KVBench
     [Benchmark]
     public async ValueTask<int> TryGetAsync()
     {
-        var total = 0;
-        for (var i = 0; i < Iter; i++)
+        var result = await _store.TryGetEntryAsync<int>("does.not.exist");
+        if (result is { Success: false, Error: NatsKVKeyNotFoundException })
         {
-            var result = await _store.TryGetEntryAsync<int>("does.not.exist");
-            if (result is { Success: false, Error: NatsKVKeyNotFoundException })
-                total++;
+            return 1;
         }
 
-        if (total != Iter)
-            throw new Exception();
-
-        return total;
+        return 0;
     }
 
     [Benchmark]
     public async ValueTask<int> GetAsyncNew()
     {
-        var total = 0;
-        for (var i = 0; i < Iter; i++)
+        try
         {
-            try
-            {
-                await _store.GetEntryAsyncNew<int>("does.not.exist");
-            }
-            catch (NatsKVKeyNotFoundException)
-            {
-                total++;
-            }
+            await _store.GetEntryAsyncNew<int>("does.not.exist");
+        }
+        catch (NatsKVKeyNotFoundException)
+        {
+            return 1;
         }
 
-        if (total != Iter)
-            throw new Exception();
-
-        return total;
+        return 0;
     }
 
-    [Benchmark]
+    [Benchmark(Baseline = true)]
     public async ValueTask<int> GetAsync()
     {
-        var total = 0;
-        for (var i = 0; i < Iter; i++)
+        try
         {
-            try
-            {
-                await _store.GetEntryAsync<int>("does.not.exist");
-            }
-            catch (NatsKVKeyNotFoundException)
-            {
-                total++;
-            }
+            await _store.GetEntryAsync<int>("does.not.exist");
+        }
+        catch (NatsKVKeyNotFoundException)
+        {
+            return 1;
         }
 
-        if (total != Iter)
-            throw new Exception();
-
-        return total;
+        return 0;
     }
 }

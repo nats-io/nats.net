@@ -34,6 +34,7 @@ public enum NatsKVOperation
 /// </summary>
 public class NatsKVStore : INatsKVStore
 {
+
     private const string NatsExpectedLastSubjectSequence = "Nats-Expected-Last-Subject-Sequence";
     private const string KVOperation = "KV-Operation";
     private const string NatsRollup = "Nats-Rollup";
@@ -44,6 +45,14 @@ public class NatsKVStore : INatsKVStore
     private const string NatsSequence = "Nats-Sequence";
     private const string NatsTimeStamp = "Nats-Time-Stamp";
     private static readonly Regex ValidKeyRegex = new(pattern: @"\A[-/_=\.a-zA-Z0-9]+\z", RegexOptions.Compiled);
+    private static readonly NatsKVException MissingSequenceHeaderException = new("Missing sequence header");
+    private static readonly NatsKVException MissingTimestampHeaderException = new("Missing timestamp header");
+    private static readonly NatsKVException MissingHeadersException = new("Missing headers");
+    private static readonly NatsKVException UnexpectedSubjectException = new("Unexpected subject");
+    private static readonly NatsKVException UnexpectedNumberOfOperationHeadersException = new("Unexpected number of operation headers");
+    private static readonly NatsKVException InvalidSequenceException = new("Can't parse sequence header");
+    private static readonly NatsKVException InvalidTimestampException = new("Can't parse timestamp header");
+    private static readonly NatsKVException InvalidOperationException = new("Can't parse operation header");
     private readonly INatsJSStream _stream;
 
     internal NatsKVStore(string bucket, INatsJSContext context, INatsJSStream stream)
@@ -300,14 +309,27 @@ public class NatsKVStore : INatsKVStore
     }
 
     /// <inheritdoc />
+#if !NETSTANDARD
+    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
+#endif
     public async ValueTask<NatsResult<NatsKVEntry<T>>> TryGetEntryAsync<T>(string key, ulong revision = default, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
         ValidateKey(key);
         serializer ??= JetStreamContext.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
-        var request = new StreamMsgGetRequest();
+#if NET8_0_OR_GREATER
+        var keySubject = string.Create(key.Length + Bucket.Length + 5, (Bucket, key), static (span, state) =>
+        {
+            "$KV.".CopyTo(span);
+            state.Bucket.CopyTo(span[4..]);
+            span[state.Bucket.Length + 4] = '.';
+            state.key.CopyTo(span[(state.Bucket.Length + 5)..]);
+        });
+#else
         var keySubject = $"$KV.{Bucket}.{key}";
+#endif
 
+        var request = new StreamMsgGetRequest();
         if (revision == default)
         {
             request.LastBySubj = keySubject;
@@ -328,36 +350,36 @@ public class NatsKVStore : INatsKVStore
                     return NatsKVKeyNotFoundException.Default;
 
                 if (!headers.TryGetLastValue(NatsSubject, out var subject))
-                    return new NatsKVException("Missing sequence header");
+                    return MissingSequenceHeaderException;
 
                 if (revision != default)
                 {
                     if (!string.Equals(subject, keySubject, StringComparison.Ordinal))
                     {
-                        return new NatsKVException("Unexpected subject");
+                        return UnexpectedSubjectException;
                     }
                 }
 
                 if (!headers.TryGetLastValue(NatsSequence, out var sequenceValue))
-                    return new NatsKVException("Missing sequence header");
+                    return MissingSequenceHeaderException;
 
                 if (!ulong.TryParse(sequenceValue, out var sequence))
-                    return new NatsKVException("Can't parse sequence header");
+                    return InvalidSequenceException;
 
                 if (!headers.TryGetLastValue(NatsTimeStamp, out var timestampValue))
-                    return new NatsKVException("Missing timestamp header");
+                    return MissingTimestampHeaderException;
 
                 if (!DateTimeOffset.TryParse(timestampValue, out var timestamp))
-                    return new NatsKVException("Can't parse timestamp header");
+                    return InvalidTimestampException;
 
                 var operation = NatsKVOperation.Put;
                 if (headers.TryGetValue(KVOperation, out var operationValues))
                 {
                     if (operationValues.Count != 1)
-                        return new NatsKVException("Unexpected number of operation headers");
+                        return UnexpectedNumberOfOperationHeadersException;
 
                     if (!Enum.TryParse(operationValues[0], ignoreCase: true, out operation))
-                        return new NatsKVException("Can't parse operation header");
+                        return InvalidOperationException;
                 }
 
                 if (operation is NatsKVOperation.Del or NatsKVOperation.Purge)
@@ -380,7 +402,7 @@ public class NatsKVStore : INatsKVStore
             }
             else
             {
-                return new NatsKVException("Missing headers");
+                return MissingHeadersException;
             }
         }
         else
@@ -391,7 +413,7 @@ public class NatsKVStore : INatsKVStore
             {
                 if (string.Equals(response.Message.Subject, keySubject, StringComparison.Ordinal))
                 {
-                    return new NatsKVException("Unexpected subject");
+                    return UnexpectedSubjectException;
                 }
             }
 
@@ -587,12 +609,12 @@ public class NatsKVStore : INatsKVStore
     /// </summary>
     private static void ValidateKey(string key)
     {
-        if (string.IsNullOrWhiteSpace(key))
+        if (string.IsNullOrWhiteSpace(key) || key.Length == 0)
         {
             ThrowNatsKVException("Key cannot be empty");
         }
 
-        if (key.StartsWith(".") || key.EndsWith("."))
+        if (key[0] == '.' || key[^1] == '.')
         {
             ThrowNatsKVException("Key cannot start or end with a period");
         }
