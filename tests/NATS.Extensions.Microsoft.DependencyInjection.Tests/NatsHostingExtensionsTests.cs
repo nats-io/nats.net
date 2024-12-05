@@ -1,3 +1,4 @@
+using System.Threading.Channels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -25,11 +26,10 @@ public class NatsHostingExtensionsTests
 
         var natsClient1 = provider.GetRequiredService<INatsClient>();
         var natsClient2 = provider.GetRequiredService<INatsClient>();
-        var natsClient3 = provider.GetRequiredService<NatsClient>();
 
         Assert.NotNull(natsClient1);
         Assert.Same(natsClient1, natsClient2);
-        Assert.Same(natsClient1, natsClient3);
+        Assert.Same(natsClient1, natsConnection1); // Same Connection implements INatsClient
         Assert.Same(natsClient1.Connection, natsConnection1);
     }
 
@@ -43,9 +43,138 @@ public class NatsHostingExtensionsTests
         var provider = services.BuildServiceProvider();
         var natsConnection1 = provider.GetRequiredService<INatsConnection>();
         var natsConnection2 = provider.GetRequiredService<INatsConnection>();
+        var natsConnection3 = provider.GetRequiredService<INatsConnection>();
+        var natsConnection4 = provider.GetRequiredService<INatsConnection>();
 
         Assert.NotNull(natsConnection1);
         Assert.NotSame(natsConnection1, natsConnection2); // Transient should return different instances
+        Assert.NotSame(natsConnection3, natsConnection4);
+        Assert.Same(natsConnection1, natsConnection3); // The pool is round-robin
+        Assert.Same(natsConnection2, natsConnection4);
+
+        var natsClient1 = provider.GetRequiredService<INatsClient>();
+        var natsClient2 = provider.GetRequiredService<INatsClient>();
+        var natsClient3 = provider.GetRequiredService<INatsClient>();
+        var natsClient4 = provider.GetRequiredService<INatsClient>();
+
+        Assert.NotNull(natsClient1);
+        Assert.NotSame(natsClient1, natsClient2);
+        Assert.NotSame(natsClient3, natsClient4);
+        Assert.Same(natsClient1, natsClient3);
+        Assert.Same(natsClient2, natsClient4);
+        Assert.Same(natsClient1, natsConnection1);
+        Assert.Same(natsClient1.Connection, natsConnection1);
+    }
+
+    [Fact]
+    public Task AddNatsClient_OptionsWithDefaults()
+    {
+        var services = new ServiceCollection();
+        services.AddNatsClient();
+
+        var provider = services.BuildServiceProvider();
+        var nats = provider.GetRequiredService<INatsConnection>();
+
+        Assert.Same(NullLoggerFactory.Instance, nats.Opts.LoggerFactory);
+
+        // These defaults are different from NatsOptions defaults but same as NatsClient defaults
+        // for ease of use for new users
+        Assert.Same(NatsClientDefaultSerializerRegistry.Default, nats.Opts.SerializerRegistry);
+        Assert.Equal(BoundedChannelFullMode.Wait, nats.Opts.SubPendingChannelFullMode);
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task AddNatsClient_WithDefaultSerializerExplicitlySet()
+    {
+        var services = new ServiceCollection();
+        services.AddNatsClient(nats =>
+        {
+            // These two settings make the options same as NatsOptions defaults
+            nats.WithSerializerRegistry(NatsDefaultSerializerRegistry.Default)
+                .WithSubPendingChannelFullMode(BoundedChannelFullMode.DropNewest);
+        });
+
+        var provider = services.BuildServiceProvider();
+        var nats = provider.GetRequiredService<INatsConnection>();
+
+        Assert.Same(NatsDefaultSerializerRegistry.Default, nats.Opts.SerializerRegistry);
+        Assert.Equal(BoundedChannelFullMode.DropNewest, nats.Opts.SubPendingChannelFullMode);
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task AddNatsClient_WithSerializerExplicitlySet()
+    {
+        var mySerializerRegistry = new NatsJsonContextSerializerRegistry(MyJsonContext.Default);
+
+        var services = new ServiceCollection();
+        services.AddNatsClient(nats =>
+        {
+            nats.ConfigureOptions(opts => opts with { SerializerRegistry = mySerializerRegistry });
+        });
+
+        var provider = services.BuildServiceProvider();
+        var nats = provider.GetRequiredService<INatsConnection>();
+
+        Assert.Same(mySerializerRegistry, nats.Opts.SerializerRegistry);
+
+        // You can only override this using .WithSubPendingChannelFullMode() on builder above
+        Assert.Equal(BoundedChannelFullMode.Wait, nats.Opts.SubPendingChannelFullMode);
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task AddNatsClient_WithDefaultSerializer()
+    {
+        await using var server = NatsServer.Start();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        // Default JSON serialization
+        {
+            var services = new ServiceCollection();
+            services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
+            services.AddNatsClient(nats =>
+            {
+                nats.ConfigureOptions(opts => server.ClientOpts(opts));
+            });
+
+            var provider = services.BuildServiceProvider();
+            var nats = provider.GetRequiredService<INatsConnection>();
+
+            // Ad-hoc JSON serialization
+            await using var sub = await nats.SubscribeCoreAsync<MyAdHocData>("foo", cancellationToken: cancellationToken);
+            await nats.PingAsync(cancellationToken);
+            await nats.PublishAsync("foo", new MyAdHocData(1, "bar"), cancellationToken: cancellationToken);
+
+            var msg = await sub.Msgs.ReadAsync(cancellationToken);
+            Assert.Equal(1, msg.Data?.Id);
+            Assert.Equal("bar", msg.Data?.Name);
+        }
+
+        // Default raw serialization
+        {
+            var services = new ServiceCollection();
+            services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
+            services.AddNatsClient(nats =>
+            {
+                nats.ConfigureOptions(opts => server.ClientOpts(opts));
+                nats.WithSerializerRegistry(NatsDefaultSerializerRegistry.Default);
+            });
+
+            var provider = services.BuildServiceProvider();
+            var nats = provider.GetRequiredService<INatsConnection>();
+
+            var exception = await Assert.ThrowsAsync<NatsException>(async () =>
+            {
+                await nats.PublishAsync("foo", new MyAdHocData(1, "bar"), cancellationToken: cancellationToken);
+            });
+            Assert.Matches("Can't serialize.*MyAdHocData", exception.Message);
+        }
     }
 
     [Fact]
@@ -218,3 +347,5 @@ public class NatsHostingExtensionsTests
     }
 #endif
 }
+
+public record MyAdHocData(int Id, string Name);
