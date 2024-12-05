@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NATS.Client.Core;
 using NATS.Client.Core.Tests;
+using NATS.Net;
 
 namespace NATS.Extensions.Microsoft.DependencyInjection.Tests;
 
@@ -21,6 +22,15 @@ public class NatsHostingExtensionsTests
 
         Assert.NotNull(natsConnection1);
         Assert.Same(natsConnection1, natsConnection2); // Singleton should return the same instance
+
+        var natsClient1 = provider.GetRequiredService<INatsClient>();
+        var natsClient2 = provider.GetRequiredService<INatsClient>();
+        var natsClient3 = provider.GetRequiredService<NatsClient>();
+
+        Assert.NotNull(natsClient1);
+        Assert.Same(natsClient1, natsClient2);
+        Assert.Same(natsClient1, natsClient3);
+        Assert.Same(natsClient1.Connection, natsConnection1);
     }
 
     [Fact]
