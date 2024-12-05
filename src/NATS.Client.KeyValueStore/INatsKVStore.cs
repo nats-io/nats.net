@@ -77,6 +77,18 @@ public interface INatsKVStore
     /// <exception cref="NatsKVException">There was an error with metadata</exception>
     ValueTask<NatsKVEntry<T>> GetEntryAsync<T>(string key, ulong revision = default, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Try to get an entry from the bucket using the key.
+    /// </summary>
+    /// <param name="key">Key of the entry</param>
+    /// <param name="revision">Revision to retrieve</param>
+    /// <param name="serializer">Optional serialized to override the default</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <typeparam name="T">Serialized value type</typeparam>
+    /// <returns>A NatsResult object representing the value or an error.</returns>
+    /// <remarks>
+    /// Use this method to avoid exceptions when, for example, the key is not found.
+    /// </remarks>
     ValueTask<NatsResult<NatsKVEntry<T>>> TryGetEntryAsync<T>(string key, ulong revision = default, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default);
 
     /// <summary>
