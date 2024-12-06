@@ -8,6 +8,7 @@ using NATS.Client.KeyValueStore;
 namespace MicroBenchmark;
 
 [MemoryDiagnoser]
+// [ShortRunJob]
 [PlainExporter]
 public class KVBench
 {
@@ -25,79 +26,116 @@ public class KVBench
         _store = (NatsKVStore)(await _kv.CreateStoreAsync("benchmark"));
     }
 
-    [Benchmark]
-    public async ValueTask<int> TryGetAsync()
-    {
-        var result = await _store.TryGetEntryAsync<int>("does.not.exist");
-        if (result is { Success: false, Error: NatsKVKeyNotFoundException })
-        {
-            return 1;
-        }
-
-        return 0;
-    }
+    // [Benchmark(Baseline = true)]
+    // public async ValueTask<int> TryGetAsync()
+    // {
+    //     var result = await _store.TryGetEntryAsync<int>("does.not.exist");
+    //     if (result is { Success: false, Error: NatsKVKeyNotFoundException })
+    //     {
+    //         return 1;
+    //     }
+    //
+    //     return 0;
+    // }
+    //
+    // [Benchmark]
+    // public async ValueTask<int> TryGetAsync2()
+    // {
+    //     var result = await _store.TryGetEntryAsync2<int>("does.not.exist");
+    //     if (result is { Success: false, Error: NatsKVKeyNotFoundException })
+    //     {
+    //         return 1;
+    //     }
+    //
+    //     return 0;
+    // }
+    //
+    // [Benchmark]
+    // public async ValueTask<int> TryGetAsync3()
+    // {
+    //     var result = await _store.TryGetEntryAsync3<int>("does.not.exist");
+    //     if (result is { Success: false, Error: NatsKVKeyNotFoundException })
+    //     {
+    //         return 1;
+    //     }
+    //
+    //     return 0;
+    // }
 
     [Benchmark(Baseline = true)]
-    public async ValueTask<int> GetAsync()
-    {
-        try
-        {
-            await _store.GetEntryAsync<int>("does.not.exist");
-        }
-        catch (NatsKVKeyNotFoundException)
-        {
-            return 1;
-        }
-
-        return 0;
-    }
+    public string StringOrig() => _store.StringOrig("does.not.exist");
 
     [Benchmark]
-    public async ValueTask<int> TryGetMultiAsync()
-    {
-        List<Task> tasks = new();
-        for (var i = 0; i < 100; i++)
-        {
-            tasks.Add(Task.Run(async () =>
-            {
-                var result = await _store.TryGetEntryAsync<int>("does.not.exist");
-                if (result is { Success: false, Error: NatsKVKeyNotFoundException })
-                {
-                    return 1;
-                }
-
-                return 0;
-            }));
-        }
-
-        await Task.WhenAll(tasks);
-
-        return 0;
-    }
+    public string StringInter() => _store.StringInter("does.not.exist");
 
     [Benchmark]
-    public async ValueTask<int> GetMultiAsync()
-    {
-        List<Task> tasks = new();
-        for (var i = 0; i < 100; i++)
-        {
-            tasks.Add(Task.Run(async () =>
-            {
-                try
-                {
-                    await _store.GetEntryAsync<int>("does.not.exist");
-                }
-                catch (NatsKVKeyNotFoundException)
-                {
-                    return 1;
-                }
+    public string StringConcat() => _store.StringConcat("does.not.exist");
 
-                return 0;
-            }));
-        }
+    [Benchmark]
+    public string StringCreate() => _store.StringCreate("does.not.exist");
 
-        await Task.WhenAll(tasks);
-
-        return 0;
-    }
+    //
+    // [Benchmark(Baseline = true)]
+    // public async ValueTask<int> GetAsync()
+    // {
+    //     try
+    //     {
+    //         await _store.GetEntryAsync<int>("does.not.exist");
+    //     }
+    //     catch (NatsKVKeyNotFoundException)
+    //     {
+    //         return 1;
+    //     }
+    //
+    //     return 0;
+    // }
+    //
+    // [Benchmark]
+    // public async ValueTask<int> TryGetMultiAsync()
+    // {
+    //     List<Task> tasks = new();
+    //     for (var i = 0; i < 100; i++)
+    //     {
+    //         tasks.Add(Task.Run(async () =>
+    //         {
+    //             var result = await _store.TryGetEntryAsync<int>("does.not.exist");
+    //             if (result is { Success: false, Error: NatsKVKeyNotFoundException })
+    //             {
+    //                 return 1;
+    //             }
+    //
+    //             return 0;
+    //         }));
+    //     }
+    //
+    //     await Task.WhenAll(tasks);
+    //
+    //     return 0;
+    // }
+    //
+    // [Benchmark]
+    // public async ValueTask<int> GetMultiAsync()
+    // {
+    //     List<Task> tasks = new();
+    //     for (var i = 0; i < 100; i++)
+    //     {
+    //         tasks.Add(Task.Run(async () =>
+    //         {
+    //             try
+    //             {
+    //                 await _store.GetEntryAsync<int>("does.not.exist");
+    //             }
+    //             catch (NatsKVKeyNotFoundException)
+    //             {
+    //                 return 1;
+    //             }
+    //
+    //             return 0;
+    //         }));
+    //     }
+    //
+    //     await Task.WhenAll(tasks);
+    //
+    //     return 0;
+    // }
 }
