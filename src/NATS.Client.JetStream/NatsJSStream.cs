@@ -181,6 +181,27 @@ public class NatsJSStream : INatsJSStream
             cancellationToken: cancellationToken);
     }
 
+    /// <summary>
+    /// Request a direct batch message
+    /// </summary>
+    /// <param name="request">Batch message request.</param>
+    /// <param name="serializer">Serializer to use for the message type.</param>
+    /// <param name="includeEob"><c>true</c> to send the last empty message with eobCode in the header; otherwise <c>false</c></param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <exception cref="InvalidOperationException">There was an issue, stream must have allow direct set.</exception>
+    public IAsyncEnumerable<NatsMsg<T>> GetBatchDirectAsync<T>(StreamMsgBatchGetRequest request, INatsDeserialize<T>? serializer = default, bool includeEob = false, CancellationToken cancellationToken = default)
+    {
+        ValidateStream();
+
+        return _context.Connection.RequestManyAsync<StreamMsgBatchGetRequest, T>(
+            subject: $"{_context.Opts.Prefix}.DIRECT.GET.{_name}",
+            data: request,
+            requestSerializer: NatsJSJsonSerializer<StreamMsgBatchGetRequest>.Default,
+            replySerializer: serializer,
+            replyOpts: new NatsSubOpts() { StopOnEmptyMsg = !includeEob, ThrowIfNoResponders = true },
+            cancellationToken: cancellationToken);
+    }
+
     public ValueTask<StreamMsgGetResponse> GetAsync(StreamMsgGetRequest request, CancellationToken cancellationToken = default) =>
         _context.JSRequestResponseAsync<StreamMsgGetRequest, StreamMsgGetResponse>(
             subject: $"{_context.Opts.Prefix}.STREAM.MSG.GET.{_name}",
@@ -191,5 +212,13 @@ public class NatsJSStream : INatsJSStream
     {
         if (_deleted)
             throw new NatsJSException($"Stream '{_name}' is deleted");
+    }
+
+    private void ValidateStream()
+    {
+        if (!Info.Config.AllowDirect)
+        {
+            throw new InvalidOperationException("StreamMsgBatchGetRequest is not permitted when AllowDirect on stream disable");
+        }
     }
 }
