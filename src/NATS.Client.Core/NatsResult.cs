@@ -29,13 +29,6 @@ public readonly struct NatsResult<T>
 
     public static implicit operator NatsResult<T>(Exception error) => new(error);
 
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    public void EnsureSuccess()
-    {
-        if (_error != null)
-            throw _error;
-    }
-
     private static T ThrowValueIsNotSetException() => throw CreateInvalidOperationException("Result value is not set");
 
     private static Exception ThrowErrorIsNotSetException() => throw CreateInvalidOperationException("Result error is not set");

@@ -178,7 +178,11 @@ public class NatsKVStore : INatsKVStore
     public async ValueTask<NatsKVEntry<T>> GetEntryAsync<T>(string key, ulong revision = default, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
         var result = await TryGetEntryAsync(key, revision, serializer, cancellationToken);
-        result.EnsureSuccess();
+        if (!result.Success)
+        {
+            ThrowException(result.Error);
+        }
+
         return result.Value;
     }
 
@@ -190,18 +194,7 @@ public class NatsKVStore : INatsKVStore
     {
         ValidateKey(key);
         serializer ??= JetStreamContext.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
-
-#if NET8_0_OR_GREATER
-        var keySubject = string.Create(key.Length + Bucket.Length + 5, (Bucket, key), static (span, state) =>
-        {
-            "$KV.".CopyTo(span);
-            state.Bucket.CopyTo(span[4..]);
-            span[state.Bucket.Length + 4] = '.';
-            state.key.CopyTo(span[(state.Bucket.Length + 5)..]);
-        });
-#else
-        var keySubject = $"$KV.{Bucket}.{key}";
-#endif
+        var keySubject = _kvBucket + key;
 
         var request = new StreamMsgGetRequest();
         if (revision == default)
@@ -321,294 +314,6 @@ public class NatsKVStore : INatsKVStore
                 Error = deserializeException,
             };
         }
-    }
-
-
-#if NET8_0_OR_GREATER
-    static void CreateKeyString(Span<char> span, (string prefix, string key) state)
-    {
-        state.prefix.CopyTo(span);
-        state.key.CopyTo(span[state.prefix.Length..]);
-    }
-#endif
-
-#if !NETSTANDARD
-    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
-#endif
-    public async ValueTask<NatsResult<NatsKVEntry<T>>> TryGetEntryAsync2<T>(string key, ulong revision = default, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
-    {
-        ValidateKey(key);
-        serializer ??= JetStreamContext.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
-
-#if NET8_0_OR_GREATER
-        var keySubject = string.Create(key.Length + _kvBucket.Length, (_kvBucket, key), CreateKeyString);
-#else
-        var keySubject = $"{_kvBucket}{key}";
-#endif
-
-        var request = new StreamMsgGetRequest();
-        if (revision == default)
-        {
-            request.LastBySubj = keySubject;
-        }
-        else
-        {
-            request.Seq = revision;
-            request.NextBySubj = keySubject;
-        }
-
-        if (_stream.Info.Config.AllowDirect)
-        {
-            var direct = await _stream.GetDirectAsync<T>(request, serializer, cancellationToken);
-
-            if (direct is { Headers: { } headers } msg)
-            {
-                if (headers.Code == 404)
-                    return NatsKVKeyNotFoundException.Default;
-
-                if (!headers.TryGetLastValue(NatsSubject, out var subject))
-                    return MissingSequenceHeaderException;
-
-                if (revision != default)
-                {
-                    if (!string.Equals(subject, keySubject, StringComparison.Ordinal))
-                    {
-                        return UnexpectedSubjectException;
-                    }
-                }
-
-                if (!headers.TryGetLastValue(NatsSequence, out var sequenceValue))
-                    return MissingSequenceHeaderException;
-
-                if (!ulong.TryParse(sequenceValue, out var sequence))
-                    return InvalidSequenceException;
-
-                if (!headers.TryGetLastValue(NatsTimeStamp, out var timestampValue))
-                    return MissingTimestampHeaderException;
-
-                if (!DateTimeOffset.TryParse(timestampValue, out var timestamp))
-                    return InvalidTimestampException;
-
-                var operation = NatsKVOperation.Put;
-                if (headers.TryGetValue(KVOperation, out var operationValues))
-                {
-                    if (operationValues.Count != 1)
-                        return UnexpectedNumberOfOperationHeadersException;
-
-                    if (!Enum.TryParse(operationValues[0], ignoreCase: true, out operation))
-                        return InvalidOperationException;
-                }
-
-                if (operation is NatsKVOperation.Del or NatsKVOperation.Purge)
-                {
-                    return new NatsKVKeyDeletedException(sequence);
-                }
-
-                return new NatsKVEntry<T>(Bucket, key)
-                {
-                    Bucket = Bucket,
-                    Key = key,
-                    Created = timestamp,
-                    Revision = sequence,
-                    Operation = operation,
-                    Value = msg.Data,
-                    Delta = 0,
-                    UsedDirectGet = true,
-                    Error = msg.Error,
-                };
-            }
-            else
-            {
-                return MissingHeadersException;
-            }
-        }
-        else
-        {
-            var response = await _stream.GetAsync(request, cancellationToken);
-
-            if (revision != default)
-            {
-                if (string.Equals(response.Message.Subject, keySubject, StringComparison.Ordinal))
-                {
-                    return UnexpectedSubjectException;
-                }
-            }
-
-            T? data;
-            NatsDeserializeException? deserializeException = null;
-            if (response.Message.Data.Length > 0)
-            {
-                var buffer = new ReadOnlySequence<byte>(response.Message.Data);
-
-                try
-                {
-                    data = serializer.Deserialize(buffer);
-                }
-                catch (Exception e)
-                {
-                    deserializeException = new NatsDeserializeException(buffer.ToArray(), e);
-                    data = default;
-                }
-            }
-            else
-            {
-                data = default;
-            }
-
-            return new NatsKVEntry<T>(Bucket, key)
-            {
-                Created = response.Message.Time,
-                Revision = response.Message.Seq,
-                Value = data,
-                UsedDirectGet = false,
-                Error = deserializeException,
-            };
-        }
-    }
-
-    #if !NETSTANDARD
-    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
-#endif
-    public async ValueTask<NatsResult<NatsKVEntry<T>>> TryGetEntryAsync3<T>(string key, ulong revision = default, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
-    {
-        ValidateKey(key);
-        serializer ??= JetStreamContext.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
-
-        var keySubject = $"{_kvBucket}{key}";
-
-        var request = new StreamMsgGetRequest();
-        if (revision == default)
-        {
-            request.LastBySubj = keySubject;
-        }
-        else
-        {
-            request.Seq = revision;
-            request.NextBySubj = keySubject;
-        }
-
-        if (_stream.Info.Config.AllowDirect)
-        {
-            var direct = await _stream.GetDirectAsync<T>(request, serializer, cancellationToken);
-
-            if (direct is { Headers: { } headers } msg)
-            {
-                if (headers.Code == 404)
-                    return NatsKVKeyNotFoundException.Default;
-
-                if (!headers.TryGetLastValue(NatsSubject, out var subject))
-                    return MissingSequenceHeaderException;
-
-                if (revision != default)
-                {
-                    if (!string.Equals(subject, keySubject, StringComparison.Ordinal))
-                    {
-                        return UnexpectedSubjectException;
-                    }
-                }
-
-                if (!headers.TryGetLastValue(NatsSequence, out var sequenceValue))
-                    return MissingSequenceHeaderException;
-
-                if (!ulong.TryParse(sequenceValue, out var sequence))
-                    return InvalidSequenceException;
-
-                if (!headers.TryGetLastValue(NatsTimeStamp, out var timestampValue))
-                    return MissingTimestampHeaderException;
-
-                if (!DateTimeOffset.TryParse(timestampValue, out var timestamp))
-                    return InvalidTimestampException;
-
-                var operation = NatsKVOperation.Put;
-                if (headers.TryGetValue(KVOperation, out var operationValues))
-                {
-                    if (operationValues.Count != 1)
-                        return UnexpectedNumberOfOperationHeadersException;
-
-                    if (!Enum.TryParse(operationValues[0], ignoreCase: true, out operation))
-                        return InvalidOperationException;
-                }
-
-                if (operation is NatsKVOperation.Del or NatsKVOperation.Purge)
-                {
-                    return new NatsKVKeyDeletedException(sequence);
-                }
-
-                return new NatsKVEntry<T>(Bucket, key)
-                {
-                    Bucket = Bucket,
-                    Key = key,
-                    Created = timestamp,
-                    Revision = sequence,
-                    Operation = operation,
-                    Value = msg.Data,
-                    Delta = 0,
-                    UsedDirectGet = true,
-                    Error = msg.Error,
-                };
-            }
-            else
-            {
-                return MissingHeadersException;
-            }
-        }
-        else
-        {
-            var response = await _stream.GetAsync(request, cancellationToken);
-
-            if (revision != default)
-            {
-                if (string.Equals(response.Message.Subject, keySubject, StringComparison.Ordinal))
-                {
-                    return UnexpectedSubjectException;
-                }
-            }
-
-            T? data;
-            NatsDeserializeException? deserializeException = null;
-            if (response.Message.Data.Length > 0)
-            {
-                var buffer = new ReadOnlySequence<byte>(response.Message.Data);
-
-                try
-                {
-                    data = serializer.Deserialize(buffer);
-                }
-                catch (Exception e)
-                {
-                    deserializeException = new NatsDeserializeException(buffer.ToArray(), e);
-                    data = default;
-                }
-            }
-            else
-            {
-                data = default;
-            }
-
-            return new NatsKVEntry<T>(Bucket, key)
-            {
-                Created = response.Message.Time,
-                Revision = response.Message.Seq,
-                Value = data,
-                UsedDirectGet = false,
-                Error = deserializeException,
-            };
-        }
-    }
-
-    public string StringOrig(string key) => $"$KV.{Bucket}.{key}";
-
-    public string StringInter(string key) => $"{_kvBucket}{key}";
-
-    public string StringConcat(string key) => _kvBucket + key;
-
-    public string StringCreate(string key)
-    {
-#if NET8_0_OR_GREATER
-        return string.Create(key.Length + _kvBucket.Length, (_kvBucket, key), CreateKeyString);
-#else
-        throw new NotImplementedException();
-#endif
     }
 
     /// <inheritdoc />
@@ -789,6 +494,9 @@ public class NatsKVStore : INatsKVStore
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void ThrowNatsKVException(string message) => throw new NatsKVException(message);
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void ThrowException(Exception exception) => throw exception;
 }
 
 public record NatsKVStatus(string Bucket, bool IsCompressed, StreamInfo Info);
