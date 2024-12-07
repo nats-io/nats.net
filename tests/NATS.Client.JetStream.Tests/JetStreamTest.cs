@@ -26,6 +26,9 @@ public class JetStreamTest
         // Create stream
         await Assert.ThrowsAnyAsync<ArgumentException>(async () => await jsmContext.CreateStreamAsync(cfg));
 
+        // Create or update stream
+        await Assert.ThrowsAnyAsync<ArgumentException>(async () => await jsmContext.CreateOrUpdateStreamAsync(cfg));
+
         // Delete stream
         await Assert.ThrowsAnyAsync<ArgumentException>(async () => await jsmContext.DeleteStreamAsync(streamName!));
 

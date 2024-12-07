@@ -60,6 +60,33 @@ public partial class NatsJSContext
     }
 
     /// <summary>
+    /// Creates a new stream if it doesn't exist or update if the stream already exists.
+    /// </summary>
+    /// <param name="config">Stream configuration request to be sent to NATS JetStream server.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>The NATS JetStream stream object which can be used to manage the stream.</returns>
+    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
+    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <exception cref="ArgumentException">The stream name in <paramref name="config"/> is invalid.</exception>
+    /// <exception cref="ArgumentNullException">The name in <paramref name="config"/> is <c>null</c>.</exception>
+    public async ValueTask<INatsJSStream> CreateOrUpdateStreamAsync(StreamConfig config, CancellationToken cancellationToken = default)
+    {
+        ThrowIfInvalidStreamName(config.Name, nameof(config.Name));
+        var response = await JSRequestAsync<StreamConfig, StreamUpdateResponse>(
+            subject: $"{Opts.Prefix}.STREAM.UPDATE.{config.Name}",
+            request: config,
+            cancellationToken);
+
+        if (response.Error is { Code: 404 })
+        {
+            return await CreateStreamAsync(config, cancellationToken);
+        }
+
+        response.EnsureSuccess();
+        return new NatsJSStream(this, response.Response!);
+    }
+
+    /// <summary>
     /// Deletes a stream.
     /// </summary>
     /// <param name="stream">Stream name to be deleted.</param>
