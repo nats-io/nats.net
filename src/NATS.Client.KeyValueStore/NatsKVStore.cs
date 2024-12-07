@@ -44,13 +44,23 @@ public class NatsKVStore : INatsKVStore
     private const string NatsSequence = "Nats-Sequence";
     private const string NatsTimeStamp = "Nats-Time-Stamp";
     private static readonly Regex ValidKeyRegex = new(pattern: @"\A[-/_=\.a-zA-Z0-9]+\z", RegexOptions.Compiled);
+    private static readonly NatsKVException MissingSequenceHeaderException = new("Missing sequence header");
+    private static readonly NatsKVException MissingTimestampHeaderException = new("Missing timestamp header");
+    private static readonly NatsKVException MissingHeadersException = new("Missing headers");
+    private static readonly NatsKVException UnexpectedSubjectException = new("Unexpected subject");
+    private static readonly NatsKVException UnexpectedNumberOfOperationHeadersException = new("Unexpected number of operation headers");
+    private static readonly NatsKVException InvalidSequenceException = new("Can't parse sequence header");
+    private static readonly NatsKVException InvalidTimestampException = new("Can't parse timestamp header");
+    private static readonly NatsKVException InvalidOperationException = new("Can't parse operation header");
     private readonly INatsJSStream _stream;
+    private readonly string _kvBucket;
 
     internal NatsKVStore(string bucket, INatsJSContext context, INatsJSStream stream)
     {
         Bucket = bucket;
         JetStreamContext = context;
         _stream = stream;
+        _kvBucket = $"$KV.{Bucket}.";
     }
 
     /// <inheritdoc />
@@ -167,12 +177,26 @@ public class NatsKVStore : INatsKVStore
     /// <inheritdoc />
     public async ValueTask<NatsKVEntry<T>> GetEntryAsync<T>(string key, ulong revision = default, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
+        var result = await TryGetEntryAsync(key, revision, serializer, cancellationToken);
+        if (!result.Success)
+        {
+            ThrowException(result.Error);
+        }
+
+        return result.Value;
+    }
+
+    /// <inheritdoc />
+#if !NETSTANDARD
+    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
+#endif
+    public async ValueTask<NatsResult<NatsKVEntry<T>>> TryGetEntryAsync<T>(string key, ulong revision = default, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
+    {
         ValidateKey(key);
         serializer ??= JetStreamContext.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
+        var keySubject = _kvBucket + key;
 
         var request = new StreamMsgGetRequest();
-        var keySubject = $"$KV.{Bucket}.{key}";
-
         if (revision == default)
         {
             request.LastBySubj = keySubject;
@@ -190,44 +214,44 @@ public class NatsKVStore : INatsKVStore
             if (direct is { Headers: { } headers } msg)
             {
                 if (headers.Code == 404)
-                    throw new NatsKVKeyNotFoundException();
+                    return NatsKVKeyNotFoundException.Default;
 
                 if (!headers.TryGetLastValue(NatsSubject, out var subject))
-                    throw new NatsKVException("Missing sequence header");
+                    return MissingSequenceHeaderException;
 
                 if (revision != default)
                 {
                     if (!string.Equals(subject, keySubject, StringComparison.Ordinal))
                     {
-                        throw new NatsKVException("Unexpected subject");
+                        return UnexpectedSubjectException;
                     }
                 }
 
                 if (!headers.TryGetLastValue(NatsSequence, out var sequenceValue))
-                    throw new NatsKVException("Missing sequence header");
+                    return MissingSequenceHeaderException;
 
                 if (!ulong.TryParse(sequenceValue, out var sequence))
-                    throw new NatsKVException("Can't parse sequence header");
+                    return InvalidSequenceException;
 
                 if (!headers.TryGetLastValue(NatsTimeStamp, out var timestampValue))
-                    throw new NatsKVException("Missing timestamp header");
+                    return MissingTimestampHeaderException;
 
                 if (!DateTimeOffset.TryParse(timestampValue, out var timestamp))
-                    throw new NatsKVException("Can't parse timestamp header");
+                    return InvalidTimestampException;
 
                 var operation = NatsKVOperation.Put;
                 if (headers.TryGetValue(KVOperation, out var operationValues))
                 {
                     if (operationValues.Count != 1)
-                        throw new NatsKVException("Unexpected number of operation headers");
+                        return UnexpectedNumberOfOperationHeadersException;
 
                     if (!Enum.TryParse(operationValues[0], ignoreCase: true, out operation))
-                        throw new NatsKVException("Can't parse operation header");
+                        return InvalidOperationException;
                 }
 
                 if (operation is NatsKVOperation.Del or NatsKVOperation.Purge)
                 {
-                    throw new NatsKVKeyDeletedException(sequence);
+                    return new NatsKVKeyDeletedException(sequence);
                 }
 
                 return new NatsKVEntry<T>(Bucket, key)
@@ -245,7 +269,7 @@ public class NatsKVStore : INatsKVStore
             }
             else
             {
-                throw new NatsKVException("Missing headers");
+                return MissingHeadersException;
             }
         }
         else
@@ -256,7 +280,7 @@ public class NatsKVStore : INatsKVStore
             {
                 if (string.Equals(response.Message.Subject, keySubject, StringComparison.Ordinal))
                 {
-                    throw new NatsKVException("Unexpected subject");
+                    return UnexpectedSubjectException;
                 }
             }
 
@@ -452,12 +476,12 @@ public class NatsKVStore : INatsKVStore
     /// </summary>
     private static void ValidateKey(string key)
     {
-        if (string.IsNullOrWhiteSpace(key))
+        if (string.IsNullOrWhiteSpace(key) || key.Length == 0)
         {
             ThrowNatsKVException("Key cannot be empty");
         }
 
-        if (key.StartsWith(".") || key.EndsWith("."))
+        if (key[0] == '.' || key[^1] == '.')
         {
             ThrowNatsKVException("Key cannot start or end with a period");
         }
@@ -470,6 +494,9 @@ public class NatsKVStore : INatsKVStore
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void ThrowNatsKVException(string message) => throw new NatsKVException(message);
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void ThrowException(Exception exception) => throw exception;
 }
 
 public record NatsKVStatus(string Bucket, bool IsCompressed, StreamInfo Info);
