@@ -8,9 +8,18 @@ namespace NATS.Client.Core.Internal;
 internal static class SslClientAuthenticationOptionsExtensions
 {
 #if !NETSTANDARD
-    public static SslClientAuthenticationOptions LoadClientCertFromPem(this SslClientAuthenticationOptions options, string certPem, string keyPem, bool offline = false, SslCertificateTrust? trust = null)
+    public static SslClientAuthenticationOptions LoadClientCertFromPem(this SslClientAuthenticationOptions options, string certPem, string keyPem, bool offline = false, SslCertificateTrust? trust = null, string? password = null)
     {
-        var leafCert = X509Certificate2.CreateFromPem(certPem, keyPem);
+        X509Certificate2 leafCert;
+        if (!string.IsNullOrEmpty(password))
+        {
+            leafCert = X509Certificate2.CreateFromEncryptedPem(certPem, keyPem, password);
+        }
+        else
+        {
+            leafCert = X509Certificate2.CreateFromPem(certPem, keyPem);
+        }
+
         var intermediateCerts = new X509Certificate2Collection();
         intermediateCerts.ImportFromPem(certPem);
         if (intermediateCerts.Count > 0)
@@ -39,11 +48,21 @@ internal static class SslClientAuthenticationOptionsExtensions
     }
 #endif
 
-    public static SslClientAuthenticationOptions LoadClientCertFromPfxFile(this SslClientAuthenticationOptions options, string certBundleFile, bool offline = false, SslCertificateTrust? trust = null)
+    public static SslClientAuthenticationOptions LoadClientCertFromPfxFile(this SslClientAuthenticationOptions options, string certBundleFile, bool offline = false, SslCertificateTrust? trust = null, string? password = null)
     {
-        var leafCert = new X509Certificate2(certBundleFile);
+        X509Certificate2 leafCert;
         var intermediateCerts = new X509Certificate2Collection();
-        intermediateCerts.Import(certBundleFile);
+
+        if (password != null)
+        {
+            leafCert = new X509Certificate2(certBundleFile, password);
+            intermediateCerts.Import(certBundleFile, password, X509KeyStorageFlags.DefaultKeySet);
+        }
+        else
+        {
+            leafCert = new X509Certificate2(certBundleFile);
+            intermediateCerts.Import(certBundleFile);
+        }
 
         // Linux does not include the leaf by default, but Windows does
         // compare leaf to first intermediate just to be sure to catch all platform differences
