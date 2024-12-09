@@ -55,7 +55,7 @@ public class TlsOptsTest
         await ValidateAsync(new NatsTlsOpts
         {
             CertBundleFile = clientCertBundleFile,
-            CertBundleFilePasswordCallback = password != null ? () => password : null,
+            CertBundleFilePassword = password,
         });
 
         await ValidateAsync(new NatsTlsOpts

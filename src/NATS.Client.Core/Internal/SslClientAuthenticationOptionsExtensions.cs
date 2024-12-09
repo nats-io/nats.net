@@ -39,12 +39,11 @@ internal static class SslClientAuthenticationOptionsExtensions
     }
 #endif
 
-    public static SslClientAuthenticationOptions LoadClientCertFromPfxFile(this SslClientAuthenticationOptions options, string certBundleFile, bool offline = false, SslCertificateTrust? trust = null, Func<string>? passwordCallback = null)
+    public static SslClientAuthenticationOptions LoadClientCertFromPfxFile(this SslClientAuthenticationOptions options, string certBundleFile, bool offline = false, SslCertificateTrust? trust = null, string? password = null)
     {
         X509Certificate2 leafCert;
         var intermediateCerts = new X509Certificate2Collection();
 
-        var password = passwordCallback?.Invoke();
         if (password != null)
         {
             leafCert = new X509Certificate2(certBundleFile, password);
