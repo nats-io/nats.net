@@ -8,9 +8,18 @@ namespace NATS.Client.Core.Internal;
 internal static class SslClientAuthenticationOptionsExtensions
 {
 #if !NETSTANDARD
-    public static SslClientAuthenticationOptions LoadClientCertFromPem(this SslClientAuthenticationOptions options, string certPem, string keyPem, bool offline = false, SslCertificateTrust? trust = null)
+    public static SslClientAuthenticationOptions LoadClientCertFromPem(this SslClientAuthenticationOptions options, string certPem, string keyPem, bool offline = false, SslCertificateTrust? trust = null, string? password = null)
     {
-        var leafCert = X509Certificate2.CreateFromPem(certPem, keyPem);
+        X509Certificate2 leafCert;
+        if (!string.IsNullOrEmpty(password))
+        {
+            leafCert = X509Certificate2.CreateFromEncryptedPem(certPem, keyPem, password);
+        }
+        else
+        {
+            leafCert = X509Certificate2.CreateFromPem(certPem, keyPem);
+        }
+
         var intermediateCerts = new X509Certificate2Collection();
         intermediateCerts.ImportFromPem(certPem);
         if (intermediateCerts.Count > 0)

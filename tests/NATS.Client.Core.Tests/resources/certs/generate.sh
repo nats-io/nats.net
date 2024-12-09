@@ -25,8 +25,12 @@ EOF
         openssl x509 -req -in "store/$child_cert_name.csr" -CA "store/$signing_cert_name.crt" -CAkey "store/$signing_cert_name.key" -CAcreateserial -out "store/$child_cert_name.crt" -days 3650 -sha256
     fi
     openssl x509 -noout -text -in "store/$child_cert_name.crt"
+
+    openssl pkcs8 -topk8 -in "store/$child_cert_name.key" -out "store/$child_cert_name.key-pass" -v2 des3 -passout pass:5678
+
     cp "store/$child_cert_name.crt" "$child_cert_name-cert.pem"
     cp "store/$child_cert_name.key" "$child_cert_name-key.pem"
+    cp "store/$child_cert_name.key-pass" "$child_cert_name-key-pass.pem"
 }
 
 rm -rf store

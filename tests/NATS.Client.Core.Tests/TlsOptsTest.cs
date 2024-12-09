@@ -37,32 +37,33 @@ public class TlsOptsTest
     }
 
     [Theory]
-    [InlineData("client-cert-bundle.pfx", null)]
-    [InlineData("client-cert-bundle.pfx", "")]
-    [InlineData("client-cert-bundle-pass.pfx", "1234")]
-    public async Task Load_client_cert_and_key(string pfxFile, string? password)
+    [InlineData("client-cert-bundle.pfx", null, "client-key.pem", null)]
+    [InlineData("client-cert-bundle.pfx", "", "client-key.pem", "")]
+    [InlineData("client-cert-bundle-pass.pfx", "1234", "client-key-pass.pem", "5678")]
+    public async Task Load_client_cert_and_key(string pfxFile, string? pfxFilepassword, string keyFile, string? keyFilePassword)
     {
         const string clientCertFile = "resources/certs/client-cert.pem";
-        const string clientKeyFile = "resources/certs/client-key.pem";
+        var clientKeyFile = $"resources/certs/{keyFile}";
         var clientCertBundleFile = $"resources/certs/{pfxFile}";
 
         await ValidateAsync(new NatsTlsOpts
         {
             CertFile = clientCertFile,
             KeyFile = clientKeyFile,
+            KeyFilePassword = keyFilePassword,
         });
 
         await ValidateAsync(new NatsTlsOpts
         {
             CertBundleFile = clientCertBundleFile,
-            CertBundleFilePassword = password,
+            CertBundleFilePassword = pfxFilepassword,
         });
 
         await ValidateAsync(new NatsTlsOpts
         {
             ConfigureClientAuthentication = async options =>
             {
-                options.LoadClientCertFromPem(await File.ReadAllTextAsync(clientCertFile), await File.ReadAllTextAsync(clientKeyFile));
+                options.LoadClientCertFromPem(await File.ReadAllTextAsync(clientCertFile), await File.ReadAllTextAsync(clientKeyFile), password: keyFilePassword);
             },
         });
 
