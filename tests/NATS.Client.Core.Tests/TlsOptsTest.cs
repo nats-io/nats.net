@@ -36,12 +36,15 @@ public class TlsOptsTest
         }
     }
 
-    [Fact]
-    public async Task Load_client_cert_and_key()
+    [Theory]
+    [InlineData("client-cert-bundle.pfx", null)]
+    [InlineData("client-cert-bundle.pfx", "")]
+    [InlineData("client-cert-bundle-pass.pfx", "1234")]
+    public async Task Load_client_cert_and_key(string pfxFile, string? password)
     {
         const string clientCertFile = "resources/certs/client-cert.pem";
-        const string clientCertBundleFile = "resources/certs/client-cert-bundle.pfx";
         const string clientKeyFile = "resources/certs/client-key.pem";
+        var clientCertBundleFile = $"resources/certs/{pfxFile}";
 
         await ValidateAsync(new NatsTlsOpts
         {
@@ -52,6 +55,7 @@ public class TlsOptsTest
         await ValidateAsync(new NatsTlsOpts
         {
             CertBundleFile = clientCertBundleFile,
+            CertBundleFilePasswordCallback = password != null ? () => password : null,
         });
 
         await ValidateAsync(new NatsTlsOpts

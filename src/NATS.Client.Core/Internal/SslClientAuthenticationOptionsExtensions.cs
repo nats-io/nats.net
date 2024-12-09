@@ -39,11 +39,22 @@ internal static class SslClientAuthenticationOptionsExtensions
     }
 #endif
 
-    public static SslClientAuthenticationOptions LoadClientCertFromPfxFile(this SslClientAuthenticationOptions options, string certBundleFile, bool offline = false, SslCertificateTrust? trust = null)
+    public static SslClientAuthenticationOptions LoadClientCertFromPfxFile(this SslClientAuthenticationOptions options, string certBundleFile, bool offline = false, SslCertificateTrust? trust = null, Func<string>? passwordCallback = null)
     {
-        var leafCert = new X509Certificate2(certBundleFile);
+        X509Certificate2 leafCert;
         var intermediateCerts = new X509Certificate2Collection();
-        intermediateCerts.Import(certBundleFile);
+
+        var password = passwordCallback?.Invoke();
+        if (password != null)
+        {
+            leafCert = new X509Certificate2(certBundleFile, password);
+            intermediateCerts.Import(certBundleFile, password, X509KeyStorageFlags.DefaultKeySet);
+        }
+        else
+        {
+            leafCert = new X509Certificate2(certBundleFile);
+            intermediateCerts.Import(certBundleFile);
+        }
 
         // Linux does not include the leaf by default, but Windows does
         // compare leaf to first intermediate just to be sure to catch all platform differences

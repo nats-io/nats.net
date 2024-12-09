@@ -64,6 +64,7 @@ echo CLIENT
 echo ================================
 create_child_cert ca client
 openssl pkcs12 -export -keypbe NONE -certpbe NONE -nomaciter -passout pass: -in client-cert.pem -inkey client-key.pem -out client-cert-bundle.pfx
+openssl pkcs12 -export -keypbe NONE -certpbe NONE -nomaciter -passout pass:1234 -in client-cert.pem -inkey client-key.pem -out client-cert-bundle-pass.pfx
 
 echo ================================
 echo CLIENT WITH CHAIN
@@ -77,6 +78,7 @@ cp store/leafclient.key chainedclient-key.pem
 cat store/intermediate02.crt >> chainedclient-cert.pem
 cat store/intermediate01.crt >> chainedclient-cert.pem
 openssl pkcs12 -export -keypbe NONE -certpbe NONE -nomaciter -passout pass: -in chainedclient-cert.pem -inkey chainedclient-key.pem -out chainedclient-cert-bundle.pfx
+openssl pkcs12 -export -keypbe NONE -certpbe NONE -nomaciter -passout pass:1234 -in chainedclient-cert.pem -inkey chainedclient-key.pem -out chainedclient-cert-bundle-pass.pfx
 
 rm -rf store
 

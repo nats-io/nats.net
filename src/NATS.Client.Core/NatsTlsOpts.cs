@@ -72,9 +72,14 @@ public sealed record NatsTlsOpts
     /// File path to PKCS#12 bundle containing X509 Client Certificate and Private Key
     /// </summary>
     /// <remarks>
-    /// Bundle should not be password protected
+    /// Use <see cref="CertBundleFilePasswordCallback"/> to specify the password for the bundle.
     /// </remarks>
     public string? CertBundleFile { get; init; }
+
+    /// <summary>
+    /// Callback to provide the password for the PKCS#12 bundle file
+    /// </summary>
+    public Func<string>? CertBundleFilePasswordCallback { get; init; }
 
     /// <summary>
     /// Callback to configure <see cref="SslClientAuthenticationOptions"/>
@@ -166,7 +171,7 @@ public sealed record NatsTlsOpts
 
         if (CertBundleFile != null)
         {
-            options.LoadClientCertFromPfxFile(CertBundleFile);
+            options.LoadClientCertFromPfxFile(CertBundleFile, passwordCallback: CertBundleFilePasswordCallback);
         }
 
         if (InsecureSkipVerify)
