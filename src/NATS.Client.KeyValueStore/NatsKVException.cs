@@ -54,6 +54,8 @@ public class NatsKVCreateException : NatsKVException
 
 public class NatsKVKeyNotFoundException : NatsKVException
 {
+    public static readonly NatsKVKeyNotFoundException Default = new();
+
     public NatsKVKeyNotFoundException()
         : base("Key not found")
     {
