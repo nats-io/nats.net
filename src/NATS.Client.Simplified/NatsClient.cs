@@ -72,6 +72,8 @@ public class NatsClient : INatsClient
         Connection = new NatsConnection(opts);
     }
 
+    internal NatsClient(INatsConnection connection) => Connection = connection;
+
     /// <inheritdoc />
     public INatsConnection Connection { get; }
 
