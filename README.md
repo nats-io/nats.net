@@ -1,5 +1,7 @@
 [![License Apache 2.0](https://img.shields.io/badge/License-Apache2-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![NuGet](https://img.shields.io/nuget/v/NATS.Net.svg?cacheSeconds=3600)](https://www.nuget.org/packages/NATS.Net)
+[![Build](https://github.com/nats-io/nats.net/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/nats-io/nats.net/actions/workflows/test.yml?query=branch%3Amain)
+[![Slack](https://img.shields.io/badge/chat-on%20slack-green)](https://slack.nats.io)
 
 # NATS .NET
 
@@ -126,6 +128,9 @@ You can join the community asking questions, sharing ideas, and helping others:
 - Follow us on X [@nats_io](https://x.com/nats_io)
 
 ### Contributing Code
+
+> [!NOTE]
+> Please make sure to **sign your commits**. All commits must be signed before a _Pull Request_ can be merged.
 
 - Read the [Contributor Guide](CONTRIBUTING.md)
 - Fork the repository and create a branch
