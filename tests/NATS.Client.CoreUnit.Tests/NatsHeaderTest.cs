@@ -96,6 +96,7 @@ public class NatsHeaderTest
     [InlineData("Request Timeout", NatsHeaders.Messages.RequestTimeout)]
     [InlineData("Message Size Exceeds MaxBytes", NatsHeaders.Messages.MessageSizeExceedsMaxBytes)]
     [InlineData("test message", NatsHeaders.Messages.Text)]
+    [InlineData("EOB", NatsHeaders.Messages.EobCode)]
     public void ParserMessageEnumTests(string message, NatsHeaders.Messages result)
     {
         var parser = new NatsHeaderParser(Encoding.UTF8);
