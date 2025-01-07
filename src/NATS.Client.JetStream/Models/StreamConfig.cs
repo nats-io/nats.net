@@ -240,6 +240,13 @@ public record StreamConfig
     public bool DiscardNewPerSubject { get; set; }
 
     /// <summary>
+    /// AllowMsgTTL allows header initiated per-message TTLs. If disabled, then the `NATS-TTL` header will be ignored.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("allow_msg_ttl")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool AllowMsgTTL { get; set; }
+
+    /// <summary>
     /// Additional metadata for the Stream
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("metadata")]

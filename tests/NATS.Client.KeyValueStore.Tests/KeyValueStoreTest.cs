@@ -460,6 +460,73 @@ public class KeyValueStoreTest
     }
 
     [Fact]
+    public async Task TestMessageTTL()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var store = await kv.CreateStoreAsync(new NatsKVConfig("kv1") { AllowMsgTTL = true }, cancellationToken: cancellationToken);
+
+        for (var i = 0; i < 10; i++)
+        {
+            await store.PutAsync($"k{i}", $"v{i}", TimeSpan.FromSeconds(1), cancellationToken: cancellationToken);
+        }
+
+        var state = await store.GetStatusAsync();
+        Assert.Equal(10, state.Info.State.Messages);
+        Assert.Equal(1ul, state.Info.State.FirstSeq);
+        Assert.Equal(10ul, state.Info.State.LastSeq);
+
+        // Sleep for two seconds, now all the messages should be gone
+        await Task.Delay(2000);
+        state = await store.GetStatusAsync();
+        Assert.Equal(0, state.Info.State.Messages);
+        Assert.Equal(11ul, state.Info.State.FirstSeq);
+        Assert.Equal(10ul, state.Info.State.LastSeq);
+    }
+
+    [Fact]
+    public async Task TestMessageNeverExpire()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var store = await kv.CreateStoreAsync(new NatsKVConfig("kv1") { AllowMsgTTL = true, MaxAge = TimeSpan.FromSeconds(1) }, cancellationToken: cancellationToken);
+
+        // The first message we publish is set to "never expire", therefore it won't age out with the MaxAge policy.
+        await store.PutAsync($"k0", $"v0", TimeSpan.MaxValue, cancellationToken: cancellationToken);
+
+        for (var i = 1; i < 11; i++)
+        {
+            await store.PutAsync($"k{i}", $"v{i}", TimeSpan.FromSeconds(1), cancellationToken: cancellationToken);
+        }
+
+        var state = await store.GetStatusAsync();
+        Assert.Equal(11, state.Info.State.Messages);
+        Assert.Equal(1ul, state.Info.State.FirstSeq);
+        Assert.Equal(11ul, state.Info.State.LastSeq);
+
+        // Sleep for two seconds, only the first message should be there
+        await Task.Delay(2000);
+        state = await store.GetStatusAsync();
+        Assert.Equal(1, state.Info.State.Messages);
+        Assert.Equal(1ul, state.Info.State.FirstSeq);
+        Assert.Equal(11ul, state.Info.State.LastSeq);
+    }
+
+    [Fact]
     public async Task History()
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));

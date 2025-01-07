@@ -20,17 +20,19 @@ public interface INatsKVStore
     /// </summary>
     /// <param name="key">Key of the entry</param>
     /// <param name="value">Value of the entry</param>
+    /// <param name="ttl">Time to live for the entry (requires the <see cref="NatsKVConfig.AllowMsgTTL"/> to be set to true)</param>
     /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <typeparam name="T">Serialized value type</typeparam>
     /// <returns>Revision number</returns>
-    ValueTask<ulong> PutAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default);
+    ValueTask<ulong> PutAsync<T>(string key, T value, TimeSpan ttl = default, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Tries to put a value into the bucket using the key
     /// </summary>
     /// <param name="key">Key of the entry</param>
     /// <param name="value">Value of the entry</param>
+    /// <param name="ttl">Time to live for the entry (requires the <see cref="NatsKVConfig.AllowMsgTTL"/> to be set to true)</param>
     /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <typeparam name="T">Serialized value type</typeparam>
@@ -38,24 +40,26 @@ public interface INatsKVStore
     /// <remarks>
     /// Use this method to avoid exceptions
     /// </remarks>
-    ValueTask<NatsResult<ulong>> TryPutAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default);
+    ValueTask<NatsResult<ulong>> TryPutAsync<T>(string key, T value, TimeSpan ttl = default, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Create a new entry in the bucket only if it doesn't exist
     /// </summary>
     /// <param name="key">Key of the entry</param>
     /// <param name="value">Value of the entry</param>
+    /// <param name="ttl">Time to live for the entry (requires the <see cref="NatsKVConfig.AllowMsgTTL"/> to be set to true)</param>
     /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <typeparam name="T">Serialized value type</typeparam>
     /// <returns>The revision number of the entry</returns>
-    ValueTask<ulong> CreateAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default);
+    ValueTask<ulong> CreateAsync<T>(string key, T value, TimeSpan ttl = default, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Tries to create a new entry in the bucket only if it doesn't exist
     /// </summary>
     /// <param name="key">Key of the entry</param>
     /// <param name="value">Value of the entry</param>
+    /// <param name="ttl">Time to live for the entry (requires the <see cref="NatsKVConfig.AllowMsgTTL"/> to be set to true)</param>
     /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <typeparam name="T">Serialized value type</typeparam>
@@ -63,7 +67,7 @@ public interface INatsKVStore
     /// <remarks>
     /// Use this method to avoid exceptions
     /// </remarks>
-    ValueTask<NatsResult<ulong>> TryCreateAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default);
+    ValueTask<NatsResult<ulong>> TryCreateAsync<T>(string key, T value, TimeSpan ttl = default, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Update an entry in the bucket only if last update revision matches
@@ -71,11 +75,12 @@ public interface INatsKVStore
     /// <param name="key">Key of the entry</param>
     /// <param name="value">Value of the entry</param>
     /// <param name="revision">Last revision number to match</param>
+    /// <param name="ttl">Time to live for the entry (requires the <see cref="NatsKVConfig.AllowMsgTTL"/> to be set to true)</param>
     /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <typeparam name="T">Serialized value type</typeparam>
     /// <returns>The revision number of the updated entry</returns>
-    ValueTask<ulong> UpdateAsync<T>(string key, T value, ulong revision, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default);
+    ValueTask<ulong> UpdateAsync<T>(string key, T value, ulong revision, TimeSpan ttl = default, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Tries to update an entry in the bucket only if last update revision matches
@@ -83,6 +88,7 @@ public interface INatsKVStore
     /// <param name="key">Key of the entry</param>
     /// <param name="value">Value of the entry</param>
     /// <param name="revision">Last revision number to match</param>
+    /// <param name="ttl">Time to live for the entry (requires the <see cref="NatsKVConfig.AllowMsgTTL"/> to be set to true)</param>
     /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <typeparam name="T">Serialized value type</typeparam>
@@ -90,7 +96,7 @@ public interface INatsKVStore
     /// <remarks>
     /// Use this method to avoid exceptions
     /// </remarks>
-    ValueTask<NatsResult<ulong>> TryUpdateAsync<T>(string key, T value, ulong revision, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default);
+    ValueTask<NatsResult<ulong>> TryUpdateAsync<T>(string key, T value, ulong revision, TimeSpan ttl = default, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Delete an entry from the bucket
