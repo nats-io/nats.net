@@ -459,7 +459,7 @@ public class KeyValueStoreTest
         }
     }
 
-    [Fact]
+    [SkipIfNatsServer(versionEarlierThan: "2.11")]
     public async Task TestMessageTTL()
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -491,7 +491,7 @@ public class KeyValueStoreTest
         Assert.Equal(10ul, state.Info.State.LastSeq);
     }
 
-    [Fact]
+    [SkipIfNatsServer(versionEarlierThan: "2.11")]
     public async Task TestMessageNeverExpire()
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
