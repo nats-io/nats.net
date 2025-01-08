@@ -77,6 +77,18 @@ public class NatsKVContext : INatsKVContext
     }
 
     /// <inheritdoc />
+    public async ValueTask<INatsKVStore> CreateOrUpdateStoreAsync(NatsKVConfig config, CancellationToken cancellationToken = default)
+    {
+        ValidateBucketName(config.Bucket);
+
+        var streamConfig = NatsKVContext.CreateStreamConfig(config);
+
+        var stream = await JetStreamContext.CreateOrUpdateStreamAsync(streamConfig, cancellationToken);
+
+        return new NatsKVStore(config.Bucket, JetStreamContext, stream);
+    }
+
+    /// <inheritdoc />
     public ValueTask<bool> DeleteStoreAsync(string bucket, CancellationToken cancellationToken = default)
     {
         ValidateBucketName(bucket);
