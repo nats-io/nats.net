@@ -210,12 +210,13 @@ jobs:
       #     nats-server.exe -v
       #     dotMemoryUnit $env:userprofile\.dotnet\tools\nunit.exe --propagate-exit-code -- .\tests\NATS.Client.Core.MemoryTests\bin\Release\net6.0\NATS.Client.Core.MemoryTests.dll
 
+      # fails when target frameworks are run in parallel; run tests with -p:TestTfmsInParallel=false
       - name: Platform Test
         run: |
           tasklist | grep -i nats-server && taskkill -F -IM nats-server.exe
           nats-server.exe -v
           cd tests\NATS.Client.Platform.Windows.Tests
-          dotnet test -c Release --no-build
+          dotnet test -c Release --no-build -p:TestTfmsInParallel=false
 
       # Not working on Windows reliably yet
       #- name: Test Core
