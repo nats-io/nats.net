@@ -12,11 +12,11 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="FluentAssertions" Version="6.5.1"/>
-        <PackageReference Include="ProcessX" Version="1.5.4"/>
-        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.5.0"/>
-        <PackageReference Include="xunit" Version="2.4.2"/>
-        <PackageReference Include="xunit.runner.visualstudio" Version="2.4.5">
+        <PackageReference Include="FluentAssertions" Version="6.5.1" />
+        <PackageReference Include="ProcessX" Version="1.5.4" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.5.0" />
+        <PackageReference Include="xunit.v3" Version="1.0.1" />
+        <PackageReference Include="xunit.runner.visualstudio" Version="3.0.1">
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
@@ -24,32 +24,30 @@
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
-        <PackageReference Include="Xunit.SkippableFact" Version="1.4.13" />
         <PackageReference Include="System.Net.Http" Version="4.3.4" />
         <PackageReference Include="System.Text.RegularExpressions" Version="4.3.1" />
     </ItemGroup>
 
     <ItemGroup>
-        <Using Include="Xunit"/>
-        <Using Include="Xunit.Abstractions"/>
-        <Using Include="FluentAssertions"/>
-        <Using Include="NATS.Client.Core"/>
-        <Using Include="NATS.Client.Core.Internal"/>
-        <Using Include="NATS.Client.Core.Commands"/>
+        <Using Include="Xunit" />
+        <Using Include="FluentAssertions" />
+        <Using Include="NATS.Client.Core" />
+        <Using Include="NATS.Client.Core.Internal" />
+        <Using Include="NATS.Client.Core.Commands" />
     </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\NATS.Client.Serializers.Json\NATS.Client.Serializers.Json.csproj" />
-        <ProjectReference Include="..\..\src\NATS.Client.Core\NATS.Client.Core.csproj"/>
+        <ProjectReference Include="..\..\src\NATS.Client.Core\NATS.Client.Core.csproj" />
     </ItemGroup>
-    
+
     <ItemGroup>
         <Content Include="..\NATS.Client.Core.Tests\resources\**\*">
             <Link>resources\%(RecursiveDir)%(Filename)%(Extension)</Link>
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>
     </ItemGroup>
-    
+
     <ItemGroup>
       <Compile Include="..\NATS.Client.Platform.Windows.Tests\NatsServerProcess.cs" />
       <Compile Include="..\NATS.Client.TestUtilities\InMemoryTestLoggerFactory.cs" />

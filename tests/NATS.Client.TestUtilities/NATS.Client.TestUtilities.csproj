@@ -13,14 +13,13 @@
     <PackageReference Include="FluentAssertions" Version="6.5.1" />
     <PackageReference Include="ProcessX" Version="1.5.4" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.5.0" />
-    <PackageReference Include="xunit" Version="2.4.2" />
+    <PackageReference Include="xunit.v3" Version="1.0.1" />
     <PackageReference Include="System.Net.Http" Version="4.3.4" />
     <PackageReference Include="System.Text.RegularExpressions" Version="4.3.1" />
   </ItemGroup>
 
   <ItemGroup>
     <Using Include="Xunit" />
-    <Using Include="Xunit.Abstractions" />
     <Using Include="FluentAssertions" />
     <Using Include="NATS.Client.Core" />
     <Using Include="NATS.Client.Core.Internal" />
