@@ -138,7 +138,7 @@ public class TlsOptsTest
         }
     }
 
-    [SkippableTheory]
+    [Theory]
     [InlineData("resources/certs/client-cert.pem", "resources/certs/client-key.pem", null, 6)]
     [InlineData(null, null, "resources/certs/client-cert-bundle.pfx", 6)]
     [InlineData("resources/certs/chainedclient-cert.pem", "resources/certs/chainedclient-key.pem", null, 8)]
@@ -146,7 +146,7 @@ public class TlsOptsTest
     public async Task Client_connect(string? clientCertFile, string? clientKeyFile, string? clientCertBundleFile, int minimumFrameworkVersion)
     {
         var version = int.Parse(Regex.Match(RuntimeInformation.FrameworkDescription, @"(\d+)\.\d").Groups[1].Value);
-        Skip.IfNot(version >= minimumFrameworkVersion, $"Requires .NET {minimumFrameworkVersion}");
+        Assert.SkipUnless(version >= minimumFrameworkVersion, $"Requires .NET {minimumFrameworkVersion}");
 
         const string caFile = "resources/certs/ca-cert.pem";
 
