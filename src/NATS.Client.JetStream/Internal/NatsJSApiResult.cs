@@ -1,4 +1,4 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Internal;
