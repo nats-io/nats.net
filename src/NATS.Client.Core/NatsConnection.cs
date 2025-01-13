@@ -461,7 +461,10 @@ public partial class NatsConnection : INatsConnection
             infoParsedSignal.SetResult();
 
             // Authentication
-            _userCredentials?.Authenticate(_clientOpts, WritableServerInfo);
+            if (_userCredentials != null)
+            {
+                await _userCredentials.AuthenticateAsync(_clientOpts, WritableServerInfo, _currentConnectUri, Opts.ConnectTimeout, _disposedCancellationTokenSource.Token).ConfigureAwait(false);
+            }
 
             await using (var priorityCommandWriter = new PriorityCommandWriter(this, _pool, _socket!, Opts, Counter, EnqueuePing))
             {
