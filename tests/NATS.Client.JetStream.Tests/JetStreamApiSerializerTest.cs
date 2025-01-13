@@ -1,4 +1,7 @@
+using System.Buffers;
+using System.Text;
 using NATS.Client.Core2.Tests;
+using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
@@ -97,5 +100,29 @@ public class JetStreamApiSerializerTest
         catch (TaskCanceledException)
         {
         }
+    }
+
+    [Fact]
+    public void Deserialize_value()
+    {
+        var serializer = NatsJSJsonDocumentSerializer<AccountInfoResponse>.Default;
+        var result = serializer.Deserialize(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes("""{"memory":1}""")));
+        result.Value.Memory.Should().Be(1);
+    }
+
+    [Fact]
+    public void Deserialize_empty_buffer()
+    {
+        var serializer = NatsJSJsonDocumentSerializer<AccountInfoResponse>.Default;
+        var result = serializer.Deserialize(ReadOnlySequence<byte>.Empty);
+        result.Exception.Message.Should().Be("Buffer is empty");
+    }
+
+    [Fact]
+    public void Deserialize_error()
+    {
+        var serializer = NatsJSJsonDocumentSerializer<AccountInfoResponse>.Default;
+        var result = serializer.Deserialize(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes("""{"error":{"code":2}}""")));
+        result.Error.Code.Should().Be(2);
     }
 }
