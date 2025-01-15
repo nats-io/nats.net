@@ -24,14 +24,13 @@ internal enum NatsEvent
     ConnectionDisconnected,
     ReconnectFailed,
     MessageDropped,
+    LameDuckModeActivated,
 }
 
 public partial class NatsConnection : INatsConnection
 {
 #pragma warning disable SA1401
     internal readonly ConnectionStatsCounter Counter; // allow to call from external sources
-    internal volatile ServerInfo? WritableServerInfo;
-
 #pragma warning restore SA1401
     private readonly object _gate = new object();
     private readonly ILogger<NatsConnection> _logger;
@@ -44,6 +43,7 @@ public partial class NatsConnection : INatsConnection
     private readonly ClientOpts _clientOpts;
     private readonly SubscriptionManager _subscriptionManager;
 
+    private ServerInfo? _writableServerInfo;
     private int _pongCount;
     private int _connectionState;
     private int _isDisposed;
@@ -109,6 +109,8 @@ public partial class NatsConnection : INatsConnection
 
     public event AsyncEventHandler<NatsMessageDroppedEventArgs>? MessageDropped;
 
+    public event AsyncEventHandler<NatsEventArgs>? LameDuckModeActivated;
+
     public INatsConnection Connection => this;
 
     public NatsOpts Opts { get; }
@@ -133,6 +135,21 @@ public partial class NatsConnection : INatsConnection
     public Func<(string Host, int Port), ValueTask<(string Host, int Port)>>? OnConnectingAsync { get; set; }
 
     public Func<ISocketConnection, ValueTask<ISocketConnection>>? OnSocketAvailableAsync { get; set; }
+
+    internal ServerInfo? WritableServerInfo
+    {
+        get => Interlocked.CompareExchange(ref _writableServerInfo, null, null);
+        set
+        {
+            var current = Interlocked.CompareExchange(ref _writableServerInfo, null, null);
+            if (current?.LameDuckMode == false && value?.LameDuckMode == true)
+            {
+                _eventChannel.Writer.TryWrite((NatsEvent.LameDuckModeActivated, new NatsEventArgs(string.Empty)));
+            }
+
+            Interlocked.Exchange(ref _writableServerInfo, value);
+        }
+    }
 
     internal bool IsDisposed
     {
@@ -761,6 +778,9 @@ public partial class NatsConnection : INatsConnection
                         break;
                     case NatsEvent.MessageDropped when MessageDropped != null && args is NatsMessageDroppedEventArgs error:
                         await MessageDropped.InvokeAsync(this, error).ConfigureAwait(false);
+                        break;
+                    case NatsEvent.LameDuckModeActivated when LameDuckModeActivated != null:
+                        await LameDuckModeActivated.InvokeAsync(this, args).ConfigureAwait(false);
                         break;
                     }
                 }
