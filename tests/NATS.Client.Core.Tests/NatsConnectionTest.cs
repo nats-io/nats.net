@@ -505,6 +505,32 @@ public abstract partial class NatsConnectionTest
         openedCount.ShouldBe(1);
         disconnectedCount.ShouldBe(1);
     }
+
+    [Fact]
+    public async Task LameDuckModeActivated_EventHandlerShouldBeInvokedWhenInfoWithLDMRecievied()
+    {
+        // Arrange
+        await using var server = NatsServer.Start(_output, _transportType);
+        await using var connection = server.CreateClientConnection();
+        await connection.ConnectAsync();
+
+        var invocationCount = 0;
+        var ldmSignal = new WaitSignal();
+
+        connection.LameDuckModeActivated += (_, _) =>
+        {
+            Interlocked.Increment(ref invocationCount);
+            ldmSignal.Pulse();
+            return default;
+        };
+
+        // Act
+        server.SignalLameDuckMode();
+        await ldmSignal;
+
+        // Assert
+        invocationCount.ShouldBe(1);
+    }
 }
 
 [JsonSerializable(typeof(SampleClass))]
