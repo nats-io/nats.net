@@ -2,6 +2,9 @@
 
 Thanks for your interest in contributing! This document contains `nats-io/nats.net` specific contributing details. If you are a first-time contributor, please refer to the general [NATS Contributor Guide](https://nats.io/contributing/) to get a comprehensive overview of contributing to the NATS project.
 
+> [!NOTE]
+> Please make sure to **sign your commits**. All commits must be signed before a _Pull Request_ can be merged.
+
 ## Getting started
 
 There are three general ways you can contribute to this repo:
@@ -31,6 +34,9 @@ A good pull request includes:
 - Unit tests where appropriate. Bug fixes will benefit from the addition of regression tests. New features will not be accepted without suitable test coverage!
 - No more commits than necessary. Sometimes having multiple commits is useful for telling a story or isolating changes from one another, but please squash down any unnecessary commits that may just be for clean-up, comments or small changes.
 - No additional external dependencies that aren't absolutely essential. Please do everything you can to avoid pulling in additional libraries/dependencies as we will be very critical of these.
+
+> [!NOTE]
+> Please make sure to **sign your commits**. All commits must be signed before a _Pull Request_ can be merged.
 
 ## Get Help
 
