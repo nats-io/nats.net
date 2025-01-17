@@ -1,9 +1,8 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using NATS.Client.Core2.Tests;
 using NATS.Net;
 
 namespace NATS.Client.JetStream.Tests;
-
 
 [Collection("nats-server-restricted-user")]
 public class PublishRetryTest
@@ -61,7 +60,6 @@ public class PublishRetryTest
             Assert.DoesNotContain("traceparent", headers);
             Assert.Empty(headers);
         }
-
     }
 
     [Fact]
