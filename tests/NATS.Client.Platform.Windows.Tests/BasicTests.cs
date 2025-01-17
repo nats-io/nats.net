@@ -5,7 +5,6 @@ using NATS.Client.KeyValueStore;
 using NATS.Client.ObjectStore;
 using NATS.Client.Serializers.Json;
 using NATS.Client.Services;
-using Xunit.Abstractions;
 
 namespace NATS.Client.Platform.Windows.Tests;
 

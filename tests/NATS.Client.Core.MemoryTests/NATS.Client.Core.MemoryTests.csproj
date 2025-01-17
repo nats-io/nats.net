@@ -24,7 +24,7 @@
     <ItemGroup>
       <ProjectReference Include="..\..\src\NATS.Client.Core\NATS.Client.Core.csproj" />
       <ProjectReference Include="..\..\src\NATS.Client.JetStream\NATS.Client.JetStream.csproj" />
-      <ProjectReference Include="..\NATS.Client.Core.Tests\NATS.Client.Core.Tests.csproj" />
+      <ProjectReference Include="..\NATS.Client.TestUtilities\NATS.Client.TestUtilities.csproj" />
     </ItemGroup>
 
 </Project>

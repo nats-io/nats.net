@@ -11,8 +11,8 @@
 
     <ItemGroup>
       <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.5.0" />
-      <PackageReference Include="xunit" Version="2.4.2" />
-      <PackageReference Include="xunit.runner.visualstudio" Version="2.4.5">
+      <PackageReference Include="xunit.v3" Version="1.0.1" />
+      <PackageReference Include="xunit.runner.visualstudio" Version="3.0.1">
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         <PrivateAssets>all</PrivateAssets>
       </PackageReference>
@@ -21,7 +21,6 @@
         <PrivateAssets>all</PrivateAssets>
       </PackageReference>
       <Using Include="Xunit" />
-      <Using Include="Xunit.Abstractions" />
       <Using Include="FluentAssertions" />
       <Using Include="NATS.Client.Core" />
       <Using Include="NATS.Client.Core.Internal" />

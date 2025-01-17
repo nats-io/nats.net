@@ -11,11 +11,11 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="FluentAssertions" Version="6.5.1"/>
-        <PackageReference Include="ProcessX" Version="1.5.4"/>
-        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.5.0"/>
-        <PackageReference Include="xunit" Version="2.4.2"/>
-        <PackageReference Include="xunit.runner.visualstudio" Version="2.4.5">
+        <PackageReference Include="FluentAssertions" Version="6.5.1" />
+        <PackageReference Include="ProcessX" Version="1.5.4" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.5.0" />
+        <PackageReference Include="xunit.v3" Version="1.0.1" />
+        <PackageReference Include="xunit.runner.visualstudio" Version="3.0.1">
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
@@ -23,20 +23,18 @@
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
-        <PackageReference Include="Xunit.SkippableFact" Version="1.4.13" />
     </ItemGroup>
 
     <ItemGroup>
-        <Using Include="Xunit"/>
-        <Using Include="Xunit.Abstractions"/>
-        <Using Include="FluentAssertions"/>
-        <Using Include="NATS.Client"/>
+        <Using Include="Xunit" />
+        <Using Include="FluentAssertions" />
+        <Using Include="NATS.Client" />
     </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\NATS.Client.JetStream\NATS.Client.JetStream.csproj" />
-        <ProjectReference Include="..\NATS.Client.TestUtilities\NATS.Client.TestUtilities.csproj"/>
-        <ProjectReference Include="..\..\src\NATS.Client.Simplified\NATS.Client.Simplified.csproj"/>
+        <ProjectReference Include="..\NATS.Client.TestUtilities\NATS.Client.TestUtilities.csproj" />
+        <ProjectReference Include="..\..\src\NATS.Client.Simplified\NATS.Client.Simplified.csproj" />
     </ItemGroup>
 
 </Project>

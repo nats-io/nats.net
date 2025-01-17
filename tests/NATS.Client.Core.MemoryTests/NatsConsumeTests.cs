@@ -3,7 +3,6 @@ using NATS.Client.Core.Tests;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
-using Xunit.Abstractions;
 
 namespace NATS.Client.Core.MemoryTests;
 
@@ -192,15 +191,4 @@ public class NatsConsumeTests
             server.DisposeAsync().AsTask().GetAwaiter().GetResult();
         }
     }
-}
-
-public class TestTextWriterOutput : ITestOutputHelper
-{
-    private readonly TextWriter _out;
-
-    public TestTextWriterOutput(TextWriter @out) => _out = @out;
-
-    public void WriteLine(string message) => _out.WriteLine(message);
-
-    public void WriteLine(string format, params object[] args) => _out.WriteLine(format, args);
 }

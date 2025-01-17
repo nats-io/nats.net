@@ -1,6 +1,5 @@
 using System;
 using Microsoft.Extensions.Logging;
-using Xunit.Abstractions;
 
 namespace NATS.Client.Core.Tests;
 
