@@ -423,6 +423,24 @@ public class NatsHeaders : IDictionary<string, StringValues>
 
     internal void SetReadOnly() => Interlocked.Exchange(ref _readonly, 1);
 
+    internal void SetOverrideReadOnly(string key, StringValues value)
+    {
+        if (key == null)
+        {
+            throw new ArgumentNullException(nameof(key));
+        }
+
+        if (value.Count == 0)
+        {
+            Store?.Remove(key);
+        }
+        else
+        {
+            EnsureStore(1);
+            Store[key] = value;
+        }
+    }
+
     private void ThrowIfReadOnly()
     {
         if (IsReadOnly)

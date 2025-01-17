@@ -8,8 +8,13 @@ public class NatsServerFixture : IDisposable
     private int _next;
 
     public NatsServerFixture()
+        : this(null)
     {
-        Server = NatsServerProcess.Start();
+    }
+
+    protected NatsServerFixture(string? config)
+    {
+        Server = NatsServerProcess.Start(config: config);
     }
 
     public NatsServerProcess Server { get; }
@@ -27,6 +32,13 @@ public class NatsServerFixture : IDisposable
 }
 
 [CollectionDefinition("nats-server")]
-public class DatabaseCollection : ICollectionFixture<NatsServerFixture>
+public class NatsServerCollection : ICollectionFixture<NatsServerFixture>
+{
+}
+
+public class NatsServerRestrictedUserFixture() : NatsServerFixture("resources/configs/restricted-user.conf");
+
+[CollectionDefinition("nats-server-restricted-user")]
+public class NatsServerRestrictedUserCollection : ICollectionFixture<NatsServerRestrictedUserFixture>
 {
 }
