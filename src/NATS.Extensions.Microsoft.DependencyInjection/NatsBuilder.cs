@@ -62,9 +62,11 @@ public class NatsBuilder
         return this;
     }
 
+    [Obsolete("By default JSON serialization is enabled. If you still want to use generated JSON serialization, use WithSerializerRegistry, JsonSerializerContext and optionally NatsSerializerBuilder")]
     public NatsBuilder AddJsonSerialization(JsonSerializerContext context) =>
         AddJsonSerialization(_ => context);
 
+    [Obsolete("By default JSON serialization is enabled. If you still want to use generated JSON serialization, use WithSerializerRegistry, JsonSerializerContext and optionally NatsSerializerBuilder")]
     public NatsBuilder AddJsonSerialization(Func<IServiceProvider, JsonSerializerContext> contextFactory)
         => ConfigureOptions((serviceProvider, opts) =>
         {
