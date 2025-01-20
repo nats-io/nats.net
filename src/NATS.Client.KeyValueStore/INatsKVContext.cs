@@ -53,6 +53,17 @@ public interface INatsKVContext
     ValueTask<INatsKVStore> UpdateStoreAsync(NatsKVConfig config, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Creates a new Key Value Store if it doesn't exist or update if the store already exists.
+    /// </summary>
+    /// <param name="config">Key Value Store configuration</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>Key Value Store</returns>
+    /// <exception cref="NatsKVException">There was an issue with configuration</exception>
+    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
+    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    ValueTask<INatsKVStore> CreateOrUpdateStoreAsync(NatsKVConfig config, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Delete a Key Value Store
     /// </summary>
     /// <param name="bucket">Name of the bucket</param>

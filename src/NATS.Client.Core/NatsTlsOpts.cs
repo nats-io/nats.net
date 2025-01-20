@@ -62,19 +62,29 @@ public sealed record NatsTlsOpts
     /// File path to PEM-encoded Private Key
     /// </summary>
     /// <remarks>
-    /// Key should not be password protected
+    /// If key is password protected use <see cref="KeyFilePassword"/>.
     /// Must be used in conjunction with <see cref="CertFile"/>.
     /// </remarks>
     public string? KeyFile { get; init; }
+
+    /// <summary>
+    /// Key file password
+    /// </summary>
+    public string? KeyFilePassword { get; init; }
 #endif
 
     /// <summary>
     /// File path to PKCS#12 bundle containing X509 Client Certificate and Private Key
     /// </summary>
     /// <remarks>
-    /// Bundle should not be password protected
+    /// Use <see cref="CertBundleFilePassword"/> to specify the password for the bundle.
     /// </remarks>
     public string? CertBundleFile { get; init; }
+
+    /// <summary>
+    /// Password for the PKCS#12 bundle file
+    /// </summary>
+    public string? CertBundleFilePassword { get; init; }
 
     /// <summary>
     /// Callback to configure <see cref="SslClientAuthenticationOptions"/>
@@ -159,14 +169,15 @@ public sealed record NatsTlsOpts
         if (CertFile != null && KeyFile != null)
         {
             options.LoadClientCertFromPem(
-                await File.ReadAllTextAsync(CertFile).ConfigureAwait(false),
-                await File.ReadAllTextAsync(KeyFile).ConfigureAwait(false));
+                certPem: await File.ReadAllTextAsync(CertFile).ConfigureAwait(false),
+                keyPem: await File.ReadAllTextAsync(KeyFile).ConfigureAwait(false),
+                password: KeyFilePassword);
         }
 #endif
 
         if (CertBundleFile != null)
         {
-            options.LoadClientCertFromPfxFile(CertBundleFile);
+            options.LoadClientCertFromPfxFile(CertBundleFile, password: CertBundleFilePassword);
         }
 
         if (InsecureSkipVerify)

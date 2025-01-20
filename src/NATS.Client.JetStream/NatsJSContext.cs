@@ -309,13 +309,13 @@ public partial class NatsJSContext
             // Validator.ValidateObject(request, new ValidationContext(request));
         }
 
-        await using var sub = await Connection.CreateRequestSubAsync<TRequest, JsonDocument>(
+        await using var sub = await Connection.CreateRequestSubAsync<TRequest, NatsJSApiResult<TResponse>>(
                 subject: subject,
                 data: request,
                 headers: default,
                 replyOpts: new NatsSubOpts { Timeout = Connection.Opts.RequestTimeout },
                 requestSerializer: NatsJSJsonSerializer<TRequest>.Default,
-                replySerializer: NatsJSJsonDocumentSerializer.Default,
+                replySerializer: NatsJSJsonDocumentSerializer<TResponse>.Default,
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
@@ -326,37 +326,22 @@ public partial class NatsJSContext
                 return new NatsNoRespondersException();
             }
 
-            if (msg.Data == null)
-            {
-                return new NatsJSException("No response data received");
-            }
-
-            // We need to determine what type we're deserializing into
-            // .NET 6 new APIs to the rescue: we can read the buffer once
-            // by deserializing into a document, inspect and using the new
-            // API deserialize to the final type from the document.
-            using var jsonDocument = msg.Data;
-
-            if (jsonDocument.RootElement.TryGetProperty("error", out var errorElement))
-            {
-                var error = errorElement.Deserialize(JetStream.NatsJSJsonSerializerContext.Default.ApiError) ?? throw new NatsJSException("Can't parse JetStream error JSON payload");
-                return new NatsJSResponse<TResponse>(default, error);
-            }
-
-            var jsonTypeInfo = NatsJSJsonSerializerContext.DefaultContext.GetTypeInfo(typeof(TResponse));
-            if (jsonTypeInfo == null)
-            {
-                return new NatsJSException($"Unknown response type {typeof(TResponse)}");
-            }
-
-            var response = (TResponse?)jsonDocument.RootElement.Deserialize(jsonTypeInfo);
-
             if (msg.Error is { } messageError)
             {
                 return messageError;
             }
 
-            return new NatsJSResponse<TResponse>(response, default);
+            if (msg.Data.HasException)
+            {
+                return msg.Data.Exception;
+            }
+
+            if (msg.Data.HasError)
+            {
+                return new NatsJSResponse<TResponse>(null, msg.Data.Error);
+            }
+
+            return new NatsJSResponse<TResponse>(msg.Data.Value, null);
         }
 
         if (sub is NatsSubBase { EndReason: NatsSubEndReason.Exception, Exception: not null } sb)

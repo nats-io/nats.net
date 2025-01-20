@@ -36,29 +36,34 @@ public class TlsOptsTest
         }
     }
 
-    [Fact]
-    public async Task Load_client_cert_and_key()
+    [Theory]
+    [InlineData("client-cert-bundle.pfx", null, "client-key.pem", null)]
+    [InlineData("client-cert-bundle.pfx", "", "client-key.pem", "")]
+    [InlineData("client-cert-bundle-pass.pfx", "1234", "client-key-pass.pem", "5678")]
+    public async Task Load_client_cert_and_key(string pfxFile, string? pfxFilepassword, string keyFile, string? keyFilePassword)
     {
         const string clientCertFile = "resources/certs/client-cert.pem";
-        const string clientCertBundleFile = "resources/certs/client-cert-bundle.pfx";
-        const string clientKeyFile = "resources/certs/client-key.pem";
+        var clientKeyFile = $"resources/certs/{keyFile}";
+        var clientCertBundleFile = $"resources/certs/{pfxFile}";
 
         await ValidateAsync(new NatsTlsOpts
         {
             CertFile = clientCertFile,
             KeyFile = clientKeyFile,
+            KeyFilePassword = keyFilePassword,
         });
 
         await ValidateAsync(new NatsTlsOpts
         {
             CertBundleFile = clientCertBundleFile,
+            CertBundleFilePassword = pfxFilepassword,
         });
 
         await ValidateAsync(new NatsTlsOpts
         {
             ConfigureClientAuthentication = async options =>
             {
-                options.LoadClientCertFromPem(await File.ReadAllTextAsync(clientCertFile), await File.ReadAllTextAsync(clientKeyFile));
+                options.LoadClientCertFromPem(await File.ReadAllTextAsync(clientCertFile), await File.ReadAllTextAsync(clientKeyFile), password: keyFilePassword);
             },
         });
 
@@ -133,7 +138,7 @@ public class TlsOptsTest
         }
     }
 
-    [SkippableTheory]
+    [Theory]
     [InlineData("resources/certs/client-cert.pem", "resources/certs/client-key.pem", null, 6)]
     [InlineData(null, null, "resources/certs/client-cert-bundle.pfx", 6)]
     [InlineData("resources/certs/chainedclient-cert.pem", "resources/certs/chainedclient-key.pem", null, 8)]
@@ -141,7 +146,7 @@ public class TlsOptsTest
     public async Task Client_connect(string? clientCertFile, string? clientKeyFile, string? clientCertBundleFile, int minimumFrameworkVersion)
     {
         var version = int.Parse(Regex.Match(RuntimeInformation.FrameworkDescription, @"(\d+)\.\d").Groups[1].Value);
-        Skip.IfNot(version >= minimumFrameworkVersion, $"Requires .NET {minimumFrameworkVersion}");
+        Assert.SkipUnless(version >= minimumFrameworkVersion, $"Requires .NET {minimumFrameworkVersion}");
 
         const string caFile = "resources/certs/ca-cert.pem";
 

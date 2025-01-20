@@ -290,6 +290,9 @@ csharp_style_expression_bodied_lambdas = true:silent
 csharp_style_expression_bodied_local_functions = false:silent
 csharp_space_around_binary_operators = before_and_after
 
+# xunit Analyzers
+dotnet_diagnostic.xUnit1051.severity = none # Calls to methods which accept CancellationToken should use TestContext.Current.CancellationToken to allow test cancellation to be more responsive
+
 [*.{cs,vb}]
 #### Naming styles ####
 

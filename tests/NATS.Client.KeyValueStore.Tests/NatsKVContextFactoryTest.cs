@@ -78,6 +78,8 @@ public class NatsKVContextFactoryTest
 
         public ValueTask<INatsJSStream> CreateStreamAsync(StreamConfig config, CancellationToken cancellationToken = default) => throw new NotImplementedException();
 
+        public ValueTask<INatsJSStream> CreateOrUpdateStreamAsync(StreamConfig config, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+
         public ValueTask<bool> DeleteStreamAsync(string stream, CancellationToken cancellationToken = default) => throw new NotImplementedException();
 
         public ValueTask<StreamPurgeResponse> PurgeStreamAsync(string stream, StreamPurgeRequest request, CancellationToken cancellationToken = default) => throw new NotImplementedException();

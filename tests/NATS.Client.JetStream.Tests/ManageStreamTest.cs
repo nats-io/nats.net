@@ -127,4 +127,61 @@ public class ManageStreamTest
 
         Assert.Equal(2, stream.Info.State.Subjects?.Count);
     }
+
+    [Fact]
+    public async Task Create_or_update_stream_should_be_create_stream_if_stream_doesnt_exist()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        await using var server = NatsServer.StartJS();
+        var nats = server.CreateClientConnection();
+        var js = new NatsJSContext(nats);
+
+        var streamConfig = new StreamConfig("s1", ["s1.*"])
+        { Storage = StreamConfigStorage.File };
+
+        var accountInfoBefore = await js.GetAccountInfoAsync(cts.Token);
+        await js.CreateOrUpdateStreamAsync(streamConfig, cts.Token);
+        var accountInfoAfter = await js.GetAccountInfoAsync(cts.Token);
+
+        Assert.Equal(0, accountInfoBefore.Streams);
+        Assert.Equal(1, accountInfoAfter.Streams);
+    }
+
+    [Fact]
+    public async Task Create_or_update_stream_should_be_update_stream_if_stream_exist()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        await using var server = NatsServer.StartJS();
+        var nats = server.CreateClientConnection();
+        var js = new NatsJSContext(nats);
+
+        var streamConfig = new StreamConfig("s1", ["s1.*"])
+        { Storage = StreamConfigStorage.File, NoAck = false };
+        var streamConfigForUpdated = streamConfig with { NoAck = true };
+
+        var stream = await js.CreateOrUpdateStreamAsync(streamConfig, cts.Token);
+        var updatedStream = await js.CreateOrUpdateStreamAsync(streamConfigForUpdated, cts.Token);
+
+        Assert.False(stream.Info.Config.NoAck);
+        Assert.True(updatedStream.Info.Config.NoAck);
+    }
+
+    [Fact]
+    public async Task Create_or_update_stream_should_be_throwing_update_operation_errors()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        await using var server = NatsServer.StartJS();
+        var nats = server.CreateClientConnection();
+        var js = new NatsJSContext(nats);
+
+        var streamConfig = new StreamConfig("s1", ["s1.*"])
+        { Storage = StreamConfigStorage.File };
+        var streamConfigForUpdated = streamConfig with { Storage = StreamConfigStorage.Memory };
+
+        await js.CreateOrUpdateStreamAsync(streamConfig, cts.Token);
+        await Assert.ThrowsAsync<NatsJSApiException>(async () => await js.CreateOrUpdateStreamAsync(streamConfigForUpdated, cts.Token));
+    }
 }

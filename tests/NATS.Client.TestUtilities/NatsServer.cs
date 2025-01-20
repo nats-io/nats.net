@@ -564,6 +564,16 @@ public class NatsCluster : IAsyncDisposable
 
 public class NullOutputHelper : ITestOutputHelper
 {
+    public string Output => string.Empty;
+
+    public void Write(string message)
+    {
+    }
+
+    public void Write(string format, params object[] args)
+    {
+    }
+
     public void WriteLine(string message)
     {
     }

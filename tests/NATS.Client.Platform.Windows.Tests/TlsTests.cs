@@ -1,6 +1,5 @@
 using System.Security.Authentication;
 using NATS.Client.Core;
-using Xunit.Abstractions;
 
 namespace NATS.Client.Platform.Windows.Tests;
 
