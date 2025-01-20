@@ -109,7 +109,7 @@ public partial class NatsConnection : INatsConnection
 
     public event AsyncEventHandler<NatsMessageDroppedEventArgs>? MessageDropped;
 
-    public event AsyncEventHandler<NatsEventArgs>? LameDuckModeActivated;
+    public event AsyncEventHandler<NatsLameDuckModeActivatedEventArgs>? LameDuckModeActivated;
 
     public INatsConnection Connection => this;
 
@@ -141,10 +141,9 @@ public partial class NatsConnection : INatsConnection
         get => Interlocked.CompareExchange(ref _writableServerInfo, null, null);
         set
         {
-            var current = Interlocked.CompareExchange(ref _writableServerInfo, null, null);
-            if (current?.LameDuckMode == false && value?.LameDuckMode == true)
+            if (value?.LameDuckMode == true)
             {
-                _eventChannel.Writer.TryWrite((NatsEvent.LameDuckModeActivated, new NatsEventArgs(string.Empty)));
+                _eventChannel.Writer.TryWrite((NatsEvent.LameDuckModeActivated, new NatsLameDuckModeActivatedEventArgs(_currentConnectUri!.Uri)));
             }
 
             Interlocked.Exchange(ref _writableServerInfo, value);
@@ -779,8 +778,8 @@ public partial class NatsConnection : INatsConnection
                     case NatsEvent.MessageDropped when MessageDropped != null && args is NatsMessageDroppedEventArgs error:
                         await MessageDropped.InvokeAsync(this, error).ConfigureAwait(false);
                         break;
-                    case NatsEvent.LameDuckModeActivated when LameDuckModeActivated != null:
-                        await LameDuckModeActivated.InvokeAsync(this, args).ConfigureAwait(false);
+                    case NatsEvent.LameDuckModeActivated when LameDuckModeActivated != null && args is NatsLameDuckModeActivatedEventArgs uri:
+                        await LameDuckModeActivated.InvokeAsync(this, uri).ConfigureAwait(false);
                         break;
                     }
                 }

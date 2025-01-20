@@ -93,7 +93,7 @@ public class NatsJSContextFactoryTest
 
         public event AsyncEventHandler<NatsMessageDroppedEventArgs>? MessageDropped;
 
-        public event AsyncEventHandler<NatsEventArgs>? LameDuckModeActivated;
+        public event AsyncEventHandler<NatsLameDuckModeActivatedEventArgs>? LameDuckModeActivated;
 #pragma warning restore CS0067
 
         public INatsServerInfo? ServerInfo { get; } = null;
