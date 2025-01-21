@@ -552,9 +552,9 @@ public abstract partial class NatsConnectionTest
         var subject = $"$SYS.REQ.SERVER.{connection.ServerInfo!.Id}.LDM";
 
         // Act
-        var response = await connection.RequestAsync<string, string>(
+        await connection.RequestAsync<string, string>(
             subject: subject,
-            data: "{}");
+            data: $$"""{"cid":{{connection.ServerInfo!.ClientId}}}""");
         await ldmSignal;
 
         // Assert
