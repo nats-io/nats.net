@@ -92,6 +92,8 @@ public class NatsJSContextFactoryTest
         public event AsyncEventHandler<NatsEventArgs>? ReconnectFailed;
 
         public event AsyncEventHandler<NatsMessageDroppedEventArgs>? MessageDropped;
+
+        public event AsyncEventHandler<NatsLameDuckModeActivatedEventArgs>? LameDuckModeActivated;
 #pragma warning restore CS0067
 
         public INatsServerInfo? ServerInfo { get; } = null;

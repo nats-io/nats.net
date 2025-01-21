@@ -505,6 +505,61 @@ public abstract partial class NatsConnectionTest
         openedCount.ShouldBe(1);
         disconnectedCount.ShouldBe(1);
     }
+
+    [SkipIfNatsServer(versionEarlierThan: "2.10")]
+    public async Task LameDuckModeActivated_EventHandlerShouldBeInvokedWhenInfoWithLDMReceived()
+    {
+        await using var natsServer = NatsServer.Start(
+            _output,
+            new NatsServerOptsBuilder()
+                .AddServerConfigText("""
+                                     accounts: {
+                                       SYS: {
+                                         users: [
+                                           {user: "sys", password: "password"}
+                                         ]
+                                       },
+                                     }
+
+                                     system_account: SYS
+                                     """)
+                .UseTransport(_transportType)
+                .Build());
+
+        var natsOpts = new NatsOpts
+        {
+            Url = natsServer.ClientUrl,
+            AuthOpts = new NatsAuthOpts
+            {
+                Username = "sys",
+                Password = "password",
+            },
+        };
+
+        await using var connection = natsServer.CreateClientConnection(natsOpts);
+        await connection.ConnectAsync();
+
+        var invocationCount = 0;
+        var ldmSignal = new WaitSignal();
+
+        connection.LameDuckModeActivated += (_, _) =>
+        {
+            Interlocked.Increment(ref invocationCount);
+            ldmSignal.Pulse();
+            return default;
+        };
+
+        var subject = $"$SYS.REQ.SERVER.{connection.ServerInfo!.Id}.LDM";
+
+        // Act
+        await connection.RequestAsync<string, string>(
+            subject: subject,
+            data: $$"""{"cid":{{connection.ServerInfo!.ClientId}}}""");
+        await ldmSignal;
+
+        // Assert
+        invocationCount.ShouldBe(1);
+    }
 }
 
 [JsonSerializable(typeof(SampleClass))]

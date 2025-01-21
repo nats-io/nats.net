@@ -33,3 +33,11 @@ public class NatsMessageDroppedEventArgs : NatsEventArgs
 
     public object? Data { get; }
 }
+
+public class NatsLameDuckModeActivatedEventArgs : NatsEventArgs
+{
+    public NatsLameDuckModeActivatedEventArgs(Uri uri)
+        : base("Lame duck mode activated") => Uri = uri;
+
+    public Uri Uri { get; }
+}
