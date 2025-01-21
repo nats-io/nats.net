@@ -507,11 +507,36 @@ public abstract partial class NatsConnectionTest
     }
 
     [Fact]
-    public async Task LameDuckModeActivated_EventHandlerShouldBeInvokedWhenInfoWithLDMRecievied()
+    public async Task LameDuckModeActivated_EventHandlerShouldBeInvokedWhenInfoWithLDMReceived()
     {
-        // Arrange
-        await using var server = NatsServer.Start(_output, _transportType);
-        await using var connection = server.CreateClientConnection();
+        await using var natsServer = NatsServer.Start(
+            _output,
+            new NatsServerOptsBuilder()
+                .AddServerConfigText("""
+                                     accounts: {
+                                       SYS: {
+                                         users: [
+                                           {user: "sys", password: "password"}
+                                         ]
+                                       },
+                                     }
+
+                                     system_account: SYS
+                                     """)
+                .UseTransport(_transportType)
+                .Build());
+
+        var natsOpts = new NatsOpts
+        {
+            Url = natsServer.ClientUrl,
+            AuthOpts = new NatsAuthOpts
+            {
+                Username = "sys",
+                Password = "password",
+            },
+        };
+
+        await using var connection = natsServer.CreateClientConnection(natsOpts);
         await connection.ConnectAsync();
 
         var invocationCount = 0;
@@ -524,8 +549,12 @@ public abstract partial class NatsConnectionTest
             return default;
         };
 
+        var subject = $"$SYS.REQ.SERVER.{connection.ServerInfo!.Id}.LDM";
+
         // Act
-        server.SignalLameDuckMode();
+        var response = await connection.RequestAsync<string, string>(
+            subject: subject,
+            data: "{}");
         await ldmSignal;
 
         // Assert

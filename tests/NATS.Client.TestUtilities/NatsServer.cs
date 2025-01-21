@@ -438,34 +438,6 @@ public class NatsServer : IAsyncDisposable
         }
     }
 
-    public void SignalLameDuckMode()
-    {
-        if (ServerProcess == null || ServerProcess.HasExited)
-        {
-            throw new Exception("Cannot signal LDM, server process is not running.");
-        }
-
-        var signalProcess = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = NatsServerPath,
-                Arguments = $"--signal ldm={ServerProcess.Id}",
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-            },
-        };
-
-        signalProcess.Start();
-        signalProcess.WaitForExit();
-
-        if (signalProcess.ExitCode != 0)
-        {
-            var error = signalProcess.StandardError.ReadToEnd();
-            throw new Exception($"Failed to signal lame duck mode: {error}");
-        }
-    }
-
     private static (string configFileName, string config, string cmd) GetCmd(NatsServerOpts opts)
     {
         var configFileName = Path.GetTempFileName();
