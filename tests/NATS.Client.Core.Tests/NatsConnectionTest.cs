@@ -506,7 +506,7 @@ public abstract partial class NatsConnectionTest
         disconnectedCount.ShouldBe(1);
     }
 
-    [Fact]
+    [SkipIfNatsServer(versionEarlierThan: "2.10")]
     public async Task LameDuckModeActivated_EventHandlerShouldBeInvokedWhenInfoWithLDMReceived()
     {
         await using var natsServer = NatsServer.Start(
