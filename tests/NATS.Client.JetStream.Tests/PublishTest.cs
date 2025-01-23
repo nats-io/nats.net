@@ -13,7 +13,7 @@ public class PublishTest
     [Fact]
     public async Task Publish_test()
     {
-        await using var server = NatsServer.StartJS();
+        await using var server = await NatsServer.StartJSAsync();
         await using var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats);
 
@@ -168,7 +168,7 @@ public class PublishTest
         // give enough time for retries to avoid NatsJSPublishNoResponseExceptions
         var natsOpts = NatsOpts.Default with { RequestTimeout = TimeSpan.FromSeconds(3) };
 
-        await using var server = NatsServer.StartJS();
+        await using var server = await NatsServer.StartJSAsync();
         var (nats1, proxy) = server.CreateProxiedClientConnection(natsOpts);
         await using var nats = nats1;
 

@@ -13,7 +13,7 @@ public class GetKeysTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await using var server = NatsServer.StartJS();
+        await using var server = await NatsServer.StartJSAsync();
         await using var nats1 = server.CreateClientConnection();
         var js1 = new NatsJSContext(nats1);
         var kv1 = new NatsKVContext(js1);
@@ -55,7 +55,7 @@ public class GetKeysTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await using var server = NatsServer.StartJS();
+        await using var server = await NatsServer.StartJSAsync();
         await using var nats1 = server.CreateClientConnection();
         var js1 = new NatsJSContext(nats1);
         var kv1 = new NatsKVContext(js1);
@@ -90,7 +90,7 @@ public class GetKeysTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await using var server = NatsServer.StartJS();
+        await using var server = await NatsServer.StartJSAsync();
         await using var nats1 = server.CreateClientConnection();
         var js1 = new NatsJSContext(nats1);
         var kv1 = new NatsKVContext(js1);

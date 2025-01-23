@@ -12,6 +12,7 @@ public class ClusterTests
     public async Task Form_a_local_cluster()
     {
         await using var cluster = new NatsCluster(new NullOutputHelper(), TransportType.Tcp, (i, b) => b.WithServerName($"n{i}").UseJetStream());
+        await cluster.StartAsync();
         await using var nats = cluster.Server1.CreateClientConnection();
 
         await nats.PingAsync();

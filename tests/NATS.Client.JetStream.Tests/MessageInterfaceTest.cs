@@ -7,7 +7,7 @@ public class MessageInterfaceTest
     [Fact]
     public async Task Using_message_interface()
     {
-        await using var server = NatsServer.StartJS();
+        await using var server = await NatsServer.StartJSAsync();
         await using var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats);
 

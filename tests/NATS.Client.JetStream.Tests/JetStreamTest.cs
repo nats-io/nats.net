@@ -51,7 +51,7 @@ public class JetStreamTest
     [Fact]
     public async Task Create_stream_test()
     {
-        await using var server = NatsServer.Start(
+        await using var server = await NatsServer.StartAsync(
             outputHelper: _output,
             opts: new NatsServerOptsBuilder()
                 .UseTransport(TransportType.Tcp)

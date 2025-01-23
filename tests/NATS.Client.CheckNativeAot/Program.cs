@@ -30,7 +30,7 @@ async Task RequestReplyTests()
 {
     Log("Request reply tests...");
 
-    await using var server = NatsServer.Start();
+    await using var server = await NatsServer.StartAsync();
     await using var nats = server.CreateClientConnection();
 
     var sub = await nats.SubscribeCoreAsync<int>("foo");
@@ -65,7 +65,7 @@ async Task JetStreamTests()
 {
     Log("JetStream tests...");
 
-    await using var server = NatsServer.StartJS();
+    await using var server = await NatsServer.StartJSAsync();
     var nats = server.CreateClientConnection();
 
     // Happy user
@@ -189,7 +189,7 @@ async Task KVTests()
 {
     Log("KV tests...");
 
-    await using var server = NatsServer.StartJS();
+    await using var server = await NatsServer.StartJSAsync();
     await using var nats = server.CreateClientConnection();
 
     var js = new NatsJSContext(nats);
@@ -212,7 +212,7 @@ async Task ObjectStoreTests()
     var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
     var cancellationToken = cts.Token;
 
-    await using var server = NatsServer.StartJS();
+    await using var server = await NatsServer.StartJSAsync();
     await using var nats = server.CreateClientConnection();
     var js = new NatsJSContext(nats);
     var ob = new NatsObjContext(js);
@@ -269,7 +269,7 @@ async Task ServicesTests()
     var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
     var cancellationToken = cts.Token;
 
-    await using var server = NatsServer.Start();
+    await using var server = await NatsServer.StartAsync();
     await using var nats = server.CreateClientConnection();
     var svc = new NatsSvcContext(nats);
 
@@ -382,7 +382,7 @@ async Task ServicesTests2()
     var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10_0000));
     var cancellationToken = cts.Token;
 
-    await using var server = NatsServer.Start();
+    await using var server = await NatsServer.StartAsync();
     await using var nats = server.CreateClientConnection();
     var svc = new NatsSvcContext(nats);
 

@@ -13,7 +13,7 @@ public class SubscriptionTest
             .Trace()
             .UseTransport(TransportType.Tcp)
             .Build();
-        await using var server = NatsServer.Start(_output, serverOptions);
+        await using var server = await NatsServer.StartAsync(_output, serverOptions);
         var options = NatsOpts.Default with { SubscriptionCleanUpInterval = TimeSpan.FromSeconds(1) };
         var (nats, proxy) = server.CreateProxiedClientConnection(options);
 
@@ -50,7 +50,7 @@ public class SubscriptionTest
     [Fact]
     public async Task Subscription_cleanup_on_message_receive_test()
     {
-        await using var server = NatsServer.Start(_output, TransportType.Tcp);
+        await using var server = await NatsServer.StartAsync(_output, TransportType.Tcp);
 
         // Make sure time won't kick-in and unsubscribe
         var options = NatsOpts.Default with { SubscriptionCleanUpInterval = TimeSpan.MaxValue };
@@ -86,7 +86,7 @@ public class SubscriptionTest
     [Fact]
     public async Task Auto_unsubscribe_on_max_messages_with_inbox_subscription_test()
     {
-        await using var server = NatsServer.Start();
+        await using var server = await NatsServer.StartAsync();
         await using var nats = server.CreateClientConnection();
         var subject = nats.NewInbox();
 
@@ -125,7 +125,7 @@ public class SubscriptionTest
     [Fact]
     public async Task Auto_unsubscribe_on_max_messages_test()
     {
-        await using var server = NatsServer.Start();
+        await using var server = await NatsServer.StartAsync();
         await using var nats = server.CreateClientConnection();
         const string subject = "foo1";
         const int maxMsgs = 99;
@@ -155,7 +155,7 @@ public class SubscriptionTest
     [Fact]
     public async Task Auto_unsubscribe_on_timeout_test()
     {
-        await using var server = NatsServer.Start();
+        await using var server = await NatsServer.StartAsync();
         await using var nats = server.CreateClientConnection();
 
         const string subject = "foo2";
@@ -178,7 +178,7 @@ public class SubscriptionTest
     [Fact]
     public async Task Auto_unsubscribe_on_idle_timeout_test()
     {
-        await using var server = NatsServer.Start();
+        await using var server = await NatsServer.StartAsync();
         await using var nats = server.CreateClientConnection();
         const string subject = "foo3";
         var opts = new NatsSubOpts { IdleTimeout = TimeSpan.FromSeconds(3) };
@@ -209,7 +209,7 @@ public class SubscriptionTest
     [Fact]
     public async Task Manual_unsubscribe_test()
     {
-        await using var server = NatsServer.Start();
+        await using var server = await NatsServer.StartAsync();
         await using var nats = server.CreateClientConnection();
         const string subject = "foo4";
         await using var sub = await nats.SubscribeCoreAsync<int>(subject);
@@ -237,7 +237,7 @@ public class SubscriptionTest
     [Fact]
     public async Task Mux_inbox_reconnect_test()
     {
-        await using var server = NatsServer.Start();
+        await using var server = await NatsServer.StartAsync();
         var (nats, proxy) = server.CreateProxiedClientConnection();
         try
         {
@@ -293,7 +293,7 @@ public class SubscriptionTest
     [Fact]
     public async Task Serialization_exceptions()
     {
-        await using var server = NatsServer.Start();
+        await using var server = await NatsServer.StartAsync();
         await using var nats = server.CreateClientConnection();
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));

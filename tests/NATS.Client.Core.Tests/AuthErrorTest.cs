@@ -12,7 +12,7 @@ public class AuthErrorTest
     [SkipOnPlatform("WINDOWS", "doesn't support HUP signal")]
     public async Task Auth_err_twice_will_stop_retries()
     {
-        await using var server = NatsServer.Start(
+        await using var server = await NatsServer.StartAsync(
             new NullOutputHelper(),
             new NatsServerOptsBuilder()
                 .AddServerConfigText(@"
@@ -79,7 +79,7 @@ authorization: {
     [SkipOnPlatform("WINDOWS", "doesn't support HUP signal")]
     public async Task Auth_err_can_be_ignored_for_retires()
     {
-        await using var server = NatsServer.Start(
+        await using var server = await NatsServer.StartAsync(
             new NullOutputHelper(),
             new NatsServerOptsBuilder()
                 .AddServerConfigText(@"

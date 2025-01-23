@@ -14,7 +14,7 @@ public class NatsJSContextFactoryTest
     public async Task Create_Context_Test()
     {
         // Arrange
-        await using var server = NatsServer.Start(
+        await using var server = await NatsServer.StartAsync(
             outputHelper: _output,
             opts: new NatsServerOptsBuilder()
                 .UseTransport(TransportType.Tcp)
@@ -35,7 +35,7 @@ public class NatsJSContextFactoryTest
     public async Task Create_Context_WithOpts_Test()
     {
         // Arrange
-        await using var server = NatsServer.Start(
+        await using var server = await NatsServer.StartAsync(
             outputHelper: _output,
             opts: new NatsServerOptsBuilder()
                 .UseTransport(TransportType.Tcp)

@@ -8,7 +8,7 @@ public class DoubleAckTest
     public async Task Fetch_should_not_block_socket()
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        await using var server = NatsServer.StartJS();
+        await using var server = await NatsServer.StartJSAsync();
 
         await using var nats = server.CreateClientConnection();
 

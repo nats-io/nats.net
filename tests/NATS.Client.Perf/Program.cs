@@ -19,7 +19,7 @@ var t = new TestParams
 Console.WriteLine("NATS NET v2 Perf Tests");
 Console.WriteLine(t);
 
-await using var server = NatsServer.Start();
+await using var server = await NatsServer.StartAsync();
 
 Console.WriteLine("\nRunning nats bench");
 var natsBenchTotalMsgs = RunNatsBench(server.ClientUrl, t);

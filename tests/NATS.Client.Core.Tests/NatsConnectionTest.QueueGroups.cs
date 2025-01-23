@@ -8,7 +8,7 @@ public abstract partial class NatsConnectionTest
         // Use high enough count to create some distribution among subscribers.
         const int messageCount = 100;
 
-        await using var server = NatsServer.Start(_output, _transportType);
+        await using var server = await NatsServer.StartAsync(_output, _transportType);
 
         await using var conn1 = server.CreateClientConnection();
         await using var conn2 = server.CreateClientConnection();

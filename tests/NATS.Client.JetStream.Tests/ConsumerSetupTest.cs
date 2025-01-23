@@ -8,7 +8,7 @@ public class ConsumerSetupTest
     [Fact]
     public async Task Create_push_consumer()
     {
-        await using var server = NatsServer.StartJS();
+        await using var server = await NatsServer.StartJSAsync();
         await using var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats);
 
@@ -40,7 +40,7 @@ public class ConsumerSetupTest
     [SkipIfNatsServer(versionEarlierThan: "2.11")]
     public async Task Create_paused_consumer()
     {
-        await using var server = NatsServer.StartJS();
+        await using var server = await NatsServer.StartJSAsync();
         await using var nats = server.CreateClientConnection();
         var js = new NatsJSContextFactory().CreateContext(nats);
 

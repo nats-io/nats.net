@@ -12,7 +12,7 @@ public class ManageStreamTest
     [Fact]
     public async Task Account_info_create_get_update_stream()
     {
-        await using var server = NatsServer.StartJS();
+        await using var server = await NatsServer.StartJSAsync();
         var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats);
 
@@ -61,7 +61,7 @@ public class ManageStreamTest
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-        await using var server = NatsServer.StartJS();
+        await using var server = await NatsServer.StartJSAsync();
         var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats);
 
@@ -103,7 +103,7 @@ public class ManageStreamTest
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-        await using var server = NatsServer.StartJS();
+        await using var server = await NatsServer.StartJSAsync();
         var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats);
 
@@ -133,7 +133,7 @@ public class ManageStreamTest
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-        await using var server = NatsServer.StartJS();
+        await using var server = await NatsServer.StartJSAsync();
         var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats);
 
@@ -153,7 +153,7 @@ public class ManageStreamTest
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-        await using var server = NatsServer.StartJS();
+        await using var server = await NatsServer.StartJSAsync();
         var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats);
 
@@ -173,7 +173,7 @@ public class ManageStreamTest
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-        await using var server = NatsServer.StartJS();
+        await using var server = await NatsServer.StartJSAsync();
         var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats);
 

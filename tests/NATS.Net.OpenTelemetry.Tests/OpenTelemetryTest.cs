@@ -13,7 +13,7 @@ public class OpenTelemetryTest
     {
         var activities = new List<Activity>();
         using var activityListener = StartActivityListener(activities);
-        await using var server = NatsServer.Start();
+        await using var server = await NatsServer.StartAsync();
         await using var nats = server.CreateClientConnection();
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));

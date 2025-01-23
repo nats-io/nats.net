@@ -12,7 +12,7 @@ public class ListTests
     [Fact]
     public async Task List_streams()
     {
-        await using var server = NatsServer.StartJS();
+        await using var server = await NatsServer.StartJSAsync();
         await using var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(5) });
         var js = new NatsJSContext(nats);
 
@@ -82,7 +82,7 @@ public class ListTests
     [Fact]
     public async Task List_consumers()
     {
-        await using var server = NatsServer.StartJS();
+        await using var server = await NatsServer.StartJSAsync();
         await using var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(5) });
         var js = new NatsJSContext(nats);
 

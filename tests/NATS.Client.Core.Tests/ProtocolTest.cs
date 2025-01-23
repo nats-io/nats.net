@@ -11,7 +11,7 @@ public class ProtocolTest
     [InlineData(1024 * 1024)]
     public async Task Protocol_parser_under_load(int size)
     {
-        await using var server = NatsServer.Start();
+        await using var server = await NatsServer.StartAsync();
         var logger = new InMemoryTestLoggerFactory(LogLevel.Error);
         var opts = server.ClientOpts(NatsOpts.Default) with { LoggerFactory = logger };
         var nats = new NatsConnection(opts);

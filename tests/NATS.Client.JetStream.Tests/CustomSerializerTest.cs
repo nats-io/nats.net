@@ -8,7 +8,7 @@ public class CustomSerializerTest
     [Fact]
     public async Task When_consuming_ack_should_be_serialized_normally_if_custom_serializer_used()
     {
-        await using var server = NatsServer.StartJS();
+        await using var server = await NatsServer.StartJSAsync();
         await using var nats = server.CreateClientConnection(new NatsOpts
         {
             SerializerRegistry = new Level42SerializerRegistry(),
