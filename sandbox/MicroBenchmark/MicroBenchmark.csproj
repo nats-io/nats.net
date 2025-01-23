@@ -14,7 +14,7 @@
         <PackageReference Include="StackExchange.Redis" Version="2.8.24" />
         <PackageReference Include="ZLogger" Version="2.5.10" />
         <PackageReference Include="NATS.Client" Version="1.1.6" />
-        <PackageReference Include="System.Drawing.Common" Version="9.0.1" />
+        <PackageReference Include="System.Drawing.Common" Version="8.0.12" />
     </ItemGroup>
 
     <ItemGroup>
