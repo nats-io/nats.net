@@ -73,8 +73,8 @@ public class NatsServer : IAsyncDisposable
 
     public Process? ServerProcess
     {
-        get => _serverProcess;
-        private set => _serverProcess = value;
+        get => Interlocked.CompareExchange(ref _serverProcess, null, null);
+        private set => Interlocked.Exchange(ref _serverProcess, value);
     }
 
     public NatsServerOpts Opts { get; }
