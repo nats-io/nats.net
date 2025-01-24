@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Models;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -126,6 +127,8 @@ public class ConsumerConsumeTest
 
         // Swallow heartbeats
         proxy.ServerInterceptors.Add(m => m?.Contains("Idle Heartbeat") ?? false ? null : m);
+
+        await nats.ConnectRetryAsync();
 
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
