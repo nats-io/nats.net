@@ -201,7 +201,9 @@ public class NatsServer : IAsyncDisposable
         {
             try
             {
-                await client.ConnectAsync("127.0.0.1", Opts.ServerPort, loopCts.Token);
+                var attemptTimeoutCts = new CancellationTokenSource(250);
+                var attemptCts = CancellationTokenSource.CreateLinkedTokenSource(loopCts.Token, attemptTimeoutCts.Token);
+                await client.ConnectAsync("127.0.0.1", Opts.ServerPort, attemptCts.Token);
                 if (client.Connected)
                     break;
             }
@@ -210,7 +212,7 @@ public class NatsServer : IAsyncDisposable
                 // ignore
             }
 
-            await Task.Delay(500, loopCts.Token);
+            await Task.Delay(250, loopCts.Token);
         }
 
         if (_processOut.IsFaulted)
