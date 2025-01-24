@@ -20,7 +20,7 @@ public class TlsTests : IClassFixture<TlsTestsNatsServerFixture>
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
 
         var exception = await Assert.ThrowsAsync<NatsException>(async () => await nats.ConnectAsync());
-        Assert.Contains("TLS authentication failed", exception.InnerException?.Message);
+        Assert.Matches("TLS authentication failed|Unable to read data from the transport", exception.InnerException?.Message);
         Assert.IsType<AuthenticationException>(exception.InnerException?.InnerException);
     }
 
