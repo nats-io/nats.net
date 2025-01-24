@@ -83,7 +83,7 @@ public static class Utils
 
 public class ProperCaseEnumNameGenerator : IEnumNameGenerator
 {
-    public string Generate(int index, string name, object value, JsonSchema schema) => Utils.ProperCase(name);
+    public string Generate(int index, string? name, object? value, JsonSchema schema) => Utils.ProperCase(name!);
 }
 
 public class ProperCasePropertyNameGenerator : IPropertyNameGenerator
@@ -93,5 +93,5 @@ public class ProperCasePropertyNameGenerator : IPropertyNameGenerator
 
 public class ProperCaseTypeNameGenerator : ITypeNameGenerator
 {
-    public string Generate(JsonSchema schema, string typeNameHint, IEnumerable<string> reservedTypeNames) => string.IsNullOrEmpty(typeNameHint) ? "Unknown" : Utils.ProperCase(typeNameHint);
+    public string Generate(JsonSchema schema, string? typeNameHint, IEnumerable<string> reservedTypeNames) => string.IsNullOrEmpty(typeNameHint) ? "Unknown" : Utils.ProperCase(typeNameHint);
 }

@@ -24,6 +24,7 @@ public class WeatherForecastService : IHostedService, IAsyncDisposable
     public Task StartAsync(CancellationToken cancellationToken)
     {
         _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cancellationToken = _cts.Token;
         _replyTask = Task.Run(
             async () =>
             {
