@@ -150,7 +150,7 @@ public class TlsOptsTest
 
         const string caFile = "resources/certs/ca-cert.pem";
 
-        await using var server = NatsServer.Start(
+        await using var server = await NatsServer.StartAsync(
             new NullOutputHelper(),
             new NatsServerOptsBuilder()
                 .UseTransport(TransportType.Tls, tlsVerify: true)

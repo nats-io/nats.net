@@ -9,7 +9,7 @@ public class TlsFirstTest
     [SkipIfNatsServer(doesNotSupportTlsFirst: true)]
     public async Task Implicit_TLS_connection()
     {
-        await using var server = NatsServer.Start(
+        await using var server = await NatsServer.StartAsync(
             new NullOutputHelper(),
             new NatsServerOptsBuilder()
                 .UseTransport(TransportType.Tls, tlsFirst: true)
@@ -43,7 +43,7 @@ public class TlsFirstTest
     [Fact]
     public async Task Implicit_TLS_fails_when_disabled()
     {
-        await using var server = NatsServer.Start(
+        await using var server = await NatsServer.StartAsync(
             new NullOutputHelper(),
             new NatsServerOptsBuilder()
                 .UseTransport(TransportType.Tls, tlsFirst: false)

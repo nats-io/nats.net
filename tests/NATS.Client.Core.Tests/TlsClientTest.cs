@@ -16,7 +16,7 @@ public class TlsClientTest
     [InlineData(TransportType.WebSocketSecure)]
     public async Task Client_connect_using_certificate(TransportType transportType)
     {
-        await using var server = NatsServer.Start(
+        await using var server = await NatsServer.StartAsync(
             new NullOutputHelper(),
             new NatsServerOptsBuilder()
                 .UseTransport(transportType, tlsVerify: true)
@@ -35,7 +35,7 @@ public class TlsClientTest
     [Fact]
     public async Task Client_connect_using_certificate_and_revocation_check()
     {
-        await using var server = NatsServer.Start(
+        await using var server = await NatsServer.StartAsync(
             new NullOutputHelper(),
             new NatsServerOptsBuilder()
                 .UseTransport(TransportType.Tls, tlsVerify: true)
@@ -69,7 +69,7 @@ public class TlsClientTest
     [InlineData(TransportType.WebSocketSecure)]
     public async Task Client_cannot_connect_without_certificate(TransportType transportType)
     {
-        await using var server = NatsServer.Start(
+        await using var server = await NatsServer.StartAsync(
             new NullOutputHelper(),
             new NatsServerOptsBuilder()
                 .UseTransport(transportType, tlsVerify: true)
