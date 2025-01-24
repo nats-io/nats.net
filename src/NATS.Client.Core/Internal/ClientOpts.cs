@@ -56,11 +56,11 @@ internal sealed class ClientOpts
 
     /// <summary>Connection username (if auth_required is set)</summary>
     [JsonPropertyName("user")]
-    public string? Username { get; init; } = null;
+    public string? Username { get; set; } = null;
 
     /// <summary>Connection password (if auth_required is set)</summary>
     [JsonPropertyName("pass")]
-    public string? Password { get; init; } = null;
+    public string? Password { get; set; } = null;
 
     /// <summary>Optional client name</summary>
     [JsonPropertyName("name")]
