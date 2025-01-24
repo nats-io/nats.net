@@ -32,7 +32,7 @@ authorization: {
                 },
             });
 
-        await using var nats = server.CreateClientConnection(new NatsOpts
+        await using var nats = await server.CreateClientConnectionAsync(new NatsOpts
         {
             AuthOpts = new NatsAuthOpts
             {
@@ -99,7 +99,7 @@ authorization: {
                 },
             });
 
-        await using var nats = server.CreateClientConnection(new NatsOpts
+        await using var nats = await server.CreateClientConnectionAsync(new NatsOpts
         {
             AuthOpts = new NatsAuthOpts
             {

@@ -14,7 +14,7 @@ public class NatsConsumeTests
         var server = await NatsServer.StartJSAsync();
         try
         {
-            var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
+            var nats = await server.CreateClientConnectionAsync(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
             var js = new NatsJSContext(nats);
 
             nats.PingAsync().AsTask().GetAwaiter().GetResult();
@@ -106,7 +106,7 @@ public class NatsConsumeTests
         var server = await NatsServer.StartJSAsync();
         try
         {
-            var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
+            var nats = await server.CreateClientConnectionAsync(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
             var js = new NatsJSContext(nats);
 
             nats.PingAsync().AsTask().GetAwaiter().GetResult();

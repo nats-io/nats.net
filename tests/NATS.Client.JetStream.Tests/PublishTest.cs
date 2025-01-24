@@ -14,7 +14,7 @@ public class PublishTest
     public async Task Publish_test()
     {
         await using var server = await NatsServer.StartJSAsync();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -198,7 +198,7 @@ public class PublishTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(45));
 
         // use different connection to create stream and consumer to avoid request timeouts
-        await using var nats0 = server.CreateClientConnection();
+        await using var nats0 = await server.CreateClientConnectionAsync();
         var js0 = new NatsJSContext(nats0);
         await js0.CreateStreamAsync("s1", new[] { "s1.>" }, cts.Token);
         await js0.CreateOrUpdateConsumerAsync("s1", "c1", cancellationToken: cts.Token);

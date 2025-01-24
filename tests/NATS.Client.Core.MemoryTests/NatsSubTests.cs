@@ -12,7 +12,7 @@ public class NatsSubTests
         var server = await NatsServer.StartAsync();
         try
         {
-            var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
+            var nats = await server.CreateClientConnectionAsync(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
 
             async Task Isolator()
             {
@@ -50,7 +50,7 @@ public class NatsSubTests
         {
             const int iterations = 10;
             const string subject = "foo.data";
-            var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
+            var nats = await server.CreateClientConnectionAsync(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
             var received = Channel.CreateUnbounded<object>();
 
             var subTask = Task.Run(async () =>
@@ -82,7 +82,7 @@ public class NatsSubTests
         {
             const int iterations = 10;
             const string subject = "foo.data";
-            var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
+            var nats = await server.CreateClientConnectionAsync(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
             var received = Channel.CreateUnbounded<object>();
 
             var subTask = Task.Run(async () =>
@@ -115,7 +115,7 @@ public class NatsSubTests
         {
             const int iterations = 10;
             const string subject = "foo.data";
-            var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
+            var nats = await server.CreateClientConnectionAsync(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
             var received = Channel.CreateUnbounded<object>();
 
             var subTask = Task.Run(async () =>
@@ -147,7 +147,7 @@ public class NatsSubTests
         {
             const int iterations = 10;
             const string subject = "foo.data";
-            var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
+            var nats = await server.CreateClientConnectionAsync(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
             var received = Channel.CreateUnbounded<object>();
 
             var subTask = Task.Run(async () =>

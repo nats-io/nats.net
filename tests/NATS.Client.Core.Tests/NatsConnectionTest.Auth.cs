@@ -123,14 +123,14 @@ public abstract partial class NatsConnectionTest
 
         _output.WriteLine("TRY ANONYMOUS CONNECTION");
         {
-            await using var failConnection = server.CreateClientConnection(ignoreAuthorizationException: true);
+            await using var failConnection = await server.CreateClientConnectionAsync(ignoreAuthorizationException: true);
             var natsException =
                 await Assert.ThrowsAsync<NatsException>(async () => await failConnection.PublishAsync(subject, 0));
             Assert.Contains("Authorization Violation", natsException.GetBaseException().Message);
         }
 
-        await using var subConnection = server.CreateClientConnection(clientOpts, useAuthInUrl: useAuthInUrl);
-        await using var pubConnection = server.CreateClientConnection(clientOpts, useAuthInUrl: useAuthInUrl);
+        await using var subConnection = await server.CreateClientConnectionAsync(clientOpts, useAuthInUrl: useAuthInUrl);
+        await using var pubConnection = await server.CreateClientConnectionAsync(clientOpts, useAuthInUrl: useAuthInUrl);
 
         var signalComplete1 = new WaitSignal();
         var signalComplete2 = new WaitSignal();

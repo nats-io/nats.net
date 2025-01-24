@@ -10,7 +10,7 @@ public class ConnectionRetryTest
     public async Task Max_retry_reached_after_disconnect()
     {
         await using var server = await NatsServer.StartAsync();
-        await using var nats = server.CreateClientConnection(new NatsOpts { MaxReconnectRetry = 2, ReconnectWaitMax = TimeSpan.Zero, ReconnectWaitMin = TimeSpan.FromSeconds(.1), });
+        await using var nats = await server.CreateClientConnectionAsync(new NatsOpts { MaxReconnectRetry = 2, ReconnectWaitMax = TimeSpan.Zero, ReconnectWaitMin = TimeSpan.FromSeconds(.1), });
 
         var signal = new WaitSignal();
         nats.ReconnectFailed += (_, _) =>
@@ -32,7 +32,7 @@ public class ConnectionRetryTest
     public async Task Retry_and_connect_after_disconnected()
     {
         await using var server = await NatsServer.StartAsync();
-        await using var nats = server.CreateClientConnection(new NatsOpts { MaxReconnectRetry = 10, ReconnectWaitMax = TimeSpan.Zero, ReconnectWaitMin = TimeSpan.FromSeconds(2), });
+        await using var nats = await server.CreateClientConnectionAsync(new NatsOpts { MaxReconnectRetry = 10, ReconnectWaitMax = TimeSpan.Zero, ReconnectWaitMin = TimeSpan.FromSeconds(2), });
 
         var signal = new WaitSignal();
         nats.ReconnectFailed += (_, _) =>
@@ -61,7 +61,7 @@ public class ConnectionRetryTest
         const int msgSize = 1048576; // 1MiB
         await using var server = await NatsServer.StartAsync();
 
-        await using var pubConn = server.CreateClientConnection();
+        await using var pubConn = await server.CreateClientConnectionAsync();
         await pubConn.ConnectAsync();
 
         var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -71,7 +71,7 @@ public class ConnectionRetryTest
         var subActive = 0;
         var subTask = Task.Run(async () =>
         {
-            await using var subConn = server.CreateClientConnection();
+            await using var subConn = await server.CreateClientConnectionAsync();
             await using var sub = await subConn.SubscribeCoreAsync<NatsMemoryOwner<byte>>("test", cancellationToken: timeoutCts.Token);
             await foreach (var msg in sub.Msgs.ReadAllAsync(timeoutCts.Token))
             {

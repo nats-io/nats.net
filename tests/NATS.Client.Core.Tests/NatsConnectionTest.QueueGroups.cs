@@ -10,9 +10,9 @@ public abstract partial class NatsConnectionTest
 
         await using var server = await NatsServer.StartAsync(_output, _transportType);
 
-        await using var conn1 = server.CreateClientConnection();
-        await using var conn2 = server.CreateClientConnection();
-        await using var conn3 = server.CreateClientConnection();
+        await using var conn1 = await server.CreateClientConnectionAsync();
+        await using var conn2 = await server.CreateClientConnectionAsync();
+        await using var conn3 = await server.CreateClientConnectionAsync();
 
         var sub1 = await conn1.SubscribeCoreAsync<int>("foo.*", queueGroup: "my-group");
         var sub2 = await conn2.SubscribeCoreAsync<int>("foo.*", queueGroup: "my-group");

@@ -87,7 +87,7 @@ public class SubscriptionTest
     public async Task Auto_unsubscribe_on_max_messages_with_inbox_subscription_test()
     {
         await using var server = await NatsServer.StartAsync();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = await server.CreateClientConnectionAsync();
         var subject = nats.NewInbox();
 
         await using var sub1 = await nats.SubscribeCoreAsync<int>(subject, opts: new NatsSubOpts { MaxMsgs = 1 });
@@ -126,7 +126,7 @@ public class SubscriptionTest
     public async Task Auto_unsubscribe_on_max_messages_test()
     {
         await using var server = await NatsServer.StartAsync();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = await server.CreateClientConnectionAsync();
         const string subject = "foo1";
         const int maxMsgs = 99;
         var opts = new NatsSubOpts { MaxMsgs = maxMsgs };
@@ -156,7 +156,7 @@ public class SubscriptionTest
     public async Task Auto_unsubscribe_on_timeout_test()
     {
         await using var server = await NatsServer.StartAsync();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = await server.CreateClientConnectionAsync();
 
         const string subject = "foo2";
         var opts = new NatsSubOpts { Timeout = TimeSpan.FromSeconds(1) };
@@ -179,7 +179,7 @@ public class SubscriptionTest
     public async Task Auto_unsubscribe_on_idle_timeout_test()
     {
         await using var server = await NatsServer.StartAsync();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = await server.CreateClientConnectionAsync();
         const string subject = "foo3";
         var opts = new NatsSubOpts { IdleTimeout = TimeSpan.FromSeconds(3) };
 
@@ -210,7 +210,7 @@ public class SubscriptionTest
     public async Task Manual_unsubscribe_test()
     {
         await using var server = await NatsServer.StartAsync();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = await server.CreateClientConnectionAsync();
         const string subject = "foo4";
         await using var sub = await nats.SubscribeCoreAsync<int>(subject);
 
@@ -294,7 +294,7 @@ public class SubscriptionTest
     public async Task Serialization_exceptions()
     {
         await using var server = await NatsServer.StartAsync();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = await server.CreateClientConnectionAsync();
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 

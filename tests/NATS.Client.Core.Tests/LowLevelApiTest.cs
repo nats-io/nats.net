@@ -13,7 +13,7 @@ public class LowLevelApiTest
     public async Task Sub_custom_builder_test()
     {
         await using var server = await NatsServer.StartAsync();
-        var nats = server.CreateClientConnection();
+        var nats = await server.CreateClientConnectionAsync();
 
         var subject = "foo.*";
         var builder = new NatsSubCustomTestBuilder(_output);

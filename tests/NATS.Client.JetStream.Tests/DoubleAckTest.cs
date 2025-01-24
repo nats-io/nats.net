@@ -10,7 +10,7 @@ public class DoubleAckTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         await using var server = await NatsServer.StartJSAsync();
 
-        await using var nats = server.CreateClientConnection();
+        await using var nats = await server.CreateClientConnectionAsync();
 
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);

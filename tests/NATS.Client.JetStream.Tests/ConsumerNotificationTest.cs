@@ -10,7 +10,7 @@ public class ConsumerNotificationTest
     public async Task Non_terminal_errors_sent_as_notifications()
     {
         await using var server = await NatsServer.StartJSAsync();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -84,7 +84,7 @@ public class ConsumerNotificationTest
     public async Task Exceeded_max_errors()
     {
         await using var server = await NatsServer.StartJSAsync();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));

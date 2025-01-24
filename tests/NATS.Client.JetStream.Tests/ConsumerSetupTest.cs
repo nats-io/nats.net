@@ -9,7 +9,7 @@ public class ConsumerSetupTest
     public async Task Create_push_consumer()
     {
         await using var server = await NatsServer.StartJSAsync();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -41,7 +41,7 @@ public class ConsumerSetupTest
     public async Task Create_paused_consumer()
     {
         await using var server = await NatsServer.StartJSAsync();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContextFactory().CreateContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));

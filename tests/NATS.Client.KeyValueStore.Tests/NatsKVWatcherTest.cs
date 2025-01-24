@@ -21,7 +21,7 @@ public class NatsKVWatcherTest
         var cancellationToken = cts.Token;
 
         await using var server = await NatsServer.StartJSAsync();
-        await using var nats1 = server.CreateClientConnection();
+        await using var nats1 = await server.CreateClientConnectionAsync();
         var js1 = new NatsJSContext(nats1);
         var kv1 = new NatsKVContext(js1);
         var store1 = await kv1.CreateStoreAsync(config, cancellationToken: cancellationToken);
@@ -104,7 +104,7 @@ public class NatsKVWatcherTest
         var cancellationToken = cts.Token;
 
         await using var server = await NatsServer.StartJSAsync();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = await server.CreateClientConnectionAsync();
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -148,7 +148,7 @@ public class NatsKVWatcherTest
         var cancellationToken = cts.Token;
 
         await using var server = await NatsServer.StartJSAsync();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = await server.CreateClientConnectionAsync();
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -214,7 +214,7 @@ public class NatsKVWatcherTest
         var cancellationToken = cts.Token;
 
         await using var server = await NatsServer.StartJSWithTraceAsync(_output);
-        await using var nats1 = server.CreateClientConnection();
+        await using var nats1 = await server.CreateClientConnectionAsync();
         var js1 = new NatsJSContext(nats1);
         var kv1 = new NatsKVContext(js1);
         var store1 = await kv1.CreateStoreAsync(bucket, cancellationToken: cancellationToken);
@@ -309,7 +309,7 @@ public class NatsKVWatcherTest
     public async Task Watch_push_consumer_flow_control()
     {
         await using var server = await NatsServer.StartJSAsync();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = await server.CreateClientConnectionAsync();
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -349,7 +349,7 @@ public class NatsKVWatcherTest
         var cancellationToken = cts.Token;
 
         await using var server = await NatsServer.StartJSAsync();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = await server.CreateClientConnectionAsync();
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -390,7 +390,7 @@ public class NatsKVWatcherTest
     public async Task Serialization_errors()
     {
         await using var server = await NatsServer.StartJSAsync();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = await server.CreateClientConnectionAsync();
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -416,7 +416,7 @@ public class NatsKVWatcherTest
     public async Task Watch_with_empty_filter()
     {
         await using var server = await NatsServer.StartJSAsync();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = await server.CreateClientConnectionAsync();
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -437,7 +437,7 @@ public class NatsKVWatcherTest
     public async Task Watch_with_multiple_filter_on_old_server()
     {
         await using var server = await NatsServer.StartJSAsync();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = await server.CreateClientConnectionAsync();
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -466,7 +466,7 @@ public class NatsKVWatcherTest
     public async Task Watch_resume_at_revision()
     {
         await using var server = await NatsServer.StartJSAsync();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = await server.CreateClientConnectionAsync();
 
         const string bucket = "Watch_resume_at_revision";
         var config = new NatsKVConfig(bucket) { History = 10 };
@@ -549,7 +549,7 @@ public class NatsKVWatcherTest
     public async Task Validate_watch_options()
     {
         await using var server = await NatsServer.StartJSAsync();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = await server.CreateClientConnectionAsync();
 
         const string bucket = nameof(Validate_watch_options);
         var config = new NatsKVConfig(bucket) { History = 10 };

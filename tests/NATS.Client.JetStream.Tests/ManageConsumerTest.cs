@@ -13,7 +13,7 @@ public class ManageConsumerTest
     public async Task Create_get_consumer()
     {
         await using var server = await NatsServer.StartJSAsync();
-        await using var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
+        await using var nats = await server.CreateClientConnectionAsync(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
@@ -44,7 +44,7 @@ public class ManageConsumerTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
         await using var server = await NatsServer.StartJSAsync();
-        var nats = server.CreateClientConnection();
+        var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
         await js.CreateOrUpdateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
@@ -86,7 +86,7 @@ public class ManageConsumerTest
     public async Task Pause_resume_consumer()
     {
         await using var server = await NatsServer.StartJSAsync();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContextFactory().CreateContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -123,7 +123,7 @@ public class ManageConsumerTest
     public async Task Consumer_create_update_action()
     {
         await using var server = await NatsServer.StartJSAsync();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContext(nats);
 
         var streamConfig = new StreamConfig { Name = "s1" };

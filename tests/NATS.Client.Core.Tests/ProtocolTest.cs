@@ -80,7 +80,7 @@ public class ProtocolTest
             {
                 try
                 {
-                    await server.CreateClientConnection().PingAsync(cts.Token);
+                    await (await server.CreateClientConnectionAsync()).PingAsync(cts.Token);
                     break;
                 }
                 catch

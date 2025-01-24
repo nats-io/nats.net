@@ -199,7 +199,7 @@ public class ConsumerConsumeTest
         await using var server = await NatsServer.StartJSAsync();
 
         var (nats, proxy) = server.CreateProxiedClientConnection();
-        await using var nats2 = server.CreateClientConnection();
+        await using var nats2 = await server.CreateClientConnectionAsync();
 
         var js = new NatsJSContext(nats);
         var js2 = new NatsJSContext(nats2);
@@ -346,7 +346,7 @@ public class ConsumerConsumeTest
     public async Task Consume_stop_test()
     {
         await using var server = await NatsServer.StartJSAsync();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = await server.CreateClientConnectionAsync();
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
@@ -422,7 +422,7 @@ public class ConsumerConsumeTest
     public async Task Serialization_errors()
     {
         await using var server = await NatsServer.StartJSAsync();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -450,7 +450,7 @@ public class ConsumerConsumeTest
     public async Task Consume_right_amount_of_messages()
     {
         await using var server = await NatsServer.StartJSAsync();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = await server.CreateClientConnectionAsync();
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
@@ -507,7 +507,7 @@ public class ConsumerConsumeTest
     public async Task Consume_right_amount_of_messages_when_ack_wait_exceeded()
     {
         await using var server = await NatsServer.StartJSAsync();
-        await using var nats = server.CreateClientConnection();
+        await using var nats = await server.CreateClientConnectionAsync();
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
 

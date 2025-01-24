@@ -58,7 +58,7 @@ public class JetStreamTest
                 .Trace()
                 .UseJetStream()
                 .Build());
-        var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
+        var nats = await server.CreateClientConnectionAsync(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
 
         // Happy user
         {

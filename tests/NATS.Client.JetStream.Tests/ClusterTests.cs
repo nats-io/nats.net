@@ -13,7 +13,7 @@ public class ClusterTests
     {
         await using var cluster = new NatsCluster(new NullOutputHelper(), TransportType.Tcp, (i, b) => b.WithServerName($"n{i}").UseJetStream());
         await cluster.StartAsync();
-        await using var nats = cluster.Server1.CreateClientConnection();
+        await using var nats = await cluster.Server1.CreateClientConnectionAsync();
 
         await nats.PingAsync();
 

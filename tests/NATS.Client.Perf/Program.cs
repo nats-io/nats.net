@@ -24,8 +24,8 @@ await using var server = await NatsServer.StartAsync();
 Console.WriteLine("\nRunning nats bench");
 var natsBenchTotalMsgs = RunNatsBench(server.ClientUrl, t);
 
-await using var nats1 = server.CreateClientConnection(NatsOpts.Default with { SubPendingChannelFullMode = BoundedChannelFullMode.Wait }, testLogger: false);
-await using var nats2 = server.CreateClientConnection(testLogger: false);
+await using var nats1 = await server.CreateClientConnectionAsync(NatsOpts.Default with { SubPendingChannelFullMode = BoundedChannelFullMode.Wait }, testLogger: false);
+await using var nats2 = await server.CreateClientConnectionAsync(testLogger: false);
 
 var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 

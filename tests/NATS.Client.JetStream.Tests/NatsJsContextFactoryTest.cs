@@ -21,7 +21,7 @@ public class NatsJSContextFactoryTest
                 .Trace()
                 .UseJetStream()
                 .Build());
-        await using var connection = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
+        await using var connection = await server.CreateClientConnectionAsync(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
         var factory = new NatsJSContextFactory();
 
         // Act
@@ -42,7 +42,7 @@ public class NatsJSContextFactoryTest
                 .Trace()
                 .UseJetStream()
                 .Build());
-        await using var connection = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
+        await using var connection = await server.CreateClientConnectionAsync(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
         var factory = new NatsJSContextFactory();
         var opts = new NatsJSOpts(connection.Opts);
 

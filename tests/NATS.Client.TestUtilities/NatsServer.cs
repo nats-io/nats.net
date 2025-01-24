@@ -159,18 +159,22 @@ public class NatsServer : IAsyncDisposable
             {
                 server = new NatsServer(outputHelper, opts);
                 await server.StartServerProcessAsync();
-                nats = server.CreateClientConnection(clientOpts ?? NatsOpts.Default, reTryCount: 3, useAuthInUrl: useAuthInUrl);
-#pragma warning disable CA2012
+                nats = await server.CreateClientConnectionAsync(clientOpts ?? NatsOpts.Default, reTryCount: 3, useAuthInUrl: useAuthInUrl);
                 return server;
             }
             catch
             {
-                server?.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                if (server != null)
+                {
+                    await server.DisposeAsync();
+                }
             }
             finally
             {
-                nats?.DisposeAsync().AsTask().GetAwaiter().GetResult();
-#pragma warning restore CA2012
+                if (nats != null)
+                {
+                    await nats.DisposeAsync();
+                }
             }
         }
 
@@ -179,7 +183,7 @@ public class NatsServer : IAsyncDisposable
 
     public async Task StartServerProcessAsync()
     {
-        _cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        _cancellationTokenSource = new CancellationTokenSource();
 
         (ConfigFile, var config, var cmd) = GetCmd(Opts);
 
@@ -190,21 +194,23 @@ public class NatsServer : IAsyncDisposable
         _processErr = EnumerateWithLogsAsync(stderr, _cancellationTokenSource.Token);
 
         // Check for start server
+        var loopTimeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var loopCts = CancellationTokenSource.CreateLinkedTokenSource(_cancellationTokenSource.Token, loopTimeoutCts.Token);
         using var client = new TcpClient();
         while (!_cancellationTokenSource.IsCancellationRequested)
         {
             try
             {
-                await client.ConnectAsync("127.0.0.1", Opts.ServerPort, _cancellationTokenSource.Token);
+                await client.ConnectAsync("127.0.0.1", Opts.ServerPort, loopCts.Token);
                 if (client.Connected)
-                    return;
+                    break;
             }
             catch
             {
                 // ignore
             }
 
-            await Task.Delay(500, _cancellationTokenSource.Token);
+            await Task.Delay(500, loopCts.Token);
         }
 
         if (_processOut.IsFaulted)
@@ -347,7 +353,7 @@ public class NatsServer : IAsyncDisposable
         return (client, proxy);
     }
 
-    public NatsConnection CreateClientConnection(NatsOpts? options = default, int reTryCount = 10, bool ignoreAuthorizationException = false, bool testLogger = true, bool useAuthInUrl = false)
+    public async Task<NatsConnection> CreateClientConnectionAsync(NatsOpts? options = default, int reTryCount = 10, bool ignoreAuthorizationException = false, bool testLogger = true, bool useAuthInUrl = false)
     {
         for (var i = 0; i < reTryCount; i++)
         {
@@ -357,9 +363,7 @@ public class NatsServer : IAsyncDisposable
 
                 try
                 {
-#pragma warning disable CA2012
-                    nats.PingAsync().AsTask().GetAwaiter().GetResult();
-#pragma warning restore CA2012
+                    await nats.PingAsync();
                 }
                 catch (NatsException e)
                 {
@@ -536,7 +540,6 @@ public class NatsCluster : IAsyncDisposable
         }
 
         var routes = new[] { _opts1, _opts2, _opts3 };
-
         foreach (var opt in routes)
         {
             opt.SetRoutes(routes);
