@@ -32,6 +32,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\NATS.Client.Core\NATS.Client.Core.csproj" />
+    <ProjectReference Include="..\NATS.Client.TestUtilities2\NATS.Client.TestUtilities2.csproj" />
   </ItemGroup>
 
   <ItemGroup>
