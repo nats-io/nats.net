@@ -62,9 +62,9 @@ public record NatsAuthOpts
 
     /// <summary>
     /// Callback to provide NATS authentication credentials.
-    /// When specified, the <see cref="NatsAuthType"/> of the
-    /// returned <see cref="NatsAuthCred"/> will take precedence
-    /// over other authentication options.
+    /// When specified, value of <see cref="NatsAuthCred"/> will take precedence
+    /// over other authentication options. Note that, <c>default</c> value of
+    /// <see cref="NatsAuthCred"/> should not be returned as the behavior is not defined.
     /// </summary>
     public Func<Uri, CancellationToken, ValueTask<NatsAuthCred>>? AuthCredCallback { get; init; }
 
