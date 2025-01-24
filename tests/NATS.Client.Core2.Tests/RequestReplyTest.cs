@@ -1,9 +1,7 @@
 using System.Buffers;
 using System.Text;
 using NATS.Client.Core2.Tests;
-#if !NET6_0_OR_GREATER
-using NATS.Client.Core.Internal.NetStandardExtensions;
-#endif
+using NATS.Client.Core2.Tests.ExtraUtils.FrameworkPolyfillExtensions;
 
 namespace NATS.Client.Core.Tests;
 

@@ -2,7 +2,10 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-#if !NET6_0_OR_GREATER
+
+#if NATS_CORE2_TEST
+using NATS.Client.Core2.Tests.ExtraUtils.FrameworkPolyfillExtensions;
+#elif !NET6_0_OR_GREATER
 using NATS.Client.Core.Internal.NetStandardExtensions;
 #endif
 

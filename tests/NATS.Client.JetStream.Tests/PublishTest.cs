@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Tests;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -199,6 +200,10 @@ public class PublishTest
 
         // use different connection to create stream and consumer to avoid request timeouts
         await using var nats0 = await server.CreateClientConnectionAsync();
+
+        await nats.ConnectRetryAsync();
+        await nats0.ConnectRetryAsync();
+
         var js0 = new NatsJSContext(nats0);
         await js0.CreateStreamAsync("s1", new[] { "s1.>" }, cts.Token);
         await js0.CreateOrUpdateConsumerAsync("s1", "c1", cancellationToken: cts.Token);

@@ -11,6 +11,7 @@
         <RunSettingsFilePath>$(MSBuildProjectDirectory)\..\xunit.runsettings</RunSettingsFilePath>
         <IsPackable>false</IsPackable>
         <IsTestProject>true</IsTestProject>
+        <DefineConstants>$(DefineConstants);NATS_CORE2_TEST</DefineConstants>
     </PropertyGroup>
 
     <ItemGroup>

@@ -36,6 +36,7 @@
       <ProjectReference Include="..\..\src\NATS.Client.Serializers.Json\NATS.Client.Serializers.Json.csproj" />
       <ProjectReference Include="..\..\src\NATS.Extensions.Microsoft.DependencyInjection\NATS.Extensions.Microsoft.DependencyInjection.csproj" />
       <ProjectReference Include="..\..\src\NATS.Net\NATS.Net.csproj" />
+      <ProjectReference Include="..\NATS.Client.TestUtilities2\NATS.Client.TestUtilities2.csproj" />
     </ItemGroup>
 
     <ItemGroup>

@@ -421,20 +421,19 @@ public abstract partial class NatsConnectionTest
         await using var server = await NatsServer.StartAsync();
         var clientOpts = server.ClientOpts(NatsOpts.Default);
 
-        var wasInvoked = false;
+        var wasInvoked = new WaitSignal();
         var nats = new NatsConnection(clientOpts);
-        nats.OnSocketAvailableAsync = async socket =>
+        nats.OnSocketAvailableAsync = socket =>
         {
-            wasInvoked = true;
-            await Task.Delay(10);
-            return socket;
+            wasInvoked.Pulse();
+            return new ValueTask<ISocketConnection>(socket);
         };
 
         // Act
         await nats.ConnectAsync();
 
         // Assert
-        Assert.True(wasInvoked, "OnSocketAvailableAsync should be invoked on initial connection.");
+        await wasInvoked;
     }
 
     [Fact]
@@ -446,26 +445,20 @@ public abstract partial class NatsConnectionTest
 
         var invocationCount = 0;
         var nats = new NatsConnection(clientOpts);
-        nats.OnSocketAvailableAsync = async socket =>
+        nats.OnSocketAvailableAsync = socket =>
         {
-            invocationCount++;
-            await Task.Delay(10);
-            return socket;
+            Interlocked.Increment(ref invocationCount);
+            return new ValueTask<ISocketConnection>(socket);
         };
 
         // Simulate initial connection
         await nats.ConnectAsync();
 
-        // Simulate disconnection
-        await server.StopAsync();
+        await server.RestartAsync();
 
-        // Act
-        // Simulate reconnection
-        await server.StartServerProcessAsync();
         await nats.ConnectAsync();
 
-        // Assert
-        Assert.Equal(2, invocationCount);
+        await Retry.Until("callback", () => Interlocked.CompareExchange(ref invocationCount, 0, 0) == 2);
     }
 
     [Fact]
