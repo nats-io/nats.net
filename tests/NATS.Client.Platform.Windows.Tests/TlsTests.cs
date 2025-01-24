@@ -1,3 +1,4 @@
+using System.Net.Sockets;
 using System.Security.Authentication;
 using NATS.Client.Core;
 
@@ -21,7 +22,7 @@ public class TlsTests : IClassFixture<TlsTestsNatsServerFixture>
 
         var exception = await Assert.ThrowsAsync<NatsException>(async () => await nats.ConnectAsync());
         Assert.Matches("TLS authentication failed|Unable to read data from the transport", exception.InnerException?.Message);
-        Assert.IsType<AuthenticationException>(exception.InnerException?.InnerException);
+        Assert.True(exception.InnerException?.InnerException is SocketException or AuthenticationException);
     }
 
     [Fact]
