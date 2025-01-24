@@ -276,7 +276,6 @@ public class NatsServer : IAsyncDisposable
     public async ValueTask RestartAsync()
     {
         DebugLogger.Log("[T] Restarting process");
-        var t1 = ServerProcess?.StartTime;
 
         var serverProcessId = ServerProcess?.Id;
 
@@ -287,7 +286,8 @@ public class NatsServer : IAsyncDisposable
             if (serverProcessId != null)
             {
                 Process.GetProcessById(serverProcessId.Value).Kill();
-                Process.GetProcessById(serverProcessId.Value).WaitForExit();
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                await Process.GetProcessById(serverProcessId.Value).WaitForExitAsync(cts.Token);
             }
         }
         catch
@@ -297,9 +297,7 @@ public class NatsServer : IAsyncDisposable
 
         await StartServerProcessAsync();
 
-        var t2 = ServerProcess?.StartTime;
-
-        if (t1 == t2)
+        if (serverProcessId == ServerProcess!.Id)
             throw new Exception("Can't restart nats-server");
     }
 
