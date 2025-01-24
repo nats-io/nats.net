@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net.Sockets;
 using System.Security.Authentication;
 using NATS.Client.Core;
@@ -40,7 +41,27 @@ public class TlsTests : IClassFixture<TlsTestsNatsServerFixture>
 
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, TlsOpts = tlsOpts });
 
-        await nats.PingAsync();
+        Exception? exception = null;
+        var stopwatch = Stopwatch.StartNew();
+        while (stopwatch.Elapsed < TimeSpan.FromSeconds(10))
+        {
+            try
+            {
+                await nats.ConnectAsync();
+                exception = null;
+                break;
+            }
+            catch (Exception ex)
+            {
+                exception = ex;
+                await Task.Delay(1000);
+            }
+        }
+
+        if (exception is not null)
+        {
+            throw exception;
+        }
 
         await using var sub = await nats.SubscribeCoreAsync<int>($"{prefix}.foo");
         for (var i = 0; i < 64; i++)
