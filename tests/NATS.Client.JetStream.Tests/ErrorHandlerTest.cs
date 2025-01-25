@@ -310,9 +310,16 @@ public class ErrorHandlerTest
 
         await Retry.Until("timed out", () => Volatile.Read(ref timeoutNotifications) > 0, timeout: TimeSpan.FromSeconds(30));
         consumeCts.Cancel();
-        await consume;
 
         Assert.True(Volatile.Read(ref timeoutNotifications) > 0);
+
+        try
+        {
+            await consume;
+        }
+        catch (OperationCanceledException)
+        {
+        }
     }
 
     [Fact]
