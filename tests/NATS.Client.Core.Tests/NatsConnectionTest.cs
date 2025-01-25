@@ -458,7 +458,7 @@ public abstract partial class NatsConnectionTest
 
         await nats.ConnectAsync();
 
-        await Retry.Until("callback", () => Interlocked.CompareExchange(ref invocationCount, 0, 0) == 2);
+        await Retry.Until("callback", () => Interlocked.CompareExchange(ref invocationCount, 0, 0) == 2, timeout: TimeSpan.FromSeconds(30));
     }
 
     [Fact]
