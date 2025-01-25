@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.Core.Tests;
 

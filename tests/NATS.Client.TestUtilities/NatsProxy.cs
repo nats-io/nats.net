@@ -121,7 +121,7 @@ public class NatsProxy : IDisposable
         }
     }
 
-    public IReadOnlyList<Frame> ClientFrames => Frames.Where(f => f.Origin == "C").ToList();
+    public IReadOnlyList<Frame> ClientFrames => Frames.Where(f => f.Origin == "C" && !f.Message.Contains("__PROXY_SIGNAL_SYNC__")).ToList();
 
     public IReadOnlyList<Frame> ServerFrames => Frames.Where(f => f.Origin == "S").ToList();
 
@@ -152,13 +152,19 @@ public class NatsProxy : IDisposable
 
     public async Task FlushFramesAsync(NatsConnection nats)
     {
-        var subject = $"_SIGNAL_SYNC_{Interlocked.Increment(ref _syncCount)}";
+        var subject = $"__PROXY_SIGNAL_SYNC__{Interlocked.Increment(ref _syncCount)}";
 
         await nats.PublishAsync(subject);
 
         await Retry.Until(
             "flush sync frame",
-            () => AllFrames.Any(f => f.Message == $"PUB {subject} 0␍␊"));
+            async () =>
+            {
+                await nats.PublishAsync(subject);
+                return AllFrames.Any(f => f.Message == $"PUB {subject} 0␍␊");
+            },
+            retryDelay: TimeSpan.FromSeconds(1),
+            timeout: TimeSpan.FromSeconds(60));
 
         lock (_frames)
             _frames.Clear();

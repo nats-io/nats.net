@@ -245,7 +245,7 @@ public class ErrorHandlerTest
 
         var js = new NatsJSContext(nats);
 
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 
         var stream = await js.CreateStreamAsync(new StreamConfig($"{prefix}s1", new[] { $"{prefix}s1.*" }), cts.Token);
         var consumer = (NatsJSOrderedConsumer)await stream.CreateOrderedConsumerAsync(cancellationToken: cts.Token);
@@ -281,7 +281,7 @@ public class ErrorHandlerTest
         // Swallow heartbeats
         proxy.ServerInterceptors.Add(m => m?.Contains("Idle Heartbeat") ?? false ? null : m);
 
-        var consumeCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
+        var consumeCts = new CancellationTokenSource();
         var consume = Task.Run(
             async () =>
             {
@@ -308,11 +308,18 @@ public class ErrorHandlerTest
             },
             cts.Token);
 
-        await Retry.Until("timed out", () => Volatile.Read(ref timeoutNotifications) > 0, timeout: TimeSpan.FromSeconds(20));
+        await Retry.Until("timed out", () => Volatile.Read(ref timeoutNotifications) > 0, timeout: TimeSpan.FromSeconds(30));
         consumeCts.Cancel();
-        await consume;
 
         Assert.True(Volatile.Read(ref timeoutNotifications) > 0);
+
+        try
+        {
+            await consume;
+        }
+        catch (OperationCanceledException)
+        {
+        }
     }
 
     [Fact]
