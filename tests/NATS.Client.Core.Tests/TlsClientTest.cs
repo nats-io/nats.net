@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.Core.Tests;
 
@@ -78,6 +79,7 @@ public class TlsClientTest
         var clientOpts = server.ClientOpts(NatsOpts.Default);
         clientOpts = clientOpts with { TlsOpts = clientOpts.TlsOpts with { CertFile = null, KeyFile = null } };
         await using var nats = new NatsConnection(clientOpts);
+        await nats.ConnectRetryAsync();
 
         var exceptionTask = Assert.ThrowsAsync<NatsException>(async () => await nats.ConnectAsync());
 
