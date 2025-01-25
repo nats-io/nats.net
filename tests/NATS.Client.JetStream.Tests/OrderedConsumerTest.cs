@@ -1,33 +1,43 @@
 using System.Diagnostics;
 using NATS.Client.Core.Tests;
+using NATS.Client.Core2.Tests;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.JetStream.Tests;
 
+[Collection("nats-server")]
 public class OrderedConsumerTest
 {
     private readonly ITestOutputHelper _output;
+    private readonly NatsServerFixture _server;
 
-    public OrderedConsumerTest(ITestOutputHelper output) => _output = output;
+    public OrderedConsumerTest(ITestOutputHelper output, NatsServerFixture server)
+    {
+        _output = output;
+        _server = server;
+    }
 
     [Fact]
     public async Task Consume_test()
     {
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        await using var server = await NatsServer.StartJSAsync();
-        await using var nats = await server.CreateClientConnectionAsync();
+        await using var nats = _server.CreateNatsConnection();
+        await nats.ConnectRetryAsync();
+        var prefix = _server.GetNextId();
+
         var js = new NatsJSContext(nats);
 
-        var stream = await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var stream = await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
 
         for (var i = 0; i < 10; i++)
         {
-            await js.PublishAsync("s1.foo", i, cancellationToken: cts.Token);
+            await js.PublishAsync($"{prefix}s1.foo", i, cancellationToken: cts.Token);
         }
 
         var consumer = await stream.CreateOrderedConsumerAsync(cancellationToken: cts.Token);
 
         var count = 0;
-        _output.WriteLine("Consuming...");
         var consumeOpts = new NatsJSConsumeOpts
         {
             MaxMsgs = 3,
@@ -35,7 +45,6 @@ public class OrderedConsumerTest
         };
         await foreach (var msg in consumer.ConsumeAsync<int>(opts: consumeOpts, cancellationToken: cts.Token))
         {
-            _output.WriteLine($"[RCV] {msg.Data}");
             Assert.Equal(count, msg.Data);
             if (++count == 10)
                 break;
@@ -51,7 +60,7 @@ public class OrderedConsumerTest
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
-        var stream = await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
+        var stream = await js.CreateStreamAsync("s1", ["s1.*"], cts.Token);
 
         for (var i = 0; i < 50; i++)
         {
@@ -87,23 +96,25 @@ public class OrderedConsumerTest
     [Fact]
     public async Task Fetch_test()
     {
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        await using var server = await NatsServer.StartJSAsync();
-        await using var nats = await server.CreateClientConnectionAsync();
+        await using var nats = _server.CreateNatsConnection();
+        await nats.ConnectRetryAsync();
+        var prefix = _server.GetNextId();
+
         var js = new NatsJSContext(nats);
 
-        var stream = await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        var stream = await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
 
         for (var i = 0; i < 10; i++)
         {
-            await js.PublishAsync("s1.foo", i, cancellationToken: cts.Token);
+            await js.PublishAsync($"{prefix}s1.foo", i, cancellationToken: cts.Token);
         }
 
         var consumer = await stream.CreateOrderedConsumerAsync(cancellationToken: cts.Token);
 
         for (var i = 0; i < 10;)
         {
-            _output.WriteLine("Fetching...");
             var fetchOpts = new NatsJSFetchOpts
             {
                 MaxMsgs = 3,
@@ -111,7 +122,6 @@ public class OrderedConsumerTest
             };
             await foreach (var msg in consumer.FetchAsync<int>(opts: fetchOpts, cancellationToken: cts.Token))
             {
-                _output.WriteLine($"[RCV] {msg.Data}");
                 Assert.Equal(i, msg.Data);
                 i++;
             }
@@ -121,12 +131,15 @@ public class OrderedConsumerTest
     [Fact]
     public async Task Fetch_no_wait_test()
     {
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        await using var server = await NatsServer.StartJSAsync();
-        await using var nats = await server.CreateClientConnectionAsync();
+        await using var nats = _server.CreateNatsConnection();
+        await nats.ConnectRetryAsync();
+        var prefix = _server.GetNextId();
+
         var js = new NatsJSContext(nats);
 
-        var stream = await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var stream = await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
 
         var consumer = await stream.CreateOrderedConsumerAsync(cancellationToken: cts.Token);
 
@@ -140,8 +153,6 @@ public class OrderedConsumerTest
 
         stopwatch.Stop();
 
-        _output.WriteLine($"stopwatch.Elapsed: {stopwatch.Elapsed}");
-
         Assert.Equal(0, count);
         Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(10));
 
@@ -149,7 +160,7 @@ public class OrderedConsumerTest
         // without waiting for the timeout.
         for (var i = 0; i < 10; i++)
         {
-            await js.PublishAsync("s1.foo", i, cancellationToken: cts.Token);
+            await js.PublishAsync($"{prefix}s1.foo", i, cancellationToken: cts.Token);
         }
 
         stopwatch.Restart();
@@ -159,7 +170,6 @@ public class OrderedConsumerTest
             var currentCount = 0;
             await foreach (var msg in consumer.FetchNoWaitAsync<int>(opts: new NatsJSFetchOpts { MaxMsgs = 6 }, cancellationToken: cts.Token))
             {
-                _output.WriteLine($"[RCV][{iterationCount}] {msg.Data}");
                 Assert.Equal(count, msg.Data);
                 count++;
                 currentCount++;
@@ -184,23 +194,25 @@ public class OrderedConsumerTest
     [Fact]
     public async Task Next_test()
     {
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        await using var server = await NatsServer.StartJSAsync();
-        await using var nats = await server.CreateClientConnectionAsync();
+        await using var nats = _server.CreateNatsConnection();
+        await nats.ConnectRetryAsync();
+        var prefix = _server.GetNextId();
+
         var js = new NatsJSContext(nats);
 
-        var stream = await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var stream = await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
 
         for (var i = 0; i < 10; i++)
         {
-            await js.PublishAsync("s1.foo", i, cancellationToken: cts.Token);
+            await js.PublishAsync($"{prefix}s1.foo", i, cancellationToken: cts.Token);
         }
 
         var consumer = await stream.CreateOrderedConsumerAsync(cancellationToken: cts.Token);
 
         for (var i = 0; i < 10;)
         {
-            _output.WriteLine("Next...");
             var nextOpts = new NatsJSNextOpts
             {
                 Expires = TimeSpan.FromSeconds(3),
@@ -209,7 +221,6 @@ public class OrderedConsumerTest
 
             if (next is { } msg)
             {
-                _output.WriteLine($"[RCV] {msg.Data}");
                 Assert.Equal(i, msg.Data);
                 i++;
             }
