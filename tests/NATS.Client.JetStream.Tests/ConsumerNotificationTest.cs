@@ -9,8 +9,8 @@ public class ConsumerNotificationTest
     [SkipOnPlatform("WINDOWS", "doesn't support signals")]
     public async Task Non_terminal_errors_sent_as_notifications()
     {
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -83,8 +83,8 @@ public class ConsumerNotificationTest
     [Fact]
     public async Task Exceeded_max_errors()
     {
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));

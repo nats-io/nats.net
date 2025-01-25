@@ -1,6 +1,7 @@
 using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Models;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -239,6 +240,8 @@ public class ErrorHandlerTest
         var proxy = new NatsProxy(_server.Port);
         await using var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}", ConnectTimeout = TimeSpan.FromSeconds(10) });
         var prefix = _server.GetNextId();
+
+        await nats.ConnectRetryAsync();
 
         var js = new NatsJSContext(nats);
 

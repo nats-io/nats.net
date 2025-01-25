@@ -1,4 +1,6 @@
+using System.Security.Cryptography;
 using System.Text;
+using Microsoft.Extensions.Logging;
 using NATS.Client.Core.NaCl;
 
 namespace NATS.Client.Core.Internal;
@@ -11,6 +13,7 @@ internal class UserCredentials
         Seed = authOpts.Seed;
         NKey = authOpts.NKey;
         Token = authOpts.Token;
+        AuthCredCallback = authOpts.AuthCredCallback;
 
         if (!string.IsNullOrEmpty(authOpts.CredsFile))
         {
@@ -31,24 +34,85 @@ internal class UserCredentials
 
     public string? Token { get; }
 
-    public string? Sign(string? nonce)
+    public Func<Uri, CancellationToken, ValueTask<NatsAuthCred>>? AuthCredCallback { get; }
+
+    public string? Sign(string? nonce, string? seed = null)
     {
-        if (Seed == null || nonce == null)
+        seed ??= Seed;
+
+        if (seed == null || nonce == null)
             return null;
 
-        using var kp = NKeys.FromSeed(Seed);
+        using var kp = NKeys.FromSeed(seed);
         var bytes = kp.Sign(Encoding.ASCII.GetBytes(nonce));
         var sig = CryptoBytes.ToBase64String(bytes);
 
         return sig;
     }
 
-    internal void Authenticate(ClientOpts opts, ServerInfo? info)
+    internal async Task AuthenticateAsync(ClientOpts opts, ServerInfo? info, NatsUri uri, TimeSpan timeout, CancellationToken cancellationToken)
     {
-        opts.JWT = Jwt;
-        opts.NKey = NKey;
-        opts.AuthToken = Token;
-        opts.Sig = info is { AuthRequired: true, Nonce: { } } ? Sign(info.Nonce) : null;
+        string? seed = null;
+        if (AuthCredCallback != null)
+        {
+            using var cts = new CancellationTokenSource(timeout);
+#if NETSTANDARD
+            using var ctr = cancellationToken.Register(static state => ((CancellationTokenSource)state!).Cancel(), cts);
+#else
+            await using var ctr = cancellationToken.UnsafeRegister(static state => ((CancellationTokenSource)state!).Cancel(), cts);
+#endif
+            var authCred = await AuthCredCallback(uri.Uri, cts.Token).ConfigureAwait(false);
+
+            switch (authCred.Type)
+            {
+            case NatsAuthType.None:
+                // Behavior in this case is undefined.
+                // A follow-up PR should define the AuthCredCallback
+                // behavior when returning NatsAuthType.None.
+                break;
+            case NatsAuthType.UserInfo:
+                opts.Username = authCred.Value;
+                opts.Password = authCred.Secret;
+                break;
+            case NatsAuthType.Token:
+                opts.AuthToken = authCred.Value;
+                break;
+            case NatsAuthType.Jwt:
+                opts.JWT = authCred.Value;
+                seed = authCred.Secret;
+                break;
+            case NatsAuthType.Nkey:
+                if (!string.IsNullOrEmpty(authCred.Secret))
+                {
+                    seed = authCred.Secret;
+                    opts.NKey = NKeys.PublicKeyFromSeed(seed);
+                }
+
+                break;
+            case NatsAuthType.CredsFile:
+                if (!string.IsNullOrEmpty(authCred.Value))
+                {
+                    (opts.JWT, seed) = LoadCredsFile(authCred.Value);
+                }
+
+                break;
+            case NatsAuthType.NkeyFile:
+                if (!string.IsNullOrEmpty(authCred.Value))
+                {
+                    (seed, opts.NKey) = LoadNKeyFile(authCred.Value);
+                }
+
+                break;
+            }
+        }
+        else
+        {
+            opts.JWT = Jwt;
+            opts.NKey = NKey;
+            opts.AuthToken = Token;
+        }
+
+        opts.Sig = info is { AuthRequired: true, Nonce: { } } ? Sign(info.Nonce, seed) : null;
     }
 
     private (string, string) LoadCredsFile(string path)

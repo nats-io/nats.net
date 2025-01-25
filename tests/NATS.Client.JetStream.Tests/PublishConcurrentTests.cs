@@ -12,8 +12,8 @@ public class PublishConcurrentTests
     [Fact]
     public async Task Publish_concurrently()
     {
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContext(nats);
 
         await js.CreateStreamAsync("s1", ["s1.>"]);

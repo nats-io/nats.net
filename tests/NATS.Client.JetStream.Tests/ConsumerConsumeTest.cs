@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Models;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -60,7 +61,7 @@ public class ConsumerConsumeTest
     [Fact]
     public async Task Consume_msgs_test()
     {
-        await using var server = NatsServer.StartJS();
+        await using var server = await NatsServer.StartJSAsync();
         var (nats, proxy) = server.CreateProxiedClientConnection();
         var js = new NatsJSContext(nats);
 
@@ -120,12 +121,14 @@ public class ConsumerConsumeTest
     public async Task Consume_idle_heartbeat_test()
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        await using var server = NatsServer.StartJSWithTrace(_output);
+        await using var server = await NatsServer.StartJSWithTraceAsync(_output);
 
         var (nats, proxy) = server.CreateProxiedClientConnection();
 
         // Swallow heartbeats
         proxy.ServerInterceptors.Add(m => m?.Contains("Idle Heartbeat") ?? false ? null : m);
+
+        await nats.ConnectRetryAsync();
 
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
@@ -196,10 +199,10 @@ public class ConsumerConsumeTest
     public async Task Consume_reconnect_test()
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        await using var server = NatsServer.StartJS();
+        await using var server = await NatsServer.StartJSAsync();
 
         var (nats, proxy) = server.CreateProxiedClientConnection();
-        await using var nats2 = server.CreateClientConnection();
+        await using var nats2 = await server.CreateClientConnectionAsync();
 
         var js = new NatsJSContext(nats);
         var js2 = new NatsJSContext(nats2);
@@ -345,8 +348,8 @@ public class ConsumerConsumeTest
     [Fact]
     public async Task Consume_stop_test()
     {
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
@@ -421,8 +424,8 @@ public class ConsumerConsumeTest
     [Fact]
     public async Task Serialization_errors()
     {
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -449,8 +452,8 @@ public class ConsumerConsumeTest
     [Fact]
     public async Task Consume_right_amount_of_messages()
     {
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
@@ -506,8 +509,8 @@ public class ConsumerConsumeTest
     [Fact]
     public async Task Consume_right_amount_of_messages_when_ack_wait_exceeded()
     {
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
 

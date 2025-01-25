@@ -20,6 +20,7 @@ public class ClusterTests(ITestOutputHelper output)
                 }
             },
             userAuthInUrl);
+        await cluster1.StartAsync();
 
         await using var cluster2 = new NatsCluster(
             new NullOutputHelper(),
@@ -34,6 +35,7 @@ public class ClusterTests(ITestOutputHelper output)
                 }
             },
             userAuthInUrl);
+        await cluster2.StartAsync();
 
         // Use the first node from each cluster as the seed
         // so that we can confirm seeds are used on retry

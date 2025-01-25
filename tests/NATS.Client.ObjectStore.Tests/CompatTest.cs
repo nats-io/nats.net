@@ -10,8 +10,8 @@ public class CompatTest
     [Fact]
     public async Task Headers_serialization()
     {
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContext(nats);
         var ob = new NatsObjContext(js);
 

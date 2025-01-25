@@ -13,7 +13,7 @@ public class WebSocketOptionsTest
     [Fact]
     public async Task Exception_in_callback_throws_nats_exception()
     {
-        await using var server = NatsServer.Start(
+        await using var server = await NatsServer.StartAsync(
             new NullOutputHelper(),
             new NatsServerOptsBuilder()
                 .UseTransport(TransportType.WebSocket)

@@ -12,7 +12,7 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 builder.Services.AddNats(configureOpts: opt => opt with
 {
     SerializerRegistry = NatsJsonSerializerRegistry.Default,
-    Url = "ws://localhost:8080",
+    Url = "ws://localhost:4280",
     Name = "BlazorClient",
 });
 

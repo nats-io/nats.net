@@ -2,9 +2,9 @@ using System.Diagnostics;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
-using Cysharp.Diagnostics;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
+using NATS.Client.Platform.Windows.Tests;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.Core.Tests;
 
@@ -23,8 +23,8 @@ public static class ServerVersions
 public class NatsServer : IAsyncDisposable
 {
     public static readonly Version Version;
-
-    private static readonly string Ext = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? ".exe" : string.Empty;
+    private static readonly bool IsWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+    private static readonly string Ext = IsWindows ? ".exe" : string.Empty;
     private static readonly string NatsServerPath = $"nats-server{Ext}";
 
     private readonly string? _jetStreamStoreDir;
@@ -32,9 +32,8 @@ public class NatsServer : IAsyncDisposable
     private readonly TransportType _transportType;
     private readonly OutputHelperLoggerFactory _loggerFactory;
     private CancellationTokenSource? _cancellationTokenSource;
-    private Task<string[]>? _processOut;
-    private Task<string[]>? _processErr;
     private int _disposed;
+    private volatile Process? _serverProcess;
 
     static NatsServer()
     {
@@ -72,7 +71,11 @@ public class NatsServer : IAsyncDisposable
 
     public string? ConfigFile { get; private set; }
 
-    public Process? ServerProcess { get; private set; }
+    public Process? ServerProcess
+    {
+        get => Interlocked.CompareExchange(ref _serverProcess, null, null);
+        private set => Interlocked.Exchange(ref _serverProcess, value);
+    }
 
     public NatsServerOpts Opts { get; }
 
@@ -118,9 +121,9 @@ public class NatsServer : IAsyncDisposable
 
     public Action<LogMessage> OnLog { get; set; } = _ => { };
 
-    public static NatsServer StartJS() => StartJS(new NullOutputHelper(), TransportType.Tcp);
+    public static Task<NatsServer> StartJSAsync() => StartJSAsync(new NullOutputHelper(), TransportType.Tcp);
 
-    public static NatsServer StartJSWithTrace(ITestOutputHelper outputHelper) => Start(
+    public static Task<NatsServer> StartJSWithTraceAsync(ITestOutputHelper outputHelper) => StartAsync(
         outputHelper: outputHelper,
         opts: new NatsServerOptsBuilder()
             .UseTransport(TransportType.Tcp)
@@ -128,30 +131,32 @@ public class NatsServer : IAsyncDisposable
             .UseJetStream()
             .Build());
 
-    public static NatsServer StartJS(ITestOutputHelper outputHelper, TransportType transportType) => Start(
+    public static Task<NatsServer> StartJSAsync(ITestOutputHelper outputHelper, TransportType transportType) => StartAsync(
         outputHelper: outputHelper,
         opts: new NatsServerOptsBuilder()
             .UseTransport(transportType)
             .UseJetStream()
             .Build());
 
-    public static NatsServer Start() => Start(new NullOutputHelper(), TransportType.Tcp);
+    public static async Task<NatsServer> StartAsync() => await StartAsync(new NullOutputHelper(), TransportType.Tcp);
 
     public static bool SupportsTlsFirst() => new Version("2.10.4") <= Version;
 
-    public static NatsServer StartWithTrace(ITestOutputHelper outputHelper)
-        => Start(
+    public static Task<NatsServer> StartWithTraceAsync(ITestOutputHelper outputHelper)
+        => StartAsync(
             outputHelper,
             new NatsServerOptsBuilder()
                 .Trace()
                 .UseTransport(TransportType.Tcp)
                 .Build());
 
-    public static NatsServer Start(ITestOutputHelper outputHelper, TransportType transportType) =>
-        Start(outputHelper, new NatsServerOptsBuilder().UseTransport(transportType).Build());
+    public static async Task<NatsServer> StartAsync(ITestOutputHelper outputHelper, TransportType transportType) =>
+        await StartAsync(outputHelper, new NatsServerOptsBuilder().UseTransport(transportType).Build());
 
-    public static NatsServer Start(ITestOutputHelper outputHelper, NatsServerOpts opts, NatsOpts? clientOpts = default, bool useAuthInUrl = false)
+    public static async Task<NatsServer> StartAsync(ITestOutputHelper outputHelper, NatsServerOpts opts, NatsOpts? clientOpts = default, bool useAuthInUrl = false)
     {
+        DebugLogger.Log("[T] Starting NATS server");
+
         NatsServer? server = null;
         NatsConnection? nats = null;
         for (var i = 0; i < 10; i++)
@@ -159,66 +164,110 @@ public class NatsServer : IAsyncDisposable
             try
             {
                 server = new NatsServer(outputHelper, opts);
-                server.StartServerProcess();
-                nats = server.CreateClientConnection(clientOpts ?? NatsOpts.Default, reTryCount: 3, useAuthInUrl: useAuthInUrl);
-#pragma warning disable CA2012
+                await server.StartServerProcessAsync();
+                nats = await server.CreateClientConnectionAsync(clientOpts ?? NatsOpts.Default, reTryCount: 3, useAuthInUrl: useAuthInUrl);
                 return server;
             }
-            catch
+            catch (Exception e)
             {
-                server?.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                DebugLogger.Log($"[T] Starting process error: {e}");
+                if (server != null)
+                {
+                    await server.DisposeAsync();
+                }
             }
             finally
             {
-                nats?.DisposeAsync().AsTask().GetAwaiter().GetResult();
-#pragma warning restore CA2012
+                if (nats != null)
+                {
+                    await nats.DisposeAsync();
+                }
             }
         }
 
         throw new Exception("Can't start nats-server and connect to it");
     }
 
-    public void StartServerProcess()
+    public async Task StartServerProcessAsync()
     {
+        DebugLogger.Log("[T] Starting process");
         _cancellationTokenSource = new CancellationTokenSource();
 
-        (ConfigFile, var config, var cmd) = GetCmd(Opts);
+        (ConfigFile, var config, var args) = GetCmd(Opts);
 
-        _outputHelper.WriteLine("ProcessStart: " + cmd + Environment.NewLine + config);
-        var (p, stdout, stderr) = ProcessX.GetDualAsyncEnumerable(cmd);
-        ServerProcess = p;
-        _processOut = EnumerateWithLogsAsync(stdout, _cancellationTokenSource.Token);
-        _processErr = EnumerateWithLogsAsync(stderr, _cancellationTokenSource.Token);
+        _outputHelper.WriteLine($"ProcessStart: {NatsServerPath} {args}{Environment.NewLine}{config}");
+        var info = new ProcessStartInfo
+        {
+            FileName = NatsServerPath,
+            Arguments = args,
+            UseShellExecute = false,
+            CreateNoWindow = false,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+        };
+        var process = new Process { StartInfo = info, };
+        var listening = new TaskCompletionSource();
+        DataReceivedEventHandler? outputHandler = (_, e) =>
+        {
+            if (e.Data != null)
+            {
+                if (e.Data.Contains("Listening for client connections"))
+                {
+                    listening.TrySetResult();
+                }
+
+                DebugLogger.Log($"  | {e.Data}", 2);
+            }
+        };
+        process.OutputDataReceived += outputHandler;
+        process.ErrorDataReceived += outputHandler;
+        process.Start();
+        if (IsWindows)
+            ChildProcessTracker.AddProcess(process);
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
+
+        await listening.Task.WaitAsync(TimeSpan.FromSeconds(3), _cancellationTokenSource.Token);
+
+        ServerProcess = process;
+
+        DebugLogger.Log($"[T] Started process {process.Id} / {Process.GetProcessById(process.Id).ProcessName}");
 
         // Check for start server
-        Task.Run(async () =>
+        var loopTimeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var loopCts = CancellationTokenSource.CreateLinkedTokenSource(_cancellationTokenSource.Token, loopTimeoutCts.Token);
+        using var client = new TcpClient();
+        var connected = false;
+        while (!_cancellationTokenSource.IsCancellationRequested)
         {
-            using var client = new TcpClient();
-            while (!_cancellationTokenSource.IsCancellationRequested)
+            try
             {
-                try
+                DebugLogger.Log($"[T] TCP Connect to {Opts.ServerPort}");
+                var attemptTimeoutCts = new CancellationTokenSource(250);
+                var attemptCts = CancellationTokenSource.CreateLinkedTokenSource(loopCts.Token, attemptTimeoutCts.Token);
+                await client.ConnectAsync("127.0.0.1", Opts.ServerPort, attemptCts.Token);
+                if (client.Connected)
                 {
-                    await client.ConnectAsync("127.0.0.1", Opts.ServerPort, _cancellationTokenSource.Token);
-                    if (client.Connected)
-                        return;
+                    connected = true;
+                    break;
                 }
-                catch
-                {
-                    // ignore
-                }
-
-                await Task.Delay(500, _cancellationTokenSource.Token);
             }
-        }).Wait(5000); // timeout
+            catch
+            {
+                // ignore
+            }
 
-        if (_processOut.IsFaulted)
-        {
-            _processOut.GetAwaiter().GetResult(); // throw exception
+            await Task.Delay(250, loopCts.Token);
         }
 
-        if (_processErr.IsFaulted)
+        if (process.HasExited)
         {
-            _processErr.GetAwaiter().GetResult(); // throw exception
+            throw new Exception($"NATS server exited with code {ServerProcess.ExitCode}");
+        }
+
+        if (!connected)
+        {
+            throw new Exception($"NATS server not connected");
         }
 
         _outputHelper.WriteLine("OK to Process Start, Port:" + Opts.ServerPort);
@@ -226,7 +275,7 @@ public class NatsServer : IAsyncDisposable
 
     public async ValueTask RestartAsync()
     {
-        var t1 = ServerProcess?.StartTime;
+        DebugLogger.Log("[T] Restarting process");
 
         var serverProcessId = ServerProcess?.Id;
 
@@ -237,7 +286,8 @@ public class NatsServer : IAsyncDisposable
             if (serverProcessId != null)
             {
                 Process.GetProcessById(serverProcessId.Value).Kill();
-                Process.GetProcessById(serverProcessId.Value).WaitForExit();
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                await Process.GetProcessById(serverProcessId.Value).WaitForExitAsync(cts.Token);
             }
         }
         catch
@@ -245,30 +295,22 @@ public class NatsServer : IAsyncDisposable
             // ignore
         }
 
-        StartServerProcess();
+        await StartServerProcessAsync();
 
-        var t2 = ServerProcess?.StartTime;
-
-        if (t1 == t2)
+        if (serverProcessId == ServerProcess!.Id)
             throw new Exception("Can't restart nats-server");
     }
 
     public async ValueTask StopAsync()
     {
+        DebugLogger.Log("[T] Stopping process");
         try
         {
             _cancellationTokenSource?.Cancel(); // trigger of process kill.
             _cancellationTokenSource?.Dispose();
-
-            var processLogs = await _processErr!; // wait for process exit, nats output info to stderror
-            if (processLogs.Length != 0)
-            {
-                _outputHelper.WriteLine("Process Logs of " + Opts.ServerPort);
-                foreach (var item in processLogs)
-                {
-                    _outputHelper.WriteLine(item);
-                }
-            }
+            ServerProcess!.Kill();
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            await ServerProcess!.WaitForExitAsync(cts.Token);
         }
         catch (OperationCanceledException)
         {
@@ -280,6 +322,8 @@ public class NatsServer : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        DebugLogger.Log("[T] Disposing server");
+
         if (Interlocked.Increment(ref _disposed) != 1)
         {
             return;
@@ -289,16 +333,9 @@ public class NatsServer : IAsyncDisposable
         {
             _cancellationTokenSource?.Cancel(); // trigger of process kill.
             _cancellationTokenSource?.Dispose();
-
-            var processLogs = await _processErr!; // wait for process exit, nats output info to stderror
-            if (processLogs.Length != 0)
-            {
-                _outputHelper.WriteLine("Process Logs of " + Opts.ServerPort);
-                foreach (var item in processLogs)
-                {
-                    _outputHelper.WriteLine(item);
-                }
-            }
+            ServerProcess!.Kill();
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            await ServerProcess!.WaitForExitAsync(cts.Token);
         }
         catch (OperationCanceledException)
         {
@@ -351,7 +388,7 @@ public class NatsServer : IAsyncDisposable
         return (client, proxy);
     }
 
-    public NatsConnection CreateClientConnection(NatsOpts? options = default, int reTryCount = 10, bool ignoreAuthorizationException = false, bool testLogger = true, bool useAuthInUrl = false)
+    public async Task<NatsConnection> CreateClientConnectionAsync(NatsOpts? options = default, int reTryCount = 10, bool ignoreAuthorizationException = false, bool testLogger = true, bool useAuthInUrl = false)
     {
         for (var i = 0; i < reTryCount; i++)
         {
@@ -361,9 +398,7 @@ public class NatsServer : IAsyncDisposable
 
                 try
                 {
-#pragma warning disable CA2012
-                    nats.PingAsync().AsTask().GetAwaiter().GetResult();
-#pragma warning restore CA2012
+                    await nats.PingAsync();
                 }
                 catch (NatsException e)
                 {
@@ -438,33 +473,16 @@ public class NatsServer : IAsyncDisposable
         }
     }
 
-    private static (string configFileName, string config, string cmd) GetCmd(NatsServerOpts opts)
+    private static (string configFileName, string config, string args) GetCmd(NatsServerOpts opts)
     {
         var configFileName = Path.GetTempFileName();
 
         var config = opts.ConfigFileContents;
         File.WriteAllText(configFileName, config);
 
-        var cmd = $"{NatsServerPath} -c {configFileName}";
+        var args = $"-c {configFileName}";
 
-        return (configFileName, config, cmd);
-    }
-
-    private async Task<string[]> EnumerateWithLogsAsync(ProcessAsyncEnumerable enumerable, CancellationToken cancellationToken)
-    {
-        var l = new List<string>();
-        try
-        {
-            await foreach (var item in enumerable.WithCancellation(cancellationToken))
-            {
-                l.Add(item);
-            }
-        }
-        catch (OperationCanceledException)
-        {
-        }
-
-        return l.ToArray();
+        return (configFileName, config, args);
     }
 }
 
@@ -478,85 +496,123 @@ public record LogMessage(
 
 public class NatsCluster : IAsyncDisposable
 {
+    private readonly NatsServerOpts _opts1;
+
+    private readonly NatsServerOpts _opts2;
+
+    private readonly NatsServerOpts _opts3;
+
     private readonly ITestOutputHelper _outputHelper;
+
+    private readonly bool _useAuthInUrl;
+
+    private NatsServer? _server1;
+
+    private NatsServer? _server2;
+
+    private NatsServer? _server3;
 
     public NatsCluster(ITestOutputHelper outputHelper, TransportType transportType, Action<int, NatsServerOptsBuilder>? configure = default, bool useAuthInUrl = false)
     {
         _outputHelper = outputHelper;
+        _useAuthInUrl = useAuthInUrl;
 
         var builder1 = new NatsServerOptsBuilder()
             .UseTransport(transportType)
             .EnableClustering();
         configure?.Invoke(1, builder1);
-        var opts1 = builder1.Build();
+        _opts1 = builder1.Build();
 
         var builder2 = new NatsServerOptsBuilder()
             .UseTransport(transportType)
             .EnableClustering();
         configure?.Invoke(2, builder2);
-        var opts2 = builder2.Build();
+        _opts2 = builder2.Build();
 
         var builder3 = new NatsServerOptsBuilder()
             .UseTransport(transportType)
             .EnableClustering();
         configure?.Invoke(3, builder3);
-        var opts3 = builder3.Build();
+        _opts3 = builder3.Build();
 
         // By querying the ports we set the values lazily on all the opts.
-        outputHelper.WriteLine($"opts1.ServerPort={opts1.ServerPort}");
-        outputHelper.WriteLine($"opts1.ClusteringPort={opts1.ClusteringPort}");
-        if (opts1.EnableWebSocket)
+        outputHelper.WriteLine($"opts1.ServerPort={_opts1.ServerPort}");
+        outputHelper.WriteLine($"opts1.ClusteringPort={_opts1.ClusteringPort}");
+        if (_opts1.EnableWebSocket)
         {
-            outputHelper.WriteLine($"opts1.WebSocketPort={opts1.WebSocketPort}");
+            outputHelper.WriteLine($"opts1.WebSocketPort={_opts1.WebSocketPort}");
         }
 
-        outputHelper.WriteLine($"opts2.ServerPort={opts2.ServerPort}");
-        outputHelper.WriteLine($"opts2.ClusteringPort={opts2.ClusteringPort}");
-        if (opts2.EnableWebSocket)
+        outputHelper.WriteLine($"opts2.ServerPort={_opts2.ServerPort}");
+        outputHelper.WriteLine($"opts2.ClusteringPort={_opts2.ClusteringPort}");
+        if (_opts2.EnableWebSocket)
         {
-            outputHelper.WriteLine($"opts2.WebSocketPort={opts2.WebSocketPort}");
+            outputHelper.WriteLine($"opts2.WebSocketPort={_opts2.WebSocketPort}");
         }
 
-        outputHelper.WriteLine($"opts3.ServerPort={opts3.ServerPort}");
-        outputHelper.WriteLine($"opts3.ClusteringPort={opts3.ClusteringPort}");
-        if (opts3.EnableWebSocket)
+        outputHelper.WriteLine($"opts3.ServerPort={_opts3.ServerPort}");
+        outputHelper.WriteLine($"opts3.ClusteringPort={_opts3.ClusteringPort}");
+        if (_opts3.EnableWebSocket)
         {
-            outputHelper.WriteLine($"opts3.WebSocketPort={opts3.WebSocketPort}");
+            outputHelper.WriteLine($"opts3.WebSocketPort={_opts3.WebSocketPort}");
         }
 
-        var routes = new[] { opts1, opts2, opts3 };
-
+        var routes = new[] { _opts1, _opts2, _opts3 };
         foreach (var opt in routes)
         {
             opt.SetRoutes(routes);
         }
-
-        _outputHelper.WriteLine($"Starting server 1...");
-        Server1 = NatsServer.Start(outputHelper, opts1, useAuthInUrl: useAuthInUrl);
-
-        _outputHelper.WriteLine($"Starting server 2...");
-        Server2 = NatsServer.Start(outputHelper, opts2, useAuthInUrl: useAuthInUrl);
-
-        _outputHelper.WriteLine($"Starting server 3...");
-        Server3 = NatsServer.Start(outputHelper, opts3, useAuthInUrl: useAuthInUrl);
     }
 
-    public NatsServer Server1 { get; }
+    public NatsServer Server1 => _server1 ?? throw new InvalidOperationException("call StartAsync");
 
-    public NatsServer Server2 { get; }
+    public NatsServer Server2 => _server2 ?? throw new InvalidOperationException("call StartAsync");
 
-    public NatsServer Server3 { get; }
+    public NatsServer Server3 => _server3 ?? throw new InvalidOperationException("call StartAsync");
+
+    public async Task StartAsync()
+    {
+        if (_server1 == null)
+        {
+            _outputHelper.WriteLine("Starting server 1...");
+            _server1 = await NatsServer.StartAsync(_outputHelper, _opts1, useAuthInUrl: _useAuthInUrl);
+        }
+
+        if (_server2 == null)
+        {
+            _outputHelper.WriteLine("Starting server 2...");
+            _server2 = await NatsServer.StartAsync(_outputHelper, _opts2, useAuthInUrl: _useAuthInUrl);
+        }
+
+        if (_server3 == null)
+        {
+            _outputHelper.WriteLine("Starting server 3...");
+            _server3 = await NatsServer.StartAsync(_outputHelper, _opts3, useAuthInUrl: _useAuthInUrl);
+        }
+    }
 
     public async ValueTask DisposeAsync()
     {
-        _outputHelper.WriteLine($"Stopping server 1...");
-        await Server1.DisposeAsync();
+        if (_server1 != null)
+        {
+            _outputHelper.WriteLine("Stopping server 1...");
+            await _server1.DisposeAsync();
+            _server1 = null;
+        }
 
-        _outputHelper.WriteLine($"Stopping server 2...");
-        await Server2.DisposeAsync();
+        if (_server2 != null)
+        {
+            _outputHelper.WriteLine("Stopping server 2...");
+            await _server2.DisposeAsync();
+            _server2 = null;
+        }
 
-        _outputHelper.WriteLine($"Stopping server 3...");
-        await Server3.DisposeAsync();
+        if (_server3 != null)
+        {
+            _outputHelper.WriteLine("Stopping server 3...");
+            await _server3.DisposeAsync();
+            _server3 = null;
+        }
     }
 }
 

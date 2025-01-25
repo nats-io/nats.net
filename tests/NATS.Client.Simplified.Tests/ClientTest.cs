@@ -15,7 +15,7 @@ public class ClientTest
     [Fact]
     public async Task Client_works_with_all_expected_types_and_falls_back_to_JSON()
     {
-        await using var server = NatsServer.StartJS();
+        await using var server = await NatsServer.StartJSAsync();
         await using var client = new NatsClient(server.ClientUrl);
 
         CancellationTokenSource ctsTestTimeout = new(TimeSpan.FromSeconds(10));
@@ -127,7 +127,7 @@ public class ClientTest
                         continue;
                     }
 
-                    await msg.ReplyAsync(new MyData(id, $"foo{id}"), cancellationToken: ctsTestTimeout.Token).ConfigureAwait(false);
+                    await msg.ReplyAsync(new MyData(id, $"foo{id}"), cancellationToken: ctsTestTimeout.Token);
                     id++;
                 }
             },

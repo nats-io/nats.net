@@ -13,8 +13,8 @@ public class GetKeysTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await using var server = NatsServer.StartJS();
-        await using var nats1 = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats1 = await server.CreateClientConnectionAsync();
         var js1 = new NatsJSContext(nats1);
         var kv1 = new NatsKVContext(js1);
         var store1 = await kv1.CreateStoreAsync(config, cancellationToken: cancellationToken);
@@ -55,8 +55,8 @@ public class GetKeysTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await using var server = NatsServer.StartJS();
-        await using var nats1 = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats1 = await server.CreateClientConnectionAsync();
         var js1 = new NatsJSContext(nats1);
         var kv1 = new NatsKVContext(js1);
         var store1 = await kv1.CreateStoreAsync(config, cancellationToken: cancellationToken);
@@ -90,8 +90,8 @@ public class GetKeysTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await using var server = NatsServer.StartJS();
-        await using var nats1 = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats1 = await server.CreateClientConnectionAsync();
         var js1 = new NatsJSContext(nats1);
         var kv1 = new NatsKVContext(js1);
         var store1 = await kv1.CreateStoreAsync(config, cancellationToken: cancellationToken);

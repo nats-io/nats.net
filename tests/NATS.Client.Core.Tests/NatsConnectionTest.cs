@@ -18,10 +18,10 @@ public abstract partial class NatsConnectionTest
     [Fact]
     public async Task SimplePubSubTest()
     {
-        await using var server = NatsServer.Start(_output, _transportType);
+        await using var server = await NatsServer.StartAsync(_output, _transportType);
 
-        await using var subConnection = server.CreateClientConnection();
-        await using var pubConnection = server.CreateClientConnection();
+        await using var subConnection = await server.CreateClientConnectionAsync();
+        await using var pubConnection = await server.CreateClientConnectionAsync();
 
         var subject = Guid.NewGuid().ToString("N");
         var signalComplete = new WaitSignal();
@@ -54,10 +54,10 @@ public abstract partial class NatsConnectionTest
     [Fact]
     public async Task PubSubNoRespondersTest()
     {
-        await using var server = NatsServer.StartWithTrace(_output);
+        await using var server = await NatsServer.StartWithTraceAsync(_output);
 
         // For no_responders to work we need to the publisher and subscriber to be using the same connection
-        await using var subConnection = server.CreateClientConnection();
+        await using var subConnection = await server.CreateClientConnectionAsync();
 
         var signalComplete = new WaitSignal();
         var replyToAddress = subConnection.NewInbox();
@@ -80,15 +80,15 @@ public abstract partial class NatsConnectionTest
     [Fact]
     public async Task EncodingTest()
     {
-        await using var server = NatsServer.Start(_output, _transportType);
+        await using var server = await NatsServer.StartAsync(_output, _transportType);
 
         var serializer1 = new NatsJsonContextSerializerRegistry(SimpleClassJsonSerializerContext.Default);
 
         foreach (var serializer in new INatsSerializerRegistry[] { serializer1 })
         {
             var options = NatsOpts.Default with { SerializerRegistry = serializer };
-            await using var subConnection = server.CreateClientConnection(options);
-            await using var pubConnection = server.CreateClientConnection(options);
+            await using var subConnection = await server.CreateClientConnectionAsync(options);
+            await using var pubConnection = await server.CreateClientConnectionAsync(options);
 
             var key = Guid.NewGuid().ToString();
 
@@ -123,11 +123,11 @@ public abstract partial class NatsConnectionTest
     [InlineData(32768)] // 32 KiB
     public async Task RequestTest(int minSize)
     {
-        await using var server = NatsServer.Start(_output, _transportType);
+        await using var server = await NatsServer.StartAsync(_output, _transportType);
 
         var options = NatsOpts.Default with { RequestTimeout = TimeSpan.FromSeconds(5) };
-        await using var subConnection = server.CreateClientConnection(options);
-        await using var pubConnection = server.CreateClientConnection(options);
+        await using var subConnection = await server.CreateClientConnectionAsync(options);
+        await using var pubConnection = await server.CreateClientConnectionAsync(options);
 
         var subject = Guid.NewGuid().ToString();
         var text = new StringBuilder(minSize).Insert(0, "a", minSize).ToString();
@@ -187,11 +187,11 @@ public abstract partial class NatsConnectionTest
             .WithServerDisposeReturnsPorts()
             .Build();
 
-        await using var server = NatsServer.Start(_output, options);
+        await using var server = await NatsServer.StartAsync(_output, options);
         var subject = Guid.NewGuid().ToString();
 
-        await using var subConnection = server.CreateClientConnection();
-        await using var pubConnection = server.CreateClientConnection();
+        await using var subConnection = await server.CreateClientConnectionAsync();
+        await using var pubConnection = await server.CreateClientConnectionAsync();
         await subConnection.ConnectAsync(); // wait open
         await pubConnection.ConnectAsync(); // wait open
 
@@ -243,7 +243,7 @@ public abstract partial class NatsConnectionTest
 
         // start new nats server on same port
         _output.WriteLine("START NEW SERVER");
-        await using var newServer = NatsServer.Start(_output, options);
+        await using var newServer = await NatsServer.StartAsync(_output, options);
         await subConnection.ConnectAsync(); // wait open again
         await pubConnection.ConnectAsync(); // wait open again
 
@@ -267,13 +267,14 @@ public abstract partial class NatsConnectionTest
     public async Task ReconnectClusterTest()
     {
         await using var cluster = new NatsCluster(_output, _transportType);
+        await cluster.StartAsync();
         await Task.Delay(TimeSpan.FromSeconds(5)); // wait for cluster completely connected.
 
         var subject = Guid.NewGuid().ToString();
 
-        await using var connection1 = cluster.Server1.CreateClientConnection();
-        await using var connection2 = cluster.Server2.CreateClientConnection();
-        await using var connection3 = cluster.Server3.CreateClientConnection();
+        await using var connection1 = await cluster.Server1.CreateClientConnectionAsync();
+        await using var connection2 = await cluster.Server2.CreateClientConnectionAsync();
+        await using var connection3 = await cluster.Server3.CreateClientConnectionAsync();
 
         await connection1.ConnectAsync();
         await connection2.ConnectAsync();
@@ -417,62 +418,55 @@ public abstract partial class NatsConnectionTest
     public async Task OnSocketAvailableAsync_ShouldBeInvokedOnInitialConnection()
     {
         // Arrange
-        await using var server = NatsServer.Start();
+        await using var server = await NatsServer.StartAsync();
         var clientOpts = server.ClientOpts(NatsOpts.Default);
 
-        var wasInvoked = false;
+        var wasInvoked = new WaitSignal();
         var nats = new NatsConnection(clientOpts);
-        nats.OnSocketAvailableAsync = async socket =>
+        nats.OnSocketAvailableAsync = socket =>
         {
-            wasInvoked = true;
-            await Task.Delay(10);
-            return socket;
+            wasInvoked.Pulse();
+            return new ValueTask<ISocketConnection>(socket);
         };
 
         // Act
         await nats.ConnectAsync();
 
         // Assert
-        Assert.True(wasInvoked, "OnSocketAvailableAsync should be invoked on initial connection.");
+        await wasInvoked;
     }
 
     [Fact]
     public async Task OnSocketAvailableAsync_ShouldBeInvokedOnReconnection()
     {
         // Arrange
-        await using var server = NatsServer.Start();
+        await using var server = await NatsServer.StartAsync();
         var clientOpts = server.ClientOpts(NatsOpts.Default);
 
         var invocationCount = 0;
         var nats = new NatsConnection(clientOpts);
-        nats.OnSocketAvailableAsync = async socket =>
+        nats.OnSocketAvailableAsync = socket =>
         {
-            invocationCount++;
-            await Task.Delay(10);
-            return socket;
+            Interlocked.Increment(ref invocationCount);
+            return new ValueTask<ISocketConnection>(socket);
         };
 
         // Simulate initial connection
         await nats.ConnectAsync();
 
-        // Simulate disconnection
-        await server.StopAsync();
+        await server.RestartAsync();
 
-        // Act
-        // Simulate reconnection
-        server.StartServerProcess();
         await nats.ConnectAsync();
 
-        // Assert
-        Assert.Equal(2, invocationCount);
+        await Retry.Until("callback", () => Interlocked.CompareExchange(ref invocationCount, 0, 0) == 2);
     }
 
     [Fact]
     public async Task ReconnectOnOpenConnection_ShouldDisconnectAndOpenNewConnection()
     {
         // Arrange
-        await using var server = NatsServer.Start(_output, _transportType);
-        await using var connection = server.CreateClientConnection();
+        await using var server = await NatsServer.StartAsync(_output, _transportType);
+        await using var connection = await server.CreateClientConnectionAsync();
         await connection.ConnectAsync(); // wait first connection open
 
         var openedCount = 0;
@@ -504,6 +498,61 @@ public abstract partial class NatsConnectionTest
         // disconnected event and open connection event are expected
         openedCount.ShouldBe(1);
         disconnectedCount.ShouldBe(1);
+    }
+
+    [SkipIfNatsServer(versionEarlierThan: "2.10")]
+    public async Task LameDuckModeActivated_EventHandlerShouldBeInvokedWhenInfoWithLDMReceived()
+    {
+        await using var natsServer = await NatsServer.StartAsync(
+            _output,
+            new NatsServerOptsBuilder()
+                .AddServerConfigText("""
+                                     accounts: {
+                                       SYS: {
+                                         users: [
+                                           {user: "sys", password: "password"}
+                                         ]
+                                       },
+                                     }
+
+                                     system_account: SYS
+                                     """)
+                .UseTransport(_transportType)
+                .Build());
+
+        var natsOpts = new NatsOpts
+        {
+            Url = natsServer.ClientUrl,
+            AuthOpts = new NatsAuthOpts
+            {
+                Username = "sys",
+                Password = "password",
+            },
+        };
+
+        await using var connection = await natsServer.CreateClientConnectionAsync(natsOpts);
+        await connection.ConnectAsync();
+
+        var invocationCount = 0;
+        var ldmSignal = new WaitSignal();
+
+        connection.LameDuckModeActivated += (_, _) =>
+        {
+            Interlocked.Increment(ref invocationCount);
+            ldmSignal.Pulse();
+            return default;
+        };
+
+        var subject = $"$SYS.REQ.SERVER.{connection.ServerInfo!.Id}.LDM";
+
+        // Act
+        await connection.RequestAsync<string, string>(
+            subject: subject,
+            data: $$"""{"cid":{{connection.ServerInfo!.ClientId}}}""");
+        await ldmSignal;
+
+        // Assert
+        invocationCount.ShouldBe(1);
     }
 }
 

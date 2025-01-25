@@ -30,8 +30,8 @@ async Task RequestReplyTests()
 {
     Log("Request reply tests...");
 
-    await using var server = NatsServer.Start();
-    await using var nats = server.CreateClientConnection();
+    await using var server = await NatsServer.StartAsync();
+    await using var nats = await server.CreateClientConnectionAsync();
 
     var sub = await nats.SubscribeCoreAsync<int>("foo");
     var reg = sub.Register(async msg =>
@@ -65,8 +65,8 @@ async Task JetStreamTests()
 {
     Log("JetStream tests...");
 
-    await using var server = NatsServer.StartJS();
-    var nats = server.CreateClientConnection();
+    await using var server = await NatsServer.StartJSAsync();
+    var nats = await server.CreateClientConnectionAsync();
 
     // Happy user
     {
@@ -189,8 +189,8 @@ async Task KVTests()
 {
     Log("KV tests...");
 
-    await using var server = NatsServer.StartJS();
-    await using var nats = server.CreateClientConnection();
+    await using var server = await NatsServer.StartJSAsync();
+    await using var nats = await server.CreateClientConnectionAsync();
 
     var js = new NatsJSContext(nats);
     var kv = new NatsKVContext(js);
@@ -212,8 +212,8 @@ async Task ObjectStoreTests()
     var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
     var cancellationToken = cts.Token;
 
-    await using var server = NatsServer.StartJS();
-    await using var nats = server.CreateClientConnection();
+    await using var server = await NatsServer.StartJSAsync();
+    await using var nats = await server.CreateClientConnectionAsync();
     var js = new NatsJSContext(nats);
     var ob = new NatsObjContext(js);
 
@@ -269,8 +269,8 @@ async Task ServicesTests()
     var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
     var cancellationToken = cts.Token;
 
-    await using var server = NatsServer.Start();
-    await using var nats = server.CreateClientConnection();
+    await using var server = await NatsServer.StartAsync();
+    await using var nats = await server.CreateClientConnectionAsync();
     var svc = new NatsSvcContext(nats);
 
     await using var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
@@ -382,8 +382,8 @@ async Task ServicesTests2()
     var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10_0000));
     var cancellationToken = cts.Token;
 
-    await using var server = NatsServer.Start();
-    await using var nats = server.CreateClientConnection();
+    await using var server = await NatsServer.StartAsync();
+    await using var nats = await server.CreateClientConnectionAsync();
     var svc = new NatsSvcContext(nats);
 
     await using var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);

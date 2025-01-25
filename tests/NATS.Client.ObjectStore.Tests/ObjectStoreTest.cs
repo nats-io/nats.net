@@ -21,8 +21,8 @@ public class ObjectStoreTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContext(nats);
         var ob = new NatsObjContext(js);
 
@@ -48,8 +48,8 @@ public class ObjectStoreTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContext(nats);
         var ob = new NatsObjContext(js);
 
@@ -130,8 +130,8 @@ public class ObjectStoreTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContext(nats);
         var ob = new NatsObjContext(js);
 
@@ -184,8 +184,8 @@ public class ObjectStoreTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10_000));
         var cancellationToken = cts.Token;
 
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContext(nats);
         var ob = new NatsObjContext(js);
 
@@ -222,8 +222,8 @@ public class ObjectStoreTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContext(nats);
         var obj = new NatsObjContext(js);
 
@@ -253,8 +253,8 @@ public class ObjectStoreTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContext(nats);
         var obj = new NatsObjContext(js);
 
@@ -300,8 +300,8 @@ public class ObjectStoreTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContext(nats);
         var obj = new NatsObjContext(js);
 
@@ -339,8 +339,8 @@ public class ObjectStoreTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContext(nats);
         var obj = new NatsObjContext(js);
 
@@ -397,8 +397,8 @@ public class ObjectStoreTest
         var cts = new CancellationTokenSource(timeout);
         var cancellationToken = cts.Token;
 
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContext(nats);
         var obj = new NatsObjContext(js);
 
@@ -436,8 +436,8 @@ public class ObjectStoreTest
     [SkipIfNatsServer(versionEarlierThan: "2.10")]
     public async Task Compressed_storage()
     {
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContext(nats);
         var obj = new NatsObjContext(js);
 
@@ -464,8 +464,8 @@ public class ObjectStoreTest
     [Fact]
     public async Task Put_get_serialization_when_default_serializer_is_not_used()
     {
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection(options: new NatsOpts
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync(options: new NatsOpts
         {
             SerializerRegistry = NatsJsonSerializerRegistry.Default,
         });
@@ -502,8 +502,8 @@ public class ObjectStoreTest
         using var activity = activitySource.StartActivity(ActivityKind.Client);
         ActivitySource.AddActivityListener(activityListener);
 
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContext(nats);
         var obj = new NatsObjContext(js);
 
@@ -534,8 +534,8 @@ public class ObjectStoreTest
         using var activity = activitySource.StartActivity(ActivityKind.Client);
         ActivitySource.AddActivityListener(activityListener);
 
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContext(nats);
         var obj = new NatsObjContext(js);
 

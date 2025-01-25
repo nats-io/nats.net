@@ -180,7 +180,7 @@ public class NatsHostingExtensionsTests
     [Fact]
     public async Task AddNatsClient_WithJsonSerializer()
     {
-        await using var server = NatsServer.Start();
+        await using var server = await NatsServer.StartAsync();
 
         var services = new ServiceCollection();
         services.AddSingleton<ILoggerFactory, NullLoggerFactory>();

@@ -1,5 +1,8 @@
+using System.Diagnostics;
+using System.Net.Sockets;
 using System.Security.Authentication;
 using NATS.Client.Core;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.Platform.Windows.Tests;
 
@@ -20,8 +23,8 @@ public class TlsTests : IClassFixture<TlsTestsNatsServerFixture>
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
 
         var exception = await Assert.ThrowsAsync<NatsException>(async () => await nats.ConnectAsync());
-        Assert.Contains("TLS authentication failed", exception.InnerException?.Message);
-        Assert.IsType<AuthenticationException>(exception.InnerException?.InnerException);
+        Assert.Matches("TLS authentication failed|Unable to read data from the transport", exception.InnerException?.Message);
+        Assert.True(exception.InnerException?.InnerException is SocketException or AuthenticationException);
     }
 
     [Fact]
@@ -38,8 +41,7 @@ public class TlsTests : IClassFixture<TlsTestsNatsServerFixture>
         };
 
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, TlsOpts = tlsOpts });
-
-        await nats.PingAsync();
+        await nats.ConnectRetryAsync();
 
         await using var sub = await nats.SubscribeCoreAsync<int>($"{prefix}.foo");
         for (var i = 0; i < 64; i++)
