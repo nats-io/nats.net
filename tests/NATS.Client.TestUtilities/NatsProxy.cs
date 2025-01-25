@@ -158,7 +158,13 @@ public class NatsProxy : IDisposable
 
         await Retry.Until(
             "flush sync frame",
-            () => AllFrames.Any(f => f.Message == $"PUB {subject} 0␍␊"));
+            async () =>
+            {
+                await nats.PublishAsync(subject);
+                return AllFrames.Any(f => f.Message == $"PUB {subject} 0␍␊");
+            },
+            retryDelay: TimeSpan.FromSeconds(1),
+            timeout: TimeSpan.FromSeconds(60));
 
         lock (_frames)
             _frames.Clear();
