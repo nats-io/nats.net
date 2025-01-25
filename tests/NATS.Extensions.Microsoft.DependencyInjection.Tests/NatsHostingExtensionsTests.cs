@@ -130,7 +130,7 @@ public class NatsHostingExtensionsTests
     [Fact]
     public async Task AddNatsClient_WithDefaultSerializer()
     {
-        await using var server = NatsServer.Start();
+        await using var server = await NatsServer.StartAsync();
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
