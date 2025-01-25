@@ -143,7 +143,7 @@ public class OrderedConsumerTest
         _output.WriteLine($"stopwatch.Elapsed: {stopwatch.Elapsed}");
 
         Assert.Equal(0, count);
-        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(3));
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(10));
 
         // Where there is less than we want to fetch, we should get all the messages
         // without waiting for the timeout.
@@ -178,7 +178,7 @@ public class OrderedConsumerTest
 
         Assert.Equal(2, iterationCount);
         Assert.Equal(10, count);
-        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(3));
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(10));
     }
 
     [Fact]

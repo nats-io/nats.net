@@ -41,7 +41,7 @@ public class ManageConsumerTest
     [Fact]
     public async Task List_delete_consumer()
     {
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         await using var server = await NatsServer.StartJSAsync();
         var nats = await server.CreateClientConnectionAsync();

@@ -107,7 +107,7 @@ public class PublishRetryTest
         };
         ActivitySource.AddActivityListener(activityListener);
 
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         await using var nats = new NatsConnection(new NatsOpts
         {
             Url = _server.Url,

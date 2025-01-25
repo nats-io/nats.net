@@ -308,9 +308,12 @@ public class NatsServer : IAsyncDisposable
         {
             _cancellationTokenSource?.Cancel(); // trigger of process kill.
             _cancellationTokenSource?.Dispose();
-            ServerProcess!.Kill();
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            await ServerProcess!.WaitForExitAsync(cts.Token);
+            if (ServerProcess != null)
+            {
+                ServerProcess.Kill();
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                await ServerProcess.WaitForExitAsync(cts.Token);
+            }
         }
         catch (OperationCanceledException)
         {
@@ -333,9 +336,12 @@ public class NatsServer : IAsyncDisposable
         {
             _cancellationTokenSource?.Cancel(); // trigger of process kill.
             _cancellationTokenSource?.Dispose();
-            ServerProcess!.Kill();
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            await ServerProcess!.WaitForExitAsync(cts.Token);
+            if (ServerProcess != null)
+            {
+                ServerProcess.Kill();
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                await ServerProcess.WaitForExitAsync(cts.Token)!;
+            }
         }
         catch (OperationCanceledException)
         {

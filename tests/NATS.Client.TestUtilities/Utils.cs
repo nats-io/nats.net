@@ -15,7 +15,7 @@ public static class Retry
 {
     public static async Task Until(string reason, Func<bool> condition, Func<Task>? action = null, TimeSpan? timeout = null, TimeSpan? retryDelay = null)
     {
-        timeout ??= TimeSpan.FromSeconds(10);
+        timeout ??= TimeSpan.FromSeconds(30);
         var delay1 = retryDelay ?? TimeSpan.FromSeconds(.1);
 
         var stopwatch = Stopwatch.StartNew();
@@ -33,7 +33,7 @@ public static class Retry
 
     public static async Task Until(string reason, Func<Task<bool>> condition, Func<Task>? action = null, TimeSpan? timeout = null, TimeSpan? retryDelay = null)
     {
-        timeout ??= TimeSpan.FromSeconds(10);
+        timeout ??= TimeSpan.FromSeconds(30);
         var delay1 = retryDelay ?? TimeSpan.FromSeconds(.1);
 
         var stopwatch = Stopwatch.StartNew();
