@@ -1,3 +1,5 @@
+using NATS.Client.TestUtilities2;
+
 namespace NATS.Client.Core.Tests;
 
 public class ClusterTests(ITestOutputHelper output)
@@ -47,6 +49,7 @@ public class ClusterTests(ITestOutputHelper output)
             NoRandomize = true,
             Url = $"{url1},{url2}",
         });
+        await nats.ConnectRetryAsync();
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 
