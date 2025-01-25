@@ -35,6 +35,21 @@ public abstract partial class NatsConnectionTest
         yield return new object[]
         {
             new Auth(
+                "USER-PASSWORD (AuthCallback takes precedence over Username & Password)",
+                "resources/configs/auth/password.conf",
+                NatsOpts.Default with
+                {
+                    AuthOpts = NatsAuthOpts.Default with {
+                        Username = "invalid",
+                        Password = "invalid",
+                        AuthCredCallback = async (_, _) => await Task.FromResult(NatsAuthCred.FromUserInfo("a", "b")),
+                    },
+                }),
+        };
+
+        yield return new object[]
+        {
+            new Auth(
                 "USER-PASSWORD_IN_CONNECTIONSTRING",
                 "resources/configs/auth/password.conf",
                 NatsOpts.Default,
@@ -59,11 +74,42 @@ public abstract partial class NatsConnectionTest
         yield return new object[]
         {
             new Auth(
+                "NKEY (AuthCallback takes precedence over NKey & Seed)",
+                "resources/configs/auth/nkey.conf",
+                NatsOpts.Default with
+                {
+                    AuthOpts = NatsAuthOpts.Default with
+                    {
+                        AuthCredCallback = async (_, _) => await Task.FromResult(NatsAuthCred.FromNkey("SUAAVWRZG6M5FA5VRRGWSCIHKTOJC7EWNIT4JV3FTOIPO4OBFR5WA7X5TE")),
+                        NKey = "invalid nkey",
+                        Seed = "invalid seed",
+                    },
+                }),
+        };
+
+        yield return new object[]
+        {
+            new Auth(
                 "NKEY (FROM FILE)",
                 "resources/configs/auth/nkey.conf",
                 NatsOpts.Default with
                 {
                     AuthOpts = NatsAuthOpts.Default with { NKeyFile = "resources/configs/auth/user.nk", },
+                }),
+        };
+
+        yield return new object[]
+        {
+            new Auth(
+                "NKEY (FROM FILE) (AuthCallback takes precedence over original file)",
+                "resources/configs/auth/nkey.conf",
+                NatsOpts.Default with
+                {
+                    AuthOpts = NatsAuthOpts.Default with
+                    {
+                        NKeyFile = string.Empty,
+                        AuthCredCallback = async (_, _) => await Task.FromResult(NatsAuthCred.FromNkeyFile("resources/configs/auth/user.nk")),
+                    },
                 }),
         };
 
@@ -86,11 +132,56 @@ public abstract partial class NatsConnectionTest
         yield return new object[]
         {
             new Auth(
+                "USER-CREDS (AuthCallback takes precedence over Jwt & Seed)",
+                "resources/configs/auth/operator.conf",
+                NatsOpts.Default with
+                {
+                    AuthOpts = NatsAuthOpts.Default with
+                    {
+                        AuthCredCallback = async (_, _) => await Task.FromResult(NatsAuthCred.FromJwt("eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ.eyJqdGkiOiJOVDJTRkVIN0pNSUpUTzZIQ09GNUpYRFNDUU1WRlFNV0MyWjI1TFk3QVNPTklYTjZFVlhBIiwiaWF0IjoxNjc5MTQ0MDkwLCJpc3MiOiJBREpOSlpZNUNXQlI0M0NOSzJBMjJBMkxPSkVBSzJSS1RaTk9aVE1HUEVCRk9QVE5FVFBZTUlLNSIsIm5hbWUiOiJteS11c2VyIiwic3ViIjoiVUJPWjVMUVJPTEpRRFBBQUNYSk1VRkJaS0Q0R0JaSERUTFo3TjVQS1dSWFc1S1dKM0VBMlc0UloiLCJuYXRzIjp7InB1YiI6e30sInN1YiI6e30sInN1YnMiOi0xLCJkYXRhIjotMSwicGF5bG9hZCI6LTEsInR5cGUiOiJ1c2VyIiwidmVyc2lvbiI6Mn19.ElYEknDixe9pZdl55S9PjduQhhqR1OQLglI1JO7YK7ECYb1mLUjGd8ntcR7ISS04-_yhygSDzX8OS8buBIxMDA", "SUAJR32IC6D45J3URHJ5AOQZWBBO6QTID27NZQKXE3GC5U3SPFEYDJK6RQ")),
+                        Jwt = "not a valid jwt",
+                        Seed = "invalid nkey seed",
+                    },
+                }),
+        };
+
+        yield return new object[]
+        {
+            new Auth(
                 "USER-CREDS (FROM FILE)",
                 "resources/configs/auth/operator.conf",
                 NatsOpts.Default with
                 {
                     AuthOpts = NatsAuthOpts.Default with { CredsFile = "resources/configs/auth/user.creds", },
+                }),
+        };
+
+        yield return new object[]
+        {
+            new Auth(
+                "USER-CREDS (FROM FILE) (AuthCallback takes precedence over original file)",
+                "resources/configs/auth/operator.conf",
+                NatsOpts.Default with
+                {
+                    AuthOpts = NatsAuthOpts.Default with
+                    {
+                        CredsFile = string.Empty,
+                        AuthCredCallback = async (_, _) => await Task.FromResult(NatsAuthCred.FromCredsFile("resources/configs/auth/user.creds")),
+                    },
+                }),
+        };
+
+        yield return new object[]
+        {
+            new Auth(
+                "Token (AuthCallback takes precedence over Token)",
+                "resources/configs/auth/token.conf",
+                NatsOpts.Default with
+                {
+                    AuthOpts = NatsAuthOpts.Default with {
+                        Token = "won't be used",
+                        AuthCredCallback = async (_, _) => await Task.FromResult(NatsAuthCred.FromToken("s3cr3t")),
+                    },
                 }),
         };
     }
@@ -117,20 +208,20 @@ public abstract partial class NatsConnectionTest
 
         var serverOpts = serverOptsBuilder.Build();
 
-        await using var server = NatsServer.Start(_output, serverOpts, clientOpts, useAuthInUrl);
+        await using var server = await NatsServer.StartAsync(_output, serverOpts, clientOpts, useAuthInUrl);
 
         var subject = Guid.NewGuid().ToString("N");
 
         _output.WriteLine("TRY ANONYMOUS CONNECTION");
         {
-            await using var failConnection = server.CreateClientConnection(ignoreAuthorizationException: true);
+            await using var failConnection = await server.CreateClientConnectionAsync(ignoreAuthorizationException: true);
             var natsException =
                 await Assert.ThrowsAsync<NatsException>(async () => await failConnection.PublishAsync(subject, 0));
             Assert.Contains("Authorization Violation", natsException.GetBaseException().Message);
         }
 
-        await using var subConnection = server.CreateClientConnection(clientOpts, useAuthInUrl: useAuthInUrl);
-        await using var pubConnection = server.CreateClientConnection(clientOpts, useAuthInUrl: useAuthInUrl);
+        await using var subConnection = await server.CreateClientConnectionAsync(clientOpts, useAuthInUrl: useAuthInUrl);
+        await using var pubConnection = await server.CreateClientConnectionAsync(clientOpts, useAuthInUrl: useAuthInUrl);
 
         var signalComplete1 = new WaitSignal();
         var signalComplete2 = new WaitSignal();
@@ -166,7 +257,7 @@ public abstract partial class NatsConnectionTest
         await disconnectSignal2;
 
         _output.WriteLine("START NEW SERVER");
-        await using var newServer = NatsServer.Start(_output, serverOpts, clientOpts, useAuthInUrl);
+        await using var newServer = await NatsServer.StartAsync(_output, serverOpts, clientOpts, useAuthInUrl);
         await subConnection.ConnectAsync(); // wait open again
         await pubConnection.ConnectAsync(); // wait open again
 

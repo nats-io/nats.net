@@ -12,7 +12,7 @@ public class DoubleAckNakDelayTests
     [Fact]
     public async Task Double_ack_received_messages()
     {
-        await using var server = NatsServer.StartJS();
+        await using var server = await NatsServer.StartJSAsync();
         var (nats1, proxy) = server.CreateProxiedClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
         await using var nats = nats1;
         var js = new NatsJSContext(nats);
@@ -46,7 +46,7 @@ public class DoubleAckNakDelayTests
     [Fact]
     public async Task Delay_nak_received_messages()
     {
-        await using var server = NatsServer.StartJS();
+        await using var server = await NatsServer.StartJSAsync();
         var (nats1, proxy) = server.CreateProxiedClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
         await using var nats = nats1;
         var js = new NatsJSContext(nats);

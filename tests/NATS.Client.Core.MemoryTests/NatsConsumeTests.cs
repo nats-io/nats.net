@@ -9,12 +9,12 @@ namespace NATS.Client.Core.MemoryTests;
 public class NatsConsumeTests
 {
     [Test]
-    public void Subscription_should_not_be_collected_when_in_consume_async_enumerator()
+    public async Task Subscription_should_not_be_collected_when_in_consume_async_enumerator()
     {
-        var server = NatsServer.StartJS();
+        var server = await NatsServer.StartJSAsync();
         try
         {
-            var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
+            var nats = await server.CreateClientConnectionAsync(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
             var js = new NatsJSContext(nats);
 
             nats.PingAsync().AsTask().GetAwaiter().GetResult();
@@ -101,12 +101,12 @@ public class NatsConsumeTests
     }
 
     [Test]
-    public void Subscription_should_not_be_collected_when_in_ordered_consume_async_enumerator()
+    public async Task Subscription_should_not_be_collected_when_in_ordered_consume_async_enumerator()
     {
-        var server = NatsServer.StartJS();
+        var server = await NatsServer.StartJSAsync();
         try
         {
-            var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
+            var nats = await server.CreateClientConnectionAsync(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
             var js = new NatsJSContext(nats);
 
             nats.PingAsync().AsTask().GetAwaiter().GetResult();

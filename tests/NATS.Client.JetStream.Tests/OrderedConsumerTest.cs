@@ -13,8 +13,8 @@ public class OrderedConsumerTest
     public async Task Consume_test()
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContext(nats);
 
         var stream = await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
@@ -45,8 +45,8 @@ public class OrderedConsumerTest
     [Fact]
     public async Task Consume_reconnect_publish()
     {
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -88,8 +88,8 @@ public class OrderedConsumerTest
     public async Task Fetch_test()
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContext(nats);
 
         var stream = await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
@@ -122,8 +122,8 @@ public class OrderedConsumerTest
     public async Task Fetch_no_wait_test()
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContext(nats);
 
         var stream = await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
@@ -185,8 +185,8 @@ public class OrderedConsumerTest
     public async Task Next_test()
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContext(nats);
 
         var stream = await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);

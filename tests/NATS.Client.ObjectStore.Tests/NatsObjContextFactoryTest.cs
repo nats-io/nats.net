@@ -13,14 +13,14 @@ public class NatsObjContextFactoryTest
     public async Task Create_Context_Test()
     {
         // Arrange
-        await using var server = NatsServer.Start(
+        await using var server = await NatsServer.StartAsync(
             outputHelper: _output,
             opts: new NatsServerOptsBuilder()
                 .UseTransport(TransportType.Tcp)
                 .Trace()
                 .UseJetStream()
                 .Build());
-        await using var connection = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
+        await using var connection = await server.CreateClientConnectionAsync(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
         var jsFactory = new NatsJSContextFactory();
         var jsContext = jsFactory.CreateContext(connection);
         var factory = new NatsObjContextFactory();

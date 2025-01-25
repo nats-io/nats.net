@@ -51,14 +51,14 @@ public class JetStreamTest
     [Fact]
     public async Task Create_stream_test()
     {
-        await using var server = NatsServer.Start(
+        await using var server = await NatsServer.StartAsync(
             outputHelper: _output,
             opts: new NatsServerOptsBuilder()
                 .UseTransport(TransportType.Tcp)
                 .Trace()
                 .UseJetStream()
                 .Build());
-        var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
+        var nats = await server.CreateClientConnectionAsync(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
 
         // Happy user
         {

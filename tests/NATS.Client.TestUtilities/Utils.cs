@@ -2,7 +2,10 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-#if !NET6_0_OR_GREATER
+
+#if NATS_CORE2_TEST
+using NATS.Client.Core2.Tests.ExtraUtils.FrameworkPolyfillExtensions;
+#elif !NET6_0_OR_GREATER
 using NATS.Client.Core.Internal.NetStandardExtensions;
 #endif
 
@@ -140,7 +143,7 @@ public static class ServiceUtils
             var count = 0;
 
             // NATS cli sends an empty JSON object '{}' as the request payload, so we do the same here
-            await foreach (var msg in nats.RequestManyAsync<string, T>(subject, "{}", replySerializer: serializer, replyOpts: replyOpts, cancellationToken: ct).ConfigureAwait(false))
+            await foreach (var msg in nats.RequestManyAsync<string, T>(subject, "{}", replySerializer: serializer, replyOpts: replyOpts, cancellationToken: ct))
             {
                 if (++count == limit)
                     break;
@@ -150,7 +153,7 @@ public static class ServiceUtils
         });
 
         var count = 0;
-        await foreach (var msg in nats.RequestManyAsync<string, T>(subject, "{}", replySerializer: serializer, replyOpts: replyOpts, cancellationToken: ct).ConfigureAwait(false))
+        await foreach (var msg in nats.RequestManyAsync<string, T>(subject, "{}", replySerializer: serializer, replyOpts: replyOpts, cancellationToken: ct))
         {
             responses.Add(msg.Data!);
             if (++count == limit)

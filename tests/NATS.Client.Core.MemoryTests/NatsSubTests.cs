@@ -7,12 +7,12 @@ namespace NATS.Client.Core.MemoryTests;
 public class NatsSubTests
 {
     [Test]
-    public void Subject_manager_should_not_hold_on_to_subscription_if_collected()
+    public async Task Subject_manager_should_not_hold_on_to_subscription_if_collected()
     {
-        var server = NatsServer.Start();
+        var server = await NatsServer.StartAsync();
         try
         {
-            var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
+            var nats = await server.CreateClientConnectionAsync(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
 
             async Task Isolator()
             {
@@ -43,14 +43,14 @@ public class NatsSubTests
     }
 
     [Test]
-    public void Subscription_should_not_be_collected_subscribe_async()
+    public async Task Subscription_should_not_be_collected_subscribe_async()
     {
-        var server = NatsServer.Start();
+        var server = await NatsServer.StartAsync();
         try
         {
             const int iterations = 10;
             const string subject = "foo.data";
-            var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
+            var nats = await server.CreateClientConnectionAsync(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
             var received = Channel.CreateUnbounded<object>();
 
             var subTask = Task.Run(async () =>
@@ -75,14 +75,14 @@ public class NatsSubTests
     }
 
     [Test]
-    public void Subscription_should_not_be_collected_subscribe_core_async_read_all_async()
+    public async Task Subscription_should_not_be_collected_subscribe_core_async_read_all_async()
     {
-        var server = NatsServer.Start();
+        var server = await NatsServer.StartAsync();
         try
         {
             const int iterations = 10;
             const string subject = "foo.data";
-            var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
+            var nats = await server.CreateClientConnectionAsync(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
             var received = Channel.CreateUnbounded<object>();
 
             var subTask = Task.Run(async () =>
@@ -108,14 +108,14 @@ public class NatsSubTests
     }
 
     [Test]
-    public void Subscription_should_not_be_collected_subscribe_core_async_read_async()
+    public async Task Subscription_should_not_be_collected_subscribe_core_async_read_async()
     {
-        var server = NatsServer.Start();
+        var server = await NatsServer.StartAsync();
         try
         {
             const int iterations = 10;
             const string subject = "foo.data";
-            var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
+            var nats = await server.CreateClientConnectionAsync(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
             var received = Channel.CreateUnbounded<object>();
 
             var subTask = Task.Run(async () =>
@@ -140,14 +140,14 @@ public class NatsSubTests
     }
 
     [Test]
-    public void Subscription_should_not_be_collected_subscribe_core_async_wait_to_read_async()
+    public async Task Subscription_should_not_be_collected_subscribe_core_async_wait_to_read_async()
     {
-        var server = NatsServer.Start();
+        var server = await NatsServer.StartAsync();
         try
         {
             const int iterations = 10;
             const string subject = "foo.data";
-            var nats = server.CreateClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
+            var nats = await server.CreateClientConnectionAsync(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
             var received = Channel.CreateUnbounded<object>();
 
             var subTask = Task.Run(async () =>

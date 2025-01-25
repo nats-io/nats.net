@@ -91,7 +91,7 @@ public class DefaultBench
     {
         for (var i = 0; i < 1; i++)
         {
-            await _redis.GetDatabase().PublishAsync(_subject, JsonSerializer.Serialize(default(MyVector3)));
+            await _redis.GetDatabase().PublishAsync(new RedisChannel(_subject, RedisChannel.PatternMode.Auto), JsonSerializer.Serialize(default(MyVector3)));
         }
     }
 

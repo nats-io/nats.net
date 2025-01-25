@@ -26,6 +26,11 @@ public interface INatsConnection : INatsClient
     event AsyncEventHandler<NatsMessageDroppedEventArgs>? MessageDropped;
 
     /// <summary>
+    /// Event that is raised when server goes into Lame Duck Mode.
+    /// </summary>
+    public event AsyncEventHandler<NatsLameDuckModeActivatedEventArgs>? LameDuckModeActivated;
+
+    /// <summary>
     /// Server information received from the NATS server.
     /// </summary>
     INatsServerInfo? ServerInfo { get; }

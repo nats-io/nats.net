@@ -11,8 +11,8 @@ public class KeyValueContextTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -30,8 +30,8 @@ public class KeyValueContextTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         var cancellationToken = cts.Token;
 
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -47,6 +47,54 @@ public class KeyValueContextTest
     }
 
     [Fact]
+    public async Task Create_store_via_create_or_update_store_test()
+    {
+        const string expectedBuketName = "kv1";
+        const string expectedDescription = "description";
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var natsKVConfig = new NatsKVConfig(expectedBuketName) { Description = expectedDescription };
+        var store = await kv.CreateOrUpdateStoreAsync(natsKVConfig, cancellationToken);
+        var status = await store.GetStatusAsync(cancellationToken);
+
+        status.Bucket.Should().Be(expectedBuketName);
+        status.Info.Config.Description.Should().Be(expectedDescription);
+    }
+
+    [Fact]
+    public async Task Update_store_via_create_or_update_store_test()
+    {
+        var buketName = "kv1";
+        var expectedDescription = "Updated description";
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var store = await kv.CreateStoreAsync(buketName, cancellationToken);
+        var status = await store.GetStatusAsync(cancellationToken);
+        status.Info.Config.Description.Should().BeNull();
+
+        var natsKVConfig = new NatsKVConfig(buketName) { Description = expectedDescription };
+        await kv.CreateOrUpdateStoreAsync(natsKVConfig, cancellationToken);
+        var updatedStatus = await store.GetStatusAsync(cancellationToken);
+        updatedStatus.Info.Config.Description.Should().Be(natsKVConfig.Description);
+    }
+
+    [Fact]
     public async Task Delete_store_test()
     {
         var bucketName = "kv1";
@@ -54,8 +102,8 @@ public class KeyValueContextTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -76,8 +124,8 @@ public class KeyValueContextTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -105,8 +153,8 @@ public class KeyValueContextTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
