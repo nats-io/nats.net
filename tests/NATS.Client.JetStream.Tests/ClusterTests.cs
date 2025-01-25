@@ -1,4 +1,5 @@
 using NATS.Client.Core.Tests;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -15,7 +16,7 @@ public class ClusterTests
         await cluster.StartAsync();
         await using var nats = await cluster.Server1.CreateClientConnectionAsync();
 
-        await nats.PingAsync();
+        await nats.ConnectRetryAsync();
 
         var urls = nats.ServerInfo!.ClientConnectUrls!.ToList();
 

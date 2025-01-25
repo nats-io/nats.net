@@ -1,28 +1,38 @@
 using System.Text.RegularExpressions;
 using NATS.Client.Core.Tests;
+using NATS.Client.Core2.Tests;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.JetStream.Tests;
 
+[Collection("nats-server")]
 public class DoubleAckNakDelayTests
 {
     private readonly ITestOutputHelper _output;
+    private readonly NatsServerFixture _server;
 
-    public DoubleAckNakDelayTests(ITestOutputHelper output) => _output = output;
+    public DoubleAckNakDelayTests(ITestOutputHelper output, NatsServerFixture server)
+    {
+        _output = output;
+        _server = server;
+    }
 
     [Fact]
     public async Task Double_ack_received_messages()
     {
-        await using var server = await NatsServer.StartJSAsync();
-        var (nats1, proxy) = server.CreateProxiedClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
-        await using var nats = nats1;
+        var proxy = _server.CreateProxy();
+        await using var nats = proxy.CreateNatsConnection();
+        await nats.ConnectRetryAsync();
+        var prefix = _server.GetNextId();
+
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
-        await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
-        var consumer = await js.CreateOrUpdateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+        await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
+        var consumer = await js.CreateOrUpdateConsumerAsync($"{prefix}s1", $"{prefix}c1", cancellationToken: cts.Token);
 
-        var ack = await js.PublishAsync("s1.foo", 42, cancellationToken: cts.Token);
+        var ack = await js.PublishAsync($"{prefix}s1.foo", 42, cancellationToken: cts.Token);
         ack.EnsureSuccess();
         var next = await consumer.NextAsync<int>(cancellationToken: cts.Token);
         if (next is { } msg)
@@ -46,17 +56,19 @@ public class DoubleAckNakDelayTests
     [Fact]
     public async Task Delay_nak_received_messages()
     {
-        await using var server = await NatsServer.StartJSAsync();
-        var (nats1, proxy) = server.CreateProxiedClientConnection(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
-        await using var nats = nats1;
+        var proxy = _server.CreateProxy();
+        await using var nats = proxy.CreateNatsConnection();
+        await nats.ConnectRetryAsync();
+        var prefix = _server.GetNextId();
+
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
-        await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
-        var consumer = await js.CreateOrUpdateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+        await js.CreateStreamAsync($"{prefix}s1", new[] { $"{prefix}s1.*" }, cts.Token);
+        var consumer = await js.CreateOrUpdateConsumerAsync($"{prefix}s1", $"{prefix}c1", cancellationToken: cts.Token);
 
-        var ack = await js.PublishAsync("s1.foo", 42, cancellationToken: cts.Token);
+        var ack = await js.PublishAsync($"{prefix}s1.foo", 42, cancellationToken: cts.Token);
         ack.EnsureSuccess();
         var next = await consumer.NextAsync<int>(cancellationToken: cts.Token);
         if (next is { } msg)

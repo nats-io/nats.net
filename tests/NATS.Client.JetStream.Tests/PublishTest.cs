@@ -1,32 +1,42 @@
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Tests;
+using NATS.Client.Core2.Tests;
+using NATS.Client.TestUtilities;
 using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.JetStream.Tests;
 
+[Collection("nats-server")]
 public class PublishTest
 {
     private readonly ITestOutputHelper _output;
+    private readonly NatsServerFixture _server;
 
-    public PublishTest(ITestOutputHelper output) => _output = output;
+    public PublishTest(ITestOutputHelper output, NatsServerFixture server)
+    {
+        _output = output;
+        _server = server;
+    }
 
     [Fact]
     public async Task Publish_test()
     {
-        await using var server = await NatsServer.StartJSAsync();
-        await using var nats = await server.CreateClientConnectionAsync();
+        await using var nats = _server.CreateNatsConnection();
+        await nats.ConnectRetryAsync();
+        var prefix = _server.GetNextId();
+
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-        await js.CreateStreamAsync("s1", new[] { "s1.>" }, cts.Token);
-        await js.CreateOrUpdateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+        await js.CreateStreamAsync($"{prefix}s1", new[] { $"{prefix}s1.>" }, cts.Token);
+        await js.CreateOrUpdateConsumerAsync($"{prefix}s1", $"{prefix}c1", cancellationToken: cts.Token);
 
         // Publish
         {
             var ack = await js.PublishAsync(
-                "s1.foo",
+                $"{prefix}s1.foo",
                 new TestData
                 {
                     Test = 1,
@@ -35,7 +45,7 @@ public class PublishTest
                 cancellationToken: cts.Token);
             Assert.Null(ack.Error);
             Assert.Equal(1, (int)ack.Seq);
-            Assert.Equal("s1", ack.Stream);
+            Assert.Equal($"{prefix}s1", ack.Stream);
             Assert.False(ack.Duplicate);
             Assert.True(ack.IsSuccess());
         }
@@ -43,7 +53,7 @@ public class PublishTest
         // Duplicate
         {
             var ack1 = await js.PublishAsync(
-                subject: "s1.foo",
+                subject: $"{prefix}s1.foo",
                 data: new TestData { Test = 2 },
                 serializer: TestDataJsonSerializer<TestData>.Default,
                 opts: new NatsJSPubOpts { MsgId = "2" },
@@ -54,7 +64,7 @@ public class PublishTest
             Assert.True(ack1.IsSuccess());
 
             var ack2 = await js.PublishAsync(
-                subject: "s1.foo",
+                subject: $"{prefix}s1.foo",
                 data: new TestData { Test = 2 },
                 serializer: TestDataJsonSerializer<TestData>.Default,
                 opts: new NatsJSPubOpts { MsgId = "2" },
@@ -67,14 +77,14 @@ public class PublishTest
         // ExpectedStream
         {
             var ack1 = await js.PublishAsync(
-                subject: "s1.foo",
+                subject: $"{prefix}s1.foo",
                 data: 1,
-                opts: new NatsJSPubOpts { ExpectedStream = "s1" },
+                opts: new NatsJSPubOpts { ExpectedStream = $"{prefix}s1" },
                 cancellationToken: cts.Token);
             Assert.Null(ack1.Error);
 
             var ack2 = await js.PublishAsync(
-                subject: "s1.foo",
+                subject: $"{prefix}s1.foo",
                 data: 2,
                 opts: new NatsJSPubOpts { ExpectedStream = "non-existent-stream" },
                 cancellationToken: cts.Token);
@@ -87,20 +97,20 @@ public class PublishTest
         // ExpectedLastSequence
         {
             var ack1 = await js.PublishAsync(
-                subject: "s1.foo",
+                subject: $"{prefix}s1.foo",
                 data: 1,
                 cancellationToken: cts.Token);
             Assert.Null(ack1.Error);
 
             var ack2 = await js.PublishAsync(
-                subject: "s1.foo",
+                subject: $"{prefix}s1.foo",
                 data: 2,
                 opts: new NatsJSPubOpts { ExpectedLastSequence = ack1.Seq },
                 cancellationToken: cts.Token);
             Assert.Null(ack2.Error);
 
             var ack3 = await js.PublishAsync(
-                subject: "s1.foo",
+                subject: $"{prefix}s1.foo",
                 data: 3,
                 opts: new NatsJSPubOpts { ExpectedLastSequence = ack1.Seq },
                 cancellationToken: cts.Token);
@@ -112,20 +122,20 @@ public class PublishTest
         // ExpectedLastSubjectSequence
         {
             var ack1 = await js.PublishAsync(
-                subject: "s1.foo.ExpectedLastSubjectSequence",
+                subject: $"{prefix}s1.foo.ExpectedLastSubjectSequence",
                 data: 1,
                 cancellationToken: cts.Token);
             Assert.Null(ack1.Error);
 
             var ack2 = await js.PublishAsync(
-                subject: "s1.foo.ExpectedLastSubjectSequence",
+                subject: $"{prefix}s1.foo.ExpectedLastSubjectSequence",
                 data: 2,
                 opts: new NatsJSPubOpts { ExpectedLastSubjectSequence = ack1.Seq },
                 cancellationToken: cts.Token);
             Assert.Null(ack2.Error);
 
             var ack3 = await js.PublishAsync(
-                subject: "s1.foo.ExpectedLastSubjectSequence",
+                subject: $"{prefix}s1.foo.ExpectedLastSubjectSequence",
                 data: 3,
                 opts: new NatsJSPubOpts { ExpectedLastSubjectSequence = ack1.Seq },
                 cancellationToken: cts.Token);
@@ -137,21 +147,21 @@ public class PublishTest
         // ExpectedLastMsgId
         {
             var ack1 = await js.PublishAsync(
-                subject: "s1.foo.ExpectedLastSubjectSequence",
+                subject: $"{prefix}s1.foo.ExpectedLastSubjectSequence",
                 data: 1,
                 opts: new NatsJSPubOpts { MsgId = "ExpectedLastMsgId-1" },
                 cancellationToken: cts.Token);
             Assert.Null(ack1.Error);
 
             var ack2 = await js.PublishAsync(
-                subject: "s1.foo.ExpectedLastSubjectSequence",
+                subject: $"{prefix}s1.foo.ExpectedLastSubjectSequence",
                 data: 2,
                 opts: new NatsJSPubOpts { MsgId = "ExpectedLastMsgId-2", ExpectedLastMsgId = "ExpectedLastMsgId-1" },
                 cancellationToken: cts.Token);
             Assert.Null(ack2.Error);
 
             var ack3 = await js.PublishAsync(
-                subject: "s1.foo.ExpectedLastSubjectSequence",
+                subject: $"{prefix}s1.foo.ExpectedLastSubjectSequence",
                 data: 3,
                 opts: new NatsJSPubOpts { MsgId = "ExpectedLastMsgId-3", ExpectedLastMsgId = "unexpected-msg-id" },
                 cancellationToken: cts.Token);
@@ -164,14 +174,26 @@ public class PublishTest
     [Fact]
     public async Task Publish_retry_test()
     {
-        var ackRegex = new Regex(@"{""stream"":""s1"",\s*""seq"":\d+}");
+        var retryCount = 0;
+        var logger = new InMemoryTestLoggerFactory(LogLevel.Debug, log =>
+        {
+            if (log is { LogLevel: LogLevel.Debug } && log.EventId == NatsJSLogEvents.PublishNoResponseRetry)
+            {
+                Interlocked.Increment(ref retryCount);
+            }
+        });
 
-        // give enough time for retries to avoid NatsJSPublishNoResponseExceptions
-        var natsOpts = NatsOpts.Default with { RequestTimeout = TimeSpan.FromSeconds(3) };
+        var proxy = _server.CreateProxy();
+        await using var nats = new NatsConnection(new NatsOpts
+        {
+            Url = $"nats://127.0.0.1:{proxy.Port}",
+            ConnectTimeout = TimeSpan.FromSeconds(10),
+            RequestTimeout = TimeSpan.FromSeconds(3), // give enough time for retries to avoid NatsJSPublishNoResponseExceptions
+            LoggerFactory = logger,
+        });
+        var prefix = _server.GetNextId();
 
-        await using var server = await NatsServer.StartJSAsync();
-        var (nats1, proxy) = server.CreateProxiedClientConnection(natsOpts);
-        await using var nats = nats1;
+        var ackRegex = new Regex($$"""{"stream":"{{prefix}}s1",\s*"seq":\s*\d+}""");
 
         var swallowAcksCount = 0;
         proxy.ServerInterceptors.Add(m =>
@@ -187,32 +209,23 @@ public class PublishTest
             return m;
         });
 
-        var retryCount = 0;
-        server.OnLog += log =>
-        {
-            if (log is { LogLevel: LogLevel.Debug } && log.EventId == NatsJSLogEvents.PublishNoResponseRetry)
-            {
-                Interlocked.Increment(ref retryCount);
-            }
-        };
-
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(45));
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 
         // use different connection to create stream and consumer to avoid request timeouts
-        await using var nats0 = await server.CreateClientConnectionAsync();
+        await using var nats0 = _server.CreateNatsConnection();
 
         await nats.ConnectRetryAsync();
         await nats0.ConnectRetryAsync();
 
         var js0 = new NatsJSContext(nats0);
-        await js0.CreateStreamAsync("s1", new[] { "s1.>" }, cts.Token);
-        await js0.CreateOrUpdateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+        await js0.CreateStreamAsync($"{prefix}s1", new[] { $"{prefix}s1.>" }, cts.Token);
+        await js0.CreateOrUpdateConsumerAsync($"{prefix}s1", $"{prefix}c1", cancellationToken: cts.Token);
 
         var js = new NatsJSContext(nats);
 
         // Publish succeeds without retry
         {
-            var ack = await js.PublishAsync("s1.foo", 1, opts: new NatsJSPubOpts { RetryAttempts = 2 }, cancellationToken: cts.Token);
+            var ack = await js.PublishAsync($"{prefix}s1.foo", 1, opts: new NatsJSPubOpts { RetryAttempts = 2 }, cancellationToken: cts.Token);
             ack.EnsureSuccess();
 
             Assert.Equal(0, Volatile.Read(ref retryCount));
@@ -226,7 +239,7 @@ public class PublishTest
             Interlocked.Exchange(ref retryCount, 0);
             Interlocked.Exchange(ref swallowAcksCount, 1);
 
-            var ack = await js.PublishAsync("s1.foo", 1, opts: new NatsJSPubOpts { RetryAttempts = 2 }, cancellationToken: cts.Token);
+            var ack = await js.PublishAsync($"{prefix}s1.foo", 1, opts: new NatsJSPubOpts { RetryAttempts = 2 }, cancellationToken: cts.Token);
             ack.EnsureSuccess();
 
             Assert.Equal(1, Volatile.Read(ref retryCount));
@@ -239,7 +252,7 @@ public class PublishTest
             Interlocked.Exchange(ref retryCount, 0);
             Interlocked.Exchange(ref swallowAcksCount, 2);
 
-            var ack = await js.PublishAsync("s1.foo", 1, opts: new NatsJSPubOpts { RetryAttempts = 3 }, cancellationToken: cts.Token);
+            var ack = await js.PublishAsync($"{prefix}s1.foo", 1, opts: new NatsJSPubOpts { RetryAttempts = 3 }, cancellationToken: cts.Token);
             ack.EnsureSuccess();
 
             Assert.Equal(2, Volatile.Read(ref retryCount));
@@ -253,7 +266,7 @@ public class PublishTest
             Interlocked.Exchange(ref swallowAcksCount, 2);
 
             await Assert.ThrowsAsync<NatsJSPublishNoResponseException>(async () =>
-                await js.PublishAsync("s1.foo", 1, opts: new NatsJSPubOpts { RetryAttempts = 2 }, cancellationToken: cts.Token));
+                await js.PublishAsync($"{prefix}s1.foo", 1, opts: new NatsJSPubOpts { RetryAttempts = 2 }, cancellationToken: cts.Token));
 
             Assert.Equal(2, Volatile.Read(ref retryCount));
             await Retry.Until("ack received", () => proxy.Frames.Count(f => ackRegex.IsMatch(f.Message)) == 2, timeout: TimeSpan.FromSeconds(20));
