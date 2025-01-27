@@ -1,8 +1,11 @@
 using System.Text.Json.Serialization;
+using System.Threading.Channels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using NATS.Client.Core;
+using NATS.Net;
 
 namespace NATS.Extensions.Microsoft.DependencyInjection;
 
@@ -14,6 +17,8 @@ public class NatsBuilder
     private Func<IServiceProvider, NatsOpts, NatsOpts>? _configureOpts;
     private Action<IServiceProvider, NatsConnection>? _configureConnection;
     private object? _diKey = null;
+    private BoundedChannelFullMode? _pending = null;
+    private INatsSerializerRegistry? _serializerRegistry = null;
 
     public NatsBuilder(IServiceCollection services)
         => _services = services;
@@ -57,9 +62,11 @@ public class NatsBuilder
         return this;
     }
 
+    [Obsolete("By default JSON serialization is enabled. If you still want to use generated JSON serialization, use WithSerializerRegistry, JsonSerializerContext and optionally NatsSerializerBuilder")]
     public NatsBuilder AddJsonSerialization(JsonSerializerContext context) =>
         AddJsonSerialization(_ => context);
 
+    [Obsolete("By default JSON serialization is enabled. If you still want to use generated JSON serialization, use WithSerializerRegistry, JsonSerializerContext and optionally NatsSerializerBuilder")]
     public NatsBuilder AddJsonSerialization(Func<IServiceProvider, JsonSerializerContext> contextFactory)
         => ConfigureOptions((serviceProvider, opts) =>
         {
@@ -78,6 +85,39 @@ public class NatsBuilder
     }
 #endif
 
+    /// <summary>
+    /// Override the default <see cref="BoundedChannelFullMode"/> for the pending messages channel.
+    /// </summary>
+    /// <param name="pending">Full mode for the subscription channel.</param>
+    /// <returns>Builder to allow method chaining.</returns>
+    /// <remarks>
+    /// This will be applied to options overriding values set for <c>SubPendingChannelFullMode</c> in options.
+    /// By default, the pending messages channel will wait for space to be available when full.
+    /// Note that this is not the same as <c>NatsOpts</c> default <c>SubPendingChannelFullMode</c> which is <c>DropNewest</c>.
+    /// </remarks>
+    public NatsBuilder WithSubPendingChannelFullMode(BoundedChannelFullMode pending)
+    {
+        _pending = pending;
+        return this;
+    }
+
+    /// <summary>
+    /// Override the default <see cref="INatsSerializerRegistry"/> for the options.
+    /// </summary>
+    /// <param name="registry">Serializer registry to use.</param>
+    /// <returns>Builder to allow method chaining.</returns>
+    /// <remarks>
+    /// This will be applied to options overriding values set for <c>SerializerRegistry</c> in options.
+    /// By default, NatsClient registry will be used which allows ad-hoc JSON serialization.
+    /// Note that this is not the same as <c>NatsOpts</c> default <c>SerializerRegistry</c> which
+    /// doesn't do ad-hoc JSON serialization.
+    /// </remarks>
+    public NatsBuilder WithSerializerRegistry(INatsSerializerRegistry registry)
+    {
+        _serializerRegistry = registry;
+        return this;
+    }
+
     internal IServiceCollection Build()
     {
         if (_poolSize != 1)
@@ -88,14 +128,16 @@ public class NatsBuilder
                 _services.TryAddSingleton<INatsConnectionPool>(static provider => provider.GetRequiredService<NatsConnectionPool>());
                 _services.TryAddTransient<NatsConnection>(static provider => PooledConnectionFactory(provider, null));
                 _services.TryAddTransient<INatsConnection>(static provider => provider.GetRequiredService<NatsConnection>());
+                _services.TryAddTransient<INatsClient>(static provider => provider.GetRequiredService<NatsConnection>());
             }
             else
             {
 #if NET8_0_OR_GREATER
                 _services.TryAddKeyedSingleton<NatsConnectionPool>(_diKey, PoolFactory);
                 _services.TryAddKeyedSingleton<INatsConnectionPool>(_diKey, static (provider, key) => provider.GetRequiredKeyedService<NatsConnectionPool>(key));
-                _services.TryAddKeyedTransient(_diKey, PooledConnectionFactory);
+                _services.TryAddKeyedTransient<NatsConnection>(_diKey, PooledConnectionFactory);
                 _services.TryAddKeyedTransient<INatsConnection>(_diKey, static (provider, key) => provider.GetRequiredKeyedService<NatsConnection>(key));
+                _services.TryAddKeyedTransient<INatsClient>(_diKey, static (provider, key) => provider.GetRequiredKeyedService<NatsConnection>(key));
 #endif
             }
         }
@@ -105,12 +147,14 @@ public class NatsBuilder
             {
                 _services.TryAddSingleton<NatsConnection>(provider => SingleConnectionFactory(provider));
                 _services.TryAddSingleton<INatsConnection>(static provider => provider.GetRequiredService<NatsConnection>());
+                _services.TryAddSingleton<INatsClient>(static provider => provider.GetRequiredService<NatsConnection>());
             }
             else
             {
 #if NET8_0_OR_GREATER
                 _services.TryAddKeyedSingleton(_diKey, SingleConnectionFactory);
                 _services.TryAddKeyedSingleton<INatsConnection>(_diKey, static (provider, key) => provider.GetRequiredKeyedService<NatsConnection>(key));
+                _services.TryAddKeyedSingleton<INatsClient>(_diKey, static (provider, key) => provider.GetRequiredKeyedService<NatsConnection>(key));
 #endif
             }
         }
@@ -133,20 +177,40 @@ public class NatsBuilder
 
     private NatsConnectionPool PoolFactory(IServiceProvider provider, object? diKey = null)
     {
-        var options = NatsOpts.Default with { LoggerFactory = provider.GetRequiredService<ILoggerFactory>() };
-        options = _configureOpts?.Invoke(provider, options) ?? options;
+        var options = GetNatsOpts(provider);
 
         return new NatsConnectionPool(_poolSize, options, con => _configureConnection?.Invoke(provider, con));
     }
 
     private NatsConnection SingleConnectionFactory(IServiceProvider provider, object? diKey = null)
     {
-        var options = NatsOpts.Default with { LoggerFactory = provider.GetRequiredService<ILoggerFactory>() };
-        options = _configureOpts?.Invoke(provider, options) ?? options;
+        var options = GetNatsOpts(provider);
 
         var conn = new NatsConnection(options);
         _configureConnection?.Invoke(provider, conn);
 
         return conn;
+    }
+
+    private NatsOpts GetNatsOpts(IServiceProvider provider)
+    {
+        var options = NatsOpts.Default with { LoggerFactory = provider.GetService<ILoggerFactory>() ?? NullLoggerFactory.Instance };
+        options = _configureOpts?.Invoke(provider, options) ?? options;
+
+        if (_serializerRegistry != null)
+        {
+            options = options with { SerializerRegistry = _serializerRegistry };
+        }
+        else
+        {
+            if (ReferenceEquals(options.SerializerRegistry, NatsOpts.Default.SerializerRegistry))
+            {
+                options = options with { SerializerRegistry = NatsClientDefaultSerializerRegistry.Default, };
+            }
+        }
+
+        options = options with { SubPendingChannelFullMode = _pending ?? BoundedChannelFullMode.Wait };
+
+        return options;
     }
 }
