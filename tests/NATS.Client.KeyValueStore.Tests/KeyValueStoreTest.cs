@@ -695,4 +695,73 @@ public class KeyValueStoreTest
         Assert.Equal("a_fromStore1", entryA.Value);
         Assert.Equal("b_fromStore2", entryB.Value);
     }
+
+    [Fact]
+    public async Task Try_Create()
+    {
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var store = await kv.CreateStoreAsync("b1");
+
+        NatsResult<ulong> result = default;
+
+        result = await store.TryCreateAsync("k1", "v1");
+        Assert.True(result.Success);
+
+        result = await store.TryCreateAsync("k1", "v2");
+        Assert.False(result.Success);
+
+        var deleteResult = await store.TryDeleteAsync("k1");
+        Assert.True(deleteResult.Success);
+
+        result = await store.TryCreateAsync("k1", "v3");
+        Assert.True(result.Success);
+
+        var finalValue = await store.TryGetEntryAsync<string>("k1");
+        Assert.True(finalValue.Success && finalValue.Value.Value == "v3");
+    }
+
+    [Fact]
+    public async Task Try_Delete()
+    {
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var store = await kv.CreateStoreAsync("b1");
+
+        var entry = await store.PutAsync("k1", "v1");
+
+        var updateResultFail = await store.TryUpdateAsync("k1", "v2", revision: entry + 1);
+        Assert.False(updateResultFail.Success);
+
+        var updateResultSuccess = await store.TryUpdateAsync("k1", "v2", revision: entry);
+        Assert.True(updateResultSuccess.Success);
+    }
+
+    [Fact]
+    public async Task Try_Update()
+    {
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var store = await kv.CreateStoreAsync("b1");
+
+        var entry = await store.PutAsync("k1", "v1");
+
+        var deleteResultFail = await store.TryDeleteAsync("k1", new NatsKVDeleteOpts { Revision = entry + 1 });
+        Assert.False(deleteResultFail.Success);
+
+        var deleteResultSuccess = await store.TryDeleteAsync("k1", new NatsKVDeleteOpts { Revision = entry });
+        Assert.True(deleteResultSuccess.Success);
+    }
 }
