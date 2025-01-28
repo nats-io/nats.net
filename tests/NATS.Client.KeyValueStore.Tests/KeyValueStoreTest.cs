@@ -711,18 +711,23 @@ public class KeyValueStoreTest
 
         result = await store.TryCreateAsync("k1", "v1");
         Assert.True(result.Success);
+        Assert.ThrowsAny<InvalidOperationException>(() => result.Error);
 
         result = await store.TryCreateAsync("k1", "v2");
         Assert.False(result.Success);
+        Assert.True(result.Error is NatsKVCreateException);
 
         var deleteResult = await store.TryDeleteAsync("k1");
         Assert.True(deleteResult.Success);
+        Assert.ThrowsAny<InvalidOperationException>(() => deleteResult.Error);
 
         result = await store.TryCreateAsync("k1", "v3");
         Assert.True(result.Success);
+        Assert.ThrowsAny<InvalidOperationException>(() => result.Error);
 
         var finalValue = await store.TryGetEntryAsync<string>("k1");
         Assert.True(finalValue.Success && finalValue.Value.Value == "v3");
+        Assert.ThrowsAny<InvalidOperationException>(() => finalValue.Error);
     }
 
     [Fact]
@@ -740,9 +745,11 @@ public class KeyValueStoreTest
 
         var updateResultFail = await store.TryUpdateAsync("k1", "v2", revision: entry + 1);
         Assert.False(updateResultFail.Success);
+        Assert.True(updateResultFail.Error is NatsKVWrongLastRevisionException);
 
         var updateResultSuccess = await store.TryUpdateAsync("k1", "v2", revision: entry);
         Assert.True(updateResultSuccess.Success);
+        Assert.ThrowsAny<InvalidOperationException>(() => updateResultSuccess.Error);
     }
 
     [Fact]
@@ -760,8 +767,10 @@ public class KeyValueStoreTest
 
         var deleteResultFail = await store.TryDeleteAsync("k1", new NatsKVDeleteOpts { Revision = entry + 1 });
         Assert.False(deleteResultFail.Success);
+        Assert.True(deleteResultFail.Error is NatsKVWrongLastRevisionException);
 
         var deleteResultSuccess = await store.TryDeleteAsync("k1", new NatsKVDeleteOpts { Revision = entry });
         Assert.True(deleteResultSuccess.Success);
+        Assert.ThrowsAny<InvalidOperationException>(() => deleteResultSuccess.Error);
     }
 }
