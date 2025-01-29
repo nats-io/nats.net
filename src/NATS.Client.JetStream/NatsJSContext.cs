@@ -82,6 +82,53 @@ public partial class NatsJSContext
         NatsHeaders? headers = default,
         CancellationToken cancellationToken = default)
     {
+        var result = await TryPublishAsync(subject, data, serializer, opts, headers, cancellationToken);
+        if (!result.Success)
+        {
+            throw result.Error;
+        }
+
+        return result.Value;
+    }
+
+    /// <summary>
+    /// Sends data to a stream associated with the subject.
+    /// </summary>
+    /// <param name="subject">Subject to publish the data to.</param>
+    /// <param name="data">Data to publish.</param>
+    /// <param name="serializer">Serializer to use for the message type.</param>
+    /// <param name="opts">Publish options.</param>
+    /// <param name="headers">Optional message headers.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the publishing call or the wait for response.</param>
+    /// <typeparam name="T">Type of the data being sent.</typeparam>
+    /// <returns>
+    /// The ACK response to indicate if stream accepted the message as well as additional
+    /// information like the sequence number of the message stored by the stream.
+    /// </returns>
+    /// <exception cref="NatsJSException">There was a problem receiving the response.</exception>
+    /// <remarks>
+    /// <para>
+    /// Use this method to avoid exceptions.
+    /// </para>
+    /// <para>
+    /// Note that if the subject isn't backed by a stream or the connected NATS server
+    /// isn't running with JetStream enabled, this call will hang waiting for an ACK
+    /// until the request times out.
+    /// </para>
+    /// <para>
+    /// By setting <c>msgId</c> you can ensure messages written to a stream only once. JetStream support idempotent
+    /// message writes by ignoring duplicate messages as indicated by the Nats-Msg-Id header. If both <c>msgId</c>
+    /// and the <c>Nats-Msg-Id</c> header value was set, <c>msgId</c> parameter value will be used.
+    /// </para>
+    /// </remarks>
+    public async ValueTask<NatsResult<PubAckResponse>> TryPublishAsync<T>(
+        string subject,
+        T? data,
+        INatsSerialize<T>? serializer = default,
+        NatsJSPubOpts? opts = default,
+        NatsHeaders? headers = default,
+        CancellationToken cancellationToken = default)
+    {
         if (opts != null)
         {
             if (opts.MsgId != null)
@@ -150,7 +197,7 @@ public partial class NatsJSContext
                 {
                     if (msg.Data == null)
                     {
-                        throw new NatsJSException("No response data received");
+                        return new NatsJSException("No response data received");
                     }
 
                     return msg.Data;
@@ -169,7 +216,7 @@ public partial class NatsJSContext
 
         // We throw a specific exception here for convenience so that the caller doesn't
         // have to check for the exception message etc.
-        throw new NatsJSPublishNoResponseException();
+        return new NatsJSPublishNoResponseException();
     }
 
     public async ValueTask<NatsJSPublishConcurrentFuture> PublishConcurrentAsync<T>(

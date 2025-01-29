@@ -27,6 +27,20 @@ public interface INatsKVStore
     ValueTask<ulong> PutAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Tries to put a value into the bucket using the key
+    /// </summary>
+    /// <param name="key">Key of the entry</param>
+    /// <param name="value">Value of the entry</param>
+    /// <param name="serializer">Serializer to use for the message type.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <typeparam name="T">Serialized value type</typeparam>
+    /// <returns>Revision number</returns>
+    /// <remarks>
+    /// Use this method to avoid exceptions
+    /// </remarks>
+    ValueTask<NatsResult<ulong>> TryPutAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Create a new entry in the bucket only if it doesn't exist
     /// </summary>
     /// <param name="key">Key of the entry</param>

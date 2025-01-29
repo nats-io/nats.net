@@ -197,6 +197,39 @@ public interface INatsJSContext
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Sends data to a stream associated with the subject.
+    /// </summary>
+    /// <param name="subject">Subject to publish the data to.</param>
+    /// <param name="data">Data to publish.</param>
+    /// <param name="serializer">Serializer to use for the message type.</param>
+    /// <param name="opts">Publish options.</param>
+    /// <param name="headers">Optional message headers.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the publishing call or the wait for response.</param>
+    /// <typeparam name="T">Type of the data being sent.</typeparam>
+    /// <returns>
+    /// The ACK response to indicate if stream accepted the message as well as additional
+    /// information like the sequence number of the message stored by the stream.
+    /// </returns>
+    /// <exception cref="NatsJSException">There was a problem receiving the response.</exception>
+    /// <remarks>
+    /// <para>
+    /// Use this method to avoid exceptions.
+    /// </para>
+    /// <para>
+    /// Note that if the subject isn't backed by a stream or the connected NATS server
+    /// isn't running with JetStream enabled, this call will hang waiting for an ACK
+    /// until the request times out.
+    /// </para>
+    /// </remarks>
+    ValueTask<NatsResult<PubAckResponse>> TryPublishAsync<T>(
+        string subject,
+        T? data,
+        INatsSerialize<T>? serializer = default,
+        NatsJSPubOpts? opts = default,
+        NatsHeaders? headers = default,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Creates a new stream if it doesn't exist or returns an existing stream with the same name.
     /// </summary>
     /// <param name="config">Stream configuration request to be sent to NATS JetStream server.</param>

@@ -4,6 +4,7 @@ namespace NATS.Client.Core;
 
 public readonly struct NatsResult
 {
+    private static readonly NatsResult _defaultSuccess = new();
     private readonly Exception? _error;
 
     public NatsResult()
@@ -15,6 +16,8 @@ public readonly struct NatsResult
     {
         _error = error;
     }
+
+    public static NatsResult DefaultSuccess => _defaultSuccess;
 
     public Exception Error => _error ?? ThrowErrorIsNotSetException();
 
