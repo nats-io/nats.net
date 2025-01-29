@@ -4,6 +4,7 @@ using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
 using NATS.Client.TestUtilities;
 using NATS.Client.TestUtilities2;
+using NATS.Net;
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -271,5 +272,15 @@ public class PublishTest
             Assert.Equal(2, Volatile.Read(ref retryCount));
             await Retry.Until("ack received", () => proxy.Frames.Count(f => ackRegex.IsMatch(f.Message)) == 2, timeout: TimeSpan.FromSeconds(20));
         }
+    }
+
+    [Fact]
+    public async Task Publish_no_responders()
+    {
+        await using var server = await NatsServer.StartAsync();
+        await using var connection = await server.CreateClientConnectionAsync();
+        var js = connection.CreateJetStreamContext();
+        var result = await js.TryPublishAsync("foo", 1);
+        Assert.IsType<NatsJSPublishNoResponseException>(result.Error);
     }
 }

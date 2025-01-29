@@ -2,6 +2,34 @@ using System.Runtime.CompilerServices;
 
 namespace NATS.Client.Core;
 
+public readonly struct NatsResult
+{
+    private readonly Exception? _error;
+
+    public NatsResult()
+    {
+        _error = null;
+    }
+
+    public NatsResult(Exception error)
+    {
+        _error = error;
+    }
+
+    public static NatsResult Default => new();
+
+    public Exception Error => _error ?? ThrowErrorIsNotSetException();
+
+    public bool Success => _error == null;
+
+    public static implicit operator NatsResult(Exception error) => new(error);
+
+    private static Exception ThrowErrorIsNotSetException() => throw CreateInvalidOperationException("Result error is not set");
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static Exception CreateInvalidOperationException(string message) => new InvalidOperationException(message);
+}
+
 public readonly struct NatsResult<T>
 {
     private readonly T? _value;

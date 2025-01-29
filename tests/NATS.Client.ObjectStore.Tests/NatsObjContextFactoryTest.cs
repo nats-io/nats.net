@@ -76,6 +76,8 @@ public class NatsObjContextFactoryTest
 
         public ValueTask<PubAckResponse> PublishAsync<T>(string subject, T? data, INatsSerialize<T>? serializer = default, NatsJSPubOpts? opts = default, NatsHeaders? headers = default, CancellationToken cancellationToken = default) => throw new NotImplementedException();
 
+        public ValueTask<NatsResult<PubAckResponse>> TryPublishAsync<T>(string subject, T? data, INatsSerialize<T>? serializer = default, NatsJSPubOpts? opts = default, NatsHeaders? headers = default, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+
         public ValueTask<INatsJSStream> CreateStreamAsync(StreamConfig config, CancellationToken cancellationToken = default) => throw new NotImplementedException();
 
         public ValueTask<INatsJSStream> CreateOrUpdateStreamAsync(StreamConfig config, CancellationToken cancellationToken = default) => throw new NotImplementedException();

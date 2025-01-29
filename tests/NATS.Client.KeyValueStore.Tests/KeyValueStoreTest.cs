@@ -695,4 +695,116 @@ public class KeyValueStoreTest
         Assert.Equal("a_fromStore1", entryA.Value);
         Assert.Equal("b_fromStore2", entryB.Value);
     }
+
+    [Fact]
+    public async Task Try_Create()
+    {
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var store = await kv.CreateStoreAsync("b1");
+
+        NatsResult<ulong> result = default;
+
+        result = await store.TryCreateAsync("k1", "v1");
+        Assert.True(result.Success);
+        Assert.ThrowsAny<InvalidOperationException>(() => result.Error);
+
+        result = await store.TryCreateAsync("k1", "v2");
+        Assert.False(result.Success);
+        Assert.True(result.Error is NatsKVCreateException);
+
+        var deleteResult = await store.TryDeleteAsync("k1");
+        Assert.True(deleteResult.Success);
+        Assert.ThrowsAny<InvalidOperationException>(() => deleteResult.Error);
+
+        result = await store.TryCreateAsync("k1", "v3");
+        Assert.True(result.Success);
+        Assert.ThrowsAny<InvalidOperationException>(() => result.Error);
+
+        var finalValue = await store.TryGetEntryAsync<string>("k1");
+        Assert.True(finalValue.Success && finalValue.Value.Value == "v3");
+        Assert.ThrowsAny<InvalidOperationException>(() => finalValue.Error);
+    }
+
+    [Fact]
+    public async Task Try_Delete()
+    {
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var store = await kv.CreateStoreAsync("b1");
+
+        var putResult = await store.TryPutAsync("k1", "v1");
+        Assert.True(putResult.Success);
+
+        var entry = putResult.Value;
+
+        var updateResultFail = await store.TryUpdateAsync("k1", "v2", revision: entry + 1);
+        Assert.False(updateResultFail.Success);
+        Assert.True(updateResultFail.Error is NatsKVWrongLastRevisionException);
+
+        var updateResultSuccess = await store.TryUpdateAsync("k1", "v2", revision: entry);
+        Assert.True(updateResultSuccess.Success);
+        Assert.ThrowsAny<InvalidOperationException>(() => updateResultSuccess.Error);
+    }
+
+    [Fact]
+    public async Task Try_Update()
+    {
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var store = await kv.CreateStoreAsync("b1");
+
+        var putFailResult = await store.TryPutAsync(".badkeystartingwithperiod", "v1");
+        Assert.False(putFailResult.Success);
+        Assert.True(putFailResult.Error is NatsKVException);
+
+        var putResult = await store.TryPutAsync("k1", "v1");
+        Assert.True(putResult.Success);
+
+        var entry = putResult.Value;
+
+        var deleteResultFail = await store.TryDeleteAsync("k1", new NatsKVDeleteOpts { Revision = entry + 1 });
+        Assert.False(deleteResultFail.Success);
+        Assert.True(deleteResultFail.Error is NatsKVWrongLastRevisionException);
+
+        var deleteResultSuccess = await store.TryDeleteAsync("k1", new NatsKVDeleteOpts { Revision = entry });
+        Assert.True(deleteResultSuccess.Success);
+        Assert.ThrowsAny<InvalidOperationException>(() => deleteResultSuccess.Error);
+    }
+
+    [Fact]
+    public void Test_Keys()
+    {
+        NatsResult keyTestResult;
+
+        keyTestResult = NatsKVStore.IsValidKey(string.Empty);
+        Assert.True(!keyTestResult.Success && keyTestResult.Error is NatsKVException);
+
+        keyTestResult = NatsKVStore.IsValidKey("     ");
+        Assert.True(!keyTestResult.Success && keyTestResult.Error is NatsKVException);
+
+        keyTestResult = NatsKVStore.IsValidKey(".a");
+        Assert.True(!keyTestResult.Success && keyTestResult.Error is NatsKVException);
+
+        keyTestResult = NatsKVStore.IsValidKey("a 1");
+        Assert.True(!keyTestResult.Success && keyTestResult.Error is NatsKVException);
+
+        keyTestResult = NatsKVStore.IsValidKey("k1");
+        Assert.True(keyTestResult.Success);
+
+        keyTestResult = NatsKVStore.IsValidKey("k.1");
+        Assert.True(keyTestResult.Success);
+    }
 }

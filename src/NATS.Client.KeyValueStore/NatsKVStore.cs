@@ -52,6 +52,9 @@ public class NatsKVStore : INatsKVStore
     private static readonly NatsKVException InvalidSequenceException = new("Can't parse sequence header");
     private static readonly NatsKVException InvalidTimestampException = new("Can't parse timestamp header");
     private static readonly NatsKVException InvalidOperationException = new("Can't parse operation header");
+    private static readonly NatsKVException KeyCannotBeEmptyException = new("Key cannot be empty");
+    private static readonly NatsKVException KeyCannotStartOrEndWithPeriodException = new("Key cannot start or end with a period");
+    private static readonly NatsKVException KeyContainsInvalidCharactersException = new("Key contains invalid characters");
     private readonly INatsJSStream _stream;
     private readonly string _kvBucket;
 
@@ -69,70 +72,175 @@ public class NatsKVStore : INatsKVStore
     /// <inheritdoc />
     public string Bucket { get; }
 
+    /// <summary>
+    /// <para>
+    /// Tests for a valid Bucket Key
+    /// </para>
+    /// <para>
+    /// Valid keys are \A[-/_=\.a-zA-Z0-9]+\z, additionally they may not start or end in .
+    /// </para>
+    /// </summary>
+    /// <param name="key">Subject to publish the data to.</param>
+    /// <returns>
+    /// A NatsResult signifying if the key is Valid, or if invalid, the exception detail.
+    /// </returns>
+    public static NatsResult IsValidKey(string key) => TryValidateKey(key);
+
     /// <inheritdoc />
     public async ValueTask<ulong> PutAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
-        ValidateKey(key);
-        var ack = await JetStreamContext.PublishAsync($"$KV.{Bucket}.{key}", value, serializer: serializer, cancellationToken: cancellationToken);
-        ack.EnsureSuccess();
-        return ack.Seq;
+        var result = await TryPutAsync(key, value, serializer, cancellationToken);
+        if (!result.Success)
+        {
+            ThrowException(result.Error);
+        }
+
+        return result.Value;
+    }
+
+    public async ValueTask<NatsResult<ulong>> TryPutAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
+    {
+        var keyValidResult = TryValidateKey(key);
+        if (!keyValidResult.Success)
+        {
+            return keyValidResult.Error;
+        }
+
+        var publishResult = await JetStreamContext.TryPublishAsync(_kvBucket + key, value, serializer: serializer, cancellationToken: cancellationToken);
+        if (publishResult.Success)
+        {
+            var ack = publishResult.Value;
+            if (ack.Error != null)
+            {
+                return new NatsJSApiException(ack.Error);
+            }
+            else if (ack.Duplicate)
+            {
+                return new NatsJSDuplicateMessageException(ack.Seq);
+            }
+
+            return ack.Seq;
+        }
+        else
+        {
+            return publishResult.Error;
+        }
     }
 
     /// <inheritdoc />
     public async ValueTask<ulong> CreateAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
-        ValidateKey(key);
+        var result = await TryCreateAsync(key, value, serializer, cancellationToken);
+        if (!result.Success)
+        {
+            ThrowException(result.Error);
+        }
+
+        return result.Value;
+    }
+
+    /// <inheritdoc />
+    public async ValueTask<NatsResult<ulong>> TryCreateAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
+    {
+        var keyValidResult = TryValidateKey(key);
+        if (!keyValidResult.Success)
+        {
+            return keyValidResult.Error;
+        }
 
         // First try to create a new entry
-        try
+        var resultUpdate = await TryUpdateAsync(key, value, revision: 0, serializer, cancellationToken);
+        if (resultUpdate.Success)
         {
-            return await UpdateAsync(key, value, revision: 0, serializer, cancellationToken);
-        }
-        catch (NatsKVWrongLastRevisionException)
-        {
+            return resultUpdate;
         }
 
-        // If that fails, try to update an existing entry which may have been deleted
-        try
-        {
-            await GetEntryAsync<T>(key, cancellationToken: cancellationToken);
-        }
-        catch (NatsKVKeyDeletedException e)
-        {
-            return await UpdateAsync(key, value, e.Revision, serializer, cancellationToken);
-        }
+        // If that fails, try to read an existing entry, this will fail if deleted.
+        var resultReadExisting = await TryGetEntryAsync<T>(key, cancellationToken: cancellationToken);
 
-        throw new NatsKVCreateException();
+        // If we succeed here, then we've just been returned an entry, so we can't create a new one
+        if (resultReadExisting.Success)
+        {
+            return new NatsKVCreateException();
+        }
+        else if (resultReadExisting.Error is NatsKVKeyDeletedException deletedException)
+        {
+            // If our previous call errored because the last entry is deleted, then that's ok, we update with the deleted revision
+            return await TryUpdateAsync(key, value, deletedException.Revision, serializer, cancellationToken);
+        }
+        else
+        {
+            return resultReadExisting.Error;
+        }
     }
 
     /// <inheritdoc />
     public async ValueTask<ulong> UpdateAsync<T>(string key, T value, ulong revision, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
-        ValidateKey(key);
+        var result = await TryUpdateAsync(key, value, revision, serializer, cancellationToken);
+        if (!result.Success)
+        {
+            ThrowException(result.Error);
+        }
+
+        return result.Value;
+    }
+
+    /// <inheritdoc />
+    public async ValueTask<NatsResult<ulong>> TryUpdateAsync<T>(string key, T value, ulong revision, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
+    {
+        var keyValidResult = TryValidateKey(key);
+        if (!keyValidResult.Success)
+        {
+            return keyValidResult.Error;
+        }
+
         var headers = new NatsHeaders { { NatsExpectedLastSubjectSequence, revision.ToString() } };
 
-        try
+        var publishResult = await JetStreamContext.TryPublishAsync(_kvBucket + key, value, headers: headers, serializer: serializer, cancellationToken: cancellationToken);
+        if (publishResult.Success)
         {
-            var ack = await JetStreamContext.PublishAsync($"$KV.{Bucket}.{key}", value, headers: headers, serializer: serializer, cancellationToken: cancellationToken);
-            ack.EnsureSuccess();
+            var ack = publishResult.Value;
+            if (ack.Error is { ErrCode: 10071, Code: 400, Description: not null } && ack.Error.Description.StartsWith("wrong last sequence", StringComparison.OrdinalIgnoreCase))
+            {
+                return new NatsKVWrongLastRevisionException();
+            }
+            else if (ack.Error != null)
+            {
+                return new NatsJSApiException(ack.Error);
+            }
+            else if (ack.Duplicate)
+            {
+                return new NatsJSDuplicateMessageException(ack.Seq);
+            }
 
             return ack.Seq;
         }
-        catch (NatsJSApiException e)
+        else
         {
-            if (e.Error is { ErrCode: 10071, Code: 400, Description: not null } && e.Error.Description.StartsWith("wrong last sequence", StringComparison.OrdinalIgnoreCase))
-            {
-                throw new NatsKVWrongLastRevisionException();
-            }
-
-            throw;
+            return publishResult.Error;
         }
     }
 
     /// <inheritdoc />
     public async ValueTask DeleteAsync(string key, NatsKVDeleteOpts? opts = default, CancellationToken cancellationToken = default)
     {
-        ValidateKey(key);
+        var result = await TryDeleteAsync(key, opts, cancellationToken);
+        if (!result.Success)
+        {
+            ThrowException(result.Error);
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask<NatsResult> TryDeleteAsync(string key, NatsKVDeleteOpts? opts = default, CancellationToken cancellationToken = default)
+    {
+        var keyValidResult = TryValidateKey(key);
+        if (!keyValidResult.Success)
+        {
+            return keyValidResult.Error;
+        }
+
         opts ??= new NatsKVDeleteOpts();
 
         var headers = new NatsHeaders();
@@ -152,27 +260,38 @@ public class NatsKVStore : INatsKVStore
             headers.Add(NatsExpectedLastSubjectSequence, opts.Revision.ToString());
         }
 
-        var subject = $"$KV.{Bucket}.{key}";
-
-        try
+        var publishResult = await JetStreamContext.TryPublishAsync<object?>(_kvBucket + key, null, headers: headers, cancellationToken: cancellationToken);
+        if (publishResult.Success)
         {
-            var ack = await JetStreamContext.PublishAsync<object?>(subject, null, headers: headers, cancellationToken: cancellationToken);
-            ack.EnsureSuccess();
-        }
-        catch (NatsJSApiException e)
-        {
-            if (e.Error is { ErrCode: 10071, Code: 400, Description: not null } && e.Error.Description.StartsWith("wrong last sequence", StringComparison.OrdinalIgnoreCase))
+            var ack = publishResult.Value;
+            if (ack.Error is { ErrCode: 10071, Code: 400, Description: not null } && ack.Error.Description.StartsWith("wrong last sequence", StringComparison.OrdinalIgnoreCase))
             {
-                throw new NatsKVWrongLastRevisionException();
+                return new NatsKVWrongLastRevisionException();
+            }
+            else if (ack.Error != null)
+            {
+                return new NatsJSApiException(ack.Error);
+            }
+            else if (ack.Duplicate)
+            {
+                return new NatsJSDuplicateMessageException(ack.Seq);
             }
 
-            throw;
+            return NatsResult.Default;
+        }
+        else
+        {
+            return publishResult.Error;
         }
     }
 
     /// <inheritdoc />
     public ValueTask PurgeAsync(string key, NatsKVDeleteOpts? opts = default, CancellationToken cancellationToken = default) =>
         DeleteAsync(key, (opts ?? new NatsKVDeleteOpts()) with { Purge = true }, cancellationToken);
+
+    /// <inheritdoc />
+    public ValueTask<NatsResult> TryPurgeAsync(string key, NatsKVDeleteOpts? opts = default, CancellationToken cancellationToken = default) =>
+        TryDeleteAsync(key, (opts ?? new NatsKVDeleteOpts()) with { Purge = true }, cancellationToken);
 
     /// <inheritdoc />
     public async ValueTask<NatsKVEntry<T>> GetEntryAsync<T>(string key, ulong revision = default, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
@@ -192,7 +311,12 @@ public class NatsKVStore : INatsKVStore
 #endif
     public async ValueTask<NatsResult<NatsKVEntry<T>>> TryGetEntryAsync<T>(string key, ulong revision = default, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
-        ValidateKey(key);
+        var keyValidResult = TryValidateKey(key);
+        if (!keyValidResult.Success)
+        {
+            return keyValidResult.Error;
+        }
+
         serializer ??= JetStreamContext.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
         var keySubject = _kvBucket + key;
 
@@ -409,7 +533,7 @@ public class NatsKVStore : INatsKVStore
 
         foreach (var entry in deleted)
         {
-            var request = new StreamPurgeRequest { Filter = $"$KV.{Bucket}.{entry.Key}" };
+            var request = new StreamPurgeRequest { Filter = _kvBucket + entry.Key };
 
             if (timeLimited && entry.Created > limit)
             {
@@ -474,26 +598,25 @@ public class NatsKVStore : INatsKVStore
     /// <summary>
     /// Valid keys are \A[-/_=\.a-zA-Z0-9]+\z, additionally they may not start or end in .
     /// </summary>
-    private static void ValidateKey(string key)
+    private static NatsResult TryValidateKey(string key)
     {
         if (string.IsNullOrWhiteSpace(key) || key.Length == 0)
         {
-            ThrowNatsKVException("Key cannot be empty");
+            return KeyCannotBeEmptyException;
         }
 
         if (key[0] == '.' || key[^1] == '.')
         {
-            ThrowNatsKVException("Key cannot start or end with a period");
+            return KeyCannotStartOrEndWithPeriodException;
         }
 
         if (!ValidKeyRegex.IsMatch(key))
         {
-            ThrowNatsKVException("Key contains invalid characters");
+            return KeyContainsInvalidCharactersException;
         }
-    }
 
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ThrowNatsKVException(string message) => throw new NatsKVException(message);
+        return NatsResult.Default;
+    }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void ThrowException(Exception exception) => throw exception;
