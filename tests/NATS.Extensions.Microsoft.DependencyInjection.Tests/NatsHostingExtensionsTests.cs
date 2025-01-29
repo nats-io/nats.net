@@ -187,7 +187,9 @@ public class NatsHostingExtensionsTests
         services.AddNatsClient(nats =>
         {
             nats.ConfigureOptions(opts => server.ClientOpts(opts));
+#pragma warning disable CS0618 // Type or member is obsolete
             nats.AddJsonSerialization(MyJsonContext.Default);
+#pragma warning restore CS0618 // Type or member is obsolete
         });
 
         var provider = services.BuildServiceProvider();
