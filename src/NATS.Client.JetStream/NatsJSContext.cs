@@ -189,7 +189,14 @@ public partial class NatsJSContext
 
             await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
             {
-                if (msg.Data == null)
+                // If JetStream is disabled, a no responders error will be returned.
+                // No responders error might also happen when reconnecting to cluster.
+                // We should retry in those cases.
+                if (msg.HasNoResponders)
+                {
+                    break;
+                }
+                else if (msg.Data == null)
                 {
                     return new NatsJSException("No response data received");
                 }
