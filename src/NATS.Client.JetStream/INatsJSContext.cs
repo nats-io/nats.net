@@ -197,7 +197,7 @@ public interface INatsJSContext
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Sends data to a stream associated with the subject.
+    /// Tries to send data to a stream associated with the subject.
     /// </summary>
     /// <param name="subject">Subject to publish the data to.</param>
     /// <param name="data">Data to publish.</param>

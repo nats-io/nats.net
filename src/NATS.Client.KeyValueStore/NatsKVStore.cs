@@ -72,7 +72,18 @@ public class NatsKVStore : INatsKVStore
     /// <inheritdoc />
     public string Bucket { get; }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// <para>
+    /// Tests for a valid Bucket Key
+    /// </para>
+    /// <para>
+    /// Valid keys are \A[-/_=\.a-zA-Z0-9]+\z, additionally they may not start or end in .
+    /// </para>
+    /// </summary>
+    /// <param name="key">Subject to publish the data to.</param>
+    /// <returns>
+    /// A NatsResult signifying if the key is Valid, or if invalid, the exception detail.
+    /// </returns>
     public static NatsResult IsValidKey(string key) => TryValidateKey(key);
 
     /// <inheritdoc />
@@ -95,15 +106,11 @@ public class NatsKVStore : INatsKVStore
             return keyValidResult.Error;
         }
 
-        var publishResult = await JetStreamContext.TryPublishAsync($"$KV.{Bucket}.{key}", value, serializer: serializer, cancellationToken: cancellationToken);
+        var publishResult = await JetStreamContext.TryPublishAsync(_kvBucket + key, value, serializer: serializer, cancellationToken: cancellationToken);
         if (publishResult.Success)
         {
             var ack = publishResult.Value;
-            if (ack.Error is { ErrCode: 10071, Code: 400, Description: not null } && ack.Error.Description.StartsWith("wrong last sequence", StringComparison.OrdinalIgnoreCase))
-            {
-                return new NatsKVWrongLastRevisionException();
-            }
-            else if (ack.Error != null)
+            if (ack.Error != null)
             {
                 return new NatsJSApiException(ack.Error);
             }
@@ -123,32 +130,13 @@ public class NatsKVStore : INatsKVStore
     /// <inheritdoc />
     public async ValueTask<ulong> CreateAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
-        var keyValidResult = TryValidateKey(key);
-        if (!keyValidResult.Success)
+        var result = await TryCreateAsync(key, value, serializer, cancellationToken);
+        if (!result.Success)
         {
-            throw keyValidResult.Error;
+            ThrowException(result.Error);
         }
 
-        // First try to create a new entry
-        try
-        {
-            return await UpdateAsync(key, value, revision: 0, serializer, cancellationToken);
-        }
-        catch (NatsKVWrongLastRevisionException)
-        {
-        }
-
-        // If that fails, try to update an existing entry which may have been deleted
-        try
-        {
-            await GetEntryAsync<T>(key, cancellationToken: cancellationToken);
-        }
-        catch (NatsKVKeyDeletedException e)
-        {
-            return await UpdateAsync(key, value, e.Revision, serializer, cancellationToken);
-        }
-
-        throw new NatsKVCreateException();
+        return result.Value;
     }
 
     /// <inheritdoc />
@@ -209,7 +197,7 @@ public class NatsKVStore : INatsKVStore
 
         var headers = new NatsHeaders { { NatsExpectedLastSubjectSequence, revision.ToString() } };
 
-        var publishResult = await JetStreamContext.TryPublishAsync($"$KV.{Bucket}.{key}", value, headers: headers, serializer: serializer, cancellationToken: cancellationToken);
+        var publishResult = await JetStreamContext.TryPublishAsync(_kvBucket + key, value, headers: headers, serializer: serializer, cancellationToken: cancellationToken);
         if (publishResult.Success)
         {
             var ack = publishResult.Value;
@@ -272,9 +260,7 @@ public class NatsKVStore : INatsKVStore
             headers.Add(NatsExpectedLastSubjectSequence, opts.Revision.ToString());
         }
 
-        var subject = $"$KV.{Bucket}.{key}";
-
-        var publishResult = await JetStreamContext.TryPublishAsync<object?>(subject, null, headers: headers, cancellationToken: cancellationToken);
+        var publishResult = await JetStreamContext.TryPublishAsync<object?>(_kvBucket + key, null, headers: headers, cancellationToken: cancellationToken);
         if (publishResult.Success)
         {
             var ack = publishResult.Value;
@@ -291,7 +277,7 @@ public class NatsKVStore : INatsKVStore
                 return new NatsJSDuplicateMessageException(ack.Seq);
             }
 
-            return new NatsResult();
+            return NatsResult.Default;
         }
         else
         {
@@ -547,7 +533,7 @@ public class NatsKVStore : INatsKVStore
 
         foreach (var entry in deleted)
         {
-            var request = new StreamPurgeRequest { Filter = $"$KV.{Bucket}.{entry.Key}" };
+            var request = new StreamPurgeRequest { Filter = _kvBucket + entry.Key };
 
             if (timeLimited && entry.Created > limit)
             {
@@ -629,11 +615,8 @@ public class NatsKVStore : INatsKVStore
             return KeyContainsInvalidCharactersException;
         }
 
-        return new NatsResult();
+        return NatsResult.Default;
     }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ThrowNatsKVException(string message) => throw new NatsKVException(message);
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void ThrowException(Exception exception) => throw exception;

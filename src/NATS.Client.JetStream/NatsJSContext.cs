@@ -183,28 +183,18 @@ public partial class NatsJSContext
                         // without the timeout the publish call will hang forever since the server
                         // which received the request won't be there to respond anymore.
                         Timeout = Connection.Opts.RequestTimeout,
-
-                        // If JetStream is disabled, a no responders error will be returned
-                        // No responders error might also happen when reconnecting to cluster
-                        ThrowIfNoResponders = true,
                     },
                     cancellationToken)
                 .ConfigureAwait(false);
 
-            try
+            await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
             {
-                await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+                if (msg.Data == null)
                 {
-                    if (msg.Data == null)
-                    {
-                        return new NatsJSException("No response data received");
-                    }
-
-                    return msg.Data;
+                    return new NatsJSException("No response data received");
                 }
-            }
-            catch (NatsNoRespondersException)
-            {
+
+                return msg.Data;
             }
 
             if (i < retryMax)
