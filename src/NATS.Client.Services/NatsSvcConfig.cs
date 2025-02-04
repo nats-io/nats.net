@@ -54,9 +54,15 @@ public record NatsSvcConfig
     public Dictionary<string, string>? Metadata { get; init; }
 
     /// <summary>
-    /// Queue group name. (default: "q")
+    /// Queue group name. (default: "q" unless <see cref="UseQueueGroup"/> is set to <c>false</c>)
     /// </summary>
     public string QueueGroup { get; init; } = "q";
+
+    /// <summary>
+    /// Use a queue group when creating service subscriptions. (default: <c>true</c>)
+    /// Queue group name is defined using <see cref="QueueGroup"/> property.
+    /// </summary>
+    public bool UseQueueGroup { get; init; } = true;
 
     /// <summary>
     /// Stats handler. JSON object returned by this handler will be included in
