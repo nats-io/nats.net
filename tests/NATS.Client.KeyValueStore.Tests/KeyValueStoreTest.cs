@@ -497,8 +497,8 @@ public class KeyValueStoreTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -514,8 +514,8 @@ public class KeyValueStoreTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await using var server = NatsServer.StartJS();
-        await using var nats = server.CreateClientConnection();
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
