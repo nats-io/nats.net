@@ -97,7 +97,7 @@ public class NatsSvcServer : INatsSvcServer
     /// </remarks>
     public ValueTask AddEndpointAsync<T>(Func<NatsSvcMsg<T>, ValueTask> handler, string? name = default, string? subject = default, string? queueGroup = default, IDictionary<string, string>? metadata = default, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
-        queueGroup ??= _config.QueueGroup;
+        queueGroup ??= _config.UseQueueGroup ? _config.QueueGroup : null;
         return AddEndpointInternalAsync<T>(handler, name, subject, queueGroup, metadata, serializer, cancellationToken);
     }
 
@@ -331,7 +331,7 @@ public class NatsSvcServer : INatsSvcServer
         {
             subject ??= name;
             var epSubject = subject != null ? $"{GroupName}{_dot}{subject}" : null;
-            queueGroup ??= QueueGroup ?? _server._config.QueueGroup;
+            queueGroup ??= QueueGroup ?? (_server._config.UseQueueGroup ? _server._config.QueueGroup : null);
             serializer ??= _server._nats.Opts.SerializerRegistry.GetDeserializer<T>();
             return _server.AddEndpointInternalAsync(handler, name, epSubject, queueGroup, metadata, serializer, cancellationToken);
         }

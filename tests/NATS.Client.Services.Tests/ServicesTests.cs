@@ -383,4 +383,100 @@ public class ServicesTests
 
         Assert.Equal(ids.Count, uniqueIds.Count);
     }
+
+    [Fact]
+    public async Task Service_without_queue_group()
+    {
+        await using var server = await NatsServer.StartAsync();
+        var (nats1, proxy) = server.CreateProxiedClientConnection();
+        await using var nats = nats1;
+        var svc = new NatsSvcContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        var cancellationToken = cts.Token;
+
+        // Default with a queue group
+        {
+            await using var s1 = await svc.AddServiceAsync(
+                new NatsSvcConfig("s1", "1.0.0"), // default is { UseQueueGroup = true },
+                cancellationToken: cancellationToken);
+
+            await using var s2 = await svc.AddServiceAsync(
+                new NatsSvcConfig("s2", "1.0.0"), // default is { UseQueueGroup = true },
+                cancellationToken: cancellationToken);
+
+            await s1.AddEndpointAsync<string>(
+                name: "ep1",
+                handler: async m =>
+                {
+                    await m.ReplyAsync("x", cancellationToken: cancellationToken);
+                },
+                cancellationToken: cancellationToken);
+
+            await s2.AddEndpointAsync<string>(
+                name: "ep1",
+                handler: async m =>
+                {
+                    await m.ReplyAsync("x", cancellationToken: cancellationToken);
+                },
+                cancellationToken: cancellationToken);
+
+            await Retry.Until("subscribed", () => proxy.Frames.Count(f => f.Message.StartsWith("SUB ep1")) == 2);
+
+            var sub = proxy.Frames.First(f => f.Message.StartsWith("SUB ep1")).Message;
+            Assert.Matches(@"SUB ep1 q \d+", sub);
+
+            var count = 0;
+            await foreach (var msg in nats.RequestManyAsync<string, string>("ep1", "x", cancellationToken: cancellationToken))
+            {
+                count++;
+            }
+
+            // Only one reply because of the queue group
+            Assert.Equal(1, count);
+        }
+
+        await proxy.FlushFramesAsync(nats);
+
+        // Without any queue group
+        {
+            await using var s1 = await svc.AddServiceAsync(
+                new NatsSvcConfig("s1", "1.0.0") { UseQueueGroup = false },
+                cancellationToken: cancellationToken);
+
+            await using var s2 = await svc.AddServiceAsync(
+                new NatsSvcConfig("s2", "1.0.0") { UseQueueGroup = false },
+                cancellationToken: cancellationToken);
+
+            await s1.AddEndpointAsync<string>(
+                name: "ep1",
+                handler: async m =>
+                {
+                    await m.ReplyAsync("x", cancellationToken: cancellationToken);
+                },
+                cancellationToken: cancellationToken);
+
+            await s2.AddEndpointAsync<string>(
+                name: "ep1",
+                handler: async m =>
+                {
+                    await m.ReplyAsync("x", cancellationToken: cancellationToken);
+                },
+                cancellationToken: cancellationToken);
+
+            await Retry.Until("subscribed", () => proxy.Frames.Count(f => f.Message.StartsWith("SUB ep1")) == 2);
+
+            var sub = proxy.Frames.First(f => f.Message.StartsWith("SUB ep1")).Message;
+            Assert.Matches(@"SUB ep1 \d+", sub);
+
+            var count = 0;
+            await foreach (var msg in nats.RequestManyAsync<string, string>("ep1", "x", cancellationToken: cancellationToken))
+            {
+                count++;
+            }
+
+            // Two replies because of the absence of any queue groups
+            Assert.Equal(2, count);
+        }
+    }
 }
