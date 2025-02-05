@@ -492,6 +492,40 @@ public class KeyValueStoreTest
     }
 
     [SkipIfNatsServer(versionEarlierThan: "2.11")]
+    public async Task TestTTLMessageWhenTTLDisabledOnStream()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var store = await kv.CreateStoreAsync(new NatsKVConfig("kv1") { AllowMsgTTL = false }, cancellationToken: cancellationToken);
+        var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () => await store.PutAsync($"somekey", $"somevalue", TimeSpan.FromSeconds(1), cancellationToken: cancellationToken));
+        Assert.Equal("per-message TTL is disabled", exception.Message);
+    }
+
+    [SkipIfNatsServer(versionEarlierThan: "2.11")]
+    public async Task SetsSubjectDeleteMarkerTTL()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        await using var server = NatsServer.StartJS();
+        await using var nats = server.CreateClientConnection();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var store = await kv.CreateStoreAsync(new NatsKVConfig("kv1") { AllowMsgTTL = true, SubjectDeleteMarkerTTL = TimeSpan.FromSeconds(2) }, cancellationToken: cancellationToken);
+        var info = await js.GetStreamAsync("KV_kv1");
+        Assert.Equal(TimeSpan.FromSeconds(2), info.Info.Config.SubjectDeleteMarkerTTL);
+    }
+
+    [SkipIfNatsServer(versionEarlierThan: "2.11")]
     public async Task TestMessageNeverExpire()
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));

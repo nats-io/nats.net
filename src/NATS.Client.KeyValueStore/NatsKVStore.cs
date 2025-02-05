@@ -112,7 +112,7 @@ public class NatsKVStore : INatsKVStore
         {
             headers = new NatsHeaders
             {
-                { NatsTtl, ttl == TimeSpan.MaxValue ? "never" : ttl.TotalSeconds.ToString("N0") },
+                { NatsTtl, ttl == TimeSpan.MaxValue ? "never" : $"{(int)ttl.TotalSeconds:D}" },
             };
         }
 
@@ -208,7 +208,7 @@ public class NatsKVStore : INatsKVStore
         var headers = new NatsHeaders { { NatsExpectedLastSubjectSequence, revision.ToString() } };
         if (ttl != default)
         {
-            headers.Add(NatsTtl, ttl == TimeSpan.MaxValue ? "never" : ttl.TotalSeconds.ToString("N0"));
+            headers.Add(NatsTtl, ttl == TimeSpan.MaxValue ? "never" : $"{(int)ttl.TotalSeconds:D}");
         }
 
         var publishResult = await JetStreamContext.TryPublishAsync(_kvBucket + key, value, headers: headers, serializer: serializer, cancellationToken: cancellationToken);

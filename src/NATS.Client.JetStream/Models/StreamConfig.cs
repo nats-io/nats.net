@@ -247,6 +247,14 @@ public record StreamConfig
     public bool AllowMsgTTL { get; set; }
 
     /// <summary>
+    /// Enables and sets a duration for adding server markers for delete, purge and max age limits.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("subject_delete_marker_ttl")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonNanosecondsConverter))]
+    public TimeSpan SubjectDeleteMarkerTTL { get; set; }
+
+    /// <summary>
     /// Additional metadata for the Stream
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("metadata")]

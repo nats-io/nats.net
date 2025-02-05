@@ -82,6 +82,11 @@ public record NatsKVConfig
     /// If true, the bucket will allow TTL on individual keys.
     /// </summary>
     public bool AllowMsgTTL { get; set; }
+
+    /// <summary>
+    /// Enables and sets a duration for adding server markers for delete, purge and max age limits.
+    /// </summary>
+    public TimeSpan SubjectDeleteMarkerTTL { get; set; }
 }
 
 /// <summary>
