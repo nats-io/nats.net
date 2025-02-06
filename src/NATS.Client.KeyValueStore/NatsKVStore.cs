@@ -88,6 +88,9 @@ public class NatsKVStore : INatsKVStore
     public static NatsResult IsValidKey(string key) => TryValidateKey(key);
 
     /// <inheritdoc />
+    public ValueTask<ulong> PutAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default) => PutAsync<T>(key, value, default, serializer, cancellationToken);
+
+    /// <inheritdoc />
     public async ValueTask<ulong> PutAsync<T>(string key, T value, TimeSpan ttl = default, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
         var result = await TryPutAsync(key, value, ttl, serializer, cancellationToken);
@@ -99,6 +102,10 @@ public class NatsKVStore : INatsKVStore
         return result.Value;
     }
 
+    /// <inheritdoc />
+    public ValueTask<NatsResult<ulong>> TryPutAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default) => TryPutAsync<T>(key, value, default, serializer, cancellationToken);
+
+    /// <inheritdoc />
     public async ValueTask<NatsResult<ulong>> TryPutAsync<T>(string key, T value, TimeSpan ttl = default, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
         var keyValidResult = TryValidateKey(key);
@@ -138,6 +145,9 @@ public class NatsKVStore : INatsKVStore
     }
 
     /// <inheritdoc />
+    public ValueTask<ulong> CreateAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default) => CreateAsync<T>(key, value, default, serializer, cancellationToken);
+
+    /// <inheritdoc />
     public async ValueTask<ulong> CreateAsync<T>(string key, T value, TimeSpan ttl = default, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
         var result = await TryCreateAsync(key, value, ttl, serializer, cancellationToken);
@@ -148,6 +158,9 @@ public class NatsKVStore : INatsKVStore
 
         return result.Value;
     }
+
+    /// <inheritdoc />
+    public ValueTask<NatsResult<ulong>> TryCreateAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default) => TryCreateAsync<T>(key, value, default, serializer, cancellationToken);
 
     /// <inheritdoc />
     public async ValueTask<NatsResult<ulong>> TryCreateAsync<T>(string key, T value, TimeSpan ttl = default, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
@@ -185,6 +198,9 @@ public class NatsKVStore : INatsKVStore
     }
 
     /// <inheritdoc />
+    public ValueTask<ulong> UpdateAsync<T>(string key, T value, ulong revision, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default) => UpdateAsync(key, value, revision, default, serializer, cancellationToken);
+
+    /// <inheritdoc />
     public async ValueTask<ulong> UpdateAsync<T>(string key, T value, ulong revision, TimeSpan ttl = default, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
         var result = await TryUpdateAsync(key, value, revision, ttl, serializer, cancellationToken);
@@ -195,6 +211,9 @@ public class NatsKVStore : INatsKVStore
 
         return result.Value;
     }
+
+    /// <inheritdoc />
+    public ValueTask<NatsResult<ulong>> TryUpdateAsync<T>(string key, T value, ulong revision, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default) => TryUpdateAsync(key, value, revision, default, serializer, cancellationToken);
 
     /// <inheritdoc />
     public async ValueTask<NatsResult<ulong>> TryUpdateAsync<T>(string key, T value, ulong revision, TimeSpan ttl = default, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
