@@ -8,7 +8,7 @@
 NATS .NET is a client library designed to connect to the NATS messaging server,
 fully supporting all NATS features.
 It integrates seamlessly with modern .NET asynchronous interfaces such as
-async enumerables and channels, and leverages advanced .NET memory, buffer and IO features.
+async enumerables and channels, and leverages advanced .NET memory, buffer and IO features. (supports server v2.11)
 
 Check out [NATS .NET client library documentation](https://nats-io.github.io/nats.net/) for guides and examples.
 
