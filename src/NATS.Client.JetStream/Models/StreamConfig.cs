@@ -240,6 +240,21 @@ public record StreamConfig
     public bool DiscardNewPerSubject { get; set; }
 
     /// <summary>
+    /// AllowMsgTTL allows header initiated per-message TTLs. If disabled, then the `NATS-TTL` header will be ignored.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("allow_msg_ttl")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool AllowMsgTTL { get; set; }
+
+    /// <summary>
+    /// Enables and sets a duration for adding server markers for delete, purge and max age limits.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("subject_delete_marker_ttl")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonNanosecondsConverter))]
+    public TimeSpan SubjectDeleteMarkerTTL { get; set; }
+
+    /// <summary>
     /// Additional metadata for the Stream
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("metadata")]
