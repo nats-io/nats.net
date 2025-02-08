@@ -20,7 +20,7 @@ public class DirectGetTest
 
         async Task GetBatchAction()
         {
-            var streamMsgBatchGetRequest = new StreamMsgBatchGetRequest { Subject = "stream_disable.x" };
+            var streamMsgBatchGetRequest = new StreamMsgBatchGetRequest { NextBySubject = "stream_disable.x" };
             await foreach (var unused in stream.GetBatchDirectAsync<string>(streamMsgBatchGetRequest, cancellationToken: cancellationToken))
             {
             }
@@ -48,7 +48,7 @@ public class DirectGetTest
             await js.PublishAsync("stream_enable.x", new TestData { Test = i }, TestDataJsonSerializer<TestData>.Default, cancellationToken: cancellationToken);
         }
 
-        var streamMsgBatchGetRequest = new StreamMsgBatchGetRequest { Subject = "stream_enable.x", Batch = 3 };
+        var streamMsgBatchGetRequest = new StreamMsgBatchGetRequest { NextBySubject = "stream_enable.x", Batch = 3 };
         await foreach (var msg in stream.GetBatchDirectAsync(streamMsgBatchGetRequest, TestDataJsonSerializer<TestData>.Default, cancellationToken: cancellationToken))
         {
             testDataList.Add(msg.Data);
@@ -76,7 +76,7 @@ public class DirectGetTest
             await js.PublishAsync("eobCode.x", new TestData { Test = i }, TestDataJsonSerializer<TestData>.Default, cancellationToken: cancellationToken);
         }
 
-        var streamMsgBatchGetRequest = new StreamMsgBatchGetRequest { Subject = "eobCode.x", Batch = 3 };
+        var streamMsgBatchGetRequest = new StreamMsgBatchGetRequest { NextBySubject = "eobCode.x", Batch = 3 };
         await foreach (var msg in stream.GetBatchDirectAsync(streamMsgBatchGetRequest, TestDataJsonSerializer<TestData>.Default, includeEob: true, cancellationToken: cancellationToken))
         {
             testDataList.Add(msg.Data);
@@ -104,7 +104,7 @@ public class DirectGetTest
             await js.PublishAsync("min_sequence.x", new TestData { Test = i }, TestDataJsonSerializer<TestData>.Default, cancellationToken: cancellationToken);
         }
 
-        var streamMsgBatchGetRequest = new StreamMsgBatchGetRequest { Subject = "min_sequence.x", Batch = 1, MinSequence = 3 };
+        var streamMsgBatchGetRequest = new StreamMsgBatchGetRequest { NextBySubject = "min_sequence.x", Batch = 1, Seq = 3 };
         await foreach (var msg in stream.GetBatchDirectAsync(streamMsgBatchGetRequest, TestDataJsonSerializer<TestData>.Default, cancellationToken: cancellationToken))
         {
             testDataList.Add(msg.Data);

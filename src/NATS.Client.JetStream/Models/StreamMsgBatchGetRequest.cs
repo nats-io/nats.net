@@ -30,7 +30,7 @@ public record StreamMsgBatchGetRequest
     [JsonPropertyName("seq")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     [Range(ulong.MinValue, ulong.MaxValue)]
-    public ulong MinSequence { get; set; }
+    public ulong Seq { get; set; }
 
     /// <summary>
     /// The minimum start time for returned message
@@ -46,10 +46,10 @@ public record StreamMsgBatchGetRequest
     [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
     [Required]
 #if NET6_0
-    public string Subject { get; set; } = default!;
+    public string NextBySubject { get; set; } = default!;
 #else
 #pragma warning disable SA1206
-    public required string Subject { get; set; }
+    public required string NextBySubject { get; set; }
 
 #pragma warning restore SA1206
 #endif
@@ -59,7 +59,7 @@ public record StreamMsgBatchGetRequest
     /// </summary>
     [JsonPropertyName("multi_last")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    public string[] LastBySubjects { get; set; } = [];
+    public string[] MultiLastBySubjects { get; set; } = [];
 
     /// <summary>
     /// Return message after sequence
