@@ -1,4 +1,3 @@
-using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
 namespace NATS.Client.JetStream.Models;
@@ -13,23 +12,23 @@ public record StreamMsgBatchGetRequest
     /// </summary>
     [JsonPropertyName("batch")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    [Range(-1, int.MaxValue)]
-    public int Batch { get; set; }
+    [System.ComponentModel.DataAnnotations.Range(ulong.MinValue, ulong.MaxValue)]
+    public ulong Batch { get; set; }
 
     /// <summary>
     /// The maximum amount of returned bytes for this request.
     /// </summary>
     [JsonPropertyName("max_bytes")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    [Range(-1, int.MaxValue)]
-    public int MaxBytes { get; set; }
+    [System.ComponentModel.DataAnnotations.Range(ulong.MinValue, long.MaxValue)]
+    public ulong MaxBytes { get; set; }
 
     /// <summary>
     /// The minimum sequence for returned message
     /// </summary>
     [JsonPropertyName("seq")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    [Range(ulong.MinValue, ulong.MaxValue)]
+    [System.ComponentModel.DataAnnotations.Range(ulong.MinValue, ulong.MaxValue)]
     public ulong Seq { get; set; }
 
     /// <summary>
@@ -43,13 +42,12 @@ public record StreamMsgBatchGetRequest
     /// The subject used filter messages that should be returned
     /// </summary>
     [JsonPropertyName("next_by_subj")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
-    [Required]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
 #if NET6_0
-    public string NextBySubject { get; set; } = default!;
+    public string? NextBySubject { get; set; } = default!;
 #else
 #pragma warning disable SA1206
-    public required string NextBySubject { get; set; }
+    public string? NextBySubject { get; set; }
 
 #pragma warning restore SA1206
 #endif
@@ -58,15 +56,15 @@ public record StreamMsgBatchGetRequest
     /// Return last messages mathing the subjects
     /// </summary>
     [JsonPropertyName("multi_last")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    public string[] MultiLastBySubjects { get; set; } = [];
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string[]? MultiLastBySubjects { get; set; }
 
     /// <summary>
     /// Return message after sequence
     /// </summary>
     [JsonPropertyName("up_to_seq")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    [Range(ulong.MinValue, ulong.MaxValue)]
+    [System.ComponentModel.DataAnnotations.Range(ulong.MinValue, ulong.MaxValue)]
     public ulong UpToSequence { get; set; }
 
     /// <summary>

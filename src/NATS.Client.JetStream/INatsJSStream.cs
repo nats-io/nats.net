@@ -117,10 +117,38 @@ public interface INatsJSStream
     /// </summary>
     /// <param name="request">Batch message request.</param>
     /// <param name="serializer">Serializer to use for the message type.</param>
-    /// <param name="includeEob"><c>true</c> to send the last empty message with eobCode in the header; otherwise <c>false</c></param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <typeparam name="T">Message type to deserialize.</typeparam>
     /// <exception cref="InvalidOperationException">There was an issue, stream must have allow direct set.</exception>
-    IAsyncEnumerable<NatsMsg<T>> GetBatchDirectAsync<T>(StreamMsgBatchGetRequest request, INatsDeserialize<T>? serializer = default, bool includeEob = false, CancellationToken cancellationToken = default);
+    IAsyncEnumerable<NatsMsg<T>> GetBatchDirectAsync<T>(StreamMsgBatchGetRequest request, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Request a direct batch message
+    /// </summary>
+    /// <param name="multiLastBySubjects">Return last messages matching the subjects</param>
+    /// <param name="batch">The maximum amount of messages to be returned</param>
+    /// <param name="serializer">Serializer to use for the message type.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <typeparam name="T">Message type to deserialize.</typeparam>
+    /// <remarks>
+    /// Get up to batch number of messages for subject
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">There was an issue, stream must have allow direct set.</exception>
+    IAsyncEnumerable<NatsMsg<T>> GetBatchDirectAsync<T>(string[] multiLastBySubjects, ulong batch, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Request a direct batch message
+    /// </summary>
+    /// <param name="nextBySubject">The subject used filter messages that should be returned</param>
+    /// <param name="batch">The maximum amount of messages to be returned</param>
+    /// <param name="serializer">Serializer to use for the message type.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <typeparam name="T">Message type to deserialize.</typeparam>
+    /// <remarks>
+    /// Get the last message for each subject in the list up to the batch size
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">There was an issue, stream must have allow direct set.</exception>
+    IAsyncEnumerable<NatsMsg<T>> GetBatchDirectAsync<T>(string nextBySubject, ulong batch, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default);
 
     ValueTask<StreamMsgGetResponse> GetAsync(StreamMsgGetRequest request, CancellationToken cancellationToken = default);
 }

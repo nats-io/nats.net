@@ -181,15 +181,22 @@ public class NatsJSStream : INatsJSStream
             cancellationToken: cancellationToken);
     }
 
-    /// <summary>
-    /// Request a direct batch message
-    /// </summary>
-    /// <param name="request">Batch message request.</param>
-    /// <param name="serializer">Serializer to use for the message type.</param>
-    /// <param name="includeEob"><c>true</c> to send the last empty message with eobCode in the header; otherwise <c>false</c></param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <exception cref="InvalidOperationException">There was an issue, stream must have allow direct set.</exception>
-    public IAsyncEnumerable<NatsMsg<T>> GetBatchDirectAsync<T>(StreamMsgBatchGetRequest request, INatsDeserialize<T>? serializer = default, bool includeEob = false, CancellationToken cancellationToken = default)
+    public IAsyncEnumerable<NatsMsg<T>> GetBatchDirectAsync<T>(StreamMsgBatchGetRequest request, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
+        => GetBatchDirectInternalAsync<T>(request, serializer, cancellationToken);
+
+    public IAsyncEnumerable<NatsMsg<T>> GetBatchDirectAsync<T>(string[] multiLastBySubjects, ulong batch, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
+    {
+        var request = new StreamMsgBatchGetRequest { MultiLastBySubjects = multiLastBySubjects, Batch = batch };
+        return GetBatchDirectInternalAsync<T>(request, serializer, cancellationToken);
+    }
+
+    public IAsyncEnumerable<NatsMsg<T>> GetBatchDirectAsync<T>(string nextBySubject, ulong batch, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
+    {
+        var request = new StreamMsgBatchGetRequest { NextBySubject = nextBySubject, Batch = batch };
+        return GetBatchDirectInternalAsync<T>(request, serializer, cancellationToken);
+    }
+
+    private IAsyncEnumerable<NatsMsg<T>> GetBatchDirectInternalAsync<T>(StreamMsgBatchGetRequest request, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
         ValidateStream();
 
@@ -198,7 +205,7 @@ public class NatsJSStream : INatsJSStream
             data: request,
             requestSerializer: NatsJSJsonSerializer<StreamMsgBatchGetRequest>.Default,
             replySerializer: serializer,
-            replyOpts: new NatsSubOpts() { StopOnEmptyMsg = !includeEob, ThrowIfNoResponders = true },
+            replyOpts: new NatsSubOpts() { StopOnEmptyMsg = true, ThrowIfNoResponders = true },
             cancellationToken: cancellationToken);
     }
 
