@@ -1,5 +1,5 @@
+using System.Runtime.CompilerServices;
 using NATS.Client.Core;
-using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
@@ -202,17 +202,27 @@ public class NatsJSStream : INatsJSStream
             request: request,
             cancellationToken);
 
-    private IAsyncEnumerable<NatsMsg<T>> GetBatchDirectInternalAsync<T>(StreamMsgBatchGetRequest request, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
+    private async IAsyncEnumerable<NatsMsg<T>> GetBatchDirectInternalAsync<T>(StreamMsgBatchGetRequest request, INatsDeserialize<T>? serializer = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ValidateStream();
 
-        return _context.Connection.RequestManyAsync<StreamMsgBatchGetRequest, T>(
+        var requestManyAsync = _context.Connection.RequestManyAsync(
             subject: $"{_context.Opts.Prefix}.DIRECT.GET.{_name}",
             data: request,
             requestSerializer: NatsJSJsonSerializer<StreamMsgBatchGetRequest>.Default,
             replySerializer: serializer,
-            replyOpts: new NatsSubOpts() { StopOnEmptyMsg = true, ThrowIfNoResponders = true },
+            replyOpts: new NatsSubOpts { StopOnEmptyMsg = true, ThrowIfNoResponders = true },
             cancellationToken: cancellationToken);
+
+        await foreach (var msg in requestManyAsync.ConfigureAwait(false))
+        {
+            if (msg.Error is { } error)
+            {
+                throw error;
+            }
+
+            yield return msg;
+        }
     }
 
     private void ThrowIfDeleted()

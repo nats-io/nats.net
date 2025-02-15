@@ -9,7 +9,7 @@ public class DirectGetTest
     public async Task Direct_get_when_stream_disable()
     {
         await using var server = NatsServer.StartJS();
-        var nats = server.CreateClientConnection();
+        await using var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats);
         var cts = new CancellationTokenSource();
         var cancellationToken = cts.Token;
@@ -33,7 +33,7 @@ public class DirectGetTest
     {
         var testDataList = new List<TestData?>();
         await using var server = NatsServer.StartJS();
-        var nats = server.CreateClientConnection();
+        await using var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats);
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(100));
         var cancellationToken = cts.Token;
@@ -57,11 +57,11 @@ public class DirectGetTest
     {
         var testDataList = new List<TestData?>();
         await using var server = NatsServer.StartJS();
-        var nats = server.CreateClientConnection();
+        await using var nats = server.CreateClientConnection();
         var js = new NatsJSContext(nats);
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(100));
         var cancellationToken = cts.Token;
-        var streamConfig = new StreamConfig("multiLast", new[] { "multiLast.*" }) { AllowDirect = true };
+        var streamConfig = new StreamConfig("multiLast", ["multiLast.*"]) { AllowDirect = true };
 
         var stream = await js.CreateStreamAsync(streamConfig, cancellationToken);
 
