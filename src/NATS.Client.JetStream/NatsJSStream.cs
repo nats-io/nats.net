@@ -196,6 +196,12 @@ public class NatsJSStream : INatsJSStream
         return GetBatchDirectInternalAsync<T>(request, serializer, cancellationToken);
     }
 
+    public ValueTask<StreamMsgGetResponse> GetAsync(StreamMsgGetRequest request, CancellationToken cancellationToken = default) =>
+        _context.JSRequestResponseAsync<StreamMsgGetRequest, StreamMsgGetResponse>(
+            subject: $"{_context.Opts.Prefix}.STREAM.MSG.GET.{_name}",
+            request: request,
+            cancellationToken);
+
     private IAsyncEnumerable<NatsMsg<T>> GetBatchDirectInternalAsync<T>(StreamMsgBatchGetRequest request, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
         ValidateStream();
@@ -208,12 +214,6 @@ public class NatsJSStream : INatsJSStream
             replyOpts: new NatsSubOpts() { StopOnEmptyMsg = true, ThrowIfNoResponders = true },
             cancellationToken: cancellationToken);
     }
-
-    public ValueTask<StreamMsgGetResponse> GetAsync(StreamMsgGetRequest request, CancellationToken cancellationToken = default) =>
-        _context.JSRequestResponseAsync<StreamMsgGetRequest, StreamMsgGetResponse>(
-            subject: $"{_context.Opts.Prefix}.STREAM.MSG.GET.{_name}",
-            request: request,
-            cancellationToken);
 
     private void ThrowIfDeleted()
     {
