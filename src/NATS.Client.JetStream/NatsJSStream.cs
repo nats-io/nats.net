@@ -1,5 +1,5 @@
+using System.Runtime.CompilerServices;
 using NATS.Client.Core;
-using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
@@ -181,15 +181,61 @@ public class NatsJSStream : INatsJSStream
             cancellationToken: cancellationToken);
     }
 
+    public IAsyncEnumerable<NatsMsg<T>> GetBatchDirectAsync<T>(StreamMsgBatchGetRequest request, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
+        => GetBatchDirectInternalAsync<T>(request, serializer, cancellationToken);
+
+    public IAsyncEnumerable<NatsMsg<T>> GetBatchDirectAsync<T>(string[] multiLastBySubjects, ulong batch, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
+    {
+        var request = new StreamMsgBatchGetRequest { MultiLastBySubjects = multiLastBySubjects, Batch = batch };
+        return GetBatchDirectInternalAsync<T>(request, serializer, cancellationToken);
+    }
+
+    public IAsyncEnumerable<NatsMsg<T>> GetBatchDirectAsync<T>(string nextBySubject, ulong batch, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
+    {
+        var request = new StreamMsgBatchGetRequest { NextBySubject = nextBySubject, Batch = batch };
+        return GetBatchDirectInternalAsync<T>(request, serializer, cancellationToken);
+    }
+
     public ValueTask<StreamMsgGetResponse> GetAsync(StreamMsgGetRequest request, CancellationToken cancellationToken = default) =>
         _context.JSRequestResponseAsync<StreamMsgGetRequest, StreamMsgGetResponse>(
             subject: $"{_context.Opts.Prefix}.STREAM.MSG.GET.{_name}",
             request: request,
             cancellationToken);
 
+    private async IAsyncEnumerable<NatsMsg<T>> GetBatchDirectInternalAsync<T>(StreamMsgBatchGetRequest request, INatsDeserialize<T>? serializer = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        ValidateStream();
+
+        var requestManyAsync = _context.Connection.RequestManyAsync(
+            subject: $"{_context.Opts.Prefix}.DIRECT.GET.{_name}",
+            data: request,
+            requestSerializer: NatsJSJsonSerializer<StreamMsgBatchGetRequest>.Default,
+            replySerializer: serializer,
+            replyOpts: new NatsSubOpts { StopOnEmptyMsg = true, ThrowIfNoResponders = true },
+            cancellationToken: cancellationToken);
+
+        await foreach (var msg in requestManyAsync.ConfigureAwait(false))
+        {
+            if (msg.Error is { } error)
+            {
+                throw error;
+            }
+
+            yield return msg;
+        }
+    }
+
     private void ThrowIfDeleted()
     {
         if (_deleted)
             throw new NatsJSException($"Stream '{_name}' is deleted");
+    }
+
+    private void ValidateStream()
+    {
+        if (!Info.Config.AllowDirect)
+        {
+            throw new InvalidOperationException("StreamMsgBatchGetRequest is not permitted when AllowDirect on stream disable");
+        }
     }
 }
