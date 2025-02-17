@@ -46,4 +46,40 @@ public record ConsumerGetnextRequest
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonNanosecondsConverter))]
     public TimeSpan IdleHeartbeat { get; set; }
+
+    /// <summary>
+    /// Priority group.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("group")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public string? Group { get; set; }
+
+    /// <summary>
+    /// Priority group minimum pending messages.
+    /// </summary>
+    /// <remarks>
+    /// When specified, this Pull request will only receive messages when the consumer has at least this many pending messages.
+    /// </remarks>
+    [System.Text.Json.Serialization.JsonPropertyName("min_pending")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [System.ComponentModel.DataAnnotations.Range(long.MinValue, long.MaxValue)]
+    public long MinPending { get; set; }
+
+    /// <summary>
+    /// Priority group minimum ACK pending messages.
+    /// </summary>
+    /// <remarks>
+    /// When specified, this Pull request will only receive messages when the consumer has at least this many ack pending messages.
+    /// </remarks>
+    [System.Text.Json.Serialization.JsonPropertyName("min_ack_pending")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [System.ComponentModel.DataAnnotations.Range(long.MinValue, long.MaxValue)]
+    public long MinAckPending { get; set; }
+
+    /// <summary>
+    /// Priority group ID.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("id")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public string? Id { get; set; }
 }
