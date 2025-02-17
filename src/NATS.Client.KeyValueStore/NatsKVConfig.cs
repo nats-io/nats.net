@@ -77,6 +77,11 @@ public record NatsKVConfig
     /// Sources defines the configuration for sources of a KeyValue store.
     /// </summary>
     public ICollection<StreamSource>? Sources { get; set; }
+
+    /// <summary>
+    /// Additional metadata for the Bucket
+    /// </summary>
+    public IDictionary<string, string>? Metadata { get; set; }
 }
 
 /// <summary>

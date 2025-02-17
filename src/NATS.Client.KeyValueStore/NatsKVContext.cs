@@ -246,6 +246,7 @@ public class NatsKVContext : INatsKVContext
             MirrorDirect = mirrorDirect,
             Sources = sources,
             Retention = StreamConfigRetention.Limits, // from ADR-8
+            Metadata = config.Metadata,
         };
 
         return streamConfig;
