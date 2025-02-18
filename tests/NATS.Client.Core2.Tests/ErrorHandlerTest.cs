@@ -103,7 +103,7 @@ public class ErrorHandlerTest
             "error is logged",
             () =>
             {
-                    return logger.Logs.Any(x => x.LogLevel == LogLevel.Error && x.Message == "Server error Permissions Violation for Publish to \"y\"");
+                return logger.Logs.Any(x => x.LogLevel == LogLevel.Error && x.Message == "Server error Permissions Violation for Publish to \"y\"");
             });
 
         await Retry.Until(
