@@ -377,6 +377,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                 var newPosition = newBuffer.PositionOf((byte)'\n');
                 var error = ParseError(newBuffer.Slice(0, buffer.GetOffset(newPosition!.Value) - 1));
                 _logger.LogError(NatsLogEvents.Protocol, "Server error {Error}", error);
+                _connection.PushEvent(NatsEvent.ServerError, new NatsServerErrorEventArgs(error));
                 _waitForPongOrErrorSignal.TrySetException(new NatsServerException(error));
                 return newBuffer.Slice(newBuffer.GetPosition(1, newPosition!.Value));
             }
@@ -384,6 +385,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
             {
                 var error = ParseError(buffer.Slice(0, buffer.GetOffset(position.Value) - 1));
                 _logger.LogError(NatsLogEvents.Protocol, "Server error {Error}", error);
+                _connection.PushEvent(NatsEvent.ServerError, new NatsServerErrorEventArgs(error));
                 _waitForPongOrErrorSignal.TrySetException(new NatsServerException(error));
                 return buffer.Slice(buffer.GetPosition(1, position.Value));
             }

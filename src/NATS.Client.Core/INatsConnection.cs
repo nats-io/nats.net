@@ -31,6 +31,11 @@ public interface INatsConnection : INatsClient
     public event AsyncEventHandler<NatsLameDuckModeActivatedEventArgs>? LameDuckModeActivated;
 
     /// <summary>
+    /// Event that is raised when server sends an error message ('-ERR').
+    /// </summary>
+    public event AsyncEventHandler<NatsServerErrorEventArgs>? ServerError;
+
+    /// <summary>
     /// Server information received from the NATS server.
     /// </summary>
     INatsServerInfo? ServerInfo { get; }
