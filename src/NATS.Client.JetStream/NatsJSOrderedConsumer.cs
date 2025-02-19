@@ -314,6 +314,10 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
             catch (NatsJSApiNoResponseException)
             {
             }
+            catch (NatsJSApiException apiException) when (apiException.Error.Code == 503)
+            {
+            }
+
 
             if (i == _opts.MaxResetAttempts)
             {
