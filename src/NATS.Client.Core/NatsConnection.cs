@@ -25,6 +25,7 @@ internal enum NatsEvent
     ReconnectFailed,
     MessageDropped,
     LameDuckModeActivated,
+    ServerError,
 }
 
 public partial class NatsConnection : INatsConnection
@@ -110,6 +111,8 @@ public partial class NatsConnection : INatsConnection
     public event AsyncEventHandler<NatsMessageDroppedEventArgs>? MessageDropped;
 
     public event AsyncEventHandler<NatsLameDuckModeActivatedEventArgs>? LameDuckModeActivated;
+
+    public event AsyncEventHandler<NatsServerErrorEventArgs>? ServerError;
 
     public INatsConnection Connection => this;
 
@@ -303,6 +306,9 @@ public partial class NatsConnection : INatsConnection
 
         return default;
     }
+
+    internal void PushEvent(NatsEvent @event, NatsEventArgs args)
+        => _eventChannel.Writer.TryWrite((@event, args));
 
     private async ValueTask InitialConnectAsync()
     {
@@ -783,6 +789,9 @@ public partial class NatsConnection : INatsConnection
                         break;
                     case NatsEvent.LameDuckModeActivated when LameDuckModeActivated != null && args is NatsLameDuckModeActivatedEventArgs uri:
                         await LameDuckModeActivated.InvokeAsync(this, uri).ConfigureAwait(false);
+                        break;
+                    case NatsEvent.ServerError when ServerError != null && args is NatsServerErrorEventArgs error:
+                        await ServerError.InvokeAsync(this, error).ConfigureAwait(false);
                         break;
                     }
                 }
