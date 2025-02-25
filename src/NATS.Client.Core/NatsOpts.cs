@@ -4,6 +4,9 @@ using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NATS.Client.Core.Internal;
+#if NETSTANDARD
+using Random = NATS.Client.Core.Internal.NetStandardExtensions.Random;
+#endif
 
 namespace NATS.Client.Core;
 
@@ -184,5 +187,23 @@ public sealed record NatsOpts
                 },
             };
         }
+    }
+}
+
+public static class NatsOptsExtensions
+{
+    /// <summary>
+    /// Applies an exponential backoff delay with an added random jitter for attempts.
+    /// </summary>
+    /// <param name="opts">The NatsOpts instance containing configuration settings for intervals and jitter.</param>
+    /// <param name="iter">The current attempt iteration, used to calculate the exponential delay.</param>
+    /// <returns>A task that completes after the calculated delay time has elapsed.</returns>
+    public static Task BackoffWithJitterAsync(this NatsOpts opts, int iter)
+    {
+        var baseDelay = opts.ReconnectWaitMin.TotalMilliseconds * Math.Pow(2, iter - 1);
+        var jitter = opts.ReconnectJitter.TotalMilliseconds * Random.Shared.NextDouble();
+
+        var delay = Math.Min(baseDelay + jitter, opts.ReconnectWaitMax.TotalMilliseconds);
+        return Task.Delay(TimeSpan.FromMilliseconds(delay));
     }
 }

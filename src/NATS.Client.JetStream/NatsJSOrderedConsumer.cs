@@ -2,6 +2,9 @@ using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.JetStream.Models;
+#if NETSTANDARD
+using Random = NATS.Client.Core.Internal.NetStandardExtensions.Random;
+#endif
 
 namespace NATS.Client.JetStream;
 
@@ -314,11 +317,16 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
             catch (NatsJSApiNoResponseException)
             {
             }
+            catch (NatsJSApiException apiException) when (apiException.Error.Code == 503)
+            {
+            }
 
             if (i == _opts.MaxResetAttempts)
             {
                 throw new NatsJSException("Maximum number of create attempts reached.");
             }
+
+            await _context.Connection.Opts.BackoffWithJitterAsync(i);
         }
 
         Info = info;

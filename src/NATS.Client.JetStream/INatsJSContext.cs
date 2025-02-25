@@ -144,6 +144,7 @@ public interface INatsJSContext
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
     /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
+    /// <remarks>This feature is only available on NATS server v2.11 and later.</remarks>
     ValueTask<ConsumerPauseResponse> PauseConsumerAsync(string stream, string consumer, DateTimeOffset pauseUntil, CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -157,6 +158,7 @@ public interface INatsJSContext
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
     /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
+    /// <remarks>This feature is only available on NATS server v2.11 and later.</remarks>
     ValueTask<bool> ResumeConsumerAsync(string stream, string consumer, CancellationToken cancellationToken = default);
 
     /// <summary>

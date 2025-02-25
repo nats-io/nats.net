@@ -236,6 +236,7 @@ public record ConsumerConfig
     /// <summary>
     /// If the consumer is paused, this contains until which time it is paused.
     /// </summary>
+    /// <remarks>This feature is only available on NATS server v2.11 and later.</remarks>
     [System.Text.Json.Serialization.JsonPropertyName("pause_until")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public DateTimeOffset? PauseUntil { get; set; }
