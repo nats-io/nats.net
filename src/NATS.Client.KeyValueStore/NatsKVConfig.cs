@@ -77,6 +77,18 @@ public record NatsKVConfig
     /// Sources defines the configuration for sources of a KeyValue store.
     /// </summary>
     public ICollection<StreamSource>? Sources { get; set; }
+
+    /// <summary>
+    /// If true, the bucket will allow TTL on individual keys.
+    /// </summary>
+    /// <remarks>This feature is only available on NATS server v2.11 and later.</remarks>
+    public bool AllowMsgTTL { get; set; }
+
+    /// <summary>
+    /// Enables and sets a duration for adding server markers for delete, purge and max age limits.
+    /// </summary>
+    /// <remarks>This feature is only available on NATS server v2.11 and later.</remarks>
+    public TimeSpan SubjectDeleteMarkerTTL { get; set; }
 }
 
 /// <summary>
