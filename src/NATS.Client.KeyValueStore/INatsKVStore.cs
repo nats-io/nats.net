@@ -57,7 +57,7 @@ public interface INatsKVStore
     /// </summary>
     /// <param name="key">Key of the entry</param>
     /// <param name="value">Value of the entry</param>
-    /// <param name="ttl">Time to live for the entry (requires the <see cref="NatsKVConfig.AllowMsgTTL"/> to be set to true). For a key that should never expire, use the <see cref="TimeSpan.MaxValue"/> constant.</param>
+    /// <param name="ttl">Time to live for the entry (requires the <see cref="NatsKVConfig.AllowMsgTTL"/> to be set to true). For a key that should never expire, use the <see cref="TimeSpan.MaxValue"/> constant. This feature is only available on NATS server v2.11 and later.</param>
     /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <typeparam name="T">Serialized value type</typeparam>
@@ -83,7 +83,7 @@ public interface INatsKVStore
     /// </summary>
     /// <param name="key">Key of the entry</param>
     /// <param name="value">Value of the entry</param>
-    /// <param name="ttl">Time to live for the entry (requires the <see cref="NatsKVConfig.AllowMsgTTL"/> to be set to true). For a key that should never expire, use the <see cref="TimeSpan.MaxValue"/> constant.</param>
+    /// <param name="ttl">Time to live for the entry (requires the <see cref="NatsKVConfig.AllowMsgTTL"/> to be set to true). For a key that should never expire, use the <see cref="TimeSpan.MaxValue"/> constant. This feature is only available on NATS server v2.11 and later.</param>
     /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <typeparam name="T">Serialized value type</typeparam>
@@ -109,7 +109,7 @@ public interface INatsKVStore
     /// </summary>
     /// <param name="key">Key of the entry</param>
     /// <param name="value">Value of the entry</param>
-    /// <param name="ttl">Time to live for the entry (requires the <see cref="NatsKVConfig.AllowMsgTTL"/> to be set to true). For a key that should never expire, use the <see cref="TimeSpan.MaxValue"/> constant.</param>
+    /// <param name="ttl">Time to live for the entry (requires the <see cref="NatsKVConfig.AllowMsgTTL"/> to be set to true). For a key that should never expire, use the <see cref="TimeSpan.MaxValue"/> constant. This feature is only available on NATS server v2.11 and later.</param>
     /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <typeparam name="T">Serialized value type</typeparam>
@@ -137,7 +137,7 @@ public interface INatsKVStore
     /// <param name="key">Key of the entry</param>
     /// <param name="value">Value of the entry</param>
     /// <param name="revision">Last revision number to match</param>
-    /// <param name="ttl">Time to live for the entry (requires the <see cref="NatsKVConfig.AllowMsgTTL"/> to be set to true). For a key that should never expire, use the <see cref="TimeSpan.MaxValue"/> constant.</param>
+    /// <param name="ttl">Time to live for the entry (requires the <see cref="NatsKVConfig.AllowMsgTTL"/> to be set to true). For a key that should never expire, use the <see cref="TimeSpan.MaxValue"/> constant. This feature is only available on NATS server v2.11 and later.</param>
     /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <typeparam name="T">Serialized value type</typeparam>
@@ -165,7 +165,7 @@ public interface INatsKVStore
     /// <param name="key">Key of the entry</param>
     /// <param name="value">Value of the entry</param>
     /// <param name="revision">Last revision number to match</param>
-    /// <param name="ttl">Time to live for the entry (requires the <see cref="NatsKVConfig.AllowMsgTTL"/> to be set to true). For a key that should never expire, use the <see cref="TimeSpan.MaxValue"/> constant.</param>
+    /// <param name="ttl">Time to live for the entry (requires the <see cref="NatsKVConfig.AllowMsgTTL"/> to be set to true). For a key that should never expire, use the <see cref="TimeSpan.MaxValue"/> constant. This feature is only available on NATS server v2.11 and later.</param>
     /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <typeparam name="T">Serialized value type</typeparam>

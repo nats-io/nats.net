@@ -242,6 +242,7 @@ public record StreamConfig
     /// <summary>
     /// AllowMsgTTL allows header initiated per-message TTLs. If disabled, then the `NATS-TTL` header will be ignored.
     /// </summary>
+    /// <remarks>This feature is only available on NATS server v2.11 and later.</remarks>
     [System.Text.Json.Serialization.JsonPropertyName("allow_msg_ttl")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public bool AllowMsgTTL { get; set; }
@@ -249,6 +250,7 @@ public record StreamConfig
     /// <summary>
     /// Enables and sets a duration for adding server markers for delete, purge and max age limits.
     /// </summary>
+    /// <remarks>This feature is only available on NATS server v2.11 and later.</remarks>
     [System.Text.Json.Serialization.JsonPropertyName("subject_delete_marker_ttl")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonNanosecondsConverter))]
