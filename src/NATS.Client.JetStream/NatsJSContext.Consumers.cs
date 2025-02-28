@@ -255,6 +255,25 @@ public partial class NatsJSContext : INatsJSContext
             subject += $".{config.FilterSubject}";
         }
 
+        // ADR-42: In the initial implementation we should limit PriorityGroups to one per consumer only
+        // and error should one be made with multiple groups. In future iterations multiple groups will
+        // be supported along with dynamic partitioning of stream data.
+        if (config.PriorityGroups != null && config.PriorityGroups.Count != 1)
+        {
+            throw new NatsJSException("Cannot create consumers with multiple priority groups.");
+        }
+
+        if (config.PriorityPolicy is "pinned_client")
+        {
+            throw new NotImplementedException("Pinned clients are not supported yet.");
+        }
+
+        // TODO: enum these values?
+        if (config.PriorityPolicy != null && config.PriorityPolicy != "none" && config.PriorityPolicy != "overflow" && config.PriorityPolicy != "pinned_client")
+        {
+            throw new NatsJSException("Cannot create consumers with priority policy other than 'overflow', 'pinned_client', or 'none'.");
+        }
+
         var response = await JSRequestResponseAsync<ConsumerCreateRequest, ConsumerInfo>(
             subject: subject,
             new ConsumerCreateRequest
