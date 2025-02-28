@@ -43,6 +43,7 @@ public class NatsKVStore : INatsKVStore
     private const string NatsSubject = "Nats-Subject";
     private const string NatsSequence = "Nats-Sequence";
     private const string NatsTimeStamp = "Nats-Time-Stamp";
+    private const string NatsTtl = "Nats-TTL";
     private static readonly Regex ValidKeyRegex = new(pattern: @"\A[-/_=\.a-zA-Z0-9]+\z", RegexOptions.Compiled);
     private static readonly NatsKVException MissingSequenceHeaderException = new("Missing sequence header");
     private static readonly NatsKVException MissingTimestampHeaderException = new("Missing timestamp header");
@@ -87,9 +88,12 @@ public class NatsKVStore : INatsKVStore
     public static NatsResult IsValidKey(string key) => TryValidateKey(key);
 
     /// <inheritdoc />
-    public async ValueTask<ulong> PutAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
+    public ValueTask<ulong> PutAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default) => PutAsync<T>(key, value, default, serializer, cancellationToken);
+
+    /// <inheritdoc />
+    public async ValueTask<ulong> PutAsync<T>(string key, T value, TimeSpan ttl = default, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
-        var result = await TryPutAsync(key, value, serializer, cancellationToken);
+        var result = await TryPutAsync(key, value, ttl, serializer, cancellationToken);
         if (!result.Success)
         {
             ThrowException(result.Error);
@@ -98,7 +102,11 @@ public class NatsKVStore : INatsKVStore
         return result.Value;
     }
 
-    public async ValueTask<NatsResult<ulong>> TryPutAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
+    /// <inheritdoc />
+    public ValueTask<NatsResult<ulong>> TryPutAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default) => TryPutAsync<T>(key, value, default, serializer, cancellationToken);
+
+    /// <inheritdoc />
+    public async ValueTask<NatsResult<ulong>> TryPutAsync<T>(string key, T value, TimeSpan ttl = default, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
         var keyValidResult = TryValidateKey(key);
         if (!keyValidResult.Success)
@@ -106,7 +114,16 @@ public class NatsKVStore : INatsKVStore
             return keyValidResult.Error;
         }
 
-        var publishResult = await JetStreamContext.TryPublishAsync(_kvBucket + key, value, serializer: serializer, cancellationToken: cancellationToken);
+        NatsHeaders? headers = default;
+        if (ttl != default)
+        {
+            headers = new NatsHeaders
+            {
+                { NatsTtl, ttl == TimeSpan.MaxValue ? "never" : $"{(int)ttl.TotalSeconds:D}" },
+            };
+        }
+
+        var publishResult = await JetStreamContext.TryPublishAsync(_kvBucket + key, value, serializer: serializer, headers: headers, cancellationToken: cancellationToken);
         if (publishResult.Success)
         {
             var ack = publishResult.Value;
@@ -128,9 +145,12 @@ public class NatsKVStore : INatsKVStore
     }
 
     /// <inheritdoc />
-    public async ValueTask<ulong> CreateAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
+    public ValueTask<ulong> CreateAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default) => CreateAsync<T>(key, value, default, serializer, cancellationToken);
+
+    /// <inheritdoc />
+    public async ValueTask<ulong> CreateAsync<T>(string key, T value, TimeSpan ttl = default, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
-        var result = await TryCreateAsync(key, value, serializer, cancellationToken);
+        var result = await TryCreateAsync(key, value, ttl, serializer, cancellationToken);
         if (!result.Success)
         {
             ThrowException(result.Error);
@@ -140,7 +160,10 @@ public class NatsKVStore : INatsKVStore
     }
 
     /// <inheritdoc />
-    public async ValueTask<NatsResult<ulong>> TryCreateAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
+    public ValueTask<NatsResult<ulong>> TryCreateAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default) => TryCreateAsync<T>(key, value, default, serializer, cancellationToken);
+
+    /// <inheritdoc />
+    public async ValueTask<NatsResult<ulong>> TryCreateAsync<T>(string key, T value, TimeSpan ttl = default, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
         var keyValidResult = TryValidateKey(key);
         if (!keyValidResult.Success)
@@ -149,7 +172,7 @@ public class NatsKVStore : INatsKVStore
         }
 
         // First try to create a new entry
-        var resultUpdate = await TryUpdateAsync(key, value, revision: 0, serializer, cancellationToken);
+        var resultUpdate = await TryUpdateAsync(key, value, revision: 0, ttl, serializer, cancellationToken);
         if (resultUpdate.Success)
         {
             return resultUpdate;
@@ -166,7 +189,7 @@ public class NatsKVStore : INatsKVStore
         else if (resultReadExisting.Error is NatsKVKeyDeletedException deletedException)
         {
             // If our previous call errored because the last entry is deleted, then that's ok, we update with the deleted revision
-            return await TryUpdateAsync(key, value, deletedException.Revision, serializer, cancellationToken);
+            return await TryUpdateAsync(key, value, deletedException.Revision, ttl, serializer, cancellationToken);
         }
         else
         {
@@ -175,9 +198,12 @@ public class NatsKVStore : INatsKVStore
     }
 
     /// <inheritdoc />
-    public async ValueTask<ulong> UpdateAsync<T>(string key, T value, ulong revision, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
+    public ValueTask<ulong> UpdateAsync<T>(string key, T value, ulong revision, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default) => UpdateAsync(key, value, revision, default, serializer, cancellationToken);
+
+    /// <inheritdoc />
+    public async ValueTask<ulong> UpdateAsync<T>(string key, T value, ulong revision, TimeSpan ttl = default, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
-        var result = await TryUpdateAsync(key, value, revision, serializer, cancellationToken);
+        var result = await TryUpdateAsync(key, value, revision, ttl, serializer, cancellationToken);
         if (!result.Success)
         {
             ThrowException(result.Error);
@@ -187,7 +213,10 @@ public class NatsKVStore : INatsKVStore
     }
 
     /// <inheritdoc />
-    public async ValueTask<NatsResult<ulong>> TryUpdateAsync<T>(string key, T value, ulong revision, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
+    public ValueTask<NatsResult<ulong>> TryUpdateAsync<T>(string key, T value, ulong revision, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default) => TryUpdateAsync(key, value, revision, default, serializer, cancellationToken);
+
+    /// <inheritdoc />
+    public async ValueTask<NatsResult<ulong>> TryUpdateAsync<T>(string key, T value, ulong revision, TimeSpan ttl = default, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
         var keyValidResult = TryValidateKey(key);
         if (!keyValidResult.Success)
@@ -196,6 +225,10 @@ public class NatsKVStore : INatsKVStore
         }
 
         var headers = new NatsHeaders { { NatsExpectedLastSubjectSequence, revision.ToString() } };
+        if (ttl != default)
+        {
+            headers.Add(NatsTtl, ttl == TimeSpan.MaxValue ? "never" : $"{(int)ttl.TotalSeconds:D}");
+        }
 
         var publishResult = await JetStreamContext.TryPublishAsync(_kvBucket + key, value, headers: headers, serializer: serializer, cancellationToken: cancellationToken);
         if (publishResult.Success)

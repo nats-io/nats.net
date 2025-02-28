@@ -246,6 +246,8 @@ public class NatsKVContext : INatsKVContext
             MirrorDirect = mirrorDirect,
             Sources = sources,
             Retention = StreamConfigRetention.Limits, // from ADR-8
+            AllowMsgTTL = config.AllowMsgTTL,
+            SubjectDeleteMarkerTTL = config.SubjectDeleteMarkerTTL,
         };
 
         return streamConfig;

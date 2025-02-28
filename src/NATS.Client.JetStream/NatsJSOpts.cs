@@ -116,6 +116,12 @@ public record NatsJSConsumeOpts
     public int? ThresholdBytes { get; init; }
 
     public Func<INatsJSNotification, CancellationToken, Task>? NotificationHandler { get; init; }
+
+    /// <summary>
+    /// Optional priority group configuration used for consuming messages.
+    /// Defines a group name and constraints for minimum pending messages and acknowledgments.
+    /// </summary>
+    public NatsJSPriorityGroupOpts? PriorityGroup { get; init; }
 }
 
 /// <summary>
@@ -134,6 +140,12 @@ public record NatsJSNextOpts
     public TimeSpan? IdleHeartbeat { get; init; }
 
     public Func<INatsJSNotification, CancellationToken, Task>? NotificationHandler { get; init; }
+
+    /// <summary>
+    /// Optional priority group configuration used for consuming messages.
+    /// Defines a group name and constraints for minimum pending messages and acknowledgments.
+    /// </summary>
+    public NatsJSPriorityGroupOpts? PriorityGroup { get; init; }
 }
 
 /// <summary>
@@ -162,6 +174,12 @@ public record NatsJSFetchOpts
     public TimeSpan? IdleHeartbeat { get; init; }
 
     public Func<INatsJSNotification, CancellationToken, Task>? NotificationHandler { get; init; }
+
+    /// <summary>
+    /// Optional priority group configuration used for consuming messages.
+    /// Defines a group name and constraints for minimum pending messages and acknowledgments.
+    /// </summary>
+    public NatsJSPriorityGroupOpts? PriorityGroup { get; init; }
 
     /// <summary>
     /// Does not wait for messages to be available
@@ -195,4 +213,25 @@ public record NatsJSPubOpts : NatsPubOpts
 
     // rnum  int           // Retry attempts
     public int RetryAttempts { get; init; } = 2;
+}
+
+/// <summary>
+/// Represents options for configuring a priority group within JetStream operations.
+/// </summary>
+public record NatsJSPriorityGroupOpts
+{
+    /// <summary>
+    /// Specifies the group name for prioritization in JetStream consumer operations.
+    /// </summary>
+    public string? Group { get; init; }
+
+    /// <summary>
+    /// When specified, this Pull request will only receive messages when the consumer has at least this many pending messages.
+    /// </summary>
+    public long MinPending { get; set; }
+
+    /// <summary>
+    /// When specified, this Pull request will only receive messages when the consumer has at least this many ack pending messages.
+    /// </summary>
+    public long MinAckPending { get; set; }
 }
