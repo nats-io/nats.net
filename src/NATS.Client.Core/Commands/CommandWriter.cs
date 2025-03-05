@@ -323,7 +323,7 @@ internal sealed class CommandWriter : IAsyncDisposable
             var size = payloadBuffer.WrittenMemory.Length + (headersBuffer?.WrittenMemory.Length ?? 0);
             if (_connection.ServerInfo is { } info && size > info.MaxPayload)
             {
-                throw new NatsException($"Payload size {size} exceeds server's maximum payload size {info.MaxPayload}");
+                throw new NatsPayloadTooLargeException($"Payload size {size} exceeds server's maximum payload size {info.MaxPayload}");
             }
         }
         catch
