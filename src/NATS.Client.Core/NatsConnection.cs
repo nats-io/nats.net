@@ -498,7 +498,17 @@ public partial class NatsConnection : INatsConnection
                 }
 
                 // receive COMMAND response (PONG or ERROR)
-                await waitForPongOrErrorSignal.Task.ConfigureAwait(false);
+                try
+                {
+                    await waitForPongOrErrorSignal.Task
+                        .WaitAsync(Opts.ConnectTimeout)
+                        .ConfigureAwait(false);
+                }
+                catch (TimeoutException)
+                {
+                    _logger.LogDebug(NatsLogEvents.Connection, "Timeout waiting for initial pong");
+                    throw;
+                }
 
                 if (reconnectTask != null)
                 {
