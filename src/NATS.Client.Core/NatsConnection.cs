@@ -61,6 +61,8 @@ public partial class NatsConnection : INatsConnection
     private TimeSpan _backoff = TimeSpan.Zero;
     private string _lastAuthError = string.Empty;
     private bool _stopRetries;
+    private Task? _publishEventsTask;
+    private Task? _reconnectLoopTask;
 
     public NatsConnection()
         : this(NatsOpts.Default)
@@ -97,7 +99,7 @@ public partial class NatsConnection : INatsConnection
             SingleWriter = false,
             SingleReader = true,
         });
-        _ = Task.Run(PublishEventsAsync, _disposedCancellationTokenSource.Token);
+        _publishEventsTask = Task.Run(PublishEventsAsync, _disposedCancellationTokenSource.Token);
     }
 
     // events
@@ -410,7 +412,7 @@ public partial class NatsConnection : INatsConnection
             _pingTimerCancellationTokenSource = new CancellationTokenSource();
             StartPingTimer(_pingTimerCancellationTokenSource.Token);
             _waitForOpenConnection.TrySetResult();
-            _ = Task.Run(ReconnectLoop);
+            _reconnectLoopTask = Task.Run(ReconnectLoop);
             _eventChannel.Writer.TryWrite((NatsEvent.ConnectionOpened, new NatsEventArgs(url?.ToString() ?? string.Empty)));
         }
     }
@@ -709,7 +711,7 @@ public partial class NatsConnection : INatsConnection
                 _pingTimerCancellationTokenSource = new CancellationTokenSource();
                 StartPingTimer(_pingTimerCancellationTokenSource.Token);
                 _waitForOpenConnection.TrySetResult();
-                _ = Task.Run(ReconnectLoop);
+                _reconnectLoopTask = Task.Run(ReconnectLoop);
                 _eventChannel.Writer.TryWrite((NatsEvent.ConnectionOpened, new NatsEventArgs(url.ToString())));
             }
         }
@@ -796,7 +798,7 @@ public partial class NatsConnection : INatsConnection
         {
             _logger.LogError(NatsLogEvents.Connection, ex, "Error occured when publishing events");
             if (!_disposedCancellationTokenSource.IsCancellationRequested)
-                _ = Task.Run(PublishEventsAsync, _disposedCancellationTokenSource.Token);
+                _publishEventsTask = Task.Run(PublishEventsAsync, _disposedCancellationTokenSource.Token);
         }
     }
 
