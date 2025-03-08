@@ -50,3 +50,11 @@ public sealed class NatsServerException : NatsException
 
     public bool IsAuthError { get; }
 }
+
+public sealed class NatsPayloadTooLargeException : NatsException
+{
+    public NatsPayloadTooLargeException(string error)
+        : base(error)
+    {
+    }
+}
