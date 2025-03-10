@@ -102,6 +102,7 @@ public record ConsumerInfo
     /// <summary>
     /// Whether the consumer is paused.
     /// </summary>
+    /// <remarks>This feature is only available on NATS server v2.11 and later.</remarks>
     [System.Text.Json.Serialization.JsonPropertyName("paused")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public bool IsPaused { get; set; }
@@ -109,6 +110,7 @@ public record ConsumerInfo
     /// <summary>
     /// If the consumer is <see cref="IsPaused"/>, this contains how much time is remaining until this consumer is unpaused.
     /// </summary>
+    /// <remarks>This feature is only available on NATS server v2.11 and later.</remarks>
     [System.Text.Json.Serialization.JsonPropertyName("pause_remaining")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonNullableNanosecondsConverter))]

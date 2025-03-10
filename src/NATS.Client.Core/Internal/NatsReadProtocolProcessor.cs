@@ -297,7 +297,9 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
             }
             catch (SocketClosedException e)
             {
+                _logger.LogDebug(NatsLogEvents.Protocol, e, "Socket closed during read loop");
                 _waitForInfoSignal.TrySetException(e);
+                _waitForPongOrErrorSignal.TrySetException(e);
                 return;
             }
             catch (Exception ex)
