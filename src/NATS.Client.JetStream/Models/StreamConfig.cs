@@ -10,7 +10,7 @@ public record StreamConfig
         Subjects = subjects;
     }
 
-    internal StreamConfig()
+    public StreamConfig()
     {
     }
 
