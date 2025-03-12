@@ -13,7 +13,7 @@ public class NatsBuilder
 {
     private readonly IServiceCollection _services;
 
-    private int _poolSize = 1;
+    private Func<IServiceProvider, int> _poolSizeConfigurer = _ => 1;
     private Func<IServiceProvider, NatsOpts, NatsOpts>? _configureOpts;
     private Action<IServiceProvider, NatsConnection>? _configureConnection;
     private object? _diKey = null;
@@ -25,7 +25,14 @@ public class NatsBuilder
 
     public NatsBuilder WithPoolSize(int size)
     {
-        _poolSize = Math.Max(size, 1);
+        _poolSizeConfigurer = _ => Math.Max(size, 1);
+
+        return this;
+    }
+
+    public NatsBuilder WithPoolSize(Func<IServiceProvider, int> sizeConfigurer)
+    {
+        _poolSizeConfigurer = sp => Math.Max(sizeConfigurer(sp), 1);
 
         return this;
     }
@@ -120,43 +127,23 @@ public class NatsBuilder
 
     internal IServiceCollection Build()
     {
-        if (_poolSize != 1)
+        if (_diKey == null)
         {
-            if (_diKey == null)
-            {
-                _services.TryAddSingleton<NatsConnectionPool>(provider => PoolFactory(provider));
-                _services.TryAddSingleton<INatsConnectionPool>(static provider => provider.GetRequiredService<NatsConnectionPool>());
-                _services.TryAddTransient<NatsConnection>(static provider => PooledConnectionFactory(provider, null));
-                _services.TryAddTransient<INatsConnection>(static provider => provider.GetRequiredService<NatsConnection>());
-                _services.TryAddTransient<INatsClient>(static provider => provider.GetRequiredService<NatsConnection>());
-            }
-            else
-            {
-#if NET8_0_OR_GREATER
-                _services.TryAddKeyedSingleton<NatsConnectionPool>(_diKey, PoolFactory);
-                _services.TryAddKeyedSingleton<INatsConnectionPool>(_diKey, static (provider, key) => provider.GetRequiredKeyedService<NatsConnectionPool>(key));
-                _services.TryAddKeyedTransient<NatsConnection>(_diKey, PooledConnectionFactory);
-                _services.TryAddKeyedTransient<INatsConnection>(_diKey, static (provider, key) => provider.GetRequiredKeyedService<NatsConnection>(key));
-                _services.TryAddKeyedTransient<INatsClient>(_diKey, static (provider, key) => provider.GetRequiredKeyedService<NatsConnection>(key));
-#endif
-            }
+            _services.TryAddSingleton<NatsConnectionPool>(provider => PoolFactory(provider));
+            _services.TryAddSingleton<INatsConnectionPool>(static provider => provider.GetRequiredService<NatsConnectionPool>());
+            _services.TryAddTransient<NatsConnection>(static provider => PooledConnectionFactory(provider, null));
+            _services.TryAddTransient<INatsConnection>(static provider => provider.GetRequiredService<NatsConnection>());
+            _services.TryAddTransient<INatsClient>(static provider => provider.GetRequiredService<NatsConnection>());
         }
         else
         {
-            if (_diKey == null)
-            {
-                _services.TryAddSingleton<NatsConnection>(provider => SingleConnectionFactory(provider));
-                _services.TryAddSingleton<INatsConnection>(static provider => provider.GetRequiredService<NatsConnection>());
-                _services.TryAddSingleton<INatsClient>(static provider => provider.GetRequiredService<NatsConnection>());
-            }
-            else
-            {
 #if NET8_0_OR_GREATER
-                _services.TryAddKeyedSingleton(_diKey, SingleConnectionFactory);
-                _services.TryAddKeyedSingleton<INatsConnection>(_diKey, static (provider, key) => provider.GetRequiredKeyedService<NatsConnection>(key));
-                _services.TryAddKeyedSingleton<INatsClient>(_diKey, static (provider, key) => provider.GetRequiredKeyedService<NatsConnection>(key));
+            _services.TryAddKeyedSingleton<NatsConnectionPool>(_diKey, PoolFactory);
+            _services.TryAddKeyedSingleton<INatsConnectionPool>(_diKey, static (provider, key) => provider.GetRequiredKeyedService<NatsConnectionPool>(key));
+            _services.TryAddKeyedTransient<NatsConnection>(_diKey, PooledConnectionFactory);
+            _services.TryAddKeyedTransient<INatsConnection>(_diKey, static (provider, key) => provider.GetRequiredKeyedService<NatsConnection>(key));
+            _services.TryAddKeyedTransient<INatsClient>(_diKey, static (provider, key) => provider.GetRequiredKeyedService<NatsConnection>(key));
 #endif
-            }
         }
 
         return _services;
@@ -179,17 +166,7 @@ public class NatsBuilder
     {
         var options = GetNatsOpts(provider);
 
-        return new NatsConnectionPool(_poolSize, options, con => _configureConnection?.Invoke(provider, con));
-    }
-
-    private NatsConnection SingleConnectionFactory(IServiceProvider provider, object? diKey = null)
-    {
-        var options = GetNatsOpts(provider);
-
-        var conn = new NatsConnection(options);
-        _configureConnection?.Invoke(provider, conn);
-
-        return conn;
+        return new NatsConnectionPool(_poolSizeConfigurer(provider), options, con => _configureConnection?.Invoke(provider, con));
     }
 
     private NatsOpts GetNatsOpts(IServiceProvider provider)

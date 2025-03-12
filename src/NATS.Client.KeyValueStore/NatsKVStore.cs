@@ -57,14 +57,18 @@ public class NatsKVStore : INatsKVStore
     private static readonly NatsKVException KeyCannotStartOrEndWithPeriodException = new("Key cannot start or end with a period");
     private static readonly NatsKVException KeyContainsInvalidCharactersException = new("Key contains invalid characters");
     private readonly INatsJSStream _stream;
+    private readonly NatsKVOpts _opts;
     private readonly string _kvBucket;
+    private readonly string _streamName;
 
-    internal NatsKVStore(string bucket, INatsJSContext context, INatsJSStream stream)
+    internal NatsKVStore(string bucket, INatsJSContext context, INatsJSStream stream, NatsKVOpts opts)
     {
         Bucket = bucket;
         JetStreamContext = context;
         _stream = stream;
+        _opts = opts;
         _kvBucket = $"$KV.{Bucket}.";
+        _streamName = NatsKVContext.KvStreamNamePrefix + Bucket;
     }
 
     /// <inheritdoc />
@@ -366,7 +370,19 @@ public class NatsKVStore : INatsKVStore
 
         if (_stream.Info.Config.AllowDirect)
         {
-            var direct = await _stream.GetDirectAsync<T>(request, serializer, cancellationToken);
+            NatsMsg<T> direct;
+            if (_opts.UseDirectGetApiWithKeysInSubject)
+            {
+                direct = await JetStreamContext.Connection.RequestAsync<object, T>(
+                    subject: $"{JetStreamContext.Opts.Prefix}.DIRECT.GET.{_streamName}.{keySubject}",
+                    data: null,
+                    replySerializer: serializer,
+                    cancellationToken: cancellationToken);
+            }
+            else
+            {
+                direct = await _stream.GetDirectAsync<T>(request, serializer, cancellationToken);
+            }
 
             if (direct is { Headers: { } headers } msg)
             {

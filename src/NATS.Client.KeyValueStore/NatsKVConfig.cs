@@ -79,6 +79,11 @@ public record NatsKVConfig
     public ICollection<StreamSource>? Sources { get; set; }
 
     /// <summary>
+    /// Additional metadata for the Bucket
+    /// </summary>
+    public IDictionary<string, string>? Metadata { get; set; }
+
+    /// <summary>
     /// If true, the bucket will allow TTL on individual keys.
     /// </summary>
     /// <remarks>This feature is only available on NATS server v2.11 and later.</remarks>

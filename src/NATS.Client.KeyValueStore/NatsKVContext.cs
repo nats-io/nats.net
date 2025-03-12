@@ -19,15 +19,30 @@ public enum NatsKVStorageType
 /// </summary>
 public class NatsKVContext : INatsKVContext
 {
-    private const string KvStreamNamePrefix = "KV_";
+    internal const string KvStreamNamePrefix = "KV_";
     private static readonly int KvStreamNamePrefixLen = KvStreamNamePrefix.Length;
     private static readonly Regex ValidBucketRegex = new(pattern: @"\A[a-zA-Z0-9_-]+\z", RegexOptions.Compiled);
+    private readonly NatsKVOpts _opts;
 
     /// <summary>
     /// Create a new Key Value Store context
     /// </summary>
     /// <param name="context">JetStream context</param>
-    public NatsKVContext(INatsJSContext context) => JetStreamContext = context;
+    /// <param name="opts">Context options</param>
+    public NatsKVContext(INatsJSContext context, NatsKVOpts opts)
+    {
+        JetStreamContext = context;
+        _opts = opts;
+    }
+
+    /// <summary>
+    /// Create a new Key Value Store context
+    /// </summary>
+    /// <param name="context">JetStream context</param>
+    public NatsKVContext(INatsJSContext context)
+        : this(context, NatsKVOpts.Default)
+    {
+    }
 
     /// <inheritdoc />
     public INatsJSContext JetStreamContext { get; }
@@ -45,7 +60,7 @@ public class NatsKVContext : INatsKVContext
 
         var stream = await JetStreamContext.CreateStreamAsync(streamConfig, cancellationToken);
 
-        return new NatsKVStore(config.Bucket, JetStreamContext, stream);
+        return new NatsKVStore(config.Bucket, JetStreamContext, stream, _opts);
     }
 
     /// <inheritdoc />
@@ -61,7 +76,7 @@ public class NatsKVContext : INatsKVContext
         }
 
         // TODO: KV mirror
-        return new NatsKVStore(bucket, JetStreamContext, stream);
+        return new NatsKVStore(bucket, JetStreamContext, stream, _opts);
     }
 
     /// <inheritdoc />
@@ -73,7 +88,7 @@ public class NatsKVContext : INatsKVContext
 
         var stream = await JetStreamContext.UpdateStreamAsync(streamConfig, cancellationToken);
 
-        return new NatsKVStore(config.Bucket, JetStreamContext, stream);
+        return new NatsKVStore(config.Bucket, JetStreamContext, stream, _opts);
     }
 
     /// <inheritdoc />
@@ -85,7 +100,7 @@ public class NatsKVContext : INatsKVContext
 
         var stream = await JetStreamContext.CreateOrUpdateStreamAsync(streamConfig, cancellationToken);
 
-        return new NatsKVStore(config.Bucket, JetStreamContext, stream);
+        return new NatsKVStore(config.Bucket, JetStreamContext, stream, _opts);
     }
 
     /// <inheritdoc />
@@ -246,10 +261,18 @@ public class NatsKVContext : INatsKVContext
             MirrorDirect = mirrorDirect,
             Sources = sources,
             Retention = StreamConfigRetention.Limits, // from ADR-8
+            Metadata = config.Metadata,
             AllowMsgTTL = config.AllowMsgTTL,
             SubjectDeleteMarkerTTL = config.SubjectDeleteMarkerTTL,
         };
 
         return streamConfig;
     }
+}
+
+public class NatsKVOpts
+{
+    public static readonly NatsKVOpts Default = new();
+
+    public bool UseDirectGetApiWithKeysInSubject { get; init; }
 }
