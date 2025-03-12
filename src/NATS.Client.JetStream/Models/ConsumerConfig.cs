@@ -254,4 +254,44 @@ public record ConsumerConfig
     [System.Text.Json.Serialization.JsonPropertyName("metadata")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public IDictionary<string, string>? Metadata { get; set; }
+
+    /// <summary>
+    /// Defines a collection of priority groups for a pull consumer.
+    /// </summary>
+    /// <remarks>
+    /// The priority group names must conform to the requirements outlined in ADR-6: alphanumeric characters, dashes, underscores, forward slashes, or equals signs are allowed, with a maximum length of 16 characters per group.
+    /// Configuring this property for a push consumer will result in an error.
+    /// </remarks>
+    [System.Text.Json.Serialization.JsonPropertyName("priority_groups")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+#if NET6_0
+    public ICollection<string>? PriorityGroups { get; set; }
+#else
+    public ICollection<string>? PriorityGroups { get; init; }
+#endif
+
+    /// <summary>
+    /// Specifies the priority policy for consumer message selection, such as prioritizing <c>overflow</c> or <c>pinned_client</c>.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("priority_policy")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [System.ComponentModel.DataAnnotations.StringLength(int.MaxValue, MinimumLength = 1)]
+    [System.ComponentModel.DataAnnotations.RegularExpression(@"^[^.*>]+$")]
+#if NET6_0
+    public string? PriorityPolicy { get; set; }
+#else
+    public string? PriorityPolicy { get; init; }
+#endif
+
+    /// <summary>
+    /// Specifies the duration for which the consumer's pinned message priority is maintained.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("priority_timeout")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonNullableNanosecondsConverter))]
+#if NET6_0
+    public TimeSpan? PinnedTTL { get; set; }
+#else
+    public TimeSpan? PinnedTTL { get; init; }
+#endif
 }

@@ -145,6 +145,7 @@ public class NatsJSConsumer : INatsJSConsumer
                 IdleHeartbeat = opts.IdleHeartbeat,
                 Expires = opts.Expires,
                 NotificationHandler = opts.NotificationHandler,
+                PriorityGroup = opts.PriorityGroup,
             },
             serializer,
             cancellationToken: cancellationToken).ConfigureAwait(false);
@@ -306,6 +307,7 @@ public class NatsJSConsumer : INatsJSConsumer
             expires: timeouts.Expires,
             idle: timeouts.IdleHeartbeat,
             notificationHandler: opts.NotificationHandler,
+            priorityGroup: opts.PriorityGroup,
             cancellationToken: cancellationToken);
 
         await _context.Connection.AddSubAsync(sub: sub, cancellationToken).ConfigureAwait(false);
@@ -319,6 +321,9 @@ public class NatsJSConsumer : INatsJSConsumer
                 MaxBytes = max.MaxBytes,
                 IdleHeartbeat = timeouts.IdleHeartbeat,
                 Expires = timeouts.Expires,
+                Group = opts.PriorityGroup?.Group,
+                MinPending = opts.PriorityGroup?.MinPending ?? 0,
+                MinAckPending = opts.PriorityGroup?.MinAckPending ?? 0,
             },
             cancellationToken).ConfigureAwait(false);
 
@@ -402,6 +407,7 @@ public class NatsJSConsumer : INatsJSConsumer
             expires: timeouts.Expires,
             notificationHandler: opts.NotificationHandler,
             idle: timeouts.IdleHeartbeat,
+            priorityGroup: opts.PriorityGroup,
             cancellationToken: cancellationToken);
 
         await _context.Connection.AddSubAsync(sub: sub, cancellationToken).ConfigureAwait(false);
@@ -412,7 +418,15 @@ public class NatsJSConsumer : INatsJSConsumer
                 // When no wait is set we don't need to send the idle heartbeat and expiration
                 // If no message is available the server will respond with a 404 immediately
                 // If messages are available the server will send a 408 direct after the last message
-                ? new ConsumerGetnextRequest { Batch = max.MaxMsgs, MaxBytes = max.MaxBytes, NoWait = opts.NoWait }
+                ? new ConsumerGetnextRequest
+                {
+                    Batch = max.MaxMsgs,
+                    MaxBytes = max.MaxBytes,
+                    NoWait = opts.NoWait,
+                    Group = opts.PriorityGroup?.Group,
+                    MinPending = opts.PriorityGroup?.MinPending ?? 0,
+                    MinAckPending = opts.PriorityGroup?.MinAckPending ?? 0,
+                }
                 : new ConsumerGetnextRequest
                 {
                     Batch = max.MaxMsgs,
@@ -420,6 +434,9 @@ public class NatsJSConsumer : INatsJSConsumer
                     IdleHeartbeat = timeouts.IdleHeartbeat,
                     Expires = timeouts.Expires,
                     NoWait = opts.NoWait,
+                    Group = opts.PriorityGroup?.Group,
+                    MinPending = opts.PriorityGroup?.MinPending ?? 0,
+                    MinAckPending = opts.PriorityGroup?.MinAckPending ?? 0,
                 },
             cancellationToken).ConfigureAwait(false);
 
