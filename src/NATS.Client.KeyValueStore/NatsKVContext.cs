@@ -22,7 +22,6 @@ public class NatsKVContext : INatsKVContext
     internal const string KvStreamNamePrefix = "KV_";
     private static readonly int KvStreamNamePrefixLen = KvStreamNamePrefix.Length;
     private static readonly Regex ValidBucketRegex = new(pattern: @"\A[a-zA-Z0-9_-]+\z", RegexOptions.Compiled);
-    private readonly NatsKVOpts _opts;
 
     /// <summary>
     /// Create a new Key Value Store context
@@ -32,7 +31,7 @@ public class NatsKVContext : INatsKVContext
     public NatsKVContext(INatsJSContext context, NatsKVOpts opts)
     {
         JetStreamContext = context;
-        _opts = opts;
+        Opts = opts;
     }
 
     /// <summary>
@@ -48,6 +47,9 @@ public class NatsKVContext : INatsKVContext
     public INatsJSContext JetStreamContext { get; }
 
     /// <inheritdoc />
+    public NatsKVOpts Opts { get; }
+
+    /// <inheritdoc />
     public ValueTask<INatsKVStore> CreateStoreAsync(string bucket, CancellationToken cancellationToken = default)
         => CreateStoreAsync(new NatsKVConfig(bucket), cancellationToken);
 
@@ -60,7 +62,7 @@ public class NatsKVContext : INatsKVContext
 
         var stream = await JetStreamContext.CreateStreamAsync(streamConfig, cancellationToken);
 
-        return new NatsKVStore(config.Bucket, JetStreamContext, stream, _opts);
+        return new NatsKVStore(config.Bucket, JetStreamContext, stream, Opts);
     }
 
     /// <inheritdoc />
@@ -76,7 +78,7 @@ public class NatsKVContext : INatsKVContext
         }
 
         // TODO: KV mirror
-        return new NatsKVStore(bucket, JetStreamContext, stream, _opts);
+        return new NatsKVStore(bucket, JetStreamContext, stream, Opts);
     }
 
     /// <inheritdoc />
@@ -88,7 +90,7 @@ public class NatsKVContext : INatsKVContext
 
         var stream = await JetStreamContext.UpdateStreamAsync(streamConfig, cancellationToken);
 
-        return new NatsKVStore(config.Bucket, JetStreamContext, stream, _opts);
+        return new NatsKVStore(config.Bucket, JetStreamContext, stream, Opts);
     }
 
     /// <inheritdoc />
@@ -100,7 +102,7 @@ public class NatsKVContext : INatsKVContext
 
         var stream = await JetStreamContext.CreateOrUpdateStreamAsync(streamConfig, cancellationToken);
 
-        return new NatsKVStore(config.Bucket, JetStreamContext, stream, _opts);
+        return new NatsKVStore(config.Bucket, JetStreamContext, stream, Opts);
     }
 
     /// <inheritdoc />
