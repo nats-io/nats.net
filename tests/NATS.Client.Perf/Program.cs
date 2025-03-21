@@ -22,7 +22,7 @@ Console.WriteLine(t);
 await using var server = await NatsServer.StartAsync();
 
 Console.WriteLine("\nRunning nats bench");
-var natsBenchTotalMsgs = RunNatsBench(server.ClientUrl, t);
+var natsBenchTotalMsgs = await RunNatsBenchAsync(server.ClientUrl, t);
 
 await using var nats1 = await server.CreateClientConnectionAsync(NatsOpts.Default with { SubPendingChannelFullMode = BoundedChannelFullMode.Wait }, testLogger: false);
 await using var nats2 = await server.CreateClientConnectionAsync(testLogger: false);
@@ -110,24 +110,12 @@ Result.Add($"allocations: {allocatedMb:n2} MB (< {t.MaxAllocatedMb} MB)", () => 
 Console.WriteLine();
 return Result.Eval();
 
-double RunNatsBench(string url, TestParams testParams)
+async Task<double> RunNatsBenchAsync(string url, TestParams testParams)
 {
-    var process = new Process
-    {
-        StartInfo = new ProcessStartInfo
-        {
-            FileName = "nats",
-            Arguments = $"bench pub {testParams.Subject} --size={testParams.Size} --msgs={testParams.Msgs} --no-progress",
-            RedirectStandardOutput = true,
-            UseShellExecute = false,
-            Environment = { { "NATS_URL", $"{url}" } },
-        },
-    };
-    process.Start();
-    process.WaitForExit();
-    var output = process.StandardOutput.ReadToEnd();
+    var sub = Task.Run(async () => await RunNatsBenchCmdAsync("sub", url, testParams));
+    await RunNatsBenchCmdAsync("pub", url, testParams);
+    var output = await sub;
     var match = Regex.Match(output, @"stats: (\S+) msgs/sec ~ (\S+) (\w+)/sec", RegexOptions.Multiline);
-    Console.WriteLine(output);
     var total = double.Parse(match.Groups[1].Value);
 
     Console.WriteLine(output);
@@ -135,6 +123,24 @@ double RunNatsBench(string url, TestParams testParams)
     Console.WriteLine();
 
     return total;
+}
+
+async Task<string> RunNatsBenchCmdAsync(string cmd, string url, TestParams @params)
+{
+    var process = new Process
+    {
+        StartInfo = new ProcessStartInfo
+        {
+            FileName = "nats",
+            Arguments = $"bench {cmd} {@params.Subject} --size={@params.Size} --msgs={@params.Msgs} --no-progress",
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+            Environment = { { "NATS_URL", $"{url}" } },
+        },
+    };
+    process.Start();
+    await process.WaitForExitAsync();
+    return await process.StandardOutput.ReadToEndAsync();
 }
 
 internal class Result
