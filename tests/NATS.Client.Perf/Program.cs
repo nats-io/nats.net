@@ -117,7 +117,7 @@ double RunNatsBench(string url, TestParams testParams)
         StartInfo = new ProcessStartInfo
         {
             FileName = "nats",
-            Arguments = $"bench {testParams.Subject} --pub 1 --sub 1 --size={testParams.Size} --msgs={testParams.Msgs} --no-progress",
+            Arguments = $"bench pub {testParams.Subject} --size={testParams.Size} --msgs={testParams.Msgs} --no-progress",
             RedirectStandardOutput = true,
             UseShellExecute = false,
             Environment = { { "NATS_URL", $"{url}" } },
@@ -126,7 +126,8 @@ double RunNatsBench(string url, TestParams testParams)
     process.Start();
     process.WaitForExit();
     var output = process.StandardOutput.ReadToEnd();
-    var match = Regex.Match(output, @"^\s*NATS Pub/Sub stats: (\S+) msgs/sec ~ (\S+) (\w+)/sec", RegexOptions.Multiline);
+    var match = Regex.Match(output, @"stats: (\S+) msgs/sec ~ (\S+) (\w+)/sec", RegexOptions.Multiline);
+    Console.WriteLine(output);
     var total = double.Parse(match.Groups[1].Value);
 
     Console.WriteLine(output);

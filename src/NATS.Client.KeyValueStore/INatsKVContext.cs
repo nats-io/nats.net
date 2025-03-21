@@ -10,6 +10,11 @@ public interface INatsKVContext
     INatsJSContext JetStreamContext { get; }
 
     /// <summary>
+    /// Configuration options for the Nats Key-Value Store operations used within the Key-Value Store context.
+    /// </summary>
+    NatsKVOpts Opts { get; }
+
+    /// <summary>
     /// Create a new Key Value Store or get an existing one
     /// </summary>
     /// <param name="bucket">Name of the bucket</param>
