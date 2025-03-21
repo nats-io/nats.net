@@ -264,6 +264,8 @@ public class NatsKVContext : INatsKVContext
             Sources = sources,
             Retention = StreamConfigRetention.Limits, // from ADR-8
             Metadata = config.Metadata,
+            AllowMsgTTL = config.AllowMsgTTL,
+            SubjectDeleteMarkerTTL = config.SubjectDeleteMarkerTTL,
         };
 
         return streamConfig;
