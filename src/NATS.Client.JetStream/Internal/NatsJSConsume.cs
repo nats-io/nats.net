@@ -27,6 +27,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
     private readonly string _consumer;
     private readonly CancellationToken _cancellationToken;
     private readonly INatsDeserialize<TMsg> _serializer;
+    private readonly NatsJSPriorityGroupOpts? _priorityGroup;
     private readonly Timer _timer;
     private readonly Task _pullTask;
     private readonly NatsJSNotificationChannel? _notificationChannel;
@@ -59,6 +60,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         Func<INatsJSNotification, CancellationToken, Task>? notificationHandler,
         INatsDeserialize<TMsg> serializer,
         NatsSubOpts? opts,
+        NatsJSPriorityGroupOpts? priorityGroup,
         CancellationToken cancellationToken)
         : base(context.Connection, context.Connection.SubscriptionManager, subject, queueGroup, opts)
     {
@@ -69,6 +71,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         _stream = stream;
         _consumer = consumer;
         _serializer = serializer;
+        _priorityGroup = priorityGroup;
 
         if (notificationHandler is { } handler)
         {
@@ -231,6 +234,9 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                 MaxBytes = maxBytes,
                 IdleHeartbeat = _idle,
                 Expires = _expires,
+                Group = _priorityGroup?.Group,
+                MinPending = _priorityGroup?.MinPending ?? 0,
+                MinAckPending = _priorityGroup?.MinAckPending ?? 0,
             };
 
             await commandWriter.PublishAsync(
@@ -455,6 +461,9 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
             MaxBytes = maxBytes,
             IdleHeartbeat = _idle,
             Expires = _expires,
+            Group = _priorityGroup?.Group,
+            MinPending = _priorityGroup?.MinPending ?? 0,
+            MinAckPending = _priorityGroup?.MinAckPending ?? 0,
         },
         Origin = origin,
     });
