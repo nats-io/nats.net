@@ -526,6 +526,56 @@ public class KeyValueStoreTest
     }
 
     [SkipIfNatsServer(versionEarlierThan: "2.11")]
+    public async Task SubjectDeleteMarkerTTL_enabled_removals_should_be_interpreted_as_Operation_Purge()
+    {
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cancellationToken = cts.Token;
+
+        var store = await kv.CreateStoreAsync(
+            new NatsKVConfig("kv1")
+            {
+                AllowMsgTTL = true,
+                SubjectDeleteMarkerTTL = TimeSpan.FromHours(1),
+                MaxAge = TimeSpan.FromSeconds(4),
+            },
+            cancellationToken: cancellationToken);
+
+        var r1 = await store.CreateAsync("foo", "LOCKED", cancellationToken: cancellationToken);
+        Assert.Equal(1ul, r1);
+
+        var create = Task.Run(
+            async () =>
+            {
+                await Task.Delay(6000, cancellationToken);
+                Console.WriteLine("6 seconds passed — creating...");
+                return await store.CreateAsync("foo", "LOCKED", ttl: TimeSpan.FromSeconds(1), cancellationToken: cancellationToken);
+            },
+            cancellationToken);
+
+        var checkOps = new List<NatsKVOperation>();
+        await foreach (var entry in store.WatchAsync<string>("foo", opts: new() { IncludeHistory = true }, cancellationToken: cancellationToken))
+        {
+            checkOps.Add(entry.Operation);
+            if (entry.Revision == 3)
+                break;
+        }
+
+        Assert.Equal(3, checkOps.Count);
+        Assert.Equal(NatsKVOperation.Put, checkOps[0]);
+        Assert.Equal(NatsKVOperation.Purge, checkOps[1]);
+        Assert.Equal(NatsKVOperation.Put, checkOps[2]);
+
+        var r2 = await create;
+        Assert.Equal(3ul, r2);
+    }
+
+    [SkipIfNatsServer(versionEarlierThan: "2.11")]
     public async Task TestMessageNeverExpire()
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
