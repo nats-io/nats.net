@@ -44,6 +44,7 @@ public class NatsKVStore : INatsKVStore
     private const string NatsSequence = "Nats-Sequence";
     private const string NatsTimeStamp = "Nats-Time-Stamp";
     private const string NatsTtl = "Nats-TTL";
+    private const string NatsMarkerReason = "Nats-Marker-Reason";
     private static readonly Regex ValidKeyRegex = new(pattern: @"\A[-/_=\.a-zA-Z0-9]+\z", RegexOptions.Compiled);
     private static readonly NatsKVException MissingSequenceHeaderException = new("Missing sequence header");
     private static readonly NatsKVException MissingTimestampHeaderException = new("Missing timestamp header");
@@ -420,6 +421,22 @@ public class NatsKVStore : INatsKVStore
 
                     if (!Enum.TryParse(operationValues[0], ignoreCase: true, out operation))
                         return InvalidOperationException;
+                }
+                else if (headers.TryGetValue(NatsMarkerReason, out var markerReasonValues))
+                {
+                    var reason = markerReasonValues.Last();
+                    if (reason is "MaxAge" or "Purge")
+                    {
+                        operation = NatsKVOperation.Purge;
+                    }
+                    else if (reason is "Remove")
+                    {
+                        operation = NatsKVOperation.Del;
+                    }
+                    else
+                    {
+                        return InvalidOperationException;
+                    }
                 }
 
                 if (operation is NatsKVOperation.Del or NatsKVOperation.Purge)
