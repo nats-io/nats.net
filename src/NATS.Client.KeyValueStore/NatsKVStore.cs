@@ -34,6 +34,7 @@ public enum NatsKVOperation
 /// </summary>
 public class NatsKVStore : INatsKVStore
 {
+    internal const string NatsMarkerReason = "Nats-Marker-Reason";
     private const string NatsExpectedLastSubjectSequence = "Nats-Expected-Last-Subject-Sequence";
     private const string KVOperation = "KV-Operation";
     private const string NatsRollup = "Nats-Rollup";
@@ -44,7 +45,6 @@ public class NatsKVStore : INatsKVStore
     private const string NatsSequence = "Nats-Sequence";
     private const string NatsTimeStamp = "Nats-Time-Stamp";
     private const string NatsTtl = "Nats-TTL";
-    private const string NatsMarkerReason = "Nats-Marker-Reason";
     private static readonly Regex ValidKeyRegex = new(pattern: @"\A[-/_=\.a-zA-Z0-9]+\z", RegexOptions.Compiled);
     private static readonly NatsKVException MissingSequenceHeaderException = new("Missing sequence header");
     private static readonly NatsKVException MissingTimestampHeaderException = new("Missing timestamp header");
