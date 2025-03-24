@@ -443,7 +443,7 @@ public class ProtocolTest
 
         {
             var payload = new byte[nats.ServerInfo!.MaxPayload + 1];
-            var exception = await Assert.ThrowsAsync<NatsException>(async () =>
+            var exception = await Assert.ThrowsAsync<NatsPayloadTooLargeException>(async () =>
                 await nats.PublishAsync("foo.none", payload, cancellationToken: cts.Token));
             Assert.Matches(@"Payload size \d+ exceeds server's maximum payload size \d+", exception.Message);
         }

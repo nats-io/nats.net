@@ -19,15 +19,15 @@ var t = new TestParams
 Console.WriteLine("NATS NET v2 Perf Tests");
 Console.WriteLine(t);
 
+var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+
 await using var server = await NatsServer.StartAsync();
 
 Console.WriteLine("\nRunning nats bench");
-var natsBenchTotalMsgs = RunNatsBench(server.ClientUrl, t);
+var natsBenchTotalMsgs = await RunNatsBenchAsync(server.ClientUrl, t, cts.Token);
 
 await using var nats1 = await server.CreateClientConnectionAsync(NatsOpts.Default with { SubPendingChannelFullMode = BoundedChannelFullMode.Wait }, testLogger: false);
 await using var nats2 = await server.CreateClientConnectionAsync(testLogger: false);
-
-var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 
 await nats1.PingAsync();
 await nats2.PingAsync();
@@ -110,23 +110,12 @@ Result.Add($"allocations: {allocatedMb:n2} MB (< {t.MaxAllocatedMb} MB)", () => 
 Console.WriteLine();
 return Result.Eval();
 
-double RunNatsBench(string url, TestParams testParams)
+async Task<double> RunNatsBenchAsync(string url, TestParams tp, CancellationToken ct)
 {
-    var process = new Process
-    {
-        StartInfo = new ProcessStartInfo
-        {
-            FileName = "nats",
-            Arguments = $"bench {testParams.Subject} --pub 1 --sub 1 --size={testParams.Size} --msgs={testParams.Msgs} --no-progress",
-            RedirectStandardOutput = true,
-            UseShellExecute = false,
-            Environment = { { "NATS_URL", $"{url}" } },
-        },
-    };
-    process.Start();
-    process.WaitForExit();
-    var output = process.StandardOutput.ReadToEnd();
-    var match = Regex.Match(output, @"^\s*NATS Pub/Sub stats: (\S+) msgs/sec ~ (\S+) (\w+)/sec", RegexOptions.Multiline);
+    var sub = Task.Run(async () => await RunNatsBenchCmdAsync("sub", url, tp, ct));
+    await RunNatsBenchCmdAsync("pub", url, tp with { Msgs = (int)(tp.Msgs * 1.2) }, ct); // +20% to cover potential loss
+    var output = await sub;
+    var match = Regex.Match(output, @"stats: (\S+) msgs/sec ~ (\S+) (\w+)/sec", RegexOptions.Multiline);
     var total = double.Parse(match.Groups[1].Value);
 
     Console.WriteLine(output);
@@ -134,6 +123,24 @@ double RunNatsBench(string url, TestParams testParams)
     Console.WriteLine();
 
     return total;
+}
+
+async Task<string> RunNatsBenchCmdAsync(string cmd, string url, TestParams @params, CancellationToken ct)
+{
+    var process = new Process
+    {
+        StartInfo = new ProcessStartInfo
+        {
+            FileName = "nats",
+            Arguments = $"bench {cmd} {@params.Subject} --size={@params.Size} --msgs={@params.Msgs} --no-progress",
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+            Environment = { { "NATS_URL", $"{url}" } },
+        },
+    };
+    process.Start();
+    await process.WaitForExitAsync(ct);
+    return await process.StandardOutput.ReadToEndAsync();
 }
 
 internal class Result

@@ -515,7 +515,13 @@ public class KeyValueStoreTest
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
 
-        var store = await kv.CreateStoreAsync(new NatsKVConfig("kv1") { History = 10 }, cancellationToken: cancellationToken);
+        var store = await kv.CreateStoreAsync(
+            new NatsKVConfig("kv1")
+            {
+                History = 10,
+                Metadata = new Dictionary<string, string> { { "meta1", "value1" } },
+            },
+            cancellationToken: cancellationToken);
 
         Assert.Equal("kv1", store.Bucket);
 
@@ -524,6 +530,16 @@ public class KeyValueStoreTest
         Assert.Equal("kv1", status.Bucket);
         Assert.Equal("KV_kv1", status.Info.Config.Name);
         Assert.Equal(10, status.Info.Config.MaxMsgsPerSubject);
+
+        if (!nats.ServerInfo!.Version.StartsWith("2.9."))
+        {
+            _output.WriteLine("Check metadata");
+            Assert.Equal("value1", status.Info.Config.Metadata?["meta1"]);
+        }
+        else
+        {
+            _output.WriteLine("Metadata is not supported in server versions < 2.10");
+        }
     }
 
     [SkipIfNatsServer(versionEarlierThan: "2.10")]
