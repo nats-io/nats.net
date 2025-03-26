@@ -95,7 +95,11 @@ public class NatsJSConsumer : INatsJSConsumer
                 if (!read)
                     break;
 
+                // if yield is blocked by the application code, we don't want
+                // heartbeat timer kicking in and issuing unnecessary pull requests.
+                cc.StopHeartbeatTimer();
                 yield return jsMsg;
+                cc.ResetHeartbeatTimer();
                 cc.Delivered(jsMsg.Size);
             }
         }
@@ -202,7 +206,11 @@ public class NatsJSConsumer : INatsJSConsumer
                 if (!read)
                     break;
 
+                // if yield is blocked by the application code, we don't want
+                // heartbeat timer kicking in and issuing unnecessary pull requests.
+                fc.StopHeartbeatTimer();
                 yield return jsMsg;
+                fc.ResetHeartbeatTimer();
             }
         }
     }
@@ -263,7 +271,11 @@ public class NatsJSConsumer : INatsJSConsumer
         await using var fc = await FetchInternalAsync<T>(opts with { NoWait = true }, serializer, cancellationToken).ConfigureAwait(false);
         await foreach (var jsMsg in fc.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
+            // if yield is blocked by the application code, we don't want
+            // heartbeat timer kicking in and issuing unnecessary pull requests.
+            fc.StopHeartbeatTimer();
             yield return jsMsg;
+            fc.ResetHeartbeatTimer();
         }
     }
 

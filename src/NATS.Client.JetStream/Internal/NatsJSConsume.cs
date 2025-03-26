@@ -165,6 +165,8 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
             cancellationToken: cancellationToken);
     }
 
+    public void StopHeartbeatTimer() => _timer.Change(Timeout.Infinite, Timeout.Infinite);
+
     public void ResetHeartbeatTimer() => _timer.Change(_hbTimeout, _hbTimeout);
 
     public void Delivered(int msgSize)
