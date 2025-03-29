@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
-using System.Xml.Linq;
+using System.Text;
+using NATS.Client.Core.Commands;
 using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
@@ -417,6 +418,116 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
         {
             throw new NatsException("unable to send reply; ReplyTo is empty");
         }
+    }
+}
+
+public static class NatsMsg
+{
+    /// <summary>
+    /// Creates a new NATS message with a string payload.
+    /// </summary>
+    /// <param name="subject">The destination subject to publish to.</param>
+    /// <param name="data">The message payload as a string.</param>
+    /// <param name="headers">Pass additional information using name-value pairs.</param>
+    /// <param name="connection">NATS connection this message is associated to.</param>
+    /// <param name="flags">Message flags to indicate no responders and empty payloads.</param>
+    /// <param name="replyTo">The reply subject that subscribers can use to send a response back to the publisher/requester.</param>
+    /// <param name="encoding">Encoding used.  Default to utf8 if not provided</param>
+    /// <returns>Returns the <see cref="NatsMsg{T}" /> NATS message structure</returns>
+    public static NatsMsg<string> Create(string subject, string data, NatsHeaders? headers = null, INatsConnection? connection = null, NatsMsgFlags flags = default, string? replyTo = null, Encoding? encoding = null)
+    {
+        encoding ??= Encoding.UTF8;
+
+        var size = subject.Length
+                   + (replyTo?.Length ?? 0)
+                   + (headers?.GetBytesLength() ?? 0)
+                   + encoding.GetByteCount(data);
+
+        return new NatsMsg<string>(subject, replyTo, size, headers, data, connection, flags);
+    }
+
+    /// <summary>
+    /// Creates a new NATS message with a binary payload.
+    /// </summary>
+    /// <param name="subject">The destination subject to publish to.</param>
+    /// <param name="data">The message payload as a byte array.</param>
+    /// <param name="headers">Pass additional information using name-value pairs.</param>
+    /// <param name="connection">NATS connection this message is associated to.</param>
+    /// <param name="flags">Message flags to indicate no responders and empty payloads.</param>
+    /// <param name="replyTo">The reply subject that subscribers can use to send a response back to the publisher/requester.</param>
+    /// <returns>Returns the <see cref="NatsMsg{T}" /> NATS message structure</returns>
+    public static NatsMsg<byte[]> Create(string subject, byte[] data, NatsHeaders? headers = null, INatsConnection? connection = null, NatsMsgFlags flags = default, string? replyTo = null)
+    {
+        var size = subject.Length
+                   + (replyTo?.Length ?? 0)
+                   + (headers?.GetBytesLength() ?? 0)
+                   + data.Length;
+
+        return new NatsMsg<byte[]>(subject, replyTo, size, headers, data, connection, flags);
+    }
+
+    /// <summary>
+    /// Creates a new NATS message with a mutable binary payload.
+    /// </summary>
+    /// <param name="subject">The destination subject to publish to.</param>
+    /// <param name="data">The message payload as a byte memory.</param>
+    /// <param name="headers">Pass additional information using name-value pairs.</param>
+    /// <param name="connection">NATS connection this message is associated to.</param>
+    /// <param name="flags">Message flags to indicate no responders and empty payloads.</param>
+    /// <param name="replyTo">The reply subject that subscribers can use to send a response back to the publisher/requester.</param>
+    /// <returns>Returns the <see cref="NatsMsg{T}" /> NATS message structure</returns>
+    public static NatsMsg<ReadOnlyMemory<byte>> Create(string subject, ReadOnlyMemory<byte> data, INatsConnection? connection = null, NatsHeaders? headers = null, NatsMsgFlags flags = default, string? replyTo = null)
+    {
+        var size = subject.Length
+                   + (replyTo?.Length ?? 0)
+                   + (headers?.GetBytesLength() ?? 0)
+                   + data.Length;
+
+        return new NatsMsg<ReadOnlyMemory<byte>>(subject, replyTo, size, headers, data, connection, flags);
+    }
+
+    /// <summary>
+    /// Creates a new NATS message with a mutable binary payload.
+    /// </summary>
+    /// <param name="subject">The destination subject to publish to.</param>
+    /// <param name="data">The message payload as a byte memory.</param>
+    /// <param name="headers">Pass additional information using name-value pairs.</param>
+    /// <param name="connection">NATS connection this message is associated to.</param>
+    /// <param name="flags">Message flags to indicate no responders and empty payloads.</param>
+    /// <param name="replyTo">The reply subject that subscribers can use to send a response back to the publisher/requester.</param>
+    /// <returns>Returns the <see cref="NatsMsg{T}" /> NATS message structure</returns>
+    public static NatsMsg<Memory<byte>> Create(string subject, Memory<byte> data, INatsConnection? connection = null, NatsHeaders? headers = null, NatsMsgFlags flags = default, string? replyTo = null)
+    {
+        var size = subject.Length
+                   + (replyTo?.Length ?? 0)
+                   + (headers?.GetBytesLength() ?? 0)
+                   + data.Length;
+
+        return new NatsMsg<Memory<byte>>(subject, replyTo, size, headers, data, connection, flags);
+    }
+
+    /// <summary>
+    /// Creates a new NATS message with a serializable payload.
+    /// </summary>
+    /// <param name="subject">The destination subject to publish to.</param>
+    /// <param name="data">Serializable data object.</param>
+    /// <param name="serializer">Serializer to use for the calculate data size.</param>
+    /// <param name="headers">Pass additional information using name-value pairs.</param>
+    /// <param name="connection">NATS connection this message is associated to.</param>
+    /// <param name="flags">Message flags to indicate no responders and empty payloads.</param>
+    /// <param name="replyTo">The reply subject that subscribers can use to send a response back to the publisher/requester.</param>
+    /// <param name="serializationBufferSize">The serializer buffer size</param>
+    /// <returns>Returns the <see cref="NatsMsg{T}" /> NATS message structure</returns>
+    public static NatsMsg<T> Create<T>(string subject, T data, INatsSerialize<T> serializer, NatsHeaders? headers = null, INatsConnection? connection = null, NatsMsgFlags flags = default, string? replyTo = null, int serializationBufferSize = 256)
+    {
+        var bufferWriter = new NatsPooledBufferWriter<byte>(serializationBufferSize);
+        serializer.Serialize(bufferWriter, data);
+        var size = subject.Length
+                   + (replyTo?.Length ?? 0)
+                   + (headers?.GetBytesLength() ?? 0)
+                   + bufferWriter.WrittenMemory.Length;
+
+        return new NatsMsg<T>(subject, replyTo, size, headers, data, connection, flags);
     }
 }
 

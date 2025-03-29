@@ -301,7 +301,7 @@ public class NatsHeaders : IDictionary<string, StringValues>
     /// </summary>
     /// <param name="encoding">Encoding used.  Default to utf8 if not provided</param>
     /// <returns>Bytes length of the header</returns>
-    public long GetBytesLength(Encoding? encoding = null)
+    public int GetBytesLength(Encoding? encoding = null)
     {
         // if null set to utf-8
         encoding = encoding ?? Encoding.UTF8;
