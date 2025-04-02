@@ -1,18 +1,15 @@
-using System.Net.Security;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
+using System.Text;
 using Microsoft.Extensions.Logging;
+
+#if NETSTANDARD2_0
+using System.Runtime.InteropServices;
+#endif
 
 namespace NATS.Client.Core.Internal;
 
-internal sealed class SocketClosedException : Exception
-{
-    public SocketClosedException(Exception? innerException)
-        : base("Socket has been closed.", innerException)
-    {
-    }
-}
+internal sealed class SocketClosedException(Exception? innerException) : Exception("Socket has been closed.", innerException);
 
 internal sealed class TcpConnection : ISocketConnection
 {
@@ -57,16 +54,49 @@ internal sealed class TcpConnection : ISocketConnection
     /// <summary>
     /// Connect with Timeout. When failed, Dispose this connection.
     /// </summary>
-    public async ValueTask ConnectAsync(string host, int port, TimeSpan timeout)
+    public async ValueTask ConnectAsync(string host, int port, NatsOpts opts)
     {
-        using var cts = new CancellationTokenSource(timeout);
+        using var cts = new CancellationTokenSource(opts.ConnectTimeout);
         try
         {
+            var proxyOpts = opts.ProxyOpts;
+            if (proxyOpts.Host != null)
+            {
 #if NETSTANDARD
-            await _socket.ConnectAsync(host, port).WaitAsync(timeout, cts.Token).ConfigureAwait(false);
+                await _socket.ConnectAsync(proxyOpts.Host, proxyOpts.Port).WaitAsync(opts.ConnectTimeout, cts.Token).ConfigureAwait(false);
 #else
-            await _socket.ConnectAsync(host, port, cts.Token).ConfigureAwait(false);
+                await _socket.ConnectAsync(proxyOpts.Host, proxyOpts.Port, cts.Token).ConfigureAwait(false);
 #endif
+
+                string? connectAuth = null;
+                if (proxyOpts.Auth != null)
+                {
+                    // Create the CONNECT request with proxy authentication
+                    var auth = Convert.ToBase64String(Encoding.UTF8.GetBytes(proxyOpts.Auth));
+                    connectAuth = $"Proxy-Authorization: Basic {auth}\r\n";
+                }
+
+                var serverWithPort = $"{host}:{port}";
+                var connectBuffer = Encoding.UTF8.GetBytes($"CONNECT {serverWithPort} HTTP/1.1\r\nHost: {serverWithPort}\r\n{connectAuth}Proxy-Connection: Keep-Alive\r\n\r\n");
+
+                // Send CONNECT request to proxy
+                await SendAsync(connectBuffer).ConfigureAwait(false);
+
+                // Validate proxy response
+                var receiveBuffer = new byte[4096];
+                var read = await ReceiveAsync(receiveBuffer).ConfigureAwait(false);
+                var response = Encoding.UTF8.GetString(receiveBuffer, 0, read);
+                if (!response.Contains("200 Connection established"))
+                    throw new Exception($"Proxy connection failed. Response: {response}");
+            }
+            else
+            {
+#if NETSTANDARD
+                await _socket.ConnectAsync(host, port).WaitAsync(opts.ConnectTimeout, cts.Token).ConfigureAwait(false);
+#else
+                await _socket.ConnectAsync(host, port, cts.Token).ConfigureAwait(false);
+#endif
+            }
         }
         catch (Exception ex)
         {
@@ -75,10 +105,8 @@ internal sealed class TcpConnection : ISocketConnection
             {
                 throw new SocketException(10060); // 10060 = connection timeout.
             }
-            else
-            {
-                throw;
-            }
+
+            throw;
         }
     }
 
@@ -132,6 +160,7 @@ internal sealed class TcpConnection : ISocketConnection
             }
             catch
             {
+                // ignored
             }
 
             try
@@ -140,6 +169,7 @@ internal sealed class TcpConnection : ISocketConnection
             }
             catch
             {
+                // ignored
             }
 
             _socket.Dispose();
@@ -149,10 +179,7 @@ internal sealed class TcpConnection : ISocketConnection
     }
 
     // when catch SocketClosedException, call this method.
-    public void SignalDisconnected(Exception exception)
-    {
-        _waitForClosedSource.TrySetResult(exception);
-    }
+    public void SignalDisconnected(Exception exception) => _waitForClosedSource.TrySetResult(exception);
 
     // NetworkStream will own the Socket, so mark as disposed
     // in order to skip socket.Dispose() in DisposeAsync
