@@ -2,14 +2,19 @@ using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Microsoft.Extensions.Logging;
-
 #if NETSTANDARD2_0
 using System.Runtime.InteropServices;
 #endif
 
 namespace NATS.Client.Core.Internal;
 
-internal sealed class SocketClosedException(Exception? innerException) : Exception("Socket has been closed.", innerException);
+internal sealed class SocketClosedException : Exception
+{
+    public SocketClosedException(Exception? innerException)
+        : base("Socket has been closed.", innerException)
+    {
+    }
+}
 
 internal sealed class TcpConnection : ISocketConnection
 {
@@ -179,7 +184,10 @@ internal sealed class TcpConnection : ISocketConnection
     }
 
     // when catch SocketClosedException, call this method.
-    public void SignalDisconnected(Exception exception) => _waitForClosedSource.TrySetResult(exception);
+    public void SignalDisconnected(Exception exception)
+    {
+        _waitForClosedSource.TrySetResult(exception);
+    }
 
     // NetworkStream will own the Socket, so mark as disposed
     // in order to skip socket.Dispose() in DisposeAsync

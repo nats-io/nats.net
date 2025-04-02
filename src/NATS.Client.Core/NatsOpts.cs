@@ -132,7 +132,7 @@ public sealed record NatsOpts
 
     /// <summary>
     /// This value will be used for subscriptions internal bounded message channel <c>FullMode</c>.
-    /// The default is to drop the newest message when full (<c>BoundedChannelFullMode.DropNewest</c>).
+    /// The default is to drop newest message when full (<c>BoundedChannelFullMode.DropNewest</c>).
     /// </summary>
     /// <remarks>
     /// If the client reaches this internal limit (bounded channel capacity), by default it will drop messages
@@ -169,11 +169,24 @@ public sealed record NatsOpts
 
         if (uriBuilder.Password is { Length: > 0 })
         {
-            return this with { AuthOpts = AuthOpts with { Username = Uri.UnescapeDataString(uriBuilder.UserName), Password = Uri.UnescapeDataString(uriBuilder.Password), }, };
+            return this with
+            {
+                AuthOpts = AuthOpts with
+                {
+                    Username = Uri.UnescapeDataString(uriBuilder.UserName),
+                    Password = Uri.UnescapeDataString(uriBuilder.Password),
+                },
+            };
         }
         else
         {
-            return this with { AuthOpts = AuthOpts with { Token = Uri.UnescapeDataString(uriBuilder.UserName), }, };
+            return this with
+            {
+                AuthOpts = AuthOpts with
+                {
+                    Token = Uri.UnescapeDataString(uriBuilder.UserName),
+                },
+            };
         }
     }
 }

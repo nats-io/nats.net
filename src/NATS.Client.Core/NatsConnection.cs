@@ -4,7 +4,6 @@ using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
 using NATS.Client.Core.Internal;
-
 #if NETSTANDARD
 using Random = NATS.Client.Core.Internal.NetStandardExtensions.Random;
 #endif
@@ -33,7 +32,7 @@ public partial class NatsConnection : INatsConnection
 #pragma warning disable SA1401
     internal readonly ConnectionStatsCounter Counter; // allow to call from external sources
 #pragma warning restore SA1401
-    private readonly object _gate = new();
+    private readonly object _gate = new object();
     private readonly ILogger<NatsConnection> _logger;
     private readonly ObjectPool _pool;
     private readonly CancellationTokenSource _disposedCancellationTokenSource;
@@ -62,6 +61,8 @@ public partial class NatsConnection : INatsConnection
     private TimeSpan _backoff = TimeSpan.Zero;
     private string _lastAuthError = string.Empty;
     private bool _stopRetries;
+    private Task? _publishEventsTask;
+    private Task? _reconnectLoopTask;
 
     public NatsConnection()
         : this(NatsOpts.Default)
@@ -85,13 +86,20 @@ public partial class NatsConnection : INatsConnection
         HeaderParser = new NatsHeaderParser(opts.HeaderEncoding);
         _defaultSubscriptionChannelOpts = new BoundedChannelOptions(opts.SubPendingChannelCapacity)
         {
-            FullMode = opts.SubPendingChannelFullMode, SingleWriter = true, SingleReader = false, AllowSynchronousContinuations = false,
+            FullMode = opts.SubPendingChannelFullMode,
+            SingleWriter = true,
+            SingleReader = false,
+            AllowSynchronousContinuations = false,
         };
 
         // push consumer events to a channel so handlers can be awaited (also prevents user code from blocking us)
-        _eventChannel = Channel.CreateUnbounded<(NatsEvent, NatsEventArgs)>(
-            new UnboundedChannelOptions { AllowSynchronousContinuations = false, SingleWriter = false, SingleReader = true, });
-        _ = Task.Run(PublishEventsAsync, _disposedCancellationTokenSource.Token);
+        _eventChannel = Channel.CreateUnbounded<(NatsEvent, NatsEventArgs)>(new UnboundedChannelOptions
+        {
+            AllowSynchronousContinuations = false,
+            SingleWriter = false,
+            SingleReader = true,
+        });
+        _publishEventsTask = Task.Run(PublishEventsAsync, _disposedCancellationTokenSource.Token);
     }
 
     // events
@@ -197,8 +205,7 @@ public partial class NatsConnection : INatsConnection
     {
         var subject = msg.Subject;
         _logger.LogWarning("Dropped message from {Subject} with {Pending} pending messages", subject, pending);
-        _eventChannel.Writer.TryWrite(
-            (NatsEvent.MessageDropped, new NatsMessageDroppedEventArgs(natsSub, pending, subject, msg.ReplyTo, msg.Headers, msg.Data)));
+        _eventChannel.Writer.TryWrite((NatsEvent.MessageDropped, new NatsMessageDroppedEventArgs(natsSub, pending, subject, msg.ReplyTo, msg.Headers, msg.Data)));
     }
 
     /// <inheritdoc />
@@ -206,7 +213,8 @@ public partial class NatsConnection : INatsConnection
     {
         if (subChannelOpts is { } overrideOpts)
         {
-            return new BoundedChannelOptions(overrideOpts.Capacity ?? _defaultSubscriptionChannelOpts.Capacity)
+            return new BoundedChannelOptions(overrideOpts.Capacity ??
+                                             _defaultSubscriptionChannelOpts.Capacity)
             {
                 AllowSynchronousContinuations =
                     _defaultSubscriptionChannelOpts.AllowSynchronousContinuations,
@@ -262,21 +270,20 @@ public partial class NatsConnection : INatsConnection
 
     internal NatsStats GetStats() => Counter.ToStats();
 
-    internal ValueTask PublishToClientHandlersAsync(
-        string subject,
-        string? replyTo,
-        int sid,
-        in ReadOnlySequence<byte>? headersBuffer,
-        in ReadOnlySequence<byte> payloadBuffer) =>
-        _subscriptionManager.PublishToClientHandlersAsync(subject, replyTo, sid, headersBuffer, payloadBuffer);
+    internal ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
+    {
+        return _subscriptionManager.PublishToClientHandlersAsync(subject, replyTo, sid, headersBuffer, payloadBuffer);
+    }
 
-    internal void ResetPongCount() => Interlocked.Exchange(ref _pongCount, 0);
+    internal void ResetPongCount()
+    {
+        Interlocked.Exchange(ref _pongCount, 0);
+    }
 
     internal ValueTask PongAsync() => CommandWriter.PongAsync(CancellationToken.None);
 
     // called only internally
-    internal ValueTask SubscribeCoreAsync(int sid, string subject, string? queueGroup, int? maxMsgs, CancellationToken cancellationToken) =>
-        CommandWriter.SubscribeAsync(sid, subject, queueGroup, maxMsgs, cancellationToken);
+    internal ValueTask SubscribeCoreAsync(int sid, string subject, string? queueGroup, int? maxMsgs, CancellationToken cancellationToken) => CommandWriter.SubscribeAsync(sid, subject, queueGroup, maxMsgs, cancellationToken);
 
     internal ValueTask UnsubscribeAsync(int sid)
     {
@@ -405,7 +412,7 @@ public partial class NatsConnection : INatsConnection
             _pingTimerCancellationTokenSource = new CancellationTokenSource();
             StartPingTimer(_pingTimerCancellationTokenSource.Token);
             _waitForOpenConnection.TrySetResult();
-            Task.Run(ReconnectLoop);
+            _reconnectLoopTask = Task.Run(ReconnectLoop);
             _eventChannel.Writer.TryWrite((NatsEvent.ConnectionOpened, new NatsEventArgs(url?.ToString() ?? string.Empty)));
         }
     }
@@ -474,12 +481,7 @@ public partial class NatsConnection : INatsConnection
             // Authentication
             if (_userCredentials != null)
             {
-                await _userCredentials.AuthenticateAsync(
-                    _clientOpts,
-                    WritableServerInfo,
-                    _currentConnectUri,
-                    Opts.ConnectTimeout,
-                    _disposedCancellationTokenSource.Token).ConfigureAwait(false);
+                await _userCredentials.AuthenticateAsync(_clientOpts, WritableServerInfo, _currentConnectUri, Opts.ConnectTimeout, _disposedCancellationTokenSource.Token).ConfigureAwait(false);
             }
 
             await using (var priorityCommandWriter = new PriorityCommandWriter(this, _pool, _socket!, Opts, Counter, EnqueuePing))
@@ -607,7 +609,7 @@ public partial class NatsConnection : INatsConnection
             _currentConnectUri = null;
             var urlEnumerator = urls.AsEnumerable().GetEnumerator();
             NatsUri? url = null;
-            CONNECT_AGAIN:
+        CONNECT_AGAIN:
 
             _logger.LogDebug(NatsLogEvents.Connection, "Trying to reconnect [{ReconnectCount}]", reconnectCount);
 
@@ -629,10 +631,7 @@ public partial class NatsConnection : INatsConnection
                     if (OnConnectingAsync != null)
                     {
                         var target = (url.Host, url.Port);
-                        _logger.LogInformation(
-                            NatsLogEvents.Connection,
-                            "Try to invoke OnConnectingAsync before connect to NATS [{ReconnectCount}]",
-                            reconnectCount);
+                        _logger.LogInformation(NatsLogEvents.Connection, "Try to invoke OnConnectingAsync before connect to NATS [{ReconnectCount}]", reconnectCount);
                         var newTarget = await OnConnectingAsync(target).ConfigureAwait(false);
 
                         if (newTarget.Host != target.Host || newTarget.Port != target.Port)
@@ -659,11 +658,7 @@ public partial class NatsConnection : INatsConnection
                         if (Opts.TlsOpts.EffectiveMode(url) == TlsMode.Implicit)
                         {
                             // upgrade TcpConnection to SslConnection
-                            _logger.LogDebug(
-                                NatsLogEvents.Connection,
-                                "Trying to reconnect and upgrading to TLS {Url} [{ReconnectCount}]",
-                                url,
-                                reconnectCount);
+                            _logger.LogDebug(NatsLogEvents.Connection, "Trying to reconnect and upgrading to TLS {Url} [{ReconnectCount}]", url, reconnectCount);
                             var sslConnection = conn.UpgradeToSslStreamConnection(Opts.TlsOpts);
                             await sslConnection.AuthenticateAsClientAsync(FixTlsHost(url), Opts.ConnectTimeout).ConfigureAwait(false);
                             _socket = sslConnection;
@@ -711,11 +706,7 @@ public partial class NatsConnection : INatsConnection
                 if (debug)
                 {
                     stopwatch.Stop();
-                    _logger.LogDebug(
-                        NatsLogEvents.Connection,
-                        "Reconnect wait over after {WaitMs}ms [{ReconnectCount}]",
-                        stopwatch.ElapsedMilliseconds,
-                        reconnectCount);
+                    _logger.LogDebug(NatsLogEvents.Connection, "Reconnect wait over after {WaitMs}ms [{ReconnectCount}]", stopwatch.ElapsedMilliseconds, reconnectCount);
                 }
 
                 goto CONNECT_AGAIN;
@@ -730,7 +721,7 @@ public partial class NatsConnection : INatsConnection
                 _pingTimerCancellationTokenSource = new CancellationTokenSource();
                 StartPingTimer(_pingTimerCancellationTokenSource.Token);
                 _waitForOpenConnection.TrySetResult();
-                Task.Run(ReconnectLoop);
+                _reconnectLoopTask = Task.Run(ReconnectLoop);
                 _eventChannel.Writer.TryWrite((NatsEvent.ConnectionOpened, new NatsEventArgs(url.ToString())));
             }
         }
@@ -740,10 +731,7 @@ public partial class NatsConnection : INatsConnection
             {
                 try
                 {
-                    _logger.LogDebug(
-                        NatsLogEvents.Connection,
-                        "Operation cancelled. Retry loop stopped because the connection was disposed [{ReconnectCount}]",
-                        reconnectCount);
+                    _logger.LogDebug(NatsLogEvents.Connection, "Operation cancelled. Retry loop stopped because the connection was disposed [{ReconnectCount}]", reconnectCount);
                 }
                 catch
                 {
@@ -820,7 +808,7 @@ public partial class NatsConnection : INatsConnection
         {
             _logger.LogError(NatsLogEvents.Connection, ex, "Error occured when publishing events");
             if (!_disposedCancellationTokenSource.IsCancellationRequested)
-                _ = Task.Run(PublishEventsAsync, _disposedCancellationTokenSource.Token);
+                _publishEventsTask = Task.Run(PublishEventsAsync, _disposedCancellationTokenSource.Token);
         }
     }
 
