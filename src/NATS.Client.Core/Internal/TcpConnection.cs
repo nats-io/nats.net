@@ -89,8 +89,15 @@ internal sealed class TcpConnection : ISocketConnection
 
                 // Validate proxy response
                 var receiveBuffer = new byte[4096];
-                var read = await ReceiveAsync(receiveBuffer).ConfigureAwait(false);
-                var response = Encoding.UTF8.GetString(receiveBuffer, 0, read);
+                var responseBuilder = new StringBuilder();
+                int read;
+                do
+                {
+                    read = await ReceiveAsync(receiveBuffer).ConfigureAwait(false);
+                    responseBuilder.Append(Encoding.UTF8.GetString(receiveBuffer, 0, read));
+                } while (read > 0 && !responseBuilder.ToString().Contains("\r\n\r\n"));
+
+                var response = responseBuilder.ToString();
                 if (!response.Contains("200 Connection established"))
                     throw new Exception($"Proxy connection failed. Response: {response}");
             }
