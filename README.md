@@ -11,7 +11,9 @@ fully supporting all NATS features.
 It integrates seamlessly with modern .NET asynchronous interfaces such as
 async enumerables and channels, and leverages advanced .NET memory, buffer and IO features. (supports server v2.11)
 
-Check out [NATS .NET client library documentation](https://nats-io.github.io/nats.net/) for guides and examples.
+### Check out [DOCS](https://nats-io.github.io/nats.net/) for guides and examples.
+
+<br>
 
 > [!NOTE]
 > **Don't confuse NuGet packages!**
