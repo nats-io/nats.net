@@ -14,7 +14,7 @@ jobs:
   update-docs:
     name: docfx
     runs-on: ubuntu-latest
-    if: contains(github.event.head_commit.message, '[nats:update-docs]')
+    # if: contains(github.event.head_commit.message, '[nats:update-docs]')
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
