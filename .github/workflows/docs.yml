@@ -28,9 +28,7 @@ jobs:
           dotnet-version: '9.x'
 
       - run: dotnet build
-
       - run: dotnet tool update -g docfx
-
       - run: docfx tools/site_src/docfx.json
 
       - name: Upload artifact
