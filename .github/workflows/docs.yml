@@ -14,7 +14,7 @@ jobs:
   update-docs:
     name: docfx
     runs-on: ubuntu-latest
-    if: contains(github.event.head_commit.message, '[nats:update-docs]')
+    # if: contains(github.event.head_commit.message, '[nats:update-docs]')
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -25,7 +25,10 @@ jobs:
       - name: Setup dotnet
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.x'
+          dotnet-version: |
+            6.x
+            8.x
+            9.x
 
       - run: dotnet build
       - run: dotnet tool update -g docfx
