@@ -5,7 +5,7 @@ You can access these methods from the consumer object created using JetStream co
 
 Install [NATS.Net](https://www.nuget.org/packages/NATS.Net) from Nuget.
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/ConsumePage.cs#js)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/JetStream/ConsumePage.cs#js)]
 
 ## Next Method
 
@@ -13,7 +13,7 @@ Next method is the simplest way of retrieving messages from a stream. Every time
 a single message or nothing based on the expiry time to wait for a message. Once a message is received you can
 process it and call next again for another.
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/ConsumePage.cs#consumer-next)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/JetStream/ConsumePage.cs#consumer-next)]
 
 Next is the simplest and most conservative way of consuming messages since you request a single message from JetStream
 server then acknowledge it before requesting more. However, next method is also the least performant since
@@ -24,7 +24,7 @@ there is no message batching.
 Fetch method requests messages in batches to improve the performance while giving the application control over how
 fast it can process messages without overwhelming the application process.
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/ConsumePage.cs#consumer-fetch)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/JetStream/ConsumePage.cs#consumer-fetch)]
 
 ## Consume Method
 
@@ -32,7 +32,7 @@ Consume method is the most performant method of consuming messages. Requests for
 overlapped so that there is a constant flow of messages from the JetStream server. Flow is controlled by `MaxMsgs`
 or `MaxBytes` and respective thresholds to not overwhelm the application and to not waste server resources.
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/ConsumePage.cs#consumer-consume)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/JetStream/ConsumePage.cs#consumer-consume)]
 
 ## Handling Exceptions
 
@@ -48,7 +48,7 @@ thrown by the client library, for example:
 A naive implementation might try to recover from errors assuming they are temporary e.g. the stream or the consumer
 will be created eventually:
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/ConsumePage.cs#consumer-consume-error)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/JetStream/ConsumePage.cs#consumer-consume-error)]
 
 Depending on your application you should configure streams and consumers with appropriate settings so that the
 messages are processed and stored based on your requirements.

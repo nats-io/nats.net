@@ -6,7 +6,7 @@ manage consumers directly, bypassing the need to get or create a stream first.
 
 You can create a context using an existing NATS connection:
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/ManagingPage.cs#js)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/JetStream/ManagingPage.cs#js)]
 
 ## Streams
 
@@ -18,7 +18,7 @@ successfully stored.
 
 An example of creating a stream:
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/ManagingPage.cs#stream)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/JetStream/ManagingPage.cs#stream)]
 
 However, in practice streams are usually managed separately from the applications, for example using the [NATS command
 line client](https://github.com/nats-io/natscli) you can create a stream interactively:
@@ -42,8 +42,8 @@ delivered and acknowledged by clients.
 
 Unlike streams, consumers are accessed by NATS client libraries as part of message consumption:
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/ManagingPage.cs#consumer-create)]
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/ManagingPage.cs#consumer-get)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/JetStream/ManagingPage.cs#consumer-create)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/JetStream/ManagingPage.cs#consumer-get)]
 
 ### Ephemeral and Durable Consumers
 
@@ -52,5 +52,5 @@ DurableName field when creating the consumer, otherwise it is considered ephemer
 exactly the same except that an ephemeral will be automatically cleaned up (deleted) after a period of inactivity,
 specifically when there are no subscriptions bound to the consumer.
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/ManagingPage.cs#consumer-durable)]
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/ManagingPage.cs#consumer-ephemeral)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/JetStream/ManagingPage.cs#consumer-durable)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/JetStream/ManagingPage.cs#consumer-ephemeral)]

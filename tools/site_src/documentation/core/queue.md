@@ -10,7 +10,7 @@ Code below demonstrates multiple subscriptions on the same queue group,
 receiving messages randomly distributed among them. This example also shows
 how queue groups can be used to load balance responders:
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Core/QueuePage.cs#queue)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Core/QueuePage.cs#queue)]
 
 Output should look similar to this:
 

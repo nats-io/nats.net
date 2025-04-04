@@ -24,14 +24,14 @@ Install [NATS.Net](https://www.nuget.org/packages/NATS.Net) from Nuget.
 Given that we have a plain class `Bar`, we can publish and subscribe to our `nats-server` sending
 and receiving `Bar` objects:
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Core/IntroPage.cs#bar)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Core/IntroPage.cs#bar)]
 
 Subscribe to all `bar` [related subjects](https://docs.nats.io/nats-concepts/subjects):
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Core/IntroPage.cs#sub)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Core/IntroPage.cs#sub)]
 
 Publish `Bar` objects to related `bar` [subjects](https://docs.nats.io/nats-concepts/subjects):
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Core/IntroPage.cs#pub)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Core/IntroPage.cs#pub)]
 
 ## What's Next
 

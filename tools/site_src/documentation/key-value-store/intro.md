@@ -20,11 +20,11 @@ Install [NATS.Net](https://www.nuget.org/packages/NATS.Net) from Nuget.
 
 Before we can do anything, we need a Key/Value Store context:
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/KeyValueStore/IntroPage.cs#kv)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/KeyValueStore/IntroPage.cs#kv)]
 
 Let's create our store first. In Key/Value Store, a bucket is simply a storage for key/value pairs:
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/KeyValueStore/IntroPage.cs#store)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/KeyValueStore/IntroPage.cs#store)]
 
 Now that we have a KV bucket in our stream, let's see its status using the [NATS command
 line client](https://github.com/nats-io/natscli):
@@ -43,8 +43,8 @@ $ nats kv ls
 We can save values in a bucket by putting them using a key, which is `order-1` in our case. We can also retrieve the
 saved value by its key:
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/KeyValueStore/IntroPage.cs#put)]
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/KeyValueStore/IntroPage.cs#order)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/KeyValueStore/IntroPage.cs#put)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/KeyValueStore/IntroPage.cs#order)]
 
 We can also confirm that our value is persisted by using the NATS command line:
 
@@ -60,4 +60,4 @@ SHOP_ORDERS > order-1 created @ 12 Oct 23 15:31 UTC
 Key/Value Store supports watchers that allow you to be notified when a value is added, updated or deleted from a
 bucket. Let's see how we can use watchers to be notified when a value is added to our bucket:
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/KeyValueStore/IntroPage.cs#watch)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/KeyValueStore/IntroPage.cs#watch)]
