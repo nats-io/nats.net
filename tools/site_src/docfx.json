@@ -4,7 +4,7 @@
       "src": [
         {
           "files": [ "**/*.csproj" ],
-          "src": "../src"
+          "src": "../../src"
         }
       ],
       "dest": "api",
@@ -31,7 +31,8 @@
           "documentation/**/toc.yml",
           "toc.yml",
           "*.md"
-        ]
+        ],
+        "exclude": "README.md"
       }
     ],
     "resource": [
@@ -41,7 +42,7 @@
         ]
       }
     ],
-    "output": "_site",
+    "output": "../../_site",
     "globalMetadataFiles": [],
     "fileMetadataFiles": [],
     "template": [

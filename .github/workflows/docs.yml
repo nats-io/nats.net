@@ -25,18 +25,18 @@ jobs:
       - name: Setup dotnet
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.x'
+          dotnet-version: '9.x'
 
       - run: dotnet build
 
       - run: dotnet tool update -g docfx
 
-      - run: docfx docs/docfx.json
+      - run: docfx tools/site_src/docfx.json
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
         with:
-          path: docs/_site
+          path: _site
 
       - name: Deploy to GitHub Pages
         id: deployment
