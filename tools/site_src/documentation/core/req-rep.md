@@ -5,11 +5,11 @@ A request is sent, and the application either waits on the response with a certa
 or receives a response asynchronously.
 
 Create a service that will be responding to requests:
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Core/ReqRepPage.cs#sub)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Core/ReqRepPage.cs#sub)]
 
 Reply to a request is asynchronously received using an _inbox_ subscription
 behind the scenes:
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Core/ReqRepPage.cs#reqrep)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Core/ReqRepPage.cs#reqrep)]
 
 Using request-reply you can build services that are resilient to failures.
 See also [Services](../services/intro.md) for a more structured approach to building services.

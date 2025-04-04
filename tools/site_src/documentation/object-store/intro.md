@@ -21,11 +21,11 @@ Install [NATS.Net](https://www.nuget.org/packages/NATS.Net) from Nuget.
 
 Before we can do anything, we need an Object Store context:
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/ObjectStore/IntroPage.cs#obj)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/ObjectStore/IntroPage.cs#obj)]
 
 Let's create our store first. In Object Store, a bucket is simply a storage for key/object pairs:
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/ObjectStore/IntroPage.cs#store)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/ObjectStore/IntroPage.cs#store)]
 
 
 Now that we have a bucket in our stream, let's see its status using the [NATS command
@@ -45,7 +45,7 @@ $ nats object ls
 We can save objects in a bucket by putting them using a key, which is `my/random/data.bin` in our case. We can also retrieve the
 saved value by its key:
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/ObjectStore/IntroPage.cs#putget)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/ObjectStore/IntroPage.cs#putget)]
 
 We can also confirm that our value is persisted by using the NATS command line:
 
@@ -65,12 +65,12 @@ Object information for test-bucket > my/random/data.bin
 
 We can get information about a key in a bucket:
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/ObjectStore/IntroPage.cs#info)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/ObjectStore/IntroPage.cs#info)]
 
 ### Delete
 
 We can delete a key from a bucket:
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/ObjectStore/IntroPage.cs#delete)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/ObjectStore/IntroPage.cs#delete)]
 
 See the API reference for the full list of [Object Store](xref:NATS.Client.ObjectStore.INatsObjStore) operations.

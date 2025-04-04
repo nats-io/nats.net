@@ -8,7 +8,7 @@ to get help diagnosing any issues you might have:
 
 (For this example, you need to add [Microsoft.Extensions.Logging.Console](https://www.nuget.org/packages/Microsoft.Extensions.Logging.Console) from Nuget.)
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Advanced/IntroPage.cs#logging)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/IntroPage.cs#logging)]
 
 ## NatsClient vs NatsConnection
 
@@ -37,11 +37,11 @@ The other difference is that `NatsClient` sets `SubPendingChannelFullMode` inter
 This is a good default for most cases, but you can change it by setting the `SubPendingChannelFullMode` option
 in `NatsClient` constructor.
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Advanced/IntroPage.cs#opts)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/IntroPage.cs#opts)]
 
 You can also use the `NatsConnection` class directly.
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Advanced/IntroPage.cs#opts2)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/IntroPage.cs#opts2)]
 
 **Which One Should I Use?**
 
@@ -71,7 +71,7 @@ If you need more control over how subscription is handled, you can use the
 [`SubscribeCoreAsync()`](xref:NATS.Client.Core.INatsConnection.SubscribeCoreAsync``1(System.String,System.String,NATS.Client.Core.INatsDeserialize{``0},NATS.Client.Core.NatsSubOpts,System.Threading.CancellationToken))
 method instead.
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Advanced/IntroPage.cs#lowlevel-sub)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/IntroPage.cs#lowlevel-sub)]
 
 ## Round Trip Time (RTT)
 
@@ -84,7 +84,7 @@ Remember that every [`NatsConnection`](xref:NATS.Client.Core.NatsConnection) ins
 and all the calls sent to the server are
 essentially sent back to back after they're picked up from internal queues and buffers.
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Advanced/IntroPage.cs#ping)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/IntroPage.cs#ping)]
 
 > [!NOTE]
 > [`NatsConnection`](xref:NATS.Client.Core.NatsConnection) establishes the first server connection when the first call to subscribe or publish is made.

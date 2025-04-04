@@ -47,7 +47,7 @@ Serialising custom data formats can be done by implementing the serializer regis
 [`INatsSerializerRegistry`](xref:NATS.Client.Core.INatsSerializerRegistry)
 that can be used to provide a custom serializer instances for specific types.
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Advanced/SerializationPage.cs#default)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/SerializationPage.cs#default)]
 
 ## Using JSON Serializer Context
 
@@ -59,16 +59,16 @@ to generate the serialization code at compile time. This is the recommended JSON
 required for [Native AOT deployments](https://learn.microsoft.com/dotnet/core/deploying/native-aot).
 
 First you need to define your JSON classes and a context to generate the serialization code:
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Advanced/SerializationPage.cs#my-data)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/SerializationPage.cs#my-data)]
 
 Then you can use the [`NatsJsonContextSerializer<T>`](xref:NATS.Client.Core.NatsJsonContextSerializer`1) to serialize and deserialize messages
 by providing the registry ([`NatsJsonContextSerializerRegistry`](xref:NATS.Client.Core.NatsJsonContextSerializerRegistry)) with the connection options:
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Advanced/SerializationPage.cs#my-data-usage)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/SerializationPage.cs#my-data-usage)]
 
 You can also set the serializer for a specific subscription or publish call:
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Advanced/SerializationPage.cs#my-data-publish)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/SerializationPage.cs#my-data-publish)]
 
 ## Using Custom Serializer
 
@@ -77,11 +77,11 @@ support a custom serialization format or if you need to support multiple seriali
 
 Here is an example of a custom serializer that uses the Google ProtoBuf serializer to serialize and deserialize:
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Advanced/SerializationPage.cs#custom-serializer)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/SerializationPage.cs#custom-serializer)]
 
 You can then use the custom serializer as the default for the connection:
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Advanced/SerializationPage.cs#custom)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/SerializationPage.cs#custom)]
 
 ## Using Multiple Serializers (chaining)
 
@@ -95,9 +95,9 @@ interface since the next serializer would not be exposed to external users of th
 Here is an example of a serializer that uses the Google ProtoBuf serializer and the [`NatsJsonContextSerializer<T>`](xref:NATS.Client.Core.NatsJsonContextSerializer`1) to
 serialize and deserialize messages based on the type:
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Advanced/SerializationPage.cs#mixed)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/SerializationPage.cs#mixed)]
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Advanced/SerializationPage.cs#chain)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/SerializationPage.cs#chain)]
 
 ## Dealing with Binary Data and Buffers
 
@@ -107,7 +107,7 @@ The [`NatsMemoryOwner<T>`](xref:NATS.Client.Core.NatsMemoryOwner`1) and [`NatsBu
 are [`IMemoryOwner<byte>`](https://learn.microsoft.com/dotnet/api/system.buffers.imemoryowner-1) and [`IBufferWriter<T>`](https://learn.microsoft.com/dotnet/api/system.buffers.ibufferwriter-1) implementations that use the [`ArrayPool`](https://learn.microsoft.com/dotnet/api/system.buffers.arraypool-1)
 to allocate buffers. They can be used with the default serializer.
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Advanced/SerializationPage.cs#buffers)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/SerializationPage.cs#buffers)]
 
 Advantage of using [`NatsMemoryOwner<T>`](xref:NATS.Client.Core.NatsMemoryOwner`1) and [`NatsBufferWriter<T>`](xref:NATS.Client.Core.NatsBufferWriter`1) is that they can be used with the default serializer and
 they can be used to allocate buffers from the [`ArrayPool<T>`](https://learn.microsoft.com/dotnet/api/system.buffers.arraypool-1) which can be reused. This is useful if you need to allocate
