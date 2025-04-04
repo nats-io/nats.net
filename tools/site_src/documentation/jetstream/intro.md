@@ -42,11 +42,11 @@ Install [NATS.Net](https://www.nuget.org/packages/NATS.Net) from Nuget.
 
 Before we can do anything, we need a JetStream context:
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/IntroPage.cs#js-connection)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/JetStream/IntroPage.cs#js-connection)]
 
 Let's create our stream first. In JetStream, a stream is simply a storage for messages:
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/IntroPage.cs#js-stream)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/JetStream/IntroPage.cs#js-stream)]
 
 We can save messages in a stream by publishing them to the subjects the stream is interested in, which is `orders.>` in
 our case, meaning any subject prefixed with `orders.` e.g. `orders.new.123`. Have a look at NATS documentation about
@@ -54,11 +54,11 @@ our case, meaning any subject prefixed with `orders.` e.g. `orders.new.123`. Hav
 
 Given that we have a record `Order`, we can publish and consume stream of `Order` objects:
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/IntroPage.cs#order-class)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/JetStream/IntroPage.cs#order-class)]
 
 We can publish to `SHOP_ORDERS` stream and receive a confirmation that our message is persisted:
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/IntroPage.cs#js-publish)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/JetStream/IntroPage.cs#js-publish)]
 
 Now that we have a few messages in our stream, let's see its status using the [NATS command
 line client](https://github.com/nats-io/natscli):
@@ -76,7 +76,7 @@ $ nats stream ls
 
 We need one more JetStream construct before we can start consuming our messages: a *consumer*:
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/IntroPage.cs#js-consumer)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/JetStream/IntroPage.cs#js-consumer)]
 
 In JetStream, consumers are stored on the server. Clients don't need to worry about maintaining state separately.
 You can think of JetStream consumers as pointers to messages in streams stored on the NATS JetStream server. Let's
@@ -97,7 +97,7 @@ Check out [JetStream documentation](https://docs.nats.io/nats-concepts/jetstream
 
 Finally, we're ready to consume the messages we persisted in `SHOP_ORDERS` stream:
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/JetStream/IntroPage.cs#consumer-consume)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/JetStream/IntroPage.cs#consumer-consume)]
 
 ## What's Next
 

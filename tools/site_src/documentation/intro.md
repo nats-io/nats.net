@@ -1,4 +1,4 @@
-# Introduction
+# Welcome to NATS .NET
 
 NATS .NET is a .NET client for the open source [NATS](https://nats.io/) messaging system.
 It's built on top of the modern .NET platform, taking advantage of the high performance features and
@@ -58,7 +58,7 @@ $ docker run nats
 
 Reference [NATS.Net NuGet package](https://www.nuget.org/packages/NATS.Net) in your project:
 
-[!code-csharp[](../../tests/NATS.Net.DocsExamples/IntroPage.cs#core-nats)]
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/IntroPage.cs#core-nats)]
 
 # [JetStream](#tab/jetstream)
 
@@ -77,7 +77,7 @@ $ docker run nats -js
 
 Reference [NATS.Net NuGet package](https://www.nuget.org/packages/NATS.Net/) in your project:
 
-[!code-csharp[](../../tests/NATS.Net.DocsExamples/IntroPage.cs#jetstream)]
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/IntroPage.cs#jetstream)]
 
 ---
 
@@ -85,6 +85,8 @@ Now you should be able to run the NATS server on your machine and use the above 
 NATS messaging and persistence.
 
 ## What's Next
+
+[Demo](demo.md) a quick demo of the NATS .NET client library using `demo.nats.io`. Useful if you don't have a running NATS Server on your machine or network.
 
 [Core NATS](core/intro.md) is the base set of functionalities and qualities of service offered by a NATS service infrastructure.
 

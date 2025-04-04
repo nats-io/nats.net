@@ -18,11 +18,11 @@ Install [NATS.Net](https://www.nuget.org/packages/NATS.Net) from Nuget.
 
 Before we can do anything, we need a Services context:
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Services/IntroPage.cs#svc)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Services/IntroPage.cs#svc)]
 
 Let's create our first service:
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Services/IntroPage.cs#add)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Services/IntroPage.cs#add)]
 
 Now that we have a service in our stream, let's see its status using the [NATS command
 line client](https://github.com/nats-io/natscli) (make sure you have at least v0.1.1):
@@ -47,7 +47,7 @@ Statistics for 0 Endpoint(s):
 
 Now we can add endpoints to our service:
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Services/IntroPage.cs#endpoint)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Services/IntroPage.cs#endpoint)]
 
 We can also confirm that our endpoint is registered by using the NATS command line:
 
@@ -76,4 +76,4 @@ as well as an optional common subject prefix for all endpoints.
 
 You can group your endpoints optionally in different [queue groups](https://docs.nats.io/nats-concepts/core-nats/queue):
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/Services/IntroPage.cs#grp)]
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Services/IntroPage.cs#grp)]
