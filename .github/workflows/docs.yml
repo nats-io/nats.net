@@ -34,7 +34,7 @@ jobs:
       - run: docfx tools/site_src/docfx.json
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v3
         with:
           path: _site
 
