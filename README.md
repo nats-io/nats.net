@@ -13,7 +13,7 @@ async enumerables and channels, and leverages advanced .NET memory, buffer and I
 
 ### Check out [DOCS](https://nats-io.github.io/nats.net/) for guides and examples.
 
-<br>
+**Additionally check out [NATS by example](https://natsbyexample.com) - An evolving collection of runnable, cross-client reference examples for NATS.**
 
 > [!NOTE]
 > **Don't confuse NuGet packages!**
