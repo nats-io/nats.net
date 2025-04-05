@@ -139,7 +139,9 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
          Int.Max: 2,147,483,647
              8mb:     8,388,608
      */
+    private const int SizeNotSet = -1;
     private readonly uint _flagsAndSize;
+    private readonly bool _hasSize;
 
     /// <summary>
     /// NATS message structure as defined by the protocol.
@@ -163,7 +165,7 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
     public NatsMsg(
         string subject,
         string? replyTo,
-        int size,
+        int? size,
         NatsHeaders? headers,
         T? data,
         INatsConnection? connection,
@@ -171,10 +173,19 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
     {
         Subject = subject;
         ReplyTo = replyTo;
-        _flagsAndSize = ((uint)flags << 30) | (uint)(size & 0x3FFFFFFF);
         Headers = headers;
         Data = data;
         Connection = connection;
+
+        _hasSize = size.HasValue;
+        if (size.HasValue)
+        {
+            _flagsAndSize = ((uint)flags << 30) | (uint)(size.Value & 0x3FFFFFFF);
+        }
+        else
+        {
+            _flagsAndSize = (uint)flags << 30;
+        }
     }
 
     /// <inheritdoc />
@@ -189,10 +200,17 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
     /// <summary>Message size in bytes.</summary>
     public int Size
     {
-        // Extract the lower 30 bits
-        get => (int)(_flagsAndSize & 0x3FFFFFFF);
+        get
+        {
+            if (_hasSize)
+            {
+                // Extract the lower 30 bits
+                return (int)(_flagsAndSize & 0x3FFFFFFF);
+            }
 
-        // Clear the lower 30 bits and set the new number
+            return SizeNotSet;
+        }
+
         init
         {
             // Mask the input value to fit within 30 bits (clear upper bits)
@@ -227,7 +245,16 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
     /// <summary>NATS connection this message is associated to.</summary>
     public INatsConnection? Connection { get; init; }
 
-    public bool IsEmpty => (_flagsAndSize & 0x40000000) != 0;
+    public bool IsEmpty
+    {
+        get
+        {
+            if (_hasSize)
+                return (_flagsAndSize & 0x40000000) != 0;
+
+            return Data == null;
+        }
+    }
 
     public bool HasNoResponders => (_flagsAndSize & 0x80000000) != 0;
 
@@ -434,10 +461,8 @@ public static class NatsMsg
     /// <param name="replyTo">The reply subject that subscribers can use to send a response back to the publisher/requester.</param>
     /// <param name="encoding">Encoding used.  Default to utf8 if not provided</param>
     /// <returns>Returns the <see cref="NatsMsg{T}" /> NATS message structure</returns>
-    public static NatsMsg<string> Create(string subject, string data, NatsHeaders? headers = null, INatsConnection? connection = null, NatsMsgFlags flags = default, string? replyTo = null, Encoding? encoding = null)
+    public static NatsMsg<string> Create(string subject, string data, Encoding encoding, NatsHeaders? headers = null, INatsConnection? connection = null, NatsMsgFlags flags = default, string? replyTo = null)
     {
-        encoding ??= Encoding.UTF8;
-
         var size = subject.Length
                    + (replyTo?.Length ?? 0)
                    + (headers?.GetBytesLength() ?? 0)
@@ -517,6 +542,7 @@ public static class NatsMsg
     /// <param name="flags">Message flags to indicate no responders and empty payloads.</param>
     /// <param name="replyTo">The reply subject that subscribers can use to send a response back to the publisher/requester.</param>
     /// <param name="serializationBufferSize">The serializer buffer size</param>
+    /// <remarks>This results in double serialization: once for size calculation, once when publishing.</remarks>
     /// <returns>Returns the <see cref="NatsMsg{T}" /> NATS message structure</returns>
     public static NatsMsg<T> Create<T>(string subject, T data, INatsSerialize<T> serializer, NatsHeaders? headers = null, INatsConnection? connection = null, NatsMsgFlags flags = default, string? replyTo = null, int serializationBufferSize = 256)
     {
@@ -529,6 +555,19 @@ public static class NatsMsg
 
         return new NatsMsg<T>(subject, replyTo, size, headers, data, connection, flags);
     }
+
+    /// <summary>
+    /// Creates a new NATS message with a serializable payload.
+    /// </summary>
+    /// <param name="subject">The destination subject to publish to.</param>
+    /// <param name="data">Serializable data object.</param>
+    /// <param name="headers">Pass additional information using name-value pairs.</param>
+    /// <param name="connection">NATS connection this message is associated to.</param>
+    /// <param name="flags">Message flags to indicate no responders and empty payloads.</param>
+    /// <param name="replyTo">The reply subject that subscribers can use to send a response back to the publisher/requester.</param>
+    /// <returns>Returns the <see cref="NatsMsg{T}" /> NATS message structure</returns>
+    public static NatsMsg<T> Create<T>(string subject, T data, NatsHeaders? headers = null, INatsConnection? connection = null, NatsMsgFlags flags = default, string? replyTo = null)
+        => new(subject, replyTo, null, headers, data, connection, flags);
 }
 
 public class NatsDeserializeException : NatsException
