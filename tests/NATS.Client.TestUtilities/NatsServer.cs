@@ -37,7 +37,7 @@ public class NatsServer : IAsyncDisposable
 
     static NatsServer()
     {
-         var process = new Process
+        var process = new Process
         {
             StartInfo = new ProcessStartInfo
             {
@@ -47,11 +47,11 @@ public class NatsServer : IAsyncDisposable
                 UseShellExecute = false,
             },
         };
-       /* process.Start();
+        process.Start();
         process.WaitForExit();
         var output = process.StandardOutput.ReadToEnd();
         var value = Regex.Match(output, @"v(\d+\.\d+\.\d+)").Groups[1].Value;
-        Version = new Version(value);*/
+        Version = new Version(value);
     }
 
     private NatsServer(ITestOutputHelper outputHelper, NatsServerOpts opts)
