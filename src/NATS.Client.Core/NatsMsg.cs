@@ -139,9 +139,8 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
          Int.Max: 2,147,483,647
              8mb:     8,388,608
      */
-    private const int SizeNotSet = -1;
     private readonly uint _flagsAndSize;
-    private readonly bool _hasSize;
+    private const int UnknownSize = 0x3FFFFFFF;
 
     /// <summary>
     /// NATS message structure as defined by the protocol.
@@ -177,15 +176,13 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
         Data = data;
         Connection = connection;
 
-        _hasSize = size.HasValue;
-        if (size.HasValue)
+
+        if (size == 0 && data == null)
         {
-            _flagsAndSize = ((uint)flags << 30) | (uint)(size.Value & 0x3FFFFFFF);
+            flags |= NatsMsgFlags.Empty;
         }
-        else
-        {
-            _flagsAndSize = (uint)flags << 30;
-        }
+
+        _flagsAndSize = ((uint)flags << 30) | (uint)((size ?? UnknownSize) & 0x3FFFFFFF);
     }
 
     /// <inheritdoc />
@@ -202,37 +199,41 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
     {
         get
         {
-            if (_hasSize)
-            {
-                // Extract the lower 30 bits
-                return (int)(_flagsAndSize & 0x3FFFFFFF);
-            }
+            if (_flagsAndSize == 0x3FFFFFFF)
+                return UnknownSize;
 
-            return SizeNotSet;
+            return (int)(_flagsAndSize & 0x3FFFFFFF);
         }
 
         init
         {
-            // Mask the input value to fit within 30 bits (clear upper bits)
-            var numberPart = (uint)(value & 0x3FFFFFFF);
-
-            // Clear the lower 30 bits and set the new number value
-            // Preserve the flags, update the number
-            _flagsAndSize = (_flagsAndSize & 0xC0000000) | numberPart;
+            var valueToStore = value == UnknownSize ? 0x3FFFFFFF : (uint)(value & 0x3FFFFFFF);
+            _flagsAndSize = (_flagsAndSize & 0xC0000000) | valueToStore;
         }
     }
 
     public NatsMsgFlags Flags
     {
-        // Extract the two leftmost bits (31st and 30th bit)
-        // Mask with 0b11 to get two bits
-        get => (NatsMsgFlags)((_flagsAndSize >> 30) & 0b11);
+        get
+        {
+            if (Size is 0 or UnknownSize)
+            {
+                return NatsMsgFlags.Empty;
+            }
+
+            // Extract the two leftmost bits (31st and 30th bit)
+            // Mask with 0b11 to get two bits
+            return (NatsMsgFlags)((_flagsAndSize >> 30) & 0b11);
+        }
 
         init
         {
-            // Clear the current flag bits (set to 0) and then set the new flag value
-            var flagsPart = (uint)value << 30;
-            _flagsAndSize = (_flagsAndSize & 0x3FFFFFFF) | flagsPart;
+            if (Size != UnknownSize)
+            {
+                // Clear the current flag bits (set to 0) and then set the new flag value
+                var flagsPart = (uint)value << 30;
+                _flagsAndSize = (_flagsAndSize & 0x3FFFFFFF) | flagsPart;
+            }
         }
     }
 
@@ -245,18 +246,13 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
     /// <summary>NATS connection this message is associated to.</summary>
     public INatsConnection? Connection { get; init; }
 
-    public bool IsEmpty
-    {
-        get
-        {
-            if (_hasSize)
-                return (_flagsAndSize & 0x40000000) != 0;
+    public bool IsEmpty =>
+        Size == UnknownSize
+            ? Data == null
+            : (_flagsAndSize & 0x40000000) != 0;
 
-            return Data == null;
-        }
-    }
-
-    public bool HasNoResponders => (_flagsAndSize & 0x80000000) != 0;
+    public bool HasNoResponders =>
+        Size != UnknownSize && (_flagsAndSize & 0x80000000) != 0;
 
     /// <inheritdoc />
     public void EnsureSuccess()

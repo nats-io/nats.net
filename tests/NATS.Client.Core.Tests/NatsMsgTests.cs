@@ -74,7 +74,7 @@ public class NatsMsgTests
         var msg = NatsMsg.Create(subject, data);
 
         // Assert
-        msg.Size.Should().Be(-1);
+        msg.Size.Should().Be(1073741823);
     }
 
     private class TestData
