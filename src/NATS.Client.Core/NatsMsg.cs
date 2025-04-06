@@ -176,7 +176,6 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
         Data = data;
         Connection = connection;
 
-
         if (size == 0 && data == null)
         {
             flags |= NatsMsgFlags.Empty;
