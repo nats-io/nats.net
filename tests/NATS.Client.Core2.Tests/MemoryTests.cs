@@ -48,6 +48,7 @@ public class MemoryTests
             cancellationToken);
 
         _output.WriteLine($"Framework version: {System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}");
+        Console.WriteLine($"Framework version: {System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}");
 
         GC.GetTotalMemory(true);
 
@@ -70,12 +71,14 @@ public class MemoryTests
 
             var mem = GC.GetTotalMemory(true);
             _output.WriteLine($"Allocated {mem,10:N0}");
+            Console.WriteLine($"Allocated {mem,10:N0}");
             mems.Add(mem);
         }
 
         var allowedMax = mems.Min() * 2;
         var max = mems.Max();
-        _output.WriteLine($"Max {max,10:N0}");
+        _output.WriteLine($"Max {max,10:N0} Min {mems.Min(),10:N0} allowed {allowedMax,10:N0}");
+        Console.WriteLine($"Max {max,10:N0} Min {mems.Min(),10:N0} allowed {allowedMax,10:N0}");
         Assert.True(max < allowedMax, "Memory usage exceeded the allowed limit.");
 
         await nats.PublishAsync(end, cancellationToken: cancellationToken);
