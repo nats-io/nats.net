@@ -37,15 +37,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup dotnet 6
+      - name: Setup dotnet
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.x'
-
-      - name: Setup dotnet 8
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.x'
+          dotnet-version: |
+            6.x
+            8.x
+            9.x
 
       - name: Build
         run: dotnet build -c Release
@@ -175,15 +173,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup dotnet 6
+      - name: Setup dotnet
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.x'
-
-      - name: Setup dotnet 8
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.x'
+          dotnet-version: |
+            6.x
+            8.x
+            9.x
 
       - name: Get nats-server
         shell: bash
