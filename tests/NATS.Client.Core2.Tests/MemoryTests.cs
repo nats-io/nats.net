@@ -26,7 +26,7 @@ public class MemoryTests
         var subject = $"{prefix}.foo";
         var data = $"{subject}.data";
         var end = $"{subject}.end";
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
         var cancellationToken = cts.Token;
 
         await nats.ConnectAsync();
@@ -53,13 +53,17 @@ public class MemoryTests
         GC.GetTotalMemory(true);
 
         // warm up
-        for (var i = 0; i < 10000; i++)
+        for (var j = 0; j < 5; j++)
         {
-            await nats.RequestAsync<int>(data, cancellationToken: cancellationToken);
+            for (var i = 0; i < 10000; i++)
+            {
+                await nats.RequestAsync<int>(data, cancellationToken: cancellationToken);
+            }
+
+            var mem = GC.GetTotalMemory(true);
+            _output.WriteLine($"Warm up allocated {mem,10:N0}");
+            Console.WriteLine($"Warm up allocated {mem,10:N0}");
         }
-
-        GC.GetTotalMemory(true);
-
 
         var mems = new List<long>();
         for (var j = 0; j < 5; j++)
