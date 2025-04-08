@@ -238,7 +238,7 @@ jobs:
           tasklist | grep -i nats-server && taskkill -F -IM nats-server.exe
           nats-server.exe -v
           cd tests/NATS.Client.Core2.Tests
-          dotnet test -c Release --no-build
+          dotnet test -c Release --no-build --logger:"console;verbosity=normal"
 
       - name: Test CoreUnit
         run: |
