@@ -156,7 +156,7 @@ internal class InboxSubBuilder : INatsSubscriptionManager
 #if NETSTANDARD2_0
             // check the usage on CI without the fix
             // if (subTable.RemoveAll(item => item.TryGetTarget(out var refSub) && refSub == sub) == 0)
-            //    _logger.LogWarning(NatsLogEvents.InboxSubscription, "Unregistered message inbox received for {Subject}", sub.Subject);
+            // _logger.LogWarning(NatsLogEvents.InboxSubscription, "Unregistered message inbox received for {Subject}", sub.Subject);
             if (subTable.Count == 0)
             {
                 _bySubject.TryRemove(sub.Subject, out _);

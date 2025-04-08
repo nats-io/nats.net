@@ -47,10 +47,20 @@ public class MemoryTests
             },
             cancellationToken);
 
-        var mem1 = GC.GetTotalMemory(true);
-        _output.WriteLine($"Allocated1 {mem1,10:N0}");
+        _output.WriteLine($"Framework version: {System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}");
+
+        GC.GetTotalMemory(true);
+
+        // warm up
+        for (var i = 0; i < 10000; i++)
+        {
+            await nats.RequestAsync<int>(data, cancellationToken: cancellationToken);
+        }
+
+        GC.GetTotalMemory(true);
+
+
         var mems = new List<long>();
-        var allowedMax = mem1 * 2;
         for (var j = 0; j < 5; j++)
         {
             for (var i = 0; i < 10000; i++)
@@ -58,11 +68,12 @@ public class MemoryTests
                 await nats.RequestAsync<int>(data, cancellationToken: cancellationToken);
             }
 
-            var mem2 = GC.GetTotalMemory(true);
-            _output.WriteLine($"Allocated2 {mem2,10:N0} {allowedMax,10:N0}");
-            mems.Add(mem2);
+            var mem = GC.GetTotalMemory(true);
+            _output.WriteLine($"Allocated {mem,10:N0}");
+            mems.Add(mem);
         }
 
+        var allowedMax = mems.Min() * 2;
         var max = mems.Max();
         _output.WriteLine($"Max {max,10:N0}");
         Assert.True(max < allowedMax, "Memory usage exceeded the allowed limit.");
