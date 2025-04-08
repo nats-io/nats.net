@@ -1,5 +1,6 @@
 [![License Apache 2.0](https://img.shields.io/badge/License-Apache2-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![NuGet](https://img.shields.io/nuget/v/NATS.Net.svg?cacheSeconds=3600)](https://www.nuget.org/packages/NATS.Net)
+[![Doc](https://img.shields.io/badge/Doc-reference-blue)](https://nats-io.github.io/nats.net/)
 [![Build](https://github.com/nats-io/nats.net/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/nats-io/nats.net/actions/workflows/test.yml?query=branch%3Amain)
 [![Slack](https://img.shields.io/badge/chat-on%20slack-green)](https://slack.nats.io)
 
@@ -10,7 +11,9 @@ fully supporting all NATS features.
 It integrates seamlessly with modern .NET asynchronous interfaces such as
 async enumerables and channels, and leverages advanced .NET memory, buffer and IO features. (supports server v2.11)
 
-Check out [NATS .NET client library documentation](https://nats-io.github.io/nats.net/) for guides and examples.
+### Check out [DOCS](https://nats-io.github.io/nats.net/) for guides and examples.
+
+**Additionally check out [NATS by example](https://natsbyexample.com) - An evolving collection of runnable, cross-client reference examples for NATS.**
 
 > [!NOTE]
 > **Don't confuse NuGet packages!**
@@ -31,67 +34,6 @@ It supports dynamic service and stream processing across various locations and d
 enhancing mobility, security, and independence from traditional constraints such as DNS.
 
 Head over to [NATS documentation](https://docs.nats.io/nats-concepts/overview) for more information.
-
-## Quick Start
-
-Install the [NATS.Net](https://www.nuget.org/packages/NATS.Net) package from NuGet:
-
-```bash
-dotnet add package NATS.Net
-```
-
-Run a local [`nats-server`](https://nats-io.github.io/nats.net/documentation/intro.html?tabs=core-nats#quick-start) to use or connect to the demo server if you're not behind a firewall:
-
-```csharp
-await using var client = new NatsClient("demo.nats.io");
-```
-
-Basic messaging:
-
-```csharp
-// NATS core M:N messaging example
-await using var client = new NatsClient();
-
-// Subscribe on one terminal
-await foreach (var msg in client.SubscribeAsync<string>(subject: "foo"))
-{
-    Console.WriteLine($"Received: {msg.Data}");
-}
-
-// Start publishing to the same subject on a second terminal
-await client.PublishAsync(subject: "foo", data: "Hello, World!");
-```
-
-Persistence with JetStream:
-
-For this you need to [run the server with JetStream](https://nats-io.github.io/nats.net/documentation/jetstream/intro.html#jetstream-quick-start) enabled if you're using a local server.
-
-```csharp
-// NATS JetStream basic publish-consume example
-await using var client = new NatsClient();
-var js = client.CreateJetStreamContext();
-
-// Create a stream to store the messages
-await js.CreateStreamAsync(new StreamConfig(name: "ORDERS", subjects: new[] { "orders.*" }));
-
-// Publish a message to the stream. The message will be stored in the stream
-// because the published subject matches one of the the stream's subjects.
-var ack = await js.PublishAsync(subject: "orders.new", data: "order 1");
-ack.EnsureSuccess();
-
-// Create a consumer on a stream to receive the messages
-var consumer = await js.CreateOrUpdateConsumerAsync("ORDERS", new ConsumerConfig("order_processor"));
-
-await foreach (var jsMsg in consumer.ConsumeAsync<string>())
-{
-    Console.WriteLine($"Processed: {jsMsg.Data}");
-    await jsMsg.AckAsync();
-}
-```
-
-See more details, including how to download and start NATS server and JetStream in our [documentation](https://nats-io.github.io/nats.net/documentation/intro.html).
-
-**Additionally check out [NATS by example](https://natsbyexample.com) - An evolving collection of runnable, cross-client reference examples for NATS.**
 
 ## NATS .NET Goals
 
