@@ -34,6 +34,7 @@ public enum NatsKVOperation
 /// </summary>
 public class NatsKVStore : INatsKVStore
 {
+    internal const string NatsMarkerReason = "Nats-Marker-Reason";
     private const string NatsExpectedLastSubjectSequence = "Nats-Expected-Last-Subject-Sequence";
     private const string KVOperation = "KV-Operation";
     private const string NatsRollup = "Nats-Rollup";
@@ -420,6 +421,22 @@ public class NatsKVStore : INatsKVStore
 
                     if (!Enum.TryParse(operationValues[0], ignoreCase: true, out operation))
                         return InvalidOperationException;
+                }
+                else if (headers.TryGetValue(NatsMarkerReason, out var markerReasonValues))
+                {
+                    var reason = markerReasonValues.Last();
+                    if (reason is "MaxAge" or "Purge")
+                    {
+                        operation = NatsKVOperation.Purge;
+                    }
+                    else if (reason is "Remove")
+                    {
+                        operation = NatsKVOperation.Del;
+                    }
+                    else
+                    {
+                        return InvalidOperationException;
+                    }
                 }
 
                 if (operation is NatsKVOperation.Del or NatsKVOperation.Purge)
