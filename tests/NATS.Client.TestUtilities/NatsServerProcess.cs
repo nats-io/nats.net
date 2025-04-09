@@ -44,6 +44,8 @@ public class NatsServerProcess : IAsyncDisposable, IDisposable
 
     public string? Config => _config;
 
+    public int Port => new Uri(Url).Port;
+
     public static ValueTask<NatsServerProcess> StartAsync(Action<string>? logger = null, string? config = null, bool withJs = true, int port = -1, string? scratch = null)
         => new(Start(logger, config, withJs, port, scratch));
 

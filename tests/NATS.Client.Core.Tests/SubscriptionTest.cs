@@ -13,9 +13,8 @@ public class SubscriptionTest
     public async Task Subscription_periodic_cleanup_test()
     {
         await using var server = await NatsServerProcess.StartAsync();
-        var options = new NatsOpts { Url = server.Url, SubscriptionCleanUpInterval = TimeSpan.FromSeconds(1) };
-        await using var nats = new NatsConnection(options);
-        var proxy = new NatsProxy(new Uri(server.Url).Port);
+        var proxy = new NatsProxy(server.Port);
+        var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}", SubscriptionCleanUpInterval = TimeSpan.FromSeconds(1) });
 
         async Task Isolator()
         {
@@ -51,9 +50,8 @@ public class SubscriptionTest
     public async Task Subscription_cleanup_on_message_receive_test()
     {
         await using var server = await NatsServerProcess.StartAsync();
-        var options = new NatsOpts { Url = server.Url, SubscriptionCleanUpInterval = TimeSpan.MaxValue };
-        await using var nats = new NatsConnection(options);
-        var proxy = new NatsProxy(new Uri(server.Url).Port);
+        var proxy = new NatsProxy(server.Port);
+        var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}", SubscriptionCleanUpInterval = TimeSpan.MaxValue });
 
         async Task Isolator()
         {
@@ -237,8 +235,8 @@ public class SubscriptionTest
     public async Task Mux_inbox_reconnect_test()
     {
         await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
-        var proxy = new NatsProxy(new Uri(server.Url).Port);
+        var proxy = new NatsProxy(server.Port);
+        var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}", ConnectTimeout = TimeSpan.FromSeconds(10) });
 
         try
         {
