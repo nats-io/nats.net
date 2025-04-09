@@ -137,6 +137,7 @@ public class NatsServerProcess : IAsyncDisposable, IDisposable
         }
 
         var url = Regex.Match(ports, @"\w+://[\d\.]+:\d+").Groups[0].Value;
+        port = new Uri(url).Port;
         log($"ports={ports}");
         log($"url={url}");
 
@@ -145,7 +146,7 @@ public class NatsServerProcess : IAsyncDisposable, IDisposable
             try
             {
                 using var tcpClient = new TcpClient();
-                tcpClient.Connect("127.0.0.1", new Uri(url).Port);
+                tcpClient.Connect("127.0.0.1", port);
                 using var networkStream = tcpClient.GetStream();
                 using var streamReader = new StreamReader(networkStream);
                 var readLine = streamReader.ReadLine();
