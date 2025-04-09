@@ -55,3 +55,10 @@ jobs:
           nats-server -v
           cd tests/NATS.Client.Core.Tests
           dotnet test -c Release --no-build
+
+      - name: Test Slow
+        run: |
+            killall nats-server 2> /dev/null | echo -n
+            nats-server -v
+            cd tests/NATS.Slow.Tests
+            dotnet test -c Release --no-build

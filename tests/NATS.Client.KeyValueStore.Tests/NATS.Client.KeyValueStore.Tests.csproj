@@ -30,6 +30,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\NATS.Client.KeyValueStore\NATS.Client.KeyValueStore.csproj" />
+    <ProjectReference Include="..\..\src\NATS.Client.Simplified\NATS.Client.Simplified.csproj" />
     <ProjectReference Include="..\NATS.Client.TestUtilities\NATS.Client.TestUtilities.csproj" />
   </ItemGroup>
 

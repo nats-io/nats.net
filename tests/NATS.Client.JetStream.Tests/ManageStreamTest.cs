@@ -1,5 +1,6 @@
 using NATS.Client.Core.Tests;
 using NATS.Client.JetStream.Models;
+using NATS.Client.Platform.Windows.Tests;
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -12,8 +13,8 @@ public class ManageStreamTest
     [Fact]
     public async Task Account_info_create_get_update_stream()
     {
-        await using var server = await NatsServer.StartJSAsync();
-        var nats = await server.CreateClientConnectionAsync();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -61,8 +62,8 @@ public class ManageStreamTest
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-        await using var server = await NatsServer.StartJSAsync();
-        var nats = await server.CreateClientConnectionAsync();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
         var js = new NatsJSContext(nats);
 
         await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
@@ -103,8 +104,8 @@ public class ManageStreamTest
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-        await using var server = await NatsServer.StartJSAsync();
-        var nats = await server.CreateClientConnectionAsync();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
         var js = new NatsJSContext(nats);
 
         await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
@@ -133,8 +134,8 @@ public class ManageStreamTest
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-        await using var server = await NatsServer.StartJSAsync();
-        var nats = await server.CreateClientConnectionAsync();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
         var js = new NatsJSContext(nats);
 
         var streamConfig = new StreamConfig("s1", ["s1.*"])
@@ -153,8 +154,8 @@ public class ManageStreamTest
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-        await using var server = await NatsServer.StartJSAsync();
-        var nats = await server.CreateClientConnectionAsync();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
         var js = new NatsJSContext(nats);
 
         var streamConfig = new StreamConfig("s1", ["s1.*"])
@@ -173,8 +174,8 @@ public class ManageStreamTest
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-        await using var server = await NatsServer.StartJSAsync();
-        var nats = await server.CreateClientConnectionAsync();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
         var js = new NatsJSContext(nats);
 
         var streamConfig = new StreamConfig("s1", ["s1.*"])

@@ -1,5 +1,7 @@
 using NATS.Client.Core.Tests;
 using NATS.Client.JetStream.Models;
+using NATS.Client.Platform.Windows.Tests;
+using NATS.Client.TestUtilities;
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -12,8 +14,8 @@ public class ManageConsumerTest
     [Fact]
     public async Task Create_get_consumer()
     {
-        await using var server = await NatsServer.StartJSAsync();
-        await using var nats = await server.CreateClientConnectionAsync(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestTimeout = TimeSpan.FromSeconds(10) });
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
@@ -43,8 +45,8 @@ public class ManageConsumerTest
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
-        await using var server = await NatsServer.StartJSAsync();
-        var nats = await server.CreateClientConnectionAsync();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
         await js.CreateOrUpdateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
@@ -85,8 +87,8 @@ public class ManageConsumerTest
     [SkipIfNatsServer(versionEarlierThan: "2.11")]
     public async Task Pause_resume_consumer()
     {
-        await using var server = await NatsServer.StartJSAsync();
-        await using var nats = await server.CreateClientConnectionAsync();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
         var js = new NatsJSContextFactory().CreateContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -122,8 +124,8 @@ public class ManageConsumerTest
     [SkipIfNatsServer(versionEarlierThan: "2.10")]
     public async Task Consumer_create_update_action()
     {
-        await using var server = await NatsServer.StartJSAsync();
-        await using var nats = await server.CreateClientConnectionAsync();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
         var js = new NatsJSContext(nats);
 
         var streamConfig = new StreamConfig { Name = "s1" };

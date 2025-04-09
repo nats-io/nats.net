@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NATS.Client.Core;
-using NATS.Client.Core.Tests;
+using NATS.Client.Platform.Windows.Tests;
 using NATS.Net;
 
 namespace NATS.Extensions.Microsoft.DependencyInjection.Tests;
@@ -130,7 +130,7 @@ public class NatsHostingExtensionsTests
     [Fact]
     public async Task AddNatsClient_WithDefaultSerializer()
     {
-        await using var server = await NatsServer.StartAsync();
+        await using var server = await NatsServerProcess.StartAsync();
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
@@ -140,7 +140,7 @@ public class NatsHostingExtensionsTests
             services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
             services.AddNatsClient(nats =>
             {
-                nats.ConfigureOptions(opts => server.ClientOpts(opts));
+                nats.ConfigureOptions(opts => opts with { Url = server.Url });
             });
 
             var provider = services.BuildServiceProvider();
@@ -162,7 +162,7 @@ public class NatsHostingExtensionsTests
             services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
             services.AddNatsClient(nats =>
             {
-                nats.ConfigureOptions(opts => server.ClientOpts(opts));
+                nats.ConfigureOptions(opts => opts with { Url = server.Url });
                 nats.WithSerializerRegistry(NatsDefaultSerializerRegistry.Default);
             });
 
@@ -195,13 +195,13 @@ public class NatsHostingExtensionsTests
     [Fact]
     public async Task AddNatsClient_WithJsonSerializer()
     {
-        await using var server = await NatsServer.StartAsync();
+        await using var server = await NatsServerProcess.StartAsync();
 
         var services = new ServiceCollection();
         services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
         services.AddNatsClient(nats =>
         {
-            nats.ConfigureOptions(opts => server.ClientOpts(opts));
+            nats.ConfigureOptions(opts => opts with { Url = server.Url });
 #pragma warning disable CS0618 // Type or member is obsolete
             nats.AddJsonSerialization(MyJsonContext.Default);
 #pragma warning restore CS0618 // Type or member is obsolete

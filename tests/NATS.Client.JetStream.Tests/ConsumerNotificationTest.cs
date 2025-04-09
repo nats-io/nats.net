@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using NATS.Client.Core.Tests;
 using NATS.Client.JetStream.Models;
+using NATS.Client.Platform.Windows.Tests;
+using NATS.Client.TestUtilities;
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -9,8 +11,8 @@ public class ConsumerNotificationTest
     [SkipOnPlatform("WINDOWS", "doesn't support signals")]
     public async Task Non_terminal_errors_sent_as_notifications()
     {
-        await using var server = await NatsServer.StartJSAsync();
-        await using var nats = await server.CreateClientConnectionAsync();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -75,7 +77,7 @@ public class ConsumerNotificationTest
         await signal2;
 
         // SIGTERM: Stops the server gracefully
-        Process.Start("kill", $"-TERM {server.ServerProcess!.Id}");
+        Process.Start("kill", $"-TERM {server.Pid}");
 
         await Task.WhenAll(consumeTask, fetchTask);
     }
@@ -83,13 +85,13 @@ public class ConsumerNotificationTest
     [Fact]
     public async Task Exceeded_max_errors()
     {
-        await using var server = await NatsServer.StartJSAsync();
-        await using var nats = await server.CreateClientConnectionAsync();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
-        await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
+        await js.CreateStreamAsync("s1", ["s1.*"], cts.Token);
 
         // 409 Exceeded MaxRequestBatch
         await ConsumeAndFetchTerminatesAsync(

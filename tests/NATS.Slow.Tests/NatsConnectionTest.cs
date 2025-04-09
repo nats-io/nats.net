@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text;
 using System.Text.Json.Serialization;
+using NATS.Client.TestUtilities;
 
 namespace NATS.Client.Core.Tests;
 
@@ -610,7 +611,7 @@ public class SampleClass : IEquatable<SampleClass>
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(Id, Name);
+        return Id.GetHashCode() + Name.GetHashCode();
     }
 
     public override string ToString()

@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Channels;
 using NATS.Client.Core.Tests;
+using NATS.Client.Platform.Windows.Tests;
 using NATS.Client.Serializers.Json;
 using NATS.Client.Services.Internal;
 using NATS.Client.Services.Models;
@@ -17,10 +18,10 @@ public class ServicesSerializationTest
     [Fact]
     public async Task Service_info_and_stat_request_serialization()
     {
-        await using var server = await NatsServer.StartAsync();
+        await using var server = await NatsServerProcess.StartAsync();
 
         // Set serializer registry to use anything but a raw bytes (NatsMemory in this case) serializer
-        await using var nats = await server.CreateClientConnectionAsync(new NatsOpts { SerializerRegistry = NatsJsonSerializerRegistry.Default });
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, SerializerRegistry = NatsJsonSerializerRegistry.Default });
 
         var svc = new NatsSvcContext(nats);
 
@@ -46,8 +47,8 @@ public class ServicesSerializationTest
     [Fact]
     public async Task Service_message_serialization()
     {
-        await using var server = await NatsServer.StartAsync();
-        await using var nats = await server.CreateClientConnectionAsync(new NatsOpts { SerializerRegistry = NatsJsonSerializerRegistry.Default });
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, SerializerRegistry = NatsJsonSerializerRegistry.Default });
 
         var svc = new NatsSvcContext(nats);
 

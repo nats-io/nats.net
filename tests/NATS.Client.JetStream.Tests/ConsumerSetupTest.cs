@@ -1,5 +1,7 @@
 using NATS.Client.Core.Tests;
 using NATS.Client.JetStream.Models;
+using NATS.Client.Platform.Windows.Tests;
+using NATS.Client.TestUtilities;
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -8,8 +10,8 @@ public class ConsumerSetupTest
     [Fact]
     public async Task Create_push_consumer()
     {
-        await using var server = await NatsServer.StartJSAsync();
-        await using var nats = await server.CreateClientConnectionAsync();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -40,8 +42,8 @@ public class ConsumerSetupTest
     [SkipIfNatsServer(versionEarlierThan: "2.11")]
     public async Task Create_paused_consumer()
     {
-        await using var server = await NatsServer.StartJSAsync();
-        await using var nats = await server.CreateClientConnectionAsync();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
         var js = new NatsJSContextFactory().CreateContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));

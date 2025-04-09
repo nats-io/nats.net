@@ -1,4 +1,5 @@
 using NATS.Client.Core.Tests;
+using NATS.Client.Platform.Windows.Tests;
 
 namespace NATS.Client.KeyValueStore.Tests;
 
@@ -7,10 +8,9 @@ public class DirectGetTest(ITestOutputHelper output)
     [Fact]
     public async Task API_subject_test()
     {
-        await using var server = await NatsServer.StartJSAsync();
-        var (nats1, proxy) = server.CreateProxiedClientConnection();
-        await using var nats = nats1;
-
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        var proxy = new NatsProxy(new Uri(server.Url).Port);
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));

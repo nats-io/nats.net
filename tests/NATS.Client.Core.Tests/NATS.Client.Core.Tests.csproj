@@ -1,7 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFrameworks>net8.0</TargetFrameworks>
+    <TargetFrameworks Condition="'$(OS)' == 'Windows_NT'">$(TargetFrameworks);net481</TargetFrameworks>
+    <RuntimeIdentifiers Condition="'$(OS)' == 'Windows_NT'">any;win-x86</RuntimeIdentifiers>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <NoWarn>$(NoWarn);CS8002</NoWarn>
@@ -40,10 +42,11 @@
     <ProjectReference Include="..\..\src\NATS.Client.Core\NATS.Client.Core.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Content Include="resources\**\*">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
+    <ItemGroup>
+        <Content Include="..\NATS.Client.TestUtilities\resources\**\*">
+            <Link>resources\%(RecursiveDir)%(Filename)%(Extension)</Link>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
 
 </Project>

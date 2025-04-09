@@ -4,8 +4,11 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.RegularExpressions;
+using NATS.Client.TestUtilities;
 
 namespace NATS.Client.Core.Tests;
+
+#if NET8_0_OR_GREATER
 
 public class TlsOptsTest
 {
@@ -201,3 +204,5 @@ public class TlsOptsTest
         }
     }
 }
+
+#endif

@@ -1,4 +1,4 @@
-using NATS.Client.Core.Tests;
+using NATS.Client.Platform.Windows.Tests;
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -8,9 +8,8 @@ public class DoubleAckTest
     public async Task Fetch_should_not_block_socket()
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        await using var server = await NatsServer.StartJSAsync();
-
-        await using var nats = await server.CreateClientConnectionAsync();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
 
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
