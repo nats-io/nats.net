@@ -700,7 +700,7 @@ public class NatsKVWatcherTest
                 }
             }
         }
-        catch (TaskCanceledException exCancelled)
+        catch (TaskCanceledException)
         {
             Assert.Fail("Task was cancelled waiting for OnNoData");
         }

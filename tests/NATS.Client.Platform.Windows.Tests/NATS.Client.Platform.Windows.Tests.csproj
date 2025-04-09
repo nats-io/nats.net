@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFrameworks>net6.0;net8.0;net481</TargetFrameworks>
+        <TargetFrameworks>net8.0;net481</TargetFrameworks>
         <RuntimeIdentifiers>any;win-x86</RuntimeIdentifiers>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
