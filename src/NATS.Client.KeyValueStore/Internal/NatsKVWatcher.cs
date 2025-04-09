@@ -271,6 +271,17 @@ internal sealed class NatsKVWatcher<T> : IAsyncDisposable
 
                                     if (_opts.IgnoreDeletes && operation is NatsKVOperation.Del or NatsKVOperation.Purge)
                                     {
+                                        // Check in case all entries are deleted and we want to terminate
+                                        // the watcher loop on no-data.
+                                        if (msg.Metadata?.NumPending == 0 && _opts.OnNoData != null)
+                                        {
+                                            if (await _opts.OnNoData(_cancellationToken))
+                                            {
+                                                _entryChannel.Writer.Complete();
+                                                return;
+                                            }
+                                        }
+
                                         continue;
                                     }
 

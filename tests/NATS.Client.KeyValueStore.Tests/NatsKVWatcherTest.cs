@@ -619,4 +619,93 @@ public class NatsKVWatcherTest
             });
         }
     }
+
+    [Fact]
+    public async Task ReadAfterDelete()
+    {
+        await using var server = await NatsServer.StartJSAsync();
+        await using var nats = await server.CreateClientConnectionAsync();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var store = await kv.CreateStoreAsync("b1");
+
+        // Read all entries, should be empty.
+        List<NatsKVEntry<string>> results = new();
+        await foreach (var entry in store.WatchAsync<string>(">", opts: new NatsKVWatchOpts
+        {
+            OnNoData = (_) => ValueTask.FromResult(true),
+        }))
+        {
+            results.Add(entry);
+        }
+
+        // Should be no results here.
+        Assert.False(results.Any());
+
+        // Add k1
+        await store.PutAsync("k1", "v1");
+
+        // Check if there, should be true
+        var result1 = await store.TryGetEntryAsync<string>("k1");
+        Assert.True(result1.Success);
+
+        // Remove k1
+        await store.DeleteAsync("k1");
+
+        // Check if there, should be false
+        var result = await store.TryGetEntryAsync<string>("k1");
+        Assert.False(result.Success);
+
+        // Read all entries.
+        results.Clear();
+        await foreach (var entry in store.WatchAsync<string>(">", opts: new NatsKVWatchOpts
+        {
+            OnNoData = (_) => ValueTask.FromResult(true),
+        }))
+        {
+            results.Add(entry);
+            if (entry.Delta == 0)
+            {
+                break;
+            }
+        }
+
+        // Should be 1 entry, which is the deleted OP
+        Assert.Single(results);
+        Assert.Equal(NatsKVOperation.Del, results[0].Operation);
+
+        // Watch and ignore deletes....  Really OnNoData should execute as we're excluding deletes and there should be no entries coming back, but this just times out.
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var cancellationToken = cts.Token;
+
+        results.Clear();
+
+        try
+        {
+            await foreach (var entry in store.WatchAsync<string>(
+            ">",
+            opts: new NatsKVWatchOpts
+            {
+                IgnoreDeletes = true,
+                OnNoData = (_) => ValueTask.FromResult(true),
+            },
+            cancellationToken: cancellationToken))
+            {
+                results.Add(entry);
+                if (entry.Delta == 0)
+                {
+                    break;
+                }
+            }
+        }
+        catch (TaskCanceledException)
+        {
+            Assert.Fail("Task was cancelled waiting for OnNoData");
+        }
+
+        // Should be no results here.
+        Assert.False(results.Any());
+    }
 }
