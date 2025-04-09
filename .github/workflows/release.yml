@@ -31,7 +31,7 @@ jobs:
           echo "create=$create" | tee -a "$GITHUB_OUTPUT"
 
       - if: ${{ fromJSON(steps.tag.outputs.create) }}
-      - name: Setup dotnet
+        name: Setup dotnet
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: |
