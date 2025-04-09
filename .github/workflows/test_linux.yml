@@ -49,13 +49,6 @@ jobs:
       - name: Build
         run: dotnet build -c Release
 
-      - name: Test Core
-        run: |
-          killall nats-server 2> /dev/null | echo -n
-          nats-server -v
-          cd tests/NATS.Client.Core.Tests
-          dotnet test -c Release --no-build --logger:"console;verbosity=normal"
-
       - name: Test Core2
         run: |
           killall nats-server 2> /dev/null | echo -n

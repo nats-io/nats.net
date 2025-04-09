@@ -100,6 +100,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "workflows", "workflows", "{
 		.github\workflows\release.yml = .github\workflows\release.yml
 		.github\workflows\test_linux.yml = .github\workflows\test_linux.yml
 		.github\workflows\test_windows.yml = .github\workflows\test_windows.yml
+		.github\workflows\test_linux_core.yml = .github\workflows\test_linux_core.yml
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.TestUtilities2", "tests\NATS.Client.TestUtilities2\NATS.Client.TestUtilities2.csproj", "{25E4C70A-196C-4855-8DFC-796C08837987}"
