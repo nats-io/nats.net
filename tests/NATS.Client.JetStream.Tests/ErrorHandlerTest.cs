@@ -121,7 +121,11 @@ public class ErrorHandlerTest
 
                 return Task.CompletedTask;
             },
+
+            // keep this high to avoid resetting heartbeat timer with
+            // 408 request timeout messages
             Expires = TimeSpan.FromSeconds(60),
+
             IdleHeartbeat = TimeSpan.FromSeconds(3),
         };
 
@@ -165,12 +169,6 @@ public class ErrorHandlerTest
             },
             cts.Token);
 
-        // XXX
-        // await Task.Delay(5000);
-        // foreach (var f in proxy.AllFrames)
-        // {
-        //     _output.WriteLine($">>> {f}");
-        // }
         await Retry.Until(
             reason: "timed out",
             condition: () => Interlocked.CompareExchange(ref _timeoutNotifications, 0, 0) > 0,
