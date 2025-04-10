@@ -141,9 +141,10 @@ public class ErrorHandlerTest
         var consume = Task.Run(
             async () =>
             {
-                await foreach (var unused in consumer.ConsumeAsync<int>(opts: opts, cancellationToken: consumeCts.Token))
+                await foreach (var msg in consumer.ConsumeAsync<int>(opts: opts, cancellationToken: consumeCts.Token))
                 {
                     Interlocked.Increment(ref count);
+                    await msg.AckAsync(cancellationToken: consumeCts.Token);
                 }
             },
             cts.Token);
