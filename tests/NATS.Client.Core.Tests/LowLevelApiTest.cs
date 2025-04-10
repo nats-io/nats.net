@@ -51,7 +51,7 @@ public class LowLevelApiTest
             _output = output;
         }
 
-        protected override ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
+        protected override ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte> headersBuffer, ReadOnlySequence<byte> payloadBuffer)
         {
             if (subject.EndsWith(".sync"))
             {
@@ -63,17 +63,14 @@ public class LowLevelApiTest
             }
             else
             {
-                var headers = headersBuffer?.ToArray();
-                var payload = payloadBuffer.ToArray();
-
                 var sb = new StringBuilder();
                 sb.AppendLine($"Subject: {subject}");
                 sb.AppendLine($"Reply-To: {replyTo}");
-                sb.Append($"Headers: ");
-                if (headers != null)
-                    sb.Append(Encoding.ASCII.GetString(headers).Replace("\r\n", " "));
+                sb.Append("Headers: ");
+                if (headersBuffer.Length > 0)
+                    sb.Append(Encoding.ASCII.GetString(headersBuffer).Replace("\r\n", " "));
                 sb.AppendLine();
-                sb.AppendLine($"Payload: {Encoding.ASCII.GetString(payload)}");
+                sb.AppendLine($"Payload: {Encoding.ASCII.GetString(payloadBuffer)}");
 
                 _output.WriteLine(sb.ToString());
 
