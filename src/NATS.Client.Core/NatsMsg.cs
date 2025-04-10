@@ -315,7 +315,7 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
     /// Builds a new instance of a <see cref="NatsMsg{T}"/> with the specified parameters.
     /// </summary>
     /// <remarks>
-    /// (LOW LEVEL API) This method is intended for internal use only. it doesn't have the same
+    /// (INTERNAL API) This method is intended for internal use only. it doesn't have the same
     /// guarantees as the public API. it may change in future versions with no notice.
     /// </remarks>
     /// <param name="subject">The subject string associated with the message.</param>
