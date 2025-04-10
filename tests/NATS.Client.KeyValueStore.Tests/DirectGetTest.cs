@@ -9,8 +9,8 @@ public class DirectGetTest(ITestOutputHelper output)
     public async Task API_subject_test()
     {
         await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
-        var proxy = new NatsProxy(new Uri(server.Url).Port);
+        var proxy = new NatsProxy(server.Port);
+        await using var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}" });
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));

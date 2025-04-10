@@ -28,8 +28,8 @@ public class NatsKVWatcherTest
         var kv1 = new NatsKVContext(js1);
         var store1 = await kv1.CreateStoreAsync(config, cancellationToken: cancellationToken);
 
-        await using var nats2 = new NatsConnection(new NatsOpts { Url = server.Url });
-        var proxy = new NatsProxy(new Uri(server.Url).Port);
+        var proxy = new NatsProxy(server.Port);
+        await using var nats2 = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}" });
         var js2 = new NatsJSContext(nats2);
         var kv2 = new NatsKVContext(js2);
         var store2 = (NatsKVStore)await kv2.CreateStoreAsync(config, cancellationToken: cancellationToken);

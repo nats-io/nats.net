@@ -389,8 +389,8 @@ public class ServicesTests
     public async Task Service_without_queue_group()
     {
         await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
-        var proxy = new NatsProxy(new Uri(server.Url).Port);
+        var proxy = new NatsProxy(server.Port);
+        await using var nats = new NatsConnection(new NatsOpts { Url = $"127.0.0.1:{proxy.Port}" });
         var svc = new NatsSvcContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
