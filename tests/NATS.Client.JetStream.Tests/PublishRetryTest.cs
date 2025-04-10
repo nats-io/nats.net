@@ -9,11 +9,13 @@ public class PublishRetryTest
 {
     private readonly ITestOutputHelper _output;
     private readonly NatsServerRestrictedUserFixture _server;
+    private readonly bool _isFramework;
 
     public PublishRetryTest(ITestOutputHelper output, NatsServerRestrictedUserFixture server)
     {
         _output = output;
         _server = server;
+        _isFramework = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription.Contains("Framework");
     }
 
     [Fact]
@@ -33,14 +35,14 @@ public class PublishRetryTest
             ActivitySource.AddActivityListener(activityListener);
             var headers = new NatsHeaders();
             await nats.PublishAsync(prefix, headers: headers, cancellationToken: cts.Token);
-            Assert.Contains("traceparent", headers);
+            Assert.Contains(_isFramework ? "Request-Id" : "traceparent", headers);
         }
 
         // Without telemetry
         {
             var headers = new NatsHeaders();
             await nats.PublishAsync(prefix, headers: headers, cancellationToken: cts.Token);
-            Assert.DoesNotContain("traceparent", headers);
+            Assert.DoesNotContain(_isFramework ? "Request-Id" : "traceparent", headers);
             Assert.Empty(headers);
         }
 
@@ -50,14 +52,14 @@ public class PublishRetryTest
             ActivitySource.AddActivityListener(activityListener);
             var headers = new NatsHeaders();
             await nats.PublishAsync(prefix, data: 1, headers: headers, cancellationToken: cts.Token);
-            Assert.Contains("traceparent", headers);
+            Assert.Contains(_isFramework ? "Request-Id" : "traceparent", headers);
         }
 
         // Without telemetry and data
         {
             var headers = new NatsHeaders();
             await nats.PublishAsync(prefix, data: 1, headers: headers, cancellationToken: cts.Token);
-            Assert.DoesNotContain("traceparent", headers);
+            Assert.DoesNotContain(_isFramework ? "Request-Id" : "traceparent", headers);
             Assert.Empty(headers);
         }
     }
@@ -85,7 +87,7 @@ public class PublishRetryTest
             var headers = new NatsHeaders();
             await nats.PublishAsync(prefix, headers: headers, cancellationToken: cts.Token);
             await nats.PublishAsync(prefix, headers: headers, cancellationToken: cts.Token);
-            Assert.Contains("traceparent", headers);
+            Assert.Contains(_isFramework ? "Request-Id" : "traceparent", headers);
         }
 
         // Also try publish-with-data method
@@ -93,7 +95,7 @@ public class PublishRetryTest
             var headers = new NatsHeaders();
             await nats.PublishAsync(prefix, data: 1, headers: headers, cancellationToken: cts.Token);
             await nats.PublishAsync(prefix, data: 1, headers: headers, cancellationToken: cts.Token);
-            Assert.Contains("traceparent", headers);
+            Assert.Contains(_isFramework ? "Request-Id" : "traceparent", headers);
         }
     }
 
@@ -132,7 +134,7 @@ public class PublishRetryTest
             });
             Assert.IsNotType<InvalidOperationException>(exception);
             Assert.DoesNotMatch("response headers cannot be modified", exception.Message);
-            Assert.Contains("traceparent", headers);
+            Assert.Contains(_isFramework ? "Request-Id" : "traceparent", headers);
         }
 
         // Also check for specific exception
@@ -146,7 +148,7 @@ public class PublishRetryTest
                     headers: headers,
                     cancellationToken: cts.Token);
             });
-            Assert.Contains("traceparent", headers);
+            Assert.Contains(_isFramework ? "Request-Id" : "traceparent", headers);
         }
     }
 }

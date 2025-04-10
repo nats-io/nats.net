@@ -11,7 +11,7 @@ public class AuthErrorTest
 
     public AuthErrorTest(ITestOutputHelper output) => _output = output;
 
-    //[SkipOnPlatform("WINDOWS", "doesn't support HUP signal")]
+    // [SkipOnPlatform("WINDOWS", "doesn't support HUP signal")]
     [Fact]
     public async Task Auth_err_twice_will_stop_retries()
     {
@@ -65,6 +65,7 @@ public class AuthErrorTest
                 .Replace("password: b", "password: c");
             File.WriteAllText(server.Config!, conf);
             await Task.Delay(1000, cts.Token);
+
             // Process.Start("kill", $"-HUP {server.Pid}");
             _output.WriteLine($"Reloading config with different password");
             server = await server.RestartAsync();
@@ -128,6 +129,7 @@ public class AuthErrorTest
                 .Replace("password: b", "password: c");
             File.WriteAllText(server.Config!, conf);
             await Task.Delay(1000, cts.Token);
+
             // Process.Start("kill", $"-HUP {server.Pid}");
             server = await server.RestartAsync();
         }
@@ -143,6 +145,7 @@ public class AuthErrorTest
                 .Replace("password: c", "password: b");
             File.WriteAllText(server.Config!, conf);
             await Task.Delay(1000, cts.Token);
+
             // Process.Start("kill", $"-HUP {server.Pid}");
             server = await server.RestartAsync();
         }

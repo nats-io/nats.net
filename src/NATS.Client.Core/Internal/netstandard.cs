@@ -286,7 +286,7 @@ namespace NATS.Client.Core.Internal.NetStandardExtensions
         {
             if (argument is null)
             {
-                throw new ArgumentException(paramName);
+                throw new ArgumentNullException(paramName);
             }
         }
     }

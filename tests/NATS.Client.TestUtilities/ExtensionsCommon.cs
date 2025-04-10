@@ -3,12 +3,14 @@ using System.Threading.Channels;
 
 namespace NATS.Client.Core.Tests;
 
-internal static class TaskExtensionsCommon
+#if NETSTANDARD2_0
+
+public static class TaskExtensionsCommon
 {
-    internal static Task WaitAsync(this Task task, CancellationToken cancellationToken)
+    public static Task WaitAsync(this Task task, CancellationToken cancellationToken)
         => WaitAsync(task, Timeout.InfiniteTimeSpan, cancellationToken);
 
-    internal static Task WaitAsync(this Task task, TimeSpan timeout, CancellationToken cancellationToken = default)
+    public static Task WaitAsync(this Task task, TimeSpan timeout, CancellationToken cancellationToken = default)
     {
         if (cancellationToken.IsCancellationRequested)
             return Task.FromCanceled(cancellationToken);
@@ -35,12 +37,12 @@ internal static class TaskExtensionsCommon
 }
 
 #pragma warning disable SA1201
-internal readonly struct VoidResult
+public readonly struct VoidResult
 #pragma warning restore SA1201
 {
 }
 
-internal sealed class TaskCompletionSource : TaskCompletionSource<VoidResult>
+public sealed class TaskCompletionSource : TaskCompletionSource<VoidResult>
 {
     public TaskCompletionSource(TaskCreationOptions creationOptions = TaskCreationOptions.None)
         : base(creationOptions)
@@ -55,7 +57,7 @@ internal sealed class TaskCompletionSource : TaskCompletionSource<VoidResult>
 }
 
 #pragma warning disable SA1204
-internal static class ChannelReaderExtensions
+public static class ChannelReaderExtensions
 #pragma warning restore SA1204
 {
     public static async IAsyncEnumerable<T> ReadAllAsync<T>(this ChannelReader<T> reader, [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -69,3 +71,5 @@ internal static class ChannelReaderExtensions
         }
     }
 }
+
+#endif
