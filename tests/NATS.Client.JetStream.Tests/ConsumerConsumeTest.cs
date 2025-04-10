@@ -98,6 +98,7 @@ public class ConsumerConsumeTest
             .ClientFrames
             .Count(f => f.Message.StartsWith($"PUB $JS.API.CONSUMER.MSG.NEXT.{prefix}s1.{prefix}c1"));
 
+        // XXX
         await Task.Delay(5000);
         foreach (var f in proxy.AllFrames)
         {

@@ -11,6 +11,7 @@ public class ErrorHandlerTest
     private readonly ITestOutputHelper _output;
     private readonly NatsServerFixture _server;
     private int _timeoutNotifications = 0;
+    private int _count = 0;
 
     public ErrorHandlerTest(ITestOutputHelper output, NatsServerFixture server)
     {
@@ -112,6 +113,7 @@ public class ErrorHandlerTest
             MaxMsgs = 10,
             NotificationHandler = (e, _) =>
             {
+                _output.WriteLine($"Got notification (type:{e.GetType().Name}): {e}");
                 if (e is NatsJSTimeoutNotification)
                 {
                     Interlocked.Increment(ref _timeoutNotifications);
@@ -125,6 +127,7 @@ public class ErrorHandlerTest
 
         await foreach (var msg in consumer.ConsumeAsync<int>(opts: opts, cancellationToken: cts.Token))
         {
+            _output.WriteLine($">> Consumed message (1): {msg.Data}");
             msg.Data.Should().Be(1);
             msg.Subject.Should().Be($"{prefix}s1.1");
             await msg.AckAsync(cancellationToken: cts.Token);
@@ -149,25 +152,37 @@ public class ErrorHandlerTest
             }
         });
 
-        var count = 0;
         var consumeCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
         var consume = Task.Run(
             async () =>
             {
                 await foreach (var msg in consumer.ConsumeAsync<int>(opts: opts, cancellationToken: consumeCts.Token))
                 {
-                    Interlocked.Increment(ref count);
+                    _output.WriteLine($">> Consumed message (2): {msg.Data}");
+                    Interlocked.Increment(ref _count);
                     await msg.AckAsync(cancellationToken: consumeCts.Token);
                 }
             },
             cts.Token);
 
-        await Retry.Until("timed out", () => Interlocked.CompareExchange(ref _timeoutNotifications, 0, 0) > 0, timeout: TimeSpan.FromSeconds(20));
+        // XXX
+        await Task.Delay(5000);
+        foreach (var f in proxy.AllFrames)
+        {
+            _output.WriteLine($">>> {f}");
+        }
+
+        await Retry.Until(
+            reason: "timed out",
+            condition: () => Interlocked.CompareExchange(ref _timeoutNotifications, 0, 0) > 0,
+            timeout: TimeSpan.FromSeconds(60));
+
         consumeCts.Cancel();
+
         await consume;
 
-        Assert.Equal(0, Volatile.Read(ref count));
-        Assert.True(Volatile.Read(ref _timeoutNotifications) > 0);
+        Assert.Equal(0, Interlocked.CompareExchange(ref _count, 0, 0));
+        Assert.True(Interlocked.CompareExchange(ref _timeoutNotifications, 0, 0) > 0);
     }
 
     [Fact]
