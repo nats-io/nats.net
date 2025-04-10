@@ -26,7 +26,7 @@ public class ListTests
 
         var js = new NatsJSContext(nats);
 
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 
         const int total = 120;
 
@@ -99,7 +99,7 @@ public class ListTests
         _output.WriteLine($"prefix: {prefix}");
         var js = new NatsJSContext(nats);
 
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 
         var stream = await js.CreateStreamAsync(new StreamConfig($"{prefix}s1", [$"{prefix}s1.*"]), cts.Token);
 

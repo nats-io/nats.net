@@ -1,30 +1,37 @@
 using System.Diagnostics;
 using NATS.Client.Core.Tests;
+using NATS.Client.Core2.Tests;
 using NATS.Client.Platform.Windows.Tests;
 
 namespace NATS.Client.JetStream.Tests;
 
+[Collection("nats-server")]
 public class PublishConcurrentTests
 {
     private readonly ITestOutputHelper _output;
+    private readonly NatsServerFixture _server;
 
-    public PublishConcurrentTests(ITestOutputHelper output) => _output = output;
+    public PublishConcurrentTests(ITestOutputHelper output, NatsServerFixture server)
+    {
+        _output = output;
+        _server = server;
+    }
 
     [Fact]
     public async Task Publish_concurrently()
     {
-        await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
         var js = new NatsJSContext(nats);
 
-        await js.CreateStreamAsync("s1", ["s1.>"]);
+        await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.>"]);
 
         // Standard publish
         {
-            var ack = await js.PublishAsync("s1.foo", 1);
+            var ack = await js.PublishAsync($"{prefix}s1.foo", 1);
             Assert.Null(ack.Error);
             Assert.Equal(1, (int)ack.Seq);
-            Assert.Equal("s1", ack.Stream);
+            Assert.Equal($"{prefix}s1", ack.Stream);
             Assert.False(ack.Duplicate);
             Assert.True(ack.IsSuccess());
             _output.WriteLine($"Published: {ack}");
@@ -32,7 +39,7 @@ public class PublishConcurrentTests
 
         // Concurrently publish
         {
-            await using var future = await js.PublishConcurrentAsync("s1.foo", 2);
+            await using var future = await js.PublishConcurrentAsync($"{prefix}s1.foo", 2);
             var ack = await future.GetResponseAsync();
             _output.WriteLine($"Published: {ack}");
         }
@@ -41,7 +48,7 @@ public class PublishConcurrentTests
         var stopwatch1 = Stopwatch.StartNew();
         for (var i = 0; i < 1_000; i++)
         {
-            var ack = await js.PublishAsync("s1.foo.single", i);
+            var ack = await js.PublishAsync($"{prefix}s1.foo.single", i);
             ack.EnsureSuccess();
         }
 
@@ -52,7 +59,7 @@ public class PublishConcurrentTests
         var futures = new NatsJSPublishConcurrentFuture[1_000];
         for (var i = 0; i < 1_000; i++)
         {
-            futures[i] = await js.PublishConcurrentAsync("s1.foo.concurrent", i);
+            futures[i] = await js.PublishConcurrentAsync($"{prefix}s1.foo.concurrent", i);
         }
 
         for (var i = 0; i < 1_000; i++)
@@ -68,6 +75,6 @@ public class PublishConcurrentTests
 
         await Retry.Until(
             "stream count settles down",
-            async () => (await js.GetStreamAsync("s1")).Info.State.Messages == 2 + 1_000 + 1_000);
+            async () => (await js.GetStreamAsync($"{prefix}s1")).Info.State.Messages == 2 + 1_000 + 1_000);
     }
 }
