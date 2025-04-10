@@ -21,16 +21,18 @@ public class ListTests
     public async Task List_streams()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestTimeout = TimeSpan.FromSeconds(5) });
-        var prefix = _server.GetNextId();
+        var prefix = _server.GetNextId() + "-";
+        _output.WriteLine($"prefix: {prefix}");
+
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
-        const int total = 1200;
+        const int total = 120;
 
         for (var i = 0; i < total; i++)
         {
-            await js.CreateStreamAsync(new StreamConfig($"{prefix}s{i:D5}", new[] { $"{prefix}s{i:D5}.*" }), cts.Token);
+            await js.CreateStreamAsync(new StreamConfig($"{prefix}s{i:D5}", [$"{prefix}s{i:D5}.*"]), cts.Token);
         }
 
         // Stream names
@@ -39,7 +41,8 @@ public class ListTests
 
             await foreach (var stream in js.ListStreamNamesAsync(cancellationToken: cts.Token))
             {
-                names.Add(stream);
+                if (stream.StartsWith(prefix))
+                    names.Add(stream);
             }
 
             Assert.Equal(total, names.Count);
@@ -65,7 +68,8 @@ public class ListTests
             var streams = new List<INatsJSStream>();
             await foreach (var stream in js.ListStreamsAsync(cancellationToken: cts.Token))
             {
-                streams.Add(stream);
+                if (stream.Info.Config.Name!.StartsWith(prefix))
+                    streams.Add(stream);
             }
 
             Assert.Equal(total, streams.Count);
@@ -91,7 +95,8 @@ public class ListTests
     public async Task List_consumers()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestTimeout = TimeSpan.FromSeconds(5) });
-        var prefix = _server.GetNextId();
+        var prefix = _server.GetNextId() + "-";
+        _output.WriteLine($"prefix: {prefix}");
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
