@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using NATS.Client.Core2.Tests;
+using NATS.Client.TestUtilities2;
 using NATS.Net;
 
 namespace NATS.Client.JetStream.Tests;
@@ -81,6 +82,7 @@ public class PublishRetryTest
             AuthOpts = new NatsAuthOpts { Username = "u" },
         });
         var prefix = _server.GetNextId();
+        await nats.ConnectRetryAsync();
 
         // Publish with no data implemented in a different method
         {
