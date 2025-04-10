@@ -311,7 +311,7 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
         flags = Flags;
     }
 
-    internal static NatsMsg<T> Build(
+    public static NatsMsg<T> Build(
         string subject,
         string? replyTo,
         in ReadOnlySequence<byte>? headersBuffer,
