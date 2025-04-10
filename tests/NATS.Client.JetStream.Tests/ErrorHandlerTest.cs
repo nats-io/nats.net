@@ -171,7 +171,6 @@ public class ErrorHandlerTest
         // {
         //     _output.WriteLine($">>> {f}");
         // }
-
         await Retry.Until(
             reason: "timed out",
             condition: () => Interlocked.CompareExchange(ref _timeoutNotifications, 0, 0) > 0,

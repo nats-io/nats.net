@@ -24,7 +24,6 @@ public class NatsKVWatcherTest
     [Fact]
     public async Task Watcher_reconnect_with_history()
     {
-
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
