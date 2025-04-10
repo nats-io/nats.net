@@ -247,7 +247,8 @@ public class ProtocolTest
 
         Log("### Manual unsubscribe");
         {
-            await proxy.FlushFramesAsync(nats);
+            using var cts1 = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            await proxy.FlushFramesAsync(nats, clear: true, cts1.Token);
 
             await using var sub = await nats.SubscribeCoreAsync<int>("foo2");
             sid++;

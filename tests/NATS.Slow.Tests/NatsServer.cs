@@ -1,28 +1,15 @@
 using System.Diagnostics;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
-using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Platform.Windows.Tests;
+using NATS.Client.TestUtilities;
 using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.Core.Tests;
 
-public static class ServerVersions
-{
-#pragma warning disable SA1310
-#pragma warning disable SA1401
-
-    // Changed INFO port reporting for WS connections (nats-server #4255)
-    public static Version V2_9_19 = new("2.9.19");
-
-#pragma warning restore SA1401
-#pragma warning restore SA1310
-}
-
 public class NatsServer : IAsyncDisposable
 {
-    public static readonly Version Version;
     private static readonly bool IsWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
     private static readonly string Ext = IsWindows ? ".exe" : string.Empty;
     private static readonly string NatsServerPath = $"nats-server{Ext}";
@@ -34,25 +21,6 @@ public class NatsServer : IAsyncDisposable
     private CancellationTokenSource? _cancellationTokenSource;
     private int _disposed;
     private volatile Process? _serverProcess;
-
-    static NatsServer()
-    {
-        var process = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = NatsServerPath,
-                Arguments = "-v",
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-            },
-        };
-        process.Start();
-        process.WaitForExit();
-        var output = process.StandardOutput.ReadToEnd();
-        var value = Regex.Match(output, @"v(\d+\.\d+\.\d+)").Groups[1].Value;
-        Version = new Version(value);
-    }
 
     private NatsServer(ITestOutputHelper outputHelper, NatsServerOpts opts)
     {
@@ -108,7 +76,7 @@ public class NatsServer : IAsyncDisposable
     {
         get
         {
-            if (_transportType is TransportType.WebSocket or TransportType.WebSocketSecure && ServerVersions.V2_9_19 <= Version)
+            if (_transportType is TransportType.WebSocket or TransportType.WebSocketSecure && ServerVersions.V2_9_19 <= NatsServerExe.Version)
             {
                 return Opts.WebSocketPort!.Value;
             }
@@ -139,8 +107,6 @@ public class NatsServer : IAsyncDisposable
             .Build());
 
     public static async Task<NatsServer> StartAsync() => await StartAsync(new NullOutputHelper(), TransportType.Tcp);
-
-    public static bool SupportsTlsFirst() => new Version("2.10.4") <= Version;
 
     public static Task<NatsServer> StartWithTraceAsync(ITestOutputHelper outputHelper)
         => StartAsync(
@@ -245,7 +211,7 @@ public class NatsServer : IAsyncDisposable
                 DebugLogger.Log($"[T] TCP Connect to {Opts.ServerPort}");
                 var attemptTimeoutCts = new CancellationTokenSource(250);
                 var attemptCts = CancellationTokenSource.CreateLinkedTokenSource(loopCts.Token, attemptTimeoutCts.Token);
-                await client.ConnectAsync("127.0.0.1", Opts.ServerPort, attemptCts.Token);
+                await client.ConnectAsync("127.0.0.1", Opts.ServerPort).WaitAsync(attemptCts.Token);
                 if (client.Connected)
                 {
                     connected = true;
@@ -286,8 +252,7 @@ public class NatsServer : IAsyncDisposable
             if (serverProcessId != null)
             {
                 Process.GetProcessById(serverProcessId.Value).Kill();
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-                await Process.GetProcessById(serverProcessId.Value).WaitForExitAsync(cts.Token);
+                Process.GetProcessById(serverProcessId.Value).WaitForExit(10_000);
             }
         }
         catch
@@ -301,7 +266,9 @@ public class NatsServer : IAsyncDisposable
             throw new Exception("Can't restart nats-server");
     }
 
+#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
     public async ValueTask StopAsync()
+#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
     {
         DebugLogger.Log("[T] Stopping process");
         try
@@ -311,8 +278,7 @@ public class NatsServer : IAsyncDisposable
             if (ServerProcess != null)
             {
                 ServerProcess.Kill();
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-                await ServerProcess.WaitForExitAsync(cts.Token);
+                ServerProcess.WaitForExit(10_000);
             }
         }
         catch (OperationCanceledException)
@@ -323,7 +289,9 @@ public class NatsServer : IAsyncDisposable
         }
     }
 
+#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
     public async ValueTask DisposeAsync()
+#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
     {
         DebugLogger.Log("[T] Disposing server");
 
@@ -339,8 +307,7 @@ public class NatsServer : IAsyncDisposable
             if (ServerProcess != null)
             {
                 ServerProcess.Kill();
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-                await ServerProcess.WaitForExitAsync(cts.Token)!;
+                ServerProcess.WaitForExit(10_000);
             }
         }
         catch (OperationCanceledException)
@@ -438,8 +405,10 @@ public class NatsServer : IAsyncDisposable
         var natsTlsOpts = Opts.EnableTls
             ? opts.TlsOpts with
             {
+#if NET8_0_OR_GREATER
                 CertFile = Opts.TlsClientCertFile,
                 KeyFile = Opts.TlsClientKeyFile,
+#endif
                 CaFile = Opts.TlsCaFile,
                 Mode = Opts.TlsFirst ? TlsMode.Implicit : TlsMode.Auto,
             }
@@ -624,59 +593,3 @@ public class NatsCluster : IAsyncDisposable
 
 #pragma warning disable CS4014
 
-public class NullOutputHelper : ITestOutputHelper
-{
-    public string Output => string.Empty;
-
-    public void Write(string message)
-    {
-    }
-
-    public void Write(string format, params object[] args)
-    {
-    }
-
-    public void WriteLine(string message)
-    {
-    }
-
-    public void WriteLine(string format, params object[] args)
-    {
-    }
-}
-
-public sealed class SkipIfNatsServer : FactAttribute
-{
-    private static readonly bool SupportsTlsFirst;
-
-    static SkipIfNatsServer() => SupportsTlsFirst = NatsServer.SupportsTlsFirst();
-
-    public SkipIfNatsServer(bool doesNotSupportTlsFirst = false, string? versionEarlierThan = default, string? versionLaterThan = default)
-    {
-        if (doesNotSupportTlsFirst && !SupportsTlsFirst)
-        {
-            Skip = "NATS server doesn't support TLS first";
-        }
-
-        if (versionEarlierThan != null && new Version(versionEarlierThan) > NatsServer.Version)
-        {
-            Skip = $"NATS server version ({NatsServer.Version}) is earlier than {versionEarlierThan}";
-        }
-
-        if (versionLaterThan != null && new Version(versionLaterThan) < NatsServer.Version)
-        {
-            Skip = $"NATS server version ({NatsServer.Version}) is later than {versionLaterThan}";
-        }
-    }
-}
-
-public sealed class SkipOnPlatform : FactAttribute
-{
-    public SkipOnPlatform(string platform, string reason)
-    {
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Create(platform)))
-        {
-            Skip = $"Platform {platform} is not supported: {reason}";
-        }
-    }
-}

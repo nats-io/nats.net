@@ -17,7 +17,7 @@ public class ParseJsonTests
         var bw = new NatsBufferWriter<byte>();
         serializer.Serialize(bw, new Placement());
 
-        var json = Encoding.UTF8.GetString(bw.WrittenSpan);
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         Assert.Equal("{}", json);
 
         var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory));
@@ -34,7 +34,7 @@ public class ParseJsonTests
         var bw = new NatsBufferWriter<byte>();
         serializer.Serialize(bw, new ConsumerConfig());
 
-        var json = Encoding.UTF8.GetString(bw.WrittenSpan);
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         Assert.Matches("\"ack_policy\":\"explicit\"", json);
     }
 }

@@ -1,5 +1,6 @@
 using NATS.Client.Core.Tests;
 using NATS.Client.JetStream.Models;
+using NATS.Client.Platform.Windows.Tests;
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -51,14 +52,8 @@ public class JetStreamTest
     [Fact]
     public async Task Create_stream_test()
     {
-        await using var server = await NatsServer.StartAsync(
-            outputHelper: _output,
-            opts: new NatsServerOptsBuilder()
-                .UseTransport(TransportType.Tcp)
-                .Trace()
-                .UseJetStream()
-                .Build());
-        var nats = await server.CreateClientConnectionAsync(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestTimeout = TimeSpan.FromSeconds(10) });
 
         // Happy user
         {

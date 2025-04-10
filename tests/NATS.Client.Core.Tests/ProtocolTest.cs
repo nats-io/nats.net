@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using NATS.Client.Platform.Windows.Tests;
 using NATS.Client.TestUtilities;
 
 namespace NATS.Client.Core.Tests;
@@ -11,9 +12,9 @@ public class ProtocolTest
     [InlineData(1024 * 1024)]
     public async Task Protocol_parser_under_load(int size)
     {
-        await using var server = await NatsServer.StartAsync();
+        var server = await NatsServerProcess.StartAsync();
         var logger = new InMemoryTestLoggerFactory(LogLevel.Error);
-        var opts = server.ClientOpts(NatsOpts.Default) with { LoggerFactory = logger };
+        var opts = new NatsOpts { Url = server.Url, LoggerFactory = logger };
         var nats = new NatsConnection(opts);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
@@ -74,13 +75,13 @@ public class ProtocolTest
         {
             await Task.Delay(1_000, cts.Token);
             var subjectCount = Volatile.Read(ref counts);
-            await server.RestartAsync();
+            server = await server.RestartAsync();
 
             while (!cts.Token.IsCancellationRequested)
             {
                 try
                 {
-                    await (await server.CreateClientConnectionAsync()).PingAsync(cts.Token);
+                    await new NatsConnection(new NatsOpts { Url = server.Url }).PingAsync(cts.Token);
                     break;
                 }
                 catch

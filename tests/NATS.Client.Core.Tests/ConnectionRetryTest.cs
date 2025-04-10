@@ -1,3 +1,5 @@
+using NATS.Client.Platform.Windows.Tests;
+
 namespace NATS.Client.Core.Tests;
 
 public class ConnectionRetryTest
@@ -9,10 +11,11 @@ public class ConnectionRetryTest
     [Fact]
     public async Task Max_retry_reached_after_disconnect()
     {
-        await using var server = await NatsServer.StartAsync();
-        await using var nats = await server.CreateClientConnectionAsync(new NatsOpts { MaxReconnectRetry = 2, ReconnectWaitMax = TimeSpan.Zero, ReconnectWaitMin = TimeSpan.FromSeconds(.1), });
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, MaxReconnectRetry = 2, ReconnectWaitMax = TimeSpan.Zero, ReconnectWaitMin = TimeSpan.FromSeconds(.1), });
+        await nats.ConnectAsync();
 
-        var signal = new WaitSignal();
+        var signal = new WaitSignal(TimeSpan.FromSeconds(30));
         nats.ReconnectFailed += (_, _) =>
         {
             signal.Pulse();
@@ -31,37 +34,47 @@ public class ConnectionRetryTest
     [Fact]
     public async Task Retry_and_connect_after_disconnected()
     {
-        await using var server = await NatsServer.StartAsync();
-        await using var nats = await server.CreateClientConnectionAsync(new NatsOpts { MaxReconnectRetry = 10, ReconnectWaitMax = TimeSpan.Zero, ReconnectWaitMin = TimeSpan.FromSeconds(2), });
+        var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, MaxReconnectRetry = 10, ReconnectWaitMax = TimeSpan.Zero, ReconnectWaitMin = TimeSpan.FromSeconds(2), });
+        await nats.ConnectAsync();
 
-        var signal = new WaitSignal();
+        var signal = new WaitSignal(TimeSpan.FromSeconds(30));
         nats.ReconnectFailed += (_, _) =>
         {
             signal.Pulse();
             return default;
         };
 
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
+        _output.WriteLine($"Stop");
         await server.StopAsync();
 
         await signal;
 
-        await Task.Delay(TimeSpan.FromSeconds(5), cts.Token);
+        _output.WriteLine($"wait 2 sec");
+        await Task.Delay(TimeSpan.FromSeconds(2), cts.Token);
 
-        await server.StartServerProcessAsync();
+        server = await server.RestartAsync();
 
+        _output.WriteLine($"wait 2 sec");
+        await Task.Delay(TimeSpan.FromSeconds(2), cts.Token);
+
+        _output.WriteLine($"ping");
         var rtt = await nats.PingAsync(cts.Token);
         Assert.True(rtt > TimeSpan.Zero);
+        _output.WriteLine($"Reconnect attempt {rtt}");
+
+        await server.DisposeAsync();
     }
 
     [Fact]
     public async Task Reconnect_doesnt_drop_partially_sent_msgs()
     {
         const int msgSize = 1048576; // 1MiB
-        await using var server = await NatsServer.StartAsync();
+        await using var server = await NatsServerProcess.StartAsync();
 
-        await using var pubConn = await server.CreateClientConnectionAsync();
+        await using var pubConn = new NatsConnection(new NatsOpts { Url = server.Url });
         await pubConn.ConnectAsync();
 
         var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -71,7 +84,7 @@ public class ConnectionRetryTest
         var subActive = 0;
         var subTask = Task.Run(async () =>
         {
-            await using var subConn = await server.CreateClientConnectionAsync();
+            await using var subConn = new NatsConnection(new NatsOpts { Url = server.Url });
             await using var sub = await subConn.SubscribeCoreAsync<NatsMemoryOwner<byte>>("test", cancellationToken: timeoutCts.Token);
             await foreach (var msg in sub.Msgs.ReadAllAsync(timeoutCts.Token))
             {

@@ -1,19 +1,22 @@
 <Project Sdk="Microsoft.NET.Sdk">
+
     <PropertyGroup>
         <TargetFramework>net8.0</TargetFramework>
         <Nullable>enable</Nullable>
+        <IsPackable>false</IsPackable>
         <NoWarn>$(NoWarn);CS8002</NoWarn>
         <ImplicitUsings>enable</ImplicitUsings>
         <RunSettingsFilePath>$(MSBuildProjectDirectory)\..\xunit.runsettings</RunSettingsFilePath>
         <IsPackable>false</IsPackable>
         <IsTestProject>true</IsTestProject>
+        <RootNamespace>NATS.Old.Tests</RootNamespace>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="FluentAssertions" Version="[7,8)" />
-        <PackageReference Include="ProcessX" Version="1.5.6" />
-        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
-        <PackageReference Include="xunit.v3" Version="1.0.1" />
+        <PackageReference Include="FluentAssertions" Version="[7,8)"/>
+        <PackageReference Include="ProcessX" Version="1.5.6"/>
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0"/>
+        <PackageReference Include="xunit.v3" Version="1.0.1"/>
         <PackageReference Include="xunit.runner.visualstudio" Version="3.0.1">
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
@@ -25,18 +28,17 @@
     </ItemGroup>
 
     <ItemGroup>
-        <Using Include="Xunit" />
-        <Using Include="FluentAssertions" />
-        <Using Include="NATS.Client.Core" />
-        <Using Include="NATS.Client.Core.Internal" />
-        <Using Include="NATS.Client.Core.Commands" />
+        <Using Include="Xunit"/>
+        <Using Include="FluentAssertions"/>
+        <Using Include="NATS.Client.Core"/>
+        <Using Include="NATS.Client.Core.Internal"/>
+        <Using Include="NATS.Client.Core.Commands"/>
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\src\NATS.Client.JetStream\NATS.Client.JetStream.csproj" />
-        <ProjectReference Include="..\..\src\NATS.Client.Serializers.Json\NATS.Client.Serializers.Json.csproj" />
-        <ProjectReference Include="..\NATS.Client.TestUtilities\NATS.Client.TestUtilities.csproj" />
         <ProjectReference Include="..\..\src\NATS.Client.Core\NATS.Client.Core.csproj" />
+        <ProjectReference Include="..\..\src\NATS.Client.JetStream\NATS.Client.JetStream.csproj" />
+        <ProjectReference Include="..\NATS.Client.TestUtilities\NATS.Client.TestUtilities.csproj" />
     </ItemGroup>
 
     <ItemGroup>
@@ -46,8 +48,4 @@
         </Content>
     </ItemGroup>
 
-    <ItemGroup>
-        <Compile Include="..\NATS.Client.Core2.Tests\NatsServerFixture.cs" />
-    </ItemGroup>
-    
 </Project>

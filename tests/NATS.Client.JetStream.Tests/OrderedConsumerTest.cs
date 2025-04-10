@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
+using NATS.Client.Platform.Windows.Tests;
 using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.JetStream.Tests;
@@ -54,8 +55,8 @@ public class OrderedConsumerTest
     [Fact]
     public async Task Consume_reconnect_publish()
     {
-        await using var server = await NatsServer.StartJSAsync();
-        await using var nats = await server.CreateClientConnectionAsync(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
+        var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestTimeout = TimeSpan.FromSeconds(10) });
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -66,7 +67,7 @@ public class OrderedConsumerTest
         {
             if (i % 10 == 0)
             {
-                await server.RestartAsync();
+                server = await server.RestartAsync();
             }
 
             (await js.PublishAsync("s1.foo", i, cancellationToken: cts.Token)).EnsureSuccess();
@@ -91,6 +92,8 @@ public class OrderedConsumerTest
         }
 
         Assert.Equal(50, count);
+
+        await server.DisposeAsync();
     }
 
     [Fact]

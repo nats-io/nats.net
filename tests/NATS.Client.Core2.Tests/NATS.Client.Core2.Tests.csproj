@@ -42,22 +42,14 @@
     <ItemGroup>
         <ProjectReference Include="..\..\src\NATS.Client.Serializers.Json\NATS.Client.Serializers.Json.csproj" />
         <ProjectReference Include="..\..\src\NATS.Client.Core\NATS.Client.Core.csproj" />
+        <ProjectReference Include="..\NATS.Client.TestUtilities\NATS.Client.TestUtilities.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-        <Content Include="..\NATS.Client.Core.Tests\resources\**\*">
+        <Content Include="..\NATS.Client.TestUtilities\resources\**\*">
             <Link>resources\%(RecursiveDir)%(Filename)%(Extension)</Link>
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>
-    </ItemGroup>
-
-    <ItemGroup>
-      <Compile Include="..\NATS.Client.Platform.Windows.Tests\NatsServerProcess.cs" />
-      <Compile Include="..\NATS.Client.TestUtilities\InMemoryTestLoggerFactory.cs" />
-      <Compile Include="..\NATS.Client.TestUtilities\MockServer.cs" />
-      <Compile Include="..\NATS.Client.TestUtilities\NatsProxy.cs" />
-      <Compile Include="..\NATS.Client.TestUtilities\Utils.cs" />
-      <Compile Include="..\NATS.Client.TestUtilities\WaitSignal.cs" />
     </ItemGroup>
 
 </Project>

@@ -1,3 +1,5 @@
+using NATS.Client.TestUtilities;
+
 namespace NATS.Client.Core.Tests;
 
 public class TlsFirstTest

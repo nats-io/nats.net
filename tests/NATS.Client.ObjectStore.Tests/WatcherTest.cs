@@ -1,4 +1,5 @@
 using NATS.Client.Core.Tests;
+using NATS.Client.Platform.Windows.Tests;
 
 namespace NATS.Client.ObjectStore.Tests;
 
@@ -7,8 +8,8 @@ public class WatcherTest
     [Fact]
     public async Task Watcher_test()
     {
-        await using var server = await NatsServer.StartJSAsync();
-        await using var nats = await server.CreateClientConnectionAsync();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
         var js = new NatsJSContext(nats);
         var ob = new NatsObjContext(js);
 
@@ -17,7 +18,7 @@ public class WatcherTest
 
         var store = await ob.CreateObjectStoreAsync("b1", cancellationToken);
 
-        await store.PutAsync("k0", new byte[] { 0 }, cancellationToken);
+        await store.PutAsync("k0", [0], cancellationToken);
 
         var signal = new WaitSignal();
 

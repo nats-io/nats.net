@@ -1,13 +1,14 @@
 using NATS.Client.Core.Tests;
+using NATS.Client.TestUtilities;
 using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.JetStream.Tests;
 
-public class ClusterTests
+public class ClusterTests2
 {
     private readonly ITestOutputHelper _output;
 
-    public ClusterTests(ITestOutputHelper output) => _output = output;
+    public ClusterTests2(ITestOutputHelper output) => _output = output;
 
     [Fact]
     public async Task Form_a_local_cluster()
