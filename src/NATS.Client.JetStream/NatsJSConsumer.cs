@@ -97,9 +97,11 @@ public class NatsJSConsumer : INatsJSConsumer
 
                 // if yield is blocked by the application code, we don't want
                 // heartbeat timer kicking in and issuing unnecessary pull requests.
-                cc.StopHeartbeatTimer();
+                Console.WriteLine($">>> CONSUMER: BEFORE YIELD: {jsMsg}");
+                //cc.StopHeartbeatTimer();
                 yield return jsMsg;
-                cc.ResetHeartbeatTimer();
+                //cc.ResetHeartbeatTimer();
+                Console.WriteLine($">>> CONSUMER: AFTER YIELD: {jsMsg}");
                 cc.Delivered(jsMsg.Size);
             }
         }
@@ -339,7 +341,7 @@ public class NatsJSConsumer : INatsJSConsumer
             },
             cancellationToken).ConfigureAwait(false);
 
-        sub.ResetHeartbeatTimer();
+        sub.ResetHeartbeatTimer("INIT");
 
         return sub;
     }

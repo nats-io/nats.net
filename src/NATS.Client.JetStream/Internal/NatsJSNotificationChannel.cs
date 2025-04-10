@@ -28,7 +28,12 @@ internal sealed class NatsJSNotificationChannel : IAsyncDisposable
         _loop = Task.Run(NotificationLoop);
     }
 
-    public void Notify(INatsJSNotification notification) => _channel.Writer.TryWrite(notification);
+    public void Notify(INatsJSNotification notification)
+    {
+        Console.WriteLine($">>> NatsJSNotificationChannel: Notify: {notification}");
+        var tryWrite = _channel.Writer.TryWrite(notification);
+        Console.WriteLine($">>> NatsJSNotificationChannel: Notify: tryWrite={tryWrite}");
+    }
 
     public async ValueTask DisposeAsync()
     {
