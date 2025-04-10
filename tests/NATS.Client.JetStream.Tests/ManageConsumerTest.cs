@@ -5,7 +5,6 @@ using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.JetStream.Tests;
 
-
 [Collection("nats-server")]
 public class ManageConsumerTest
 {
