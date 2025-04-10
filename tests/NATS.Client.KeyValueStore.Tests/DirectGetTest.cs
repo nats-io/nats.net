@@ -1,5 +1,6 @@
 using NATS.Client.Core.Tests;
 using NATS.Client.Platform.Windows.Tests;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.KeyValueStore.Tests;
 
@@ -11,6 +12,8 @@ public class DirectGetTest(ITestOutputHelper output)
         await using var server = await NatsServerProcess.StartAsync();
         var proxy = new NatsProxy(server.Port);
         await using var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}" });
+        await nats.ConnectRetryAsync();
+
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
