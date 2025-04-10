@@ -92,19 +92,22 @@ public class ConsumerConsumeTest
                 break;
         }
 
+        await proxy.FlushFramesAsync(nats, false, cts.Token);
+
         int? PullCount() => proxy?
             .ClientFrames
             .Count(f => f.Message.StartsWith($"PUB $JS.API.CONSUMER.MSG.NEXT.{prefix}s1.{prefix}c1"));
 
         await Retry.Until(
             reason: "received enough pulls",
-            condition: () => PullCount() > 3,
-            action: () =>
+            condition: () =>
             {
-                return Task.CompletedTask;
+                var pullCount = PullCount();
+                _output.WriteLine($"pullCount: {pullCount}");
+                return pullCount > 4;
             },
             retryDelay: TimeSpan.FromSeconds(3),
-            timeout: TimeSpan.FromSeconds(15));
+            timeout: TimeSpan.FromSeconds(60));
 
         var msgNextRequests = proxy
             .ClientFrames
@@ -216,7 +219,7 @@ public class ConsumerConsumeTest
         var consumer = (NatsJSConsumer)await js.GetConsumerAsync($"{prefix}s1", $"{prefix}c1", cts.Token);
 
         // Not interested in management messages sent upto this point
-        await proxy.FlushFramesAsync(nats);
+        await proxy.FlushFramesAsync(nats, clear: true, cts.Token);
 
         var readerTask = Task.Run(async () =>
         {

@@ -437,7 +437,7 @@ public class ServicesTests
             Assert.Equal(1, count);
         }
 
-        await proxy.FlushFramesAsync(nats);
+        await proxy.FlushFramesAsync(nats, clear: true, cts.Token);
 
         // Without any queue group
         {

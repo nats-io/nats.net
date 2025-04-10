@@ -237,7 +237,7 @@ public class PublishTest
 
         // Publish fails once but succeeds after retry
         {
-            await proxy.FlushFramesAsync(nats);
+            await proxy.FlushFramesAsync(nats, clear: true, cts.Token);
             Interlocked.Exchange(ref retryCount, 0);
             Interlocked.Exchange(ref swallowAcksCount, 1);
 
@@ -250,7 +250,7 @@ public class PublishTest
 
         // Publish fails twice but succeeds after a third retry when attempts is 3
         {
-            await proxy.FlushFramesAsync(nats);
+            await proxy.FlushFramesAsync(nats, clear: true, cts.Token);
             Interlocked.Exchange(ref retryCount, 0);
             Interlocked.Exchange(ref swallowAcksCount, 2);
 
@@ -263,7 +263,7 @@ public class PublishTest
 
         // Publish fails even after two retries
         {
-            await proxy.FlushFramesAsync(nats);
+            await proxy.FlushFramesAsync(nats, clear: true, cts.Token);
             Interlocked.Exchange(ref retryCount, 0);
             Interlocked.Exchange(ref swallowAcksCount, 2);
 

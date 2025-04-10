@@ -27,7 +27,7 @@ public class DirectGetTest(ITestOutputHelper output)
             await store.PutAsync("x", 1, cancellationToken: cancellationToken);
             await store.PutAsync("x", 2, cancellationToken: cancellationToken);
 
-            await proxy.FlushFramesAsync(nats);
+            await proxy.FlushFramesAsync(nats, clear: true, cts.Token);
 
             var entry = await store.GetEntryAsync<int>("x", cancellationToken: cancellationToken);
             Assert.Equal(2, entry.Value);
@@ -49,7 +49,7 @@ public class DirectGetTest(ITestOutputHelper output)
             await store.PutAsync("x", 1, cancellationToken: cancellationToken);
             await store.PutAsync("x", 2, cancellationToken: cancellationToken);
 
-            await proxy.FlushFramesAsync(nats);
+            await proxy.FlushFramesAsync(nats, clear: true, cts.Token);
 
             var entry = await store.GetEntryAsync<int>("x", cancellationToken: cancellationToken);
             Assert.Equal(2, entry.Value);
