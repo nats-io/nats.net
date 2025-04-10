@@ -17,6 +17,11 @@ async enumerables and channels, and leverages advanced .NET memory, buffer and I
 **Additionally check out [NATS by example](https://natsbyexample.com) - An evolving collection of runnable, cross-client reference examples for NATS.**
 
 > [!NOTE]
+> **We are not testing with .NET 6.0 target anymore** even though it is still targeted by the library.
+> This is to reduce the number of test runs and speed up the CI process as well as to prepare for
+> the next major version, possibly dropping .NET 6.0 support.
+
+> [!NOTE]
 > **Don't confuse NuGet packages!**
 > NATS .NET package on NuGet is called [NATS.Net](https://www.nuget.org/packages/NATS.Net).
 > There is another package called `NATS.Client` which is the older version of the client library
