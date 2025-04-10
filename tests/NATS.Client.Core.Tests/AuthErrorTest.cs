@@ -11,7 +11,8 @@ public class AuthErrorTest
 
     public AuthErrorTest(ITestOutputHelper output) => _output = output;
 
-    [SkipOnPlatform("WINDOWS", "doesn't support HUP signal")]
+    //[SkipOnPlatform("WINDOWS", "doesn't support HUP signal")]
+    [Fact]
     public async Task Auth_err_twice_will_stop_retries()
     {
         var authErrCount = 0;
@@ -26,16 +27,17 @@ public class AuthErrorTest
                            }
                            """;
         File.WriteAllText(path: confFile, contents: confContents);
-        await using var server = await NatsServerProcess.StartAsync(config: confFile);
+        var server = await NatsServerProcess.StartAsync(config: confFile);
         await using var nats = new NatsConnection(new NatsOpts
         {
             Url = server.Url,
             AuthOpts = new NatsAuthOpts { Username = "a", Password = "b", },
-            IgnoreAuthErrorAbort = true,
+            IgnoreAuthErrorAbort = false,
             LoggerFactory = new InMemoryTestLoggerFactory(
                 LogLevel.Warning,
                 log =>
                 {
+                    _output.WriteLine($"LOG: {log.LogLevel} - {log.Message}");
                     if (log.LogLevel == LogLevel.Warning && log.Message.StartsWith("Authentication error:"))
                     {
                         Interlocked.Increment(ref authErrCount);
@@ -51,7 +53,9 @@ public class AuthErrorTest
 
         // Successful connection
         {
+            _output.WriteLine($"Starting at {server.Url}");
             var rtt = await nats.PingAsync(cts.Token);
+            _output.WriteLine($"Ping at {server.Url} took {rtt}");
             Assert.True(rtt > TimeSpan.Zero);
         }
 
@@ -61,14 +65,20 @@ public class AuthErrorTest
                 .Replace("password: b", "password: c");
             File.WriteAllText(server.Config!, conf);
             await Task.Delay(1000, cts.Token);
-            Process.Start("kill", $"-HUP {server.Pid}");
+            // Process.Start("kill", $"-HUP {server.Pid}");
+            _output.WriteLine($"Reloading config with different password");
+            server = await server.RestartAsync();
         }
 
+        _output.WriteLine($"Stopping at {server.Url}");
         await Retry.Until("stopped", () => Volatile.Read(ref stopCount) == 1);
         Assert.Equal(2, Volatile.Read(ref authErrCount));
+
+        await server.DisposeAsync();
     }
 
-    [SkipOnPlatform("WINDOWS", "doesn't support HUP signal")]
+    // [SkipOnPlatform("WINDOWS", "doesn't support HUP signal")]
+    [Fact]
     public async Task Auth_err_can_be_ignored_for_retires()
     {
         var authErrCount = 0;
@@ -83,7 +93,7 @@ public class AuthErrorTest
                            }
                            """;
         File.WriteAllText(path: confFile, contents: confContents);
-        await using var server = await NatsServerProcess.StartAsync(config: confFile);
+        var server = await NatsServerProcess.StartAsync(config: confFile);
         await using var nats = new NatsConnection(new NatsOpts
         {
             Url = server.Url,
@@ -118,7 +128,8 @@ public class AuthErrorTest
                 .Replace("password: b", "password: c");
             File.WriteAllText(server.Config!, conf);
             await Task.Delay(1000, cts.Token);
-            Process.Start("kill", $"-HUP {server.Pid}");
+            // Process.Start("kill", $"-HUP {server.Pid}");
+            server = await server.RestartAsync();
         }
 
         await Retry.Until("stopped", () => Volatile.Read(ref authErrCount) > 3, timeout: TimeSpan.FromSeconds(30));
@@ -132,7 +143,8 @@ public class AuthErrorTest
                 .Replace("password: c", "password: b");
             File.WriteAllText(server.Config!, conf);
             await Task.Delay(1000, cts.Token);
-            Process.Start("kill", $"-HUP {server.Pid}");
+            // Process.Start("kill", $"-HUP {server.Pid}");
+            server = await server.RestartAsync();
         }
 
         // Reconnected successfully
@@ -140,5 +152,7 @@ public class AuthErrorTest
             var rtt = await nats.PingAsync(cts.Token);
             Assert.True(rtt > TimeSpan.Zero);
         }
+
+        await server.DisposeAsync();
     }
 }
