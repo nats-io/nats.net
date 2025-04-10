@@ -1,4 +1,3 @@
-using System.Text;
 using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Models;
@@ -18,7 +17,6 @@ public class ErrorHandlerTest
     {
         _output = output;
         _server = server;
-        Console.SetOut(new TestOutputWriter(output));
     }
 
     [Fact]
@@ -115,7 +113,7 @@ public class ErrorHandlerTest
             MaxMsgs = 10,
             NotificationHandler = (e, _) =>
             {
-                _output.WriteLine($">> NotificationHandler: Got notification (type:{e.GetType().Name}): {e}");
+                _output.WriteLine($"Got notification (type:{e.GetType().Name}): {e}");
                 if (e is NatsJSTimeoutNotification)
                 {
                     Interlocked.Increment(ref _timeoutNotifications);
@@ -123,7 +121,7 @@ public class ErrorHandlerTest
 
                 return Task.CompletedTask;
             },
-            Expires = TimeSpan.FromSeconds(60),
+            Expires = TimeSpan.FromSeconds(6),
             IdleHeartbeat = TimeSpan.FromSeconds(3),
         };
 
@@ -154,11 +152,10 @@ public class ErrorHandlerTest
             }
         });
 
-        using var consumeCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
+        var consumeCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
         var consume = Task.Run(
             async () =>
             {
-                _output.WriteLine(">> Starting consume loop...");
                 await foreach (var msg in consumer.ConsumeAsync<int>(opts: opts, cancellationToken: consumeCts.Token))
                 {
                     _output.WriteLine($">> Consumed message (2): {msg.Data}");
@@ -169,11 +166,11 @@ public class ErrorHandlerTest
             cts.Token);
 
         // XXX
-        // await Task.Delay(5000);
-        // foreach (var f in proxy.AllFrames)
-        // {
-        //     _output.WriteLine($">>> {f}");
-        // }
+        await Task.Delay(5000);
+        foreach (var f in proxy.AllFrames)
+        {
+            _output.WriteLine($">>> {f}");
+        }
 
         await Retry.Until(
             reason: "timed out",
@@ -409,27 +406,4 @@ public class ErrorHandlerTest
 
 public class TestConsumerNotificationException : Exception
 {
-}
-
-public class TestOutputWriter : TextWriter
-{
-    private readonly ITestOutputHelper _output;
-
-    public TestOutputWriter(ITestOutputHelper output)
-    {
-        _output = output;
-    }
-
-    public override Encoding Encoding => Encoding.UTF8;
-
-    public override void WriteLine(string? value)
-    {
-        _output.WriteLine(value ?? string.Empty);
-    }
-
-    // Optional: Handle other Write methods if needed
-    public override void Write(string? value)
-    {
-        _output.WriteLine(value ?? string.Empty); // Treat as WriteLine for simplicity
-    }
 }

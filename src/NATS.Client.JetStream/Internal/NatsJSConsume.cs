@@ -103,17 +103,8 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         _timer = new Timer(
             static state =>
             {
-                // XXX
-                Console.WriteLine($">>> CONSUME: TIMER: CALLBACK FIRED!");
-
                 var self = (NatsJSConsume<TMsg>)state!;
-                var natsJsNotificationChannel = self._notificationChannel;
-                if (natsJsNotificationChannel != null)
-                {
-                    // XXX
-                    Console.WriteLine($">>> CONSUME: TIMER: Notify");
-                    natsJsNotificationChannel.Notify(new NatsJSTimeoutNotification());
-                }
+                self._notificationChannel?.Notify(new NatsJSTimeoutNotification());
 
                 if (self._cancellationToken.IsCancellationRequested)
                 {
@@ -174,19 +165,9 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
             cancellationToken: cancellationToken);
     }
 
-    public void StopHeartbeatTimer()
-    {
-        Console.WriteLine($">>> CONSUME: StopHeartbeatTimer");
-        _timer.Change(Timeout.Infinite, Timeout.Infinite);
-    }
+    public void StopHeartbeatTimer() => _timer.Change(Timeout.Infinite, Timeout.Infinite);
 
-    public void ResetHeartbeatTimer(string who)
-    {
-        var caller = new System.Diagnostics.StackTrace().GetFrame(1)?.GetMethod()?.Name;
-        Console.WriteLine($">>> CONSUME: ResetHeartbeatTimer ({who}) called by {caller}");
-        //Console.WriteLine($">>> CONSUME: ResetHeartbeatTimer");
-        _timer.Change(_hbTimeout, _hbTimeout);
-    }
+    public void ResetHeartbeatTimer() => _timer.Change(_hbTimeout, _hbTimeout);
 
     public void Delivered(int msgSize)
     {
@@ -278,8 +259,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         ReadOnlySequence<byte>? headersBuffer,
         ReadOnlySequence<byte> payloadBuffer)
     {
-        Console.WriteLine($">>> CONSUME: ReceiveInternalAsync: {subject}:\n{Encoding.ASCII.GetString(headersBuffer?.ToArray()??[])}\n{Encoding.ASCII.GetString(payloadBuffer.ToArray())}");
-        ResetHeartbeatTimer("ReceiveInternalAsync");
+        ResetHeartbeatTimer();
 
         if (subject == Subject)
         {
