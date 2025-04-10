@@ -34,4 +34,15 @@
     <ProjectReference Include="..\NATS.Client.TestUtilities\NATS.Client.TestUtilities.csproj" />
   </ItemGroup>
 
+    <ItemGroup>
+        <Content Include="..\NATS.Client.TestUtilities\resources\**\*">
+            <Link>resources\%(RecursiveDir)%(Filename)%(Extension)</Link>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Include="..\NATS.Client.Core2.Tests\NatsServerFixture.cs" />
+    </ItemGroup>
+    
 </Project>
