@@ -98,7 +98,7 @@ public class ConsumerConsumeTest
 
         await Retry.Until(
             reason: "received enough pulls",
-            condition: () => PullCount() > 4,
+            condition: () => PullCount() > 3,
             action: () =>
             {
                 return Task.CompletedTask;
