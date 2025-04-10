@@ -1,28 +1,39 @@
+using NATS.Client.Core2.Tests;
 using NATS.Client.Platform.Windows.Tests;
 
 namespace NATS.Client.JetStream.Tests;
 
+[Collection("nats-server")]
 public class DoubleAckTest
 {
+    private readonly ITestOutputHelper _output;
+    private readonly NatsServerFixture _server;
+
+    public DoubleAckTest(ITestOutputHelper output, NatsServerFixture server)
+    {
+        _output = output;
+        _server = server;
+    }
+
     [Fact]
     public async Task Fetch_should_not_block_socket()
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
 
         var js = new NatsJSContext(nats);
-        await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
+        await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
 
         for (var i = 0; i < 100; i++)
         {
-            var ack = await js.PublishAsync("s1.foo", i, cancellationToken: cts.Token);
+            var ack = await js.PublishAsync($"{prefix}s1.foo", i, cancellationToken: cts.Token);
             ack.EnsureSuccess();
         }
 
         // fetch loop
         {
-            var consumer = (NatsJSConsumer)await js.CreateOrUpdateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+            var consumer = (NatsJSConsumer)await js.CreateOrUpdateConsumerAsync($"{prefix}s1", $"{prefix}c1", cancellationToken: cts.Token);
 
             var fetchOpts = new NatsJSFetchOpts
             {
@@ -44,7 +55,7 @@ public class DoubleAckTest
 
         // consume loop
         {
-            var consumer = (NatsJSConsumer)await js.CreateOrUpdateConsumerAsync("s1", "c2", cancellationToken: cts.Token);
+            var consumer = (NatsJSConsumer)await js.CreateOrUpdateConsumerAsync($"{prefix}s1", $"{prefix}c2", cancellationToken: cts.Token);
 
             var opts = new NatsJSConsumeOpts
             {

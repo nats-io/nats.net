@@ -1,20 +1,27 @@
 using NATS.Client.Core.Tests;
+using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Models;
 using NATS.Client.Platform.Windows.Tests;
 
 namespace NATS.Client.JetStream.Tests;
 
+[Collection("nats-server")]
 public class ListTests
 {
     private readonly ITestOutputHelper _output;
+    private readonly NatsServerFixture _server;
 
-    public ListTests(ITestOutputHelper output) => _output = output;
+    public ListTests(ITestOutputHelper output, NatsServerFixture server)
+    {
+        _output = output;
+        _server = server;
+    }
 
     [Fact]
     public async Task List_streams()
     {
-        await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestTimeout = TimeSpan.FromSeconds(5) });
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestTimeout = TimeSpan.FromSeconds(5) });
+        var prefix = _server.GetNextId();
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -23,7 +30,7 @@ public class ListTests
 
         for (var i = 0; i < total; i++)
         {
-            await js.CreateStreamAsync(new StreamConfig($"s{i:D5}", new[] { $"s{i:D5}.*" }), cts.Token);
+            await js.CreateStreamAsync(new StreamConfig($"{prefix}s{i:D5}", new[] { $"{prefix}s{i:D5}.*" }), cts.Token);
         }
 
         // Stream names
@@ -41,7 +48,7 @@ public class ListTests
 
             for (var i = 0; i < total; i++)
             {
-                Assert.Equal($"s{i:D5}", names[i]);
+                Assert.Equal($"{prefix}s{i:D5}", names[i]);
             }
 
             var noNames = 0;
@@ -67,7 +74,7 @@ public class ListTests
 
             for (var i = 0; i < total; i++)
             {
-                Assert.Equal($"s{i:D5}", streams[i].Info.Config.Name);
+                Assert.Equal($"{prefix}s{i:D5}", streams[i].Info.Config.Name);
             }
 
             var noNames = 0;
@@ -83,19 +90,19 @@ public class ListTests
     [Fact]
     public async Task List_consumers()
     {
-        await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestTimeout = TimeSpan.FromSeconds(5) });
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestTimeout = TimeSpan.FromSeconds(5) });
+        var prefix = _server.GetNextId();
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
-        var stream = await js.CreateStreamAsync(new StreamConfig("s1", new[] { "s1.*" }), cts.Token);
+        var stream = await js.CreateStreamAsync(new StreamConfig($"{prefix}s1", [$"{prefix}s1.*"]), cts.Token);
 
         const int total = 1200;
 
         for (var i = 0; i < total; i++)
         {
-            await js.CreateOrUpdateConsumerAsync("s1", new ConsumerConfig($"c{i:D5}"), cts.Token);
+            await js.CreateOrUpdateConsumerAsync($"{prefix}s1", new ConsumerConfig($"{prefix}c{i:D5}"), cts.Token);
         }
 
         // List names
@@ -112,7 +119,7 @@ public class ListTests
 
             for (var i = 0; i < total; i++)
             {
-                Assert.Equal($"c{i:D5}", names[i]);
+                Assert.Equal($"{prefix}c{i:D5}", names[i]);
             }
         }
 
@@ -130,13 +137,13 @@ public class ListTests
 
             for (var i = 0; i < total; i++)
             {
-                Assert.Equal($"c{i:D5}", consumers[i].Info.Name);
+                Assert.Equal($"{prefix}c{i:D5}", consumers[i].Info.Name);
             }
         }
 
         // Empty list
         {
-            var stream2 = await js.CreateStreamAsync(new StreamConfig("s2", new[] { "s2.*" }), cts.Token);
+            var stream2 = await js.CreateStreamAsync(new StreamConfig($"{prefix}s2", [$"{prefix}s2.*"]), cts.Token);
 
             var count = 0;
             await foreach (var unused in stream2.ListConsumersAsync(cts.Token))

@@ -1,13 +1,24 @@
 using System.Diagnostics;
 using NATS.Client.Core.Tests;
+using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Models;
 using NATS.Client.Platform.Windows.Tests;
 using NATS.Client.TestUtilities;
 
 namespace NATS.Client.JetStream.Tests;
 
+[Collection("nats-server")]
 public class ConsumerNotificationTest
 {
+    private readonly ITestOutputHelper _output;
+    private readonly NatsServerFixture _server;
+
+    public ConsumerNotificationTest(ITestOutputHelper output, NatsServerFixture server)
+    {
+        _output = output;
+        _server = server;
+    }
+
     [SkipOnPlatform("WINDOWS", "doesn't support signals")]
     public async Task Non_terminal_errors_sent_as_notifications()
     {
@@ -85,18 +96,19 @@ public class ConsumerNotificationTest
     [Fact]
     public async Task Exceeded_max_errors()
     {
-        await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
-        await js.CreateStreamAsync("s1", ["s1.*"], cts.Token);
+        await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
 
         // 409 Exceeded MaxRequestBatch
         await ConsumeAndFetchTerminatesAsync(
+            $"{prefix}s1",
             js,
-            new ConsumerConfig("c1") { MaxBatch = 10, },
+            new ConsumerConfig($"{prefix}c1") { MaxBatch = 10, },
             new NatsJSConsumeOpts { MaxMsgs = 20, },
             new NatsJSFetchOpts { MaxMsgs = 20, },
             expectedCode: 409,
@@ -105,8 +117,9 @@ public class ConsumerNotificationTest
 
         // 409 Exceeded MaxRequestExpires
         await ConsumeAndFetchTerminatesAsync(
+            $"{prefix}s1",
             js,
-            new ConsumerConfig("c2") { MaxExpires = TimeSpan.FromSeconds(10), },
+            new ConsumerConfig($"{prefix}c2") { MaxExpires = TimeSpan.FromSeconds(10), },
             new NatsJSConsumeOpts { MaxMsgs = 20, Expires = TimeSpan.FromSeconds(20) },
             new NatsJSFetchOpts { MaxMsgs = 20, Expires = TimeSpan.FromSeconds(20) },
             expectedCode: 409,
@@ -115,8 +128,9 @@ public class ConsumerNotificationTest
 
         // 409 Exceeded MaxRequestMaxBytes
         await ConsumeAndFetchTerminatesAsync(
+            $"{prefix}s1",
             js,
-            new ConsumerConfig("c3") { MaxBytes = 1024, },
+            new ConsumerConfig($"{prefix}c3") { MaxBytes = 1024, },
             new NatsJSConsumeOpts { MaxBytes = 2048, },
             new NatsJSFetchOpts { MaxBytes = 2048, },
             expectedCode: 409,
@@ -125,6 +139,7 @@ public class ConsumerNotificationTest
     }
 
     private async Task ConsumeAndFetchTerminatesAsync(
+        string stream,
         NatsJSContext js,
         ConsumerConfig consumerConfig,
         NatsJSConsumeOpts natsJSConsumeOpts,
@@ -134,7 +149,7 @@ public class ConsumerNotificationTest
         CancellationToken cancellationToken)
     {
         var consumer = await js.CreateOrUpdateConsumerAsync(
-            stream: "s1",
+            stream: stream,
             config: consumerConfig,
             cancellationToken: cancellationToken);
 

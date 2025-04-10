@@ -243,7 +243,9 @@ public class ConsumerConsumeTest
 
         await Retry.Until(
             "acked",
-            () => proxy.ClientFrames.Any(f => f.Message.StartsWith($"PUB $JS.ACK.{prefix}s1.{prefix}c1")));
+            () => proxy.ClientFrames.Any(f => f.Message.StartsWith($"PUB $JS.ACK.{prefix}s1.{prefix}c1")),
+            timeout: TimeSpan.FromSeconds(20),
+            retryDelay: TimeSpan.FromSeconds(1));
 
         Assert.Contains(proxy.ClientFrames, f => f.Message.Contains("CONSUMER.MSG.NEXT"));
 
