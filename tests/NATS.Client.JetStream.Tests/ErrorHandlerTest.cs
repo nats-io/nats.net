@@ -149,7 +149,7 @@ public class ErrorHandlerTest
             },
             cts.Token);
 
-        await Retry.Until("timed out", () => Volatile.Read(ref timeoutNotifications) > 0, timeout: TimeSpan.FromSeconds(20));
+        await Retry.Until("timed out", () => Interlocked.CompareExchange(ref timeoutNotifications, 0, 0) > 0, timeout: TimeSpan.FromSeconds(20));
         consumeCts.Cancel();
         await consume;
 
