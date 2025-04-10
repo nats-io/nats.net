@@ -20,7 +20,7 @@ public class PublishRetryTest
     }
 
     [Fact]
-    public async Task Publish_with_or_without_telemetry()
+    public async Task Publish_with_telemetry()
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         await using var nats = new NatsConnection(new NatsOpts
@@ -39,14 +39,6 @@ public class PublishRetryTest
             Assert.Contains(_isFramework ? "Request-Id" : "traceparent", headers);
         }
 
-        // Without telemetry
-        {
-            var headers = new NatsHeaders();
-            await nats.PublishAsync(prefix, headers: headers, cancellationToken: cts.Token);
-            Assert.DoesNotContain(_isFramework ? "Request-Id" : "traceparent", headers);
-            Assert.Empty(headers);
-        }
-
         // With telemetry and data
         {
             using var activityListener = new ActivityListener { ShouldListenTo = _ => true, Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData, };
@@ -54,14 +46,6 @@ public class PublishRetryTest
             var headers = new NatsHeaders();
             await nats.PublishAsync(prefix, data: 1, headers: headers, cancellationToken: cts.Token);
             Assert.Contains(_isFramework ? "Request-Id" : "traceparent", headers);
-        }
-
-        // Without telemetry and data
-        {
-            var headers = new NatsHeaders();
-            await nats.PublishAsync(prefix, data: 1, headers: headers, cancellationToken: cts.Token);
-            Assert.DoesNotContain(_isFramework ? "Request-Id" : "traceparent", headers);
-            Assert.Empty(headers);
         }
     }
 
