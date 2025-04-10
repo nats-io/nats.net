@@ -121,7 +121,7 @@ public class ErrorHandlerTest
 
                 return Task.CompletedTask;
             },
-            Expires = TimeSpan.FromSeconds(6),
+            Expires = TimeSpan.FromSeconds(60),
             IdleHeartbeat = TimeSpan.FromSeconds(3),
         };
 
@@ -166,11 +166,11 @@ public class ErrorHandlerTest
             cts.Token);
 
         // XXX
-        await Task.Delay(5000);
-        foreach (var f in proxy.AllFrames)
-        {
-            _output.WriteLine($">>> {f}");
-        }
+        // await Task.Delay(5000);
+        // foreach (var f in proxy.AllFrames)
+        // {
+        //     _output.WriteLine($">>> {f}");
+        // }
 
         await Retry.Until(
             reason: "timed out",
