@@ -36,7 +36,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="..\NATS.Client.Core.Tests\resources\**\*">
+    <Content Include="..\NATS.Client.TestUtilities\resources\**\*">
       <Link>resources\%(RecursiveDir)%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
