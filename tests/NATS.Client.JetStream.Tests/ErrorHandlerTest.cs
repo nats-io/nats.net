@@ -10,6 +10,7 @@ public class ErrorHandlerTest
 {
     private readonly ITestOutputHelper _output;
     private readonly NatsServerFixture _server;
+    private int _timeoutNotifications = 0;
 
     public ErrorHandlerTest(ITestOutputHelper output, NatsServerFixture server)
     {
@@ -106,7 +107,6 @@ public class ErrorHandlerTest
 
         (await js.PublishAsync($"{prefix}s1.1", 1, cancellationToken: cts.Token)).EnsureSuccess();
 
-        var timeoutNotifications = 0;
         var opts = new NatsJSConsumeOpts
         {
             MaxMsgs = 10,
@@ -114,7 +114,7 @@ public class ErrorHandlerTest
             {
                 if (e is NatsJSTimeoutNotification)
                 {
-                    Interlocked.Increment(ref timeoutNotifications);
+                    Interlocked.Increment(ref _timeoutNotifications);
                 }
 
                 return Task.CompletedTask;
@@ -131,10 +131,23 @@ public class ErrorHandlerTest
             break;
         }
 
-        Assert.Equal(0, Volatile.Read(ref timeoutNotifications));
+        Assert.Equal(0, Interlocked.CompareExchange(ref _timeoutNotifications, 0, 0));
 
         // Swallow heartbeats
-        proxy.ServerInterceptors.Add(m => m?.Contains("Idle Heartbeat") ?? false ? null : m);
+        proxy.ServerInterceptors.Add(m =>
+        {
+            var isIdleHeartbeat = m?.Contains("Idle Heartbeat") ?? false;
+
+            if (isIdleHeartbeat)
+            {
+                _output.WriteLine($">> Swallowed Idle Heartbeat: {m}");
+                return null;
+            }
+            else
+            {
+                return m;
+            }
+        });
 
         var count = 0;
         var consumeCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
@@ -149,12 +162,12 @@ public class ErrorHandlerTest
             },
             cts.Token);
 
-        await Retry.Until("timed out", () => Interlocked.CompareExchange(ref timeoutNotifications, 0, 0) > 0, timeout: TimeSpan.FromSeconds(20));
+        await Retry.Until("timed out", () => Interlocked.CompareExchange(ref _timeoutNotifications, 0, 0) > 0, timeout: TimeSpan.FromSeconds(20));
         consumeCts.Cancel();
         await consume;
 
         Assert.Equal(0, Volatile.Read(ref count));
-        Assert.True(Volatile.Read(ref timeoutNotifications) > 0);
+        Assert.True(Volatile.Read(ref _timeoutNotifications) > 0);
     }
 
     [Fact]
