@@ -12,18 +12,18 @@ public class IndexPagePub
         Console.WriteLine("NATS.Net.DocsExamples.IndexPagePub");
         {
             #region demo
-            await using var nc = new NatsClient("demo.nats.io");
+            await using NatsClient nc = new NatsClient("demo.nats.io");
 
             Console.Write("Enter your room: ");
-            var room = Console.ReadLine();
+            string? room = Console.ReadLine();
 
             Console.Write("Enter your name: ");
-            var name = Console.ReadLine();
+            string? name = Console.ReadLine();
 
             while (true)
             {
                 Console.Write("Enter a message to publish: ");
-                var message = Console.ReadLine();
+                string? message = Console.ReadLine();
                 await nc.PublishAsync(subject: $"hello.{room}.{name}", data: message);
             }
             #endregion

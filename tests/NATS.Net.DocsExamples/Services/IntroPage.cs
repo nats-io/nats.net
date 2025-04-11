@@ -1,12 +1,5 @@
 // ReSharper disable SuggestVarOrType_Elsewhere
 
-using System.Text.Json.Serialization;
-using NATS.Client.Core;
-using NATS.Client.JetStream;
-using NATS.Client.JetStream.Models;
-using NATS.Client.KeyValueStore;
-using NATS.Client.ObjectStore;
-using NATS.Client.Serializers.Json;
 using NATS.Client.Services;
 
 #pragma warning disable SA1123
@@ -25,12 +18,12 @@ public class IntroPage
         Console.WriteLine("NATS.Net.DocsExamples.Services.IntroPage");
 
         #region svc
-        await using var nc = new NatsClient();
-        var svc = nc.CreateServicesContext();
+        await using NatsClient nc = new NatsClient();
+        INatsSvcContext svc = nc.CreateServicesContext();
         #endregion
 
         #region add
-        await using var testService = await svc.AddServiceAsync("test", "1.0.0");
+        await using INatsSvcServer testService = await svc.AddServiceAsync("test", "1.0.0");
         #endregion
 
         #region endpoint
@@ -55,7 +48,7 @@ public class IntroPage
         #endregion
 
         #region grp
-        var grp1 = await testService.AddGroupAsync("grp1");
+        NatsSvcServer.Group grp1 = await testService.AddGroupAsync("grp1");
         await grp1.AddEndpointAsync<int>(name: "ep1", handler: async m =>
         {
             // handle message

@@ -2,9 +2,7 @@
 #pragma warning disable SA1124
 #pragma warning disable SA1509
 
-using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
-using NATS.Client.Serializers.Json;
 
 namespace NATS.Net.DocsExamples.Core;
 
@@ -20,9 +18,9 @@ public class IntroPage
             subscription = Task.Run(async () =>
             {
                 #region sub
-                await using var nc = new NatsClient();
+                await using NatsClient nc = new NatsClient();
 
-                await foreach (var msg in nc.SubscribeAsync<Bar>("bar.>"))
+                await foreach (NatsMsg<Bar> msg in nc.SubscribeAsync<Bar>("bar.>"))
                 {
                     if (msg.Subject == "bar.exit")
                         break;
@@ -37,9 +35,9 @@ public class IntroPage
 
         {
             #region pub
-            await using var nc = new NatsClient();
+            await using NatsClient nc = new NatsClient();
 
-            for (var i = 0; i < 10; i++)
+            for (int i = 0; i < 10; i++)
             {
                 Console.WriteLine($" Publishing {i}...");
                 await nc.PublishAsync<Bar>($"bar.baz.{i}", new Bar(Id: i, Name: "Baz"));
@@ -48,7 +46,7 @@ public class IntroPage
             await nc.PublishAsync("bar.exit");
             #endregion
 
-            for (var i = 0; i < 3; i++)
+            for (int i = 0; i < 3; i++)
             {
                 await Task.Delay(250);
                 await nc.PublishAsync("bar.exit");

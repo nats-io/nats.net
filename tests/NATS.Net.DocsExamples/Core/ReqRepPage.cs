@@ -19,15 +19,15 @@ public class ReqRepPage
         Console.WriteLine("____________________________________________________________");
         Console.WriteLine("NATS.Net.DocsExamples.Core.ReqRepPage");
 
-        await using var nc1 = new NatsClient();
-        var myMathService = new MyMathService(nc1);
+        await using NatsClient nc1 = new NatsClient();
+        MyMathService myMathService = new MyMathService(nc1);
         await myMathService.StartAsync(CancellationToken.None);
 
         await Task.Delay(1000);
 
         {
             #region reqrep
-            await using var nc = new NatsClient();
+            await using NatsClient nc = new NatsClient();
 
             NatsMsg<int> reply = await nc.RequestAsync<int, int>("math.double", 2);
 
@@ -51,11 +51,11 @@ public class MyMathService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await foreach (var msg in _natsClient.SubscribeAsync<int>("math.double", cancellationToken: stoppingToken))
+        await foreach (NatsMsg<int> msg in _natsClient.SubscribeAsync<int>("math.double", cancellationToken: stoppingToken))
         {
             Console.WriteLine($"Received request: {msg.Data}");
 
-            var result = 2 * msg.Data;
+            int result = 2 * msg.Data;
 
             await msg.ReplyAsync(result, cancellationToken: stoppingToken);
         }

@@ -1,12 +1,8 @@
 // ReSharper disable SuggestVarOrType_Elsewhere
 
-using System.Text.Json.Serialization;
-using NATS.Client.Core;
 using NATS.Client.JetStream;
-using NATS.Client.JetStream.Models;
-using NATS.Client.KeyValueStore;
 using NATS.Client.ObjectStore;
-using NATS.Client.Serializers.Json;
+using NATS.Client.ObjectStore.Models;
 
 #pragma warning disable SA1123
 #pragma warning disable SA1124
@@ -23,8 +19,8 @@ public class IntroPage
         Console.WriteLine("NATS.Net.DocsExamples.ObjectStore.IntroPage");
 
         #region obj
-        await using var nc = new NatsClient();
-        var obj = nc.CreateObjectStoreContext();
+        await using NatsClient nc = new NatsClient();
+        INatsObjContext obj = nc.CreateObjectStoreContext();
         #endregion
 
         try
@@ -37,7 +33,7 @@ public class IntroPage
         }
 
         #region store
-        var store = await obj.CreateObjectStoreAsync("test-bucket");
+        INatsObjStore store = await obj.CreateObjectStoreAsync("test-bucket");
         #endregion
 
         await File.WriteAllTextAsync("data.bin", "tests");
@@ -50,7 +46,7 @@ public class IntroPage
             #endregion
 
             #region info
-            var metadata = await store.GetInfoAsync("my/random/data.bin");
+            ObjectMetadata metadata = await store.GetInfoAsync("my/random/data.bin");
 
             Console.WriteLine("Metadata:");
             Console.WriteLine($"  Bucket: {metadata.Bucket}");
