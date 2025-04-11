@@ -6,19 +6,15 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 #endif
 
-namespace NATS.Client.Core.Internal;
+namespace NATS.Client.Core;
 
-internal sealed class WebSocketConnection : ISocketConnection
+public class WebSocketConnection : ISocketConnection
 {
-    private readonly ClientWebSocket _socket;
     private readonly TaskCompletionSource<Exception> _waitForClosedSource = new();
     private readonly TimeSpan _socketCloseTimeout = TimeSpan.FromSeconds(5); // matches _socketComponentDisposeTimeout in NatsConnection.cs
     private int _disposed;
 
-    public WebSocketConnection()
-    {
-        _socket = new ClientWebSocket();
-    }
+    public ClientWebSocket Socket { get; } = new();
 
     public Task<Exception> WaitForClosed => _waitForClosedSource.Task;
 
@@ -34,7 +30,7 @@ internal sealed class WebSocketConnection : ISocketConnection
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Task ConnectAsync(Uri uri, CancellationToken cancellationToken)
     {
-        return _socket.ConnectAsync(uri, cancellationToken);
+        return Socket.ConnectAsync(uri, cancellationToken);
     }
 
     /// <summary>
@@ -45,8 +41,8 @@ internal sealed class WebSocketConnection : ISocketConnection
         using var cts = new CancellationTokenSource(opts.ConnectTimeout);
         try
         {
-            await opts.WebSocketOpts.ApplyClientWebSocketOptionsAsync(_socket.Options, uri, opts.TlsOpts, cts.Token).ConfigureAwait(false);
-            await _socket.ConnectAsync(uri.Uri, cts.Token).ConfigureAwait(false);
+            await opts.WebSocketOpts.ApplyClientWebSocketOptionsAsync(Socket.Options, uri, opts.TlsOpts, cts.Token).ConfigureAwait(false);
+            await Socket.ConnectAsync(uri.Uri, cts.Token).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -71,9 +67,9 @@ internal sealed class WebSocketConnection : ISocketConnection
             segment = new ArraySegment<byte>(buffer.ToArray());
         }
 
-        await _socket.SendAsync(segment, WebSocketMessageType.Binary, true, CancellationToken.None).ConfigureAwait(false);
+        await Socket.SendAsync(segment, WebSocketMessageType.Binary, true, CancellationToken.None).ConfigureAwait(false);
 #else
-        await _socket.SendAsync(buffer, WebSocketMessageType.Binary, WebSocketMessageFlags.EndOfMessage, CancellationToken.None).ConfigureAwait(false);
+        await Socket.SendAsync(buffer, WebSocketMessageType.Binary, WebSocketMessageFlags.EndOfMessage, CancellationToken.None).ConfigureAwait(false);
 #endif
         return buffer.Length;
     }
@@ -87,9 +83,9 @@ internal sealed class WebSocketConnection : ISocketConnection
             ThrowHelper.ThrowInvalidOperationException("Can't get underlying array");
         }
 
-        var wsRead = await _socket.ReceiveAsync(segment, CancellationToken.None).ConfigureAwait(false);
+        var wsRead = await Socket.ReceiveAsync(segment, CancellationToken.None).ConfigureAwait(false);
 #else
-        var wsRead = await _socket.ReceiveAsync(buffer, CancellationToken.None).ConfigureAwait(false);
+        var wsRead = await Socket.ReceiveAsync(buffer, CancellationToken.None).ConfigureAwait(false);
 #endif
         return wsRead.Count;
     }
@@ -98,7 +94,7 @@ internal sealed class WebSocketConnection : ISocketConnection
     {
         // ClientWebSocket.Abort() doesn't accept a cancellation token, so check at the beginning of this method
         cancellationToken.ThrowIfCancellationRequested();
-        _socket.Abort();
+        Socket.Abort();
         return default;
     }
 
@@ -117,13 +113,13 @@ internal sealed class WebSocketConnection : ISocketConnection
             try
             {
                 var cts = new CancellationTokenSource(_socketCloseTimeout);
-                await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, default, cts.Token).ConfigureAwait(false);
+                await Socket.CloseAsync(WebSocketCloseStatus.NormalClosure, default, cts.Token).ConfigureAwait(false);
             }
             catch
             {
             }
 
-            _socket.Dispose();
+            Socket.Dispose();
         }
     }
 
