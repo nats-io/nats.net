@@ -1,4 +1,3 @@
-using System.Net.WebSockets;
 using System.Text;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
@@ -52,6 +51,8 @@ public sealed record NatsOpts
     public NatsAuthOpts AuthOpts { get; init; } = NatsAuthOpts.Default;
 
     public NatsTlsOpts TlsOpts { get; init; } = NatsTlsOpts.Default;
+
+    public NatsProxyOpts ProxyOpts { get; init; } = NatsProxyOpts.Default;
 
     public NatsWebSocketOpts WebSocketOpts { get; init; } = NatsWebSocketOpts.Default;
 

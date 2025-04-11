@@ -344,7 +344,7 @@ public partial class NatsConnection : INatsConnection
                 else
                 {
                     var conn = new TcpConnection(_logger);
-                    await conn.ConnectAsync(target.Host, target.Port, Opts.ConnectTimeout).ConfigureAwait(false);
+                    await conn.ConnectAsync(target.Host, target.Port, Opts).ConfigureAwait(false);
                     _socket = conn;
 
                     if (Opts.TlsOpts.EffectiveMode(uri) == TlsMode.Implicit)
@@ -433,7 +433,7 @@ public partial class NatsConnection : INatsConnection
         try
         {
             // Wait for an INFO message from server. If we land on a dead socket and server response
-            // can't be received, this will throw a timeout exception and we will retry the connection.
+            // can't be received, this will throw a timeout exception, and we will retry the connection.
             await waitForInfoSignal.Task.WaitAsync(Opts.RequestTimeout).ConfigureAwait(false);
 
             // check to see if we should upgrade to TLS
@@ -652,7 +652,7 @@ public partial class NatsConnection : INatsConnection
                     {
                         _logger.LogDebug(NatsLogEvents.Connection, "Trying to reconnect using TCP {Url} [{ReconnectCount}]", url, reconnectCount);
                         var conn = new TcpConnection(_logger);
-                        await conn.ConnectAsync(url.Host, url.Port, Opts.ConnectTimeout).ConfigureAwait(false);
+                        await conn.ConnectAsync(url.Host, url.Port, Opts).ConfigureAwait(false);
                         _socket = conn;
 
                         if (Opts.TlsOpts.EffectiveMode(url) == TlsMode.Implicit)
