@@ -120,3 +120,5 @@ nuget/*.unitypackage
 # MacOS folder attributes
 .DS_Store
 /tests/NATS.Client.TestUtilities/Properties/launchSettings.json
+
+/_site
