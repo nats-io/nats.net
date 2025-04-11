@@ -415,53 +415,6 @@ public abstract partial class NatsConnectionTest
     }
 
     [Fact]
-    public async Task OnSocketAvailableAsync_ShouldBeInvokedOnInitialConnection()
-    {
-        // Arrange
-        await using var server = await NatsServer.StartAsync();
-        var clientOpts = server.ClientOpts(NatsOpts.Default);
-
-        var wasInvoked = new WaitSignal();
-        var nats = new NatsConnection(clientOpts);
-        nats.OnSocketAvailableAsync = socket =>
-        {
-            wasInvoked.Pulse();
-            return new ValueTask<ISocketConnection>(socket);
-        };
-
-        // Act
-        await nats.ConnectAsync();
-
-        // Assert
-        await wasInvoked;
-    }
-
-    [Fact]
-    public async Task OnSocketAvailableAsync_ShouldBeInvokedOnReconnection()
-    {
-        // Arrange
-        await using var server = await NatsServer.StartAsync();
-        var clientOpts = server.ClientOpts(NatsOpts.Default);
-
-        var invocationCount = 0;
-        var nats = new NatsConnection(clientOpts);
-        nats.OnSocketAvailableAsync = socket =>
-        {
-            Interlocked.Increment(ref invocationCount);
-            return new ValueTask<ISocketConnection>(socket);
-        };
-
-        // Simulate initial connection
-        await nats.ConnectAsync();
-
-        await server.RestartAsync();
-
-        await nats.ConnectAsync();
-
-        await Retry.Until("callback", () => Interlocked.CompareExchange(ref invocationCount, 0, 0) == 2, timeout: TimeSpan.FromSeconds(30));
-    }
-
-    [Fact]
     public async Task ReconnectOnOpenConnection_ShouldDisconnectAndOpenNewConnection()
     {
         // Arrange

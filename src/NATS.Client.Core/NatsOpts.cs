@@ -1,3 +1,4 @@
+using System.Net.WebSockets;
 using System.Text;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
@@ -52,8 +53,6 @@ public sealed record NatsOpts
 
     public NatsTlsOpts TlsOpts { get; init; } = NatsTlsOpts.Default;
 
-    public NatsProxyOpts ProxyOpts { get; init; } = NatsProxyOpts.Default;
-
     public NatsWebSocketOpts WebSocketOpts { get; init; } = NatsWebSocketOpts.Default;
 
     public INatsSerializerRegistry SerializerRegistry { get; init; } = NatsDefaultSerializerRegistry.Default;
@@ -98,6 +97,8 @@ public sealed record NatsOpts
 
     public Encoding SubjectEncoding { get; init; } = Encoding.ASCII;
 
+    public ISocketConnectionFactory SocketConnectionFactory { get; init; } = DefaultSocketConnectionFactory.Instance;
+
     public bool WaitUntilSent { get; init; } = false;
 
     /// <summary>
@@ -132,7 +133,7 @@ public sealed record NatsOpts
 
     /// <summary>
     /// This value will be used for subscriptions internal bounded message channel <c>FullMode</c>.
-    /// The default is to drop newest message when full (<c>BoundedChannelFullMode.DropNewest</c>).
+    /// The default is to drop the newest message when full (<c>BoundedChannelFullMode.DropNewest</c>).
     /// </summary>
     /// <remarks>
     /// If the client reaches this internal limit (bounded channel capacity), by default it will drop messages
