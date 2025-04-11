@@ -97,8 +97,6 @@ public sealed record NatsOpts
 
     public Encoding SubjectEncoding { get; init; } = Encoding.ASCII;
 
-    public ISocketConnectionFactory SocketConnectionFactory { get; init; } = DefaultSocketConnectionFactory.Instance;
-
     public bool WaitUntilSent { get; init; } = false;
 
     /// <summary>
@@ -133,7 +131,7 @@ public sealed record NatsOpts
 
     /// <summary>
     /// This value will be used for subscriptions internal bounded message channel <c>FullMode</c>.
-    /// The default is to drop the newest message when full (<c>BoundedChannelFullMode.DropNewest</c>).
+    /// The default is to drop newest message when full (<c>BoundedChannelFullMode.DropNewest</c>).
     /// </summary>
     /// <remarks>
     /// If the client reaches this internal limit (bounded channel capacity), by default it will drop messages
@@ -143,6 +141,8 @@ public sealed record NatsOpts
     /// case it might risk server disconnecting the client as a slow consumer.
     /// </remarks>
     public BoundedChannelFullMode SubPendingChannelFullMode { get; init; } = BoundedChannelFullMode.DropNewest;
+
+    public Func<NatsUri, NatsOpts, CancellationToken, ValueTask<ISocketConnection>>? SocketConnectionFactory { get; set; } = null;
 
     internal NatsUri[] GetSeedUris(bool suppressRandomization = false)
     {

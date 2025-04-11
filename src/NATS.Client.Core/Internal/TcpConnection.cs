@@ -3,11 +3,10 @@ using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
-using NATS.Client.Core.Internal;
 
-namespace NATS.Client.Core;
+namespace NATS.Client.Core.Internal;
 
-public sealed class SocketClosedException : Exception
+internal sealed class SocketClosedException : Exception
 {
     public SocketClosedException(Exception? innerException)
         : base("Socket has been closed.", innerException)
@@ -15,26 +14,24 @@ public sealed class SocketClosedException : Exception
     }
 }
 
-public class TcpConnection : ISocketConnection
+internal sealed class TcpConnection : ISocketConnection
 {
+    private readonly ILogger _logger;
+    private readonly Socket _socket;
     private readonly TaskCompletionSource<Exception> _waitForClosedSource = new();
     private int _disposed;
 
     public TcpConnection(ILogger logger)
     {
-        Logger = logger;
-        Socket = new Socket(Socket.OSSupportsIPv6 ? AddressFamily.InterNetworkV6 : AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        _logger = logger;
+        _socket = new Socket(Socket.OSSupportsIPv6 ? AddressFamily.InterNetworkV6 : AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         if (Socket.OSSupportsIPv6)
         {
-            Socket.DualMode = true;
+            _socket.DualMode = true;
         }
 
-        Socket.NoDelay = true;
+        _socket.NoDelay = true;
     }
-
-    public ILogger Logger { get; }
-
-    public Socket Socket { get; }
 
     public Task<Exception> WaitForClosed => _waitForClosedSource.Task;
 
@@ -51,9 +48,9 @@ public class TcpConnection : ISocketConnection
     public ValueTask ConnectAsync(string host, int port, CancellationToken cancellationToken)
     {
 #if NETSTANDARD
-        return new ValueTask(Socket.ConnectAsync(host, port).WaitAsync(Timeout.InfiniteTimeSpan, cancellationToken));
+        return new ValueTask(_socket.ConnectAsync(host, port).WaitAsync(Timeout.InfiniteTimeSpan, cancellationToken));
 #else
-        return Socket.ConnectAsync(host, port, cancellationToken);
+        return _socket.ConnectAsync(host, port, cancellationToken);
 #endif
     }
 
@@ -66,9 +63,9 @@ public class TcpConnection : ISocketConnection
         try
         {
 #if NETSTANDARD
-            await Socket.ConnectAsync(host, port).WaitAsync(timeout, cts.Token).ConfigureAwait(false);
+            await _socket.ConnectAsync(host, port).WaitAsync(timeout, cts.Token).ConfigureAwait(false);
 #else
-                await Socket.ConnectAsync(host, port, cts.Token).ConfigureAwait(false);
+            await _socket.ConnectAsync(host, port, cts.Token).ConfigureAwait(false);
 #endif
         }
         catch (Exception ex)
@@ -94,9 +91,9 @@ public class TcpConnection : ISocketConnection
             segment = new ArraySegment<byte>(buffer.ToArray());
         }
 
-        return new ValueTask<int>(Socket.SendAsync(segment, SocketFlags.None));
+        return new ValueTask<int>(_socket.SendAsync(segment, SocketFlags.None));
 #else
-        return Socket.SendAsync(buffer, SocketFlags.None, CancellationToken.None);
+        return _socket.SendAsync(buffer, SocketFlags.None, CancellationToken.None);
 #endif
     }
 
@@ -109,19 +106,19 @@ public class TcpConnection : ISocketConnection
             ThrowHelper.ThrowInvalidOperationException("Can't get underlying array");
         }
 
-        return new ValueTask<int>(Socket.ReceiveAsync(segment, SocketFlags.None));
+        return new ValueTask<int>(_socket.ReceiveAsync(segment, SocketFlags.None));
 #else
-        return Socket.ReceiveAsync(buffer, SocketFlags.None, CancellationToken.None);
+        return _socket.ReceiveAsync(buffer, SocketFlags.None, CancellationToken.None);
 #endif
     }
 
     public ValueTask AbortConnectionAsync(CancellationToken cancellationToken)
     {
 #if NETSTANDARD
-        Socket.Disconnect(false);
+        _socket.Disconnect(false);
         return default;
 #else
-        return Socket.DisconnectAsync(false, cancellationToken);
+        return _socket.DisconnectAsync(false, cancellationToken);
 #endif
     }
 
@@ -135,19 +132,17 @@ public class TcpConnection : ISocketConnection
             }
             catch
             {
-                // ignored
             }
 
             try
             {
-                Socket.Shutdown(SocketShutdown.Both);
+                _socket.Shutdown(SocketShutdown.Both);
             }
             catch
             {
-                // ignored
             }
 
-            Socket.Dispose();
+            _socket.Dispose();
         }
 
         return default;
@@ -161,13 +156,13 @@ public class TcpConnection : ISocketConnection
 
     // NetworkStream will own the Socket, so mark as disposed
     // in order to skip socket.Dispose() in DisposeAsync
-    internal SslStreamConnection UpgradeToSslStreamConnection(NatsTlsOpts tlsOpts)
+    public SslStreamConnection UpgradeToSslStreamConnection(NatsTlsOpts tlsOpts)
     {
         if (Interlocked.Increment(ref _disposed) == 1)
         {
             return new SslStreamConnection(
-                Logger,
-                Socket,
+                _logger,
+                _socket,
                 tlsOpts,
                 _waitForClosedSource);
         }

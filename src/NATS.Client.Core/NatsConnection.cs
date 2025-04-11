@@ -1,10 +1,10 @@
+using System;
 using System.Buffers;
 using System.Diagnostics;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
 using NATS.Client.Core.Internal;
-
 #if NETSTANDARD
 using Random = NATS.Client.Core.Internal.NetStandardExtensions.Random;
 #endif
@@ -43,7 +43,6 @@ public partial class NatsConnection : INatsConnection
     private readonly Channel<(NatsEvent, NatsEventArgs)> _eventChannel;
     private readonly ClientOpts _clientOpts;
     private readonly SubscriptionManager _subscriptionManager;
-    private readonly ISocketConnectionFactory _socketConnectionFactory;
 
     private ServerInfo? _writableServerInfo;
     private int _pongCount;
@@ -74,7 +73,6 @@ public partial class NatsConnection : INatsConnection
     public NatsConnection(NatsOpts opts)
     {
         _logger = opts.LoggerFactory.CreateLogger<NatsConnection>();
-        _socketConnectionFactory = opts.SocketConnectionFactory;
         Opts = opts.ReadUserInfoFromConnectionString();
         ConnectionState = NatsConnectionState.Closed;
         _waitForOpenConnection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -138,6 +136,8 @@ public partial class NatsConnection : INatsConnection
 
     // Hooks
     public Func<(string Host, int Port), ValueTask<(string Host, int Port)>>? OnConnectingAsync { get; set; }
+
+    public Func<ISocketConnection, ValueTask<ISocketConnection>>? OnSocketAvailableAsync { get; set; }
 
     internal ServerInfo? WritableServerInfo
     {
@@ -259,30 +259,6 @@ public partial class NatsConnection : INatsConnection
         }
     }
 
-    public NatsUri FixTlsHost(NatsUri uri)
-    {
-        var lastSeedConnectUri = _lastSeedConnectUri;
-        var lastSeedHost = lastSeedConnectUri?.Host;
-
-        if (string.IsNullOrEmpty(lastSeedHost))
-            return uri;
-
-        // if the current URI is not a seed URI and is not a DNS hostname, check the server cert against the
-        // last seed hostname if it was a DNS hostname
-        if (!uri.IsSeed
-         && Uri.CheckHostName(uri.Host) != UriHostNameType.Dns
-         && Uri.CheckHostName(lastSeedHost) == UriHostNameType.Dns)
-        {
-#if NETSTANDARD2_0
-            return uri.CloneWith(lastSeedHost!);
-#else
-            return uri.CloneWith(lastSeedHost);
-#endif
-        }
-
-        return uri;
-    }
-
     internal string SpanDestinationName(string subject)
     {
         if (subject.StartsWith(Opts.InboxPrefix, StringComparison.Ordinal))
@@ -352,10 +328,48 @@ public partial class NatsConnection : INatsConnection
         {
             try
             {
-               _socket = await _socketConnectionFactory.OnConnectionAsync(uri, this, _logger).ConfigureAwait(false);
+                var target = (uri.Host, uri.Port);
+                if (OnConnectingAsync != null)
+                {
+                    _logger.LogInformation(NatsLogEvents.Connection, "Try to invoke OnConnectingAsync before connect to NATS");
+                    target = await OnConnectingAsync(target).ConfigureAwait(false);
+                }
 
-               _currentConnectUri = uri;
-               break;
+                _logger.LogInformation(NatsLogEvents.Connection, "Try to connect NATS {0}", uri);
+                if (Opts.SocketConnectionFactory != null)
+                {
+                    _logger.LogInformation(NatsLogEvents.Connection, "Try to connect using SocketConnectionFactory {0}", uri);
+                    _socket = await Opts.SocketConnectionFactory(uri, Opts, _disposedCancellationTokenSource.Token).ConfigureAwait(false);
+                }
+                else if (uri.IsWebSocket)
+                {
+                    var conn = new WebSocketConnection();
+                    await conn.ConnectAsync(uri, Opts).ConfigureAwait(false);
+                    _socket = conn;
+                }
+                else
+                {
+                    var conn = new TcpConnection(_logger);
+                    await conn.ConnectAsync(target.Host, target.Port, Opts.ConnectTimeout).ConfigureAwait(false);
+                    _socket = conn;
+
+                    if (Opts.TlsOpts.EffectiveMode(uri) == TlsMode.Implicit)
+                    {
+                        // upgrade TcpConnection to SslConnection
+                        var sslConnection = conn.UpgradeToSslStreamConnection(Opts.TlsOpts);
+                        await sslConnection.AuthenticateAsClientAsync(uri, Opts.ConnectTimeout).ConfigureAwait(false);
+                        _socket = sslConnection;
+                    }
+                }
+
+                if (OnSocketAvailableAsync != null)
+                {
+                    _logger.LogInformation(NatsLogEvents.Connection, "Try to invoke OnSocketAvailable");
+                    _socket = await OnSocketAvailableAsync(_socket).ConfigureAwait(false);
+                }
+
+                _currentConnectUri = uri;
+                break;
             }
             catch (Exception ex)
             {
@@ -425,7 +439,7 @@ public partial class NatsConnection : INatsConnection
         try
         {
             // Wait for an INFO message from server. If we land on a dead socket and server response
-            // can't be received, this will throw a timeout exception, and we will retry the connection.
+            // can't be received, this will throw a timeout exception and we will retry the connection.
             await waitForInfoSignal.Task.WaitAsync(Opts.RequestTimeout).ConfigureAwait(false);
 
             // check to see if we should upgrade to TLS
@@ -619,7 +633,56 @@ public partial class NatsConnection : INatsConnection
                 if (urlEnumerator.MoveNext())
                 {
                     url = urlEnumerator.Current;
-                    _socket = await _socketConnectionFactory.OnReconnectionAsync(url, this, _logger, reconnectCount).ConfigureAwait(false);
+
+                    if (OnConnectingAsync != null)
+                    {
+                        var target = (url.Host, url.Port);
+                        _logger.LogInformation(NatsLogEvents.Connection, "Try to invoke OnConnectingAsync before connect to NATS [{ReconnectCount}]", reconnectCount);
+                        var newTarget = await OnConnectingAsync(target).ConfigureAwait(false);
+
+                        if (newTarget.Host != target.Host || newTarget.Port != target.Port)
+                        {
+                            url = url.CloneWith(newTarget.Host, newTarget.Port);
+                        }
+                    }
+
+                    _logger.LogInformation(NatsLogEvents.Connection, "Tried to connect NATS {Url} [{ReconnectCount}]", url, reconnectCount);
+
+                    if (Opts.SocketConnectionFactory != null)
+                    {
+                        _logger.LogInformation(NatsLogEvents.Connection, "Try to connect using SocketConnectionFactory {Url} [{ReconnectCount}]", url, reconnectCount);
+                        _socket = await Opts.SocketConnectionFactory(url, Opts, _disposedCancellationTokenSource.Token).ConfigureAwait(false);
+                    }
+                    else if (url.IsWebSocket)
+                    {
+                        _logger.LogDebug(NatsLogEvents.Connection, "Trying to reconnect using WebSocket {Url} [{ReconnectCount}]", url, reconnectCount);
+                        var conn = new WebSocketConnection();
+                        await conn.ConnectAsync(url, Opts).ConfigureAwait(false);
+                        _socket = conn;
+                    }
+                    else
+                    {
+                        _logger.LogDebug(NatsLogEvents.Connection, "Trying to reconnect using TCP {Url} [{ReconnectCount}]", url, reconnectCount);
+                        var conn = new TcpConnection(_logger);
+                        await conn.ConnectAsync(url.Host, url.Port, Opts.ConnectTimeout).ConfigureAwait(false);
+                        _socket = conn;
+
+                        if (Opts.TlsOpts.EffectiveMode(url) == TlsMode.Implicit)
+                        {
+                            // upgrade TcpConnection to SslConnection
+                            _logger.LogDebug(NatsLogEvents.Connection, "Trying to reconnect and upgrading to TLS {Url} [{ReconnectCount}]", url, reconnectCount);
+                            var sslConnection = conn.UpgradeToSslStreamConnection(Opts.TlsOpts);
+                            await sslConnection.AuthenticateAsClientAsync(FixTlsHost(url), Opts.ConnectTimeout).ConfigureAwait(false);
+                            _socket = sslConnection;
+                        }
+                    }
+
+                    if (OnSocketAvailableAsync != null)
+                    {
+                        _logger.LogInformation(NatsLogEvents.Connection, "Try to invoke OnSocketAvailable");
+                        _socket = await OnSocketAvailableAsync(_socket).ConfigureAwait(false);
+                    }
+
                     _currentConnectUri = url;
                 }
                 else
@@ -759,6 +822,30 @@ public partial class NatsConnection : INatsConnection
             if (!_disposedCancellationTokenSource.IsCancellationRequested)
                 _publishEventsTask = Task.Run(PublishEventsAsync, _disposedCancellationTokenSource.Token);
         }
+    }
+
+    private NatsUri FixTlsHost(NatsUri uri)
+    {
+        var lastSeedConnectUri = _lastSeedConnectUri;
+        var lastSeedHost = lastSeedConnectUri?.Host;
+
+        if (string.IsNullOrEmpty(lastSeedHost))
+            return uri;
+
+        // if the current URI is not a seed URI and is not a DNS hostname, check the server cert against the
+        // last seed hostname if it was a DNS hostname
+        if (!uri.IsSeed
+            && Uri.CheckHostName(uri.Host) != UriHostNameType.Dns
+            && Uri.CheckHostName(lastSeedHost) == UriHostNameType.Dns)
+        {
+#if NETSTANDARD2_0
+            return uri.CloneWith(lastSeedHost!);
+#else
+            return uri.CloneWith(lastSeedHost);
+#endif
+        }
+
+        return uri;
     }
 
     private async Task WaitWithJitterAsync()
