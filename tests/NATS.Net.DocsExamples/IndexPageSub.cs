@@ -1,3 +1,5 @@
+using NATS.Client.Core;
+
 #pragma warning disable SA1123
 #pragma warning disable SA1124
 #pragma warning disable SA1509
@@ -12,14 +14,14 @@ public class IndexPageSub
         Console.WriteLine("NATS.Net.DocsExamples.IndexPageSub");
         {
             #region demo
-            await using var nc = new NatsClient("demo.nats.io");
+            await using NatsClient nc = new NatsClient("demo.nats.io");
 
             Console.Write("Enter your room: ");
-            var room = Console.ReadLine();
+            string? room = Console.ReadLine();
 
             Console.WriteLine($"Listening for messages on 'hello.{room}.>'");
 
-            await foreach (var msg in nc.SubscribeAsync<string>(subject: $"hello.{room}.>"))
+            await foreach (NatsMsg<string> msg in nc.SubscribeAsync<string>(subject: $"hello.{room}.>"))
             {
                 Console.WriteLine($"Received: {msg.Subject}: {msg.Data}");
             }

@@ -1,6 +1,5 @@
 // ReSharper disable SuggestVarOrType_Elsewhere
 
-using System.Text.Json.Serialization;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Models;
@@ -23,8 +22,8 @@ public class ConsumerPage
 
         try
         {
-            await using var nats1 = new NatsConnection();
-            var js1 = new NatsJSContext(nats1);
+            await using NatsConnection nats1 = new NatsConnection();
+            NatsJSContext js1 = new NatsJSContext(nats1);
             await js1.DeleteStreamAsync("ORDERS");
             await Task.Delay(1000);
         }
@@ -34,8 +33,8 @@ public class ConsumerPage
 
         try
         {
-            await using var nats1 = new NatsConnection();
-            var js1 = new NatsJSContext(nats1);
+            await using NatsConnection nats1 = new NatsConnection();
+            NatsJSContext js1 = new NatsJSContext(nats1);
             await js1.DeleteStreamAsync("SHOP_ORDERS");
             await Task.Delay(1000);
         }
@@ -44,15 +43,15 @@ public class ConsumerPage
         }
 
         #region js
-        await using var nc = new NatsClient();
-        var js = nc.CreateJetStreamContext();
+        await using NatsClient nc = new NatsClient();
+        INatsJSContext js = nc.CreateJetStreamContext();
 
         await js.CreateStreamAsync(new StreamConfig(name: "ORDERS", subjects: ["orders.>"]));
 
-        var consumer = await js.CreateOrUpdateConsumerAsync(stream: "ORDERS", new ConsumerConfig("order_processor"));
+        INatsJSConsumer consumer = await js.CreateOrUpdateConsumerAsync(stream: "ORDERS", new ConsumerConfig("order_processor"));
 
         // Publish new order messages
-        var ack = await js.PublishAsync(subject: "orders.new.1", data: new Order { Id = 1 });
+        PubAckResponse ack = await js.PublishAsync(subject: "orders.new.1", data: new Order { Id = 1 });
 
         // If you want exceptions to be thrown, you can use EnsureSuccess() method instead
         if (!ack.IsSuccess())
@@ -63,7 +62,7 @@ public class ConsumerPage
 
         {
             #region consumer-next
-            var next = await consumer.NextAsync<Order>();
+            NatsJSMsg<Order>? next = await consumer.NextAsync<Order>();
 
             if (next is { } msg)
             {
@@ -74,10 +73,10 @@ public class ConsumerPage
         }
 
         {
-            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
-            var cancellationToken = cts.Token;
+            CancellationTokenSource cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+            CancellationToken cancellationToken = cts.Token;
             #region consumer-fetch
-            await foreach (var msg in consumer.FetchAsync<Order>(new NatsJSFetchOpts { MaxMsgs = 1000 }).WithCancellation(cancellationToken))
+            await foreach (NatsJSMsg<Order> msg in consumer.FetchAsync<Order>(new NatsJSFetchOpts { MaxMsgs = 1000 }).WithCancellation(cancellationToken))
             {
                 // Process message
                 await msg.AckAsync();
@@ -88,11 +87,11 @@ public class ConsumerPage
         }
 
         {
-            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
-            var cancellationToken = cts.Token;
+            CancellationTokenSource cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+            CancellationToken cancellationToken = cts.Token;
             #region consumer-consume
             // Continuously consume a batch of messages (1000 by default)
-            await foreach (var msg in consumer.ConsumeAsync<Order>().WithCancellation(cancellationToken))
+            await foreach (NatsJSMsg<Order> msg in consumer.ConsumeAsync<Order>().WithCancellation(cancellationToken))
             {
                 // Process message
                 await msg.AckAsync();
@@ -103,8 +102,8 @@ public class ConsumerPage
         }
 
         {
-            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
-            var cancellationToken = cts.Token;
+            CancellationTokenSource cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+            CancellationToken cancellationToken = cts.Token;
 
             #region consumer-consume-error
             while (!cancellationToken.IsCancellationRequested)
@@ -113,7 +112,7 @@ public class ConsumerPage
                 {
                     await consumer.RefreshAsync(cancellationToken); // or try to recreate consumer
 
-                    await foreach (var msg in consumer.ConsumeAsync<Order>().WithCancellation(cancellationToken))
+                    await foreach (NatsJSMsg<Order> msg in consumer.ConsumeAsync<Order>().WithCancellation(cancellationToken))
                     {
                         // Process message
                         await msg.AckAsync(cancellationToken: cancellationToken);

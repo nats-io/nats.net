@@ -31,9 +31,9 @@ public class SerializationPage
 
             #region default
             // Set your custom serializer registry as the default for the connection.
-            var opts = NatsOpts.Default with { SerializerRegistry = new MyProtoBufSerializerRegistry() };
+            NatsOpts opts = NatsOpts.Default with { SerializerRegistry = new MyProtoBufSerializerRegistry() };
 
-            await using var nc = new NatsClient(opts);
+            await using NatsClient nc = new NatsClient(opts);
             #endregion
         }
 
@@ -42,15 +42,15 @@ public class SerializationPage
 
             #region my-data-usage
             // Set the custom serializer registry as the default for the connection.
-            var myRegistry = new NatsJsonContextSerializerRegistry(MyJsonContext.Default, OtherJsonContext.Default);
+            NatsJsonContextSerializerRegistry myRegistry = new NatsJsonContextSerializerRegistry(MyJsonContext.Default, OtherJsonContext.Default);
 
-            var opts = new NatsOpts { SerializerRegistry = myRegistry };
+            NatsOpts opts = new NatsOpts { SerializerRegistry = myRegistry };
 
-            await using var nc = new NatsClient(opts);
+            await using NatsClient nc = new NatsClient(opts);
 
-            var subscriber = Task.Run(async () =>
+            Task subscriber = Task.Run(async () =>
             {
-                await foreach (var msg in nc.SubscribeAsync<MyData>("foo"))
+                await foreach (NatsMsg<MyData> msg in nc.SubscribeAsync<MyData>("foo"))
                 {
                     // Outputs 'MyData { Id = 1, Name = bar }'
                     Console.WriteLine(msg.Data);
@@ -71,13 +71,13 @@ public class SerializationPage
             Console.WriteLine("  #region my-data-publish");
 
             #region my-data-publish
-            await using var nc = new NatsClient();
+            await using NatsClient nc = new NatsClient();
 
-            var serializer = new NatsJsonContextSerializer<MyData>(MyJsonContext.Default);
+            NatsJsonContextSerializer<MyData> serializer = new NatsJsonContextSerializer<MyData>(MyJsonContext.Default);
 
-            var subscriber = Task.Run(async () =>
+            Task subscriber = Task.Run(async () =>
             {
-                await foreach (var msg in nc.SubscribeAsync<MyData>("foo", serializer: serializer))
+                await foreach (NatsMsg<MyData> msg in nc.SubscribeAsync<MyData>("foo", serializer: serializer))
                 {
                     // Outputs 'MyData { Id = 1, Name = bar }'
                     Console.WriteLine(msg.Data);
@@ -98,13 +98,13 @@ public class SerializationPage
             Console.WriteLine("  #region custom");
 
             #region custom
-            var opts = new NatsOpts { SerializerRegistry = new MyProtoBufSerializerRegistry() };
+            NatsOpts opts = new NatsOpts { SerializerRegistry = new MyProtoBufSerializerRegistry() };
 
-            await using var nc = new NatsClient(opts);
+            await using NatsClient nc = new NatsClient(opts);
 
-            var subscriber = Task.Run(async () =>
+            Task subscriber = Task.Run(async () =>
             {
-                await foreach (var msg in nc.SubscribeAsync<Greeting>("foo"))
+                await foreach (NatsMsg<Greeting> msg in nc.SubscribeAsync<Greeting>("foo"))
                 {
                     // Outputs '{ "id": 42, "name": "Marvin" }'
                     Console.WriteLine(msg.Data);
@@ -125,13 +125,13 @@ public class SerializationPage
             Console.WriteLine("  #region chain");
 
             #region chain
-            var opts = new NatsOpts { SerializerRegistry = new MixedSerializerRegistry() };
+            NatsOpts opts = new NatsOpts { SerializerRegistry = new MixedSerializerRegistry() };
 
-            await using var nc = new NatsClient(opts);
+            await using NatsClient nc = new NatsClient(opts);
 
-            var subscriber1 = Task.Run(async () =>
+            Task subscriber1 = Task.Run(async () =>
             {
-                await foreach (var msg in nc.SubscribeAsync<Greeting>("greet"))
+                await foreach (NatsMsg<Greeting> msg in nc.SubscribeAsync<Greeting>("greet"))
                 {
                     // Outputs '{ "id": 42, "name": "Marvin" }'
                     Console.WriteLine(msg.Data);
@@ -139,9 +139,9 @@ public class SerializationPage
                 }
             });
 
-            var subscriber2 = Task.Run(async () =>
+            Task subscriber2 = Task.Run(async () =>
             {
-                await foreach (var msg in nc.SubscribeAsync<MyData>("data"))
+                await foreach (NatsMsg<MyData> msg in nc.SubscribeAsync<MyData>("data"))
                 {
                     // Outputs 'MyData { Id = 1, Name = bar }'
                     Console.WriteLine(msg.Data);
@@ -166,19 +166,19 @@ public class SerializationPage
             #region buffers
             // The default serializer knows how to deal with binary data types like NatsMemoryOwner<byte>.
             // So, you can use it without specifying a serializer.
-            await using var nc = new NatsClient();
+            await using NatsClient nc = new NatsClient();
 
-            var subscriber = Task.Run(async () =>
+            Task subscriber = Task.Run(async () =>
             {
                 // The default serializer knows how to deal with binary data types like NatsMemoryOwner<byte>.
-                await foreach (var msg in nc.SubscribeAsync<NatsMemoryOwner<byte>>("foo"))
+                await foreach (NatsMsg<NatsMemoryOwner<byte>> msg in nc.SubscribeAsync<NatsMemoryOwner<byte>>("foo"))
                 {
                     // Check for the end of messages.
                     if (msg.Data.Length == 0)
                         break;
 
                     // Dispose the memory owner after using it so it can be returned to the pool.
-                    using var memoryOwner = msg.Data;
+                    using NatsMemoryOwner<byte> memoryOwner = msg.Data;
 
                     // Outputs 'Hi'
                     Console.WriteLine(Encoding.ASCII.GetString(memoryOwner.Memory.Span));
@@ -190,8 +190,8 @@ public class SerializationPage
 
             // Don't reuse NatsBufferWriter, it's disposed and returned to the pool
             // by the publisher after being written to the network.
-            var bw = new NatsBufferWriter<byte>();
-            var memory = bw.GetMemory(2);
+            NatsBufferWriter<byte> bw = new NatsBufferWriter<byte>();
+            Memory<byte> memory = bw.GetMemory(2);
             memory.Span[0] = (byte)'H';
             memory.Span[1] = (byte)'i';
             bw.Advance(2);

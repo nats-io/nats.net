@@ -15,7 +15,7 @@ public class SecurityPage
 
         {
             #region user-pass
-            var opts = new NatsOpts
+            NatsOpts opts = new NatsOpts
             {
                 AuthOpts = NatsAuthOpts.Default with
                 {
@@ -24,13 +24,13 @@ public class SecurityPage
                 },
             };
 
-            await using var nats = new NatsClient(opts);
+            await using NatsClient nats = new NatsClient(opts);
             #endregion
         }
 
         {
             #region tls-implicit
-            var opts = new NatsOpts
+            NatsOpts opts = new NatsOpts
             {
                 TlsOpts = new NatsTlsOpts
                 {
@@ -38,13 +38,13 @@ public class SecurityPage
                 },
             };
 
-            await using var nats = new NatsClient(opts);
+            await using NatsClient nats = new NatsClient(opts);
             #endregion
         }
 
         {
             #region tls-mutual
-            var opts = new NatsOpts
+            NatsOpts opts = new NatsOpts
             {
                 TlsOpts = new NatsTlsOpts
                 {
@@ -54,7 +54,7 @@ public class SecurityPage
                 },
             };
 
-            await using var nats = new NatsClient(opts);
+            await using NatsClient nats = new NatsClient(opts);
             #endregion
         }
     }
