@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using NATS.Client.Core.Internal;
@@ -37,6 +38,14 @@ public partial class NatsConnection
             using var activity = Telemetry.StartSendActivity($"{SpanDestinationName(subject)} {Telemetry.Constants.RequestReplyActivityName}", this, subject, null);
             try
             {
+                if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
+                {
+                    using var rmb = _replyTaskFactory.GetResult(replySerializer);
+                    requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
+                    await PublishAsync(subject, data, headers, rmb.Subject, requestSerializer, requestOpts, cancellationToken).ConfigureAwait(false);
+                    return await rmb.GetMsgAsync(cancellationToken).ConfigureAwait(false);
+                }
+
                 replyOpts = SetReplyOptsDefaults(replyOpts);
                 await using var sub1 = await CreateRequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
                     .ConfigureAwait(false);
@@ -53,6 +62,14 @@ public partial class NatsConnection
                 Telemetry.SetException(activity, e);
                 throw;
             }
+        }
+
+        if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
+        {
+            using var rmb = _replyTaskFactory.GetResult(replySerializer);
+            requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
+            await PublishAsync(subject, data, headers, rmb.Subject, requestSerializer, requestOpts, cancellationToken).ConfigureAwait(false);
+            return await rmb.GetMsgAsync(cancellationToken).ConfigureAwait(false);
         }
 
         replyOpts = SetReplyOptsDefaults(replyOpts);

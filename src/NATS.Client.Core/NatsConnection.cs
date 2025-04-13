@@ -42,6 +42,7 @@ public partial class NatsConnection : INatsConnection
     private readonly Channel<(NatsEvent, NatsEventArgs)> _eventChannel;
     private readonly ClientOpts _clientOpts;
     private readonly SubscriptionManager _subscriptionManager;
+    private readonly ReplyTaskFactory _replyTaskFactory;
 
     private ServerInfo? _writableServerInfo;
     private int _pongCount;
@@ -82,6 +83,7 @@ public partial class NatsConnection : INatsConnection
         CommandWriter = new CommandWriter("main", this, _pool, Opts, Counter, EnqueuePing);
         InboxPrefix = NewInbox(opts.InboxPrefix);
         _subscriptionManager = new SubscriptionManager(this, InboxPrefix);
+        _replyTaskFactory = new ReplyTaskFactory(this);
         _clientOpts = ClientOpts.Create(Opts);
         HeaderParser = new NatsHeaderParser(opts.HeaderEncoding);
         _defaultSubscriptionChannelOpts = new BoundedChannelOptions(opts.SubPendingChannelCapacity)
@@ -198,6 +200,11 @@ public partial class NatsConnection : INatsConnection
 
         // Only Closed(initial) state, can run initial connect.
         await InitialConnectAsync().ConfigureAwait(false);
+
+        if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
+        {
+            await _subscriptionManager.InitializeInboxSubscriptionAsync(_disposedCancellationTokenSource.Token).ConfigureAwait(false);
+        }
     }
 
     /// <inheritdoc />
@@ -272,6 +279,25 @@ public partial class NatsConnection : INatsConnection
 
     internal ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
     {
+        if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
+        {
+            if (_subscriptionManager.InboxSid == sid)
+            {
+                var idString = subject.AsSpan().Slice(InboxPrefix.Length + 1)
+#if NETSTANDARD2_0
+                    .ToString()
+#endif
+                ;
+
+                if (long.TryParse(idString, out var id))
+                {
+                    _replyTaskFactory.SetResult(id, replyTo, payloadBuffer, headersBuffer);
+                }
+
+                return default;
+            }
+        }
+
         return _subscriptionManager.PublishToClientHandlersAsync(subject, replyTo, sid, headersBuffer, payloadBuffer);
     }
 
