@@ -142,6 +142,8 @@ public sealed record NatsOpts
     /// </remarks>
     public BoundedChannelFullMode SubPendingChannelFullMode { get; init; } = BoundedChannelFullMode.DropNewest;
 
+    public Func<NatsUri, NatsOpts, CancellationToken, ValueTask<ISocketConnection>>? SocketConnectionFactory { get; set; } = null;
+
     internal NatsUri[] GetSeedUris(bool suppressRandomization = false)
     {
         var urls = Url.Split(',');
