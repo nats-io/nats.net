@@ -108,7 +108,7 @@ internal sealed class SslStreamConnection : INatsSocketConnection
 
     public async Task AuthenticateAsClientAsync(NatsUri uri, TimeSpan timeout)
     {
-        var options = await _tlsOpts.AuthenticateAsClientOptionsAsync(uri).ConfigureAwait(true);
+        var options = await _tlsOpts.AuthenticateAsClientOptionsAsync(uri.Uri).ConfigureAwait(true);
 
 #if NETSTANDARD2_0
         if (_sslStream != null)

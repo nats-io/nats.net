@@ -309,7 +309,7 @@ public partial class NatsConnection : INatsConnection
 
         foreach (var uri in uris)
         {
-            if (Opts.TlsOpts.EffectiveMode(uri) == TlsMode.Disable && uri.IsTls)
+            if (Opts.TlsOpts.EffectiveMode(uri.Uri) == TlsMode.Disable && uri.IsTls)
                 throw new NatsException($"URI {uri} requires TLS but TlsMode is set to Disable");
         }
 
@@ -393,7 +393,7 @@ public partial class NatsConnection : INatsConnection
         var connectionFactory = Opts.SocketConnectionFactory ?? (uri.IsWebSocket ? WebSocketFactory.Default : TcpFactory.Default);
         _logger.LogInformation(NatsLogEvents.Connection, "Connect to NATS using {FactoryType} {Uri}", connectionFactory.GetType().Name, uri);
         _socket = await connectionFactory.ConnectAsync(uri.Uri, Opts, _disposedCancellationTokenSource.Token).ConfigureAwait(false);
-        if (Opts.TlsOpts.EffectiveMode(uri) == TlsMode.Implicit
+        if (Opts.TlsOpts.EffectiveMode(uri.Uri) == TlsMode.Implicit
             && _socket is INatsTlsUpgradeableSocketConnection tlsUpgradeableSocket)
         {
             _logger.LogDebug(NatsLogEvents.Security, "Perform implicit TLS Upgrade to {Uri}", uri);
@@ -433,19 +433,19 @@ public partial class NatsConnection : INatsConnection
             // check to see if we should upgrade to TLS
             if (_socket is INatsTlsUpgradeableSocketConnection tlsUpgradeableSocket)
             {
-                if (Opts.TlsOpts.EffectiveMode(_currentConnectUri) == TlsMode.Disable && WritableServerInfo!.TlsRequired)
+                if (Opts.TlsOpts.EffectiveMode(_currentConnectUri.Uri) == TlsMode.Disable && WritableServerInfo!.TlsRequired)
                 {
                     throw new NatsException(
                         $"Server {_currentConnectUri} requires TLS but TlsMode is set to Disable");
                 }
 
-                if (Opts.TlsOpts.EffectiveMode(_currentConnectUri) == TlsMode.Require && !WritableServerInfo!.TlsRequired && !WritableServerInfo.TlsAvailable)
+                if (Opts.TlsOpts.EffectiveMode(_currentConnectUri.Uri) == TlsMode.Require && !WritableServerInfo!.TlsRequired && !WritableServerInfo.TlsAvailable)
                 {
                     throw new NatsException(
                         $"Server {_currentConnectUri} does not support TLS but TlsMode is set to Require");
                 }
 
-                if (Opts.TlsOpts.TryTls(_currentConnectUri) && (WritableServerInfo!.TlsRequired || WritableServerInfo.TlsAvailable))
+                if (Opts.TlsOpts.TryTls(_currentConnectUri.Uri) && (WritableServerInfo!.TlsRequired || WritableServerInfo.TlsAvailable))
                 {
                     // do TLS upgrade
                     var targetUri = FixTlsHost(_currentConnectUri);

@@ -1,8 +1,6 @@
-using System.Net.Security;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using Microsoft.Extensions.Logging;
 
 namespace NATS.Client.Core.Internal;
 
@@ -42,35 +40,25 @@ internal sealed class TcpConnection : INatsTlsUpgradeableSocketConnection
     // socket is disposed:
     //  throws DisposedException
 
-    // return ValueTask directly for performance, not care exception and signal-disconnected.
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public ValueTask ConnectAsync(string host, int port, CancellationToken cancellationToken)
-    {
-#if NETSTANDARD
-        return new ValueTask(Socket.ConnectAsync(host, port).WaitAsync(Timeout.InfiniteTimeSpan, cancellationToken));
-#else
-        return Socket.ConnectAsync(host, port, cancellationToken);
-#endif
-    }
-
     /// <summary>
     /// Connect with Timeout. When failed, Dispose this connection.
     /// </summary>
-    public async ValueTask ConnectAsync(string host, int port, TimeSpan timeout)
+    public async ValueTask ConnectAsync(Uri uri, NatsOpts opts, CancellationToken cancellationToken)
     {
-        using var cts = new CancellationTokenSource(timeout);
+        using var timeoutCts = new CancellationTokenSource(opts.ConnectTimeout);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
         try
         {
 #if NETSTANDARD
-            await Socket.ConnectAsync(host, port).WaitAsync(timeout, cts.Token).ConfigureAwait(false);
+            await Socket.ConnectAsync(uri.Host, uri.Port).WaitAsync(Timeout.InfiniteTimeSpan, cts.Token).ConfigureAwait(false);
 #else
-            await Socket.ConnectAsync(host, port, cts.Token).ConfigureAwait(false);
+            await Socket.ConnectAsync(uri.Host, uri.Port, cts.Token).ConfigureAwait(false);
 #endif
         }
         catch (Exception ex)
         {
             await DisposeAsync().ConfigureAwait(false);
-            if (ex is OperationCanceledException)
+            if (ex is OperationCanceledException && timeoutCts.Token.IsCancellationRequested)
             {
                 throw new SocketException(10060); // 10060 = connection timeout.
             }

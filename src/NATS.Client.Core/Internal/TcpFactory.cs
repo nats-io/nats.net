@@ -7,7 +7,7 @@ namespace NATS.Client.Core.Internal
         public async ValueTask<INatsSocketConnection> ConnectAsync(Uri uri, NatsOpts opts, CancellationToken cancellationToken)
         {
             var conn = new TcpConnection();
-            await conn.ConnectAsync(uri.Host, uri.Port, cancellationToken).ConfigureAwait(false);
+            await conn.ConnectAsync(uri, opts, cancellationToken).ConfigureAwait(false);
 
             return conn;
         }

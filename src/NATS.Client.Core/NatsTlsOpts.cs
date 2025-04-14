@@ -115,19 +115,19 @@ public sealed record NatsTlsOpts
         }
     }
 
-    internal TlsMode EffectiveMode(NatsUri uri) => Mode switch
+    internal TlsMode EffectiveMode(Uri uri) => Mode switch
     {
-        TlsMode.Auto => HasTlsCerts || uri.Uri.Scheme.ToLower() == "tls" ? TlsMode.Require : TlsMode.Prefer,
+        TlsMode.Auto => HasTlsCerts || uri.Scheme.ToLower() == "tls" ? TlsMode.Require : TlsMode.Prefer,
         _ => Mode,
     };
 
-    internal bool TryTls(NatsUri uri)
+    internal bool TryTls(Uri uri)
     {
         var effectiveMode = EffectiveMode(uri);
         return effectiveMode is TlsMode.Require or TlsMode.Prefer;
     }
 
-    internal async ValueTask<SslClientAuthenticationOptions> AuthenticateAsClientOptionsAsync(NatsUri uri)
+    internal async ValueTask<SslClientAuthenticationOptions> AuthenticateAsClientOptionsAsync(Uri uri)
     {
         if (EffectiveMode(uri) == TlsMode.Disable)
         {

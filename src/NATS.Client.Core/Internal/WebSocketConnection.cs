@@ -30,28 +30,22 @@ internal sealed class WebSocketConnection : INatsSocketConnection
     // socket is disposed:
     //  throws DisposedException
 
-    // return ValueTask directly for performance, not care exception and signal-disconnected.
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Task ConnectAsync(Uri uri, CancellationToken cancellationToken)
-    {
-        return _socket.ConnectAsync(uri, cancellationToken);
-    }
-
     /// <summary>
     /// Connect with Timeout. When failed, Dispose this connection.
     /// </summary>
-    public async ValueTask ConnectAsync(NatsUri uri, NatsOpts opts)
+    public async ValueTask ConnectAsync(Uri uri, NatsOpts opts, CancellationToken cancellationToken)
     {
-        using var cts = new CancellationTokenSource(opts.ConnectTimeout);
+        using var timeoutCts = new CancellationTokenSource(opts.ConnectTimeout);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
         try
         {
             await opts.WebSocketOpts.ApplyClientWebSocketOptionsAsync(_socket.Options, uri, opts.TlsOpts, cts.Token).ConfigureAwait(false);
-            await _socket.ConnectAsync(uri.Uri, cts.Token).ConfigureAwait(false);
+            await _socket.ConnectAsync(uri, cts.Token).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             await DisposeAsync().ConfigureAwait(false);
-            if (ex is OperationCanceledException)
+            if (ex is OperationCanceledException && timeoutCts.Token.IsCancellationRequested)
             {
                 throw new SocketException(10060); // 10060 = connection timeout.
             }
