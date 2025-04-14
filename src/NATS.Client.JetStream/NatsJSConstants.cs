@@ -1,7 +1,7 @@
 using System.Buffers;
 using System.Text;
 
-namespace NATS.Client.JetStream.Internal;
+namespace NATS.Client.JetStream;
 
 public static class NatsJSConstants
 {
