@@ -1,9 +1,9 @@
 using System.Buffers;
 using System.Text;
 
-namespace NATS.Client.JetStream.Internal;
+namespace NATS.Client.JetStream;
 
-internal static class NatsJSConstants
+public static class NatsJSConstants
 {
     public static readonly ReadOnlySequence<byte> Ack = new(Encoding.ASCII.GetBytes("+ACK"));
     public static readonly ReadOnlySequence<byte> Nak = new(Encoding.ASCII.GetBytes("-NAK"));
