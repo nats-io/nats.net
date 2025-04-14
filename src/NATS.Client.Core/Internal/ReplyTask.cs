@@ -54,7 +54,7 @@ internal class ReplyTask<T> : ReplyTaskBase, IDisposable
             _msg = NatsMsg<T>.Build(Subject, replyTo, headersBuffer, payload, _connection, _connection.HeaderParser, _deserializer);
         }
 
-        _tcs.SetResult();
+        _tcs.TrySetResult();
     }
 
     public void Dispose() => _factory.Return(_id);
@@ -95,9 +95,9 @@ internal class ReplyTaskFactory
 
     public void SetResult(long id, string? replyTo, in ReadOnlySequence<byte> payloadBuffer, in ReadOnlySequence<byte>? headersBuffer)
     {
-        if (_reply.TryGetValue(id, out var rmb))
+        if (_reply.TryGetValue(id, out var rt))
         {
-            rmb.SetResult(replyTo, payloadBuffer, headersBuffer);
+            rt.SetResult(replyTo, payloadBuffer, headersBuffer);
         }
     }
 }
