@@ -40,10 +40,10 @@ public partial class NatsConnection
             {
                 if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
                 {
-                    using var rmb = _replyTaskFactory.GetResult(replySerializer);
+                    using var rmb = _replyTaskFactory.CreateReplyTask(replySerializer);
                     requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
                     await PublishAsync(subject, data, headers, rmb.Subject, requestSerializer, requestOpts, cancellationToken).ConfigureAwait(false);
-                    return await rmb.GetMsgAsync(cancellationToken).ConfigureAwait(false);
+                    return await rmb.GetResultAsync(cancellationToken).ConfigureAwait(false);
                 }
 
                 replyOpts = SetReplyOptsDefaults(replyOpts);
@@ -66,10 +66,10 @@ public partial class NatsConnection
 
         if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
         {
-            using var rmb = _replyTaskFactory.GetResult(replySerializer);
+            using var rmb = _replyTaskFactory.CreateReplyTask(replySerializer);
             requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
             await PublishAsync(subject, data, headers, rmb.Subject, requestSerializer, requestOpts, cancellationToken).ConfigureAwait(false);
-            return await rmb.GetMsgAsync(cancellationToken).ConfigureAwait(false);
+            return await rmb.GetResultAsync(cancellationToken).ConfigureAwait(false);
         }
 
         replyOpts = SetReplyOptsDefaults(replyOpts);

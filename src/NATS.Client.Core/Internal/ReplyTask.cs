@@ -29,7 +29,7 @@ internal class ReplyTask<T> : ReplyTaskBase, IDisposable
 
     public string Subject => _subject;
 
-    public async ValueTask<NatsMsg<T>> GetMsgAsync(CancellationToken cancellationToken)
+    public async ValueTask<NatsMsg<T>> GetResultAsync(CancellationToken cancellationToken)
     {
         try
         {
@@ -88,7 +88,7 @@ internal class ReplyTaskFactory
         _reply = new ConcurrentDictionary<long, ReplyTaskBase>();
     }
 
-    public ReplyTask<TReply> GetResult<TReply>(INatsDeserialize<TReply>? deserializer)
+    public ReplyTask<TReply> CreateReplyTask<TReply>(INatsDeserialize<TReply>? deserializer)
     {
         deserializer ??= _serializerRegistry.GetDeserializer<TReply>();
         var id = Interlocked.Increment(ref _nextId);
