@@ -88,12 +88,12 @@ internal class ReplyTaskFactory
         _reply = new ConcurrentDictionary<long, ReplyTaskBase>();
     }
 
-    public ReplyTask<TReply> CreateReplyTask<TReply>(INatsDeserialize<TReply>? deserializer)
+    public ReplyTask<TReply> CreateReplyTask<TReply>(INatsDeserialize<TReply>? deserializer, TimeSpan? requestTimeout)
     {
         deserializer ??= _serializerRegistry.GetDeserializer<TReply>();
         var id = Interlocked.Increment(ref _nextId);
         var replyTo = _inboxPrefix + id;
-        var rmb = new ReplyTask<TReply>(this, id, replyTo, _connection, _headerParser, deserializer, _requestTimeout);
+        var rmb = new ReplyTask<TReply>(this, id, replyTo, _connection, _headerParser, deserializer, requestTimeout ?? _requestTimeout);
         _reply[id] = rmb;
         return rmb;
     }
