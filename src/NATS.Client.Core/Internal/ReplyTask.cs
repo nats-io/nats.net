@@ -5,29 +5,28 @@ namespace NATS.Client.Core.Internal;
 
 internal class ReplyTask<T> : ReplyTaskBase, IDisposable
 {
+    private readonly object _gate;
     private readonly ReplyTaskFactory _factory;
     private readonly long _id;
-    private readonly string _subject;
     private readonly NatsConnection _connection;
-    private readonly NatsHeaderParser _headerParser;
     private readonly INatsDeserialize<T> _deserializer;
     private readonly TimeSpan _requestTimeout;
     private readonly TaskCompletionSource _tcs;
     private NatsMsg<T> _msg;
 
-    public ReplyTask(ReplyTaskFactory factory, long id, string subject, NatsConnection connection, NatsHeaderParser headerParser, INatsDeserialize<T> deserializer, TimeSpan requestTimeout)
+    public ReplyTask(ReplyTaskFactory factory, long id, string subject, NatsConnection connection, INatsDeserialize<T> deserializer, TimeSpan requestTimeout)
     {
         _factory = factory;
         _id = id;
-        _subject = subject;
+        Subject = subject;
         _connection = connection;
-        _headerParser = headerParser;
         _deserializer = deserializer;
         _requestTimeout = requestTimeout;
         _tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _gate = new object();
     }
 
-    public string Subject => _subject;
+    public string Subject { get; }
 
     public async ValueTask<NatsMsg<T>> GetResultAsync(CancellationToken cancellationToken)
     {
@@ -42,7 +41,7 @@ internal class ReplyTask<T> : ReplyTaskBase, IDisposable
             throw new NatsNoReplyException();
         }
 
-        lock (this)
+        lock (_gate)
         {
             return _msg;
         }
@@ -50,9 +49,9 @@ internal class ReplyTask<T> : ReplyTaskBase, IDisposable
 
     public override void SetResult(string? replyTo, ReadOnlySequence<byte> payload, ReadOnlySequence<byte>? headersBuffer)
     {
-        lock (this)
+        lock (_gate)
         {
-            _msg = NatsMsg<T>.Build(Subject, replyTo, headersBuffer, payload, _connection, _headerParser, _deserializer);
+            _msg = NatsMsg<T>.Build(Subject, replyTo, headersBuffer, payload, _connection, _connection.HeaderParser, _deserializer);
         }
 
         _tcs.SetResult();
@@ -70,30 +69,24 @@ internal class ReplyTaskBase
 
 internal class ReplyTaskFactory
 {
-    private readonly NatsConnection _connection;
     private readonly string _inboxPrefix;
-    private readonly NatsHeaderParser _headerParser;
-    private readonly INatsSerializerRegistry _serializerRegistry;
+    private readonly NatsConnection _connection;
     private readonly ConcurrentDictionary<long, ReplyTaskBase> _reply;
-    private readonly TimeSpan _requestTimeout;
     private long _nextId;
 
     public ReplyTaskFactory(NatsConnection connection)
     {
         _connection = connection;
         _inboxPrefix = _connection.InboxPrefix + ".";
-        _headerParser = _connection.HeaderParser;
-        _requestTimeout = _connection.Opts.RequestTimeout;
-        _serializerRegistry = _connection.Opts.SerializerRegistry;
         _reply = new ConcurrentDictionary<long, ReplyTaskBase>();
     }
 
     public ReplyTask<TReply> CreateReplyTask<TReply>(INatsDeserialize<TReply>? deserializer, TimeSpan? requestTimeout)
     {
-        deserializer ??= _serializerRegistry.GetDeserializer<TReply>();
+        deserializer ??= _connection.Opts.SerializerRegistry.GetDeserializer<TReply>();
         var id = Interlocked.Increment(ref _nextId);
-        var replyTo = _inboxPrefix + id;
-        var rmb = new ReplyTask<TReply>(this, id, replyTo, _connection, _headerParser, deserializer, requestTimeout ?? _requestTimeout);
+        var subject = _inboxPrefix + id;
+        var rmb = new ReplyTask<TReply>(this, id, subject, _connection, deserializer, requestTimeout ?? _connection.Opts.RequestTimeout);
         _reply[id] = rmb;
         return rmb;
     }
