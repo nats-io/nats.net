@@ -1,6 +1,6 @@
-namespace NATS.Client.Core;
+namespace NATS.Client.Core.Internal;
 
-public sealed class NatsUri : IEquatable<NatsUri>
+internal sealed record NatsUri
 {
     public const string DefaultScheme = "nats";
 
@@ -57,7 +57,7 @@ public sealed class NatsUri : IEquatable<NatsUri>
         _redacted = IsWebSocket && Uri.AbsolutePath != "/" ? uriBuilder.Uri.ToString() : uriBuilder.Uri.ToString().Trim('/');
     }
 
-    public Uri Uri { get; }
+    public Uri Uri { get; init; }
 
     public bool IsSeed { get; }
 
@@ -69,28 +69,5 @@ public sealed class NatsUri : IEquatable<NatsUri>
 
     public int Port => Uri.Port;
 
-    public NatsUri CloneWith(string host, int? port = default)
-    {
-        var newUri = new UriBuilder(Uri)
-        {
-            Host = host,
-            Port = port ?? Port,
-        }.Uri.ToString();
-
-        return new NatsUri(newUri, IsSeed);
-    }
-
     public override string ToString() => _redacted;
-
-    public override int GetHashCode() => Uri.GetHashCode();
-
-    public bool Equals(NatsUri? other)
-    {
-        if (other == null)
-            return false;
-        if (ReferenceEquals(this, other))
-            return true;
-
-        return Uri.Equals(other.Uri);
-    }
 }

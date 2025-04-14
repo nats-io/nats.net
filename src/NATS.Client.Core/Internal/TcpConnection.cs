@@ -14,24 +14,23 @@ internal sealed class SocketClosedException : Exception
     }
 }
 
-internal sealed class TcpConnection : ISocketConnection
+internal sealed class TcpConnection : INatsTlsUpgradeableSocketConnection
 {
-    private readonly ILogger _logger;
-    private readonly Socket _socket;
     private readonly TaskCompletionSource<Exception> _waitForClosedSource = new();
     private int _disposed;
 
-    public TcpConnection(ILogger logger)
+    public TcpConnection()
     {
-        _logger = logger;
-        _socket = new Socket(Socket.OSSupportsIPv6 ? AddressFamily.InterNetworkV6 : AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        Socket = new Socket(Socket.OSSupportsIPv6 ? AddressFamily.InterNetworkV6 : AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         if (Socket.OSSupportsIPv6)
         {
-            _socket.DualMode = true;
+            Socket.DualMode = true;
         }
 
-        _socket.NoDelay = true;
+        Socket.NoDelay = true;
     }
+
+    public Socket Socket { get; }
 
     public Task<Exception> WaitForClosed => _waitForClosedSource.Task;
 
@@ -48,9 +47,9 @@ internal sealed class TcpConnection : ISocketConnection
     public ValueTask ConnectAsync(string host, int port, CancellationToken cancellationToken)
     {
 #if NETSTANDARD
-        return new ValueTask(_socket.ConnectAsync(host, port).WaitAsync(Timeout.InfiniteTimeSpan, cancellationToken));
+        return new ValueTask(Socket.ConnectAsync(host, port).WaitAsync(Timeout.InfiniteTimeSpan, cancellationToken));
 #else
-        return _socket.ConnectAsync(host, port, cancellationToken);
+        return Socket.ConnectAsync(host, port, cancellationToken);
 #endif
     }
 
@@ -63,9 +62,9 @@ internal sealed class TcpConnection : ISocketConnection
         try
         {
 #if NETSTANDARD
-            await _socket.ConnectAsync(host, port).WaitAsync(timeout, cts.Token).ConfigureAwait(false);
+            await Socket.ConnectAsync(host, port).WaitAsync(timeout, cts.Token).ConfigureAwait(false);
 #else
-            await _socket.ConnectAsync(host, port, cts.Token).ConfigureAwait(false);
+            await Socket.ConnectAsync(host, port, cts.Token).ConfigureAwait(false);
 #endif
         }
         catch (Exception ex)
@@ -91,9 +90,9 @@ internal sealed class TcpConnection : ISocketConnection
             segment = new ArraySegment<byte>(buffer.ToArray());
         }
 
-        return new ValueTask<int>(_socket.SendAsync(segment, SocketFlags.None));
+        return new ValueTask<int>(Socket.SendAsync(segment, SocketFlags.None));
 #else
-        return _socket.SendAsync(buffer, SocketFlags.None, CancellationToken.None);
+        return Socket.SendAsync(buffer, SocketFlags.None, CancellationToken.None);
 #endif
     }
 
@@ -106,19 +105,19 @@ internal sealed class TcpConnection : ISocketConnection
             ThrowHelper.ThrowInvalidOperationException("Can't get underlying array");
         }
 
-        return new ValueTask<int>(_socket.ReceiveAsync(segment, SocketFlags.None));
+        return new ValueTask<int>(Socket.ReceiveAsync(segment, SocketFlags.None));
 #else
-        return _socket.ReceiveAsync(buffer, SocketFlags.None, CancellationToken.None);
+        return Socket.ReceiveAsync(buffer, SocketFlags.None, CancellationToken.None);
 #endif
     }
 
     public ValueTask AbortConnectionAsync(CancellationToken cancellationToken)
     {
 #if NETSTANDARD
-        _socket.Disconnect(false);
+        Socket.Disconnect(false);
         return default;
 #else
-        return _socket.DisconnectAsync(false, cancellationToken);
+        return Socket.DisconnectAsync(false, cancellationToken);
 #endif
     }
 
@@ -136,13 +135,13 @@ internal sealed class TcpConnection : ISocketConnection
 
             try
             {
-                _socket.Shutdown(SocketShutdown.Both);
+                Socket.Shutdown(SocketShutdown.Both);
             }
             catch
             {
             }
 
-            _socket.Dispose();
+            Socket.Dispose();
         }
 
         return default;
@@ -152,21 +151,5 @@ internal sealed class TcpConnection : ISocketConnection
     public void SignalDisconnected(Exception exception)
     {
         _waitForClosedSource.TrySetResult(exception);
-    }
-
-    // NetworkStream will own the Socket, so mark as disposed
-    // in order to skip socket.Dispose() in DisposeAsync
-    public SslStreamConnection UpgradeToSslStreamConnection(NatsTlsOpts tlsOpts)
-    {
-        if (Interlocked.Increment(ref _disposed) == 1)
-        {
-            return new SslStreamConnection(
-                _logger,
-                _socket,
-                tlsOpts,
-                _waitForClosedSource);
-        }
-
-        throw new ObjectDisposedException(nameof(TcpConnection));
     }
 }

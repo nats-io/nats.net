@@ -2,6 +2,7 @@ using System.Text;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using NATS.Client.Core.Internal;
 #if NETSTANDARD
 using Random = NATS.Client.Core.Internal.NetStandardExtensions.Random;
 #endif
@@ -140,7 +141,13 @@ public sealed record NatsOpts
     /// </remarks>
     public BoundedChannelFullMode SubPendingChannelFullMode { get; init; } = BoundedChannelFullMode.DropNewest;
 
-    public Func<NatsUri, NatsOpts, CancellationToken, ValueTask<ISocketConnection>>? SocketConnectionFactory { get; init; } = null;
+    /// <summary>
+    /// Factory for creating socket connections to the NATS server.
+    /// When set, this factory will be used instead of the default connection implementation.
+    /// For the library to handle TLS upgrade automatically, implement the <see cref="INatsTlsUpgradeableSocketConnection"/> interface.
+    /// </summary>
+    /// <seealso cref="INatsTlsUpgradeableSocketConnection"/>
+    public INatsSocketConnectionFactory? SocketConnectionFactory { get; init; }
 
     internal NatsUri[] GetSeedUris(bool suppressRandomization = false)
     {

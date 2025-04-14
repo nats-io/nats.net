@@ -50,7 +50,7 @@ public partial class NatsConnection : INatsConnection
     private int _reconnectCount;
 
     // when reconnected, make new instance.
-    private ISocketConnection? _socket;
+    private INatsSocketConnection? _socket;
     private CancellationTokenSource? _pingTimerCancellationTokenSource;
     private volatile NatsUri? _currentConnectUri;
     private volatile NatsUri? _lastSeedConnectUri;
@@ -93,12 +93,7 @@ public partial class NatsConnection : INatsConnection
         };
 
         // push consumer events to a channel so handlers can be awaited (also prevents user code from blocking us)
-        _eventChannel = Channel.CreateUnbounded<(NatsEvent, NatsEventArgs)>(new UnboundedChannelOptions
-        {
-            AllowSynchronousContinuations = false,
-            SingleWriter = false,
-            SingleReader = true,
-        });
+        _eventChannel = Channel.CreateUnbounded<(NatsEvent, NatsEventArgs)>(new UnboundedChannelOptions { AllowSynchronousContinuations = false, SingleWriter = false, SingleReader = true, });
         _publishEventsTask = Task.Run(PublishEventsAsync, _disposedCancellationTokenSource.Token);
     }
 
@@ -136,7 +131,7 @@ public partial class NatsConnection : INatsConnection
     // Hooks
     public Func<(string Host, int Port), ValueTask<(string Host, int Port)>>? OnConnectingAsync { get; set; }
 
-    public Func<ISocketConnection, ValueTask<ISocketConnection>>? OnSocketAvailableAsync { get; set; }
+    public Func<INatsSocketConnection, ValueTask<INatsSocketConnection>>? OnSocketAvailableAsync { get; set; }
 
     internal ServerInfo? WritableServerInfo
     {
@@ -165,7 +160,7 @@ public partial class NatsConnection : INatsConnection
     internal ObjectPool ObjectPool => _pool;
 
     // only used for internal testing
-    internal ISocketConnection? TestSocket => _socket;
+    internal INatsSocketConnection? TestSocket => _socket;
 
     /// <summary>
     /// Connect socket and write CONNECT command to nats server.
@@ -327,47 +322,7 @@ public partial class NatsConnection : INatsConnection
         {
             try
             {
-                var target = (uri.Host, uri.Port);
-                if (OnConnectingAsync != null)
-                {
-                    _logger.LogInformation(NatsLogEvents.Connection, "Try to invoke OnConnectingAsync before connect to NATS");
-                    target = await OnConnectingAsync(target).ConfigureAwait(false);
-                }
-
-                _logger.LogInformation(NatsLogEvents.Connection, "Try to connect NATS {0}", uri);
-                if (Opts.SocketConnectionFactory != null)
-                {
-                    _logger.LogInformation(NatsLogEvents.Connection, "Try to connect using SocketConnectionFactory {0}", uri);
-                    _socket = await Opts.SocketConnectionFactory(uri, Opts, _disposedCancellationTokenSource.Token).ConfigureAwait(false);
-                }
-                else if (uri.IsWebSocket)
-                {
-                    var conn = new WebSocketConnection();
-                    await conn.ConnectAsync(uri, Opts).ConfigureAwait(false);
-                    _socket = conn;
-                }
-                else
-                {
-                    var conn = new TcpConnection(_logger);
-                    await conn.ConnectAsync(target.Host, target.Port, Opts.ConnectTimeout).ConfigureAwait(false);
-                    _socket = conn;
-
-                    if (Opts.TlsOpts.EffectiveMode(uri) == TlsMode.Implicit)
-                    {
-                        // upgrade TcpConnection to SslConnection
-                        var sslConnection = conn.UpgradeToSslStreamConnection(Opts.TlsOpts);
-                        await sslConnection.AuthenticateAsClientAsync(uri, Opts.ConnectTimeout).ConfigureAwait(false);
-                        _socket = sslConnection;
-                    }
-                }
-
-                if (OnSocketAvailableAsync != null)
-                {
-                    _logger.LogInformation(NatsLogEvents.Connection, "Try to invoke OnSocketAvailable");
-                    _socket = await OnSocketAvailableAsync(_socket).ConfigureAwait(false);
-                }
-
-                _currentConnectUri = uri;
+                await ConnectSocketAsync(uri).ConfigureAwait(false);
                 break;
             }
             catch (Exception ex)
@@ -422,6 +377,40 @@ public partial class NatsConnection : INatsConnection
         }
     }
 
+    private async Task ConnectSocketAsync(NatsUri uri)
+    {
+        var target = (uri.Host, uri.Port);
+        if (OnConnectingAsync != null)
+        {
+            _logger.LogInformation(NatsLogEvents.Connection, "Invoke OnConnectingAsync before connecting to NATS {Uri}", uri);
+            target = await OnConnectingAsync(target).ConfigureAwait(false);
+            if (target.Host != uri.Host || target.Port != uri.Port)
+            {
+                uri = uri with { Uri = new UriBuilder(uri.Uri) { Host = target.Host, Port = target.Port, }.Uri };
+            }
+        }
+
+        var connectionFactory = Opts.SocketConnectionFactory ?? (uri.IsWebSocket ? WebSocketFactory.Default : TcpFactory.Default);
+        _logger.LogInformation(NatsLogEvents.Connection, "Connect to NATS using {FactoryType} {Uri}", connectionFactory.GetType().Name, uri);
+        _socket = await connectionFactory.ConnectAsync(uri.Uri, Opts, _disposedCancellationTokenSource.Token).ConfigureAwait(false);
+        if (Opts.TlsOpts.EffectiveMode(uri) == TlsMode.Implicit
+            && _socket is INatsTlsUpgradeableSocketConnection tlsUpgradeableSocket)
+        {
+            _logger.LogDebug(NatsLogEvents.Security, "Perform implicit TLS Upgrade to {Uri}", uri);
+            var sslConnection = new SslStreamConnection(tlsUpgradeableSocket, Opts.TlsOpts);
+            await sslConnection.AuthenticateAsClientAsync(uri, Opts.ConnectTimeout).ConfigureAwait(false);
+            _socket = sslConnection;
+        }
+
+        if (OnSocketAvailableAsync != null)
+        {
+            _logger.LogInformation(NatsLogEvents.Connection, "Invoke OnSocketAvailable after connecting to NATS {Uri}", uri);
+            _socket = await OnSocketAvailableAsync(_socket).ConfigureAwait(false);
+        }
+
+        _currentConnectUri = uri;
+    }
+
     private async ValueTask SetupReaderWriterAsync(bool reconnect)
     {
         _logger.LogDebug(NatsLogEvents.Connection, "Setup reader and writer");
@@ -442,7 +431,7 @@ public partial class NatsConnection : INatsConnection
             await waitForInfoSignal.Task.WaitAsync(Opts.RequestTimeout).ConfigureAwait(false);
 
             // check to see if we should upgrade to TLS
-            if (_socket is TcpConnection tcpConnection)
+            if (_socket is INatsTlsUpgradeableSocketConnection tlsUpgradeableSocket)
             {
                 if (Opts.TlsOpts.EffectiveMode(_currentConnectUri) == TlsMode.Disable && WritableServerInfo!.TlsRequired)
                 {
@@ -469,7 +458,7 @@ public partial class NatsConnection : INatsConnection
                     _socketReader = null;
 
                     // upgrade TcpConnection to SslConnection
-                    var sslConnection = tcpConnection.UpgradeToSslStreamConnection(Opts.TlsOpts);
+                    var sslConnection = new SslStreamConnection(tlsUpgradeableSocket, Opts.TlsOpts);
                     await sslConnection.AuthenticateAsClientAsync(targetUri, Opts.ConnectTimeout).ConfigureAwait(false);
                     _socket = sslConnection;
 
@@ -632,57 +621,8 @@ public partial class NatsConnection : INatsConnection
                 if (urlEnumerator.MoveNext())
                 {
                     url = urlEnumerator.Current;
-
-                    if (OnConnectingAsync != null)
-                    {
-                        var target = (url.Host, url.Port);
-                        _logger.LogInformation(NatsLogEvents.Connection, "Try to invoke OnConnectingAsync before connect to NATS [{ReconnectCount}]", reconnectCount);
-                        var newTarget = await OnConnectingAsync(target).ConfigureAwait(false);
-
-                        if (newTarget.Host != target.Host || newTarget.Port != target.Port)
-                        {
-                            url = url.CloneWith(newTarget.Host, newTarget.Port);
-                        }
-                    }
-
-                    _logger.LogInformation(NatsLogEvents.Connection, "Tried to connect NATS {Url} [{ReconnectCount}]", url, reconnectCount);
-
-                    if (Opts.SocketConnectionFactory != null)
-                    {
-                        _logger.LogInformation(NatsLogEvents.Connection, "Try to connect using SocketConnectionFactory {Url} [{ReconnectCount}]", url, reconnectCount);
-                        _socket = await Opts.SocketConnectionFactory(url, Opts, _disposedCancellationTokenSource.Token).ConfigureAwait(false);
-                    }
-                    else if (url.IsWebSocket)
-                    {
-                        _logger.LogDebug(NatsLogEvents.Connection, "Trying to reconnect using WebSocket {Url} [{ReconnectCount}]", url, reconnectCount);
-                        var conn = new WebSocketConnection();
-                        await conn.ConnectAsync(url, Opts).ConfigureAwait(false);
-                        _socket = conn;
-                    }
-                    else
-                    {
-                        _logger.LogDebug(NatsLogEvents.Connection, "Trying to reconnect using TCP {Url} [{ReconnectCount}]", url, reconnectCount);
-                        var conn = new TcpConnection(_logger);
-                        await conn.ConnectAsync(url.Host, url.Port, Opts.ConnectTimeout).ConfigureAwait(false);
-                        _socket = conn;
-
-                        if (Opts.TlsOpts.EffectiveMode(url) == TlsMode.Implicit)
-                        {
-                            // upgrade TcpConnection to SslConnection
-                            _logger.LogDebug(NatsLogEvents.Connection, "Trying to reconnect and upgrading to TLS {Url} [{ReconnectCount}]", url, reconnectCount);
-                            var sslConnection = conn.UpgradeToSslStreamConnection(Opts.TlsOpts);
-                            await sslConnection.AuthenticateAsClientAsync(FixTlsHost(url), Opts.ConnectTimeout).ConfigureAwait(false);
-                            _socket = sslConnection;
-                        }
-                    }
-
-                    if (OnSocketAvailableAsync != null)
-                    {
-                        _logger.LogInformation(NatsLogEvents.Connection, "Try to invoke OnSocketAvailable");
-                        _socket = await OnSocketAvailableAsync(_socket).ConfigureAwait(false);
-                    }
-
-                    _currentConnectUri = url;
+                    _logger.LogInformation(NatsLogEvents.Connection, "Reconnecting to NATS {Url} [{ReconnectCount}]", url, reconnectCount);
+                    await ConnectSocketAsync(url).ConfigureAwait(false);
                 }
                 else
                 {
@@ -837,11 +777,17 @@ public partial class NatsConnection : INatsConnection
             && Uri.CheckHostName(uri.Host) != UriHostNameType.Dns
             && Uri.CheckHostName(lastSeedHost) == UriHostNameType.Dns)
         {
+            return uri with
+            {
+                Uri = new UriBuilder(uri.Uri)
+                {
 #if NETSTANDARD2_0
-            return uri.CloneWith(lastSeedHost!);
+                    Host = lastSeedHost!,
 #else
-            return uri.CloneWith(lastSeedHost);
+                    Host = lastSeedHost,
 #endif
+                }.Uri,
+            };
         }
 
         return uri;

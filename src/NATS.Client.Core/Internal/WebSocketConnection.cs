@@ -8,7 +8,7 @@ using System.Runtime.InteropServices;
 
 namespace NATS.Client.Core.Internal;
 
-internal sealed class WebSocketConnection : ISocketConnection
+internal sealed class WebSocketConnection : INatsSocketConnection
 {
     private readonly ClientWebSocket _socket;
     private readonly TaskCompletionSource<Exception> _waitForClosedSource = new();

@@ -12,25 +12,21 @@ using System.Runtime.InteropServices;
 
 namespace NATS.Client.Core.Internal;
 
-internal sealed class SslStreamConnection : ISocketConnection
+internal sealed class SslStreamConnection : INatsSocketConnection
 {
-    private readonly ILogger _logger;
-    private readonly Socket _socket;
-    private readonly TaskCompletionSource<Exception> _waitForClosedSource;
+    private readonly INatsTlsUpgradeableSocketConnection _socketConnection;
     private readonly NatsTlsOpts _tlsOpts;
     private readonly CancellationTokenSource _closeCts = new();
     private int _disposed;
     private SslStream? _sslStream;
 
-    public SslStreamConnection(ILogger logger, Socket socket, NatsTlsOpts tlsOpts, TaskCompletionSource<Exception> waitForClosedSource)
+    public SslStreamConnection(INatsTlsUpgradeableSocketConnection socketConnection, NatsTlsOpts tlsOpts)
     {
-        _logger = logger;
-        _socket = socket;
+        _socketConnection = socketConnection;
         _tlsOpts = tlsOpts;
-        _waitForClosedSource = waitForClosedSource;
     }
 
-    public Task<Exception> WaitForClosed => _waitForClosedSource.Task;
+    public Task<Exception> WaitForClosed => _socketConnection.WaitForClosed;
 
     public async ValueTask DisposeAsync()
     {
@@ -43,7 +39,6 @@ internal sealed class SslStreamConnection : ISocketConnection
 #else
                 _closeCts.Cancel();
 #endif
-                _waitForClosedSource.TrySetCanceled();
             }
             catch
             {
@@ -58,6 +53,8 @@ internal sealed class SslStreamConnection : ISocketConnection
                 await _sslStream.DisposeAsync().ConfigureAwait(false);
 #endif
             }
+
+            await _socketConnection.DisposeAsync().ConfigureAwait(false);
         }
     }
 
@@ -107,10 +104,7 @@ internal sealed class SslStreamConnection : ISocketConnection
     }
 
     // when catch SocketClosedException, call this method.
-    public void SignalDisconnected(Exception exception)
-    {
-        _waitForClosedSource.TrySetResult(exception);
-    }
+    public void SignalDisconnected(Exception exception) => _socketConnection.SignalDisconnected(exception);
 
     public async Task AuthenticateAsClientAsync(NatsUri uri, TimeSpan timeout)
     {
@@ -121,7 +115,7 @@ internal sealed class SslStreamConnection : ISocketConnection
             _sslStream.Dispose();
 
         _sslStream = new SslStream(
-            innerStream: new NetworkStream(_socket, true),
+            innerStream: new NetworkStream(_socketConnection.Socket, true),
             leaveInnerStreamOpen: false,
             userCertificateSelectionCallback: options.LocalCertificateSelectionCallback,
             userCertificateValidationCallback: options.RemoteCertificateValidationCallback);
@@ -135,13 +129,13 @@ internal sealed class SslStreamConnection : ISocketConnection
         }
         catch (AuthenticationException ex)
         {
-            throw new NatsException($"TLS authentication failed", ex);
+            throw new NatsException("TLS authentication failed", ex);
         }
 #else
         if (_sslStream != null)
             await _sslStream.DisposeAsync().ConfigureAwait(false);
 
-        _sslStream = new SslStream(innerStream: new NetworkStream(_socket, true));
+        _sslStream = new SslStream(innerStream: new NetworkStream(_socketConnection.Socket, true));
         try
         {
             using var cts = new CancellationTokenSource(timeout);
@@ -153,7 +147,7 @@ internal sealed class SslStreamConnection : ISocketConnection
         }
         catch (AuthenticationException ex)
         {
-            throw new NatsException($"TLS authentication failed", ex);
+            throw new NatsException("TLS authentication failed", ex);
         }
 #endif
     }

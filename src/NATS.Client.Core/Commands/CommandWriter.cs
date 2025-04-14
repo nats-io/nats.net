@@ -49,7 +49,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     private readonly PipeWriter _pipeWriter;
     private readonly SemaphoreSlim _semLock = new(1);
     private readonly PartialSendFailureCounter _partialSendFailureCounter = new();
-    private ISocketConnection? _socketConnection;
+    private INatsSocketConnection? _socketConnection;
     private Task? _flushTask;
     private Task? _readerLoopTask;
     private CancellationTokenSource? _ctsReader;
@@ -87,7 +87,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         _logger.LogDebug(NatsLogEvents.Buffer, "Created {Name}", _name);
     }
 
-    public void Reset(ISocketConnection socketConnection)
+    public void Reset(INatsSocketConnection socketConnection)
     {
         _logger.LogDebug(NatsLogEvents.Buffer, "Resetting {Name}", _name);
 
@@ -481,7 +481,7 @@ internal sealed class CommandWriter : IAsyncDisposable
 
     private static async Task ReaderLoopAsync(
         ILogger<CommandWriter> logger,
-        ISocketConnection connection,
+        INatsSocketConnection connection,
         PipeReader pipeReader,
         Channel<int> channelSize,
         Memory<byte> consolidateMem,

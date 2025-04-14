@@ -24,7 +24,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
     private readonly bool _trace;
     private int _disposed;
 
-    public NatsReadProtocolProcessor(ISocketConnection socketConnection, NatsConnection connection, TaskCompletionSource waitForInfoSignal, TaskCompletionSource waitForPongOrErrorSignal, Task infoParsed)
+    public NatsReadProtocolProcessor(INatsSocketConnection socketConnection, NatsConnection connection, TaskCompletionSource waitForInfoSignal, TaskCompletionSource waitForPongOrErrorSignal, Task infoParsed)
     {
         _connection = connection;
         _logger = connection.Opts.LoggerFactory.CreateLogger<NatsReadProtocolProcessor>();
