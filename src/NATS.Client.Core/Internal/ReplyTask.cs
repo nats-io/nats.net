@@ -124,11 +124,14 @@ internal sealed class ReplyTaskFactory
 
     public void Return(long id) => _replies.TryRemove(id, out _);
 
-    public void SetResult(long id, string? replyTo, in ReadOnlySequence<byte> payloadBuffer, in ReadOnlySequence<byte>? headersBuffer)
+    public bool TrySetResult(long id, string? replyTo, in ReadOnlySequence<byte> payloadBuffer, in ReadOnlySequence<byte>? headersBuffer)
     {
         if (_replies.TryGetValue(id, out var rt))
         {
             rt.SetResult(replyTo, payloadBuffer, headersBuffer);
+            return true;
         }
+
+        return false;
     }
 }

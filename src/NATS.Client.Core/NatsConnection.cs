@@ -297,8 +297,13 @@ public partial class NatsConnection : INatsConnection
 
                 if (long.TryParse(idString, out var id))
                 {
-                    _replyTaskFactory.SetResult(id, replyTo, payloadBuffer, headersBuffer);
-                    return default;
+                    if (_replyTaskFactory.TrySetResult(id, replyTo, payloadBuffer, headersBuffer))
+                    {
+                        return default;
+                    }
+
+                    // if we can't set the result, either the task is already timed out or
+                    // it's not a reply to a request.
                 }
 
                 // if we can't parse the id, it's not a reply.
