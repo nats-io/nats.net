@@ -10,39 +10,36 @@ namespace MicroBenchmark;
 [PlainExporter]
 public class RequestReplyBench
 {
-    private NatsConnection _nats;
-    private CancellationTokenSource _cts;
-    private Task _subscription;
+    private NatsConnection _nats1;
+    private NatsConnection _nats2;
 
     [GlobalSetup]
     public async Task SetupAsync()
     {
-        _nats = new NatsConnection();
-        await _nats.ConnectAsync();
-        _cts = new CancellationTokenSource();
-        _subscription = Task.Run(async () =>
-        {
-            await foreach (var msg in _nats.SubscribeAsync<int>("req_rep_bench", cancellationToken: _cts.Token))
-            {
-                await msg.ReplyAsync(0xBEEF);
-            }
-        });
+        _nats1 = new NatsConnection();
+        _nats2 = new NatsConnection(new NatsOpts { RequestReplyMode = NatsRequestReplyMode.Direct });
+        await _nats1.ConnectAsync();
+        await _nats2.ConnectAsync();
     }
 
     [GlobalCleanup]
     public async Task CleanupAsync()
     {
-        await _cts.CancelAsync();
-        await _subscription;
-        await _nats.DisposeAsync();
+        await _nats1.DisposeAsync();
+        await _nats2.DisposeAsync();
     }
 
+    [Benchmark(Baseline = true)]
+    public async Task<string> RequestReplyAsync() => await GetResultAsync(_nats1);
+
     [Benchmark]
-    public async Task<int> RequestReplyAsync()
+    public async Task<string> RequestReplyDirectAsync() => await GetResultAsync(_nats2);
+
+    private static async Task<string> GetResultAsync(NatsConnection nats)
     {
-        var reply = await _nats.RequestAsync<int, int>("req_rep_bench", 0xDEAD);
+        var reply = await nats.RequestAsync<string>("$JS.API.INFO");
         var result = reply.Data;
-        ArgumentOutOfRangeException.ThrowIfNotEqual(0xBEEF, result);
+        ArgumentException.ThrowIfNullOrEmpty(result);
         return result;
     }
 }
