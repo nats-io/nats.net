@@ -7,7 +7,8 @@ namespace NATS.Client.Core;
 /// </summary>
 /// <remarks>
 /// This interface defines the contract for low-level socket connections to NATS servers,
-/// providing methods for sending and receiving data, as well as managing the connection lifecycle.
+/// providing methods for sending and receiving data and disposing the socket.
+/// Disposing should attempt to perform graceful shutdown of the socket.
 /// </remarks>
 public interface INatsSocketConnection : IAsyncDisposable
 {
