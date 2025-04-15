@@ -281,7 +281,13 @@ public partial class NatsConnection : INatsConnection
     {
         if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
         {
-            if (_subscriptionManager.InboxSid == sid)
+            // Direct mode, check if the subject is an inbox
+            // and if so, check if the subject is a reply to a request
+            // by checking if the subject length is less than two NUIDs + dots
+            // e.g. _INBOX.Hu5HPpWesrJhvQq2NG3YJ6.Hu5HPpWesrJhvQq2NG3YLw
+            //  vs. _INBOX.Hu5HPpWesrJhvQq2NG3YJ6.1234
+            // otherwise, it's not a reply in direct mode.
+            if (_subscriptionManager.InboxSid == sid && subject.Length < InboxPrefix.Length + 1 + 22 + 1 + 22)
             {
                 var idString = subject.AsSpan().Slice(InboxPrefix.Length + 1)
 #if NETSTANDARD2_0
@@ -292,9 +298,10 @@ public partial class NatsConnection : INatsConnection
                 if (long.TryParse(idString, out var id))
                 {
                     _replyTaskFactory.SetResult(id, replyTo, payloadBuffer, headersBuffer);
+                    return default;
                 }
 
-                return default;
+                // if we can't parse the id, it's not a reply.
             }
         }
 
