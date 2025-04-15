@@ -131,9 +131,9 @@ public class ConnectionRetryTest
         {
             while (!stopCts.IsCancellationRequested)
             {
-                if (pubConn is { ConnectionState: NatsConnectionState.Open, TestSocket.WaitForClosed.IsCanceled: false })
+                if (pubConn is { ConnectionState: NatsConnectionState.Open, TestSocketConnection.WaitForClosed.IsCanceled: false })
                 {
-                    await pubConn.TestSocket.AbortConnectionAsync(timeoutCts.Token);
+                    await pubConn.TestSocketConnection.DisposeAsync();
                     Interlocked.Increment(ref reconnects);
                 }
 

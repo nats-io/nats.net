@@ -29,7 +29,7 @@ public sealed record NatsWebSocketOpts
 
     internal async ValueTask ApplyClientWebSocketOptionsAsync(
         ClientWebSocketOptions clientWebSocketOptions,
-        NatsUri uri,
+        Uri uri,
         NatsTlsOpts tlsOpts,
         CancellationToken cancellationToken)
     {
@@ -73,7 +73,7 @@ public sealed record NatsWebSocketOpts
 
         if (ConfigureClientWebSocketOptions != null)
         {
-            await ConfigureClientWebSocketOptions(uri.Uri, clientWebSocketOptions, cancellationToken).ConfigureAwait(false);
+            await ConfigureClientWebSocketOptions(uri, clientWebSocketOptions, cancellationToken).ConfigureAwait(false);
         }
     }
 }

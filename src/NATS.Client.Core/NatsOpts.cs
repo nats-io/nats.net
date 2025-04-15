@@ -1,4 +1,3 @@
-using System.Net.WebSockets;
 using System.Text;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
@@ -141,6 +140,14 @@ public sealed record NatsOpts
     /// case it might risk server disconnecting the client as a slow consumer.
     /// </remarks>
     public BoundedChannelFullMode SubPendingChannelFullMode { get; init; } = BoundedChannelFullMode.DropNewest;
+
+    /// <summary>
+    /// Factory for creating socket connections to the NATS server.
+    /// When set, this factory will be used instead of the default connection implementation.
+    /// For the library to handle TLS upgrade automatically, implement the <see cref="INatsTlsUpgradeableSocketConnection"/> interface.
+    /// </summary>
+    /// <seealso cref="INatsTlsUpgradeableSocketConnection"/>
+    public INatsSocketConnectionFactory? SocketConnectionFactory { get; init; }
 
     internal NatsUri[] GetSeedUris(bool suppressRandomization = false)
     {
