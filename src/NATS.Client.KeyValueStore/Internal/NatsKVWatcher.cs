@@ -207,6 +207,18 @@ internal sealed class NatsKVWatcher<T> : IAsyncDisposable
                                         _ => operation,
                                     };
                                 }
+                                else if (headers.TryGetValue(NatsKVStore.NatsMarkerReason, out var markerReasonValues))
+                                {
+                                    var reason = markerReasonValues.Last();
+                                    if (reason is "MaxAge" or "Purge")
+                                    {
+                                        operation = NatsKVOperation.Purge;
+                                    }
+                                    else if (reason is "Remove")
+                                    {
+                                        operation = NatsKVOperation.Del;
+                                    }
+                                }
 
                                 if (headers is { Code: 100, MessageText: "FlowControl Request" })
                                 {
