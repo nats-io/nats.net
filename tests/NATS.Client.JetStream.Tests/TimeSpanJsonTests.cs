@@ -34,7 +34,7 @@ public class TimeSpanJsonTests
         var bw = new NatsBufferWriter<byte>();
         serializer.Serialize(bw, new ConsumerConfig { AckWait = time });
 
-        var json = Encoding.UTF8.GetString(bw.WrittenSpan);
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         Assert.Matches(expected, json);
 
         var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory));
@@ -54,7 +54,7 @@ public class TimeSpanJsonTests
         var bw = new NatsBufferWriter<byte>();
         serializer.Serialize(bw, new ConsumerConfig { IdleHeartbeat = time });
 
-        var json = Encoding.UTF8.GetString(bw.WrittenSpan);
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         Assert.Matches(expected, json);
 
         var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory));
@@ -74,7 +74,7 @@ public class TimeSpanJsonTests
         var bw = new NatsBufferWriter<byte>();
         serializer.Serialize(bw, new ConsumerConfig { InactiveThreshold = time });
 
-        var json = Encoding.UTF8.GetString(bw.WrittenSpan);
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         Assert.Matches(expected, json);
 
         var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory));
@@ -94,7 +94,7 @@ public class TimeSpanJsonTests
         var bw = new NatsBufferWriter<byte>();
         serializer.Serialize(bw, new ConsumerConfig { MaxExpires = time });
 
-        var json = Encoding.UTF8.GetString(bw.WrittenSpan);
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         Assert.Matches(expected, json);
 
         var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory));
@@ -114,7 +114,7 @@ public class TimeSpanJsonTests
         var bw = new NatsBufferWriter<byte>();
         serializer.Serialize(bw, new ConsumerGetnextRequest { Expires = time });
 
-        var json = Encoding.UTF8.GetString(bw.WrittenSpan);
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         Assert.Matches(expected, json);
 
         var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory));
@@ -134,7 +134,7 @@ public class TimeSpanJsonTests
         var bw = new NatsBufferWriter<byte>();
         serializer.Serialize(bw, new ConsumerGetnextRequest { IdleHeartbeat = time });
 
-        var json = Encoding.UTF8.GetString(bw.WrittenSpan);
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         Assert.Matches(expected, json);
 
         var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory));
@@ -154,7 +154,7 @@ public class TimeSpanJsonTests
         var bw = new NatsBufferWriter<byte>();
         serializer.Serialize(bw, new PeerInfo { Name = "test", Active = time });
 
-        var json = Encoding.UTF8.GetString(bw.WrittenSpan);
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         Assert.Matches(expected, json);
 
         var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory));
@@ -174,7 +174,7 @@ public class TimeSpanJsonTests
         var bw = new NatsBufferWriter<byte>();
         serializer.Serialize(bw, new StreamConfig { MaxAge = time });
 
-        var json = Encoding.UTF8.GetString(bw.WrittenSpan);
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         Assert.Matches(expected, json);
 
         var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory));
@@ -194,7 +194,7 @@ public class TimeSpanJsonTests
         var bw = new NatsBufferWriter<byte>();
         serializer.Serialize(bw, new StreamConfig { DuplicateWindow = time });
 
-        var json = Encoding.UTF8.GetString(bw.WrittenSpan);
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         Assert.Matches(expected, json);
 
         var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory));
@@ -214,7 +214,7 @@ public class TimeSpanJsonTests
         var bw = new NatsBufferWriter<byte>();
         serializer.Serialize(bw, new StreamSourceInfo { Name = "test", Active = time });
 
-        var json = Encoding.UTF8.GetString(bw.WrittenSpan);
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         Assert.Matches(expected, json);
 
         var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory));
@@ -235,7 +235,7 @@ public class TimeSpanJsonTests
         var bw = new NatsBufferWriter<byte>();
         serializer.Serialize(bw, new ConsumerInfo { StreamName = "test", Name = "test", PauseRemaining = time });
 
-        var json = Encoding.UTF8.GetString(bw.WrittenSpan);
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         if (value != null)
         {
             Assert.Matches(expected, json);

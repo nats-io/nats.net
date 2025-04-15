@@ -1,6 +1,7 @@
 using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Models;
+using NATS.Client.TestUtilities;
 
 namespace NATS.Client.JetStream.Tests;
 

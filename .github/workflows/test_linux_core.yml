@@ -1,0 +1,64 @@
+name: Test Linux Core
+
+on:
+  pull_request: {}
+  push:
+    branches:
+    - main
+
+jobs:
+  linux_test:
+    name: Linux
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - branch: 'v2.9'
+          - branch: 'v2.10'
+          - branch: 'latest'
+          - branch: 'main'
+    runs-on: ubuntu-latest
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+      NUGET_XMLDOC_MODE: skip
+    steps:
+      - name: Install nats-server
+        run: |
+          branch=$(curl https://api.mtmk.dev/gh/v1/releases/tag/nats-io/nats-server/${{ matrix.config.branch }})
+          for i in 1 2 3
+          do
+            curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@$branch | PREFIX=. sh && break || sleep 30
+          done
+          sudo mv nats-server /usr/local/bin
+
+      - name: Check nats-server
+        run: nats-server -v
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup dotnet
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            6.x
+            8.x
+            9.x
+
+      - name: Build
+        run: dotnet build -c Release
+
+      - name: Test Core
+        run: |
+          killall nats-server 2> /dev/null | echo -n
+          nats-server -v
+          cd tests/NATS.Client.Core.Tests
+          dotnet test -c Release --no-build
+
+      - name: Test Slow
+        run: |
+            killall nats-server 2> /dev/null | echo -n
+            nats-server -v
+            cd tests/NATS.Slow.Tests
+            dotnet test -c Release --no-build

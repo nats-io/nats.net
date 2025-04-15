@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFrameworks>net6.0;net8.0;net481</TargetFrameworks>
+        <TargetFrameworks>net8.0;net481</TargetFrameworks>
         <RuntimeIdentifiers>any;win-x86</RuntimeIdentifiers>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
@@ -36,7 +36,7 @@
       <ProjectReference Include="..\..\src\NATS.Client.Serializers.Json\NATS.Client.Serializers.Json.csproj" />
       <ProjectReference Include="..\..\src\NATS.Extensions.Microsoft.DependencyInjection\NATS.Extensions.Microsoft.DependencyInjection.csproj" />
       <ProjectReference Include="..\..\src\NATS.Net\NATS.Net.csproj" />
-      <ProjectReference Include="..\NATS.Client.TestUtilities2\NATS.Client.TestUtilities2.csproj" />
+      <ProjectReference Include="..\NATS.Client.TestUtilities\NATS.Client.TestUtilities.csproj" />
     </ItemGroup>
 
     <ItemGroup>

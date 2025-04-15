@@ -16,11 +16,11 @@ public class PubSubPage
 
         {
             #region pubsub
-            await using var nc = new NatsClient();
+            await using NatsClient nc = new NatsClient();
 
-            var subscription = Task.Run(async () =>
+            Task subscription = Task.Run(async () =>
             {
-                await foreach (var msg in nc.SubscribeAsync<int>("foo"))
+                await foreach (NatsMsg<int> msg in nc.SubscribeAsync<int>("foo"))
                 {
                     Console.WriteLine($"Received {msg.Subject}: {msg.Data}\n");
 
@@ -32,7 +32,7 @@ public class PubSubPage
             // Give subscription time to start
             await Task.Delay(1000);
 
-            for (var i = 0; i < 10; i++)
+            for (int i = 0; i < 10; i++)
             {
                 Console.WriteLine($" Publishing {i}...");
                 await nc.PublishAsync<int>("foo", i);

@@ -334,7 +334,23 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
         flags = Flags;
     }
 
-    internal static NatsMsg<T> Build(
+    /// <summary>
+    /// Builds a new instance of a <see cref="NatsMsg{T}"/> with the specified parameters.
+    /// </summary>
+    /// <remarks>
+    /// (INTERNAL API) This method is intended for internal use only. it doesn't have the same
+    /// guarantees as the public API. it may change in future versions with no notice.
+    /// </remarks>
+    /// <param name="subject">The subject string associated with the message.</param>
+    /// <param name="replyTo">The optional reply-to subject string.</param>
+    /// <param name="headersBuffer">The optional buffer containing the message headers.</param>
+    /// <param name="payloadBuffer">The buffer containing the message payload.</param>
+    /// <param name="connection">The connection associated with the message.</param>
+    /// <param name="headerParser">The parser for processing message headers.</param>
+    /// <param name="serializer">The deserializer for the message payload.</param>
+    /// <returns>A new <see cref="NatsMsg{T}"/> instance containing the provided data.</returns>
+    /// <exception cref="NatsException">Thrown if there is an error during the processing of the message.</exception>
+    public static NatsMsg<T> Build(
         string subject,
         string? replyTo,
         in ReadOnlySequence<byte>? headersBuffer,

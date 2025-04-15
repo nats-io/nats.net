@@ -10,6 +10,8 @@ public class ErrorHandlerTest
 {
     private readonly ITestOutputHelper _output;
     private readonly NatsServerFixture _server;
+    private int _timeoutNotifications = 0;
+    private int _count = 0;
 
     public ErrorHandlerTest(ITestOutputHelper output, NatsServerFixture server)
     {
@@ -106,54 +108,78 @@ public class ErrorHandlerTest
 
         (await js.PublishAsync($"{prefix}s1.1", 1, cancellationToken: cts.Token)).EnsureSuccess();
 
-        var timeoutNotifications = 0;
         var opts = new NatsJSConsumeOpts
         {
             MaxMsgs = 10,
             NotificationHandler = (e, _) =>
             {
+                _output.WriteLine($"Got notification (type:{e.GetType().Name}): {e}");
                 if (e is NatsJSTimeoutNotification)
                 {
-                    Interlocked.Increment(ref timeoutNotifications);
+                    Interlocked.Increment(ref _timeoutNotifications);
                 }
 
                 return Task.CompletedTask;
             },
-            Expires = TimeSpan.FromSeconds(6),
+
+            // keep this high to avoid resetting heartbeat timer with
+            // 408 request timeout messages
+            Expires = TimeSpan.FromSeconds(60),
+
             IdleHeartbeat = TimeSpan.FromSeconds(3),
         };
 
         await foreach (var msg in consumer.ConsumeAsync<int>(opts: opts, cancellationToken: cts.Token))
         {
+            _output.WriteLine($">> Consumed message (1): {msg.Data}");
             msg.Data.Should().Be(1);
             msg.Subject.Should().Be($"{prefix}s1.1");
             await msg.AckAsync(cancellationToken: cts.Token);
             break;
         }
 
-        Assert.Equal(0, Volatile.Read(ref timeoutNotifications));
+        Assert.Equal(0, Interlocked.CompareExchange(ref _timeoutNotifications, 0, 0));
 
         // Swallow heartbeats
-        proxy.ServerInterceptors.Add(m => m?.Contains("Idle Heartbeat") ?? false ? null : m);
+        proxy.ServerInterceptors.Add(m =>
+        {
+            var isIdleHeartbeat = m?.Contains("Idle Heartbeat") ?? false;
 
-        var count = 0;
+            if (isIdleHeartbeat)
+            {
+                _output.WriteLine($">> Swallowed Idle Heartbeat: {m}");
+                return null;
+            }
+            else
+            {
+                return m;
+            }
+        });
+
         var consumeCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
         var consume = Task.Run(
             async () =>
             {
-                await foreach (var unused in consumer.ConsumeAsync<int>(opts: opts, cancellationToken: consumeCts.Token))
+                await foreach (var msg in consumer.ConsumeAsync<int>(opts: opts, cancellationToken: consumeCts.Token))
                 {
-                    Interlocked.Increment(ref count);
+                    _output.WriteLine($">> Consumed message (2): {msg.Data}");
+                    Interlocked.Increment(ref _count);
+                    await msg.AckAsync(cancellationToken: consumeCts.Token);
                 }
             },
             cts.Token);
 
-        await Retry.Until("timed out", () => Volatile.Read(ref timeoutNotifications) > 0, timeout: TimeSpan.FromSeconds(20));
+        await Retry.Until(
+            reason: "timed out",
+            condition: () => Interlocked.CompareExchange(ref _timeoutNotifications, 0, 0) > 0,
+            timeout: TimeSpan.FromSeconds(60));
+
         consumeCts.Cancel();
+
         await consume;
 
-        Assert.Equal(0, Volatile.Read(ref count));
-        Assert.True(Volatile.Read(ref timeoutNotifications) > 0);
+        Assert.Equal(0, Interlocked.CompareExchange(ref _count, 0, 0));
+        Assert.True(Interlocked.CompareExchange(ref _timeoutNotifications, 0, 0) > 0);
     }
 
     [Fact]

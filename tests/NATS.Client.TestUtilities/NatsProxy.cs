@@ -150,24 +150,27 @@ public class NatsProxy : IDisposable
         }
     }
 
-    public async Task FlushFramesAsync(NatsConnection nats)
+    public async Task FlushFramesAsync(NatsConnection nats, bool clear, CancellationToken cancellationToken)
     {
         var subject = $"__PROXY_SIGNAL_SYNC__{Interlocked.Increment(ref _syncCount)}";
 
-        await nats.PublishAsync(subject);
+        await nats.PublishAsync(subject, cancellationToken: cancellationToken);
 
         await Retry.Until(
             "flush sync frame",
             async () =>
             {
-                await nats.PublishAsync(subject);
+                await nats.PublishAsync(subject, cancellationToken: cancellationToken);
                 return AllFrames.Any(f => f.Message == $"PUB {subject} 0␍␊");
             },
             retryDelay: TimeSpan.FromSeconds(1),
             timeout: TimeSpan.FromSeconds(60));
 
-        lock (_frames)
-            _frames.Clear();
+        if (clear)
+        {
+            lock (_frames)
+                _frames.Clear();
+        }
     }
 
     public void Dispose() => _tcpListener.Server.Dispose();

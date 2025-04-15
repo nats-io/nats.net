@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
+        <TargetFramework>net8.0</TargetFramework>
         <Nullable>enable</Nullable>
         <NoWarn>$(NoWarn);CS8002</NoWarn>
         <ImplicitUsings>enable</ImplicitUsings>
@@ -33,9 +33,21 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\..\src\NATS.Client.JetStream\NATS.Client.JetStream.csproj" />
         <ProjectReference Include="..\..\src\NATS.Client.Serializers.Json\NATS.Client.Serializers.Json.csproj" />
         <ProjectReference Include="..\NATS.Client.TestUtilities\NATS.Client.TestUtilities.csproj" />
         <ProjectReference Include="..\..\src\NATS.Client.Core\NATS.Client.Core.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+        <Content Include="..\NATS.Client.TestUtilities\resources\**\*">
+            <Link>resources\%(RecursiveDir)%(Filename)%(Extension)</Link>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Include="..\NATS.Client.Core2.Tests\NatsServerFixture.cs" />
+    </ItemGroup>
+    
 </Project>

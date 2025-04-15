@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
+        <TargetFramework>net8.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <RunSettingsFilePath>$(MSBuildProjectDirectory)\..\xunit.runsettings</RunSettingsFilePath>
@@ -30,7 +30,19 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\NATS.Client.KeyValueStore\NATS.Client.KeyValueStore.csproj" />
+    <ProjectReference Include="..\..\src\NATS.Client.Simplified\NATS.Client.Simplified.csproj" />
     <ProjectReference Include="..\NATS.Client.TestUtilities\NATS.Client.TestUtilities.csproj" />
   </ItemGroup>
 
+    <ItemGroup>
+        <Content Include="..\NATS.Client.TestUtilities\resources\**\*">
+            <Link>resources\%(RecursiveDir)%(Filename)%(Extension)</Link>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Include="..\NATS.Client.Core2.Tests\NatsServerFixture.cs" />
+    </ItemGroup>
+    
 </Project>
