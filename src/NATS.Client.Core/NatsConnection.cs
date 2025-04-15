@@ -199,7 +199,7 @@ public partial class NatsConnection : INatsConnection
 
         if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
         {
-            await _subscriptionManager.InitializeInboxSubscriptionAsync(_disposedCancellationTokenSource.Token).ConfigureAwait(false);
+            await _subscriptionManager.InitializeInboxSubscriptionAsync(_disposedCts.Token).ConfigureAwait(false);
         }
     }
 
