@@ -13,6 +13,6 @@ public partial class NatsConnection
         }
 
         _logger.LogInformation(NatsLogEvents.Connection, "Forcing reconnection to NATS server");
-        await _socket!.AbortConnectionAsync(CancellationToken.None).ConfigureAwait(false);
+        await _socketConnection!.DisposeAsync().ConfigureAwait(false);
     }
 }
