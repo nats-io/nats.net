@@ -1,7 +1,8 @@
 [![License Apache 2.0](https://img.shields.io/badge/License-Apache2-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![NuGet](https://img.shields.io/nuget/v/NATS.Net.svg?cacheSeconds=3600)](https://www.nuget.org/packages/NATS.Net)
 [![Doc](https://img.shields.io/badge/Doc-reference-blue)](https://nats-io.github.io/nats.net/)
-[![Build](https://github.com/nats-io/nats.net/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/nats-io/nats.net/actions/workflows/test.yml?query=branch%3Amain)
+[![Test Linux](https://github.com/nats-io/nats.net/actions/workflows/test_linux.yml/badge.svg?branch=main)](https://github.com/nats-io/nats.net/actions/workflows/test_linux.yml?query=branch%3Amain)
+[![Test Windows](https://github.com/nats-io/nats.net/actions/workflows/test_windows.yml/badge.svg?branch=main)](https://github.com/nats-io/nats.net/actions/workflows/test_windows.yml?query=branch%3Amain)
 [![Slack](https://img.shields.io/badge/chat-on%20slack-green)](https://slack.nats.io)
 
 # NATS .NET
@@ -14,6 +15,11 @@ async enumerables and channels, and leverages advanced .NET memory, buffer and I
 ### Check out [DOCS](https://nats-io.github.io/nats.net/) for guides and examples.
 
 **Additionally check out [NATS by example](https://natsbyexample.com) - An evolving collection of runnable, cross-client reference examples for NATS.**
+
+> [!NOTE]
+> **We are not testing with .NET 6.0 target anymore** even though it is still targeted by the library.
+> This is to reduce the number of test runs and speed up the CI process as well as to prepare for
+> the next major version, possibly dropping .NET 6.0 support.
 
 > [!NOTE]
 > **Don't confuse NuGet packages!**

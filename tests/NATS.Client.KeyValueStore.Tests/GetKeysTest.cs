@@ -1,4 +1,6 @@
 using NATS.Client.Core.Tests;
+using NATS.Client.Platform.Windows.Tests;
+using NATS.Client.TestUtilities;
 
 namespace NATS.Client.KeyValueStore.Tests;
 
@@ -13,8 +15,8 @@ public class GetKeysTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await using var server = await NatsServer.StartJSAsync();
-        await using var nats1 = await server.CreateClientConnectionAsync();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats1 = new NatsConnection(new NatsOpts { Url = server.Url });
         var js1 = new NatsJSContext(nats1);
         var kv1 = new NatsKVContext(js1);
         var store1 = await kv1.CreateStoreAsync(config, cancellationToken: cancellationToken);
@@ -55,8 +57,8 @@ public class GetKeysTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await using var server = await NatsServer.StartJSAsync();
-        await using var nats1 = await server.CreateClientConnectionAsync();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats1 = new NatsConnection(new NatsOpts { Url = server.Url });
         var js1 = new NatsJSContext(nats1);
         var kv1 = new NatsKVContext(js1);
         var store1 = await kv1.CreateStoreAsync(config, cancellationToken: cancellationToken);
@@ -90,8 +92,8 @@ public class GetKeysTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await using var server = await NatsServer.StartJSAsync();
-        await using var nats1 = await server.CreateClientConnectionAsync();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats1 = new NatsConnection(new NatsOpts { Url = server.Url });
         var js1 = new NatsJSContext(nats1);
         var kv1 = new NatsKVContext(js1);
         var store1 = await kv1.CreateStoreAsync(config, cancellationToken: cancellationToken);
@@ -107,7 +109,7 @@ public class GetKeysTest
         var ks1 = new List<string>();
 
         // Multiple keys are only supported in NATS Server 2.10 and later
-        await foreach (var k in store1.GetKeysAsync(new string[] { "d", "a.>", "c.>" }, cancellationToken: cancellationToken))
+        await foreach (var k in store1.GetKeysAsync(["d", "a.>", "c.>"], cancellationToken: cancellationToken))
         {
             ks1.Add(k);
         }

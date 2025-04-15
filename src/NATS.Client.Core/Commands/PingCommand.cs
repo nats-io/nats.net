@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Threading.Tasks.Sources;
 using NATS.Client.Core.Internal;
 
@@ -6,7 +7,7 @@ namespace NATS.Client.Core.Commands;
 internal class PingCommand : IValueTaskSource<TimeSpan>, IObjectPoolNode<PingCommand>
 {
     private readonly ObjectPool? _pool;
-    private DateTimeOffset _start;
+    private Stopwatch _stopwatch;
     private ManualResetValueTaskSourceCore<TimeSpan> _core;
     private PingCommand? _next;
 
@@ -17,20 +18,20 @@ internal class PingCommand : IValueTaskSource<TimeSpan>, IObjectPoolNode<PingCom
         {
             RunContinuationsAsynchronously = true,
         };
-        _start = DateTimeOffset.MinValue;
+        _stopwatch = new Stopwatch();
     }
 
     public ref PingCommand? NextNode => ref _next;
 
-    public void Start() => _start = DateTimeOffset.UtcNow;
+    public void Start() => _stopwatch.Restart();
 
-    public void SetResult() => _core.SetResult(DateTimeOffset.UtcNow - _start);
+    public void SetResult() => _core.SetResult(_stopwatch.Elapsed);
 
     public void SetCanceled() => _core.SetException(new OperationCanceledException());
 
     public void Reset()
     {
-        _start = DateTimeOffset.MinValue;
+        _stopwatch.Reset();
         _core.Reset();
     }
 

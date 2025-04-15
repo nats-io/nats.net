@@ -19,22 +19,22 @@ public class QueuePage
         Console.WriteLine("NATS.Net.DocsExamples.Core.QueuePage");
 
         #region queue
-        await using var nc = new NatsClient();
+        await using NatsClient nc = new NatsClient();
 
         // Create a cancellation token source to stop the subscriptions
-        using var cts = new CancellationTokenSource();
+        using CancellationTokenSource cts = new CancellationTokenSource();
 
-        var replyTasks = new List<Task>();
+        List<Task> replyTasks = new List<Task>();
 
-        for (var i = 0; i < 3; i++)
+        for (int i = 0; i < 3; i++)
         {
             // Create three subscriptions all on the same queue group
             // Create a background message loop for every subscription
-            var replyTaskId = i;
+            int replyTaskId = i;
             replyTasks.Add(Task.Run(async () =>
             {
                 // Retrieve messages until unsubscribed
-                await foreach (var msg in nc.SubscribeAsync<int>("math.double", queueGroup: "maths-service", cancellationToken: cts.Token))
+                await foreach (NatsMsg<int> msg in nc.SubscribeAsync<int>("math.double", queueGroup: "maths-service", cancellationToken: cts.Token))
                 {
                     Console.WriteLine($"[{replyTaskId}] Received request: {msg.Data}");
                     await msg.ReplyAsync($"Answer is: {2 * msg.Data}");
@@ -48,7 +48,7 @@ public class QueuePage
         await Task.Delay(1000);
 
         // Send a few requests
-        for (var i = 0; i < 10; i++)
+        for (int i = 0; i < 10; i++)
         {
             NatsMsg<string> reply = await nc.RequestAsync<int, string>("math.double", i);
             Console.WriteLine($"Reply: '{reply.Data}'");

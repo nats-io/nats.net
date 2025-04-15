@@ -4,8 +4,11 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.RegularExpressions;
+using NATS.Client.TestUtilities;
 
 namespace NATS.Client.Core.Tests;
+
+#if NET8_0_OR_GREATER
 
 public class TlsOptsTest
 {
@@ -31,7 +34,7 @@ public class TlsOptsTest
 
         static async ValueTask ValidateAsync(NatsTlsOpts opts)
         {
-            var clientOpts = await opts.AuthenticateAsClientOptionsAsync(new NatsUri("demo.nats.io", true));
+            var clientOpts = await opts.AuthenticateAsClientOptionsAsync(new NatsUri("demo.nats.io", true).Uri);
             Assert.NotNull(clientOpts.RemoteCertificateValidationCallback);
         }
     }
@@ -71,7 +74,7 @@ public class TlsOptsTest
 
         static async Task ValidateAsync(NatsTlsOpts opts)
         {
-            var clientOpts = await opts.AuthenticateAsClientOptionsAsync(new NatsUri("demo.nats.io", true));
+            var clientOpts = await opts.AuthenticateAsClientOptionsAsync(new NatsUri("demo.nats.io", true).Uri);
 
 #if NET8_0_OR_GREATER
             Assert.NotNull(clientOpts.ClientCertificateContext);
@@ -119,7 +122,7 @@ public class TlsOptsTest
         static async Task ValidateAsync(NatsTlsOpts opts)
         {
 #if NET8_0_OR_GREATER
-            var clientOpts = await opts.AuthenticateAsClientOptionsAsync(new NatsUri("demo.nats.io", true));
+            var clientOpts = await opts.AuthenticateAsClientOptionsAsync(new NatsUri("demo.nats.io", true).Uri);
             var ctx = clientOpts.ClientCertificateContext;
             Assert.NotNull(ctx);
 
@@ -201,3 +204,5 @@ public class TlsOptsTest
         }
     }
 }
+
+#endif

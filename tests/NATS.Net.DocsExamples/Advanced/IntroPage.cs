@@ -22,15 +22,15 @@ public class IntroPage
 
         {
             #region lowlevel-sub
-            await using var nc = new NatsConnection();
+            await using NatsConnection nc = new NatsConnection();
 
             // Connections are lazy, so we need to connect explicitly
             // to avoid any races between subscription and publishing.
             await nc.ConnectAsync();
 
-            await using var sub = await nc.SubscribeCoreAsync<int>("foo");
+            await using INatsSub<int> sub = await nc.SubscribeCoreAsync<int>("foo");
 
-            for (var i = 0; i < 10; i++)
+            for (int i = 0; i < 10; i++)
             {
                 Console.WriteLine($" Publishing {i}...");
                 await nc.PublishAsync<int>("foo", i);
@@ -41,7 +41,7 @@ public class IntroPage
 
             // Messages have been collected in the subscription internal channel
             // now we can drain them
-            await foreach (var msg in sub.Msgs.ReadAllAsync())
+            await foreach (NatsMsg<int> msg in sub.Msgs.ReadAllAsync())
             {
                 Console.WriteLine($"Received {msg.Subject}: {msg.Data}\n");
                 if (msg.Data == -1)
@@ -56,7 +56,7 @@ public class IntroPage
 
         {
             #region ping
-            await using var nc = new NatsClient();
+            await using NatsClient nc = new NatsClient();
 
             TimeSpan rtt = await nc.PingAsync();
 
@@ -66,18 +66,18 @@ public class IntroPage
 
         {
             #region logging
-            using var loggerFactory = LoggerFactory.Create(configure: builder => builder.AddConsole());
+            using ILoggerFactory loggerFactory = LoggerFactory.Create(configure: builder => builder.AddConsole());
 
-            var opts = new NatsOpts { LoggerFactory = loggerFactory };
+            NatsOpts opts = new NatsOpts { LoggerFactory = loggerFactory };
 
-            await using var nc = new NatsClient(opts);
+            await using NatsClient nc = new NatsClient(opts);
             #endregion
         }
 
         {
             #region opts
 
-            var opts = new NatsOpts
+            NatsOpts opts = new NatsOpts
             {
                 // You need to set pending in the constructor and not use
                 // the option here, as it will be ignored.
@@ -89,19 +89,19 @@ public class IntroPage
                 // ...
             };
 
-            await using var nc = new NatsClient(opts, pending: BoundedChannelFullMode.DropNewest);
+            await using NatsClient nc = new NatsClient(opts, pending: BoundedChannelFullMode.DropNewest);
             #endregion
         }
 
         {
             #region opts2
 
-            var opts = new NatsOpts
+            NatsOpts opts = new NatsOpts
             {
                 // Your custom options
             };
 
-            await using var nc = new NatsConnection(opts);
+            await using NatsConnection nc = new NatsConnection(opts);
             #endregion
         }
     }

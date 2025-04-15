@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using NATS.Client.Core.Internal;
@@ -38,6 +39,15 @@ public partial class NatsConnection
             try
             {
                 replyOpts = SetReplyOptsDefaults(replyOpts);
+
+                if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
+                {
+                    using var rt = _replyTaskFactory.CreateReplyTask(replySerializer, replyOpts.Timeout);
+                    requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
+                    await PublishAsync(subject, data, headers, rt.Subject, requestSerializer, requestOpts, cancellationToken).ConfigureAwait(false);
+                    return await rt.GetResultAsync(cancellationToken).ConfigureAwait(false);
+                }
+
                 await using var sub1 = await CreateRequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
                     .ConfigureAwait(false);
 
@@ -56,6 +66,15 @@ public partial class NatsConnection
         }
 
         replyOpts = SetReplyOptsDefaults(replyOpts);
+
+        if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
+        {
+            using var rt = _replyTaskFactory.CreateReplyTask(replySerializer, replyOpts.Timeout);
+            requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
+            await PublishAsync(subject, data, headers, rt.Subject, requestSerializer, requestOpts, cancellationToken).ConfigureAwait(false);
+            return await rt.GetResultAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         await using var sub = await CreateRequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
             .ConfigureAwait(false);
 

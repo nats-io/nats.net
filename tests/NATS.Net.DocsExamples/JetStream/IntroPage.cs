@@ -20,8 +20,8 @@ public class IntroPage
 
         try
         {
-            await using var nats1 = new NatsConnection();
-            var js1 = new NatsJSContext(nats1);
+            await using NatsConnection nats1 = new NatsConnection();
+            NatsJSContext js1 = new NatsJSContext(nats1);
             await js1.DeleteStreamAsync("SHOP_ORDERS");
             await Task.Delay(1000);
         }
@@ -31,8 +31,8 @@ public class IntroPage
 
         try
         {
-            await using var nats1 = new NatsConnection();
-            var js1 = new NatsJSContext(nats1);
+            await using NatsConnection nats1 = new NatsConnection();
+            NatsJSContext js1 = new NatsJSContext(nats1);
             await js1.DeleteStreamAsync("ORDERS");
             await Task.Delay(1000);
         }
@@ -41,8 +41,8 @@ public class IntroPage
         }
 
         #region js-connection
-        await using var nc = new NatsClient();
-        var js = nc.CreateJetStreamContext();
+        await using NatsClient nc = new NatsClient();
+        INatsJSContext js = nc.CreateJetStreamContext();
         #endregion
 
         #region js-stream
@@ -51,25 +51,25 @@ public class IntroPage
 
         #region js-publish
         // Publish new order messages
-        for (var i = 0; i < 10; i++)
+        for (int i = 0; i < 10; i++)
         {
             // Notice we're using JetStream context to publish and receive ACKs
-            var ack = await js.PublishAsync($"orders.new.{i}", new Order { Id = i });
+            PubAckResponse ack = await js.PublishAsync($"orders.new.{i}", new Order { Id = i });
             ack.EnsureSuccess();
         }
         #endregion
 
         #region js-consumer
-        var consumer = await js.CreateOrUpdateConsumerAsync(stream: "SHOP_ORDERS", new ConsumerConfig("order_processor"));
+        INatsJSConsumer consumer = await js.CreateOrUpdateConsumerAsync(stream: "SHOP_ORDERS", new ConsumerConfig("order_processor"));
         #endregion
 
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
-        var cancellationToken = cts.Token;
+        CancellationTokenSource cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+        CancellationToken cancellationToken = cts.Token;
 
         #region consumer-consume
-        await foreach (var msg in consumer.ConsumeAsync<Order>().WithCancellation(cancellationToken))
+        await foreach (NatsJSMsg<Order> msg in consumer.ConsumeAsync<Order>().WithCancellation(cancellationToken))
         {
-            var order = msg.Data;
+            Order? order = msg.Data;
             Console.WriteLine($"Processing {msg.Subject} {order}...");
             await msg.AckAsync(cancellationToken: cancellationToken);
             // this loop never ends unless there is an error

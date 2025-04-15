@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using NATS.Client.TestUtilities;
 using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.Core.Tests;
@@ -64,6 +65,8 @@ public class TlsClientTest
             Assert.Contains("remote certificate was rejected", exception.InnerException!.InnerException!.Message);
         }).WaitAsync(TimeSpan.FromSeconds(10));
     }
+
+#if NET8_0_OR_GREATER
 
     [Theory]
     [InlineData(TransportType.Tls)]
@@ -130,4 +133,6 @@ public class TlsClientTest
         signal.Pulse();
         await serverTask;
     }
+#endif
+
 }

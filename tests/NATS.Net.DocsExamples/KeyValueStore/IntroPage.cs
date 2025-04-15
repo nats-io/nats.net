@@ -1,11 +1,7 @@
 // ReSharper disable SuggestVarOrType_Elsewhere
 
-using System.Text.Json.Serialization;
-using NATS.Client.Core;
 using NATS.Client.JetStream;
-using NATS.Client.JetStream.Models;
 using NATS.Client.KeyValueStore;
-using NATS.Client.Serializers.Json;
 
 #pragma warning disable SA1123
 #pragma warning disable SA1124
@@ -22,8 +18,8 @@ public class IntroPage
         Console.WriteLine("NATS.Net.DocsExamples.KeyValueStore.IntroPage");
 
         #region kv
-        await using var nc = new NatsClient();
-        var kv = nc.CreateKeyValueStoreContext();
+        await using NatsClient nc = new NatsClient();
+        INatsKVContext kv = nc.CreateKeyValueStoreContext();
         #endregion
 
         try
@@ -36,27 +32,27 @@ public class IntroPage
         }
 
         #region store
-        var store = await kv.CreateStoreAsync("SHOP_ORDERS");
+        INatsKVStore store = await kv.CreateStoreAsync("SHOP_ORDERS");
         #endregion
 
         {
             #region put
             await store.PutAsync("order-1", new ShopOrder(Id: 1));
 
-            var entry = await store.GetEntryAsync<ShopOrder>("order-1");
+            NatsKVEntry<ShopOrder> entry = await store.GetEntryAsync<ShopOrder>("order-1");
 
             Console.WriteLine($"[GET] {entry.Value}");
             #endregion
         }
 
         {
-            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
-            var cancellationToken = cts.Token;
+            CancellationTokenSource cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+            CancellationToken cancellationToken = cts.Token;
 
             try
             {
                 #region watch
-                await foreach (var entry in store.WatchAsync<ShopOrder>(cancellationToken: cancellationToken))
+                await foreach (NatsKVEntry<ShopOrder> entry in store.WatchAsync<ShopOrder>(cancellationToken: cancellationToken))
                 {
                     Console.WriteLine($"[RCV] {entry}");
                 }
