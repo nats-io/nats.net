@@ -40,7 +40,7 @@ internal sealed class ReplyTask<T> : ReplyTaskBase, IDisposable
         }
         catch (TimeoutException)
         {
-            throw new NatsNoReplyException();
+            NatsNoReplyException.Throw();
         }
 
         lock (_gate)
