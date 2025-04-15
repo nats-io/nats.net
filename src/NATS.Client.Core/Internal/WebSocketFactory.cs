@@ -6,8 +6,8 @@ namespace NATS.Client.Core.Internal
 
         public async ValueTask<INatsSocketConnection> ConnectAsync(Uri uri, NatsOpts opts, CancellationToken cancellationToken)
         {
-            var conn = new WebSocketConnection();
-            await conn.ConnectAsync(uri, opts, cancellationToken).ConfigureAwait(false);
+            var conn = new WebSocketConnection(opts);
+            await conn.ConnectAsync(uri, cancellationToken).ConfigureAwait(false);
 
             return conn;
         }

@@ -49,7 +49,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     private readonly PipeWriter _pipeWriter;
     private readonly SemaphoreSlim _semLock = new(1);
     private readonly PartialSendFailureCounter _partialSendFailureCounter = new();
-    private INatsSocketConnection? _socketConnection;
+    private SocketConnectionWrapper? _socketConnection;
     private Task? _flushTask;
     private Task? _readerLoopTask;
     private CancellationTokenSource? _ctsReader;
@@ -87,7 +87,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         _logger.LogDebug(NatsLogEvents.Buffer, "Created {Name}", _name);
     }
 
-    public void Reset(INatsSocketConnection socketConnection)
+    public void Reset(SocketConnectionWrapper socketConnection)
     {
         _logger.LogDebug(NatsLogEvents.Buffer, "Resetting {Name}", _name);
 
@@ -481,7 +481,7 @@ internal sealed class CommandWriter : IAsyncDisposable
 
     private static async Task ReaderLoopAsync(
         ILogger<CommandWriter> logger,
-        INatsSocketConnection connection,
+        SocketConnectionWrapper socketConnection,
         PipeReader pipeReader,
         Channel<int> channelSize,
         Memory<byte> consolidateMem,
@@ -535,7 +535,7 @@ internal sealed class CommandWriter : IAsyncDisposable
                                 stopwatch.Restart();
                             }
 
-                            sent = await connection.SendAsync(sendMem).ConfigureAwait(false);
+                            sent = await socketConnection.SendAsync(sendMem).ConfigureAwait(false);
 
                             if (trace)
                             {
@@ -664,7 +664,7 @@ internal sealed class CommandWriter : IAsyncDisposable
                 // We signal the connection to disconnect, which will trigger a reconnect
                 // in the connection loop.  This is necessary because the connection may
                 // be half-open, and we can't rely on the reader loop to detect that.
-                connection.SignalDisconnected(e);
+                socketConnection.SignalDisconnected(e);
             }
             catch (Exception e1)
             {

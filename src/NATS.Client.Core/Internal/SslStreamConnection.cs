@@ -26,8 +26,6 @@ internal sealed class SslStreamConnection : INatsSocketConnection
         _tlsOpts = tlsOpts;
     }
 
-    public Task<Exception> WaitForClosed => _socketConnection.WaitForClosed;
-
     public async ValueTask DisposeAsync()
     {
         if (Interlocked.Increment(ref _disposed) == 1)
@@ -47,6 +45,19 @@ internal sealed class SslStreamConnection : INatsSocketConnection
 
             if (_sslStream != null)
             {
+                try
+                {
+#if NETSTANDARD2_0
+                    _sslStream.Close();
+#else
+                    await _sslStream.ShutdownAsync().ConfigureAwait(false);
+#endif
+                }
+                catch
+                {
+                    // ignored
+                }
+
 #if NETSTANDARD2_0
                 _sslStream.Dispose();
 #else
@@ -102,9 +113,6 @@ internal sealed class SslStreamConnection : INatsSocketConnection
 #endif
         }
     }
-
-    // when catch SocketClosedException, call this method.
-    public void SignalDisconnected(Exception exception) => _socketConnection.SignalDisconnected(exception);
 
     public async Task AuthenticateAsClientAsync(NatsUri uri, TimeSpan timeout)
     {

@@ -14,11 +14,12 @@ internal sealed class SocketClosedException : Exception
 
 internal sealed class TcpConnection : INatsTlsUpgradeableSocketConnection
 {
-    private readonly TaskCompletionSource<Exception> _waitForClosedSource = new();
+    private readonly NatsOpts _natsOpts;
     private int _disposed;
 
-    public TcpConnection()
+    public TcpConnection(NatsOpts natsOpts)
     {
+        _natsOpts = natsOpts;
         Socket = new Socket(Socket.OSSupportsIPv6 ? AddressFamily.InterNetworkV6 : AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         if (Socket.OSSupportsIPv6)
         {
@@ -30,42 +31,20 @@ internal sealed class TcpConnection : INatsTlsUpgradeableSocketConnection
 
     public Socket Socket { get; }
 
-    public Task<Exception> WaitForClosed => _waitForClosedSource.Task;
-
-    // CancellationToken is not used, operation lifetime is completely same as socket.
-
-    // socket is closed:
-    //  receiving task returns 0 read
-    //  throws SocketException when call method
-    // socket is disposed:
-    //  throws DisposedException
-
-    /// <summary>
-    /// Connect with Timeout. When failed, Dispose this connection.
-    /// </summary>
-    public async ValueTask ConnectAsync(Uri uri, NatsOpts opts, CancellationToken cancellationToken)
+    public async ValueTask ConnectAsync(Uri uri, CancellationToken cancellationToken)
     {
-        using var timeoutCts = new CancellationTokenSource(opts.ConnectTimeout);
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
         try
         {
 #if NETSTANDARD
-            await Socket.ConnectAsync(uri.Host, uri.Port).WaitAsync(Timeout.InfiniteTimeSpan, cts.Token).ConfigureAwait(false);
+            await Socket.ConnectAsync(uri.Host, uri.Port).WaitAsync(Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false);
 #else
-            await Socket.ConnectAsync(uri.Host, uri.Port, cts.Token).ConfigureAwait(false);
+            await Socket.ConnectAsync(uri.Host, uri.Port, cancellationToken).ConfigureAwait(false);
 #endif
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             await DisposeAsync().ConfigureAwait(false);
-            if (ex is OperationCanceledException && timeoutCts.Token.IsCancellationRequested)
-            {
-                throw new SocketException(10060); // 10060 = connection timeout.
-            }
-            else
-            {
-                throw;
-            }
+            throw;
         }
     }
 
@@ -109,35 +88,33 @@ internal sealed class TcpConnection : INatsTlsUpgradeableSocketConnection
 #endif
     }
 
-    public ValueTask DisposeAsync()
+    public
+#if !NETSTANDARD
+        async
+#endif
+        ValueTask DisposeAsync()
     {
         if (Interlocked.Increment(ref _disposed) == 1)
         {
             try
             {
-                _waitForClosedSource.TrySetCanceled();
+#if NETSTANDARD
+                Socket.Disconnect(false);
+#else
+                using var cts = new CancellationTokenSource(_natsOpts.ConnectTimeout);
+                await Socket.DisconnectAsync(false, cts.Token).ConfigureAwait(false);
+#endif
             }
             catch
             {
-            }
-
-            try
-            {
-                Socket.Shutdown(SocketShutdown.Both);
-            }
-            catch
-            {
+                // ignored
             }
 
             Socket.Dispose();
         }
 
+#if NETSTANDARD
         return default;
-    }
-
-    // when catch SocketClosedException, call this method.
-    public void SignalDisconnected(Exception exception)
-    {
-        _waitForClosedSource.TrySetResult(exception);
+#endif
     }
 }

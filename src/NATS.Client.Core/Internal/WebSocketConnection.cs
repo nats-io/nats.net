@@ -1,5 +1,3 @@
-using System.Net.Security;
-using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Runtime.CompilerServices;
 #if NETSTANDARD
@@ -8,51 +6,22 @@ using System.Runtime.InteropServices;
 
 namespace NATS.Client.Core.Internal;
 
-internal sealed class WebSocketConnection : INatsSocketConnection
+internal sealed class WebSocketConnection(NatsOpts natsOpts) : INatsSocketConnection
 {
-    private readonly ClientWebSocket _socket;
-    private readonly TaskCompletionSource<Exception> _waitForClosedSource = new();
-    private readonly TimeSpan _socketCloseTimeout = TimeSpan.FromSeconds(5); // matches _socketComponentDisposeTimeout in NatsConnection.cs
+    private readonly ClientWebSocket _socket = new();
     private int _disposed;
 
-    public WebSocketConnection()
+    public async ValueTask ConnectAsync(Uri uri, CancellationToken cancellationToken)
     {
-        _socket = new ClientWebSocket();
-    }
-
-    public Task<Exception> WaitForClosed => _waitForClosedSource.Task;
-
-    // CancellationToken is not used, operation lifetime is completely same as socket.
-
-    // socket is closed:
-    //  receiving task returns 0 read
-    //  throws SocketException when call method
-    // socket is disposed:
-    //  throws DisposedException
-
-    /// <summary>
-    /// Connect with Timeout. When failed, Dispose this connection.
-    /// </summary>
-    public async ValueTask ConnectAsync(Uri uri, NatsOpts opts, CancellationToken cancellationToken)
-    {
-        using var timeoutCts = new CancellationTokenSource(opts.ConnectTimeout);
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
         try
         {
-            await opts.WebSocketOpts.ApplyClientWebSocketOptionsAsync(_socket.Options, uri, opts.TlsOpts, cts.Token).ConfigureAwait(false);
-            await _socket.ConnectAsync(uri, cts.Token).ConfigureAwait(false);
+            await natsOpts.WebSocketOpts.ApplyClientWebSocketOptionsAsync(_socket.Options, uri, natsOpts.TlsOpts, cancellationToken).ConfigureAwait(false);
+            await _socket.ConnectAsync(uri, cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             await DisposeAsync().ConfigureAwait(false);
-            if (ex is OperationCanceledException && timeoutCts.Token.IsCancellationRequested)
-            {
-                throw new SocketException(10060); // 10060 = connection timeout.
-            }
-            else
-            {
-                throw;
-            }
+            throw;
         }
     }
 
@@ -88,42 +57,21 @@ internal sealed class WebSocketConnection : INatsSocketConnection
         return wsRead.Count;
     }
 
-    public ValueTask AbortConnectionAsync(CancellationToken cancellationToken)
-    {
-        // ClientWebSocket.Abort() doesn't accept a cancellation token, so check at the beginning of this method
-        cancellationToken.ThrowIfCancellationRequested();
-        _socket.Abort();
-        return default;
-    }
-
     public async ValueTask DisposeAsync()
     {
         if (Interlocked.Increment(ref _disposed) == 1)
         {
             try
             {
-                _waitForClosedSource.TrySetCanceled();
+                using var cts = new CancellationTokenSource(natsOpts.ConnectTimeout);
+                await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, null, cts.Token).ConfigureAwait(false);
             }
             catch
             {
-            }
-
-            try
-            {
-                var cts = new CancellationTokenSource(_socketCloseTimeout);
-                await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, default, cts.Token).ConfigureAwait(false);
-            }
-            catch
-            {
+                // ignored
             }
 
             _socket.Dispose();
         }
-    }
-
-    // when catch SocketClosedException, call this method.
-    public void SignalDisconnected(Exception exception)
-    {
-        _waitForClosedSource.TrySetResult(exception);
     }
 }
