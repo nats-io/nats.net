@@ -335,12 +335,7 @@ public partial class NatsConnection : INatsConnection
                 }
 
                 _logger.LogInformation(NatsLogEvents.Connection, "Try to connect NATS {0}", uri);
-                if (Opts.SocketConnectionFactory != null)
-                {
-                    _logger.LogInformation(NatsLogEvents.Connection, "Try to connect using SocketConnectionFactory {0}", uri);
-                    _socket = await Opts.SocketConnectionFactory(uri, Opts, _disposedCancellationTokenSource.Token).ConfigureAwait(false);
-                }
-                else if (uri.IsWebSocket)
+                if (uri.IsWebSocket)
                 {
                     var conn = new WebSocketConnection();
                     await conn.ConnectAsync(uri, Opts).ConfigureAwait(false);
@@ -646,13 +641,7 @@ public partial class NatsConnection : INatsConnection
                     }
 
                     _logger.LogInformation(NatsLogEvents.Connection, "Tried to connect NATS {Url} [{ReconnectCount}]", url, reconnectCount);
-
-                    if (Opts.SocketConnectionFactory != null)
-                    {
-                        _logger.LogInformation(NatsLogEvents.Connection, "Try to connect using SocketConnectionFactory {Url} [{ReconnectCount}]", url, reconnectCount);
-                        _socket = await Opts.SocketConnectionFactory(url, Opts, _disposedCancellationTokenSource.Token).ConfigureAwait(false);
-                    }
-                    else if (url.IsWebSocket)
+                    if (url.IsWebSocket)
                     {
                         _logger.LogDebug(NatsLogEvents.Connection, "Trying to reconnect using WebSocket {Url} [{ReconnectCount}]", url, reconnectCount);
                         var conn = new WebSocketConnection();

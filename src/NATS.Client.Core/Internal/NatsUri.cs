@@ -1,6 +1,6 @@
-namespace NATS.Client.Core;
+namespace NATS.Client.Core.Internal;
 
-public sealed class NatsUri : IEquatable<NatsUri>
+internal sealed class NatsUri : IEquatable<NatsUri>
 {
     public const string DefaultScheme = "nats";
 
