@@ -84,16 +84,10 @@ public record NatsKVConfig
     public IDictionary<string, string>? Metadata { get; set; }
 
     /// <summary>
-    /// If true, the bucket will allow TTL on individual keys.
+    /// How long the bucket keeps markers when keys are removed by the TTL setting, 0 meaning markers are not supported.
     /// </summary>
     /// <remarks>This feature is only available on NATS server v2.11 and later.</remarks>
-    public bool AllowMsgTTL { get; set; }
-
-    /// <summary>
-    /// Enables and sets a duration for adding server markers for delete, purge and max age limits.
-    /// </summary>
-    /// <remarks>This feature is only available on NATS server v2.11 and later.</remarks>
-    public TimeSpan SubjectDeleteMarkerTTL { get; set; }
+    public TimeSpan LimitMarkerTTL { get; init; }
 }
 
 /// <summary>
