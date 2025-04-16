@@ -613,7 +613,6 @@ public class KeyValueStoreTest
                 break;
         }
 
-
         Assert.Equal(3, checkOps.Count);
         Assert.Equal(NatsKVOperation.Put, checkOps[0]);
         Assert.Equal(NatsKVOperation.Purge, checkOps[1]);
