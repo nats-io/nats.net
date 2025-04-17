@@ -25,4 +25,12 @@ public record ApiStats
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
     [System.ComponentModel.DataAnnotations.Range(0, int.MaxValue)]
     public int Errors { get; set; }
+
+    /// <summary>
+    /// Inflight API requests
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("inflight")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [System.ComponentModel.DataAnnotations.Range(0, ulong.MaxValue)]
+    public ulong Inflight { get; set; }
 }
