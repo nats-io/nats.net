@@ -48,7 +48,7 @@ public record AccountStats
 
     [System.Text.Json.Serialization.JsonPropertyName("tiers")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public IDictionary<string, object>? Tiers { get; set; }
+    public IDictionary<string, Tier>? Tiers { get; set; }
 
     [System.Text.Json.Serialization.JsonPropertyName("api")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
