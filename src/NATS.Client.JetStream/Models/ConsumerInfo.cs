@@ -126,4 +126,11 @@ public record ConsumerInfo
     [System.Text.Json.Serialization.JsonPropertyName("push_bound")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public bool PushBound { get; set; }
+
+    /// <summary>
+    /// TODO
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("pinned_ids")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public IDictionary<string, string>? Metadata { get; set; }
 }
