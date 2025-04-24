@@ -1,1 +1,1 @@
-2.6.0-preview.4
+2.6.0-preview.5
