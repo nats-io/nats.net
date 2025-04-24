@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using NATS.Client.Core.Tests;
 using NATS.Client.JetStream.Models;
 using NATS.Client.Platform.Windows.Tests;
@@ -461,6 +462,23 @@ public class KeyValueStoreTest
         }
     }
 
+    [SkipIfNatsServer(versionLaterThan: "2.11")]
+    public async Task TestMessageTTLApiNotSupportedupport()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        // Config validation
+        var exception = await Assert.ThrowsAsync<NatsKVException>(() => kv.CreateStoreAsync(new NatsKVConfig("kv1") { LimitMarkerTTL = TimeSpan.FromSeconds(10) }, cancellationToken: cancellationToken).AsTask());
+        _output.WriteLine(exception.Message);
+    }
+
     [SkipIfNatsServer(versionEarlierThan: "2.11")]
     public async Task TestMessageTTL()
     {
@@ -473,24 +491,52 @@ public class KeyValueStoreTest
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
 
-        var store = await kv.CreateStoreAsync(new NatsKVConfig("kv1") { AllowMsgTTL = true }, cancellationToken: cancellationToken);
+        // Check TTL support
+        var exception = await Assert.ThrowsAsync<NatsKVException>(async () =>
+        {
+            var store1 = await kv.CreateStoreAsync(new NatsKVConfig("kv0") { LimitMarkerTTL = TimeSpan.Zero }, cancellationToken: cancellationToken);
+            await store1.CreateAsync("k1", "v1", ttl: TimeSpan.FromSeconds(60), cancellationToken: cancellationToken);
+        });
+        Assert.Equal("This store does not support TTL", exception.Message);
+
+        // Check API version
+        var info = await js.JSRequestResponseAsync<object, AccountInfoResponse>("$JS.API.INFO", null, cancellationToken);
+        Assert.True(info.Api.Level >= 1);
+
+        // Config validation
+        await Assert.ThrowsAsync<NatsKVException>(() => kv.CreateStoreAsync(new NatsKVConfig("kv1") { LimitMarkerTTL = TimeSpan.FromSeconds(-1) }, cancellationToken: cancellationToken).AsTask());
+        await Assert.ThrowsAsync<NatsKVException>(() => kv.CreateStoreAsync(new NatsKVConfig("kv1") { LimitMarkerTTL = TimeSpan.FromSeconds(.99) }, cancellationToken: cancellationToken).AsTask());
+
+        var store = await kv.CreateStoreAsync(new NatsKVConfig("kv1") { LimitMarkerTTL = TimeSpan.FromSeconds(2) }, cancellationToken: cancellationToken);
 
         for (var i = 0; i < 10; i++)
         {
-            await store.PutAsync($"k{i}", $"v{i}", TimeSpan.FromSeconds(1), cancellationToken: cancellationToken);
+            await store.CreateAsync($"k{i}", $"v{i}", TimeSpan.FromSeconds(2), cancellationToken: cancellationToken);
         }
 
-        var state = await store.GetStatusAsync();
+        var state = await store.GetStatusAsync(cancellationToken);
         Assert.Equal(10, state.Info.State.Messages);
         Assert.Equal(1ul, state.Info.State.FirstSeq);
         Assert.Equal(10ul, state.Info.State.LastSeq);
 
-        // Sleep for two seconds, now all the messages should be gone
-        await Task.Delay(2000);
-        state = await store.GetStatusAsync();
+        await Retry.Until(
+            reason: "messages are deleted",
+            condition: async () =>
+            {
+                var state1 = await store.GetStatusAsync(cancellationToken);
+                _output.WriteLine($"Messages: {state1.Info.State.Messages}");
+                _output.WriteLine($"FirstSeq: {state1.Info.State.FirstSeq}");
+                _output.WriteLine($"LastSeq: {state1.Info.State.LastSeq}");
+
+                return state1.Info.State is { Messages: 0, FirstSeq: 21, LastSeq: 20 };
+            },
+            retryDelay: TimeSpan.FromSeconds(2),
+            timeout: TimeSpan.FromSeconds(30));
+
+        state = await store.GetStatusAsync(cancellationToken);
         Assert.Equal(0, state.Info.State.Messages);
-        Assert.Equal(11ul, state.Info.State.FirstSeq);
-        Assert.Equal(10ul, state.Info.State.LastSeq);
+        Assert.Equal(21ul, state.Info.State.FirstSeq);
+        Assert.Equal(20ul, state.Info.State.LastSeq);
     }
 
     [SkipIfNatsServer(versionEarlierThan: "2.11")]
@@ -505,9 +551,9 @@ public class KeyValueStoreTest
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
 
-        var store = await kv.CreateStoreAsync(new NatsKVConfig("kv1") { AllowMsgTTL = false }, cancellationToken: cancellationToken);
-        var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () => await store.PutAsync($"somekey", $"somevalue", TimeSpan.FromSeconds(1), cancellationToken: cancellationToken));
-        Assert.Equal("per-message TTL is disabled", exception.Message);
+        var store = await kv.CreateStoreAsync(new NatsKVConfig("kv1") { LimitMarkerTTL = TimeSpan.Zero }, cancellationToken: cancellationToken);
+        var exception = await Assert.ThrowsAsync<NatsKVException>(async () => await store.CreateAsync($"somekey", $"somevalue", TimeSpan.FromSeconds(1), cancellationToken: cancellationToken));
+        Assert.Equal("This store does not support TTL", exception.Message);
     }
 
     [SkipIfNatsServer(versionEarlierThan: "2.11")]
@@ -522,7 +568,7 @@ public class KeyValueStoreTest
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
 
-        var store = await kv.CreateStoreAsync(new NatsKVConfig("kv1") { AllowMsgTTL = true, SubjectDeleteMarkerTTL = TimeSpan.FromSeconds(2) }, cancellationToken: cancellationToken);
+        var store = await kv.CreateStoreAsync(new NatsKVConfig("kv1") { LimitMarkerTTL = TimeSpan.FromSeconds(2) }, cancellationToken: cancellationToken);
         var info = await js.GetStreamAsync("KV_kv1");
         Assert.Equal(TimeSpan.FromSeconds(2), info.Info.Config.SubjectDeleteMarkerTTL);
     }
@@ -542,8 +588,7 @@ public class KeyValueStoreTest
         var store = await kv.CreateStoreAsync(
             new NatsKVConfig("kv1")
             {
-                AllowMsgTTL = true,
-                SubjectDeleteMarkerTTL = TimeSpan.FromHours(1),
+                LimitMarkerTTL = TimeSpan.FromHours(1),
                 MaxAge = TimeSpan.FromSeconds(4),
             },
             cancellationToken: cancellationToken);
@@ -589,27 +634,37 @@ public class KeyValueStoreTest
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
 
-        var store = await kv.CreateStoreAsync(new NatsKVConfig("kv1") { AllowMsgTTL = true, MaxAge = TimeSpan.FromSeconds(1) }, cancellationToken: cancellationToken);
+        var store = await kv.CreateStoreAsync(new NatsKVConfig("kv1") { LimitMarkerTTL = TimeSpan.FromSeconds(2) }, cancellationToken: cancellationToken);
 
         // The first message we publish is set to "never expire", therefore it won't age out with the MaxAge policy.
-        await store.PutAsync($"k0", $"v0", TimeSpan.MaxValue, cancellationToken: cancellationToken);
+        await store.CreateAsync($"k0", $"v0", TimeSpan.MaxValue, cancellationToken: cancellationToken);
+
+        await Task.Delay(1000);
 
         for (var i = 1; i < 11; i++)
         {
-            await store.PutAsync($"k{i}", $"v{i}", TimeSpan.FromSeconds(1), cancellationToken: cancellationToken);
+            await store.CreateAsync($"k{i}", $"v{i}", TimeSpan.FromSeconds(2), cancellationToken: cancellationToken);
         }
 
-        var state = await store.GetStatusAsync();
+        var state = await store.GetStatusAsync(cancellationToken);
         Assert.Equal(11, state.Info.State.Messages);
         Assert.Equal(1ul, state.Info.State.FirstSeq);
         Assert.Equal(11ul, state.Info.State.LastSeq);
 
-        // Sleep for two seconds, only the first message should be there
-        await Task.Delay(2000);
-        state = await store.GetStatusAsync();
+        await Retry.Until(
+            reason: "messages are deleted",
+            condition: async () =>
+            {
+                var state1 = await store.GetStatusAsync(cancellationToken);
+                return state1.Info.State is { Messages: 1, FirstSeq: 1, LastSeq: 21 };
+            },
+            retryDelay: TimeSpan.FromSeconds(2),
+            timeout: TimeSpan.FromSeconds(30));
+
+        state = await store.GetStatusAsync(cancellationToken);
         Assert.Equal(1, state.Info.State.Messages);
         Assert.Equal(1ul, state.Info.State.FirstSeq);
-        Assert.Equal(11ul, state.Info.State.LastSeq);
+        Assert.Equal(21ul, state.Info.State.LastSeq);
     }
 
     [Fact]

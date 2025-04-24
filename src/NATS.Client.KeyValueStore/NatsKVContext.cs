@@ -58,6 +58,20 @@ public class NatsKVContext : INatsKVContext
     {
         ValidateBucketName(config.Bucket);
 
+        if (config.LimitMarkerTTL < TimeSpan.Zero || (config.LimitMarkerTTL > TimeSpan.Zero && config.LimitMarkerTTL < TimeSpan.FromSeconds(1)))
+        {
+            throw new NatsKVException("Invalid LimitMarkerTTL");
+        }
+
+        if (config.LimitMarkerTTL > TimeSpan.Zero)
+        {
+            var info = await JetStreamContext.JSRequestResponseAsync<object, AccountInfoResponse>("$JS.API.INFO", null, cancellationToken);
+            if (info.Api.Level < 1)
+            {
+                throw new NatsKVException("API doesn't support LimitMarkerTTL");
+            }
+        }
+
         var streamConfig = NatsKVContext.CreateStreamConfig(config);
 
         var stream = await JetStreamContext.CreateStreamAsync(streamConfig, cancellationToken);
@@ -133,7 +147,8 @@ public class NatsKVContext : INatsKVContext
         {
             var stream = await JetStreamContext.GetStreamAsync(name, cancellationToken: cancellationToken);
             var isCompressed = stream.Info.Config.Compression != StreamConfigCompression.None;
-            yield return new NatsKVStatus(name, isCompressed, stream.Info);
+
+            yield return new NatsKVStatus(name, isCompressed, NatsKVStore.GetLimitMarkerTTL(stream.Info.Config), stream.Info);
         }
     }
 
@@ -264,8 +279,8 @@ public class NatsKVContext : INatsKVContext
             Sources = sources,
             Retention = StreamConfigRetention.Limits, // from ADR-8
             Metadata = config.Metadata,
-            AllowMsgTTL = config.AllowMsgTTL,
-            SubjectDeleteMarkerTTL = config.SubjectDeleteMarkerTTL,
+            AllowMsgTTL = config.LimitMarkerTTL > TimeSpan.Zero,
+            SubjectDeleteMarkerTTL = config.LimitMarkerTTL,
         };
 
         return streamConfig;
