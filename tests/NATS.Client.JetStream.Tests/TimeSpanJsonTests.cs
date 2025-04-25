@@ -3,12 +3,11 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Tests;
 
-public class TimeSpanJsonTests(ITestOutputHelper output)
+public class TimeSpanJsonTests
 {
     [Fact]
     public void NatsJSJsonDateTimeOffsetConverter_serialize_UTC_offset_as_Z()
