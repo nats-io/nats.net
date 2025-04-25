@@ -82,6 +82,12 @@ public record NatsKVConfig
     /// Additional metadata for the Bucket
     /// </summary>
     public IDictionary<string, string>? Metadata { get; set; }
+
+    /// <summary>
+    /// How long the bucket keeps markers when keys are removed by the TTL setting, 0 meaning markers are not supported.
+    /// </summary>
+    /// <remarks>This feature is only available on NATS server v2.11 and later.</remarks>
+    public TimeSpan LimitMarkerTTL { get; init; }
 }
 
 /// <summary>
