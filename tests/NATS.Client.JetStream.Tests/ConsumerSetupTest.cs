@@ -93,13 +93,22 @@ public class ConsumerSetupTest
 
         await js.CreateStreamAsync(new StreamConfig($"{prefix}s1", [$"{prefix}s1.*"]), cts.Token);
 
+        var consumerConfig = new ConsumerConfig
+        {
+            Name = $"{prefix}c1",
+            Backoff = [TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(3)],
+        };
+
+        if (new Version("2.10") >= NatsServerExe.Version)
+        {
+            // nats-server 2.9 needs this to be set to > length of backoff
+            // error: max deliver is required to be > length of backoff values
+            consumerConfig.MaxDeliver = 4;
+        }
+
         await js.CreateOrUpdateConsumerAsync(
             stream: $"{prefix}s1",
-            config: new ConsumerConfig
-            {
-                Name = $"{prefix}c1",
-                Backoff = [TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(3)],
-            },
+            config: consumerConfig,
             cancellationToken: cts.Token);
 
         // Check the consumer config
