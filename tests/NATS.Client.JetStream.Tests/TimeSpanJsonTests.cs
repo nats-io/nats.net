@@ -260,7 +260,7 @@ public class TimeSpanJsonTests
         var bw = new NatsBufferWriter<byte>();
         serializer.Serialize(bw, new ConsumerConfig { Backoff = timeSpans });
 
-        var json = Encoding.UTF8.GetString(bw.WrittenSpan);
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         Assert.Matches(expected, json);
 
         var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory));
