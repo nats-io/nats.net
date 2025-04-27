@@ -314,7 +314,7 @@ public partial class NatsJSContext
         }
 
 #if NETSTANDARD2_0
-        if (name.Contains(" ."))
+        if (name.Contains(".") || name.Contains(" "))
 #else
         var nameSpan = name.AsSpan();
         if (nameSpan.IndexOfAny(" .") >= 0)

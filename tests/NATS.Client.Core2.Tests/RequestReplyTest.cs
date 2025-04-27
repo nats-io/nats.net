@@ -1,5 +1,7 @@
 using System.Buffers;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using NATS.Client.Core2.Tests;
 using NATS.Client.Core2.Tests.ExtraUtils.FrameworkPolyfillExtensions;
 
@@ -413,5 +415,39 @@ public class RequestReplyTest
 
         await sub.DisposeAsync();
         await reg;
+    }
+
+    [Fact]
+    public async Task Direct_request_reply_test()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = NatsRequestReplyMode.Direct });
+        var reply = await nats.RequestAsync<string>("$JS.API.INFO", cancellationToken: default);
+
+        // reply-to should be inbox with id
+        // e.g. _INBOX.Hu5HPpWesrJhvQq2NG3YJ6.1
+        reply.Subject.Length.Should().BeLessThan("_INBOX..".Length + (2 * 22));
+        Assert.True(long.TryParse(reply.Subject.Split('.')[2], out var id));
+        Assert.True(id > 0);
+
+        // simple response check
+        var json = JsonNode.Parse(reply.Data!)!;
+        var type = json["type"]!.GetValue<string>();
+        Assert.Equal("io.nats.jetstream.api.v1.account_info_response", type);
+    }
+
+    [Fact]
+    public async Task Default_SharedInbox_request_reply_test()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var reply = await nats.RequestAsync<string>("$JS.API.INFO", cancellationToken: default);
+
+        // reply-to should be inbox
+        // e.g. _INBOX.Hu5HPpWesrJhvQq2NG3YJ6.Hu5HPpWesrJhvQq2NG3YLw
+        Assert.Equal("_INBOX..".Length + (2 * 22), reply.Subject.Length);
+
+        // simple response check
+        var json = JsonNode.Parse(reply.Data!)!;
+        var type = json["type"]!.GetValue<string>();
+        Assert.Equal("io.nats.jetstream.api.v1.account_info_response", type);
     }
 }

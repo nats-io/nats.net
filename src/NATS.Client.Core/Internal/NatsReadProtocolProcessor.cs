@@ -24,7 +24,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
     private readonly bool _trace;
     private int _disposed;
 
-    public NatsReadProtocolProcessor(ISocketConnection socketConnection, NatsConnection connection, TaskCompletionSource waitForInfoSignal, TaskCompletionSource waitForPongOrErrorSignal, Task infoParsed)
+    public NatsReadProtocolProcessor(SocketConnectionWrapper socketConnection, NatsConnection connection, TaskCompletionSource waitForInfoSignal, TaskCompletionSource waitForPongOrErrorSignal, Task infoParsed)
     {
         _connection = connection;
         _logger = connection.Opts.LoggerFactory.CreateLogger<NatsReadProtocolProcessor>();
@@ -377,7 +377,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                 _socketReader.AdvanceTo(buffer.Start);
                 var newBuffer = await _socketReader.ReadUntilReceiveNewLineAsync().ConfigureAwait(false);
                 var newPosition = newBuffer.PositionOf((byte)'\n');
-                var error = ParseError(newBuffer.Slice(0, buffer.GetOffset(newPosition!.Value) - 1));
+                var error = ParseError(newBuffer.Slice(0, newBuffer.GetOffset(newPosition!.Value) - 1));
                 _logger.LogError(NatsLogEvents.Protocol, "Server error {Error}", error);
                 _waitForPongOrErrorSignal.TrySetException(new NatsServerException(error));
                 return newBuffer.Slice(newBuffer.GetPosition(1, newPosition!.Value));

@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Text;
+using NATS.Client.Platform.Windows.Tests;
 
 namespace NATS.Client.Core.Tests;
 
@@ -12,8 +13,8 @@ public class LowLevelApiTest
     [Fact]
     public async Task Sub_custom_builder_test()
     {
-        await using var server = await NatsServer.StartAsync();
-        var nats = await server.CreateClientConnectionAsync();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
 
         var subject = "foo.*";
         var builder = new NatsSubCustomTestBuilder(_output);
@@ -80,7 +81,7 @@ public class LowLevelApiTest
                 _builder.MessageReceived(sb.ToString());
             }
 
-            return ValueTask.CompletedTask;
+            return default;
         }
 
         protected override void TryComplete()

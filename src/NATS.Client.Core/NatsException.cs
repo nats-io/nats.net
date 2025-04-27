@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 
 namespace NATS.Client.Core;
@@ -24,6 +25,10 @@ public sealed class NatsNoReplyException : NatsException
         : base("No reply received")
     {
     }
+
+    [DoesNotReturn]
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static void Throw() => throw new NatsNoReplyException();
 }
 
 public sealed class NatsNoRespondersException : NatsException

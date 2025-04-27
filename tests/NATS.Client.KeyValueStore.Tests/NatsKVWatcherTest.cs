@@ -1,32 +1,46 @@
 using System.Buffers.Text;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Tests;
+using NATS.Client.Core2.Tests;
 using NATS.Client.KeyValueStore.Internal;
+using NATS.Client.Platform.Windows.Tests;
+using NATS.Client.TestUtilities;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.KeyValueStore.Tests;
 
+[Collection("nats-server")]
 public class NatsKVWatcherTest
 {
     private readonly ITestOutputHelper _output;
+    private readonly NatsServerFixture _server;
 
-    public NatsKVWatcherTest(ITestOutputHelper output) => _output = output;
+    public NatsKVWatcherTest(ITestOutputHelper output, NatsServerFixture server)
+    {
+        _output = output;
+        _server = server;
+    }
 
     [Fact]
     public async Task Watcher_reconnect_with_history()
     {
-        const string bucket = "b1";
-        var config = new NatsKVConfig(bucket) { History = 10 };
-
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await using var server = await NatsServer.StartJSAsync();
-        await using var nats1 = await server.CreateClientConnectionAsync();
+        await using var nats1 = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
+        await nats1.ConnectRetryAsync();
         var js1 = new NatsJSContext(nats1);
         var kv1 = new NatsKVContext(js1);
+
+        var bucket = $"{prefix}b1";
+        var config = new NatsKVConfig(bucket) { History = 10 };
+
         var store1 = await kv1.CreateStoreAsync(config, cancellationToken: cancellationToken);
 
-        var (nats2, proxy) = server.CreateProxiedClientConnection();
+        var proxy = new NatsProxy(_server.Port);
+        await using var nats2 = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}" });
+        await nats1.ConnectRetryAsync();
         var js2 = new NatsJSContext(nats2);
         var kv2 = new NatsKVContext(js2);
         var store2 = (NatsKVStore)await kv2.CreateStoreAsync(config, cancellationToken: cancellationToken);
@@ -103,13 +117,13 @@ public class NatsKVWatcherTest
         var cts = new CancellationTokenSource(timeout);
         var cancellationToken = cts.Token;
 
-        await using var server = await NatsServer.StartJSAsync();
-        await using var nats = await server.CreateClientConnectionAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
 
-        var bucket = "b1";
+        var bucket = $"{prefix}b1";
         var store = await kv.CreateStoreAsync(bucket, cancellationToken: cancellationToken);
 
         await store.PutAsync("k1", "v1", cancellationToken: cancellationToken);
@@ -147,13 +161,13 @@ public class NatsKVWatcherTest
         var cts = new CancellationTokenSource(timeout);
         var cancellationToken = cts.Token;
 
-        await using var server = await NatsServer.StartJSAsync();
-        await using var nats = await server.CreateClientConnectionAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
 
-        var bucket = "b1";
+        var bucket = $"{prefix}b1";
         var store = await kv.CreateStoreAsync(bucket, cancellationToken: cancellationToken);
 
         await store.PutAsync("k1", "v1", cancellationToken: cancellationToken);
@@ -207,19 +221,34 @@ public class NatsKVWatcherTest
     [Fact]
     public async Task Watcher_timeout_reconnect()
     {
-        const string bucket = "b1";
         var timeout = TimeSpan.FromSeconds(30);
 
         var cts = new CancellationTokenSource(timeout);
         var cancellationToken = cts.Token;
 
-        await using var server = await NatsServer.StartJSWithTraceAsync(_output);
-        await using var nats1 = await server.CreateClientConnectionAsync();
+        await using var nats1 = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
         var js1 = new NatsJSContext(nats1);
         var kv1 = new NatsKVContext(js1);
+        var bucket = $"{prefix}b1";
         var store1 = await kv1.CreateStoreAsync(bucket, cancellationToken: cancellationToken);
 
-        var (nats2, proxy) = server.CreateProxiedClientConnection();
+        var signal = new WaitSignal(timeout);
+        await using var nats2 = new NatsConnection(new NatsOpts
+        {
+            Url = _server.Url,
+            LoggerFactory = new InMemoryTestLoggerFactory(
+                level: LogLevel.Debug,
+                logger: log =>
+                {
+                    if (log is { Category: "NATS.Client.KeyValueStore.Internal.NatsKVWatcher", LogLevel: LogLevel.Debug })
+                    {
+                        if (log.EventId == NatsKVLogEvents.IdleTimeout)
+                            signal.Pulse();
+                    }
+                }),
+        });
+        var proxy = new NatsProxy(_server.Port);
         var js2 = new NatsJSContext(nats2);
         var kv2 = new NatsKVContext(js2);
         var store2 = (NatsKVStore)await kv2.CreateStoreAsync(bucket, cancellationToken: cancellationToken);
@@ -260,16 +289,6 @@ public class NatsKVWatcherTest
         await store1.PutAsync("k1.p1", 5, cancellationToken: cancellationToken);
         await store1.PutAsync("k1.p1", 6, cancellationToken: cancellationToken);
 
-        var signal = new WaitSignal(timeout);
-        server.OnLog += log =>
-        {
-            if (log is { Category: "NATS.Client.KeyValueStore.Internal.NatsKVWatcher", LogLevel: LogLevel.Debug })
-            {
-                if (log.EventId == NatsKVLogEvents.IdleTimeout)
-                    signal.Pulse();
-            }
-        };
-
         await Task.Delay(10_000, cancellationToken);
 
         await signal;
@@ -308,8 +327,8 @@ public class NatsKVWatcherTest
     [Fact]
     public async Task Watch_push_consumer_flow_control()
     {
-        await using var server = await NatsServer.StartJSAsync();
-        await using var nats = await server.CreateClientConnectionAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -318,7 +337,7 @@ public class NatsKVWatcherTest
         var cts = new CancellationTokenSource(timeout);
         var cancellationToken = cts.Token;
 
-        var bucket = "b1";
+        var bucket = $"{prefix}b1";
         var store = await kv.CreateStoreAsync(bucket, cancellationToken: cancellationToken);
 
         // with large number of entries we'd receive the flow control messages
@@ -348,13 +367,13 @@ public class NatsKVWatcherTest
         var cts = new CancellationTokenSource(timeout);
         var cancellationToken = cts.Token;
 
-        await using var server = await NatsServer.StartJSAsync();
-        await using var nats = await server.CreateClientConnectionAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
 
-        var bucket = "b1";
+        var bucket = $"{prefix}b1";
         var store = await kv.CreateStoreAsync(bucket, cancellationToken: cancellationToken);
 
         var signal = new WaitSignal(timeout);
@@ -389,15 +408,15 @@ public class NatsKVWatcherTest
     [Fact]
     public async Task Serialization_errors()
     {
-        await using var server = await NatsServer.StartJSAsync();
-        await using var nats = await server.CreateClientConnectionAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-        var store = await kv.CreateStoreAsync("b1", cancellationToken: cts.Token);
+        var store = await kv.CreateStoreAsync($"{prefix}b1", cancellationToken: cts.Token);
 
         await store.PutAsync($"k1", "not an int", cancellationToken: cts.Token);
 
@@ -415,15 +434,15 @@ public class NatsKVWatcherTest
     [Fact]
     public async Task Watch_with_empty_filter()
     {
-        await using var server = await NatsServer.StartJSAsync();
-        await using var nats = await server.CreateClientConnectionAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-        var store = await kv.CreateStoreAsync("b1", cancellationToken: cts.Token);
+        var store = await kv.CreateStoreAsync($"{prefix}b1", cancellationToken: cts.Token);
 
         await Assert.ThrowsAsync<ArgumentException>(async () =>
         {
@@ -436,15 +455,15 @@ public class NatsKVWatcherTest
     [SkipIfNatsServer(versionLaterThan: "2.9.999")]
     public async Task Watch_with_multiple_filter_on_old_server()
     {
-        await using var server = await NatsServer.StartJSAsync();
-        await using var nats = await server.CreateClientConnectionAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-        var store = await kv.CreateStoreAsync("b1", cancellationToken: cts.Token);
+        var store = await kv.CreateStoreAsync($"{prefix}b1", cancellationToken: cts.Token);
 
         // If we try to watch with multiple keys on an old server, we will have to
         // let the request go through since there is no way to know the server version
@@ -465,10 +484,10 @@ public class NatsKVWatcherTest
     [Fact]
     public async Task Watch_resume_at_revision()
     {
-        await using var server = await NatsServer.StartJSAsync();
-        await using var nats = await server.CreateClientConnectionAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
 
-        const string bucket = "Watch_resume_at_revision";
+        var bucket = $"{prefix}Watch_resume_at_revision";
         var config = new NatsKVConfig(bucket) { History = 10 };
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -548,10 +567,10 @@ public class NatsKVWatcherTest
     [Fact]
     public async Task Validate_watch_options()
     {
-        await using var server = await NatsServer.StartJSAsync();
-        await using var nats = await server.CreateClientConnectionAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
 
-        const string bucket = nameof(Validate_watch_options);
+        var bucket = prefix + nameof(Validate_watch_options);
         var config = new NatsKVConfig(bucket) { History = 10 };
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -618,5 +637,94 @@ public class NatsKVWatcherTest
                 }
             });
         }
+    }
+
+    [Fact]
+    public async Task ReadAfterDelete()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var store = await kv.CreateStoreAsync($"{prefix}b1");
+
+        // Read all entries, should be empty.
+        List<NatsKVEntry<string>> results = new();
+        await foreach (var entry in store.WatchAsync<string>(">", opts: new NatsKVWatchOpts
+        {
+            OnNoData = (_) => ValueTask.FromResult(true),
+        }))
+        {
+            results.Add(entry);
+        }
+
+        // Should be no results here.
+        Assert.False(results.Any());
+
+        // Add k1
+        await store.PutAsync("k1", "v1");
+
+        // Check if there, should be true
+        var result1 = await store.TryGetEntryAsync<string>("k1");
+        Assert.True(result1.Success);
+
+        // Remove k1
+        await store.DeleteAsync("k1");
+
+        // Check if there, should be false
+        var result = await store.TryGetEntryAsync<string>("k1");
+        Assert.False(result.Success);
+
+        // Read all entries.
+        results.Clear();
+        await foreach (var entry in store.WatchAsync<string>(">", opts: new NatsKVWatchOpts
+        {
+            OnNoData = (_) => ValueTask.FromResult(true),
+        }))
+        {
+            results.Add(entry);
+            if (entry.Delta == 0)
+            {
+                break;
+            }
+        }
+
+        // Should be 1 entry, which is the deleted OP
+        Assert.Single(results);
+        Assert.Equal(NatsKVOperation.Del, results[0].Operation);
+
+        // Watch and ignore deletes....  Really OnNoData should execute as we're excluding deletes and there should be no entries coming back, but this just times out.
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var cancellationToken = cts.Token;
+
+        results.Clear();
+
+        try
+        {
+            await foreach (var entry in store.WatchAsync<string>(
+            ">",
+            opts: new NatsKVWatchOpts
+            {
+                IgnoreDeletes = true,
+                OnNoData = (_) => ValueTask.FromResult(true),
+            },
+            cancellationToken: cancellationToken))
+            {
+                results.Add(entry);
+                if (entry.Delta == 0)
+                {
+                    break;
+                }
+            }
+        }
+        catch (TaskCanceledException)
+        {
+            Assert.Fail("Task was cancelled waiting for OnNoData");
+        }
+
+        // Should be no results here.
+        Assert.False(results.Any());
     }
 }

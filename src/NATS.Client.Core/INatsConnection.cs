@@ -64,7 +64,7 @@ public interface INatsConnection : INatsClient
     /// <summary>
     /// Hook when socket is available.
     /// </summary>
-    Func<ISocketConnection, ValueTask<ISocketConnection>>? OnSocketAvailableAsync { get; set; }
+    Func<INatsSocketConnection, ValueTask<INatsSocketConnection>>? OnSocketAvailableAsync { get; set; }
 
     /// <summary>
     /// Publishes a serializable message payload to the given subject name, optionally supplying a reply subject.

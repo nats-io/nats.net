@@ -1,4 +1,3 @@
-using System.Net.WebSockets;
 using System.Text;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
@@ -9,6 +8,22 @@ using Random = NATS.Client.Core.Internal.NetStandardExtensions.Random;
 #endif
 
 namespace NATS.Client.Core;
+
+/// <summary>
+/// Specifies the modes for handling request-reply interactions in NATS.
+/// </summary>
+public enum NatsRequestReplyMode
+{
+    /// <summary>
+    /// Uses a shared inbox for all requests.
+    /// </summary>
+    SharedInbox,
+
+    /// <summary>
+    /// Uses a direct reply for each request.
+    /// </summary>
+    Direct,
+}
 
 /// <summary>
 /// Immutable options for NatsConnection, you can configure via `with` operator.
@@ -141,6 +156,32 @@ public sealed record NatsOpts
     /// case it might risk server disconnecting the client as a slow consumer.
     /// </remarks>
     public BoundedChannelFullMode SubPendingChannelFullMode { get; init; } = BoundedChannelFullMode.DropNewest;
+
+    /// <summary>
+    /// Determines the mechanism for handling request-reply interactions in NATS.
+    /// </summary>
+    /// <remarks>
+    /// There are two available modes:
+    /// <para>
+    /// 1. <see cref="NatsRequestReplyMode.SharedInbox"/> - Uses a shared subscription inbox for handling replies
+    /// to request messages, using the muxer.
+    /// </para>
+    /// <para>
+    /// 2. <see cref="NatsRequestReplyMode.Direct"/> - While using the same inbox prefix, each reply
+    /// is handled before being processed by the muxer. This mode is more resource-efficient.
+    /// </para>
+    /// The <see cref="RequestReplyMode"/> setting determines which mode is used during message exchanges
+    /// initiated by <see cref="NatsConnection.RequestAsync{TRequest, TReply}"/> or other related methods.
+    /// </remarks>
+    public NatsRequestReplyMode RequestReplyMode { get; init; } = NatsRequestReplyMode.SharedInbox;
+
+    /// <summary>
+    /// Factory for creating socket connections to the NATS server.
+    /// When set, this factory will be used instead of the default connection implementation.
+    /// For the library to handle TLS upgrade automatically, implement the <see cref="INatsTlsUpgradeableSocketConnection"/> interface.
+    /// </summary>
+    /// <seealso cref="INatsTlsUpgradeableSocketConnection"/>
+    public INatsSocketConnectionFactory? SocketConnectionFactory { get; init; }
 
     internal NatsUri[] GetSeedUris(bool suppressRandomization = false)
     {

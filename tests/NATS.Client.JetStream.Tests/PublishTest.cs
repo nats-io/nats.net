@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
+using NATS.Client.Platform.Windows.Tests;
 using NATS.Client.TestUtilities;
 using NATS.Client.TestUtilities2;
 using NATS.Net;
@@ -236,7 +237,7 @@ public class PublishTest
 
         // Publish fails once but succeeds after retry
         {
-            await proxy.FlushFramesAsync(nats);
+            await proxy.FlushFramesAsync(nats, clear: true, cts.Token);
             Interlocked.Exchange(ref retryCount, 0);
             Interlocked.Exchange(ref swallowAcksCount, 1);
 
@@ -249,7 +250,7 @@ public class PublishTest
 
         // Publish fails twice but succeeds after a third retry when attempts is 3
         {
-            await proxy.FlushFramesAsync(nats);
+            await proxy.FlushFramesAsync(nats, clear: true, cts.Token);
             Interlocked.Exchange(ref retryCount, 0);
             Interlocked.Exchange(ref swallowAcksCount, 2);
 
@@ -262,7 +263,7 @@ public class PublishTest
 
         // Publish fails even after two retries
         {
-            await proxy.FlushFramesAsync(nats);
+            await proxy.FlushFramesAsync(nats, clear: true, cts.Token);
             Interlocked.Exchange(ref retryCount, 0);
             Interlocked.Exchange(ref swallowAcksCount, 2);
 
@@ -277,9 +278,9 @@ public class PublishTest
     [Fact]
     public async Task Publish_no_responders()
     {
-        await using var server = await NatsServer.StartAsync();
-        await using var connection = await server.CreateClientConnectionAsync();
-        var js = connection.CreateJetStreamContext();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        var js = nats.CreateJetStreamContext();
         var result = await js.TryPublishAsync("foo", 1);
         Assert.IsType<NatsJSPublishNoResponseException>(result.Error);
     }

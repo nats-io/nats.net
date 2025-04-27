@@ -1,4 +1,6 @@
 using NATS.Client.Core.Tests;
+using NATS.Client.Platform.Windows.Tests;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.KeyValueStore.Tests;
 
@@ -7,9 +9,10 @@ public class DirectGetTest(ITestOutputHelper output)
     [Fact]
     public async Task API_subject_test()
     {
-        await using var server = await NatsServer.StartJSAsync();
-        var (nats1, proxy) = server.CreateProxiedClientConnection();
-        await using var nats = nats1;
+        await using var server = await NatsServerProcess.StartAsync();
+        var proxy = new NatsProxy(server.Port);
+        await using var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}" });
+        await nats.ConnectRetryAsync();
 
         var js = new NatsJSContext(nats);
 
@@ -24,7 +27,7 @@ public class DirectGetTest(ITestOutputHelper output)
             await store.PutAsync("x", 1, cancellationToken: cancellationToken);
             await store.PutAsync("x", 2, cancellationToken: cancellationToken);
 
-            await proxy.FlushFramesAsync(nats);
+            await proxy.FlushFramesAsync(nats, clear: true, cts.Token);
 
             var entry = await store.GetEntryAsync<int>("x", cancellationToken: cancellationToken);
             Assert.Equal(2, entry.Value);
@@ -46,7 +49,7 @@ public class DirectGetTest(ITestOutputHelper output)
             await store.PutAsync("x", 1, cancellationToken: cancellationToken);
             await store.PutAsync("x", 2, cancellationToken: cancellationToken);
 
-            await proxy.FlushFramesAsync(nats);
+            await proxy.FlushFramesAsync(nats, clear: true, cts.Token);
 
             var entry = await store.GetEntryAsync<int>("x", cancellationToken: cancellationToken);
             Assert.Equal(2, entry.Value);

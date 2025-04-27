@@ -2,10 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
-
-#if !NET6_0_OR_GREATER
-using NATS.Client.Core.Internal.NetStandardExtensions;
-#endif
+using NATS.Client.Core.Tests;
 
 namespace NATS.Client.TestUtilities;
 
