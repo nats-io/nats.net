@@ -535,7 +535,6 @@ public class NatsMsgBuilder<T>
                 size = Encoding.GetBytes(str).Length;
                 break;
             default:
-            {
                 if (Serializer != null)
                 {
                     var bufferWriter = new NatsPooledBufferWriter<byte>(SerializationBufferSize);
@@ -544,7 +543,6 @@ public class NatsMsgBuilder<T>
                 }
 
                 break;
-            }
             }
 
             if (size > 0)
