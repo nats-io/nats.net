@@ -15,7 +15,14 @@ public class NatsMsgTests
         var headers = new NatsHeaders();
 
         // Act
-        var msg = NatsMsg.Create(subject, data, Encoding.UTF8, replyTo: replyTo, headers: headers);
+        var builder = new NatsMsgBuilder<string>
+        {
+            Subject = subject,
+            Data = data,
+            ReplyTo = replyTo,
+            Headers = headers,
+        };
+        var msg = builder.Msg;
 
         // Assert
         var expectedSize = subject.Length + replyTo.Length + headers.GetBytesLength() + Encoding.UTF8.GetByteCount(data);
@@ -32,7 +39,14 @@ public class NatsMsgTests
         var headers = new NatsHeaders();
 
         // Act
-        var msg = NatsMsg.Create(subject, data, headers: headers, replyTo: replyTo);
+        var builder = new NatsMsgBuilder<byte[]>
+        {
+            Subject = subject,
+            Data = data,
+            ReplyTo = replyTo,
+            Headers = headers,
+        };
+        var msg = builder.Msg;
 
         // Assert
         var expectedSize = subject.Length + (replyTo?.Length ?? 0) + headers.GetBytesLength() + data.Length;
@@ -51,7 +65,15 @@ public class NatsMsgTests
         var serializer = new NatsJsonSerializer<TestData>();
 
         // Act
-        var msg = NatsMsg.Create(subject, data, serializer, headers: headers, replyTo: replyTo);
+        var builder = new NatsMsgBuilder<TestData>
+        {
+            Subject = subject,
+            Data = data,
+            Serializer = serializer,
+            Headers = headers,
+            ReplyTo = replyTo,
+        };
+        var msg = builder.Msg;
 
         var bufferWriter = new NatsPooledBufferWriter<byte>(256);
         serializer.Serialize(bufferWriter, data);
@@ -71,10 +93,15 @@ public class NatsMsgTests
         var data = new TestData { Id = 1, Name = "example" };
 
         // Act
-        var msg = NatsMsg.Create(subject, data);
+        var builder = new NatsMsgBuilder<TestData>
+        {
+            Subject = subject,
+            Data = data,
+        };
+        var msg = builder.Msg;
 
         // Assert
-        msg.Size.Should().Be(1073741823);
+        msg.Size.Should().Be(0);
     }
 
     private class TestData
