@@ -140,7 +140,6 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
              8mb:     8,388,608
      */
     private readonly uint _flagsAndSize;
-    private const int UnknownSize = 0x3FFFFFFF;
 
     /// <summary>
     /// NATS message structure as defined by the protocol.
@@ -164,7 +163,7 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
     public NatsMsg(
         string subject,
         string? replyTo,
-        int? size,
+        int size,
         NatsHeaders? headers,
         T? data,
         INatsConnection? connection,
@@ -172,16 +171,10 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
     {
         Subject = subject;
         ReplyTo = replyTo;
+        _flagsAndSize = ((uint)flags << 30) | (uint)(size & 0x3FFFFFFF);
         Headers = headers;
         Data = data;
         Connection = connection;
-
-        if (size == 0 && data == null)
-        {
-            flags |= NatsMsgFlags.Empty;
-        }
-
-        _flagsAndSize = ((uint)flags << 30) | (uint)((size ?? UnknownSize) & 0x3FFFFFFF);
     }
 
     /// <inheritdoc />
@@ -196,43 +189,32 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
     /// <summary>Message size in bytes.</summary>
     public int Size
     {
-        get
-        {
-            if (_flagsAndSize == 0x3FFFFFFF)
-                return UnknownSize;
+        // Extract the lower 30 bits
+        get => (int)(_flagsAndSize & 0x3FFFFFFF);
 
-            return (int)(_flagsAndSize & 0x3FFFFFFF);
-        }
-
+        // Clear the lower 30 bits and set the new number
         init
         {
-            var valueToStore = value == UnknownSize ? 0x3FFFFFFF : (uint)(value & 0x3FFFFFFF);
-            _flagsAndSize = (_flagsAndSize & 0xC0000000) | valueToStore;
+            // Mask the input value to fit within 30 bits (clear upper bits)
+            var numberPart = (uint)(value & 0x3FFFFFFF);
+
+            // Clear the lower 30 bits and set the new number value
+            // Preserve the flags, update the number
+            _flagsAndSize = (_flagsAndSize & 0xC0000000) | numberPart;
         }
     }
 
     public NatsMsgFlags Flags
     {
-        get
-        {
-            if (Size is 0 or UnknownSize)
-            {
-                return NatsMsgFlags.Empty;
-            }
-
-            // Extract the two leftmost bits (31st and 30th bit)
-            // Mask with 0b11 to get two bits
-            return (NatsMsgFlags)((_flagsAndSize >> 30) & 0b11);
-        }
+        // Extract the two leftmost bits (31st and 30th bit)
+        // Mask with 0b11 to get two bits
+        get => (NatsMsgFlags)((_flagsAndSize >> 30) & 0b11);
 
         init
         {
-            if (Size != UnknownSize)
-            {
-                // Clear the current flag bits (set to 0) and then set the new flag value
-                var flagsPart = (uint)value << 30;
-                _flagsAndSize = (_flagsAndSize & 0x3FFFFFFF) | flagsPart;
-            }
+            // Clear the current flag bits (set to 0) and then set the new flag value
+            var flagsPart = (uint)value << 30;
+            _flagsAndSize = (_flagsAndSize & 0x3FFFFFFF) | flagsPart;
         }
     }
 
@@ -245,13 +227,9 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
     /// <summary>NATS connection this message is associated to.</summary>
     public INatsConnection? Connection { get; init; }
 
-    public bool IsEmpty =>
-        Size == UnknownSize
-            ? Data == null
-            : (_flagsAndSize & 0x40000000) != 0;
+    public bool IsEmpty => (_flagsAndSize & 0x40000000) != 0;
 
-    public bool HasNoResponders =>
-        Size != UnknownSize && (_flagsAndSize & 0x80000000) != 0;
+    public bool HasNoResponders => (_flagsAndSize & 0x80000000) != 0;
 
     /// <inheritdoc />
     public void EnsureSuccess()
@@ -521,7 +499,7 @@ public class NatsMsgBuilder<T>
         {
             if (string.IsNullOrWhiteSpace(Subject))
                 throw new InvalidOperationException("Subject must be specified and non-empty.");
-            int? size = 0; // Default size is 0 if not calculated
+            var size = 0; // Default size is 0 if not calculated
 
             switch (Data)
             {
