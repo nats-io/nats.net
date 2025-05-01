@@ -239,6 +239,8 @@ public abstract class NatsSubBase
         _idleTimeoutTimer?.Dispose();
         _startUpTimeoutTimer?.Dispose();
 
+        _tokenRegistration.Dispose();
+
         if (Exception != null)
         {
             if (Exception is NatsSubException { Exception: not null } nse)
@@ -248,8 +250,6 @@ public abstract class NatsSubBase
 
             throw Exception;
         }
-
-        _tokenRegistration.Dispose();
 
         return unsubscribeAsync;
     }

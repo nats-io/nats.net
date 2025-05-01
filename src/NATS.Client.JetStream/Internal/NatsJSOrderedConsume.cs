@@ -136,14 +136,19 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
         Interlocked.Exchange(ref _disposed, 1);
 
         _context.Connection.ConnectionDisconnected -= ConnectionOnConnectionDisconnected;
-
-        await base.DisposeAsync().ConfigureAwait(false);
-        await _pullTask.ConfigureAwait(false);
+        try
+        {
+            await base.DisposeAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            await _pullTask.ConfigureAwait(false);
 #if NETSTANDARD2_0
-        _timer.Dispose();
+            _timer.Dispose();
 #else
-        await _timer.DisposeAsync().ConfigureAwait(false);
+            await _timer.DisposeAsync().ConfigureAwait(false);
 #endif
+        }
     }
 
     internal override ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter, int sid)
