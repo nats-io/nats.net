@@ -935,6 +935,7 @@ public partial class NatsConnection : INatsConnection
         }
         catch (OperationCanceledException)
         {
+            // Cancelling is part of a normal reconnect operation, so we don't need to log this
         }
         catch (Exception e)
         {
