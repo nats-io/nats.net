@@ -758,6 +758,15 @@ public partial class NatsConnection : INatsConnection
             }
         }
 
+        try
+        {
+            _logger.LogDebug(NatsLogEvents.Connection, "Reconnect loop stopped [{ReconnectCount}]", reconnectCount);
+        }
+        catch
+        {
+            // ignore logging exceptions in case our host might be disposed or shutting down
+        }
+
         return;
 
         bool CheckDisposed()
