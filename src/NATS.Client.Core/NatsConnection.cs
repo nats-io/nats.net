@@ -764,7 +764,7 @@ public partial class NatsConnection : INatsConnection
         }
         catch
         {
-            // ignore logging exceptions in case our host might be disposed or shutting down
+            // ignore logging exceptions since our host might be disposed or shutting down
         }
 
         return;
