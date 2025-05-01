@@ -756,19 +756,6 @@ public partial class NatsConnection : INatsConnection
                 // which in turn would crash the application.
                 // (e.g. we've seen this with EventLog provider on Windows)
             }
-
-            return;
-        }
-
-        // the reconnect loop should never get here, since everything
-        // is either an early return or stays in the loop
-        try
-        {
-            _logger.LogError(NatsLogEvents.Connection, "Retry loop stopped and connection state is invalid [{ReconnectCount}]", reconnectCount);
-        }
-        catch
-        {
-            // ignore logging exceptions since our host might be disposed or shutting down
         }
 
         return;
@@ -945,6 +932,9 @@ public partial class NatsConnection : INatsConnection
                 await PingOnlyAsync(cancellationToken).ConfigureAwait(false);
                 await periodicTimer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false);
             }
+        }
+        catch (OperationCanceledException)
+        {
         }
         catch (Exception e)
         {
