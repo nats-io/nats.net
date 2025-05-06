@@ -20,7 +20,7 @@ internal class HeaderWriter
 
     private static ReadOnlySpan<byte> ColonSpace => new[] { ByteColon, ByteSpace };
 
-    internal static long GetBytesLength(NatsHeaders headers, Encoding encoding)
+    internal static int GetBytesLength(NatsHeaders headers, Encoding encoding)
     {
         var len = CommandConstants.NatsHeaders10NewLine.Length;
         foreach (var kv in headers)

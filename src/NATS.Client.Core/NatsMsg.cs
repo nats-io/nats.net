@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
-using System.Xml.Linq;
+using System.Text;
+using NATS.Client.Core.Commands;
 using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
@@ -432,6 +433,111 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
         if (string.IsNullOrWhiteSpace(ReplyTo))
         {
             throw new NatsException("unable to send reply; ReplyTo is empty");
+        }
+    }
+}
+
+/// <summary>
+/// Builder class for creating <see cref="NatsMsg{T}" />
+/// </summary>
+public class NatsMsgBuilder<T>
+{
+    /// <summary>
+    /// The destination subject to publish to.
+    /// </summary>
+    public string Subject { get; set; } = null!;
+
+    /// <summary>
+    /// The reply subject that subscribers can use to send a response back to the publisher/requester.
+    /// </summary>
+    public string? ReplyTo { get; set; }
+
+    /// <summary>
+    /// Pass additional information using name-value pairs.
+    /// </summary>
+    public NatsHeaders? Headers { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the message payload.
+    /// </summary>
+    public T? Data { get; set; }
+
+    /// <summary>
+    /// NATS connection this message is associated to.
+    /// </summary>
+    public INatsConnection? Connection { get; set; }
+
+    /// <summary>
+    /// Message flags to indicate no responders and empty payloads.
+    /// </summary>
+    public NatsMsgFlags Flags { get; set; } = default;
+
+    /// <summary>
+    /// Serializer to use for the calculate data size.
+    /// </summary>
+    /// <remarks>This results in double serialization: once for size calculation, once when publishing.</remarks>
+    public INatsSerializer<T>? Serializer { get; set; }
+
+    /// <summary>
+    /// The serializer buffer size
+    /// </summary>
+    /// <remarks>This results in double serialization: once for size calculation, once when publishing.</remarks>
+    public int SerializationBufferSize { get; set; } = 256;
+
+    /// <summary>
+    /// Encoding used.  Default to utf8 if not provided
+    /// </summary>
+    public Encoding Encoding { get; set; } = Encoding.UTF8;
+
+    /// <summary>
+    ///     Builds and returns the <see cref="NatsMsg{T}" /> instance.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Thrown if <see cref="Subject"/> is null or Empty</exception>
+    public NatsMsg<T> Msg
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(Subject))
+                throw new InvalidOperationException("Subject must be specified and non-empty.");
+            var size = 0; // Default size is 0 if not calculated
+
+            switch (Data)
+            {
+            case ReadOnlyMemory<byte> memoryData:
+                size = memoryData.Length;
+                break;
+            case byte[] byteArray:
+                size = byteArray.Length; // Directly use the length of byte[]
+                break;
+            case string str:
+                size = Encoding.GetBytes(str).Length;
+                break;
+            default:
+                if (Serializer != null && Data != null)
+                {
+                    var bufferWriter = new NatsPooledBufferWriter<byte>(SerializationBufferSize);
+                    Serializer.Serialize(bufferWriter, Data);
+                    size = bufferWriter.WrittenMemory.Length;
+                }
+
+                break;
+            }
+
+            if (size > 0)
+            {
+                size += Subject.Length
+                        + (ReplyTo?.Length ?? 0)
+                        + (Headers?.GetBytesLength() ?? 0);
+            }
+
+            return new NatsMsg<T>(
+                Subject,
+                ReplyTo,
+                size,
+                Headers,
+                Data,
+                Connection,
+                Flags);
         }
     }
 }
