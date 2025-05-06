@@ -1,7 +1,8 @@
 using System.Buffers;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
-using NATS.Client.JetStream.Internal;
+using System.Text.RegularExpressions;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Tests;
@@ -249,5 +250,40 @@ public class TimeSpanJsonTests
         var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory));
         Assert.NotNull(result);
         Assert.Equal(time, result.PauseRemaining);
+    }
+
+    [Theory]
+    [ClassData(typeof(BackoffTestData))]
+    public void ConsumerConfigBackoff_test(int minimumFrameworkVersion, List<TimeSpan>? timeSpans, string expected)
+    {
+        var version = int.Parse(Regex.Match(RuntimeInformation.FrameworkDescription, @"(\d+)\.\d").Groups[1].Value);
+        Assert.SkipUnless(version >= minimumFrameworkVersion, $"Requires .NET {minimumFrameworkVersion}");
+
+        var serializer = NatsJSJsonSerializer<ConsumerConfig>.Default;
+
+        var bw = new NatsBufferWriter<byte>();
+        serializer.Serialize(bw, new ConsumerConfig { Backoff = timeSpans });
+
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
+        Assert.Matches(expected, json);
+
+        var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory));
+        Assert.NotNull(result);
+        Assert.Equal(timeSpans, result.Backoff);
+    }
+
+    private class BackoffTestData : TheoryData<int, List<TimeSpan>?, string>
+    {
+        public BackoffTestData()
+        {
+            Add(4, null, "(?!backoff)");
+            Add(4, [], "\"backoff\":\\[\\]}");
+            Add(4, [TimeSpan.FromMilliseconds(1)], "\"backoff\":\\[1000000\\]}");
+
+            // .NET Framework 4.8 doesn't seeem to support TimeSpan.FromMilliseconds(0.001)
+            Add(6, [TimeSpan.FromTicks(1), TimeSpan.FromMilliseconds(0.001), TimeSpan.FromMilliseconds(1234)], "\"backoff\":\\[100,1000,1234000000\\]}");
+
+            Add(4, [TimeSpan.FromSeconds(5), TimeSpan.FromMinutes(5), TimeSpan.FromHours(5)], "\"backoff\":\\[5000000000,300000000000,18000000000000\\]}");
+        }
     }
 }

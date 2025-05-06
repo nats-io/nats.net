@@ -223,7 +223,8 @@ public record ConsumerConfig
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("backoff")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public ICollection<long>? Backoff { get; set; }
+    [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonNullableCollectionNanosecondsConverter))]
+    public ICollection<TimeSpan>? Backoff { get; set; }
 
     /// <summary>
     /// When set do not inherit the replica count from the stream but specifically set it to this amount

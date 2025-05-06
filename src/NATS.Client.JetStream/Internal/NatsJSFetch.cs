@@ -160,17 +160,23 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
     public override async ValueTask DisposeAsync()
     {
         Interlocked.Exchange(ref _disposed, 1);
-        await base.DisposeAsync().ConfigureAwait(false);
-#if NETSTANDARD2_0
-        _hbTimer.Dispose();
-        _expiresTimer.Dispose();
-#else
-        await _hbTimer.DisposeAsync().ConfigureAwait(false);
-        await _expiresTimer.DisposeAsync().ConfigureAwait(false);
-#endif
-        if (_notificationChannel != null)
+        try
         {
-            await _notificationChannel.DisposeAsync();
+            await base.DisposeAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+#if NETSTANDARD2_0
+            _hbTimer.Dispose();
+            _expiresTimer.Dispose();
+#else
+            await _hbTimer.DisposeAsync().ConfigureAwait(false);
+            await _expiresTimer.DisposeAsync().ConfigureAwait(false);
+#endif
+            if (_notificationChannel != null)
+            {
+                await _notificationChannel.DisposeAsync();
+            }
         }
     }
 
