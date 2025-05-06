@@ -4,6 +4,8 @@ using System.Text;
 using System.Text.RegularExpressions;
 using NATS.Client.Core.Tests;
 
+#pragma warning disable SA1118
+
 namespace NATS.Client.TestUtilities;
 
 public class MockServer : IAsyncDisposable
@@ -38,16 +40,20 @@ public class MockServer : IAsyncDisposable
 #else
                     var tcpClient = await _server.AcceptTcpClientAsync();
 #endif
-                    var client = new Client(this, tcpClient);
                     n++;
                     Log($"[S] [{n}] New client connected");
                     var stream = tcpClient.GetStream();
 
-                    var sw = new StreamWriter(stream, Encoding.ASCII);
+                    // simple 8-bit encoding so that (int)char == byte
+                    var encoding = Encoding.GetEncoding(28591);
+
+                    var sw = new StreamWriter(stream, encoding);
                     await sw.WriteAsync($"INFO {info}\r\n");
                     await sw.FlushAsync();
 
-                    var sr = new StreamReader(stream, Encoding.ASCII);
+                    var client = new Client(this, tcpClient, sw);
+
+                    var sr = new StreamReader(stream, encoding);
 
                     _clients.Add(Task.Run(async () =>
                     {
@@ -60,46 +66,67 @@ public class MockServer : IAsyncDisposable
                                 return;
                             }
 
+                            Log($"[S] [{n}] RCV {line}");
+
                             if (line.StartsWith("CONNECT"))
                             {
-                                Log($"[S] [{n}] RCV CONNECT");
+                                // S: INFO {"option_name":option_value,...}␍␊
+                                // C: CONNECT {"option_name":option_value,...}␍␊
                             }
                             else if (line.StartsWith("PING"))
                             {
-                                Log($"[S] [{n}] RCV PING");
+                                // B: PING␍␊
+                                // B: PONG␍␊
                                 await sw.WriteAsync("PONG\r\n");
                                 await sw.FlushAsync();
-                                Log($"[S] [{n}] SND PONG");
                             }
                             else if (line.StartsWith("SUB"))
                             {
-                                var m = Regex.Match(line, @"^SUB\s+(?<subject>\S+)");
+                                // C: SUB <subject> [queue group] <sid>␍␊
+                                // C: UNSUB <sid> [max_msgs]␍␊
+                                var m = Regex.Match(line, @"^SUB\s+(?<subject>\S+)(?:\s+(?<queueGroup>\S+))?\s+(?<sid>\S+)$");
                                 var subject = m.Groups["subject"].Value;
-                                Log($"[S] [{n}] RCV SUB {subject}");
-                                await handler(client, new Cmd("SUB", subject, 0));
+                                var sid = m.Groups["sid"].Value;
+                                await handler(client, new Cmd("SUB", subject, null, 0, 0, null, sid));
                             }
                             else if (line.StartsWith("PUB") || line.StartsWith("HPUB"))
                             {
-                                var m = Regex.Match(line, @"^(H?PUB)\s+(?<subject>\S+).*?(?<size>\d+)$");
-                                var size = int.Parse(m.Groups["size"].Value);
+                                // C: PUB <subject> [reply-to] <#bytes>␍␊[payload]␍␊
+                                // C: HPUB <subject> [reply-to] <#header-bytes> <#total-bytes>␍␊[headers]␍␊␍␊[payload]␍␊
+                                Match m;
+                                m = Regex.Match(
+                                    input: line,
+                                    pattern: """
+                                             ^(H?PUB)
+                                              \s+(?<subject>\S+)
+                                              (?:\s+(?<replyTo>\S+))?
+                                              (?:\s+(?<hsize>\d+))?
+                                              \s+(?<size>\d+)$
+                                             """,
+                                    RegexOptions.IgnorePatternWhitespace);
                                 var subject = m.Groups["subject"].Value;
-                                Log($"[S] [{n}] RCV PUB {subject} {size}");
-                                await handler(client, new Cmd("PUB", subject, size));
+                                var replyTo = m.Groups["replyTo"].Value;
+                                var size = int.Parse(m.Groups["size"].Value);
+                                var hsizeValue = m.Groups["hsize"].Value;
+                                var hsize = int.Parse(string.IsNullOrWhiteSpace(hsizeValue) ? "0" : hsizeValue);
                                 var read = 0;
                                 var buffer = new char[size];
                                 while (read < size)
                                 {
                                     var received = await sr.ReadAsync(buffer, read, size - read);
                                     read += received;
-                                    Log($"[S] [{n}] RCV {received} bytes (size={size} read={read})");
                                 }
 
                                 // Log($"[S] RCV PUB payload: {new string(buffer)}");
                                 await sr.ReadLineAsync();
+
+                                await handler(client, new Cmd("PUB", subject, replyTo, size, hsize, buffer, string.Empty));
                             }
                             else
                             {
-                                Log($"[S] [{n}] RCV LINE: {line}");
+                                // S: MSG <subject> <sid> [reply-to] <#bytes>␍␊[payload]␍␊
+                                // S: HMSG <subject> <sid> [reply-to] <#header-bytes> <#total-bytes>␍␊[headers]␍␊␍␊[payload]␍␊
+                                Log($"[S] [{n}] RCV LINE NOT PROCESSED: {line}");
                             }
                         }
                     }));
@@ -162,18 +189,21 @@ public class MockServer : IAsyncDisposable
 
     public void Log(string m) => _logger(m);
 
-    public record Cmd(string Name, string Subject, int Size);
+    public record Cmd(string Name, string Subject, string? ReplyTo, int Size, int Hsize, char[]? Buffer, string Sid);
 
     public class Client
     {
         private readonly MockServer _server;
         private readonly TcpClient _tcpClient;
 
-        public Client(MockServer server, TcpClient tcpClient)
+        public Client(MockServer server, TcpClient tcpClient, StreamWriter writer)
         {
+            Writer = writer;
             _server = server;
             _tcpClient = tcpClient;
         }
+
+        public StreamWriter Writer { get; }
 
         public void Log(string m) => _server.Log(m);
 

@@ -23,4 +23,5 @@ public static class NatsJSLogEvents
     public static readonly EventId RecreateConsumer = new(2017, nameof(RecreateConsumer));
     public static readonly EventId Internal = new(2018, nameof(Internal));
     public static readonly EventId Retry = new(2019, nameof(Retry));
+    public static readonly EventId NoResponders = new(2020, nameof(NoResponders));
 }

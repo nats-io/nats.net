@@ -353,6 +353,13 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                             _pendingMsgs = 0;
                         }
                     }
+                    else if (headers.Code == 503)
+                    {
+                        _logger.LogDebug(NatsJSLogEvents.NoResponders, "503 no responders");
+
+                        // Schedule a pull request to get more messages.
+                        _timer.Change(Connection.Opts.RequestTimeout, Connection.Opts.RequestTimeout);
+                    }
                     else if (headers.HasTerminalJSError())
                     {
                         _userMsgs.Writer.TryComplete(new NatsJSProtocolException(headers.Code, headers.Message, headers.MessageText));
