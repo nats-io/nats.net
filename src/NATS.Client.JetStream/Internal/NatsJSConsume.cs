@@ -190,16 +190,22 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
     public override async ValueTask DisposeAsync()
     {
         Interlocked.Exchange(ref _disposed, 1);
-        await base.DisposeAsync().ConfigureAwait(false);
-        await _pullTask.ConfigureAwait(false);
-#if NETSTANDARD2_0
-        _timer.Dispose();
-#else
-        await _timer.DisposeAsync().ConfigureAwait(false);
-#endif
-        if (_notificationChannel != null)
+        try
         {
-            await _notificationChannel.DisposeAsync();
+            await base.DisposeAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            await _pullTask.ConfigureAwait(false);
+#if NETSTANDARD2_0
+            _timer.Dispose();
+#else
+            await _timer.DisposeAsync().ConfigureAwait(false);
+#endif
+            if (_notificationChannel != null)
+            {
+                await _notificationChannel.DisposeAsync();
+            }
         }
     }
 
