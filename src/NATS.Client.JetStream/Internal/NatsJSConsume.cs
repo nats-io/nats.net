@@ -104,7 +104,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
             static state =>
             {
                 var self = (NatsJSConsume<TMsg>)state!;
-                self._notificationChannel?.Notify(new NatsJSTimeoutNotification());
+                self._notificationChannel?.Notify(NatsJSTimeoutNotification.Default);
 
                 if (self._cancellationToken.IsCancellationRequested)
                 {
@@ -338,15 +338,18 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                     if (headers is { Code: 408, Message: NatsHeaders.Messages.RequestTimeout })
                     {
                     }
-                    else if (headers is { Code: 409, Message: NatsHeaders.Messages.MessageSizeExceedsMaxBytes })
-                    {
-                    }
                     else if (headers is { Code: 100, Message: NatsHeaders.Messages.IdleHeartbeat })
                     {
+                    }
+                    else if (headers is { Code: 409, Message: NatsHeaders.Messages.MessageSizeExceedsMaxBytes })
+                    {
+                        _logger.LogWarning(NatsJSLogEvents.MessageSizeExceedsMaxBytes, "Message Size Exceeds MaxBytes");
+                        _notificationChannel?.Notify(NatsJSMessageSizeExceedsMaxBytesNotification.Default);
                     }
                     else if (headers.Code == 409 && string.Equals(headers.MessageText, "Leadership Change", StringComparison.OrdinalIgnoreCase))
                     {
                         _logger.LogDebug(NatsJSLogEvents.LeadershipChange, "Leadership Change");
+                        _notificationChannel?.Notify(NatsJSLeadershipChangeNotification.Default);
                         lock (_pendingGate)
                         {
                             _pendingBytes = 0;
@@ -356,9 +359,12 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                     else if (headers.Code == 503)
                     {
                         _logger.LogDebug(NatsJSLogEvents.NoResponders, "503 no responders");
-
-                        // Schedule a pull request to get more messages.
-                        _timer.Change(Connection.Opts.RequestTimeout, Connection.Opts.RequestTimeout);
+                        _notificationChannel?.Notify(NatsJSNoRespondersNotification.Default);
+                        lock (_pendingGate)
+                        {
+                            _pendingBytes = 0;
+                            _pendingMsgs = 0;
+                        }
                     }
                     else if (headers.HasTerminalJSError())
                     {
@@ -367,8 +373,8 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                     }
                     else
                     {
-                        _notificationChannel?.Notify(new NatsJSProtocolNotification("Unhandled protocol message", headers.Code, headers.MessageText));
                         _logger.LogWarning(NatsJSLogEvents.ProtocolMessage, "Unhandled protocol message: {Code} {Description}", headers.Code, headers.MessageText);
+                        _notificationChannel?.Notify(new NatsJSProtocolNotification("Unhandled protocol message", headers.Code, headers.MessageText));
                     }
                 }
                 else

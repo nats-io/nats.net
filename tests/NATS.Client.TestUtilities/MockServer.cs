@@ -6,6 +6,8 @@ using NATS.Client.Core.Tests;
 
 #pragma warning disable SA1118
 
+#pragma warning disable SA1204
+
 namespace NATS.Client.TestUtilities;
 
 public class MockServer : IAsyncDisposable
@@ -18,11 +20,11 @@ public class MockServer : IAsyncDisposable
 
     public MockServer(
         Func<Client, Cmd, Task> handler,
-        Action<string> logger,
+        Action<string>? logger = null,
         string info = "{\"max_payload\":1048576}",
         CancellationToken cancellationToken = default)
     {
-        _logger = logger;
+        _logger = logger ?? (_ => { });
         _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cancellationToken = _cts.Token;
         _server = new TcpListener(IPAddress.Parse("127.0.0.1"), 0);
@@ -87,7 +89,8 @@ public class MockServer : IAsyncDisposable
                                 var m = Regex.Match(line, @"^SUB\s+(?<subject>\S+)(?:\s+(?<queueGroup>\S+))?\s+(?<sid>\S+)$");
                                 var subject = m.Groups["subject"].Value;
                                 var sid = m.Groups["sid"].Value;
-                                await handler(client, new Cmd("SUB", subject, null, 0, 0, null, sid));
+                                client.AddSid(subject, sid);
+                                await handler(client, new Cmd("SUB", subject, null, 0, 0, null, sid, client));
                             }
                             else if (line.StartsWith("PUB") || line.StartsWith("HPUB"))
                             {
@@ -120,7 +123,7 @@ public class MockServer : IAsyncDisposable
                                 // Log($"[S] RCV PUB payload: {new string(buffer)}");
                                 await sr.ReadLineAsync();
 
-                                await handler(client, new Cmd("PUB", subject, replyTo, size, hsize, buffer, string.Empty));
+                                await handler(client, new Cmd("PUB", subject, replyTo, size, hsize, buffer, string.Empty, client));
                             }
                             else
                             {
@@ -189,10 +192,15 @@ public class MockServer : IAsyncDisposable
 
     public void Log(string m) => _logger(m);
 
-    public record Cmd(string Name, string Subject, string? ReplyTo, int Size, int Hsize, char[]? Buffer, string Sid);
+    public record Cmd(string Name, string Subject, string? ReplyTo, int Size, int Hsize, char[]? Buffer, string Sid, Client Client)
+    {
+        public void Reply(string? headers = null, string? payload = null)
+            => Client.SendMsg(subject: ReplyTo!, headers: headers, payload: payload);
+    }
 
     public class Client
     {
+        private readonly Dictionary<string, string> _sids = new();
         private readonly MockServer _server;
         private readonly TcpClient _tcpClient;
 
@@ -205,8 +213,88 @@ public class MockServer : IAsyncDisposable
 
         public StreamWriter Writer { get; }
 
+        public void SendMsg(string subject, string? replyTo = null, string? headers = null, string? payload = null)
+        {
+            var sid = GetSid(subject);
+            var psize = string.IsNullOrEmpty(payload) ? 0 : payload.Length;
+            replyTo = string.IsNullOrWhiteSpace(replyTo) ? string.Empty : " " + replyTo;
+            if (headers != null)
+            {
+                if (!headers.EndsWith("\r\n"))
+                {
+                    headers += "\r\n";
+                }
+
+                // S: HMSG <subject> <sid> [reply-to] <#header-bytes> <#total-bytes>␍␊[headers]␍␊␍␊[payload]␍␊
+                var hsize = headers.Length;
+                var size = hsize + psize;
+                Writer.Write($"HMSG {subject} {sid}{replyTo} {hsize} {size}\r\n{headers}\r\n\r\n{payload}\r\n");
+            }
+            else
+            {
+                // S: MSG <subject> <sid> [reply-to] <#bytes>␍␊[payload]␍␊
+                Writer.Write($"MSG {subject} {sid}{replyTo} {psize}\r\n{payload}\r\n");
+            }
+
+            Writer.Flush();
+        }
+
         public void Log(string m) => _server.Log(m);
 
         public void Close() => _tcpClient.Close();
+
+        public void AddSid(string subject, string sid) => _sids[subject] = sid;
+
+        public string GetSid(string subject)
+        {
+            if (_sids.TryGetValue(subject, out var sid))
+                return sid;
+
+            foreach (var kv in _sids)
+            {
+                if (Match(subject, kv.Key))
+                {
+                    return kv.Value;
+                }
+            }
+
+            throw new KeyNotFoundException();
+        }
+
+        public static bool Match(string subject, string pattern)
+        {
+            if (string.IsNullOrEmpty(subject) || string.IsNullOrEmpty(pattern))
+                return false;
+
+            var subjectParts = subject.Split('.');
+            var patternParts = pattern.Split('.');
+
+            return MatchParts(subjectParts, patternParts, 0, 0);
+        }
+
+        private static bool MatchParts(string[] subject, string[] pattern, int subjIdx, int patIdx)
+        {
+            // Match found when both arrays are fully consumed
+            if (subjIdx == subject.Length && patIdx == pattern.Length)
+                return true;
+
+            // If pattern has '>', it matches all remaining tokens
+            if (patIdx < pattern.Length && pattern[patIdx] == ">")
+                return true;
+
+            // If either array is consumed, no match
+            if (subjIdx == subject.Length || patIdx == pattern.Length)
+                return false;
+
+            // '*' matches any token at current position
+            if (pattern[patIdx] == "*")
+                return MatchParts(subject, pattern, subjIdx + 1, patIdx + 1);
+
+            // Direct token comparison
+            if (pattern[patIdx] == subject[subjIdx])
+                return MatchParts(subject, pattern, subjIdx + 1, patIdx + 1);
+
+            return false;
+        }
     }
 }
