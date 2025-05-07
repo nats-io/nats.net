@@ -88,33 +88,24 @@ internal sealed class TcpConnection : INatsTlsUpgradeableSocketConnection
 #endif
     }
 
-    public
-#if !NETSTANDARD
-        async
-#endif
-        ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         if (Interlocked.Increment(ref _disposed) == 1)
         {
             try
             {
-#if NETSTANDARD
-                Socket.Disconnect(false);
-#else
-                using var cts = new CancellationTokenSource(_natsOpts.ConnectTimeout);
-                await Socket.DisconnectAsync(false, cts.Token).ConfigureAwait(false);
-#endif
+                Socket.Shutdown(SocketShutdown.Both);
             }
             catch
             {
                 // ignored
             }
-
-            Socket.Dispose();
+            finally
+            {
+                Socket.Dispose();
+            }
         }
 
-#if NETSTANDARD
         return default;
-#endif
     }
 }

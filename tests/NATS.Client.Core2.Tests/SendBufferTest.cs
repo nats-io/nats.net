@@ -100,13 +100,13 @@ public class SendBufferTest
         await using var server = new MockServer(
             handler: (client, cmd) =>
             {
-                if (cmd.Name == "PUB")
+                if (cmd.Name == "(PRE)PUB")
                 {
                     lock (pubs)
                         pubs.Add($"PUB {cmd.Subject}");
                 }
 
-                if (cmd is { Name: "PUB", Subject: "close" })
+                if (cmd is { Name: "(PRE)PUB", Subject: "close" })
                 {
                     client.Close();
                 }

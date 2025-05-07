@@ -38,15 +38,16 @@ internal record SocketConnectionWrapper(INatsSocketConnection InnerSocket) : INa
         await _sem.WaitAsync().ConfigureAwait(false);
         try
         {
-            // dispose first, then signal
             try
             {
-                await InnerSocket.DisposeAsync().ConfigureAwait(false);
+                _waitForClosedSource.TrySetCanceled();
             }
-            finally
+            catch
             {
-                _waitForClosedSource.TrySetResult();
+                // ignore if already set
             }
+
+            await InnerSocket.DisposeAsync().ConfigureAwait(false);
         }
         finally
         {
