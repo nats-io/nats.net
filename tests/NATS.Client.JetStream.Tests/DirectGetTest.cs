@@ -1,4 +1,4 @@
-using NATS.Client.Core2.Tests;
+﻿using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Models;
 using NATS.Client.TestUtilities;
 
@@ -16,7 +16,7 @@ public class DirectGetTest
         _server = server;
     }
 
-    [SkipIfNatsServer(versionEarlierThan: "2.11")]
+    [SkipIfNatsServer(versionEarlierThan: "2.10.28")]
     public async Task Direct_get_returns_503_no_responders()
     {
         // https://github.com/nats-io/nats-server/commit/ce309b79d99552996e18dce47dc04bdc730c0d84
@@ -38,7 +38,7 @@ public class DirectGetTest
             cancellationToken: cts.Token));
     }
 
-    [SkipIfNatsServer(versionLaterThan: "2.11")]
+    [SkipIfNatsServer(versionLaterThan: "2.10.28")]
     public async Task Direct_get_returns_no_reply()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
