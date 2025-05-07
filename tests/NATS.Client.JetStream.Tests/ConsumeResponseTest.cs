@@ -4,7 +4,7 @@ using NATS.Net;
 
 namespace NATS.Client.JetStream.Tests;
 
-public class ConsumeResponseTest(ITestOutputHelper output)
+public class ConsumeResponseTest
 {
     [Fact]
     public async Task Consume_response()
@@ -49,7 +49,6 @@ public class ConsumeResponseTest(ITestOutputHelper output)
                                    IdleHeartbeat = TimeSpan.FromSeconds(1),
                                    NotificationHandler = (n, ct) =>
                                    {
-                                       // output.WriteLine($"NOTIFICATION: {n}");
                                        notifications.Add(n);
                                        return Task.CompletedTask;
                                    },
