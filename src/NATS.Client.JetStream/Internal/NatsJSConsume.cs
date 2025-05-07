@@ -340,6 +340,8 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                     }
                     else if (headers is { Code: 100, Message: NatsHeaders.Messages.IdleHeartbeat })
                     {
+                        // No action is required for idle heartbeat notifications.
+                        // This branch is intentionally left empty.
                     }
                     else if (headers is { Code: 409, Message: NatsHeaders.Messages.MessageSizeExceedsMaxBytes })
                     {
