@@ -112,6 +112,9 @@ public class MockServer : IAsyncDisposable
                                 var size = int.Parse(m.Groups["size"].Value);
                                 var hsizeValue = m.Groups["hsize"].Value;
                                 var hsize = int.Parse(string.IsNullOrWhiteSpace(hsizeValue) ? "0" : hsizeValue);
+
+                                await handler(client, new Cmd("(PRE)PUB", subject, replyTo, size, hsize, null, string.Empty, client));
+
                                 var read = 0;
                                 var buffer = new char[size];
                                 while (read < size)

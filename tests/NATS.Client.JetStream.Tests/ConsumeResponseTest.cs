@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using NATS.Client.TestUtilities;
 using NATS.Net;
 
