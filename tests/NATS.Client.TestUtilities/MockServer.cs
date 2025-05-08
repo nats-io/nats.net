@@ -4,6 +4,10 @@ using System.Text;
 using System.Text.RegularExpressions;
 using NATS.Client.Core.Tests;
 
+#pragma warning disable SA1118
+
+#pragma warning disable SA1204
+
 namespace NATS.Client.TestUtilities;
 
 public class MockServer : IAsyncDisposable
@@ -16,11 +20,11 @@ public class MockServer : IAsyncDisposable
 
     public MockServer(
         Func<Client, Cmd, Task> handler,
-        Action<string> logger,
+        Action<string>? logger = null,
         string info = "{\"max_payload\":1048576}",
         CancellationToken cancellationToken = default)
     {
-        _logger = logger;
+        _logger = logger ?? (_ => { });
         _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cancellationToken = _cts.Token;
         _server = new TcpListener(IPAddress.Parse("127.0.0.1"), 0);
@@ -38,16 +42,20 @@ public class MockServer : IAsyncDisposable
 #else
                     var tcpClient = await _server.AcceptTcpClientAsync();
 #endif
-                    var client = new Client(this, tcpClient);
                     n++;
                     Log($"[S] [{n}] New client connected");
                     var stream = tcpClient.GetStream();
 
-                    var sw = new StreamWriter(stream, Encoding.ASCII);
+                    // simple 8-bit encoding so that (int)char == byte
+                    var encoding = Encoding.GetEncoding(28591);
+
+                    var sw = new StreamWriter(stream, encoding);
                     await sw.WriteAsync($"INFO {info}\r\n");
                     await sw.FlushAsync();
 
-                    var sr = new StreamReader(stream, Encoding.ASCII);
+                    var client = new Client(this, tcpClient, sw);
+
+                    var sr = new StreamReader(stream, encoding);
 
                     _clients.Add(Task.Run(async () =>
                     {
@@ -60,46 +68,71 @@ public class MockServer : IAsyncDisposable
                                 return;
                             }
 
+                            Log($"[S] [{n}] RCV {line}");
+
                             if (line.StartsWith("CONNECT"))
                             {
-                                Log($"[S] [{n}] RCV CONNECT");
+                                // S: INFO {"option_name":option_value,...}␍␊
+                                // C: CONNECT {"option_name":option_value,...}␍␊
                             }
                             else if (line.StartsWith("PING"))
                             {
-                                Log($"[S] [{n}] RCV PING");
+                                // B: PING␍␊
+                                // B: PONG␍␊
                                 await sw.WriteAsync("PONG\r\n");
                                 await sw.FlushAsync();
-                                Log($"[S] [{n}] SND PONG");
                             }
                             else if (line.StartsWith("SUB"))
                             {
-                                var m = Regex.Match(line, @"^SUB\s+(?<subject>\S+)");
+                                // C: SUB <subject> [queue group] <sid>␍␊
+                                // C: UNSUB <sid> [max_msgs]␍␊
+                                var m = Regex.Match(line, @"^SUB\s+(?<subject>\S+)(?:\s+(?<queueGroup>\S+))?\s+(?<sid>\S+)$");
                                 var subject = m.Groups["subject"].Value;
-                                Log($"[S] [{n}] RCV SUB {subject}");
-                                await handler(client, new Cmd("SUB", subject, 0));
+                                var sid = m.Groups["sid"].Value;
+                                client.AddSid(subject, sid);
+                                await handler(client, new Cmd("SUB", subject, null, 0, 0, null, sid, client));
                             }
                             else if (line.StartsWith("PUB") || line.StartsWith("HPUB"))
                             {
-                                var m = Regex.Match(line, @"^(H?PUB)\s+(?<subject>\S+).*?(?<size>\d+)$");
-                                var size = int.Parse(m.Groups["size"].Value);
+                                // C: PUB <subject> [reply-to] <#bytes>␍␊[payload]␍␊
+                                // C: HPUB <subject> [reply-to] <#header-bytes> <#total-bytes>␍␊[headers]␍␊␍␊[payload]␍␊
+                                Match m;
+                                m = Regex.Match(
+                                    input: line,
+                                    pattern: """
+                                             ^(H?PUB)
+                                              \s+(?<subject>\S+)
+                                              (?:\s+(?<replyTo>\S+))?
+                                              (?:\s+(?<hsize>\d+))?
+                                              \s+(?<size>\d+)$
+                                             """,
+                                    RegexOptions.IgnorePatternWhitespace);
                                 var subject = m.Groups["subject"].Value;
-                                Log($"[S] [{n}] RCV PUB {subject} {size}");
-                                await handler(client, new Cmd("PUB", subject, size));
+                                var replyTo = m.Groups["replyTo"].Value;
+                                var size = int.Parse(m.Groups["size"].Value);
+                                var hsizeValue = m.Groups["hsize"].Value;
+                                var hsize = int.Parse(string.IsNullOrWhiteSpace(hsizeValue) ? "0" : hsizeValue);
+
+                                await handler(client, new Cmd("(PRE)PUB", subject, replyTo, size, hsize, null, string.Empty, client));
+
                                 var read = 0;
                                 var buffer = new char[size];
                                 while (read < size)
                                 {
                                     var received = await sr.ReadAsync(buffer, read, size - read);
                                     read += received;
-                                    Log($"[S] [{n}] RCV {received} bytes (size={size} read={read})");
                                 }
 
                                 // Log($"[S] RCV PUB payload: {new string(buffer)}");
                                 await sr.ReadLineAsync();
+
+                                await handler(client, new Cmd("PUB", subject, replyTo, size, hsize, buffer, string.Empty, client));
                             }
                             else
                             {
-                                Log($"[S] [{n}] RCV LINE: {line}");
+                                // S: MSG <subject> <sid> [reply-to] <#bytes>␍␊[payload]␍␊
+                                // S: HMSG <subject> <sid> [reply-to] <#header-bytes> <#total-bytes>␍␊[headers]␍␊␍␊[payload]␍␊
+                                Log($"[S] [{n}] RCV LINE NOT PROCESSED: {line}");
                             }
                         }
                     }));
@@ -162,21 +195,109 @@ public class MockServer : IAsyncDisposable
 
     public void Log(string m) => _logger(m);
 
-    public record Cmd(string Name, string Subject, int Size);
+    public record Cmd(string Name, string Subject, string? ReplyTo, int Size, int Hsize, char[]? Buffer, string Sid, Client Client)
+    {
+        public void Reply(string? headers = null, string? payload = null)
+            => Client.SendMsg(subject: ReplyTo!, headers: headers, payload: payload);
+    }
 
     public class Client
     {
+        private readonly Dictionary<string, string> _sids = new();
         private readonly MockServer _server;
         private readonly TcpClient _tcpClient;
 
-        public Client(MockServer server, TcpClient tcpClient)
+        public Client(MockServer server, TcpClient tcpClient, StreamWriter writer)
         {
+            Writer = writer;
             _server = server;
             _tcpClient = tcpClient;
+        }
+
+        public StreamWriter Writer { get; }
+
+        public void SendMsg(string subject, string? replyTo = null, string? headers = null, string? payload = null)
+        {
+            var sid = GetSid(subject);
+            var psize = string.IsNullOrEmpty(payload) ? 0 : payload!.Length;
+            replyTo = string.IsNullOrWhiteSpace(replyTo) ? string.Empty : " " + replyTo;
+            if (headers != null)
+            {
+                if (!headers.EndsWith("\r\n"))
+                {
+                    headers += "\r\n";
+                }
+
+                // S: HMSG <subject> <sid> [reply-to] <#header-bytes> <#total-bytes>␍␊[headers]␍␊␍␊[payload]␍␊
+                var hsize = headers.Length;
+                var size = hsize + psize;
+                Writer.Write($"HMSG {subject} {sid}{replyTo} {hsize} {size}\r\n{headers}\r\n\r\n{payload}\r\n");
+            }
+            else
+            {
+                // S: MSG <subject> <sid> [reply-to] <#bytes>␍␊[payload]␍␊
+                Writer.Write($"MSG {subject} {sid}{replyTo} {psize}\r\n{payload}\r\n");
+            }
+
+            Writer.Flush();
         }
 
         public void Log(string m) => _server.Log(m);
 
         public void Close() => _tcpClient.Close();
+
+        public void AddSid(string subject, string sid) => _sids[subject] = sid;
+
+        public string GetSid(string subject)
+        {
+            if (_sids.TryGetValue(subject, out var sid))
+                return sid;
+
+            foreach (var kv in _sids)
+            {
+                if (Match(subject, kv.Key))
+                {
+                    return kv.Value;
+                }
+            }
+
+            throw new KeyNotFoundException();
+        }
+
+        public static bool Match(string subject, string pattern)
+        {
+            if (string.IsNullOrEmpty(subject) || string.IsNullOrEmpty(pattern))
+                return false;
+
+            var subjectParts = subject.Split('.');
+            var patternParts = pattern.Split('.');
+
+            return MatchParts(subjectParts, patternParts, 0, 0);
+        }
+
+        private static bool MatchParts(string[] subject, string[] pattern, int subjIdx, int patIdx)
+        {
+            // Match found when both arrays are fully consumed
+            if (subjIdx == subject.Length && patIdx == pattern.Length)
+                return true;
+
+            // If pattern has '>', it matches all remaining tokens
+            if (patIdx < pattern.Length && pattern[patIdx] == ">")
+                return true;
+
+            // If either array is consumed, no match
+            if (subjIdx == subject.Length || patIdx == pattern.Length)
+                return false;
+
+            // '*' matches any token at current position
+            if (pattern[patIdx] == "*")
+                return MatchParts(subject, pattern, subjIdx + 1, patIdx + 1);
+
+            // Direct token comparison
+            if (pattern[patIdx] == subject[subjIdx])
+                return MatchParts(subject, pattern, subjIdx + 1, patIdx + 1);
+
+            return false;
+        }
     }
 }
