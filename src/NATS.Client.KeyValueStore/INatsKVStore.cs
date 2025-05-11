@@ -105,6 +105,19 @@ public interface INatsKVStore
     ValueTask<ulong> UpdateAsync<T>(string key, T value, ulong revision, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Update an entry in the bucket only if last update revision matches
+    /// </summary>
+    /// <param name="key">Key of the entry</param>
+    /// <param name="value">Value of the entry</param>
+    /// <param name="revision">Last revision number to match</param>
+    /// <param name="ttl">Time to live for the entry (requires the <see cref="NatsKVConfig.LimitMarkerTTL"/> to be set to true). For a key that should never expire, use the <see cref="TimeSpan.MaxValue"/> constant. This feature is only available on NATS server v2.11 and later.</param>
+    /// <param name="serializer">Serializer to use for the message type.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <typeparam name="T">Serialized value type</typeparam>
+    /// <returns>The revision number of the updated entry</returns>
+    ValueTask<ulong> UpdateAsync<T>(string key, T value, ulong revision, TimeSpan ttl, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Tries to update an entry in the bucket only if last update revision matches
     /// </summary>
     /// <param name="key">Key of the entry</param>
@@ -118,6 +131,22 @@ public interface INatsKVStore
     /// Use this method to avoid exceptions
     /// </remarks>
     ValueTask<NatsResult<ulong>> TryUpdateAsync<T>(string key, T value, ulong revision, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Tries to update an entry in the bucket only if last update revision matches
+    /// </summary>
+    /// <param name="key">Key of the entry</param>
+    /// <param name="value">Value of the entry</param>
+    /// <param name="revision">Last revision number to match</param>
+    /// <param name="ttl">Time to live for the entry (requires the <see cref="NatsKVConfig.LimitMarkerTTL"/> to be set to true). For a key that should never expire, use the <see cref="TimeSpan.MaxValue"/> constant. This feature is only available on NATS server v2.11 and later.</param>
+    /// <param name="serializer">Serializer to use for the message type.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <typeparam name="T">Serialized value type</typeparam>
+    /// <returns>A NatsResult object representing the revision number of the updated entry or an error.</returns>
+    /// <remarks>
+    /// Use this method to avoid exceptions
+    /// </remarks>
+    ValueTask<NatsResult<ulong>> TryUpdateAsync<T>(string key, T value, ulong revision, TimeSpan ttl, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Delete an entry from the bucket
