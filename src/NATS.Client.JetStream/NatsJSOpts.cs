@@ -115,6 +115,31 @@ public record NatsJSConsumeOpts
     /// </summary>
     public int? ThresholdBytes { get; init; }
 
+    /// <summary>
+    /// A handler function invoked for notifications related to consumption, allowing custom handling of
+    /// operational updates or state changes during the consumer's lifecycle.
+    /// </summary>
+    /// <remarks>
+    /// Possible notifications include:
+    /// <para>
+    /// <see cref="NatsJSProtocolNotification"/> is sent when the server sends a header not handled by the client.
+    /// </para>
+    /// <para>
+    /// <see cref="NatsJSMessageSizeExceedsMaxBytesNotification"/> is sent when a message exceeds the maximum bytes limit.
+    /// </para>
+    /// <para>
+    /// <see cref="NatsJSLeadershipChangeNotification"/> is sent when the JetStream leadership changes.
+    /// </para>
+    /// <para>
+    /// <see cref="NatsJSNoRespondersNotification"/> is sent when there are no responders for a request.
+    /// This is a generic NATS server 503 error which may be caused by various reasons, however, in most cases
+    /// it will indicate that the cluster's state is changing and a server is restarting.
+    /// </para>
+    /// <para>
+    /// <see cref="NatsJSTimeoutNotification"/> is sent when the client times out waiting for a response.
+    /// It is triggered when the server does not respond within twice the idle heartbeat duration.
+    /// </para>
+    /// </remarks>
     public Func<INatsJSNotification, CancellationToken, Task>? NotificationHandler { get; init; }
 
     /// <summary>

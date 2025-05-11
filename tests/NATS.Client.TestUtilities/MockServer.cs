@@ -219,7 +219,7 @@ public class MockServer : IAsyncDisposable
         public void SendMsg(string subject, string? replyTo = null, string? headers = null, string? payload = null)
         {
             var sid = GetSid(subject);
-            var psize = string.IsNullOrEmpty(payload) ? 0 : payload.Length;
+            var psize = string.IsNullOrEmpty(payload) ? 0 : payload!.Length;
             replyTo = string.IsNullOrWhiteSpace(replyTo) ? string.Empty : " " + replyTo;
             if (headers != null)
             {

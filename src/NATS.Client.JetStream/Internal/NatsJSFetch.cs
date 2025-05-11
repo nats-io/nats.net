@@ -94,7 +94,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
             static state =>
             {
                 var self = (NatsJSFetch<TMsg>)state!;
-                self._notificationChannel?.Notify(new NatsJSTimeoutNotification());
+                self._notificationChannel?.Notify(NatsJSTimeoutNotification.Default);
 
                 self.EndSubscription(NatsSubEndReason.IdleHeartbeatTimeout);
                 if (self._debug)
