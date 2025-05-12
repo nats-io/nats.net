@@ -37,7 +37,6 @@
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="System.IO.Pipelines" Version="8.0.0"/>
     </ItemGroup>
 
     <!--  Dependencies for netstandard only  -->
@@ -49,6 +48,7 @@
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
         </PackageReference>
+        <PackageReference Include="System.IO.Pipelines" Version="8.0.0"/>
     </ItemGroup>
 
     <!--  Dependencies for netstandard2.0 only -->
@@ -61,9 +61,8 @@
         <PackageReference Include="IndexRange" Version="1.0.3"/>
     </ItemGroup>
 
-    <!--  Dependencies for net6.0 and net8.0 only -->
-    <ItemGroup Condition="'$(TargetFramework)' == 'net6.0' OR '$(TargetFramework)' == 'net8.0'">
-        <PackageReference Include="System.Text.Json" Version="8.0.5"/>
+    <ItemGroup Condition="'$(TargetFramework)' == 'net6' OR '$(TargetFramework)' == 'net8'">
+        <PackageReference Include="System.IO.Pipelines" Version="8.0.0"/>
     </ItemGroup>
 
     <ItemGroup>
