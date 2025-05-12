@@ -61,6 +61,7 @@
         <PackageReference Include="IndexRange" Version="1.0.3"/>
     </ItemGroup>
 
+    <!--  Dependencies for net6.0 and net8.0 only -->
     <ItemGroup Condition="'$(TargetFramework)' == 'net6.0' OR '$(TargetFramework)' == 'net8.0'">
         <PackageReference Include="System.IO.Pipelines" Version="8.0.0"/>
     </ItemGroup>
