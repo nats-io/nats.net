@@ -27,6 +27,13 @@
   <!--  Dependencies for netstandard only  -->
   <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0' OR '$(TargetFramework)' == 'netstandard2.1'">
     <PackageReference Include="System.ComponentModel.Annotations" Version="5.0.0" />
+    <PackageReference Include="System.Text.Json" Version="8.0.5"/>
+  </ItemGroup>
+
+
+  <!--  Dependencies for net6.0 and net8.0 only -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net6.0'">
+    <PackageReference Include="System.Text.Json" Version="8.0.5"/>
   </ItemGroup>
 
   <ItemGroup>
