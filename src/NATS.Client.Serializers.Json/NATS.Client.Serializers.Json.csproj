@@ -10,7 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\NATS.Client.Core\NATS.Client.Core.csproj" />
+    <ProjectReference Include="..\NATS.Client.Abstractions\NATS.Client.Abstractions.csproj" />
   </ItemGroup>
 
 </Project>
