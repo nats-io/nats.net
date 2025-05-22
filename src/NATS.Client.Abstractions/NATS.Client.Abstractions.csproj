@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0;netstandard2.1;net6.0;net8.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+    <!-- NuGet Packaging -->
+    <PackageTags>pubsub;messaging;abstractions</PackageTags>
+    <Description>NATS client Abstractions for .NET</Description>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+</Project>
