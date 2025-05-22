@@ -6,13 +6,13 @@ namespace NATS.Client.Core.Internal;
 // https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/#messaging-attributes
 internal static class Telemetry
 {
-    internal const string NatsActivitySource = "NATS.Net";
-    internal static readonly ActivitySource NatsActivities = new(name: NatsActivitySource);
+    public const string NatsActivitySource = "NATS.Net";
+    public static readonly ActivitySource NatsActivities = new(name: NatsActivitySource);
     private static readonly object BoxedTrue = true;
 
-    internal static bool HasListeners() => NatsActivities.HasListeners();
+    public static bool HasListeners() => NatsActivities.HasListeners();
 
-    internal static Activity? StartSendActivity(
+    public static Activity? StartSendActivity(
         string name,
         INatsConnection? connection,
         string subject,
@@ -86,7 +86,7 @@ internal static class Telemetry
         return activity;
     }
 
-    internal static void AddTraceContextHeaders(Activity? activity, ref NatsHeaders? headers)
+    public static void AddTraceContextHeaders(Activity? activity, ref NatsHeaders? headers)
     {
         if (activity is null)
             return;
@@ -103,7 +103,7 @@ internal static class Telemetry
                     return;
                 }
 
-                // There are cases where headers reused internally (e.g. JetStream publish retry)
+                // There are cases where headers reused publicly (e.g. JetStream publish retry)
                 // there may also be cases where application can reuse the same header
                 // in which case we should still be able to overwrite headers with telemetry fields
                 // even though headers would be set to readonly before being passed down in publish methods.
@@ -111,7 +111,7 @@ internal static class Telemetry
             });
     }
 
-    internal static Activity? StartReceiveActivity(
+    public static Activity? StartReceiveActivity(
         INatsConnection? connection,
         string name,
         string subscriptionSubject,
@@ -205,7 +205,7 @@ internal static class Telemetry
         return activity;
     }
 
-    internal static void SetException(Activity? activity, Exception exception)
+    public static void SetException(Activity? activity, Exception exception)
     {
         if (activity is null)
             return;
@@ -288,7 +288,7 @@ internal static class Telemetry
         return ActivityContext.TryParse(traceParent, traceState, isRemote: true, out context);
     }
 
-    internal class Constants
+    public class Constants
     {
         public const string True = "true";
         public const string False = "false";
