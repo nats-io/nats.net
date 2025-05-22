@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
