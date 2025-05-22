@@ -11,10 +11,6 @@ public static class TracerProviderBuilderExtensions
         if (configure is not null)
             configure(NatsInstrumentationOptions.Default);
 
-        // builder.ConfigureServices(services =>
-        // {
-        //     services.Configure(configure ?? (_ => { }));
-        // });
         builder.AddSource(Telemetry.NatsActivitySource);
         return builder;
     }
