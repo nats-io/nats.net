@@ -112,7 +112,7 @@ public class ConsumerFetchTest
         var signal2 = new WaitSignal();
         var reader = Task.Run(async () =>
         {
-            int x = 0;
+            var x = 0;
             await foreach (var msg in fc.Msgs.ReadAllAsync(cts.Token))
             {
                 _output.WriteLine($"rcv:{++x}");
