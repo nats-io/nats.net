@@ -19,10 +19,12 @@ public class ConsumerSetupTest
         _server = server;
     }
 
-    [Fact]
-    public async Task Create_push_consumer()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Create_push_consumer(NatsRequestReplyMode mode)
     {
-        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
         var prefix = _server.GetNextId();
         var js = new NatsJSContext(nats);
 
@@ -82,10 +84,12 @@ public class ConsumerSetupTest
         Assert.Equal(pauseUntil, config.PauseUntil);
     }
 
-    [Fact]
-    public async Task Consumer_config()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Consumer_config(NatsRequestReplyMode mode)
     {
-        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
         var prefix = _server.GetNextId();
         var js = new NatsJSContextFactory().CreateContext(nats);
 

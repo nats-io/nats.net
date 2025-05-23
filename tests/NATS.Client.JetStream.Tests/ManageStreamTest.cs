@@ -18,11 +18,13 @@ public class ManageStreamTest
         _server = server;
     }
 
-    [Fact]
-    public async Task Account_info_create_get_update_stream()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Account_info_create_get_update_stream(NatsRequestReplyMode mode)
     {
         await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestReplyMode = mode });
         await nats.ConnectRetryAsync();
 
         var js = new NatsJSContext(nats);
@@ -67,10 +69,12 @@ public class ManageStreamTest
         }
     }
 
-    [Fact]
-    public async Task List_delete_stream()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task List_delete_stream(NatsRequestReplyMode mode)
     {
-        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
         var prefix = _server.GetNextId() + "-";
         await nats.ConnectRetryAsync();
 
@@ -113,10 +117,12 @@ public class ManageStreamTest
         }
     }
 
-    [Fact]
-    public async Task Delete_one_msg()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Delete_one_msg(NatsRequestReplyMode mode)
     {
-        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
         var prefix = _server.GetNextId();
         await nats.ConnectRetryAsync();
 
@@ -145,13 +151,15 @@ public class ManageStreamTest
         Assert.Equal(2, stream.Info.State.Subjects?.Count);
     }
 
-    [Fact]
-    public async Task Create_or_update_stream_should_be_create_stream_if_stream_doesnt_exist()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Create_or_update_stream_should_be_create_stream_if_stream_doesnt_exist(NatsRequestReplyMode mode)
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
         await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestReplyMode = mode });
         await nats.ConnectRetryAsync();
 
         var js = new NatsJSContext(nats);
@@ -167,10 +175,12 @@ public class ManageStreamTest
         Assert.Equal(1, accountInfoAfter.Streams);
     }
 
-    [Fact]
-    public async Task Create_or_update_stream_should_be_update_stream_if_stream_exist()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Create_or_update_stream_should_be_update_stream_if_stream_exist(NatsRequestReplyMode mode)
     {
-        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
         var prefix = _server.GetNextId();
         await nats.ConnectRetryAsync();
 
@@ -189,10 +199,12 @@ public class ManageStreamTest
         Assert.True(updatedStream.Info.Config.NoAck);
     }
 
-    [Fact]
-    public async Task Create_or_update_stream_should_be_throwing_update_operation_errors()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Create_or_update_stream_should_be_throwing_update_operation_errors(NatsRequestReplyMode mode)
     {
-        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
         var prefix = _server.GetNextId();
         await nats.ConnectRetryAsync();
 

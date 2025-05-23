@@ -17,11 +17,13 @@ public class DoubleAckNakDelayTests
         _server = server;
     }
 
-    [Fact]
-    public async Task Double_ack_received_messages()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Double_ack_received_messages(NatsRequestReplyMode mode)
     {
         var proxy = _server.CreateProxy();
-        await using var nats = proxy.CreateNatsConnection();
+        await using var nats = proxy.CreateNatsConnection(mode);
         await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
 
@@ -53,11 +55,13 @@ public class DoubleAckNakDelayTests
         }
     }
 
-    [Fact]
-    public async Task Delay_nak_received_messages()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Delay_nak_received_messages(NatsRequestReplyMode mode)
     {
         var proxy = _server.CreateProxy();
-        await using var nats = proxy.CreateNatsConnection();
+        await using var nats = proxy.CreateNatsConnection(mode);
         await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
 
