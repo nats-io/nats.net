@@ -15,11 +15,12 @@ public static class Utils
     public static NatsProxy CreateProxy(this NatsServerFixture server)
         => new(new Uri(server.Url).Port);
 
-    public static NatsConnection CreateNatsConnection(this NatsProxy proxy)
+    public static NatsConnection CreateNatsConnection(this NatsProxy proxy, NatsRequestReplyMode mode = NatsRequestReplyMode.SharedInbox)
         => new(new NatsOpts
         {
             Url = $"nats://127.0.0.1:{proxy.Port}",
             ConnectTimeout = TimeSpan.FromSeconds(10),
+            RequestReplyMode = mode,
         });
 
     public static NatsConnection CreateNatsConnection(this NatsServerFixture server)

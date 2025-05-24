@@ -93,6 +93,31 @@ public sealed class SkipIfNatsServer : FactAttribute
     }
 }
 
+public sealed class SkipIfNatsServerTheory : TheoryAttribute
+{
+    private static readonly bool SupportsTlsFirst;
+
+    static SkipIfNatsServerTheory() => SupportsTlsFirst = NatsServerExe.SupportsTlsFirst();
+
+    public SkipIfNatsServerTheory(bool doesNotSupportTlsFirst = false, string? versionEarlierThan = default, string? versionLaterThan = default)
+    {
+        if (doesNotSupportTlsFirst && !SupportsTlsFirst)
+        {
+            Skip = "NATS server doesn't support TLS first";
+        }
+
+        if (versionEarlierThan != null && new Version(versionEarlierThan) > NatsServerExe.Version)
+        {
+            Skip = $"NATS server version ({NatsServerExe.Version}) is earlier than {versionEarlierThan}";
+        }
+
+        if (versionLaterThan != null && new Version(versionLaterThan) < NatsServerExe.Version)
+        {
+            Skip = $"NATS server version ({NatsServerExe.Version}) is later than {versionLaterThan}";
+        }
+    }
+}
+
 public sealed class SkipOnPlatform : FactAttribute
 {
     public SkipOnPlatform(string platform, string reason)

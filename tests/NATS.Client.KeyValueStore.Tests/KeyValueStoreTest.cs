@@ -12,11 +12,13 @@ public class KeyValueStoreTest
 
     public KeyValueStoreTest(ITestOutputHelper output) => _output = output;
 
-    [Fact]
-    public async Task Simple_create_put_get_test()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Simple_create_put_get_test(NatsRequestReplyMode mode)
     {
         await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestReplyMode = mode });
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -31,11 +33,13 @@ public class KeyValueStoreTest
         Assert.Equal("v1", entry.Value);
     }
 
-    [Fact]
-    public async Task Handle_non_direct_gets()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Handle_non_direct_gets(NatsRequestReplyMode mode)
     {
         await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestReplyMode = mode });
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -69,14 +73,16 @@ public class KeyValueStoreTest
         Assert.Equal("v1", entry.Value);
     }
 
-    [Fact]
-    public async Task Get_keys()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Get_keys(NatsRequestReplyMode mode)
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
         await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestReplyMode = mode });
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -106,14 +112,16 @@ public class KeyValueStoreTest
         Assert.Equal(total, count);
     }
 
-    [Fact]
-    public async Task Get_key_revisions()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Get_key_revisions(NatsRequestReplyMode mode)
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
         await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestReplyMode = mode });
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -164,14 +172,16 @@ public class KeyValueStoreTest
         }
     }
 
-    [Fact]
-    public async Task Delete_and_purge()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Delete_and_purge(NatsRequestReplyMode mode)
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
         await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestReplyMode = mode });
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -290,14 +300,16 @@ public class KeyValueStoreTest
         }
     }
 
-    [Fact]
-    public async Task Purge_deletes()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Purge_deletes(NatsRequestReplyMode mode)
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
         await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestReplyMode = mode });
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -372,14 +384,16 @@ public class KeyValueStoreTest
         await store.PurgeDeletesAsync(opts: new NatsKVPurgeOpts { DeleteMarkersThreshold = TimeSpan.Zero }, cancellationToken: cancellationToken);
     }
 
-    [Fact]
-    public async Task Update_with_revisions()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Update_with_revisions(NatsRequestReplyMode mode)
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
         await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestReplyMode = mode });
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -410,14 +424,16 @@ public class KeyValueStoreTest
         }
     }
 
-    [Fact]
-    public async Task Create()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Create(NatsRequestReplyMode mode)
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
         await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestReplyMode = mode });
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -479,14 +495,16 @@ public class KeyValueStoreTest
         _output.WriteLine(exception.Message);
     }
 
-    [SkipIfNatsServer(versionEarlierThan: "2.11")]
-    public async Task TestMessageTTL()
+    [SkipIfNatsServerTheory(versionEarlierThan: "2.11")]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task TestMessageTTL(NatsRequestReplyMode mode)
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
         await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestReplyMode = mode });
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -539,14 +557,16 @@ public class KeyValueStoreTest
         Assert.Equal(20ul, state.Info.State.LastSeq);
     }
 
-    [SkipIfNatsServer(versionEarlierThan: "2.11")]
-    public async Task TestTTLMessageWhenTTLDisabledOnStream()
+    [SkipIfNatsServerTheory(versionEarlierThan: "2.11")]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task TestTTLMessageWhenTTLDisabledOnStream(NatsRequestReplyMode mode)
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
         await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestReplyMode = mode });
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -556,14 +576,16 @@ public class KeyValueStoreTest
         Assert.Equal("This store does not support TTL", exception.Message);
     }
 
-    [SkipIfNatsServer(versionEarlierThan: "2.11")]
-    public async Task SetsSubjectDeleteMarkerTTL()
+    [SkipIfNatsServerTheory(versionEarlierThan: "2.11")]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task SetsSubjectDeleteMarkerTTL(NatsRequestReplyMode mode)
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
         await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestReplyMode = mode });
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -573,11 +595,13 @@ public class KeyValueStoreTest
         Assert.Equal(TimeSpan.FromSeconds(2), info.Info.Config.SubjectDeleteMarkerTTL);
     }
 
-    [SkipIfNatsServer(versionEarlierThan: "2.11")]
-    public async Task SubjectDeleteMarkerTTL_enabled_removals_should_be_interpreted_as_Operation_Purge()
+    [SkipIfNatsServerTheory(versionEarlierThan: "2.11")]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task SubjectDeleteMarkerTTL_enabled_removals_should_be_interpreted_as_Operation_Purge(NatsRequestReplyMode mode)
     {
         await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestReplyMode = mode });
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -622,14 +646,16 @@ public class KeyValueStoreTest
         Assert.Equal(3ul, r2);
     }
 
-    [SkipIfNatsServer(versionEarlierThan: "2.11")]
-    public async Task TestMessageNeverExpire()
+    [SkipIfNatsServerTheory(versionEarlierThan: "2.11")]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task TestMessageNeverExpire(NatsRequestReplyMode mode)
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
         await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestReplyMode = mode });
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -667,14 +693,16 @@ public class KeyValueStoreTest
         Assert.Equal(21ul, state.Info.State.LastSeq);
     }
 
-    [Fact]
-    public async Task History()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task History(NatsRequestReplyMode mode)
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
         await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestReplyMode = mode });
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -711,14 +739,16 @@ public class KeyValueStoreTest
         }
     }
 
-    [Fact]
-    public async Task Status()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Status(NatsRequestReplyMode mode)
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
         await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestReplyMode = mode });
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -750,11 +780,13 @@ public class KeyValueStoreTest
         }
     }
 
-    [SkipIfNatsServer(versionEarlierThan: "2.10")]
-    public async Task Compressed_storage()
+    [SkipIfNatsServerTheory(versionEarlierThan: "2.10")]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Compressed_storage(NatsRequestReplyMode mode)
     {
         await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestReplyMode = mode });
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -779,11 +811,13 @@ public class KeyValueStoreTest
         Assert.Equal(StreamConfigCompression.S2, status2.Info.Config.Compression);
     }
 
-    [Fact]
-    public async Task Validate_keys()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Validate_keys(NatsRequestReplyMode mode)
     {
         await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestReplyMode = mode });
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -832,8 +866,10 @@ public class KeyValueStoreTest
         }
     }
 
-    [Fact]
-    public async Task TestDirectMessageRepublishedSubject()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task TestDirectMessageRepublishedSubject(NatsRequestReplyMode mode)
     {
         var streamBucketName = "sb-" + Nuid.NewNuid();
         var subject = "test";
@@ -846,7 +882,7 @@ public class KeyValueStoreTest
         var streamConfig = new StreamConfig(streamBucketName, new[] { streamSubject }) { Republish = new Republish { Src = ">", Dest = republishDest } };
 
         await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestReplyMode = mode });
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
 
@@ -873,11 +909,13 @@ public class KeyValueStoreTest
         Assert.Equal("tres", kve3.Value);
     }
 
-    [SkipIfNatsServer(versionEarlierThan: "2.10")]
-    public async Task Test_CombinedSources()
+    [SkipIfNatsServerTheory(versionEarlierThan: "2.10")]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Test_CombinedSources(NatsRequestReplyMode mode)
     {
         await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestReplyMode = mode });
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -920,11 +958,13 @@ public class KeyValueStoreTest
         Assert.Equal("b_fromStore2", entryB.Value);
     }
 
-    [Fact]
-    public async Task Try_Create()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Try_Create(NatsRequestReplyMode mode)
     {
         await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestReplyMode = mode });
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -954,11 +994,13 @@ public class KeyValueStoreTest
         Assert.ThrowsAny<InvalidOperationException>(() => finalValue.Error);
     }
 
-    [Fact]
-    public async Task Try_Delete()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Try_Delete(NatsRequestReplyMode mode)
     {
         await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestReplyMode = mode });
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -979,11 +1021,13 @@ public class KeyValueStoreTest
         Assert.ThrowsAny<InvalidOperationException>(() => updateResultSuccess.Error);
     }
 
-    [Fact]
-    public async Task Try_Update()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Try_Update(NatsRequestReplyMode mode)
     {
         await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestReplyMode = mode });
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);

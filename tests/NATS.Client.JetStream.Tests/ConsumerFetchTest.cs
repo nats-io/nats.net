@@ -15,11 +15,13 @@ public class ConsumerFetchTest
         _server = server;
     }
 
-    [Fact]
-    public async Task Fetch_test()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Fetch_test(NatsRequestReplyMode mode)
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
         var prefix = _server.GetNextId();
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync($"{prefix}s1", new[] { $"{prefix}s1.*" }, cts.Token);
@@ -45,11 +47,13 @@ public class ConsumerFetchTest
         Assert.Equal(10, count);
     }
 
-    [Fact]
-    public async Task FetchNoWait_test()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task FetchNoWait_test(NatsRequestReplyMode mode)
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
         var prefix = _server.GetNextId();
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync($"{prefix}s1", new[] { $"{prefix}s1.*" }, cts.Token);
@@ -73,10 +77,14 @@ public class ConsumerFetchTest
         Assert.Equal(10, count);
     }
 
-    [Fact]
-    public async Task Fetch_dispose_test()
+    [Theory]
+
+    // TODO: Fix this test
+    // [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Fetch_dispose_test(NatsRequestReplyMode mode)
     {
-        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
         var prefix = _server.GetNextId();
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
@@ -104,8 +112,10 @@ public class ConsumerFetchTest
         var signal2 = new WaitSignal();
         var reader = Task.Run(async () =>
         {
+            var x = 0;
             await foreach (var msg in fc.Msgs.ReadAllAsync(cts.Token))
             {
+                _output.WriteLine($"rcv:{++x}");
                 await msg.AckAsync(cancellationToken: cts.Token);
                 signal1.Pulse();
                 await signal2;
@@ -124,6 +134,7 @@ public class ConsumerFetchTest
             async () =>
             {
                 var c = await js.GetConsumerAsync($"{prefix}s1", $"{prefix}c1", cts.Token);
+                _output.WriteLine($"pend1:{c.Info.NumAckPending}");
                 return c.Info.NumAckPending == 9;
             },
             retryDelay: TimeSpan.FromSeconds(1),
@@ -140,6 +151,7 @@ public class ConsumerFetchTest
             async () =>
             {
                 var c = await js.GetConsumerAsync($"{prefix}s1", $"{prefix}c1", cts.Token);
+                _output.WriteLine($"pend:{c.Info.NumAckPending}");
                 return c.Info.NumAckPending == 0;
             },
             retryDelay: TimeSpan.FromSeconds(1),

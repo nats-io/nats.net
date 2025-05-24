@@ -15,13 +15,16 @@ public class JSPublishBench
     private NatsConnection _nats;
     private NatsJSContext _js;
 
+    [Params(NatsRequestReplyMode.Direct, NatsRequestReplyMode.SharedInbox)]
+    public NatsRequestReplyMode Mode { get; set; }
+
     [Params(1, 10, 1_000)]
     public int Batch { get; set; }
 
     [GlobalSetup]
     public async Task Setup()
     {
-        _nats = new NatsConnection();
+        _nats = new NatsConnection(new NatsOpts { RequestReplyMode = Mode });
         _js = new NatsJSContext(_nats);
         await _nats.ConnectAsync();
         await _js.CreateStreamAsync(new StreamConfig("bench_test1", ["bench_test1"]));

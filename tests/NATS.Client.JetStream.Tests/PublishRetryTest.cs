@@ -17,11 +17,13 @@ public class PublishRetryTest
         _server = server;
     }
 
-    [Fact]
-    public async Task Publish_without_telemetry()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Publish_without_telemetry(NatsRequestReplyMode mode)
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
         var prefix = _server.GetNextId();
 
         // Without telemetry
