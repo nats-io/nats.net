@@ -15,6 +15,9 @@ internal class UserCredentials
         Token = authOpts.Token;
         AuthCredCallback = authOpts.AuthCredCallback;
 
+#if NETSTANDARD2_0
+#pragma warning disable CS8604 // Possible null reference argument.
+#endif
         if (!string.IsNullOrEmpty(authOpts.CredsFile))
         {
             (Jwt, Seed) = LoadCredsFile(authOpts.CredsFile);
@@ -24,6 +27,9 @@ internal class UserCredentials
         {
             (Seed, NKey) = LoadNKeyFile(authOpts.NKeyFile);
         }
+#if NETSTANDARD2_0
+#pragma warning restore CS8604 // Possible null reference argument.
+#endif
     }
 
     public string? Jwt { get; }
@@ -81,6 +87,9 @@ internal class UserCredentials
                 opts.JWT = authCred.Value;
                 seed = authCred.Secret;
                 break;
+#if NETSTANDARD2_0
+#pragma warning disable CS8604 // Possible null reference argument for parameter...
+#endif
             case NatsAuthType.Nkey:
                 if (!string.IsNullOrEmpty(authCred.Secret))
                 {
@@ -104,6 +113,9 @@ internal class UserCredentials
 
                 break;
             }
+#if NETSTANDARD2_0
+#pragma warning restore CS8604 // Possible null reference argument for parameter...
+#endif
         }
         else
         {
