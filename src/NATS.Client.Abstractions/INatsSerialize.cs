@@ -1,3 +1,5 @@
+using System.Buffers;
+
 namespace NATS.Client.Core;
 
 /// <summary>
