@@ -4,6 +4,9 @@
     <!-- NuGet Packaging -->
     <PackageTags>pubsub;messaging</PackageTags>
     <Description>NATS client generic JSON serializer. Not suitable for native AOT deployments.</Description>
+
+    <IsTrimmable>false</IsTrimmable>
+    <IsAotCompatible>false</IsAotCompatible>
   </PropertyGroup>
 
   <ItemGroup>
