@@ -393,29 +393,26 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
                    + (headersBuffer?.Length ?? 0)
                    + payloadBuffer.Length;
 
-        if (Telemetry.HasListeners())
+        var activityName = connection is NatsConnection nats
+            ? $"{nats.SpanDestinationName(subject)} {Telemetry.Constants.ReceiveActivityName}"
+            : Telemetry.Constants.ReceiveActivityName;
+
+        headers ??= new NatsHeaders();
+
+        var activity = Telemetry.StartReceiveActivity(
+            connection,
+            name: activityName,
+            subscriptionSubject: subject,
+            queueGroup: null,
+            subject: subject,
+            replyTo: replyTo,
+            bodySize: payloadBuffer.Length,
+            size: size,
+            headers: headers);
+
+        if (activity is not null)
         {
-            var activityName = connection is NatsConnection nats
-                ? $"{nats.SpanDestinationName(subject)} {Telemetry.Constants.ReceiveActivityName}"
-                : Telemetry.Constants.ReceiveActivityName;
-
-            headers ??= new NatsHeaders();
-
-            var activity = Telemetry.StartReceiveActivity(
-                connection,
-                name: activityName,
-                subscriptionSubject: subject,
-                queueGroup: null,
-                subject: subject,
-                replyTo: replyTo,
-                bodySize: payloadBuffer.Length,
-                size: size,
-                headers: headers);
-
-            if (activity is not null)
-            {
-                headers.Activity = activity;
-            }
+            headers.Activity = activity;
         }
 
         return new NatsMsg<T>(subject, replyTo, (int)size, headers, data, connection, flags);

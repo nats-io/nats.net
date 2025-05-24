@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics.Metrics;
 
 namespace NATS.Client.Core.Internal;
 
@@ -6,12 +7,52 @@ namespace NATS.Client.Core.Internal;
 // https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/#messaging-attributes
 internal static class Telemetry
 {
-    internal static readonly ActivitySource NatsActivities = new(name: NatsActivitySource);
-
     private const string NatsActivitySource = "NATS.Net";
-    private static readonly object BoxedTrue = true;
+    private const string MeterName = "NATS.Net";
+    private static readonly ActivitySource NatsActivities = new(name: NatsActivitySource);
+    private static readonly Meter NatsMeter = new Meter(MeterName);
 
-    internal static bool HasListeners() => NatsActivities.HasListeners();
+    private static readonly Counter<long> _subscriptionCounter = NatsMeter.CreateCounter<long>(
+            Constants.SubscriptionInstrumentName,
+            unit: "{subscriptions}",
+            description: "Number of subscriptions");
+
+    private static readonly Counter<long> _pendingMessagesCounter = NatsMeter.CreateCounter<long>(
+            Constants.PendingMessagesInstrumentName,
+            unit: "{messages}",
+            description: "Number of pending messages");
+
+    private static readonly Histogram<long> _sentBytesHistogram = NatsMeter.CreateHistogram<long>(
+            Constants.SentBytesInstrumentName,
+            unit: "{bytes}",
+            description: "Number of bytes sent");
+
+    private static readonly Histogram<long> _receivedBytesHistogram = NatsMeter.CreateHistogram<long>(
+            Constants.ReceivedBytesInstrumentName,
+            unit: "{bytes}",
+            description: "Number of bytes received");
+
+    private static readonly Counter<long> _sentMessagesCounter = NatsMeter.CreateCounter<long>(
+            Constants.SentMessagesInstrumentName,
+            unit: "{messages}",
+            description: "Number of messages sent");
+
+    private static readonly Counter<long> _receivedMessagesCounter = NatsMeter.CreateCounter<long>(
+            Constants.ReceivedMessagesInstrumentName,
+            unit: "{messages}",
+            description: "Number of messages received");
+
+    private static readonly Histogram<double> _durationOperationHistogram = NatsMeter.CreateHistogram<double>(
+        Constants.DurationOperationInstrumentName,
+        unit: "{s}",
+        description: "Duration of messaging operation initiated by a producer or consumer client.");
+
+    private static readonly Histogram<double> _durationProcessHistogram = NatsMeter.CreateHistogram<double>(
+        Constants.DurationProcessInstrumentName,
+        unit: "{s}",
+        description: "Duration of processing operation within client.");
+
+    private static readonly object BoxedTrue = true;
 
     internal static Activity? StartSendActivity(
         string name,
@@ -72,8 +113,8 @@ internal static class Telemetry
 
     internal static void AddTraceContextHeaders(Activity? activity, ref NatsHeaders? headers)
     {
-        if (activity is null)
-            return;
+        if (!NatsActivities.HasListeners())
+            return null;
 
         headers ??= new NatsHeaders();
         DistributedContextPropagator.Current.Inject(
@@ -108,7 +149,7 @@ internal static class Telemetry
     {
         if (!NatsActivities.HasListeners())
             return null;
-
+            
         KeyValuePair<string, object?>[] tags;
         if (connection is NatsConnection { ServerInfo: not null } conn)
         {
@@ -216,6 +257,51 @@ internal static class Telemetry
         }
     }
 
+    internal static void IncrementSubscriptionCount(KeyValuePair<string, object?>[] tags)
+    {
+        _subscriptionCounter.Add(1, tags);
+    }
+
+    internal static void DecrementSubscriptionCount(KeyValuePair<string, object?>[] tags)
+    {
+        _subscriptionCounter.Add(-1, tags);
+    }
+
+    internal static void AddPendingMessages(long messages, KeyValuePair<string, object?>[] tags)
+    {
+        _pendingMessagesCounter.Add(messages, tags);
+    }
+
+    internal static void RecordSentBytes(long bytes, KeyValuePair<string, object?>[] tags)
+    {
+        _sentBytesHistogram.Record(bytes, tags);
+    }
+
+    internal static void RecordReceivedBytes(long bytes, KeyValuePair<string, object?>[] tags)
+    {
+        _receivedBytesHistogram.Record(bytes, tags);
+    }
+
+    internal static void AddSentMessages(long messages, KeyValuePair<string, object?>[] tags)
+    {
+        _sentMessagesCounter.Add(messages, tags);
+    }
+
+    internal static void AddReceivedMessages(long messages, KeyValuePair<string, object?>[] tags)
+    {
+        _receivedMessagesCounter.Add(messages, tags);
+    }
+
+    internal static void RecordOperationDuration(double duration, KeyValuePair<string, object?>[] tags)
+    {
+        _durationOperationHistogram.Record(duration, tags);
+    }
+
+    internal static void RecordProcessDuration(long bytes, KeyValuePair<string, object?>[] tags)
+    {
+        _durationProcessHistogram.Record(bytes, tags);
+    }
+
     private static bool TryParseTraceContext(NatsHeaders headers, out ActivityContext context)
     {
         DistributedContextPropagator.Current.ExtractTraceIdAndState(
@@ -289,5 +375,14 @@ internal static class Telemetry
         public const string NetworkPeerAddress = "network.peer.address";
         public const string NetworkPeerPort = "network.peer.port";
         public const string NetworkLocalAddress = "network.local.address";
+
+        public const string PendingMessagesInstrumentName = $"messaging.client.pending.messages";
+        public const string SentBytesInstrumentName = $"messaging.client.sent.bytes";
+        public const string ReceivedBytesInstrumentName = $"messaging.client.consumed.bytes";
+        public const string SentMessagesInstrumentName = $"messaging.client.sent.messages";
+        public const string ReceivedMessagesInstrumentName = $"messaging.client.consumed.messages";
+        public const string SubscriptionInstrumentName = $"messaging.client.nats.subscription.count";
+        public const string DurationOperationInstrumentName = $"messaging.client.operation.duration";
+        public const string DurationProcessInstrumentName = $"messaging.process.duration";
     }
 }

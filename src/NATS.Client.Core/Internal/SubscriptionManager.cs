@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
 
@@ -51,22 +52,14 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
 
     public ValueTask SubscribeAsync(NatsSubBase sub, CancellationToken cancellationToken)
     {
-        if (Telemetry.HasListeners())
+        ValueTask task;
+        using var activity = Telemetry.StartSendActivity($"{_connection.SpanDestinationName(sub.Subject)} {Telemetry.Constants.SubscribeActivityName}", _connection, sub.Subject, null, null);
+        if (activity != null)
         {
-            using var activity = Telemetry.StartSendActivity($"{_connection.SpanDestinationName(sub.Subject)} {Telemetry.Constants.SubscribeActivityName}", _connection, sub.Subject, null, null);
             try
             {
-                if (IsInboxSubject(sub.Subject))
-                {
-                    if (sub.QueueGroup != null)
-                    {
-                        throw new NatsException("Inbox subscriptions don't support queue groups");
-                    }
-
-                    return SubscribeInboxAsync(sub, cancellationToken);
-                }
-
-                return SubscribeInternalAsync(sub.Subject, sub.QueueGroup, sub.Opts, sub, cancellationToken);
+                task = SubscribeImpAsync(sub, cancellationToken);
+                Telemetry.RecordOperationDuration(activity.Duration.TotalSeconds, activity.TagObjects.ToArray());
             }
             catch (Exception ex)
             {
@@ -74,18 +67,12 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
                 throw;
             }
         }
-
-        if (IsInboxSubject(sub.Subject))
+        else
         {
-            if (sub.QueueGroup != null)
-            {
-                throw new NatsException("Inbox subscriptions don't support queue groups");
-            }
-
-            return SubscribeInboxAsync(sub, cancellationToken);
+            task = SubscribeImpAsync(sub, cancellationToken);
         }
 
-        return SubscribeInternalAsync(sub.Subject, sub.QueueGroup, sub.Opts, sub, cancellationToken);
+        return task;
     }
 
     public ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
@@ -260,6 +247,21 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
                 _inboxSubLock.Release();
             }
         }
+    }
+
+    private ValueTask SubscribeImpAsync(NatsSubBase sub, CancellationToken cancellationToken)
+    {
+        if (IsInboxSubject(sub.Subject))
+        {
+            if (sub.QueueGroup != null)
+            {
+                throw new NatsException("Inbox subscriptions don't support queue groups");
+            }
+
+            return SubscribeInboxAsync(sub, cancellationToken);
+        }
+
+        return SubscribeInternalAsync(sub.Subject, sub.QueueGroup, sub.Opts, sub, cancellationToken);
     }
 
     private async ValueTask SubscribeInboxAsync(NatsSubBase sub, CancellationToken cancellationToken)

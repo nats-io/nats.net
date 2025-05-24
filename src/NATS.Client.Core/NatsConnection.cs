@@ -30,9 +30,6 @@ internal enum NatsEvent
 
 public partial class NatsConnection : INatsConnection
 {
-#pragma warning disable SA1401
-    internal readonly ConnectionStatsCounter Counter; // allow to call from external sources
-#pragma warning restore SA1401
     private readonly object _gate = new object();
     private readonly ILogger<NatsConnection> _logger;
     private readonly ObjectPool _pool;
@@ -80,8 +77,7 @@ public partial class NatsConnection : INatsConnection
         _disposedCts = new CancellationTokenSource();
         _pool = new ObjectPool(opts.ObjectPoolSize);
         _name = opts.Name;
-        Counter = new ConnectionStatsCounter();
-        CommandWriter = new CommandWriter("main", this, _pool, Opts, Counter, EnqueuePing);
+        CommandWriter = new CommandWriter("main", this, _pool, Opts, EnqueuePing);
         InboxPrefix = NewInbox(opts.InboxPrefix);
         _subscriptionManager = new SubscriptionManager(this, InboxPrefix);
         _replyTaskFactory = new ReplyTaskFactory(this);
@@ -270,8 +266,6 @@ public partial class NatsConnection : INatsConnection
         var tokens = subject.Split('.');
         return tokens.Length < 2 ? subject : $"{tokens[0]}.{tokens[1]}";
     }
-
-    internal NatsStats GetStats() => Counter.ToStats();
 
     internal ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
     {
@@ -528,7 +522,7 @@ public partial class NatsConnection : INatsConnection
                 await _userCredentials.AuthenticateAsync(_clientOpts, WritableServerInfo, _currentConnectUri, Opts.ConnectTimeout, _disposedCts.Token).ConfigureAwait(false);
             }
 
-            await using (var priorityCommandWriter = new PriorityCommandWriter(this, _pool, _socketConnection!, Opts, Counter, EnqueuePing))
+            await using (var priorityCommandWriter = new PriorityCommandWriter(this, _pool, _socketConnection!, Opts, EnqueuePing))
             {
                 // add CONNECT and PING command to priority lane
                 await priorityCommandWriter.CommandWriter.ConnectAsync(_clientOpts, CancellationToken.None).ConfigureAwait(false);

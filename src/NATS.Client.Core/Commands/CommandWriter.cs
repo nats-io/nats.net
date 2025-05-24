@@ -37,7 +37,6 @@ internal sealed class CommandWriter : IAsyncDisposable
     private readonly int _arrayPoolInitialSize;
     private readonly object _lock = new();
     private readonly CancellationTokenSource _cts;
-    private readonly ConnectionStatsCounter _counter;
     private readonly Memory<byte> _consolidateMem = new byte[SendMemSize].AsMemory();
     private readonly TimeSpan _defaultCommandTimeout;
     private readonly Action<PingCommand> _enqueuePing;
@@ -55,7 +54,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     private CancellationTokenSource? _ctsReader;
     private volatile bool _disposed;
 
-    public CommandWriter(string name, NatsConnection connection, ObjectPool pool, NatsOpts opts, ConnectionStatsCounter counter, Action<PingCommand> enqueuePing, TimeSpan? overrideCommandTimeout = default)
+    public CommandWriter(string name, NatsConnection connection, ObjectPool pool, NatsOpts opts, Action<PingCommand> enqueuePing, TimeSpan? overrideCommandTimeout = default)
     {
         _logger = opts.LoggerFactory.CreateLogger<CommandWriter>();
         _trace = _logger.IsEnabled(LogLevel.Trace);
@@ -67,7 +66,6 @@ internal sealed class CommandWriter : IAsyncDisposable
         // avoid defining another option.
         _arrayPoolInitialSize = opts.WriterBufferSize / 256;
 
-        _counter = counter;
         _defaultCommandTimeout = overrideCommandTimeout ?? opts.CommandTimeout;
         _enqueuePing = enqueuePing;
         _protocolWriter = new ProtocolWriter(opts.SubjectEncoding);
@@ -321,6 +319,8 @@ internal sealed class CommandWriter : IAsyncDisposable
                 serializer.Serialize(payloadBuffer, value);
 
             var size = payloadBuffer.WrittenMemory.Length + (headersBuffer?.WrittenMemory.Length ?? 0);
+            Activity.Current?.AddTag("messaging.message.body.size", payloadBuffer.WrittenMemory.Length);
+            Activity.Current?.AddTag("messaging.message.envelope.size", size);
             if (_connection.ServerInfo is { } info && size > info.MaxPayload)
             {
                 throw new NatsPayloadTooLargeException($"Payload size {size} exceeds server's maximum payload size {info.MaxPayload}");
@@ -693,11 +693,19 @@ internal sealed class CommandWriter : IAsyncDisposable
             return;
         }
 
-        Interlocked.Add(ref _counter.PendingMessages, 1);
+        Telemetry.AddPendingMessages(1, Activity.Current.TagObjects.ToArray());
 
         _channelSize.Writer.TryWrite(size);
         var flush = _pipeWriter.FlushAsync();
-        _flushTask = flush.IsCompletedSuccessfully ? null : flush.AsTask();
+        if (flush.IsCompletedSuccessfully)
+        {
+            _flushTask = null;
+            Telemetry.AddPendingMessages(-1, Activity.Current.TagObjects.ToArray());
+        }
+        else
+        {
+            _flushTask = flush.AsTask();
+        }
     }
 
     private async ValueTask ConnectStateMachineAsync(bool lockHeld, ClientOpts connectOpts, CancellationToken cancellationToken)
