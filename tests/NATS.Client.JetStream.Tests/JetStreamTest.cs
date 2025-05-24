@@ -49,11 +49,13 @@ public class JetStreamTest
         await Assert.ThrowsAnyAsync<ArgumentException>(async () => await jsmContext.DeleteMessageAsync(streamName!, new StreamMsgDeleteRequest()));
     }
 
-    [Fact]
-    public async Task Create_stream_test()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Create_stream_test(NatsRequestReplyMode mode)
     {
         await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestTimeout = TimeSpan.FromSeconds(10) });
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestTimeout = TimeSpan.FromSeconds(10), RequestReplyMode = mode });
 
         // Happy user
         {

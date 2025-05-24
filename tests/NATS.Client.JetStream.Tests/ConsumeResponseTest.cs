@@ -6,8 +6,10 @@ namespace NATS.Client.JetStream.Tests;
 
 public class ConsumeResponseTest
 {
-    [Fact]
-    public async Task Consume_response()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Consume_response(NatsRequestReplyMode mode)
     {
         var headers = new Stack<string>();
         headers.Push("NATS/1.0 400 Bad Test Request");
@@ -35,7 +37,7 @@ public class ConsumeResponseTest
         });
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        await using var nats = new NatsConnection(new NatsOpts { Url = ms.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = ms.Url, RequestReplyMode = mode });
         var js = nats.CreateJetStreamContext();
         var consumer = await js.GetConsumerAsync("x", "x", cts.Token);
 
