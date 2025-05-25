@@ -29,7 +29,8 @@ internal static class Telemetry
             QueueGroup: null,
             BodySize: null,
             Size: null,
-            Connection: connection);
+            Connection: connection,
+            ParentContext: parentContext);
 
         if (NatsInstrumentationOptions.Default.Filter is { } filter && !filter(instrumentationContext))
             return null;
@@ -125,6 +126,9 @@ internal static class Telemetry
         if (!NatsActivities.HasListeners())
             return null;
 
+        if (headers is null || !TryParseTraceContext(headers, out var context))
+            context = default;
+
         var instrumentationContext = new NatsInstrumentationContext(
             Subject: subject,
             Headers: headers,
@@ -132,7 +136,8 @@ internal static class Telemetry
             QueueGroup: queueGroup,
             BodySize: bodySize,
             Size: size,
-            Connection: connection);
+            Connection: connection,
+            ParentContext: context);
 
         if (NatsInstrumentationOptions.Default.Filter is { } filter && !filter(instrumentationContext))
             return null;
@@ -189,9 +194,6 @@ internal static class Telemetry
             if (replyTo is not null)
                 tags[9] = new KeyValuePair<string, object?>(Constants.ReplyTo, replyTo);
         }
-
-        if (headers is null || !TryParseTraceContext(headers, out var context))
-            context = default;
 
         var activity = NatsActivities.StartActivity(
             name,
