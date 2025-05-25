@@ -99,6 +99,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "workflows", "workflows", "{
 		.github\workflows\test_linux.yml = .github\workflows\test_linux.yml
 		.github\workflows\test_windows.yml = .github\workflows\test_windows.yml
 		.github\workflows\test_linux_core.yml = .github\workflows\test_linux_core.yml
+		.github\workflows\signoffs.yml = .github\workflows\signoffs.yml
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "examples", "examples", "{5BF3C0C5-94CA-4008-8DF5-890ED8E06990}"
