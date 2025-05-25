@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace NATS.Client.Core.Internal;
 
 public readonly record struct NatsInstrumentationContext(
@@ -7,4 +9,5 @@ public readonly record struct NatsInstrumentationContext(
     string? QueueGroup,
     long? BodySize,
     long? Size,
-    INatsConnection? Connection);
+    INatsConnection? Connection,
+    ActivityContext? ParentContext);
