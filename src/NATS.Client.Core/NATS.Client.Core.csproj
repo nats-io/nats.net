@@ -1,32 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFrameworks>netstandard2.0;netstandard2.1;net6.0;net8.0</TargetFrameworks>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
-        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-
         <!-- NuGet Packaging -->
         <PackageTags>pubsub;messaging</PackageTags>
         <Description>NATS core client for .NET</Description>
-        <IsPackable>true</IsPackable>
-    </PropertyGroup>
-
-    <PropertyGroup Condition="'$(TargetFramework)' == 'netstandard2.0' OR '$(TargetFramework)' == 'netstandard2.1'">
-        <IsTrimmable>false</IsTrimmable>
-        <NoWarn>$(NoWarn);CS8774</NoWarn>
-    </PropertyGroup>
-
-    <PropertyGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
-        <NoWarn>$(NoWarn);CS8604</NoWarn>
-    </PropertyGroup>
-
-    <PropertyGroup Condition="'$(TargetFramework)' == 'net6.0' OR '$(TargetFramework)' == 'net8.0'">
-        <IsTrimmable>true</IsTrimmable>
-    </PropertyGroup>
-
-    <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
-        <isAotCompatible>true</isAotCompatible>
     </PropertyGroup>
 
     <!--  Dependencies for all -->
