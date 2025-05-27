@@ -52,27 +52,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
 
     public ValueTask SubscribeAsync(NatsSubBase sub, CancellationToken cancellationToken)
     {
-        ValueTask task;
-        using var activity = Telemetry.StartSendActivity($"{_connection.SpanDestinationName(sub.Subject)} {Telemetry.Constants.SubscribeActivityName}", _connection, sub.Subject, null, null);
-        if (activity != null)
-        {
-            try
-            {
-                task = SubscribeImpAsync(sub, cancellationToken);
-                Telemetry.RecordOperationDuration(activity.Duration.TotalSeconds, activity.TagObjects.ToArray());
-            }
-            catch (Exception ex)
-            {
-                Telemetry.SetException(activity, ex);
-                throw;
-            }
-        }
-        else
-        {
-            task = SubscribeImpAsync(sub, cancellationToken);
-        }
-
-        return task;
+        return SubscribeInternalAsync(sub, cancellationToken);;
     }
 
     public ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
@@ -170,6 +150,8 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
         return _connection.UnsubscribeAsync(subMetadata.Sid);
     }
 
+
+
     /// <summary>
     /// Returns commands for all the live subscriptions to be used on reconnect so that they can rebuild their connection state on the server.
     /// </summary>
@@ -249,19 +231,41 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
         }
     }
 
-    private ValueTask SubscribeImpAsync(NatsSubBase sub, CancellationToken cancellationToken)
+    private ValueTask SubscribeInternalAsync(NatsSubBase sub, CancellationToken cancellationToken)
     {
-        if (IsInboxSubject(sub.Subject))
+        var start = DateTimeOffset.UtcNow;
+        using var activity = Telemetry.StartSendActivity(start, $"{SpanDestinationName(subject)} {Telemetry.Constants.PublishActivityName}", this, subject, replyTo);
+        Task task;
+        
+        try
         {
-            if (sub.QueueGroup != null)
+            if (IsInboxSubject(sub.Subject))
             {
-                throw new NatsException("Inbox subscriptions don't support queue groups");
+                if (sub.QueueGroup != null)
+                {
+                    throw new NatsException("Inbox subscriptions don't support queue groups");
+                }
+
+                task = SubscribeInboxAsync(sub, cancellationToken);
             }
-
-            return SubscribeInboxAsync(sub, cancellationToken);
+            else
+            {
+                task = SubscribeQueueAsync(sub, cancellationToken);
+            }
         }
-
-        return SubscribeInternalAsync(sub.Subject, sub.QueueGroup, sub.Opts, sub, cancellationToken);
+        catch (Exception ex)
+        {
+            Telemetry.SetException(activity, ex);
+            throw;
+        }
+        finally
+        {
+            var end = DateTimeOffset.UtcNow;
+            activity?.SetEndTime(end.UtcDateTime);
+            var duration = end - start;
+            Telemetry.RecordOperationDuration(duration.TotalSeconds, activity.TagObjects.ToArray());
+        }
+        return task;
     }
 
     private async ValueTask SubscribeInboxAsync(NatsSubBase sub, CancellationToken cancellationToken)
@@ -270,8 +274,11 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
         await InboxSubBuilder.RegisterAsync(sub).ConfigureAwait(false);
     }
 
-    private async ValueTask SubscribeInternalAsync(string subject, string? queueGroup, NatsSubOpts? opts, NatsSubBase sub, CancellationToken cancellationToken)
+    private async ValueTask SubscribeQueueAsync(NatsSubBase sub, CancellationToken cancellationToken)
     {
+        string subject = sub.Subject;
+        string? queueGroup = sub.QueueGroup;
+        NatsSubOpts? opts = sub.Opts;
         var sid = GetNextSid();
 
         if (sub is InboxSub)

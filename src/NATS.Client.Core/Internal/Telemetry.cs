@@ -55,6 +55,7 @@ internal static class Telemetry
     private static readonly object BoxedTrue = true;
 
     internal static Activity? StartSendActivity(
+        DateTime date,
         string name,
         INatsConnection? connection,
         string subject,
@@ -105,6 +106,7 @@ internal static class Telemetry
         }
 
         return NatsActivities.StartActivity(
+            date,
             name,
             kind: ActivityKind.Producer,
             parentContext: parentContext ?? default,
@@ -137,6 +139,7 @@ internal static class Telemetry
     }
 
     internal static Activity? StartReceiveActivity(
+        DateTime date,
         INatsConnection? connection,
         string name,
         string subscriptionSubject,
@@ -149,7 +152,7 @@ internal static class Telemetry
     {
         if (!NatsActivities.HasListeners())
             return null;
-            
+
         KeyValuePair<string, object?>[] tags;
         if (connection is NatsConnection { ServerInfo: not null } conn)
         {
@@ -207,6 +210,7 @@ internal static class Telemetry
             context = default;
 
         return NatsActivities.StartActivity(
+            date,
             name,
             kind: ActivityKind.Consumer,
             parentContext: context,
