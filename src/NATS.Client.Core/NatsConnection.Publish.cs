@@ -24,7 +24,7 @@ public partial class NatsConnection
     {
         var start = DateTimeOffset.UtcNow;
         using var activity = Telemetry.StartSendActivity(start, $"{SpanDestinationName(subject)} {Telemetry.Constants.PublishActivityName}", this, subject, replyTo);
-        Task task;
+        ValueTask task;
 
         //code to create the message to be sent and record as a span + metric
 
@@ -48,6 +48,7 @@ public partial class NatsConnection
             var duration = end - start;
             Telemetry.RecordOperationDuration(duration.TotalSeconds, activity.TagObjects.ToArray());
         }
+        
         return task;
     }
 

@@ -7,9 +7,9 @@ namespace NATS.Client.Core.Internal;
 // https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/#messaging-attributes
 internal static class Telemetry
 {
+    internal static readonly ActivitySource NatsActivities = new(name: NatsActivitySource);
     private const string NatsActivitySource = "NATS.Net";
     private const string MeterName = "NATS.Net";
-    private static readonly ActivitySource NatsActivities = new(name: NatsActivitySource);
     private static readonly Meter NatsMeter = new Meter(MeterName);
 
     private static readonly Counter<long> _subscriptionCounter = NatsMeter.CreateCounter<long>(
@@ -53,6 +53,8 @@ internal static class Telemetry
         description: "Duration of processing operation within client.");
 
     private static readonly object BoxedTrue = true;
+    
+    internal static bool HasListeners() => NatsActivities.HasListeners();
 
     internal static Activity? StartSendActivity(
         DateTime date,
@@ -116,7 +118,7 @@ internal static class Telemetry
     internal static void AddTraceContextHeaders(Activity? activity, ref NatsHeaders? headers)
     {
         if (!NatsActivities.HasListeners())
-            return null;
+            return;
 
         headers ??= new NatsHeaders();
         DistributedContextPropagator.Current.Inject(
