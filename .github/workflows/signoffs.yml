@@ -1,4 +1,4 @@
-﻿name: Sign-offs
+name: Sign-offs
 
 on:
   pull_request: {}
