@@ -33,59 +33,37 @@ public partial class NatsConnection
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default)
     {
-        using var activity = Telemetry.StartSendActivity($"{SpanDestinationName(subject)} {Telemetry.Constants.RequestReplyActivityName}", this, subject, null);
-        if (activity != null)
+        var date = DateTimeOffset.UtcNow;
+        using var activity = Telemetry.StartSendActivity(date, $"{SpanDestinationName(subject)} {Telemetry.Constants.RequestReplyActivityName}", this, subject, null);
+        try
         {
-            try
+            Telemetry.AddTraceContextHeaders(activity, ref headers);
+            replyOpts = SetReplyOptsDefaults(replyOpts);
+
+            if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
             {
-                Telemetry.AddTraceContextHeaders(activity, ref headers);
-                replyOpts = SetReplyOptsDefaults(replyOpts);
-
-                if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
-                {
-                    using var rt = _replyTaskFactory.CreateReplyTask(replySerializer, replyOpts.Timeout);
-                    requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
-                    await PublishAsync(subject, data, headers, rt.Subject, requestSerializer, requestOpts, cancellationToken).ConfigureAwait(false);
-                    return await rt.GetResultAsync(cancellationToken).ConfigureAwait(false);
-                }
-
-                await using var sub1 = await CreateRequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
-                    .ConfigureAwait(false);
-
-                Telemetry.RecordOperationDuration(activity.Duration.TotalSeconds, activity.TagObjects.ToArray());
-                await foreach (var msg in sub1.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
-                {
-                    return msg;
-                }
-
-                throw new NatsNoReplyException();
+                using var rt = _replyTaskFactory.CreateReplyTask(replySerializer, replyOpts.Timeout);
+                requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
+                await PublishAsync(subject, data, headers, rt.Subject, requestSerializer, requestOpts, cancellationToken).ConfigureAwait(false);
+                return await rt.GetResultAsync(cancellationToken).ConfigureAwait(false);
             }
-            catch (Exception e)
+
+            await using var sub = await CreateRequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
+                .ConfigureAwait(false);
+
+            Telemetry.RecordOperationDuration(activity.Duration.TotalSeconds, activity.TagObjects.ToArray());
+            await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
             {
-                Telemetry.SetException(activity, e);
-                throw;
+                return msg;
             }
+
+            throw new NatsNoReplyException();
         }
-
-        replyOpts = SetReplyOptsDefaults(replyOpts);
-
-        if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
+        catch (Exception e)
         {
-            using var rt = _replyTaskFactory.CreateReplyTask(replySerializer, replyOpts.Timeout);
-            requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
-            await PublishAsync(subject, data, headers, rt.Subject, requestSerializer, requestOpts, cancellationToken).ConfigureAwait(false);
-            return await rt.GetResultAsync(cancellationToken).ConfigureAwait(false);
+            Telemetry.SetException(activity, e);
+            throw;
         }
-
-        await using var sub = await CreateRequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
-            .ConfigureAwait(false);
-
-        await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
-        {
-            return msg;
-        }
-
-        throw new NatsNoReplyException();
     }
 
     /// <inheritdoc />

@@ -52,7 +52,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
 
     public ValueTask SubscribeAsync(NatsSubBase sub, CancellationToken cancellationToken)
     {
-        return SubscribeInternalAsync(sub, cancellationToken);;
+        return SubscribeInternalAsync(sub, cancellationToken);
     }
 
     public ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
@@ -150,8 +150,6 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
         return _connection.UnsubscribeAsync(subMetadata.Sid);
     }
 
-
-
     /// <summary>
     /// Returns commands for all the live subscriptions to be used on reconnect so that they can rebuild their connection state on the server.
     /// </summary>
@@ -216,12 +214,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
                     // For example if the user provides a timeout, we don't want to timeout the real inbox subscription
                     // since it must live duration of the connection.
                     _inboxSub = InboxSubBuilder.Build(inboxSubject, opts: default, _connection, manager: this);
-                    await SubscribeInternalAsync(
-                        inboxSubject,
-                        queueGroup: default,
-                        opts: default,
-                        _inboxSub,
-                        cancellationToken).ConfigureAwait(false);
+                    await SubscribeQueueAsync(_inboxSub, cancellationToken).ConfigureAwait(false);
                 }
             }
             finally
@@ -234,9 +227,8 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
     private ValueTask SubscribeInternalAsync(NatsSubBase sub, CancellationToken cancellationToken)
     {
         var start = DateTimeOffset.UtcNow;
-        using var activity = Telemetry.StartSendActivity(start, $"{SpanDestinationName(subject)} {Telemetry.Constants.PublishActivityName}", this, subject, replyTo);
-        Task task;
-        
+        using var activity = Telemetry.StartSendActivity(start, $"{_connection.SpanDestinationName(sub.Subject)} {Telemetry.Constants.PublishActivityName}", _connection, sub.Subject, null, null);
+        ValueTask task;
         try
         {
             if (IsInboxSubject(sub.Subject))
@@ -265,6 +257,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
             var duration = end - start;
             Telemetry.RecordOperationDuration(duration.TotalSeconds, activity.TagObjects.ToArray());
         }
+
         return task;
     }
 
@@ -276,9 +269,6 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
 
     private async ValueTask SubscribeQueueAsync(NatsSubBase sub, CancellationToken cancellationToken)
     {
-        string subject = sub.Subject;
-        string? queueGroup = sub.QueueGroup;
-        NatsSubOpts? opts = sub.Opts;
         var sid = GetNextSid();
 
         if (sub is InboxSub)
@@ -293,7 +283,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
 
         lock (_gate)
         {
-            _bySid[sid] = new SidMetadata(Subject: subject, WeakReference: new WeakReference<NatsSubBase>(sub));
+            _bySid[sid] = new SidMetadata(Subject: sub.Subject, WeakReference: new WeakReference<NatsSubBase>(sub));
 #if NETSTANDARD2_0
             lock (_bySub)
             {
@@ -308,7 +298,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
 
         try
         {
-            await _connection.SubscribeCoreAsync(sid, subject, queueGroup, opts?.MaxMsgs, cancellationToken).ConfigureAwait(false);
+            await _connection.SubscribeCoreAsync(sid, sub.Subject, sub.QueueGroup, sub.Opts?.MaxMsgs, cancellationToken).ConfigureAwait(false);
             await sub.ReadyAsync().ConfigureAwait(false);
         }
         catch
