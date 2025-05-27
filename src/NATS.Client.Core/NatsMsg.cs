@@ -400,6 +400,7 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
         headers ??= new NatsHeaders();
 
         var activity = Telemetry.StartReceiveActivity(
+            DateTimeOffset.UtcNow,
             connection,
             name: activityName,
             subscriptionSubject: subject,

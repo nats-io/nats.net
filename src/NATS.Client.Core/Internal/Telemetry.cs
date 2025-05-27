@@ -7,9 +7,9 @@ namespace NATS.Client.Core.Internal;
 // https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/#messaging-attributes
 internal static class Telemetry
 {
+    internal static readonly ActivitySource NatsActivities = new(name: NatsActivitySource);
     private const string NatsActivitySource = "NATS.Net";
     private const string MeterName = "NATS.Net";
-    private static readonly ActivitySource NatsActivities = new(name: NatsActivitySource);
     private static readonly Meter NatsMeter = new Meter(MeterName);
 
     private static readonly Counter<long> _subscriptionCounter = NatsMeter.CreateCounter<long>(
@@ -54,8 +54,10 @@ internal static class Telemetry
 
     private static readonly object BoxedTrue = true;
 
+    internal static bool HasListeners() => NatsActivities.HasListeners();
+
     internal static Activity? StartSendActivity(
-        DateTime date,
+        DateTimeOffset date,
         string name,
         INatsConnection? connection,
         string subject,
@@ -106,9 +108,9 @@ internal static class Telemetry
         }
 
         return NatsActivities.StartActivity(
-            date,
             name,
             kind: ActivityKind.Producer,
+            startTime: date,
             parentContext: parentContext ?? default,
             tags: tags);
     }
@@ -116,7 +118,7 @@ internal static class Telemetry
     internal static void AddTraceContextHeaders(Activity? activity, ref NatsHeaders? headers)
     {
         if (!NatsActivities.HasListeners())
-            return null;
+            return;
 
         headers ??= new NatsHeaders();
         DistributedContextPropagator.Current.Inject(
@@ -139,7 +141,7 @@ internal static class Telemetry
     }
 
     internal static Activity? StartReceiveActivity(
-        DateTime date,
+        DateTimeOffset date,
         INatsConnection? connection,
         string name,
         string subscriptionSubject,
@@ -210,9 +212,9 @@ internal static class Telemetry
             context = default;
 
         return NatsActivities.StartActivity(
-            date,
             name,
-            kind: ActivityKind.Consumer,
+            kind: ActivityKind.Producer,
+            startTime: date,
             parentContext: context,
             tags: tags);
     }
