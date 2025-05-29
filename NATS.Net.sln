@@ -4,6 +4,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 17.1.32210.238
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{4827B3EC-73D8-436D-AE2A-5E29AC95FD0C}"
+	ProjectSection(SolutionItems) = preProject
+		src\Directory.Build.props = src\Directory.Build.props
+	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "sandbox", "sandbox", "{95A69671-16CA-4133-981C-CC381B7AAA30}"
 EndProject
@@ -99,6 +102,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "workflows", "workflows", "{
 		.github\workflows\test_linux.yml = .github\workflows\test_linux.yml
 		.github\workflows\test_windows.yml = .github\workflows\test_windows.yml
 		.github\workflows\test_linux_core.yml = .github\workflows\test_linux_core.yml
+		.github\workflows\signoffs.yml = .github\workflows\signoffs.yml
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "examples", "examples", "{5BF3C0C5-94CA-4008-8DF5-890ED8E06990}"
