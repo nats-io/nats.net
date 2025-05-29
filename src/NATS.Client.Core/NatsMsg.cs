@@ -421,6 +421,9 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
         return new NatsMsg<T>(subject, replyTo, (int)size, headers, data, connection, flags);
     }
 
+#if NETSTANDARD2_0
+#pragma warning disable CS8774 // Member 'ReplyTo' must have a non-null value when exiting..
+#endif
     [MemberNotNull(nameof(Connection))]
     [MemberNotNull(nameof(ReplyTo))]
     private void CheckReplyPreconditions()
@@ -435,6 +438,9 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
             throw new NatsException("unable to send reply; ReplyTo is empty");
         }
     }
+#if NETSTANDARD2_0
+#pragma warning restore CS8774 // Member 'ReplyTo' must have a non-null value when exiting..
+#endif
 }
 
 /// <summary>
