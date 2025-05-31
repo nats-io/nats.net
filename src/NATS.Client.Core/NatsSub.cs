@@ -17,7 +17,18 @@ public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
         NatsSubOpts? opts,
         INatsDeserialize<T> serializer,
         CancellationToken cancellationToken = default)
-        : base(connection, manager, subject, queueGroup, opts, cancellationToken)
+        : this(connection, manager, new NatsSubscriptionProps(subject) { QueueGroup = queueGroup }, opts, serializer, cancellationToken)
+    {
+    }
+
+    public NatsSub(
+        INatsConnection connection,
+        INatsSubscriptionManager manager,
+        NatsSubscriptionProps props,
+        NatsSubOpts? opts,
+        INatsDeserialize<T> serializer,
+        CancellationToken cancellationToken = default)
+        : base(connection, manager, props, opts, cancellationToken)
     {
         _msgs = Channel.CreateBounded<NatsMsg<T>>(
             connection.GetBoundedChannelOpts(opts?.ChannelOpts),

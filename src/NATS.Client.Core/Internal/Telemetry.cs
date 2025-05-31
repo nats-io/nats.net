@@ -1,5 +1,7 @@
+using System;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using System.Drawing;
 
 namespace NATS.Client.Core.Internal;
 
@@ -56,57 +58,73 @@ internal static class Telemetry
 
     internal static bool HasListeners() => NatsActivities.HasListeners();
 
+    internal static List<KeyValuePair<string, object?>> GetTags(INatsServerInfo serverInfo)
+    {
+        return new List<KeyValuePair<string, object?>>()
+        {
+            new KeyValuePair<string, object?>(Constants.ClientId, serverInfo.ClientId.ToString()),
+            new KeyValuePair<string, object?>(Constants.NetworkLocalAddress, serverInfo.ClientIp),
+            new KeyValuePair<string, object?>(Constants.NetworkPeerAddress, serverInfo.Host),
+            new KeyValuePair<string, object?>(Constants.NetworkPeerPort, serverInfo.Port.ToString()),
+            new KeyValuePair<string, object?>(Constants.NetworkProtoName, "nats"),
+            new KeyValuePair<string, object?>(Constants.NetworkProtoVersion, serverInfo.ProtocolVersion.ToString()),
+            new KeyValuePair<string, object?>(Constants.ServerAddress, serverInfo.Host),
+            new KeyValuePair<string, object?>(Constants.ServerPort, serverInfo.Port.ToString()),
+        };
+    }
+
+    internal static KeyValuePair<string, object?>[] GetTags(string operation, INatsServerInfo? serverInfo, NatsPublishProps pubOpts)
+    {
+        var tags = new List<KeyValuePair<string, object?>>()
+        {
+            new KeyValuePair<string, object?>(Constants.SystemKey, Constants.SystemVal),
+            new KeyValuePair<string, object?>(Constants.OpKey, operation),
+
+            new KeyValuePair<string, object?>(Constants.DestName, pubOpts.Subject),
+            new KeyValuePair<string, object?>(Constants.DestTemplate, pubOpts.SubjectTemplate),
+            new KeyValuePair<string, object?>(Constants.DestIsTemporary, pubOpts.UsesInbox ? Constants.True : Constants.False),
+            new KeyValuePair<string, object?>(Constants.ReplyToName, pubOpts.ReplyTo),
+            new KeyValuePair<string, object?>(Constants.Subject, pubOpts.Subject),
+        };
+
+        if (serverInfo != null)
+        {
+            tags.AddRange(GetTags(serverInfo));
+        }
+
+        return tags.ToArray();
+    }
+
+    internal static KeyValuePair<string, object?>[] GetTags(string operation, INatsServerInfo? serverInfo, NatsProcessProps props)
+    {
+        var tags = new List<KeyValuePair<string, object?>>()
+        {
+            new KeyValuePair<string, object?>(Constants.SystemKey, Constants.SystemVal),
+            new KeyValuePair<string, object?>(Constants.OpKey, operation),
+
+            //new KeyValuePair<string, object?>(Constants.QueueGroup, queueGroup)
+        };
+
+        if (serverInfo != null)
+        {
+            tags.AddRange(GetTags(serverInfo));
+        }
+
+        return tags.ToArray();
+    }
+
     internal static Activity? StartSendActivity(
         DateTimeOffset date,
-        string name,
-        INatsConnection? connection,
-        string subject,
-        string? replyTo,
+        NatsPublishProps opts,
+        string operation,
+        KeyValuePair<string, object?>[]? tags = default,
         ActivityContext? parentContext = null)
     {
         if (!NatsActivities.HasListeners())
             return null;
+        var destination = opts.UsesInbox ? "inbox" : opts.SantisedSubject();
 
-        KeyValuePair<string, object?>[] tags;
-        if (connection is NatsConnection { ServerInfo: not null } conn)
-        {
-            var len = 11;
-            if (replyTo is not null)
-                len++;
-
-            var serverPort = conn.ServerInfo.Port.ToString();
-            tags = new KeyValuePair<string, object?>[len];
-            tags[0] = new KeyValuePair<string, object?>(Constants.SystemKey, Constants.SystemVal);
-            tags[1] = new KeyValuePair<string, object?>(Constants.OpKey, Constants.OpPub);
-            tags[2] = new KeyValuePair<string, object?>(Constants.DestName, subject);
-
-            tags[3] = new KeyValuePair<string, object?>(Constants.ClientId, conn.ServerInfo.ClientId.ToString());
-            tags[4] = new KeyValuePair<string, object?>(Constants.ServerAddress, conn.ServerInfo.Host);
-            tags[5] = new KeyValuePair<string, object?>(Constants.ServerPort, serverPort);
-            tags[6] = new KeyValuePair<string, object?>(Constants.NetworkProtoName, "nats");
-            tags[7] = new KeyValuePair<string, object?>(Constants.NetworkProtoVersion, conn.ServerInfo.ProtocolVersion.ToString());
-            tags[8] = new KeyValuePair<string, object?>(Constants.NetworkPeerAddress, conn.ServerInfo.Host);
-            tags[9] = new KeyValuePair<string, object?>(Constants.NetworkPeerPort, serverPort);
-            tags[10] = new KeyValuePair<string, object?>(Constants.NetworkLocalAddress, conn.ServerInfo.ClientIp);
-
-            if (replyTo is not null)
-                tags[11] = new KeyValuePair<string, object?>(Constants.ReplyTo, replyTo);
-        }
-        else
-        {
-            var len = 3;
-            if (replyTo is not null)
-                len++;
-
-            tags = new KeyValuePair<string, object?>[len];
-            tags[0] = new KeyValuePair<string, object?>(Constants.SystemKey, Constants.SystemVal);
-            tags[1] = new KeyValuePair<string, object?>(Constants.OpKey, Constants.OpPub);
-            tags[2] = new KeyValuePair<string, object?>(Constants.DestName, subject);
-
-            if (replyTo is not null)
-                tags[3] = new KeyValuePair<string, object?>(Constants.ReplyTo, replyTo);
-        }
-
+        var name = $"{destination} {operation}";
         return NatsActivities.StartActivity(
             name,
             kind: ActivityKind.Producer,
@@ -142,80 +160,34 @@ internal static class Telemetry
 
     internal static Activity? StartReceiveActivity(
         DateTimeOffset date,
-        INatsConnection? connection,
-        string name,
-        string subscriptionSubject,
-        string? queueGroup,
-        string subject,
-        string? replyTo,
-        long bodySize,
-        long size,
-        NatsHeaders? headers)
+        NatsProcessProps opts,
+        string operation,
+        KeyValuePair<string, object?>[]? tags = default,
+        ActivityContext? parentContext = null)
     {
         if (!NatsActivities.HasListeners())
             return null;
 
-        KeyValuePair<string, object?>[] tags;
-        if (connection is NatsConnection { ServerInfo: not null } conn)
+        /*if (connection is NatsConnection { ServerInfo: not null } conn)
         {
-            var serverPort = conn.ServerInfo.Port.ToString();
-
-            var len = 17;
-            if (replyTo is not null)
-                len++;
-            if (queueGroup is not null)
-                len++;
-
-            tags = new KeyValuePair<string, object?>[len];
-            tags[0] = new KeyValuePair<string, object?>(Constants.SystemKey, Constants.SystemVal);
-            tags[1] = new KeyValuePair<string, object?>(Constants.OpKey, Constants.OpRec);
-            tags[2] = new KeyValuePair<string, object?>(Constants.DestTemplate, subscriptionSubject);
-            tags[3] = new KeyValuePair<string, object?>(Constants.DestIsTemporary, subscriptionSubject.StartsWith(conn.InboxPrefix, StringComparison.Ordinal) ? Constants.True : Constants.False);
-            tags[4] = new KeyValuePair<string, object?>(Constants.Subject, subject);
-            tags[5] = new KeyValuePair<string, object?>(Constants.DestName, subject);
             tags[6] = new KeyValuePair<string, object?>(Constants.DestPubName, subject);
             tags[7] = new KeyValuePair<string, object?>(Constants.MsgBodySize, bodySize.ToString());
             tags[8] = new KeyValuePair<string, object?>(Constants.MsgTotalSize, size.ToString());
-            tags[9] = new KeyValuePair<string, object?>(Constants.ClientId, conn.ServerInfo.ClientId.ToString());
-            tags[10] = new KeyValuePair<string, object?>(Constants.ServerAddress, conn.ServerInfo.Host);
-            tags[11] = new KeyValuePair<string, object?>(Constants.ServerPort, serverPort);
-            tags[12] = new KeyValuePair<string, object?>(Constants.NetworkProtoName, "nats");
-            tags[13] = new KeyValuePair<string, object?>(Constants.NetworkProtoVersion, conn.ServerInfo.ProtocolVersion.ToString());
-            tags[14] = new KeyValuePair<string, object?>(Constants.NetworkPeerAddress, conn.ServerInfo.Host);
-            tags[15] = new KeyValuePair<string, object?>(Constants.NetworkPeerPort, serverPort);
-            tags[16] = new KeyValuePair<string, object?>(Constants.NetworkLocalAddress, conn.ServerInfo.ClientIp);
 
-            var index = 17;
-            if (replyTo is not null)
-                tags[index++] = new KeyValuePair<string, object?>(Constants.ReplyTo, replyTo);
             if (queueGroup is not null)
                 tags[index] = new KeyValuePair<string, object?>(Constants.QueueGroup, queueGroup);
         }
-        else
-        {
-            tags = new KeyValuePair<string, object?>[10];
-            tags[0] = new KeyValuePair<string, object?>(Constants.SystemKey, Constants.SystemVal);
-            tags[1] = new KeyValuePair<string, object?>(Constants.OpKey, Constants.OpRec);
-            tags[2] = new KeyValuePair<string, object?>(Constants.DestTemplate, subscriptionSubject);
-            tags[3] = new KeyValuePair<string, object?>(Constants.QueueGroup, queueGroup);
-            tags[4] = new KeyValuePair<string, object?>(Constants.Subject, subject);
-            tags[5] = new KeyValuePair<string, object?>(Constants.DestName, subject);
-            tags[6] = new KeyValuePair<string, object?>(Constants.DestPubName, subject);
-            tags[7] = new KeyValuePair<string, object?>(Constants.MsgBodySize, bodySize.ToString());
-            tags[8] = new KeyValuePair<string, object?>(Constants.MsgTotalSize, size.ToString());
-
-            if (replyTo is not null)
-                tags[9] = new KeyValuePair<string, object?>(Constants.ReplyTo, replyTo);
-        }
 
         if (headers is null || !TryParseTraceContext(headers, out var context))
-            context = default;
+            context = default;*/
+        var destination = opts.UsesInbox ? "inbox" : opts.SantisedSubject();
+        var name = $"{destination} {operation}";
 
         return NatsActivities.StartActivity(
             name,
             kind: ActivityKind.Producer,
             startTime: date,
-            parentContext: context,
+            parentContext: parentContext ?? default,
             tags: tags);
     }
 
@@ -354,6 +326,7 @@ internal static class Telemetry
         public const string RequestReplyActivityName = "request";
         public const string PublishActivityName = "publish";
         public const string SubscribeActivityName = "subscribe";
+        public const string CreateActivityName = "create";
         public const string ReceiveActivityName = "receive";
 
         public const string SystemKey = "messaging.system";
@@ -371,7 +344,7 @@ internal static class Telemetry
         public const string DestPubName = "messaging.destination_publish.name";
 
         public const string QueueGroup = "messaging.consumer.group.name";
-        public const string ReplyTo = "messaging.nats.message.reply_to";
+        public const string ReplyToName = "messaging.nats.message.reply_to";
         public const string Subject = "messaging.nats.message.subject";
 
         public const string ServerAddress = "server.address";

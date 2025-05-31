@@ -43,14 +43,13 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
         TimeSpan expires,
         TimeSpan idle,
         NatsJSContext context,
+        NatsSubscriptionProps props,
         string stream,
         string consumer,
-        string subject,
-        string? queueGroup,
         INatsDeserialize<TMsg> serializer,
         NatsSubOpts? opts,
         CancellationToken cancellationToken)
-        : base(context.Connection, context.Connection.SubscriptionManager, subject, queueGroup, opts)
+        : base(context.Connection, context.Connection.SubscriptionManager, props, opts, cancellationToken)
     {
         _cancellationToken = cancellationToken;
         _logger = Connection.Opts.LoggerFactory.CreateLogger<NatsJSConsume<TMsg>>();
@@ -151,7 +150,7 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
         }
     }
 
-    internal override ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter, int sid)
+    internal override ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter, NatsSubscriptionProps props)
     {
         // Override normal subscription behavior to resubscribe on reconnect
         return default;

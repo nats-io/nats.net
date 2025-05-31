@@ -70,7 +70,7 @@ public interface INatsSvcEndpoint : IAsyncDisposable
 public abstract class NatsSvcEndpointBase : NatsSubBase, INatsSvcEndpoint
 {
     protected NatsSvcEndpointBase(INatsConnection connection, string subject, string? queueGroup, NatsSubOpts? opts)
-        : base(connection, connection.SubscriptionManager, subject, queueGroup, opts)
+        : base(connection, connection.SubscriptionManager, new NatsSubscriptionProps(subject) { QueueGroup = queueGroup }, opts)
     {
     }
 

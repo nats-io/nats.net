@@ -14,18 +14,8 @@ internal class NatsKVWatchSub<T> : NatsSubBase
     private readonly INatsDeserialize<T> _serializer;
     private readonly ChannelWriter<NatsKVWatchCommandMsg<T>> _commands;
 
-    public NatsKVWatchSub(
-        INatsJSContext context,
-        Channel<NatsKVWatchCommandMsg<T>> commandChannel,
-        INatsDeserialize<T> serializer,
-        NatsSubOpts? opts,
-        CancellationToken cancellationToken)
-        : base(
-            connection: context.Connection,
-            manager: context.Connection.SubscriptionManager,
-            subject: context.NewBaseInbox(),
-            queueGroup: default,
-            opts)
+    public NatsKVWatchSub(INatsJSContext context, Channel<NatsKVWatchCommandMsg<T>> commandChannel, INatsDeserialize<T> serializer, NatsSubOpts? opts, CancellationToken cancellationToken)
+        : base(connection: context.Connection, manager: context.Connection.SubscriptionManager, props: new NatsSubscriptionProps(context.NewBaseInbox()),opts, cancellationToken)
     {
         _context = context;
         _cancellationToken = cancellationToken;

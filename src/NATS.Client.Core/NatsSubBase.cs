@@ -65,6 +65,24 @@ public abstract class NatsSubBase
         string? queueGroup,
         NatsSubOpts? opts,
         CancellationToken cancellationToken = default)
+        : this(connection, manager, new NatsSubscriptionProps(subject) { QueueGroup = queueGroup }, opts, cancellationToken)
+    {
+    }
+
+    /// <summary>
+    /// Creates a new instance of <see cref="NatsSubBase"/>.
+    /// </summary>
+    /// <param name="connection">NATS connection.</param>
+    /// <param name="manager">Subscription manager.</param>
+    /// <param name="props">Properties of the subscription.</param>
+    /// <param name="opts">Subscription options.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    protected NatsSubBase(
+        INatsConnection connection,
+        INatsSubscriptionManager manager,
+        NatsSubscriptionProps props,
+        NatsSubOpts? opts,
+        CancellationToken cancellationToken = default)
     {
         _logger = connection.Opts.LoggerFactory.CreateLogger<NatsSubBase>();
         _debug = _logger.IsEnabled(LogLevel.Debug);
@@ -76,8 +94,7 @@ public abstract class NatsSubBase
         _timeout = opts?.Timeout ?? default;
 
         Connection = connection;
-        Subject = subject;
-        QueueGroup = queueGroup;
+        Props = props;
         Opts = opts;
 
         // If cancellation token is already cancelled we don't need to register however there is still
@@ -132,16 +149,21 @@ public abstract class NatsSubBase
     }
 
     /// <summary>
+    /// A collection of properties to describe the subscription.
+    /// </summary>
+    public NatsSubscriptionProps Props { get; }
+
+    /// <summary>
     /// The subject name to subscribe to.
     /// </summary>
-    public string Subject { get; }
+    public string Subject => Props.Subject;
 
     /// <summary>
     /// If specified, the subscriber will join this queue group. Subscribers with the same queue group name,
     /// become a queue group, and only one randomly chosen subscriber of the queue group will
     /// consume a message each time a message is received by the queue group.
     /// </summary>
-    public string? QueueGroup { get; }
+    public string? QueueGroup => Props.QueueGroup;
 
     /// <summary>
     /// Represents an exception that occurs during the execution of a NATS subscription.
@@ -326,9 +348,9 @@ public abstract class NatsSubBase
     /// Additional command (e.g. publishing pull requests in case of JetStream consumers) can be written as part of the reconnect routine.
     /// </remarks>
     /// <param name="commandWriter">command writer used to write reconnect commands</param>
-    /// <param name="sid">SID which might be required to create subscription commands</param>
+    /// <param name="props">Properties required by the create subscription commands</param>
     /// <returns>ValueTask</returns>
-    internal virtual ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter, int sid) => commandWriter.SubscribeAsync(sid, Subject, QueueGroup, PendingMsgs, CancellationToken.None);
+    internal virtual ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter, NatsSubscriptionProps props) => commandWriter.SubscribeAsync(props, PendingMsgs, CancellationToken.None);
 
     /// <summary>
     /// Invoked when a MSG or HMSG arrives for the subscription.

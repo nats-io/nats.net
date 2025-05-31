@@ -12,11 +12,11 @@ internal class InboxSub : NatsSubBase
 
     public InboxSub(
         InboxSubBuilder inbox,
-        string subject,
+        NatsSubscriptionProps props,
         NatsSubOpts? opts,
         NatsConnection connection,
         INatsSubscriptionManager manager)
-    : base(connection, manager, subject, queueGroup: default, opts)
+    : base(connection, manager, props, opts)
     {
         _inbox = inbox;
         _connection = connection;
@@ -46,9 +46,9 @@ internal class InboxSubBuilder : INatsSubscriptionManager
 
     public InboxSubBuilder(ILogger<InboxSubBuilder> logger) => _logger = logger;
 
-    public InboxSub Build(string subject, NatsSubOpts? opts, NatsConnection connection, INatsSubscriptionManager manager)
+    public InboxSub Build(NatsSubscriptionProps props, NatsSubOpts? opts, NatsConnection connection, INatsSubscriptionManager manager)
     {
-        return new InboxSub(this, subject, opts, connection, manager);
+        return new InboxSub(this, props, opts, connection, manager);
     }
 
     public ValueTask RegisterAsync(NatsSubBase sub)

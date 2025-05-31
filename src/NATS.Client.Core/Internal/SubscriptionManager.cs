@@ -7,7 +7,7 @@ using NATS.Client.Core.Commands;
 
 namespace NATS.Client.Core.Internal;
 
-internal record struct SidMetadata(string Subject, WeakReference<NatsSubBase> WeakReference);
+internal record struct SidMetadata(NatsSubscriptionProps Properties, WeakReference<NatsSubBase> WeakReference);
 
 internal sealed record SubscriptionMetadata(int Sid);
 
@@ -42,7 +42,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
         _cleanupInterval = _connection.Opts.SubscriptionCleanUpInterval;
         _timer = Task.Run(CleanupAsync);
         InboxSubBuilder = new InboxSubBuilder(connection.Opts.LoggerFactory.CreateLogger<InboxSubBuilder>());
-        _inboxSubSentinel = new InboxSub(InboxSubBuilder, nameof(_inboxSubSentinel), default, connection, this);
+        _inboxSubSentinel = new InboxSub(InboxSubBuilder, new NatsSubscriptionProps(nameof(_inboxSubSentinel)), default, connection, this);
         _inboxSub = _inboxSubSentinel;
     }
 
@@ -55,36 +55,37 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
         return SubscribeInternalAsync(sub, cancellationToken);
     }
 
-    public ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
+    public ValueTask PublishToClientHandlersAsync(NatsProcessProps props, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
     {
         if (_trace)
         {
-            _logger.LogTrace(NatsLogEvents.Subscription, "Received subscription data for {Subject}/{Sid}", subject, sid);
+            _logger.LogTrace(NatsLogEvents.Subscription, "Received subscription data for {Subject}/{Sid}", props.Subject, props.SubscriptionId);
         }
 
         int? orphanSid = null;
         lock (_gate)
         {
-            if (_bySid.TryGetValue(sid, out var sidMetadata))
+            if (_bySid.TryGetValue(props.SubscriptionId, out var sidMetadata))
             {
+                props.Subscription = sidMetadata.Properties;
                 if (sidMetadata.WeakReference.TryGetTarget(out var sub))
                 {
                     if (_trace)
                     {
-                        _logger.LogTrace(NatsLogEvents.Subscription, "Found subscription handler for {Subject}/{Sid}", subject, sid);
+                        _logger.LogTrace(NatsLogEvents.Subscription, "Found subscription handler for {Subject}/{Sid}", props.Subject, props.SubscriptionId);
                     }
 
-                    return sub.ReceiveAsync(subject, replyTo, headersBuffer, payloadBuffer);
+                    return sub.ReceiveAsync(props.Subject, props.ReplyTo, headersBuffer, payloadBuffer);
                 }
                 else
                 {
-                    _logger.LogWarning(NatsLogEvents.Subscription, "Subscription GCd but was never disposed {Subject}/{Sid}", subject, sid);
-                    orphanSid = sid;
+                    _logger.LogWarning(NatsLogEvents.Subscription, "Subscription GCd but was never disposed {Subject}/{Sid}", props.Subject, props.SubscriptionId);
+                    orphanSid = props.SubscriptionId;
                 }
             }
             else
             {
-                _logger.LogWarning(NatsLogEvents.Subscription, "Can\'t find subscription for {Subject}/{Sid}", subject, sid);
+                _logger.LogWarning(NatsLogEvents.Subscription, "Can\'t find subscription for {Subject}/{Sid}", props.Subject, props.SubscriptionId);
             }
         }
 
@@ -92,7 +93,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
         {
             try
             {
-                return _connection.UnsubscribeAsync(sid);
+                return _connection.UnsubscribeAsync(new NatsSubscriptionProps(orphanSid.Value));
             }
             catch (Exception e)
             {
@@ -147,7 +148,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
             _logger.LogDebug(NatsLogEvents.Subscription, "Removing subscription {Subject}/{Sid}", sub.Subject, subMetadata.Sid);
         }
 
-        return _connection.UnsubscribeAsync(subMetadata.Sid);
+        return _connection.UnsubscribeAsync(sub.Props);
     }
 
     /// <summary>
@@ -175,14 +176,14 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
                 }
                 else
                 {
-                    _logger.LogError(NatsLogEvents.Subscription, "While reconnecting found subscription GCd but was never disposed {SidMetadataSubject}/{Sid}", sidMetadata.Subject, sid);
+                    _logger.LogError(NatsLogEvents.Subscription, "While reconnecting found subscription GCd but was never disposed {SidMetadataSubject}/{Sid}", sidMetadata.Properties.Subject, sid);
                 }
             }
         }
 
         foreach (var (sub, sid) in subs)
         {
-            await sub.WriteReconnectCommandsAsync(commandWriter, sid).ConfigureAwait(false);
+            await sub.WriteReconnectCommandsAsync(commandWriter, new NatsSubscriptionProps(sid)).ConfigureAwait(false);
 
             if (_debug)
             {
@@ -191,9 +192,9 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
         }
     }
 
-    internal INatsSubscriptionManager GetManagerFor(string subject)
+    internal INatsSubscriptionManager GetManagerFor(NatsSubscriptionProps props)
     {
-        if (IsInboxSubject(subject))
+        if (props.UsesInbox)
             return InboxSubBuilder;
         return this;
     }
@@ -207,14 +208,19 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
             {
                 if (Interlocked.CompareExchange(ref _inboxSub, _inboxSubSentinel, _inboxSubSentinel) == _inboxSubSentinel)
                 {
-                    var inboxSubject = $"{_inboxPrefix}.*";
+                    var inboxSubject = new NatsSubscriptionProps($"{_inboxPrefix}.*");
 
                     // We need to subscribe to the real inbox subject before we can register the internal subject.
                     // We use 'default' options here since options provided by the user are for the internal subscription.
                     // For example if the user provides a timeout, we don't want to timeout the real inbox subscription
                     // since it must live duration of the connection.
                     _inboxSub = InboxSubBuilder.Build(inboxSubject, opts: default, _connection, manager: this);
-                    await SubscribeQueueAsync(_inboxSub, cancellationToken).ConfigureAwait(false);
+                    var props = new NatsSubscriptionProps(_inboxSub.Subject)
+                    {
+                        InboxPrefix = _connection.InboxPrefix,
+                        QueueGroup = _inboxSub.QueueGroup,
+                    };
+                    await SubscribeQueueAsync(props, _inboxSub, cancellationToken).ConfigureAwait(false);
                 }
             }
             finally
@@ -227,13 +233,19 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
     private ValueTask SubscribeInternalAsync(NatsSubBase sub, CancellationToken cancellationToken)
     {
         var start = DateTimeOffset.UtcNow;
-        using var activity = Telemetry.StartSendActivity(start, $"{_connection.SpanDestinationName(sub.Subject)} {Telemetry.Constants.PublishActivityName}", _connection, sub.Subject, null, null);
+        var props = new NatsSubscriptionProps(sub.Subject)
+        {
+            InboxPrefix = _connection.InboxPrefix,
+            QueueGroup = sub.QueueGroup,
+        };
+        var tags = Telemetry.GetTags(_connection.ServerInfo, props);
+        using var activity = Telemetry.StartActivity(start, props, Telemetry.Constants.SubscribeActivityName, tags);
         ValueTask task;
         try
         {
-            if (IsInboxSubject(sub.Subject))
+            if (props.UsesInbox)
             {
-                if (sub.QueueGroup != null)
+                if (props.QueueGroup != null)
                 {
                     throw new NatsException("Inbox subscriptions don't support queue groups");
                 }
@@ -242,7 +254,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
             }
             else
             {
-                task = SubscribeQueueAsync(sub, cancellationToken);
+                task = SubscribeQueueAsync(props, sub, cancellationToken);
             }
         }
         catch (Exception ex)
@@ -267,38 +279,38 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
         await InboxSubBuilder.RegisterAsync(sub).ConfigureAwait(false);
     }
 
-    private async ValueTask SubscribeQueueAsync(NatsSubBase sub, CancellationToken cancellationToken)
+    private async ValueTask SubscribeQueueAsync(NatsSubscriptionProps props, NatsSubBase sub, CancellationToken cancellationToken)
     {
-        var sid = GetNextSid();
+        props.SubscriptionId = GetNextSid();
 
         if (sub is InboxSub)
         {
-            Interlocked.Exchange(ref _inboxSid, sid);
+            Interlocked.Exchange(ref _inboxSid, props.SubscriptionId);
         }
 
         if (_debug)
         {
-            _logger.LogDebug(NatsLogEvents.Subscription, "New subscription {Subject}/{Sid}", sub.Subject, sid);
+            _logger.LogDebug(NatsLogEvents.Subscription, "New subscription {Subject}/{Sid}", sub.Subject, props.SubscriptionId);
         }
 
         lock (_gate)
         {
-            _bySid[sid] = new SidMetadata(Subject: sub.Subject, WeakReference: new WeakReference<NatsSubBase>(sub));
+            _bySid[props.SubscriptionId] = new SidMetadata(Properties: props, WeakReference: new WeakReference<NatsSubBase>(sub));
 #if NETSTANDARD2_0
             lock (_bySub)
             {
                 if (_bySub.TryGetValue(sub, out _))
                     _bySub.Remove(sub);
-                _bySub.Add(sub, new SubscriptionMetadata(Sid: sid));
+                _bySub.Add(sub, new SubscriptionMetadata(Sid: props.SubscriptionId));
             }
 #else
-            _bySub.AddOrUpdate(sub, new SubscriptionMetadata(Sid: sid));
+            _bySub.AddOrUpdate(sub, new SubscriptionMetadata(Sid: props.SubscriptionId));
 #endif
         }
 
         try
         {
-            await _connection.SubscribeCoreAsync(sid, sub.Subject, sub.QueueGroup, sub.Opts?.MaxMsgs, cancellationToken).ConfigureAwait(false);
+            await _connection.SubscribeCoreAsync(props, sub.Opts?.MaxMsgs, cancellationToken).ConfigureAwait(false);
             await sub.ReadyAsync().ConfigureAwait(false);
         }
         catch
@@ -330,7 +342,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
                         continue;
 
                     // NatsSub object GCed
-                    _logger.LogWarning(NatsLogEvents.Subscription, "Subscription GCd but was never disposed {SidMetadataSubject}/{Sid}", sidMetadata.Subject, sid);
+                    _logger.LogWarning(NatsLogEvents.Subscription, "Subscription GCd but was never disposed {SidMetadataSubject}/{Sid}", sidMetadata.Properties.Subject, sid);
                     orphanSids ??= new List<int>();
                     orphanSids.Add(sid);
                 }
@@ -351,7 +363,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
             try
             {
                 _logger.LogWarning(NatsLogEvents.Subscription, "Unsubscribing orphan subscription {Sid}", sid);
-                await _connection.UnsubscribeAsync(sid).ConfigureAwait(false);
+                await _connection.UnsubscribeAsync(new NatsSubscriptionProps(sid)).ConfigureAwait(false);
             }
             catch (Exception e)
             {

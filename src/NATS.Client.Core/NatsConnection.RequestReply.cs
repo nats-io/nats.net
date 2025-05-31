@@ -31,27 +31,70 @@ public partial class NatsConnection
         INatsDeserialize<TReply>? replySerializer = default,
         NatsPubOpts? requestOpts = default,
         NatsSubOpts? replyOpts = default,
+        CancellationToken cancellationToken = default) =>
+        await RequestInternalAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, null, replyOpts, cancellationToken).ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public ValueTask<NatsMsg<TReply>> RequestAsync<TReply>(
+        string subject,
+        INatsDeserialize<TReply>? replySerializer = default,
+        NatsSubOpts? replyOpts = default,
+        CancellationToken cancellationToken = default) =>
+        RequestInternalAsync<object, TReply>(subject, default, default, default, replySerializer, default, replyOpts, cancellationToken);
+
+    /// <inheritdoc />
+    public async IAsyncEnumerable<NatsMsg<TReply>> RequestManyAsync<TRequest, TReply>(
+        string subject,
+        TRequest? data,
+        NatsHeaders? headers = default,
+        INatsSerialize<TRequest>? requestSerializer = default,
+        INatsDeserialize<TReply>? replySerializer = default,
+        NatsPubOpts? requestOpts = default,
+        NatsSubOpts? replyOpts = default,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        replyOpts = SetReplyManyOptsDefaults(replyOpts);
+
+        await using var sub = await CreateRequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
+                .ConfigureAwait(false);
+
+        await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        {
+            yield return msg;
+        }
+    }
+
+    private async ValueTask<NatsMsg<TReply>> RequestInternalAsync<TRequest, TReply>(
+        string subject,
+        TRequest? data,
+        NatsHeaders? headers = default,
+        INatsSerialize<TRequest>? requestSerializer = default,
+        INatsDeserialize<TReply>? replySerializer = default,
+        NatsPublishProps? props = default,
+        NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default)
     {
+        props ??= new NatsPublishProps(subject);
+        props.InboxPrefix ??= InboxPrefix;
+
         var date = DateTimeOffset.UtcNow;
-        using var activity = Telemetry.StartSendActivity(date, $"{SpanDestinationName(subject)} {Telemetry.Constants.RequestReplyActivityName}", this, subject, null);
+        var tags = Telemetry.GetTags(Telemetry.Constants.RequestReplyActivityName, ServerInfo, requestOpts);
+        using var activity = Telemetry.StartSendActivity(date, requestOpts, Telemetry.Constants.RequestReplyActivityName, tags);
         try
         {
             Telemetry.AddTraceContextHeaders(activity, ref headers);
-            replyOpts = SetReplyOptsDefaults(replyOpts);
 
             if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
             {
-                using var rt = _replyTaskFactory.CreateReplyTask(replySerializer, replyOpts.Timeout);
-                requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
-                await PublishAsync(subject, data, headers, rt.Subject, requestSerializer, requestOpts, cancellationToken).ConfigureAwait(false);
-                return await rt.GetResultAsync(cancellationToken).ConfigureAwait(false);
+                return await RequestDirectInternalAsync(props, data, headers, requestSerializer, replySerializer, replyOpts, activity, cancellationToken).ConfigureAwait(false);
             }
 
-            await using var sub = await CreateRequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
-                .ConfigureAwait(false);
+            replyOpts = SetReplyManyOptsDefaults(replyOpts);
+            requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
+            replySerializer ??= Opts.SerializerRegistry.GetDeserializer<TReply>();
+            await using var sub = await CreateRequestSubInternalAsync<TRequest, TReply>(props, data, headers, requestSerializer, replySerializer, replyOpts, cancellationToken)
+                    .ConfigureAwait(false);
 
-            Telemetry.RecordOperationDuration(activity.Duration.TotalSeconds, activity.TagObjects.ToArray());
             await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
             {
                 return msg;
@@ -66,40 +109,31 @@ public partial class NatsConnection
         }
     }
 
-    /// <inheritdoc />
-    public ValueTask<NatsMsg<TReply>> RequestAsync<TReply>(
-        string subject,
-        INatsDeserialize<TReply>? replySerializer = default,
-        NatsSubOpts? replyOpts = default,
-        CancellationToken cancellationToken = default) =>
-        RequestAsync<object, TReply>(
-            subject: subject,
-            data: default,
-            headers: default,
-            requestSerializer: default,
-            replySerializer: replySerializer,
-            requestOpts: default,
-            replyOpts: replyOpts,
-            cancellationToken: cancellationToken);
-
-    /// <inheritdoc />
-    public async IAsyncEnumerable<NatsMsg<TReply>> RequestManyAsync<TRequest, TReply>(
-        string subject,
+    private async ValueTask<NatsMsg<TReply>> RequestDirectInternalAsync<TRequest, TReply>(
+        NatsPublishProps props,
         TRequest? data,
         NatsHeaders? headers = default,
         INatsSerialize<TRequest>? requestSerializer = default,
         INatsDeserialize<TReply>? replySerializer = default,
-        NatsPubOpts? requestOpts = default,
         NatsSubOpts? replyOpts = default,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        Activity? activity = default,
+        CancellationToken cancellationToken = default)
     {
-        replyOpts = SetReplyManyOptsDefaults(replyOpts);
-        await using var sub = await CreateRequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
-            .ConfigureAwait(false);
-
-        await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        try
         {
-            yield return msg;
+            replyOpts = SetReplyOptsDefaults(replyOpts);
+            requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
+
+            using var rt = _replyTaskFactory.CreateReplyTask(replySerializer, replyOpts.Timeout);
+
+            // to do add in reply to tags on both activity and array before invoking
+            await PublishInternalAsync(props, requestSerializer, data, headers, activity, cancellationToken).ConfigureAwait(false);
+            return await rt.GetResultAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception e)
+        {
+            Telemetry.SetException(activity, e);
+            throw;
         }
     }
 

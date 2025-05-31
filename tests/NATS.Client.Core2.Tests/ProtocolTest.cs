@@ -343,7 +343,7 @@ public class ProtocolTest
         var cmdSubject = $"{_server.GetNextId()}.bar";
 
         var sync = 0;
-        await using var sub = new NatsSubReconnectTest(nats, subject, cmdSubject, i => Interlocked.Exchange(ref sync, i));
+        await using var sub = new NatsSubReconnectTest(nats, new NatsSubscriptionProps(subject), cmdSubject, i => Interlocked.Exchange(ref sync, i));
         await nats.AddSubAsync(sub);
 
         await Retry.Until(
@@ -468,21 +468,21 @@ public class ProtocolTest
         private readonly string _cmdSubject;
         private readonly Action<int> _callback;
 
-        internal NatsSubReconnectTest(NatsConnection connection, string subject, string cmdSubject, Action<int> callback)
-            : base(connection, connection.SubscriptionManager, subject, queueGroup: default, opts: default)
+        internal NatsSubReconnectTest(NatsConnection connection, NatsSubscriptionProps props, string cmdSubject, Action<int> callback)
+            : base(connection, connection.SubscriptionManager, props, opts: default)
         {
             _cmdSubject = cmdSubject;
             _callback = callback;
         }
 
-        internal override async ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter, int sid)
+        internal override async ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter, NatsSubscriptionProps props)
         {
-            await base.WriteReconnectCommandsAsync(commandWriter, sid);
+            await base.WriteReconnectCommandsAsync(commandWriter, props);
 
             // Any additional commands to send on reconnect
             for (var i = 0; i < 100; i++)
             {
-                await commandWriter.PublishAsync($"{_cmdSubject}{i}", default, default, default, NatsRawSerializer<byte>.Default, default);
+                await commandWriter.PublishAsync(new NatsPublishProps($"{_cmdSubject}{i}"), default, default, default);
             }
         }
 
