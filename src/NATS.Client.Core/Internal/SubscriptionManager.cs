@@ -55,36 +55,36 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
         return SubscribeInternalAsync(sub, cancellationToken);
     }
 
-    public ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
+    public ValueTask PublishToClientHandlersAsync(NatsProOpts opts, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
     {
         if (_trace)
         {
-            _logger.LogTrace(NatsLogEvents.Subscription, "Received subscription data for {Subject}/{Sid}", subject, sid);
+            _logger.LogTrace(NatsLogEvents.Subscription, "Received subscription data for {Subject}/{Sid}", opts.Subject, opts.Sid);
         }
 
         int? orphanSid = null;
         lock (_gate)
         {
-            if (_bySid.TryGetValue(sid, out var sidMetadata))
+            if (_bySid.TryGetValue(opts.Sid, out var sidMetadata))
             {
                 if (sidMetadata.WeakReference.TryGetTarget(out var sub))
                 {
                     if (_trace)
                     {
-                        _logger.LogTrace(NatsLogEvents.Subscription, "Found subscription handler for {Subject}/{Sid}", subject, sid);
+                        _logger.LogTrace(NatsLogEvents.Subscription, "Found subscription handler for {Subject}/{Sid}", opts.Subject, opts.Sid);
                     }
 
-                    return sub.ReceiveAsync(subject, replyTo, headersBuffer, payloadBuffer);
+                    return sub.ReceiveAsync(opts.Subject, opts.ReplyTo, headersBuffer, payloadBuffer);
                 }
                 else
                 {
-                    _logger.LogWarning(NatsLogEvents.Subscription, "Subscription GCd but was never disposed {Subject}/{Sid}", subject, sid);
-                    orphanSid = sid;
+                    _logger.LogWarning(NatsLogEvents.Subscription, "Subscription GCd but was never disposed {Subject}/{Sid}", opts.Subject, opts.Sid);
+                    orphanSid = opts.Sid;
                 }
             }
             else
             {
-                _logger.LogWarning(NatsLogEvents.Subscription, "Can\'t find subscription for {Subject}/{Sid}", subject, sid);
+                _logger.LogWarning(NatsLogEvents.Subscription, "Can\'t find subscription for {Subject}/{Sid}", opts.Subject, opts.Sid);
             }
         }
 
@@ -92,7 +92,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
         {
             try
             {
-                return _connection.UnsubscribeAsync(sid);
+                return _connection.UnsubscribeAsync(opts.Sid);
             }
             catch (Exception e)
             {
@@ -227,7 +227,10 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
     private ValueTask SubscribeInternalAsync(NatsSubBase sub, CancellationToken cancellationToken)
     {
         var start = DateTimeOffset.UtcNow;
-        using var activity = Telemetry.StartSendActivity(start, $"{_connection.SpanDestinationName(sub.Subject)} {Telemetry.Constants.PublishActivityName}", _connection, sub.Subject, null, null);
+        var opts = new NatsPubOpts();
+        opts.Subject = sub.Subject;
+        var tags = Telemetry.GetTags(Telemetry.Constants.PublishActivityName, _connection.ServerInfo, opts);
+        using var activity = Telemetry.StartSendActivity(start, opts, Telemetry.Constants.PublishActivityName, tags);
         ValueTask task;
         try
         {

@@ -13,14 +13,29 @@ public partial class NatsConnection
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default)
     {
-        var replyTo = NewInbox();
+        requestOpts ??= new NatsPubOpts();
+        requestOpts.Subject ??= subject;
+        requestOpts.ReplyTo ??= NewInbox();
+        requestOpts.InboxPrefix ??= InboxPrefix;
 
         replySerializer ??= Opts.SerializerRegistry.GetDeserializer<TReply>();
-        var sub = new NatsSub<TReply>(this, _subscriptionManager.InboxSubBuilder, replyTo, queueGroup: default, replyOpts, replySerializer);
-        await AddSubAsync(sub, cancellationToken).ConfigureAwait(false);
-
         requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
-        await PublishAsync(subject, data, headers, replyTo, requestSerializer, requestOpts, cancellationToken).ConfigureAwait(false);
+
+        return await CreateRequestSubInternalAsync<TRequest, TReply>(requestOpts, data, headers, requestSerializer, replySerializer, replyOpts, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async ValueTask<NatsSub<TReply>> CreateRequestSubInternalAsync<TRequest, TReply>(
+        NatsPubOpts requestOpts,
+        TRequest? data,
+        NatsHeaders? headers,
+        INatsSerialize<TRequest> requestSerializer,
+        INatsDeserialize<TReply> replySerializer,
+        NatsSubOpts? replyOpts = default,
+        CancellationToken cancellationToken = default)
+    {
+        var sub = new NatsSub<TReply>(this, _subscriptionManager.InboxSubBuilder, requestOpts.ReplyTo, queueGroup: default, replyOpts, replySerializer);
+        await AddSubAsync(sub, cancellationToken).ConfigureAwait(false);
+        await PublishInternalAsync(requestOpts, requestSerializer, data, headers, null, cancellationToken).ConfigureAwait(false);
 
         return sub;
     }

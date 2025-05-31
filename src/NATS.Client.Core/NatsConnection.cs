@@ -35,10 +35,12 @@ public partial class NatsConnection : INatsConnection
     private readonly ObjectPool _pool;
     private readonly CancellationTokenSource _disposedCts;
     private readonly string _name;
+    private readonly int _arrayPoolInitialSize;
     private readonly TimeSpan _socketComponentDisposeTimeout = TimeSpan.FromSeconds(5);
     private readonly BoundedChannelOptions _defaultSubscriptionChannelOpts;
     private readonly Channel<(NatsEvent, NatsEventArgs)> _eventChannel;
     private readonly ClientOpts _clientOpts;
+    private readonly HeaderWriter _headerWriter;
     private readonly SubscriptionManager _subscriptionManager;
     private readonly ReplyTaskFactory _replyTaskFactory;
 
@@ -77,11 +79,17 @@ public partial class NatsConnection : INatsConnection
         _disposedCts = new CancellationTokenSource();
         _pool = new ObjectPool(opts.ObjectPoolSize);
         _name = opts.Name;
-        CommandWriter = new CommandWriter("main", this, _pool, Opts, EnqueuePing);
+
+        // Derive ArrayPool rent size from buffer size to
+        // avoid defining another option.
+        _arrayPoolInitialSize = opts.WriterBufferSize / 256;
+
+        CommandWriter = new CommandWriter("main", this, Opts, EnqueuePing);
         InboxPrefix = NewInbox(opts.InboxPrefix);
         _subscriptionManager = new SubscriptionManager(this, InboxPrefix);
         _replyTaskFactory = new ReplyTaskFactory(this);
         _clientOpts = ClientOpts.Create(Opts);
+        _headerWriter = new HeaderWriter(opts.HeaderEncoding);
         HeaderParser = new NatsHeaderParser(opts.HeaderEncoding);
         _defaultSubscriptionChannelOpts = new BoundedChannelOptions(opts.SubPendingChannelCapacity)
         {
@@ -267,7 +275,7 @@ public partial class NatsConnection : INatsConnection
         return tokens.Length < 2 ? subject : $"{tokens[0]}.{tokens[1]}";
     }
 
-    internal ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
+    internal ValueTask PublishToClientHandlersAsync(NatsProOpts opts, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
     {
         if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
         {
@@ -277,17 +285,17 @@ public partial class NatsConnection : INatsConnection
             // e.g. _INBOX.Hu5HPpWesrJhvQq2NG3YJ6.Hu5HPpWesrJhvQq2NG3YLw
             //  vs. _INBOX.Hu5HPpWesrJhvQq2NG3YJ6.1234
             // otherwise, it's not a reply in direct mode.
-            if (_subscriptionManager.InboxSid == sid && subject.Length < InboxPrefix.Length + 1 + 22 + 1 + 22)
+            if (_subscriptionManager.InboxSid == opts.Sid && opts.Subject.Length < InboxPrefix.Length + 1 + 22 + 1 + 22)
             {
-                var idString = subject.AsSpan().Slice(InboxPrefix.Length + 1)
+                var idString = opts.Subject.AsSpan().Slice(InboxPrefix.Length + 1)
 #if NETSTANDARD2_0
                     .ToString()
 #endif
                 ;
 
-                if (long.TryParse(idString, out var id))
+                if (long.TryParse(idString, out opts.Id))
                 {
-                    if (_replyTaskFactory.TrySetResult(id, replyTo, payloadBuffer, headersBuffer))
+                    if (_replyTaskFactory.TrySetResult(opts, payloadBuffer, headersBuffer))
                     {
                         return default;
                     }
@@ -300,7 +308,7 @@ public partial class NatsConnection : INatsConnection
             }
         }
 
-        return _subscriptionManager.PublishToClientHandlersAsync(subject, replyTo, sid, headersBuffer, payloadBuffer);
+        return _subscriptionManager.PublishToClientHandlersAsync(opts, headersBuffer, payloadBuffer);
     }
 
     internal void ResetPongCount()
@@ -522,7 +530,7 @@ public partial class NatsConnection : INatsConnection
                 await _userCredentials.AuthenticateAsync(_clientOpts, WritableServerInfo, _currentConnectUri, Opts.ConnectTimeout, _disposedCts.Token).ConfigureAwait(false);
             }
 
-            await using (var priorityCommandWriter = new PriorityCommandWriter(this, _pool, _socketConnection!, Opts, EnqueuePing))
+            await using (var priorityCommandWriter = new PriorityCommandWriter(this, _socketConnection!, Opts, EnqueuePing))
             {
                 // add CONNECT and PING command to priority lane
                 await priorityCommandWriter.CommandWriter.ConnectAsync(_clientOpts, CancellationToken.None).ConfigureAwait(false);

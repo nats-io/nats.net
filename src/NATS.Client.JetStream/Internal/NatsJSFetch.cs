@@ -195,10 +195,10 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
 
         await commandWriter.PublishAsync(
             subject: $"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
-            value: request,
-            headers: default,
+            // to do fix me
+            payloadBuffer: default,
+            headersBuffer: default,
             replyTo: Subject,
-            serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
             cancellationToken: CancellationToken.None);
     }
 
