@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
 
@@ -51,41 +52,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
 
     public ValueTask SubscribeAsync(NatsSubBase sub, CancellationToken cancellationToken)
     {
-        if (Telemetry.HasListeners())
-        {
-            using var activity = Telemetry.StartSendActivity($"{_connection.SpanDestinationName(sub.Subject)} {Telemetry.Constants.SubscribeActivityName}", _connection, sub.Subject, null, null);
-            try
-            {
-                if (IsInboxSubject(sub.Subject))
-                {
-                    if (sub.QueueGroup != null)
-                    {
-                        throw new NatsException("Inbox subscriptions don't support queue groups");
-                    }
-
-                    return SubscribeInboxAsync(sub, cancellationToken);
-                }
-
-                return SubscribeInternalAsync(sub.Subject, sub.QueueGroup, sub.Opts, sub, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                Telemetry.SetException(activity, ex);
-                throw;
-            }
-        }
-
-        if (IsInboxSubject(sub.Subject))
-        {
-            if (sub.QueueGroup != null)
-            {
-                throw new NatsException("Inbox subscriptions don't support queue groups");
-            }
-
-            return SubscribeInboxAsync(sub, cancellationToken);
-        }
-
-        return SubscribeInternalAsync(sub.Subject, sub.QueueGroup, sub.Opts, sub, cancellationToken);
+        return SubscribeInternalAsync(sub, cancellationToken);;
     }
 
     public ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
@@ -247,12 +214,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
                     // For example if the user provides a timeout, we don't want to timeout the real inbox subscription
                     // since it must live duration of the connection.
                     _inboxSub = InboxSubBuilder.Build(inboxSubject, opts: default, _connection, manager: this);
-                    await SubscribeInternalAsync(
-                        inboxSubject,
-                        queueGroup: default,
-                        opts: default,
-                        _inboxSub,
-                        cancellationToken).ConfigureAwait(false);
+                    await SubscribeQueueAsync(_inboxSub, cancellationToken).ConfigureAwait(false);
                 }
             }
             finally
@@ -262,13 +224,50 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
         }
     }
 
+    private ValueTask SubscribeInternalAsync(NatsSubBase sub, CancellationToken cancellationToken)
+    {
+        var start = DateTimeOffset.UtcNow;
+        using var activity = Telemetry.StartSendActivity(start, $"{_connection.SpanDestinationName(sub.Subject)} {Telemetry.Constants.PublishActivityName}", this, sub.Subject, sub.ReplyTo);
+        ValueTask task;
+        try
+        {
+            if (IsInboxSubject(sub.Subject))
+            {
+                if (sub.QueueGroup != null)
+                {
+                    throw new NatsException("Inbox subscriptions don't support queue groups");
+                }
+
+                task = SubscribeInboxAsync(sub, cancellationToken);
+            }
+            else
+            {
+                task = SubscribeQueueAsync(sub, cancellationToken);
+            }
+        }
+        catch (Exception ex)
+        {
+            Telemetry.SetException(activity, ex);
+            throw;
+        }
+        finally
+        {
+            var end = DateTimeOffset.UtcNow;
+            activity?.SetEndTime(end.UtcDateTime);
+            var duration = end - start;
+            Telemetry.RecordOperationDuration(duration.TotalSeconds, activity.TagObjects.ToArray());
+        }
+
+        return task;
+    }
+
     private async ValueTask SubscribeInboxAsync(NatsSubBase sub, CancellationToken cancellationToken)
     {
         await InitializeInboxSubscriptionAsync(cancellationToken).ConfigureAwait(false);
         await InboxSubBuilder.RegisterAsync(sub).ConfigureAwait(false);
     }
 
-    private async ValueTask SubscribeInternalAsync(string subject, string? queueGroup, NatsSubOpts? opts, NatsSubBase sub, CancellationToken cancellationToken)
+    private async ValueTask SubscribeQueueAsync(NatsSubBase sub, CancellationToken cancellationToken)
     {
         var sid = GetNextSid();
 
@@ -284,7 +283,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
 
         lock (_gate)
         {
-            _bySid[sid] = new SidMetadata(Subject: subject, WeakReference: new WeakReference<NatsSubBase>(sub));
+            _bySid[sid] = new SidMetadata(Subject: sub.Subject, WeakReference: new WeakReference<NatsSubBase>(sub));
 #if NETSTANDARD2_0
             lock (_bySub)
             {
@@ -299,7 +298,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
 
         try
         {
-            await _connection.SubscribeCoreAsync(sid, subject, queueGroup, opts?.MaxMsgs, cancellationToken).ConfigureAwait(false);
+            await _connection.SubscribeCoreAsync(sid, sub.Subject, sub.QueueGroup, sub.Opts?.MaxMsgs, cancellationToken).ConfigureAwait(false);
             await sub.ReadyAsync().ConfigureAwait(false);
         }
         catch
