@@ -1,44 +1,44 @@
-﻿name: Update Docs
-
-on:
-  push:
-    branches:
-      - main
-
-permissions:
-  contents: write
-  pages: write
-  id-token: write
-
-jobs:
-  update-docs:
-    name: docfx
-    runs-on: ubuntu-latest
-    # if: contains(github.event.head_commit.message, '[nats:update-docs]')
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup dotnet
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: |
-            6.x
-            8.x
-            9.x
-
-      - run: dotnet build
-      - run: dotnet tool update -g docfx
-      - run: docfx tools/site_src/docfx.json
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: _site
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+﻿#name: Update Docs
+#
+#on:
+#  push:
+#    branches:
+#      - main
+#
+#permissions:
+#  contents: write
+#  pages: write
+#  id-token: write
+#
+#jobs:
+#  update-docs:
+#    name: docfx
+#    runs-on: ubuntu-latest
+#    # if: contains(github.event.head_commit.message, '[nats:update-docs]')
+#    environment:
+#      name: github-pages
+#      url: ${{ steps.deployment.outputs.page_url }}
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v4
+#
+#      - name: Setup dotnet
+#        uses: actions/setup-dotnet@v4
+#        with:
+#          dotnet-version: |
+#            6.x
+#            8.x
+#            9.x
+#
+#      - run: dotnet build
+#      - run: dotnet tool update -g docfx
+#      - run: docfx tools/site_src/docfx.json
+#
+#      - name: Upload artifact
+#        uses: actions/upload-pages-artifact@v3
+#        with:
+#          path: _site
+#
+#      - name: Deploy to GitHub Pages
+#        id: deployment
+#        uses: actions/deploy-pages@v4

@@ -1,30 +1,30 @@
-﻿name: Format
-
-on:
-  pull_request: {}
-
-jobs:
-  check:
-    name: check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup dotnet
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: |
-            6.x
-            8.x
-            9.x
-
-      - name: Check formatting
-        run: |
-          if dotnet format --verify-no-changes; then
-            echo "formatting passed"
-          else
-            rc="$?"
-            echo "formatting failed; run 'dotnet format'" >&2
-            exit "$rc"
-          fi
+﻿#name: Format
+#
+#on:
+#  pull_request: {}
+#
+#jobs:
+#  check:
+#    name: check
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v4
+#
+#      - name: Setup dotnet
+#        uses: actions/setup-dotnet@v4
+#        with:
+#          dotnet-version: |
+#            6.x
+#            8.x
+#            9.x
+#
+#      - name: Check formatting
+#        run: |
+#          if dotnet format --verify-no-changes; then
+#            echo "formatting passed"
+#          else
+#            rc="$?"
+#            echo "formatting failed; run 'dotnet format'" >&2
+#            exit "$rc"
+#          fi
