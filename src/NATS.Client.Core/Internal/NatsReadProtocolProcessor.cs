@@ -183,7 +183,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                         var payloadSlice = buffer.Slice(payloadBegin);
 
                         var tags = Telemetry.GetTags(_connection.ServerInfo, props);
-                        using var processActivity = Telemetry.StartReceiveActivity(processDate, opts, "", tags);
+                        using var processActivity = Telemetry.StartActivity(processDate, props, _connection.ServerInfo, Telemetry.Constants.ReceiveActivityName, tags);
                         ReadOnlySequence<byte> payloadBuffer;
                         if (props.PayloadLength == 0)
                         {
@@ -219,7 +219,11 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                             payloadBuffer = payloadSlice;
                         }
 
+                        Telemetry.AddPendingMessages(1, tags);
                         await _connection.PublishToClientHandlersAsync(props, null, payloadBuffer).ConfigureAwait(false);
+                        Telemetry.AddPendingMessages(-1, tags);
+                        Telemetry.AddReceivedMessages(1, tags);
+                        Telemetry.RecordReceivedBytes(props.TotalEnvelopeLength, tags);
                     }
                     else if (code == ServerOpCodes.HMsg)
                     {
@@ -257,8 +261,8 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
 
                         Debug.Assert(props.PayloadLength >= 0, "Protocol error: illogical header and total lengths");
 
-                        var tags = Telemetry.GetTags("", _connection.ServerInfo, opts);
-                        using var processActivity = Telemetry.StartReceiveActivity(processDate, opts, "", tags);
+                        var tags = Telemetry.GetTags(_connection.ServerInfo, props);
+                        using var processActivity = Telemetry.StartActivity(processDate, props, _connection.ServerInfo, Telemetry.Constants.ReceiveActivityName, tags);
 
                         var headerBegin = buffer.GetPosition(1, positionBeforeNatsHeader.Value);
                         var totalSlice = buffer.Slice(headerBegin);
@@ -284,8 +288,12 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                         var headerSlice = totalSlice.Slice(0, props.HeaderLength);
                         var payloadSlice = totalSlice.Slice(props.HeaderLength, props.PayloadLength);
 
+                        Telemetry.AddPendingMessages(1, tags);
                         await _connection.PublishToClientHandlersAsync(props, headerSlice, payloadSlice)
                             .ConfigureAwait(false);
+                        Telemetry.AddPendingMessages(-1, tags);
+                        Telemetry.AddReceivedMessages(1, tags);
+                        Telemetry.RecordReceivedBytes(props.TotalEnvelopeLength, tags);
                     }
                     else
                     {
@@ -450,7 +458,6 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         {
             // reaches invalid line, log warn and try to get newline and go to nextloop.
             _logger.LogWarning(NatsLogEvents.Protocol, "Reached invalid line");
-            Telemetry.AddReceivedMessages(-1, Activity.Current.TagObjects.ToArray());
 
             var position = buffer.PositionOf((byte)'\n');
             if (position == null)

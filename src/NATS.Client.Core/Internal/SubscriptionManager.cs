@@ -239,7 +239,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
             QueueGroup = sub.QueueGroup,
         };
         var tags = Telemetry.GetTags(_connection.ServerInfo, props);
-        using var activity = Telemetry.StartActivity(start, props, Telemetry.Constants.SubscribeActivityName, tags);
+        using var activity = Telemetry.StartActivity(start, props, _connection.ServerInfo, Telemetry.Constants.SubscribeActivityName, tags);
         ValueTask task;
         try
         {
@@ -267,7 +267,8 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
             var end = DateTimeOffset.UtcNow;
             activity?.SetEndTime(end.UtcDateTime);
             var duration = end - start;
-            Telemetry.RecordOperationDuration(duration.TotalSeconds, activity.TagObjects.ToArray());
+            Telemetry.IncrementSubscriptionCount(tags);
+            Telemetry.RecordOperationDuration(Telemetry.Constants.SubscribeActivityName, duration, tags);
         }
 
         return task;

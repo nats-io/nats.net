@@ -321,8 +321,16 @@ public partial class NatsConnection : INatsConnection
     {
         try
         {
+            var start = DateTimeOffset.UtcNow;
+            var tags = Telemetry.GetTags(ServerInfo, props);
+            using var unsubActivity = Telemetry.StartActivity(start, props, ServerInfo, Telemetry.Constants.UnsubscribeActivityName, tags);
             // TODO: use maxMsgs in INatsSub<T> to unsubscribe.
             var result = CommandWriter.UnsubscribeAsync(props, null, CancellationToken.None);
+            var end = DateTimeOffset.UtcNow;
+            var duration = end - start;
+            unsubActivity?.SetEndTime(end.DateTime);
+            Telemetry.DecrementSubscriptionCount(tags);
+            Telemetry.RecordOperationDuration(Telemetry.Constants.UnsubscribeActivityName, duration, tags);
             return result;
         }
         catch (Exception ex)

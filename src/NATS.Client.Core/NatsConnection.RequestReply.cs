@@ -77,9 +77,9 @@ public partial class NatsConnection
         props ??= new NatsPublishProps(subject);
         props.InboxPrefix ??= InboxPrefix;
 
-        var date = DateTimeOffset.UtcNow;
-        var tags = Telemetry.GetTags(Telemetry.Constants.RequestReplyActivityName, ServerInfo, requestOpts);
-        using var activity = Telemetry.StartSendActivity(date, requestOpts, Telemetry.Constants.RequestReplyActivityName, tags);
+        var start = DateTimeOffset.UtcNow;
+        var tags = Telemetry.GetTags(ServerInfo, props);
+        using var activity = Telemetry.StartActivity(start, props, ServerInfo, Telemetry.Constants.RequestReplyActivityName, tags);
         try
         {
             Telemetry.AddTraceContextHeaders(activity, ref headers);
@@ -106,6 +106,13 @@ public partial class NatsConnection
         {
             Telemetry.SetException(activity, e);
             throw;
+        }
+        finally
+        {
+            var end = DateTimeOffset.UtcNow;
+            var duration = end - start;
+            activity?.SetEndTime(end.DateTime);
+            Telemetry.RecordOperationDuration(Telemetry.Constants.RequestReplyActivityName, duration, tags);
         }
     }
 

@@ -31,22 +31,22 @@ public partial class NatsConnection
     private ValueTask PublishInternalAsync<T>(NatsPublishProps props, INatsSerialize<T> serializer, T? data, NatsHeaders? headers = default, Activity? activity = default, CancellationToken cancellationToken = default)
     {
         DateTimeOffset? publishStart = null;
-        KeyValuePair<string, object?>[] tags;
+        List<KeyValuePair<string, object?>> tags;
         if (activity == null)
         {
             publishStart = DateTimeOffset.UtcNow;
-            tags = Telemetry.GetTags(Telemetry.Constants.PublishActivityName, ServerInfo, opts);
-            using var publishActivity = Telemetry.StartSendActivity(publishStart.Value, opts, Telemetry.Constants.PublishActivityName, tags);
+            tags = Telemetry.GetTags(ServerInfo, props);
+            using var publishActivity = Telemetry.StartActivity(publishStart.Value, props, ServerInfo, Telemetry.Constants.PublishActivityName, tags);
             activity = publishActivity;
         }
         else
         {
-            tags = activity.TagObjects.ToArray();
+            tags = activity.TagObjects.ToList();
         }
 
         var createStart = DateTimeOffset.UtcNow;
         DateTimeOffset? createEnd = null;
-        using var createActivity = Telemetry.StartSendActivity(createStart, opts, Telemetry.Constants.CreateActivityName, tags);
+        using var createActivity = Telemetry.StartActivity(createStart, props, ServerInfo, Telemetry.Constants.CreateActivityName, tags);
 
         ValueTask task;
 
@@ -73,6 +73,8 @@ public partial class NatsConnection
                 serializer.Serialize(payloadBuffer, data);
 
             createEnd = DateTimeOffset.UtcNow;
+            props.HeaderLength = headersBuffer?.WrittenMemory.Length ?? 0;
+            props.TotalMessageLength = props.HeaderLength + payloadBuffer.WrittenMemory.Length;
             task = PublishInternalAsync(props, payloadBuffer.WrittenMemory, headersBuffer?.WrittenMemory, cancellationToken);
         }
         catch (Exception ex)
@@ -92,7 +94,10 @@ public partial class NatsConnection
         {
             createEnd ??= DateTimeOffset.UtcNow;
             createActivity?.SetEndTime(createEnd.Value.UtcDateTime);
-            var createDuration = createEnd - createStart;
+            var createDuration = createEnd.Value - createStart;
+            Telemetry.RecordOperationDuration(Telemetry.Constants.CreateActivityName, createDuration, tags);
+            Telemetry.AddSentMessages(1, tags);
+            Telemetry.RecordSentBytes(props.TotalEnvelopeLength, tags);
 
             if (payloadBuffer != null)
             {
@@ -111,7 +116,7 @@ public partial class NatsConnection
                 var publishEnd = DateTimeOffset.UtcNow;
                 activity?.SetEndTime(publishEnd.UtcDateTime);
                 var publishDuration = publishEnd - publishStart.Value;
-                Telemetry.RecordOperationDuration(publishDuration.TotalSeconds, tags);
+                Telemetry.RecordOperationDuration(Telemetry.Constants.PublishActivityName, publishDuration, tags);
             }
         }
 

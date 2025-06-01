@@ -58,79 +58,71 @@ internal static class Telemetry
 
     internal static bool HasListeners() => NatsActivities.HasListeners();
 
-    internal static List<KeyValuePair<string, object?>> GetTags(INatsServerInfo serverInfo)
-    {
-        return new List<KeyValuePair<string, object?>>()
-        {
-            new KeyValuePair<string, object?>(Constants.ClientId, serverInfo.ClientId.ToString()),
-            new KeyValuePair<string, object?>(Constants.NetworkLocalAddress, serverInfo.ClientIp),
-            new KeyValuePair<string, object?>(Constants.NetworkPeerAddress, serverInfo.Host),
-            new KeyValuePair<string, object?>(Constants.NetworkPeerPort, serverInfo.Port.ToString()),
-            new KeyValuePair<string, object?>(Constants.NetworkProtoName, "nats"),
-            new KeyValuePair<string, object?>(Constants.NetworkProtoVersion, serverInfo.ProtocolVersion.ToString()),
-            new KeyValuePair<string, object?>(Constants.ServerAddress, serverInfo.Host),
-            new KeyValuePair<string, object?>(Constants.ServerPort, serverInfo.Port.ToString()),
-        };
-    }
-
-    internal static KeyValuePair<string, object?>[] GetTags(string operation, INatsServerInfo? serverInfo, NatsPublishProps pubOpts)
+    internal static List<KeyValuePair<string, object?>> GetTags(INatsServerInfo? serverInfo, NatsOperationProps props)
     {
         var tags = new List<KeyValuePair<string, object?>>()
         {
             new KeyValuePair<string, object?>(Constants.SystemKey, Constants.SystemVal),
-            new KeyValuePair<string, object?>(Constants.OpKey, operation),
 
-            new KeyValuePair<string, object?>(Constants.DestName, pubOpts.Subject),
-            new KeyValuePair<string, object?>(Constants.DestTemplate, pubOpts.SubjectTemplate),
-            new KeyValuePair<string, object?>(Constants.DestIsTemporary, pubOpts.UsesInbox ? Constants.True : Constants.False),
-            new KeyValuePair<string, object?>(Constants.ReplyToName, pubOpts.ReplyTo),
-            new KeyValuePair<string, object?>(Constants.Subject, pubOpts.Subject),
+            new KeyValuePair<string, object?>(Constants.DestName, props.Subject),
+            new KeyValuePair<string, object?>(Constants.DestTemplate, props.SubjectTemplate),
         };
 
         if (serverInfo != null)
         {
-            tags.AddRange(GetTags(serverInfo));
+            tags.Add(new KeyValuePair<string, object?>(Constants.NetworkProtoName, "nats"));
+            tags.Add(new KeyValuePair<string, object?>(Constants.NetworkProtoVersion, serverInfo.ProtocolVersion.ToString()));
+            tags.Add(new KeyValuePair<string, object?>(Constants.ServerAddress, serverInfo.Host));
+            tags.Add(new KeyValuePair<string, object?>(Constants.ServerPort, serverInfo.Port.ToString()));
         }
 
-        return tags.ToArray();
+        return tags;
     }
 
-    internal static KeyValuePair<string, object?>[] GetTags(string operation, INatsServerInfo? serverInfo, NatsProcessProps props)
-    {
-        var tags = new List<KeyValuePair<string, object?>>()
-        {
-            new KeyValuePair<string, object?>(Constants.SystemKey, Constants.SystemVal),
-            new KeyValuePair<string, object?>(Constants.OpKey, operation),
-
-            //new KeyValuePair<string, object?>(Constants.QueueGroup, queueGroup)
-        };
-
-        if (serverInfo != null)
-        {
-            tags.AddRange(GetTags(serverInfo));
-        }
-
-        return tags.ToArray();
-    }
-
-    internal static Activity? StartSendActivity(
+    internal static Activity? StartActivity(
         DateTimeOffset date,
-        NatsPublishProps opts,
+        NatsOperationProps props,
+        INatsServerInfo? serverInfo,
         string operation,
-        KeyValuePair<string, object?>[]? tags = default,
+        List<KeyValuePair<string, object?>> tags,
         ActivityContext? parentContext = null)
     {
         if (!NatsActivities.HasListeners())
             return null;
-        var destination = opts.UsesInbox ? "inbox" : opts.SantisedSubject();
+        var destination = props.UsesInbox ? "inbox" : props.SantisedSubject();
+
+        tags.Add(new KeyValuePair<string, object?>(Constants.DestIsTemporary, props.UsesInbox ? Constants.True : Constants.False));
+        tags.Add(new KeyValuePair<string, object?>(Constants.DestIsAnonymous, Constants.False));
+        tags.Add(new KeyValuePair<string, object?>(Constants.Subject, props.Subject));
+        tags.Add(new KeyValuePair<string, object?>(Constants.OpKey, operation));
+
+        if (serverInfo != null)
+        {
+            tags.Add(new KeyValuePair<string, object?>(Constants.ClientId, serverInfo.ClientId.ToString()));
+            tags.Add(new KeyValuePair<string, object?>(Constants.NetworkLocalAddress, serverInfo.ClientIp));
+            tags.Add(new KeyValuePair<string, object?>(Constants.NetworkPeerAddress, serverInfo.Host));
+            tags.Add(new KeyValuePair<string, object?>(Constants.NetworkPeerPort, serverInfo.Port.ToString()));
+        }
+
+        if (props is NatsProcessProps process)
+        {
+            tags.Add(new KeyValuePair<string, object?>(Constants.DestSubscription, process.SubscriptionId));
+            tags.Add(new KeyValuePair<string, object?>(Constants.QueueGroup, process.Subscription?.QueueGroup));
+        }
+
+        if (props is NatsPublishProps publish)
+        {
+            tags.Add(new KeyValuePair<string, object?>(Constants.ReplyToName, publish.ReplyTo));
+        }
 
         var name = $"{destination} {operation}";
-        return NatsActivities.StartActivity(
+        var activity = NatsActivities.StartActivity(
             name,
             kind: ActivityKind.Producer,
             startTime: date,
             parentContext: parentContext ?? default,
             tags: tags);
+        return activity;
     }
 
     internal static void AddTraceContextHeaders(Activity? activity, ref NatsHeaders? headers)
@@ -156,39 +148,6 @@ internal static class Telemetry
                 // even though headers would be set to readonly before being passed down in publish methods.
                 headers.SetOverrideReadOnly(fieldName, fieldValue);
             });
-    }
-
-    internal static Activity? StartReceiveActivity(
-        DateTimeOffset date,
-        NatsProcessProps opts,
-        string operation,
-        KeyValuePair<string, object?>[]? tags = default,
-        ActivityContext? parentContext = null)
-    {
-        if (!NatsActivities.HasListeners())
-            return null;
-
-        /*if (connection is NatsConnection { ServerInfo: not null } conn)
-        {
-            tags[6] = new KeyValuePair<string, object?>(Constants.DestPubName, subject);
-            tags[7] = new KeyValuePair<string, object?>(Constants.MsgBodySize, bodySize.ToString());
-            tags[8] = new KeyValuePair<string, object?>(Constants.MsgTotalSize, size.ToString());
-
-            if (queueGroup is not null)
-                tags[index] = new KeyValuePair<string, object?>(Constants.QueueGroup, queueGroup);
-        }
-
-        if (headers is null || !TryParseTraceContext(headers, out var context))
-            context = default;*/
-        var destination = opts.UsesInbox ? "inbox" : opts.SantisedSubject();
-        var name = $"{destination} {operation}";
-
-        return NatsActivities.StartActivity(
-            name,
-            kind: ActivityKind.Producer,
-            startTime: date,
-            parentContext: parentContext ?? default,
-            tags: tags);
     }
 
     internal static void SetException(Activity? activity, Exception exception)
@@ -235,44 +194,31 @@ internal static class Telemetry
         }
     }
 
-    internal static void IncrementSubscriptionCount(KeyValuePair<string, object?>[] tags)
-    {
-        _subscriptionCounter.Add(1, tags);
-    }
+    internal static void IncrementSubscriptionCount(List<KeyValuePair<string, object?>> tags)
+        => _subscriptionCounter.Add(1, tags.ToArray());
 
-    internal static void DecrementSubscriptionCount(KeyValuePair<string, object?>[] tags)
-    {
-        _subscriptionCounter.Add(-1, tags);
-    }
+    internal static void DecrementSubscriptionCount(List<KeyValuePair<string, object?>> tags)
+        => _subscriptionCounter.Add(-1, tags.ToArray());
 
-    internal static void AddPendingMessages(long messages, KeyValuePair<string, object?>[] tags)
-    {
-        _pendingMessagesCounter.Add(messages, tags);
-    }
+    internal static void RecordSentBytes(long bytes, List<KeyValuePair<string, object?>> tags)
+        => _sentBytesHistogram.Record(bytes, tags.ToArray());
 
-    internal static void RecordSentBytes(long bytes, KeyValuePair<string, object?>[] tags)
-    {
-        _sentBytesHistogram.Record(bytes, tags);
-    }
+    internal static void RecordReceivedBytes(long bytes, List<KeyValuePair<string, object?>> tags)
+        => _receivedBytesHistogram.Record(bytes, tags.ToArray());
 
-    internal static void RecordReceivedBytes(long bytes, KeyValuePair<string, object?>[] tags)
-    {
-        _receivedBytesHistogram.Record(bytes, tags);
-    }
+    internal static void AddPendingMessages(long messages, List<KeyValuePair<string, object?>> tags)
+        => _pendingMessagesCounter.Add(messages, tags.ToArray());
 
-    internal static void AddSentMessages(long messages, KeyValuePair<string, object?>[] tags)
-    {
-        _sentMessagesCounter.Add(messages, tags);
-    }
+    internal static void AddSentMessages(long messages, List<KeyValuePair<string, object?>> tags)
+        => _sentMessagesCounter.Add(messages, tags.ToArray());
 
-    internal static void AddReceivedMessages(long messages, KeyValuePair<string, object?>[] tags)
-    {
-        _receivedMessagesCounter.Add(messages, tags);
-    }
+    internal static void AddReceivedMessages(long messages, List<KeyValuePair<string, object?>> tags)
+        => _receivedMessagesCounter.Add(messages, tags.ToArray());
 
-    internal static void RecordOperationDuration(double duration, KeyValuePair<string, object?>[] tags)
+    internal static void RecordOperationDuration(string operation, TimeSpan duration, List<KeyValuePair<string, object?>> tags)
     {
-        _durationOperationHistogram.Record(duration, tags);
+        tags.Add(new KeyValuePair<string, object?>(Constants.OpKey, operation));
+        _durationOperationHistogram.Record(duration.TotalSeconds, tags.ToArray());
     }
 
     internal static void RecordProcessDuration(long bytes, KeyValuePair<string, object?>[] tags)
@@ -326,6 +272,7 @@ internal static class Telemetry
         public const string RequestReplyActivityName = "request";
         public const string PublishActivityName = "publish";
         public const string SubscribeActivityName = "subscribe";
+        public const string UnsubscribeActivityName = "unsubscribe";
         public const string CreateActivityName = "create";
         public const string ReceiveActivityName = "receive";
 
@@ -340,7 +287,9 @@ internal static class Telemetry
 
         public const string DestTemplate = "messaging.destination.template";
         public const string DestName = "messaging.destination.name";
+        public const string DestSubscription = "messaging.destination.subscription.name";
         public const string DestIsTemporary = "messaging.destination.temporary";
+        public const string DestIsAnonymous = "messaging.destination.anonymous";
         public const string DestPubName = "messaging.destination_publish.name";
 
         public const string QueueGroup = "messaging.consumer.group.name";
