@@ -13,6 +13,9 @@ jobs:
       fail-fast: false
       matrix:
         config:
+          - branch: 'v2.9'
+          - branch: 'v2.10'
+          - branch: 'latest'
           - branch: 'main'
     runs-on: ubuntu-latest
     env:
@@ -24,7 +27,7 @@ jobs:
         id: setup-go
         uses: actions/setup-go@v4
       - name: Install nats-server
-        run: go install github.com/nats-io/nats-server/v2@main
+        run: go install github.com/nats-io/nats-server/v2@${{ matrix.config.branch }}
 
 #      - name: Install nats-server
 #        run: |
