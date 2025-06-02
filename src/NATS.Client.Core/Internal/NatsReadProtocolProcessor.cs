@@ -220,10 +220,10 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                         }
 
                         Telemetry.AddPendingMessages(1, tags);
+                        Telemetry.RecordReceivedBytes(props.TotalEnvelopeLength, tags);
                         await _connection.PublishToClientHandlersAsync(props, null, payloadBuffer).ConfigureAwait(false);
                         Telemetry.AddPendingMessages(-1, tags);
                         Telemetry.AddReceivedMessages(1, tags);
-                        Telemetry.RecordReceivedBytes(props.TotalEnvelopeLength, tags);
                     }
                     else if (code == ServerOpCodes.HMsg)
                     {
@@ -251,8 +251,6 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                         }
 
                         var props = ParseHMessageHeader(msgHeader);
-
-                        props.InboxPrefix = _connection.InboxPrefix;
 
                         if (_trace)
                         {
@@ -289,11 +287,11 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                         var payloadSlice = totalSlice.Slice(props.HeaderLength, props.PayloadLength);
 
                         Telemetry.AddPendingMessages(1, tags);
+                        Telemetry.RecordReceivedBytes(props.TotalEnvelopeLength, tags);
                         await _connection.PublishToClientHandlersAsync(props, headerSlice, payloadSlice)
                             .ConfigureAwait(false);
                         Telemetry.AddPendingMessages(-1, tags);
                         Telemetry.AddReceivedMessages(1, tags);
-                        Telemetry.RecordReceivedBytes(props.TotalEnvelopeLength, tags);
                     }
                     else
                     {

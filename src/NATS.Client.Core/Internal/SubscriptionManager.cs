@@ -1,7 +1,6 @@
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
-using System.Threading;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
 
@@ -250,11 +249,13 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
                     throw new NatsException("Inbox subscriptions don't support queue groups");
                 }
 
+                //props.RequestReplyMode = NatsRequestReplyMode.Direct;
                 task = SubscribeInboxAsync(sub, cancellationToken);
             }
             else
             {
                 task = SubscribeQueueAsync(props, sub, cancellationToken);
+                //props.RequestReplyMode = NatsRequestReplyMode.Direct;
             }
         }
         catch (Exception ex)
@@ -371,10 +372,5 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
                 _logger.LogWarning(NatsLogEvents.Subscription, "Error unsubscribing during cleanup: {Error}", e.GetBaseException().Message);
             }
         }
-    }
-
-    private bool IsInboxSubject(string subject)
-    {
-        return subject.StartsWith(_inboxPrefix, StringComparison.Ordinal);
     }
 }

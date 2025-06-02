@@ -64,7 +64,6 @@ internal sealed class SocketReader
             }
 
             totalRead += read;
-            Telemetry.RecordReceivedBytes(read, Activity.Current.TagObjects.ToArray());
             _seqeunceBuilder.Append(_availableMemory.Slice(0, read));
             _availableMemory = _availableMemory.Slice(read);
         }
@@ -110,7 +109,6 @@ internal sealed class SocketReader
                 throw ex;
             }
 
-            Telemetry.RecordReceivedBytes(read, Activity.Current.TagObjects.ToArray());
             var appendMemory = _availableMemory.Slice(0, read);
             _seqeunceBuilder.Append(appendMemory);
             _availableMemory = _availableMemory.Slice(read);

@@ -265,16 +265,6 @@ public partial class NatsConnection : INatsConnection
         }
     }
 
-    internal string SpanDestinationName(string subject)
-    {
-        if (subject.StartsWith(Opts.InboxPrefix, StringComparison.Ordinal))
-            return "inbox";
-
-        // to avoid long span names and low cardinality, only take the first two tokens
-        var tokens = subject.Split('.');
-        return tokens.Length < 2 ? subject : $"{tokens[0]}.{tokens[1]}";
-    }
-
     internal ValueTask PublishToClientHandlersAsync(NatsProcessProps props, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
     {
         if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
@@ -324,6 +314,7 @@ public partial class NatsConnection : INatsConnection
             var start = DateTimeOffset.UtcNow;
             var tags = Telemetry.GetTags(ServerInfo, props);
             using var unsubActivity = Telemetry.StartActivity(start, props, ServerInfo, Telemetry.Constants.UnsubscribeActivityName, tags);
+
             // TODO: use maxMsgs in INatsSub<T> to unsubscribe.
             var result = CommandWriter.UnsubscribeAsync(props, null, CancellationToken.None);
             var end = DateTimeOffset.UtcNow;

@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using NATS.Client.Core.Internal;
@@ -130,6 +129,7 @@ public partial class NatsConnection
         {
             replyOpts = SetReplyOptsDefaults(replyOpts);
             requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
+            replySerializer ??= Opts.SerializerRegistry.GetDeserializer<TReply>();
 
             using var rt = _replyTaskFactory.CreateReplyTask(replySerializer, replyOpts.Timeout);
 

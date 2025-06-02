@@ -2,12 +2,17 @@ namespace NATS.Client.Core;
 
 public record NatsOperationProps
 {
-    public NatsOperationProps(string subject) => SubjectTemplate = subject;
+    private const string SubjectIdentifier = "{{SubjectId}}";
+
+    public NatsOperationProps(string subject)
+    {
+        SubjectTemplate = subject;
+    }
 
     public NatsOperationProps(string subjectTemplate, string subjectId)
     {
         SubjectTemplate = subjectTemplate;
-        if (subjectTemplate.Contains("{{SubjectId}}"))
+        if (subjectTemplate.Contains(SubjectIdentifier))
         {
             SubjectId = subjectId;
         }
@@ -19,11 +24,11 @@ public record NatsOperationProps
 
     public string Subject => SubjectId == null ?
                 SubjectTemplate :
-                SubjectTemplate.Replace("{{SubjectId}}", SubjectId);
+                SubjectTemplate.Replace(SubjectIdentifier, SubjectId);
 
-    internal string? InboxPrefix { get; set; } = null;
+    internal string InboxPrefix { get; set; }
 
-    internal bool UsesInbox => !string.IsNullOrEmpty(InboxPrefix) && Subject?.StartsWith(InboxPrefix, StringComparison.Ordinal) == true;
+    internal bool UsesInbox => !string.IsNullOrEmpty(InboxPrefix) && InboxPrefix != "UNKNOWN" && Subject.StartsWith(InboxPrefix, StringComparison.Ordinal);
 
     internal string SantisedSubject()
     {

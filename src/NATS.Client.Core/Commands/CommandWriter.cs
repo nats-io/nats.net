@@ -291,8 +291,6 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
 
         var size = payloadBuffer.Length + (headersBuffer?.Length ?? 0);
-        Activity.Current?.AddTag("messaging.message.body.size", payloadBuffer.Length);
-        Activity.Current?.AddTag("messaging.message.envelope.size", size);
         if (_connection.ServerInfo is { } info && size > info.MaxPayload)
         {
             throw new NatsPayloadTooLargeException($"Payload size {size} exceeds server's maximum payload size {info.MaxPayload}");

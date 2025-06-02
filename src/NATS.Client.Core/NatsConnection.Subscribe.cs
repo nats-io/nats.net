@@ -37,9 +37,8 @@ public partial class NatsConnection
         return await SubscribeInternalAsync<T>(props, serializer, opts, cancellationToken).ConfigureAwait(false);
     }
 
-    private async ValueTask<INatsSub<T>> SubscribeInternalAsync<T>(NatsSubscriptionProps props, INatsDeserialize<T>? serializer, NatsSubOpts? opts = default, CancellationToken cancellationToken = default)
+    private async ValueTask<INatsSub<T>> SubscribeInternalAsync<T>(NatsSubscriptionProps props, INatsDeserialize<T> serializer, NatsSubOpts? opts = default, CancellationToken cancellationToken = default)
     {
-        serializer ??= Opts.SerializerRegistry.GetDeserializer<T>();
         var sub = new NatsSub<T>(this, _subscriptionManager.GetManagerFor(props), props, opts, serializer, cancellationToken);
         await AddSubAsync(sub, cancellationToken).ConfigureAwait(false);
         return sub;
