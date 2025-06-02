@@ -17,7 +17,18 @@ public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
         NatsSubOpts? opts,
         INatsDeserialize<T> serializer,
         CancellationToken cancellationToken = default)
-        : base(connection, manager, subject, queueGroup, opts, cancellationToken)
+        : this(connection, manager, new NatsSubscriptionProps(subject, "UNKNOWN", queueGroup), opts, serializer, cancellationToken)
+    {
+    }
+
+    public NatsSub(
+        INatsConnection connection,
+        INatsSubscriptionManager manager,
+        NatsSubscriptionProps props,
+        NatsSubOpts? opts,
+        INatsDeserialize<T> serializer,
+        CancellationToken cancellationToken = default)
+        : base(connection, manager, props, opts, cancellationToken)
     {
         _msgs = Channel.CreateBounded<NatsMsg<T>>(
             connection.GetBoundedChannelOpts(opts?.ChannelOpts),
@@ -32,11 +43,11 @@ public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
 
     private INatsDeserialize<T> Serializer { get; }
 
-    protected override async ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
+    protected override async ValueTask ReceiveInternalAsync(NatsProcessProps props, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
     {
         var natsMsg = NatsMsg<T>.Build(
-            subject,
-            replyTo,
+            props.Subject.ToString(),
+            props.ReplyTo?.ToString(),
             headersBuffer,
             payloadBuffer,
             Connection,

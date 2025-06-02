@@ -53,16 +53,15 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         TimeSpan expires,
         TimeSpan idle,
         NatsJSContext context,
+        NatsSubscriptionProps props,
         string stream,
         string consumer,
-        string subject,
-        string? queueGroup,
         Func<INatsJSNotification, CancellationToken, Task>? notificationHandler,
         INatsDeserialize<TMsg> serializer,
         NatsSubOpts? opts,
         NatsJSPriorityGroupOpts? priorityGroup,
         CancellationToken cancellationToken)
-        : base(context.Connection, context.Connection.SubscriptionManager, subject, queueGroup, opts)
+        : base(context.Connection, context.Connection.SubscriptionManager, props, opts)
     {
         _cancellationToken = cancellationToken;
         _logger = Connection.Opts.LoggerFactory.CreateLogger<NatsJSConsume<TMsg>>();
@@ -209,9 +208,9 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         }
     }
 
-    internal override async ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter, int sid)
+    internal override async ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter, NatsSubscriptionProps props)
     {
-        await base.WriteReconnectCommandsAsync(commandWriter, sid);
+        await base.WriteReconnectCommandsAsync(commandWriter, props);
 
         if (_cancellationToken.IsCancellationRequested)
             return;
@@ -246,12 +245,12 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                 MinPending = _priorityGroup?.MinPending ?? 0,
                 MinAckPending = _priorityGroup?.MinAckPending ?? 0,
             };
-
+            var prop = new NatsPublishProps($"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}", "UNKNOWN");
+            prop.SetReplyTo(Subject);
             await commandWriter.PublishAsync(
-                subject: $"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
+                props: prop,
                 value: request,
                 headers: default,
-                replyTo: Subject,
                 serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
                 cancellationToken: CancellationToken.None);
 

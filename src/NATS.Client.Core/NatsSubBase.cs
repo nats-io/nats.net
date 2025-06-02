@@ -47,6 +47,7 @@ public abstract class NatsSubBase
     private bool _endSubscription;
     private int _endReasonRaw;
     private int _pendingMsgs;
+    private bool _fallback;
     private Exception? _exception;
 
     /// <summary>
@@ -65,6 +66,24 @@ public abstract class NatsSubBase
         string? queueGroup,
         NatsSubOpts? opts,
         CancellationToken cancellationToken = default)
+        : this(connection, manager, new NatsSubscriptionProps(subject, "UNKNOWN", queueGroup), opts, cancellationToken)
+    {
+    }
+
+    /// <summary>
+    /// Creates a new instance of <see cref="NatsSubBase"/>.
+    /// </summary>
+    /// <param name="connection">NATS connection.</param>
+    /// <param name="manager">Subscription manager.</param>
+    /// <param name="props">Properties of the subscription.</param>
+    /// <param name="opts">Subscription options.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    protected NatsSubBase(
+        INatsConnection connection,
+        INatsSubscriptionManager manager,
+        NatsSubscriptionProps props,
+        NatsSubOpts? opts,
+        CancellationToken cancellationToken = default)
     {
         _logger = connection.Opts.LoggerFactory.CreateLogger<NatsSubBase>();
         _debug = _logger.IsEnabled(LogLevel.Debug);
@@ -76,8 +95,7 @@ public abstract class NatsSubBase
         _timeout = opts?.Timeout ?? default;
 
         Connection = connection;
-        Subject = subject;
-        QueueGroup = queueGroup;
+        Props = props;
         Opts = opts;
 
         // If cancellation token is already cancelled we don't need to register however there is still
@@ -134,14 +152,14 @@ public abstract class NatsSubBase
     /// <summary>
     /// The subject name to subscribe to.
     /// </summary>
-    public string Subject { get; }
+    public string Subject => Props.Subject.ToString();
 
     /// <summary>
     /// If specified, the subscriber will join this queue group. Subscribers with the same queue group name,
     /// become a queue group, and only one randomly chosen subscriber of the queue group will
     /// consume a message each time a message is received by the queue group.
     /// </summary>
-    public string? QueueGroup { get; }
+    public string? QueueGroup => Props.QueueGroup;
 
     /// <summary>
     /// Represents an exception that occurs during the execution of a NATS subscription.
@@ -163,6 +181,17 @@ public abstract class NatsSubBase
     /// Represents a connection to the NATS server.
     /// </summary>
     protected INatsConnection Connection { get; }
+
+    private NatsSubscriptionProps Props { get; }
+
+    /// <summary>
+    /// A collection of properties to describe the subscription.
+    /// </summary>
+    public NatsSubscriptionProps SubscriptionProps(string inboxPrefix)
+    {
+        Props.Subject.InboxPrefix = inboxPrefix;
+        return Props;
+    }
 
     /// <summary>
     /// Signals that the subscription is ready to receive messages.
@@ -262,7 +291,20 @@ public abstract class NatsSubBase
     /// <param name="replyTo">Reply subject received for this subscription.</param>
     /// <param name="headersBuffer">Headers buffer received for this subscription.</param>
     /// <param name="payloadBuffer">Payload buffer received for this subscription.</param>
+    [Obsolete("Nats processing props should be passed instead")]
     public virtual async ValueTask ReceiveAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
+    {
+        await ReceiveAsync(new NatsProcessProps(subject, 0, "UNKNOWN"), headersBuffer, payloadBuffer).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Called when a message is received for the subscription.
+    /// Calls <see cref="ReceiveInternalAsync"/> to process the message handling any exceptions.
+    /// </summary>
+    /// <param name="props">Properties of the message being processed.</param>
+    /// <param name="headersBuffer">Headers buffer received for this subscription.</param>
+    /// <param name="payloadBuffer">Payload buffer received for this subscription.</param>
+    public virtual async ValueTask ReceiveAsync(NatsProcessProps props, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
     {
         ResetIdleTimeout();
 
@@ -283,7 +325,7 @@ public abstract class NatsSubBase
         try
         {
             // Need to await to handle any exceptions
-            await ReceiveInternalAsync(subject, replyTo, headersBuffer, payloadBuffer).ConfigureAwait(false);
+            await ReceiveInternalAsync(props, headersBuffer, payloadBuffer).ConfigureAwait(false);
         }
         catch (ChannelClosedException)
         {
@@ -326,9 +368,9 @@ public abstract class NatsSubBase
     /// Additional command (e.g. publishing pull requests in case of JetStream consumers) can be written as part of the reconnect routine.
     /// </remarks>
     /// <param name="commandWriter">command writer used to write reconnect commands</param>
-    /// <param name="sid">SID which might be required to create subscription commands</param>
+    /// <param name="props">Properties required by the create subscription commands</param>
     /// <returns>ValueTask</returns>
-    internal virtual ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter, int sid) => commandWriter.SubscribeAsync(sid, Subject, QueueGroup, PendingMsgs, CancellationToken.None);
+    internal virtual ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter, NatsSubscriptionProps props) => commandWriter.SubscribeAsync(props, PendingMsgs, CancellationToken.None);
 
     /// <summary>
     /// Invoked when a MSG or HMSG arrives for the subscription.
@@ -341,7 +383,34 @@ public abstract class NatsSubBase
     /// <param name="headersBuffer">Raw headers bytes. You can use <see cref="NatsConnection"/> <see cref="NatsHeaderParser"/> to decode them.</param>
     /// <param name="payloadBuffer">Raw payload bytes.</param>
     /// <returns></returns>
-    protected abstract ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer);
+    [Obsolete("This should not be called as we now pass the properties")]
+    protected virtual ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
+    {
+        if (_fallback)
+        {
+            throw new NotImplementedException("ReceiveInternalAsync should be implemented");
+        }
+
+        var props = new NatsProcessProps(subject, 0, "UNKNOWN");
+        props.SetReplyTo(replyTo);
+        return ReceiveInternalAsync(props, headersBuffer, payloadBuffer);
+    }
+
+    /// <summary>
+    /// Invoked when a MSG or HMSG arrives for the subscription.
+    /// <remarks>
+    /// This method is invoked while reading from the socket. Buffers belong to the socket reader and you should process them as quickly as possible or create a copy before you return from this method.
+    /// </remarks>
+    /// </summary>
+    /// <param name="props">Subject received for this subscription. This might not be the subject you subscribed to especially when using wildcards. For example, if you subscribed to events.* you may receive events.open.</param>
+    /// <param name="headersBuffer">Raw headers bytes. You can use <see cref="NatsConnection"/> <see cref="NatsHeaderParser"/> to decode them.</param>
+    /// <param name="payloadBuffer">Raw payload bytes.</param>
+    /// <returns></returns>
+    protected virtual ValueTask ReceiveInternalAsync(NatsProcessProps props, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
+    {
+        _fallback = true;
+        return ReceiveInternalAsync(props.Subject.ToString(), props.ReplyTo?.ToString(), headersBuffer, payloadBuffer);
+    }
 
     /// <summary>
     /// Sets the exception that caused the subscription to end.

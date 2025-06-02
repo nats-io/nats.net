@@ -23,8 +23,7 @@ internal class NatsKVWatchSub<T> : NatsSubBase
         : base(
             connection: context.Connection,
             manager: context.Connection.SubscriptionManager,
-            subject: context.NewBaseInbox(),
-            queueGroup: default,
+            props: new NatsSubscriptionProps(context.NewBaseInbox()),
             opts)
     {
         _context = context;

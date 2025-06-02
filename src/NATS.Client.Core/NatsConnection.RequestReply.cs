@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using NATS.Client.Core.Internal;
@@ -33,6 +32,7 @@ public partial class NatsConnection
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default)
     {
+        var props = new NatsPublishProps(subject, InboxPrefix);
         if (Telemetry.HasListeners())
         {
             using var activity = Telemetry.StartSendActivity($"{SpanDestinationName(subject)} {Telemetry.Constants.RequestReplyActivityName}", this, subject, null);
@@ -48,7 +48,7 @@ public partial class NatsConnection
                     return await rt.GetResultAsync(cancellationToken).ConfigureAwait(false);
                 }
 
-                await using var sub1 = await CreateRequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
+                await using var sub1 = await CreateRequestSubAsync<TRequest, TReply>(props, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
                     .ConfigureAwait(false);
 
                 await foreach (var msg in sub1.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
@@ -70,12 +70,13 @@ public partial class NatsConnection
         if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
         {
             using var rt = _replyTaskFactory.CreateReplyTask(replySerializer, replyOpts.Timeout);
+            props.SetReplyTo(rt.Subject);
             requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
-            await PublishAsync(subject, data, headers, rt.Subject, requestSerializer, requestOpts, cancellationToken).ConfigureAwait(false);
+            await PublishAsync(props, data, headers, requestSerializer, cancellationToken).ConfigureAwait(false);
             return await rt.GetResultAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        await using var sub = await CreateRequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
+        await using var sub = await CreateRequestSubAsync<TRequest, TReply>(props, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
             .ConfigureAwait(false);
 
         await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))

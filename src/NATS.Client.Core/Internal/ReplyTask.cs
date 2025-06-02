@@ -9,17 +9,17 @@ internal sealed class ReplyTask<T> : ReplyTaskBase, IDisposable
 {
     private readonly object _gate;
     private readonly ReplyTaskFactory _factory;
-    private readonly long _id;
+    private readonly long _subjectNum;
     private readonly NatsConnection _connection;
     private readonly INatsDeserialize<T> _deserializer;
     private readonly TimeSpan _requestTimeout;
     private readonly TaskCompletionSource _tcs;
     private NatsMsg<T> _msg;
 
-    public ReplyTask(ReplyTaskFactory factory, long id, string subject, NatsConnection connection, INatsDeserialize<T> deserializer, TimeSpan requestTimeout)
+    public ReplyTask(ReplyTaskFactory factory, long subjectNum, string subject, NatsConnection connection, INatsDeserialize<T> deserializer, TimeSpan requestTimeout)
     {
         _factory = factory;
-        _id = id;
+        _subjectNum = subjectNum;
         Subject = subject;
         _connection = connection;
         _deserializer = deserializer;
@@ -49,22 +49,22 @@ internal sealed class ReplyTask<T> : ReplyTaskBase, IDisposable
         }
     }
 
-    public override void SetResult(string? replyTo, ReadOnlySequence<byte> payload, ReadOnlySequence<byte>? headersBuffer)
+    public override void SetResult(NatsProcessProps props, ReadOnlySequence<byte> payload, ReadOnlySequence<byte>? headersBuffer)
     {
         lock (_gate)
         {
-            _msg = NatsMsg<T>.Build(Subject, replyTo, headersBuffer, payload, _connection, _connection.HeaderParser, _deserializer);
+            _msg = NatsMsg<T>.Build(Subject, props.ReplyTo?.ToString(), headersBuffer, payload, _connection, _connection.HeaderParser, _deserializer);
         }
 
         _tcs.TrySetResult();
     }
 
-    public void Dispose() => _factory.Return(_id);
+    public void Dispose() => _factory.Return(_subjectNum);
 }
 
 internal abstract class ReplyTaskBase
 {
-    public abstract void SetResult(string? replyTo, ReadOnlySequence<byte> payload, ReadOnlySequence<byte>? headersBuffer);
+    public abstract void SetResult(NatsProcessProps props, ReadOnlySequence<byte> payload, ReadOnlySequence<byte>? headersBuffer);
 }
 
 internal sealed class ReplyTaskFactory
@@ -95,7 +95,7 @@ internal sealed class ReplyTaskFactory
     {
         deserializer ??= _serializerRegistry.GetDeserializer<TReply>();
         var id = Interlocked.Increment(ref _nextId);
-
+        
         string subject;
         if (_allocSubject)
         {
@@ -124,11 +124,11 @@ internal sealed class ReplyTaskFactory
 
     public void Return(long id) => _replies.TryRemove(id, out _);
 
-    public bool TrySetResult(long id, string? replyTo, in ReadOnlySequence<byte> payloadBuffer, in ReadOnlySequence<byte>? headersBuffer)
+    public bool TrySetResult(NatsProcessProps props, in ReadOnlySequence<byte> payloadBuffer, in ReadOnlySequence<byte>? headersBuffer)
     {
-        if (_replies.TryGetValue(id, out var rt))
+        if (_replies.TryGetValue(props.SubjectNumber, out var rt))
         {
-            rt.SetResult(replyTo, payloadBuffer, headersBuffer);
+            rt.SetResult(props, payloadBuffer, headersBuffer);
             return true;
         }
 
