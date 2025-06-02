@@ -294,11 +294,11 @@ internal sealed class CommandWriter : IAsyncDisposable
         return default;
     }
 
-    public ValueTask PublishAsync<T>(string subject, T? value, NatsHeaders? headers, string? replyTo, INatsSerialize<T> serializer, CancellationToken cancellationToken)
+    public ValueTask PublishAsync<T>(NatsPublishProps props, T? value, NatsHeaders? headers, INatsSerialize<T> serializer, CancellationToken cancellationToken)
     {
         if (_trace)
         {
-            _logger.LogTrace(NatsLogEvents.Protocol, "PUB {Subject} {ReplyTo}", subject, replyTo);
+            _logger.LogTrace(NatsLogEvents.Protocol, "PUB {Subject} {ReplyTo}", props.Subject, props.ReplyTo);
         }
 
         NatsPooledBufferWriter<byte>? headersBuffer = null;
@@ -346,12 +346,12 @@ internal sealed class CommandWriter : IAsyncDisposable
 #pragma warning restore VSTHRD103
 #pragma warning restore CA2016
         {
-            return PublishStateMachineAsync(false, subject, replyTo, headersBuffer, payloadBuffer, cancellationToken);
+            return PublishStateMachineAsync(false, props, headersBuffer, payloadBuffer, cancellationToken);
         }
 
         if (_flushTask.IsNotCompletedSuccessfully())
         {
-            return PublishStateMachineAsync(true, subject, replyTo, headersBuffer, payloadBuffer, cancellationToken);
+            return PublishStateMachineAsync(true, props, headersBuffer, payloadBuffer, cancellationToken);
         }
 
         try
@@ -361,7 +361,7 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
-            _protocolWriter.WritePublish(_pipeWriter, subject, replyTo, headersBuffer?.WrittenMemory, payloadBuffer.WrittenMemory);
+            _protocolWriter.WritePublish(_pipeWriter, props, headersBuffer?.WrittenMemory, payloadBuffer.WrittenMemory);
             EnqueueCommand();
         }
         finally
@@ -381,11 +381,11 @@ internal sealed class CommandWriter : IAsyncDisposable
         return default;
     }
 
-    public ValueTask SubscribeAsync(int sid, string subject, string? queueGroup, int? maxMsgs, CancellationToken cancellationToken)
+    public ValueTask SubscribeAsync(NatsSubscriptionProps props, int? maxMsgs, CancellationToken cancellationToken)
     {
         if (_trace)
         {
-            _logger.LogTrace(NatsLogEvents.Protocol, "SUB {Subject} {QueueGroup} {MaxMsgs}", subject, queueGroup, maxMsgs);
+            _logger.LogTrace(NatsLogEvents.Protocol, "SUB {Subject} {QueueGroup} {MaxMsgs}", props.Subject, props.QueueGroup, maxMsgs);
         }
 
 #pragma warning disable CA2016
@@ -394,12 +394,12 @@ internal sealed class CommandWriter : IAsyncDisposable
 #pragma warning restore VSTHRD103
 #pragma warning restore CA2016
         {
-            return SubscribeStateMachineAsync(false, sid, subject, queueGroup, maxMsgs, cancellationToken);
+            return SubscribeStateMachineAsync(false, props, maxMsgs, cancellationToken);
         }
 
         if (_flushTask.IsNotCompletedSuccessfully())
         {
-            return SubscribeStateMachineAsync(true, sid, subject, queueGroup, maxMsgs, cancellationToken);
+            return SubscribeStateMachineAsync(true, props, maxMsgs, cancellationToken);
         }
 
         try
@@ -409,7 +409,7 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
-            _protocolWriter.WriteSubscribe(_pipeWriter, sid, subject, queueGroup, maxMsgs);
+            _protocolWriter.WriteSubscribe(_pipeWriter, props, maxMsgs);
             EnqueueCommand();
         }
         finally
@@ -420,11 +420,11 @@ internal sealed class CommandWriter : IAsyncDisposable
         return default;
     }
 
-    public ValueTask UnsubscribeAsync(int sid, int? maxMsgs, CancellationToken cancellationToken)
+    public ValueTask UnsubscribeAsync(NatsSubscriptionProps props, int? maxMsgs, CancellationToken cancellationToken)
     {
         if (_trace)
         {
-            _logger.LogTrace(NatsLogEvents.Protocol, "UNSUB {Sid} {MaxMsgs}", sid, maxMsgs);
+            _logger.LogTrace(NatsLogEvents.Protocol, "UNSUB {Sid} {MaxMsgs}", props.SubscriptionId, maxMsgs);
         }
 
 #pragma warning disable CA2016
@@ -433,12 +433,12 @@ internal sealed class CommandWriter : IAsyncDisposable
 #pragma warning restore VSTHRD103
 #pragma warning restore CA2016
         {
-            return UnsubscribeStateMachineAsync(false, sid, maxMsgs, cancellationToken);
+            return UnsubscribeStateMachineAsync(false, props, maxMsgs, cancellationToken);
         }
 
         if (_flushTask.IsNotCompletedSuccessfully())
         {
-            return UnsubscribeStateMachineAsync(true, sid, maxMsgs, cancellationToken);
+            return UnsubscribeStateMachineAsync(true, props, maxMsgs, cancellationToken);
         }
 
         try
@@ -448,7 +448,7 @@ internal sealed class CommandWriter : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(CommandWriter));
             }
 
-            _protocolWriter.WriteUnsubscribe(_pipeWriter, sid, maxMsgs);
+            _protocolWriter.WriteUnsubscribe(_pipeWriter, props, maxMsgs);
             EnqueueCommand();
         }
         finally
@@ -815,7 +815,7 @@ internal sealed class CommandWriter : IAsyncDisposable
 #if !NETSTANDARD
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
 #endif
-    private async ValueTask PublishStateMachineAsync(bool lockHeld, string subject, string? replyTo, NatsPooledBufferWriter<byte>? headersBuffer, NatsPooledBufferWriter<byte> payloadBuffer, CancellationToken cancellationToken)
+    private async ValueTask PublishStateMachineAsync(bool lockHeld, NatsPublishProps props, NatsPooledBufferWriter<byte>? headersBuffer, NatsPooledBufferWriter<byte> payloadBuffer, CancellationToken cancellationToken)
     {
         try
         {
@@ -839,7 +839,7 @@ internal sealed class CommandWriter : IAsyncDisposable
                     await _flushTask!.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
                 }
 
-                _protocolWriter.WritePublish(_pipeWriter, subject, replyTo, headersBuffer?.WrittenMemory, payloadBuffer.WrittenMemory);
+                _protocolWriter.WritePublish(_pipeWriter, props, headersBuffer?.WrittenMemory, payloadBuffer.WrittenMemory);
                 EnqueueCommand();
             }
             catch (TimeoutException)
@@ -866,7 +866,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
     }
 
-    private async ValueTask SubscribeStateMachineAsync(bool lockHeld, int sid, string subject, string? queueGroup, int? maxMsgs, CancellationToken cancellationToken)
+    private async ValueTask SubscribeStateMachineAsync(bool lockHeld, NatsSubscriptionProps props, int? maxMsgs, CancellationToken cancellationToken)
     {
         if (!lockHeld)
         {
@@ -888,7 +888,7 @@ internal sealed class CommandWriter : IAsyncDisposable
                 await _flushTask!.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
             }
 
-            _protocolWriter.WriteSubscribe(_pipeWriter, sid, subject, queueGroup, maxMsgs);
+            _protocolWriter.WriteSubscribe(_pipeWriter, props, maxMsgs);
             EnqueueCommand();
         }
         catch (TimeoutException)
@@ -903,7 +903,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
     }
 
-    private async ValueTask UnsubscribeStateMachineAsync(bool lockHeld, int sid, int? maxMsgs, CancellationToken cancellationToken)
+    private async ValueTask UnsubscribeStateMachineAsync(bool lockHeld, NatsSubscriptionProps props, int? maxMsgs, CancellationToken cancellationToken)
     {
         if (!lockHeld)
         {
@@ -925,7 +925,7 @@ internal sealed class CommandWriter : IAsyncDisposable
                 await _flushTask!.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false);
             }
 
-            _protocolWriter.WriteUnsubscribe(_pipeWriter, sid, maxMsgs);
+            _protocolWriter.WriteUnsubscribe(_pipeWriter, props, maxMsgs);
             EnqueueCommand();
         }
         catch (TimeoutException)

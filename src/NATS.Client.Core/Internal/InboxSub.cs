@@ -12,22 +12,22 @@ internal class InboxSub : NatsSubBase
 
     public InboxSub(
         InboxSubBuilder inbox,
-        string subject,
+        NatsSubscriptionProps props,
         NatsSubOpts? opts,
         NatsConnection connection,
         INatsSubscriptionManager manager)
-    : base(connection, manager, subject, queueGroup: default, opts)
+    : base(connection, manager, props, opts)
     {
         _inbox = inbox;
         _connection = connection;
     }
 
     // Avoid base class error handling since inboxed subscribers will be responsible for that.
-    public override ValueTask ReceiveAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer) =>
-        _inbox.ReceivedAsync(subject, replyTo, headersBuffer, payloadBuffer, _connection);
+    public override ValueTask ReceiveAsync(NatsProcessProps props, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer) =>
+        _inbox.ReceivedAsync(props, headersBuffer, payloadBuffer, _connection);
 
     // Not used. Dummy implementation to keep base happy.
-    protected override ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
+    protected override ValueTask ReceiveInternalAsync(NatsProcessProps props, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
         => default;
 
     protected override void TryComplete()
@@ -46,9 +46,9 @@ internal class InboxSubBuilder : INatsSubscriptionManager
 
     public InboxSubBuilder(ILogger<InboxSubBuilder> logger) => _logger = logger;
 
-    public InboxSub Build(string subject, NatsSubOpts? opts, NatsConnection connection, INatsSubscriptionManager manager)
+    public InboxSub Build(NatsSubscriptionProps props, NatsSubOpts? opts, NatsConnection connection, INatsSubscriptionManager manager)
     {
-        return new InboxSub(this, subject, opts, connection, manager);
+        return new InboxSub(this, props, opts, connection, manager);
     }
 
     public ValueTask RegisterAsync(NatsSubBase sub)
@@ -119,11 +119,11 @@ internal class InboxSubBuilder : INatsSubscriptionManager
         return sub.ReadyAsync();
     }
 
-    public async ValueTask ReceivedAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer, NatsConnection connection)
+    public async ValueTask ReceivedAsync(NatsProcessProps props, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer, NatsConnection connection)
     {
-        if (!_bySubject.TryGetValue(subject, out var subTable))
+        if (!_bySubject.TryGetValue(props.Subject.ToString(), out var subTable))
         {
-            _logger.LogWarning(NatsLogEvents.InboxSubscription, "Unregistered message inbox received for {Subject}", subject);
+            _logger.LogWarning(NatsLogEvents.InboxSubscription, "Unregistered message inbox received for {Subject}", props.Subject);
             return;
         }
 
@@ -132,13 +132,13 @@ internal class InboxSubBuilder : INatsSubscriptionManager
         {
             if (weakReference.TryGetTarget(out var sub))
             {
-                await sub.ReceiveAsync(subject, replyTo, headersBuffer, payloadBuffer).ConfigureAwait(false);
+                await sub.ReceiveAsync(props, headersBuffer, payloadBuffer).ConfigureAwait(false);
             }
         }
 #else
         foreach (var (sub, _) in subTable)
         {
-            await sub.ReceiveAsync(subject, replyTo, headersBuffer, payloadBuffer).ConfigureAwait(false);
+            await sub.ReceiveAsync(props, headersBuffer, payloadBuffer).ConfigureAwait(false);
         }
 #endif
     }

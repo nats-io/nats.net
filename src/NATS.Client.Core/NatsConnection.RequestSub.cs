@@ -13,14 +13,37 @@ public partial class NatsConnection
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default)
     {
-        var replyTo = NewInbox();
-
+        var props = new NatsPublishProps(subject, InboxPrefix);
+        props.SetReplyTo(NewInbox());
         replySerializer ??= Opts.SerializerRegistry.GetDeserializer<TReply>();
-        var sub = new NatsSub<TReply>(this, _subscriptionManager.InboxSubBuilder, replyTo, queueGroup: default, replyOpts, replySerializer);
+        var subProps = new NatsSubscriptionProps(props.Subject);
+        var sub = new NatsSub<TReply>(this, _subscriptionManager.InboxSubBuilder, subProps, replyOpts, replySerializer);
         await AddSubAsync(sub, cancellationToken).ConfigureAwait(false);
 
         requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
-        await PublishAsync(subject, data, headers, replyTo, requestSerializer, requestOpts, cancellationToken).ConfigureAwait(false);
+        await PublishAsync(props, data, headers, requestSerializer, cancellationToken).ConfigureAwait(false);
+
+        return sub;
+    }
+
+    /// <inheritdoc />
+    internal async ValueTask<NatsSub<TReply>> CreateRequestSubAsync<TRequest, TReply>(
+        NatsPublishProps props,
+        TRequest? data,
+        NatsHeaders? headers = default,
+        INatsSerialize<TRequest>? requestSerializer = default,
+        INatsDeserialize<TReply>? replySerializer = default,
+        NatsPubOpts? requestOpts = default,
+        NatsSubOpts? replyOpts = default,
+        CancellationToken cancellationToken = default)
+    {
+        replySerializer ??= Opts.SerializerRegistry.GetDeserializer<TReply>();
+        var subProps = new NatsSubscriptionProps(props.Subject);
+        var sub = new NatsSub<TReply>(this, _subscriptionManager.InboxSubBuilder, subProps, replyOpts, replySerializer);
+        await AddSubAsync(sub, cancellationToken).ConfigureAwait(false);
+
+        requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
+        await PublishAsync(props, data, headers, requestSerializer, cancellationToken).ConfigureAwait(false);
 
         return sub;
     }
