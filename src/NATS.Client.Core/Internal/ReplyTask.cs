@@ -5,24 +5,20 @@ using System.Text;
 
 namespace NATS.Client.Core.Internal;
 
-internal sealed class ReplyTask<T> : ReplyTaskBase, IDisposable
+internal sealed class ReplyTask : ReplyTaskBase, IDisposable
 {
     private readonly object _gate;
     private readonly ReplyTaskFactory _factory;
     private readonly long _id;
-    private readonly NatsConnection _connection;
-    private readonly INatsDeserialize<T> _deserializer;
     private readonly TimeSpan _requestTimeout;
     private readonly TaskCompletionSource _tcs;
-    private NatsMsg<T> _msg;
+    private NatsRecievedEvent _msg;
 
-    public ReplyTask(ReplyTaskFactory factory, long id, string subject, NatsConnection connection, INatsDeserialize<T> deserializer, TimeSpan requestTimeout)
+    public ReplyTask(ReplyTaskFactory factory, long id, string subject, TimeSpan requestTimeout)
     {
         _factory = factory;
         _id = id;
         Subject = subject;
-        _connection = connection;
-        _deserializer = deserializer;
         _requestTimeout = requestTimeout;
         _tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         _gate = new object();
@@ -30,7 +26,7 @@ internal sealed class ReplyTask<T> : ReplyTaskBase, IDisposable
 
     public string Subject { get; }
 
-    public async ValueTask<NatsMsg<T>> GetResultAsync(CancellationToken cancellationToken)
+    public async ValueTask<NatsRecievedEvent> GetResultAsync(CancellationToken cancellationToken)
     {
         try
         {
@@ -53,7 +49,7 @@ internal sealed class ReplyTask<T> : ReplyTaskBase, IDisposable
     {
         lock (_gate)
         {
-            _msg = NatsMsg<T>.Build(Subject, replyTo, headersBuffer, payload, _connection, _connection.HeaderParser, _deserializer);
+            _msg = new NatsRecievedEvent(Subject, replyTo, headersBuffer, payload);
         }
 
         _tcs.TrySetResult();
@@ -73,7 +69,6 @@ internal sealed class ReplyTaskFactory
     private readonly string _inboxPrefixString;
     private readonly NatsConnection _connection;
     private readonly ConcurrentDictionary<long, ReplyTaskBase> _replies;
-    private readonly INatsSerializerRegistry _serializerRegistry;
     private readonly TimeSpan _requestTimeout;
     private readonly int _subjectMaxLength;
     private readonly bool _allocSubject;
@@ -86,14 +81,12 @@ internal sealed class ReplyTaskFactory
         _inboxPrefix = Encoding.UTF8.GetBytes(_inboxPrefixString);
         _subjectMaxLength = _inboxPrefix.Length + 20; // 20 digits for long
         _allocSubject = _subjectMaxLength < 128;
-        _serializerRegistry = _connection.Opts.SerializerRegistry;
         _requestTimeout = _connection.Opts.RequestTimeout;
         _replies = new ConcurrentDictionary<long, ReplyTaskBase>();
     }
 
-    public ReplyTask<TReply> CreateReplyTask<TReply>(INatsDeserialize<TReply>? deserializer, TimeSpan? requestTimeout)
+    public ReplyTask CreateReplyTask(TimeSpan? requestTimeout)
     {
-        deserializer ??= _serializerRegistry.GetDeserializer<TReply>();
         var id = Interlocked.Increment(ref _nextId);
 
         string subject;
@@ -117,7 +110,7 @@ internal sealed class ReplyTaskFactory
             subject = _inboxPrefixString + id;
         }
 
-        var rt = new ReplyTask<TReply>(this, id, subject, _connection, deserializer, requestTimeout ?? _requestTimeout);
+        var rt = new ReplyTask(this, id, subject, requestTimeout ?? _requestTimeout);
         _replies.TryAdd(id, rt);
         return rt;
     }

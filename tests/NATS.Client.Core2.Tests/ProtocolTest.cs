@@ -482,7 +482,7 @@ public class ProtocolTest
             // Any additional commands to send on reconnect
             for (var i = 0; i < 100; i++)
             {
-                await commandWriter.PublishAsync($"{_cmdSubject}{i}", default, default, default, NatsRawSerializer<byte>.Default, default);
+                await commandWriter.PublishAsync($"{_cmdSubject}{i}", default, default, default, default);
             }
         }
 

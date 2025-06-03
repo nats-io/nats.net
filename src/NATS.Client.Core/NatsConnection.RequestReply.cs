@@ -42,10 +42,12 @@ public partial class NatsConnection
 
                 if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
                 {
-                    using var rt = _replyTaskFactory.CreateReplyTask(replySerializer, replyOpts.Timeout);
+                    using var rt = _replyTaskFactory.CreateReplyTask(replyOpts.Timeout);
                     requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
                     await PublishAsync(subject, data, headers, rt.Subject, requestSerializer, requestOpts, cancellationToken).ConfigureAwait(false);
-                    return await rt.GetResultAsync(cancellationToken).ConfigureAwait(false);
+                    var msgEvent = await rt.GetResultAsync(cancellationToken).ConfigureAwait(false);
+                    replySerializer ??= Opts.SerializerRegistry.GetDeserializer<TReply>();
+                    return NatsMsg<TReply>.Build(msgEvent.Subject, msgEvent.ReplyTo, msgEvent.HeadersBuffer, msgEvent.Payload, this, HeaderParser, replySerializer);
                 }
 
                 await using var sub1 = await CreateRequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
@@ -69,10 +71,12 @@ public partial class NatsConnection
 
         if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
         {
-            using var rt = _replyTaskFactory.CreateReplyTask(replySerializer, replyOpts.Timeout);
+            using var rt = _replyTaskFactory.CreateReplyTask(replyOpts.Timeout);
             requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
             await PublishAsync(subject, data, headers, rt.Subject, requestSerializer, requestOpts, cancellationToken).ConfigureAwait(false);
-            return await rt.GetResultAsync(cancellationToken).ConfigureAwait(false);
+            var msgEvent = await rt.GetResultAsync(cancellationToken).ConfigureAwait(false);
+            replySerializer ??= Opts.SerializerRegistry.GetDeserializer<TReply>();
+            return NatsMsg<TReply>.Build(msgEvent.Subject, msgEvent.ReplyTo, msgEvent.HeadersBuffer, msgEvent.Payload, this, HeaderParser, replySerializer);
         }
 
         await using var sub = await CreateRequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)

@@ -38,10 +38,12 @@ public partial class NatsConnection : INatsConnection
     private readonly ObjectPool _pool;
     private readonly CancellationTokenSource _disposedCts;
     private readonly string _name;
+    private readonly int _arrayPoolInitialSize;
     private readonly TimeSpan _socketComponentDisposeTimeout = TimeSpan.FromSeconds(5);
     private readonly BoundedChannelOptions _defaultSubscriptionChannelOpts;
     private readonly Channel<(NatsEvent, NatsEventArgs)> _eventChannel;
     private readonly ClientOpts _clientOpts;
+    private readonly HeaderWriter _headerWriter;
     private readonly SubscriptionManager _subscriptionManager;
     private readonly ReplyTaskFactory _replyTaskFactory;
 
@@ -81,11 +83,16 @@ public partial class NatsConnection : INatsConnection
         _pool = new ObjectPool(opts.ObjectPoolSize);
         _name = opts.Name;
         Counter = new ConnectionStatsCounter();
-        CommandWriter = new CommandWriter("main", this, _pool, Opts, Counter, EnqueuePing);
+
+        // Derive ArrayPool rent size from buffer size to
+        // avoid defining another option.
+        _arrayPoolInitialSize = opts.WriterBufferSize / 256;
+        CommandWriter = new CommandWriter("main", this, Opts, Counter, EnqueuePing);
         InboxPrefix = NewInbox(opts.InboxPrefix);
         _subscriptionManager = new SubscriptionManager(this, InboxPrefix);
         _replyTaskFactory = new ReplyTaskFactory(this);
         _clientOpts = ClientOpts.Create(Opts);
+        _headerWriter = new HeaderWriter(opts.HeaderEncoding);
         HeaderParser = new NatsHeaderParser(opts.HeaderEncoding);
         _defaultSubscriptionChannelOpts = new BoundedChannelOptions(opts.SubPendingChannelCapacity)
         {

@@ -247,12 +247,11 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                 MinAckPending = _priorityGroup?.MinAckPending ?? 0,
             };
 
-            await commandWriter.PublishAsync(
+            await Connection.PublishAsync(
                 subject: $"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
-                value: request,
+                data: request,
                 headers: default,
                 replyTo: Subject,
-                serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
                 cancellationToken: CancellationToken.None);
 
             ResetPending();

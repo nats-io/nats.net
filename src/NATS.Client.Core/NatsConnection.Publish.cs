@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using NATS.Client.Core.Commands;
 using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
@@ -14,9 +16,7 @@ public partial class NatsConnection
             try
             {
                 headers?.SetReadOnly();
-                return ConnectionState != NatsConnectionState.Open
-                    ? ConnectAndPublishAsync(subject, default, headers, replyTo, NatsRawSerializer<byte[]>.Default, cancellationToken)
-                    : CommandWriter.PublishAsync(subject, default, headers, replyTo, NatsRawSerializer<byte[]>.Default, cancellationToken);
+                return PerformPublishAsync(subject, headers, default, NatsRawSerializer<byte[]>.Default, replyTo, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -26,9 +26,7 @@ public partial class NatsConnection
         }
 
         headers?.SetReadOnly();
-        return ConnectionState != NatsConnectionState.Open
-            ? ConnectAndPublishAsync(subject, default, headers, replyTo, NatsRawSerializer<byte[]>.Default, cancellationToken)
-            : CommandWriter.PublishAsync(subject, default, headers, replyTo, NatsRawSerializer<byte[]>.Default, cancellationToken);
+        return PerformPublishAsync(subject, headers, default, NatsRawSerializer<byte[]>.Default, replyTo, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -42,9 +40,7 @@ public partial class NatsConnection
             {
                 serializer ??= Opts.SerializerRegistry.GetSerializer<T>();
                 headers?.SetReadOnly();
-                return ConnectionState != NatsConnectionState.Open
-                    ? ConnectAndPublishAsync(subject, data, headers, replyTo, serializer, cancellationToken)
-                    : CommandWriter.PublishAsync(subject, data, headers, replyTo, serializer, cancellationToken);
+                return PerformPublishAsync(subject, headers, data, serializer, replyTo, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -55,18 +51,71 @@ public partial class NatsConnection
 
         serializer ??= Opts.SerializerRegistry.GetSerializer<T>();
         headers?.SetReadOnly();
-        return ConnectionState != NatsConnectionState.Open
-            ? ConnectAndPublishAsync(subject, data, headers, replyTo, serializer, cancellationToken)
-            : CommandWriter.PublishAsync(subject, data, headers, replyTo, serializer, cancellationToken);
+        return PerformPublishAsync<T>(subject, headers, data, serializer, replyTo, cancellationToken);
     }
 
     /// <inheritdoc />
     public ValueTask PublishAsync<T>(in NatsMsg<T> msg, INatsSerialize<T>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default) =>
         PublishAsync(msg.Subject, msg.Data, msg.Headers, msg.ReplyTo, serializer, opts, cancellationToken);
 
-    private async ValueTask ConnectAndPublishAsync<T>(string subject, T? data, NatsHeaders? headers, string? replyTo, INatsSerialize<T> serializer, CancellationToken cancellationToken)
+    private async ValueTask ConnectAndPublishAsync(string subject, ReadOnlyMemory<byte>? headers, ReadOnlyMemory<byte> data, string? replyTo, CancellationToken cancellationToken)
     {
         await ConnectAsync().AsTask().WaitAsync(cancellationToken).ConfigureAwait(false);
-        await CommandWriter.PublishAsync(subject, data, headers, replyTo, serializer, cancellationToken).ConfigureAwait(false);
+        await CommandWriter.PublishAsync(subject, headers, data, replyTo, cancellationToken).ConfigureAwait(false);
+    }
+
+    private ValueTask PerformPublishAsync<T>(string subject, NatsHeaders? headers, T? data, INatsSerialize<T> serializer, string? replyTo = default, CancellationToken cancellationToken = default)
+    {
+        NatsPooledBufferWriter<byte>? headersBuffer = null;
+        NatsPooledBufferWriter<byte>? payloadBuffer = null;
+
+        ValueTask task;
+
+        try
+        {
+            if (headers != null)
+            {
+                headers?.SetReadOnly();
+                if (!_pool.TryRent(out headersBuffer))
+                    headersBuffer = new NatsPooledBufferWriter<byte>(_arrayPoolInitialSize);
+            }
+
+            if (!_pool.TryRent(out payloadBuffer!))
+                payloadBuffer = new NatsPooledBufferWriter<byte>(_arrayPoolInitialSize);
+
+            if (headers != null)
+                _headerWriter.Write(headersBuffer!, headers);
+
+            if (data != null)
+                serializer.Serialize(payloadBuffer, data);
+            task = DoPublishAsync(subject, headersBuffer?.WrittenMemory, payloadBuffer.WrittenMemory, replyTo, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            throw;
+        }
+        finally
+        {
+            if (payloadBuffer != null)
+            {
+                payloadBuffer.Reset();
+                _pool.Return(payloadBuffer);
+            }
+
+            if (headersBuffer != null)
+            {
+                headersBuffer.Reset();
+                _pool.Return(headersBuffer);
+            }
+        }
+
+        return task;
+    }
+
+    private ValueTask DoPublishAsync(string subject, ReadOnlyMemory<byte>? headers = default, ReadOnlyMemory<byte> data = default, string? replyTo = default, CancellationToken cancellationToken = default)
+    {
+        return ConnectionState != NatsConnectionState.Open
+            ? ConnectAndPublishAsync(subject, headers, data, replyTo, cancellationToken)
+            : CommandWriter.PublishAsync(subject, headers, data, replyTo, cancellationToken);
     }
 }
