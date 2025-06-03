@@ -77,8 +77,10 @@ internal sealed class ProtocolWriter
     // or
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#hpub
     // HPUB <subject> [reply-to] <#header bytes> <#total bytes>\r\n[headers]\r\n\r\n[payload]\r\n
-    public void WritePublish(IBufferWriter<byte> writer, string subject, string? replyTo, ReadOnlyMemory<byte>? headers, ReadOnlyMemory<byte> payload)
+    public void WritePublish(IBufferWriter<byte> writer, NatsPublishProps props, ReadOnlyMemory<byte>? headers, ReadOnlyMemory<byte> payload)
     {
+        var subject = props.Subject;
+        var replyTo = props.ReplyTo;
         if (headers == null)
         {
             WritePub(writer, subject, replyTo, payload);
@@ -91,8 +93,12 @@ internal sealed class ProtocolWriter
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#sub
     // SUB <subject> [queue group] <sid>
-    public void WriteSubscribe(IBufferWriter<byte> writer, int sid, string subject, string? queueGroup, int? maxMsgs)
+    public void WriteSubscribe(IBufferWriter<byte> writer, NatsSubscriptionProps props, int? maxMsgs)
     {
+        var sid = props.SubscriptionId;
+        var subject = props.Subject;
+        var queueGroup = props.QueueGroup;
+
         // 'SUB '                       + subject                                +' '+ sid                +'\r\n'
         var ctrlLen = SubSpaceLength + _subjectEncoding.GetByteCount(subject) + 1 + MaxIntStringLength + NewLineLength;
 
@@ -138,14 +144,16 @@ internal sealed class ProtocolWriter
         // between our SUB and UNSUB calls.
         if (maxMsgs != null)
         {
-            WriteUnsubscribe(writer, sid, maxMsgs);
+            WriteUnsubscribe(writer, props, maxMsgs);
         }
     }
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#unsub
     // UNSUB <sid> [max_msgs]
-    public void WriteUnsubscribe(IBufferWriter<byte> writer, int sid, int? maxMessages)
+    public void WriteUnsubscribe(IBufferWriter<byte> writer, NatsSubscriptionProps probs, int? maxMessages)
     {
+        var sid = probs.SubscriptionId;
+
         // 'UNSUB '                       + sid                +'\r\n'
         var ctrlLen = UnsubSpaceLength + MaxIntStringLength + NewLineLength;
         if (maxMessages != null)

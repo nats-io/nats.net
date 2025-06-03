@@ -30,18 +30,17 @@ internal enum NatsEvent
 
 public partial class NatsConnection : INatsConnection
 {
-#pragma warning disable SA1401
-    internal readonly ConnectionStatsCounter Counter; // allow to call from external sources
-#pragma warning restore SA1401
     private readonly object _gate = new object();
     private readonly ILogger<NatsConnection> _logger;
     private readonly ObjectPool _pool;
     private readonly CancellationTokenSource _disposedCts;
     private readonly string _name;
+    private readonly int _arrayPoolInitialSize;
     private readonly TimeSpan _socketComponentDisposeTimeout = TimeSpan.FromSeconds(5);
     private readonly BoundedChannelOptions _defaultSubscriptionChannelOpts;
     private readonly Channel<(NatsEvent, NatsEventArgs)> _eventChannel;
     private readonly ClientOpts _clientOpts;
+    private readonly HeaderWriter _headerWriter;
     private readonly SubscriptionManager _subscriptionManager;
     private readonly ReplyTaskFactory _replyTaskFactory;
 
@@ -80,12 +79,17 @@ public partial class NatsConnection : INatsConnection
         _disposedCts = new CancellationTokenSource();
         _pool = new ObjectPool(opts.ObjectPoolSize);
         _name = opts.Name;
-        Counter = new ConnectionStatsCounter();
-        CommandWriter = new CommandWriter("main", this, _pool, Opts, Counter, EnqueuePing);
+
+        // Derive ArrayPool rent size from buffer size to
+        // avoid defining another option.
+        _arrayPoolInitialSize = opts.WriterBufferSize / 256;
+
+        CommandWriter = new CommandWriter("main", this, Opts, EnqueuePing);
         InboxPrefix = NewInbox(opts.InboxPrefix);
         _subscriptionManager = new SubscriptionManager(this, InboxPrefix);
         _replyTaskFactory = new ReplyTaskFactory(this);
         _clientOpts = ClientOpts.Create(Opts);
+        _headerWriter = new HeaderWriter(opts.HeaderEncoding);
         HeaderParser = new NatsHeaderParser(opts.HeaderEncoding);
         _defaultSubscriptionChannelOpts = new BoundedChannelOptions(opts.SubPendingChannelCapacity)
         {
@@ -261,31 +265,13 @@ public partial class NatsConnection : INatsConnection
         }
     }
 
-    internal string SpanDestinationName(string subject)
-    {
-        if (subject.StartsWith(Opts.InboxPrefix, StringComparison.Ordinal))
-            return "inbox";
-
-        // to avoid long span names and low cardinality, only take the first two tokens
-        var tokens = subject.Split('.');
-        return tokens.Length < 2 ? subject : $"{tokens[0]}.{tokens[1]}";
-    }
-
-    internal NatsStats GetStats() => Counter.ToStats();
-
-    internal ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
+    internal ValueTask PublishToClientHandlersAsync(NatsProcessProps props, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
     {
         if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
         {
-            // Direct mode, check if the subject is an inbox
-            // and if so, check if the subject is a reply to a request
-            // by checking if the subject length is less than two NUIDs + dots
-            // e.g. _INBOX.Hu5HPpWesrJhvQq2NG3YJ6.Hu5HPpWesrJhvQq2NG3YLw
-            //  vs. _INBOX.Hu5HPpWesrJhvQq2NG3YJ6.1234
-            // otherwise, it's not a reply in direct mode.
-            if (_subscriptionManager.InboxSid == sid && subject.Length < InboxPrefix.Length + 1 + 22 + 1 + 22)
+            if (_subscriptionManager.InboxSid == props.SubscriptionId && props.UsesInbox && props.IsDirectReply)
             {
-                var idString = subject.AsSpan().Slice(InboxPrefix.Length + 1)
+                var idString = props.Subject.AsSpan().Slice(InboxPrefix.Length + 1)
 #if NETSTANDARD2_0
                     .ToString()
 #endif
@@ -293,7 +279,8 @@ public partial class NatsConnection : INatsConnection
 
                 if (long.TryParse(idString, out var id))
                 {
-                    if (_replyTaskFactory.TrySetResult(id, replyTo, payloadBuffer, headersBuffer))
+                    props.InboxId = id;
+                    if (_replyTaskFactory.TrySetResult(props, payloadBuffer, headersBuffer))
                     {
                         return default;
                     }
@@ -306,7 +293,7 @@ public partial class NatsConnection : INatsConnection
             }
         }
 
-        return _subscriptionManager.PublishToClientHandlersAsync(subject, replyTo, sid, headersBuffer, payloadBuffer);
+        return _subscriptionManager.PublishToClientHandlersAsync(props, headersBuffer, payloadBuffer);
     }
 
     internal void ResetPongCount()
@@ -317,14 +304,25 @@ public partial class NatsConnection : INatsConnection
     internal ValueTask PongAsync() => CommandWriter.PongAsync(CancellationToken.None);
 
     // called only internally
-    internal ValueTask SubscribeCoreAsync(int sid, string subject, string? queueGroup, int? maxMsgs, CancellationToken cancellationToken) => CommandWriter.SubscribeAsync(sid, subject, queueGroup, maxMsgs, cancellationToken);
+    internal ValueTask SubscribeCoreAsync(NatsSubscriptionProps props, int? maxMsgs, CancellationToken cancellationToken)
+        => CommandWriter.SubscribeAsync(props, maxMsgs, cancellationToken);
 
-    internal ValueTask UnsubscribeAsync(int sid)
+    internal ValueTask UnsubscribeAsync(NatsSubscriptionProps props)
     {
         try
         {
+            var start = DateTimeOffset.UtcNow;
+            var tags = Telemetry.GetTags(ServerInfo, props);
+            using var unsubActivity = Telemetry.StartActivity(start, props, ServerInfo, Telemetry.Constants.UnsubscribeActivityName, tags);
+
             // TODO: use maxMsgs in INatsSub<T> to unsubscribe.
-            return CommandWriter.UnsubscribeAsync(sid, null, CancellationToken.None);
+            var result = CommandWriter.UnsubscribeAsync(props, null, CancellationToken.None);
+            var end = DateTimeOffset.UtcNow;
+            var duration = end - start;
+            unsubActivity?.SetEndTime(end.DateTime);
+            Telemetry.DecrementSubscriptionCount(tags);
+            Telemetry.RecordOperationDuration(Telemetry.Constants.UnsubscribeActivityName, duration, tags);
+            return result;
         }
         catch (Exception ex)
         {
@@ -528,7 +526,7 @@ public partial class NatsConnection : INatsConnection
                 await _userCredentials.AuthenticateAsync(_clientOpts, WritableServerInfo, _currentConnectUri, Opts.ConnectTimeout, _disposedCts.Token).ConfigureAwait(false);
             }
 
-            await using (var priorityCommandWriter = new PriorityCommandWriter(this, _pool, _socketConnection!, Opts, Counter, EnqueuePing))
+            await using (var priorityCommandWriter = new PriorityCommandWriter(this, _socketConnection!, Opts, EnqueuePing))
             {
                 // add CONNECT and PING command to priority lane
                 await priorityCommandWriter.CommandWriter.ConnectAsync(_clientOpts, CancellationToken.None).ConfigureAwait(false);

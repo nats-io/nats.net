@@ -16,9 +16,9 @@ public class LowLevelApiTest
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
 
-        var subject = "foo.*";
+        var props = new NatsSubscriptionProps("foo.*");
         var builder = new NatsSubCustomTestBuilder(_output);
-        var sub = builder.Build(subject, default, nats, nats.SubscriptionManager);
+        var sub = builder.Build(props, default, nats, nats.SubscriptionManager);
         await nats.AddSubAsync(sub);
 
         await Retry.Until(
@@ -45,8 +45,8 @@ public class LowLevelApiTest
         private readonly NatsSubCustomTestBuilder _builder;
         private readonly ITestOutputHelper _output;
 
-        public NatsSubTest(string subject, NatsConnection connection, NatsSubCustomTestBuilder builder, ITestOutputHelper output, INatsSubscriptionManager manager)
-        : base(connection, manager, subject, default, default)
+        public NatsSubTest(NatsSubscriptionProps props, NatsConnection connection, NatsSubCustomTestBuilder builder, ITestOutputHelper output, INatsSubscriptionManager manager)
+        : base(connection, manager, props, default, default)
         {
             _builder = builder;
             _output = output;
@@ -111,9 +111,9 @@ public class LowLevelApiTest
             }
         }
 
-        public NatsSubTest Build(string subject, NatsSubOpts? opts, NatsConnection connection, INatsSubscriptionManager manager)
+        public NatsSubTest Build(NatsSubscriptionProps props, NatsSubOpts? opts, NatsConnection connection, INatsSubscriptionManager manager)
         {
-            return new NatsSubTest(subject, connection, builder: this, _output, manager);
+            return new NatsSubTest(props, connection, builder: this, _output, manager);
         }
 
         public void Sync() => Interlocked.Exchange(ref _sync, 1);

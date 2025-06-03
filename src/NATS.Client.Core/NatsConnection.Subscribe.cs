@@ -9,9 +9,13 @@ public partial class NatsConnection
     public async IAsyncEnumerable<NatsMsg<T>> SubscribeAsync<T>(string subject, string? queueGroup = default, INatsDeserialize<T>? serializer = default, NatsSubOpts? opts = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         serializer ??= Opts.SerializerRegistry.GetDeserializer<T>();
+        var props = new NatsSubscriptionProps(subject)
+        {
+            QueueGroup = queueGroup,
+            InboxPrefix = InboxPrefix,
+        };
 
-        await using var sub = new NatsSub<T>(this, _subscriptionManager.GetManagerFor(subject), subject, queueGroup, opts, serializer, cancellationToken);
-        await AddSubAsync(sub, cancellationToken: cancellationToken).ConfigureAwait(false);
+        await using var sub = await SubscribeInternalAsync<T>(props, serializer, opts, cancellationToken).ConfigureAwait(false);
 
         // We don't cancel the channel reader here because we want to keep reading until the subscription
         // channel writer completes so that messages left in the channel can be consumed before exit the loop.
@@ -25,7 +29,17 @@ public partial class NatsConnection
     public async ValueTask<INatsSub<T>> SubscribeCoreAsync<T>(string subject, string? queueGroup = default, INatsDeserialize<T>? serializer = default, NatsSubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         serializer ??= Opts.SerializerRegistry.GetDeserializer<T>();
-        var sub = new NatsSub<T>(this, _subscriptionManager.GetManagerFor(subject), subject, queueGroup, opts, serializer, cancellationToken);
+        var props = new NatsSubscriptionProps(subject)
+        {
+            QueueGroup = queueGroup,
+            InboxPrefix = InboxPrefix,
+        };
+        return await SubscribeInternalAsync<T>(props, serializer, opts, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async ValueTask<INatsSub<T>> SubscribeInternalAsync<T>(NatsSubscriptionProps props, INatsDeserialize<T> serializer, NatsSubOpts? opts = default, CancellationToken cancellationToken = default)
+    {
+        var sub = new NatsSub<T>(this, _subscriptionManager.GetManagerFor(props), props, opts, serializer, cancellationToken);
         await AddSubAsync(sub, cancellationToken).ConfigureAwait(false);
         return sub;
     }

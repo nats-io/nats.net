@@ -49,11 +49,11 @@ internal sealed class ReplyTask<T> : ReplyTaskBase, IDisposable
         }
     }
 
-    public override void SetResult(string? replyTo, ReadOnlySequence<byte> payload, ReadOnlySequence<byte>? headersBuffer)
+    public override void SetResult(NatsProcessProps props, ReadOnlySequence<byte> payload, ReadOnlySequence<byte>? headersBuffer)
     {
         lock (_gate)
         {
-            _msg = NatsMsg<T>.Build(Subject, replyTo, headersBuffer, payload, _connection, _connection.HeaderParser, _deserializer);
+            _msg = NatsMsg<T>.Build(Subject, props.ReplyTo, headersBuffer, payload, _connection, _connection.HeaderParser, _deserializer);
         }
 
         _tcs.TrySetResult();
@@ -64,7 +64,7 @@ internal sealed class ReplyTask<T> : ReplyTaskBase, IDisposable
 
 internal abstract class ReplyTaskBase
 {
-    public abstract void SetResult(string? replyTo, ReadOnlySequence<byte> payload, ReadOnlySequence<byte>? headersBuffer);
+    public abstract void SetResult(NatsProcessProps props, ReadOnlySequence<byte> payload, ReadOnlySequence<byte>? headersBuffer);
 }
 
 internal sealed class ReplyTaskFactory
@@ -124,11 +124,11 @@ internal sealed class ReplyTaskFactory
 
     public void Return(long id) => _replies.TryRemove(id, out _);
 
-    public bool TrySetResult(long id, string? replyTo, in ReadOnlySequence<byte> payloadBuffer, in ReadOnlySequence<byte>? headersBuffer)
+    public bool TrySetResult(NatsProcessProps props, in ReadOnlySequence<byte> payloadBuffer, in ReadOnlySequence<byte>? headersBuffer)
     {
-        if (_replies.TryGetValue(id, out var rt))
+        if (_replies.TryGetValue(props.InboxId, out var rt))
         {
-            rt.SetResult(replyTo, payloadBuffer, headersBuffer);
+            rt.SetResult(props, payloadBuffer, headersBuffer);
             return true;
         }
 
