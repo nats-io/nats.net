@@ -45,7 +45,8 @@ public partial class NatsConnection
                     using var rt = _replyTaskFactory.CreateReplyTask(replySerializer, replyOpts.Timeout);
                     requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
                     await PublishAsync(subject, data, headers, rt.Subject, requestSerializer, requestOpts, cancellationToken).ConfigureAwait(false);
-                    return await rt.GetResultAsync(cancellationToken).ConfigureAwait(false);
+                    var msgEvent = await rt.GetResultAsync(cancellationToken).ConfigureAwait(false);
+                    return NatsMsg<TReply>.Build(msgEvent.Subject, msgEvent.ReplyTo, msgEvent.HeadersBuffer, msgEvent.Payload, this, HeaderParser, replySerializer);
                 }
 
                 await using var sub1 = await CreateRequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
@@ -72,7 +73,8 @@ public partial class NatsConnection
             using var rt = _replyTaskFactory.CreateReplyTask(replySerializer, replyOpts.Timeout);
             requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
             await PublishAsync(subject, data, headers, rt.Subject, requestSerializer, requestOpts, cancellationToken).ConfigureAwait(false);
-            return await rt.GetResultAsync(cancellationToken).ConfigureAwait(false);
+            var msgEvent = await rt.GetResultAsync(cancellationToken).ConfigureAwait(false);
+            return NatsMsg<TReply>.Build(msgEvent.Subject, msgEvent.ReplyTo, msgEvent.HeadersBuffer, msgEvent.Payload, this, HeaderParser, replySerializer);
         }
 
         await using var sub = await CreateRequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
