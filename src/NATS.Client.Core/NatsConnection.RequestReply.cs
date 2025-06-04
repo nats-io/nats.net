@@ -32,7 +32,7 @@ public partial class NatsConnection
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default)
     {
-        var props = new NatsPublishProps(subject, InboxPrefix);
+        NatsPublishProps props = requestOpts?.Props ?? new NatsPublishProps(subject, InboxPrefix);
         if (Telemetry.HasListeners())
         {
             using var activity = Telemetry.StartSendActivity($"{SpanDestinationName(subject)} {Telemetry.Constants.RequestReplyActivityName}", this, subject, null);
@@ -48,7 +48,7 @@ public partial class NatsConnection
                     return await rt.GetResultAsync(cancellationToken).ConfigureAwait(false);
                 }
 
-                await using var sub1 = await CreateRequestSubAsync<TRequest, TReply>(props, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
+                await using var sub1 = await CreateRequestSubAsync<TRequest, TReply>(props, data, headers, requestSerializer, replySerializer, replyOpts, cancellationToken)
                     .ConfigureAwait(false);
 
                 await foreach (var msg in sub1.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
@@ -76,7 +76,7 @@ public partial class NatsConnection
             return await rt.GetResultAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        await using var sub = await CreateRequestSubAsync<TRequest, TReply>(props, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
+        await using var sub = await CreateRequestSubAsync<TRequest, TReply>(props, data, headers, requestSerializer, replySerializer, replyOpts, cancellationToken)
             .ConfigureAwait(false);
 
         await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))

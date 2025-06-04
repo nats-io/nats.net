@@ -12,6 +12,11 @@ public record NatsMessagingProps : NatsOperationProps
     {
     }
 
+    internal NatsMessagingProps(string subjectTemplate, Dictionary<string, object> properties, string inboxPrefix)
+        : base(subjectTemplate, properties, inboxPrefix)
+    {
+    }
+
     public NatsSubject? ReplyTo { get; private set; } = null;
 
     internal int PayloadLength => TotalMessageLength - HeaderLength;
@@ -29,8 +34,11 @@ public record NatsMessagingProps : NatsOperationProps
         ReplyTo = new NatsSubject(replyToTemplate, "ReplyToId", replyToId, Subject.InboxPrefix);
     }
 
-    public void SetReplyTo(string replyTo)
+    public void SetReplyTo(string? replyTo)
     {
-        ReplyTo = new NatsSubject(replyTo);
+        if (replyTo != null)
+        {
+            ReplyTo = new NatsSubject(replyTo);
+        }
     }
 }

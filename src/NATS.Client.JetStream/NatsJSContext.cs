@@ -41,11 +41,20 @@ public partial class NatsJSContext
     /// </summary>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>The account information based on the NATS connection credentials.</returns>
-    public ValueTask<AccountInfoResponse> GetAccountInfoAsync(CancellationToken cancellationToken = default) =>
-        JSRequestResponseAsync<object, AccountInfoResponse>(
-            subject: $"{Opts.Prefix}.INFO",
+    public ValueTask<AccountInfoResponse> GetAccountInfoAsync(CancellationToken cancellationToken = default)
+    {
+        var props = new NatsPublishProps(
+            "{prefix}.{entity}",
+            new Dictionary<string, object>()
+            {
+                { "prefix", Opts.Prefix },
+                { "entity", "INFO" },
+            });
+        return JSRequestResponseAsync<object, AccountInfoResponse>(
+            props: props,
             request: null,
             cancellationToken);
+    }
 
     /// <summary>
     /// Sends data to a stream associated with the subject.
@@ -336,7 +345,20 @@ public partial class NatsJSContext
         where TRequest : class
         where TResponse : class
     {
-        var response = await JSRequestAsync<TRequest, TResponse>(subject, request, cancellationToken);
+        var response = await JSRequestAsync<TRequest, TResponse>(new NatsPublishProps(subject), request, cancellationToken);
+        response.EnsureSuccess();
+        return response.Response!;
+    }
+
+    /// <inheritdoc />
+    public async ValueTask<TResponse> JSRequestResponseAsync<TRequest, TResponse>(
+        NatsPublishProps props,
+        TRequest? request,
+        CancellationToken cancellationToken = default)
+        where TRequest : class
+        where TResponse : class
+    {
+        var response = await JSRequestAsync<TRequest, TResponse>(props, request, cancellationToken);
         response.EnsureSuccess();
         return response.Response!;
     }
@@ -366,13 +388,13 @@ public partial class NatsJSContext
     }
 
     internal async ValueTask<NatsJSResponse<TResponse>> JSRequestAsync<TRequest, TResponse>(
-        string subject,
+        NatsPublishProps props,
         TRequest? request,
         CancellationToken cancellationToken = default)
         where TRequest : class
         where TResponse : class
     {
-        var result = await TryJSRequestAsync<TRequest, TResponse>(subject, request, cancellationToken).ConfigureAwait(false);
+        var result = await TryJSRequestAsync<TRequest, TResponse>(props, request, cancellationToken).ConfigureAwait(false);
         if (!result.Success)
         {
             throw result.Error;
@@ -382,7 +404,7 @@ public partial class NatsJSContext
     }
 
     internal async ValueTask<NatsResult<NatsJSResponse<TResponse>>> TryJSRequestAsync<TRequest, TResponse>(
-        string subject,
+        NatsPublishProps props,
         TRequest? request,
         CancellationToken cancellationToken = default)
         where TRequest : class
@@ -400,9 +422,10 @@ public partial class NatsJSContext
             try
             {
                 msg = await Connection.RequestAsync<TRequest, NatsJSApiResult<TResponse>>(
-                    subject: subject,
+                    subject: string.Empty,
                     data: request,
                     headers: null,
+                    requestOpts: new NatsPubOpts { Props = props },
                     replyOpts: new NatsSubOpts { Timeout = Connection.Opts.RequestTimeout },
                     requestSerializer: NatsJSJsonSerializer<TRequest>.Default,
                     replySerializer: NatsJSJsonDocumentSerializer<TResponse>.Default,
@@ -441,9 +464,10 @@ public partial class NatsJSContext
         }
 
         await using var sub = await Connection.CreateRequestSubAsync<TRequest, NatsJSApiResult<TResponse>>(
-                subject: subject,
+                subject: string.Empty,
                 data: request,
                 headers: default,
+                requestOpts: new NatsPubOpts { Props = props },
                 replyOpts: new NatsSubOpts { Timeout = Connection.Opts.RequestTimeout },
                 requestSerializer: NatsJSJsonSerializer<TRequest>.Default,
                 replySerializer: NatsJSJsonDocumentSerializer<TResponse>.Default,
