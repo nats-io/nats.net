@@ -13,7 +13,7 @@ public partial class NatsConnection
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default)
     {
-        var props = new NatsPublishProps(subject, InboxPrefix);
+        var props = requestOpts?.Props ?? new NatsPublishProps(subject, InboxPrefix);
         props.SetReplyTo(NewInbox());
         replySerializer ??= Opts.SerializerRegistry.GetDeserializer<TReply>();
         var subProps = new NatsSubscriptionProps(props.Subject);
@@ -33,7 +33,6 @@ public partial class NatsConnection
         NatsHeaders? headers = default,
         INatsSerialize<TRequest>? requestSerializer = default,
         INatsDeserialize<TReply>? replySerializer = default,
-        NatsPubOpts? requestOpts = default,
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default)
     {

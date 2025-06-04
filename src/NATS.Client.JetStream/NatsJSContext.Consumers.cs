@@ -67,10 +67,8 @@ public partial class NatsJSContext : INatsJSContext
     public async ValueTask<INatsJSConsumer> GetConsumerAsync(string stream, string consumer, CancellationToken cancellationToken = default)
     {
         ThrowIfInvalidStreamName(stream);
-        var response = await JSRequestResponseAsync<object, ConsumerInfo>(
-            subject: $"{Opts.Prefix}.CONSUMER.INFO.{stream}.{consumer}",
-            request: null,
-            cancellationToken);
+        var props = GetConsumerProps("INFO", stream, consumer);
+        var response = await JSRequestResponseAsync<object, ConsumerInfo>(props, null, cancellationToken);
         return new NatsJSConsumer(this, response);
     }
 
@@ -81,10 +79,11 @@ public partial class NatsJSContext : INatsJSContext
     {
         ThrowIfInvalidStreamName(stream);
         var offset = 0;
+        var props = GetConsumerProps("LIST", stream);
         while (!cancellationToken.IsCancellationRequested)
         {
             var response = await JSRequestResponseAsync<ConsumerListRequest, ConsumerListResponse>(
-                subject: $"{Opts.Prefix}.CONSUMER.LIST.{stream}",
+                props: props,
                 new ConsumerListRequest { Offset = offset },
                 cancellationToken);
 
@@ -107,10 +106,11 @@ public partial class NatsJSContext : INatsJSContext
     {
         ThrowIfInvalidStreamName(stream);
         var offset = 0;
+        var props = GetConsumerProps("NAMES", stream);
         while (!cancellationToken.IsCancellationRequested)
         {
             var response = await JSRequestResponseAsync<ConsumerNamesRequest, ConsumerNamesResponse>(
-                subject: $"{Opts.Prefix}.CONSUMER.NAMES.{stream}",
+                props: props,
                 new ConsumerNamesRequest { Offset = offset },
                 cancellationToken);
 
@@ -138,10 +138,8 @@ public partial class NatsJSContext : INatsJSContext
     public async ValueTask<bool> DeleteConsumerAsync(string stream, string consumer, CancellationToken cancellationToken = default)
     {
         ThrowIfInvalidStreamName(stream);
-        var response = await JSRequestResponseAsync<object, ConsumerDeleteResponse>(
-            subject: $"{Opts.Prefix}.CONSUMER.DELETE.{stream}.{consumer}",
-            request: null,
-            cancellationToken);
+        var props = GetConsumerProps("DELETE", stream, consumer);
+        var response = await JSRequestResponseAsync<object, ConsumerDeleteResponse>(props, null, cancellationToken);
         return response.Success;
     }
 
@@ -161,7 +159,7 @@ public partial class NatsJSContext : INatsJSContext
     {
         ThrowIfInvalidStreamName(stream);
         var response = await JSRequestResponseAsync<ConsumerPauseRequest, ConsumerPauseResponse>(
-            subject: $"{Opts.Prefix}.CONSUMER.PAUSE.{stream}.{consumer}",
+            props: GetConsumerProps("PAUSE", stream, consumer),
             request: new ConsumerPauseRequest { PauseUntil = pauseUntil },
             cancellationToken);
         return response;
@@ -181,10 +179,8 @@ public partial class NatsJSContext : INatsJSContext
     public async ValueTask<bool> ResumeConsumerAsync(string stream, string consumer, CancellationToken cancellationToken = default)
     {
         ThrowIfInvalidStreamName(stream);
-        var response = await JSRequestResponseAsync<object, ConsumerPauseResponse>(
-            subject: $"{Opts.Prefix}.CONSUMER.PAUSE.{stream}.{consumer}",
-            request: null,
-            cancellationToken);
+        var props = GetConsumerProps("PAUSE", stream, consumer);
+        var response = await JSRequestResponseAsync<object, ConsumerPauseResponse>(props, null, cancellationToken);
         return !response.IsPaused;
     }
 
@@ -229,12 +225,9 @@ public partial class NatsJSContext : INatsJSContext
         }
 
         var name = Nuid.NewNuid();
-        var subject = $"{Opts.Prefix}.CONSUMER.CREATE.{stream}.{name}";
+        var props = GetConsumerProps("CREATE", stream, name);
 
-        return JSRequestResponseAsync<ConsumerCreateRequest, ConsumerInfo>(
-            subject: subject,
-            request,
-            cancellationToken);
+        return JSRequestResponseAsync<ConsumerCreateRequest, ConsumerInfo>(props, request, cancellationToken);
     }
 
     private async ValueTask<NatsJSConsumer> CreateOrUpdateConsumerInternalAsync(
@@ -243,16 +236,12 @@ public partial class NatsJSContext : INatsJSContext
         ConsumerCreateAction action,
         CancellationToken cancellationToken)
     {
-        var subject = $"{Opts.Prefix}.CONSUMER.CREATE.{stream}";
+        var props = GetConsumerProps("CREATE", stream, config.Name);
 
-        if (!string.IsNullOrWhiteSpace(config.Name))
+        if (!string.IsNullOrWhiteSpace(config.FilterSubject) && config.FilterSubject != null)
         {
-            subject += $".{config.Name}";
-        }
-
-        if (!string.IsNullOrWhiteSpace(config.FilterSubject))
-        {
-            subject += $".{config.FilterSubject}";
+            props.Subject.Values.Add("filterSubject", config.FilterSubject);
+            props.Subject.Template += ".filterSubject";
         }
 
         // ADR-42: In the initial implementation we should limit PriorityGroups to one per consumer only
@@ -275,7 +264,7 @@ public partial class NatsJSContext : INatsJSContext
         }
 
         var response = await JSRequestResponseAsync<ConsumerCreateRequest, ConsumerInfo>(
-            subject: subject,
+            props: props,
             new ConsumerCreateRequest
             {
                 StreamName = stream,
@@ -285,5 +274,26 @@ public partial class NatsJSContext : INatsJSContext
             cancellationToken);
 
         return new NatsJSConsumer(this, response);
+    }
+
+    private NatsPublishProps GetConsumerProps(string action, string stream, string? consumer = default)
+    {
+        var template = "{prefix}.{entity}.{action}.{stream}";
+        var values = new Dictionary<string, object>()
+            {
+                { "prefix", Opts.Prefix },
+                { "entity", "CONSUMER" },
+                { "action", action },
+                { "stream", stream },
+            };
+        if (consumer != null)
+        {
+            template += ".{id}";
+            values.Add("id", consumer);
+        }
+
+        return new NatsPublishProps(
+            template,
+            values);
     }
 }

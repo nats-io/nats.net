@@ -26,7 +26,7 @@ public record NatsSubject
 
     internal string? InboxPrefix { get; set; }
 
-    internal string? Template { get; private set; }
+    internal string? Template { get; set; }
 
     internal Dictionary<string, object> Values { get; private set; }
 

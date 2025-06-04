@@ -12,6 +12,11 @@ public record NatsOperationProps
     {
     }
 
+    public NatsOperationProps(string subjectTemplate, Dictionary<string, object> properties, string inboxPrefix)
+        : this(new NatsSubject(subjectTemplate, properties, inboxPrefix))
+    {
+    }
+
     public NatsOperationProps(NatsSubject subject)
     {
         Subject = subject;
