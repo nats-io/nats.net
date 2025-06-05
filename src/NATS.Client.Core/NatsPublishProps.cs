@@ -2,18 +2,18 @@ namespace NATS.Client.Core;
 
 public record NatsPublishProps : NatsMessagingProps
 {
-    public NatsPublishProps(string subject, string inboxPrefix = "UNKNOWN")
-        : base(subject, inboxPrefix)
+    public NatsPublishProps(string subject)
+        : base(subject)
     {
     }
 
-    public NatsPublishProps(string subjectTemplate, string subjectId, string inboxPrefix = "UNKNOWN")
-        : base(subjectTemplate, subjectId, inboxPrefix)
+    public NatsPublishProps(string subjectTemplate, string subjectId)
+        : base(subjectTemplate, subjectId)
     {
     }
 
-    internal NatsPublishProps(string subjectTemplate, Dictionary<string, object> properties, string inboxPrefix = "UNKNOWN")
-        : base(subjectTemplate, properties, inboxPrefix)
+    public NatsPublishProps(string subjectTemplate, Dictionary<string, object> properties)
+        : base(subjectTemplate, properties)
     {
     }
 }

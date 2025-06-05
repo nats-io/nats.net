@@ -277,32 +277,12 @@ public partial class NatsConnection : INatsConnection
     {
         if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
         {
-            // Direct mode, check if the subject is an inbox
-            // and if so, check if the subject is a reply to a request
-            // by checking if the subject length is less than two NUIDs + dots
-            // e.g. _INBOX.Hu5HPpWesrJhvQq2NG3YJ6.Hu5HPpWesrJhvQq2NG3YLw
-            //  vs. _INBOX.Hu5HPpWesrJhvQq2NG3YJ6.1234
-            // otherwise, it's not a reply in direct mode.
-            if (_subscriptionManager.InboxSid == props.SubscriptionId && props.Subject.ToString().Length < InboxPrefix.Length + 1 + 22 + 1 + 22)
+            if (_subscriptionManager.InboxSid == props.SubscriptionId && props.IsReplyToRequest(InboxPrefix))
             {
-                var idString = props.Subject.ToString().AsSpan().Slice(InboxPrefix.Length + 1)
-#if NETSTANDARD2_0
-                    .ToString()
-#endif
-                ;
-
-                if (long.TryParse(idString, out var id))
+                if (_replyTaskFactory.TrySetResult(props, payloadBuffer, headersBuffer))
                 {
-                    if (_replyTaskFactory.TrySetResult(props, payloadBuffer, headersBuffer))
-                    {
-                        return default;
-                    }
-
-                    // if we can't set the result, either the task is already timed out or
-                    // it's not a reply to a request.
+                    return default;
                 }
-
-                // if we can't parse the id, it's not a reply.
             }
         }
 

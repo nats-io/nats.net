@@ -71,9 +71,13 @@ var stopwatch = Stopwatch.StartNew();
 var payload = new ReadOnlySequence<byte>(new byte[t.Size]);
 var pubSync = 0;
 var pubAsync = 0;
+var options = new NatsPubOpts()
+{
+    Props = new NatsPublishProps(t.Subject),
+};
 for (var i = 0; i < t.Msgs; i++)
 {
-    var vt = nats2.PublishAsync(t.Subject, payload, cancellationToken: cts.Token);
+    var vt = nats2.PublishAsync(t.Subject, payload, opts: options, cancellationToken: cts.Token);
     if (vt.IsCompletedSuccessfully)
     {
         pubSync++;

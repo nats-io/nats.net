@@ -66,7 +66,7 @@ public abstract class NatsSubBase
         string? queueGroup,
         NatsSubOpts? opts,
         CancellationToken cancellationToken = default)
-        : this(connection, manager, new NatsSubscriptionProps(subject, "UNKNOWN", queueGroup), opts, cancellationToken)
+        : this(connection, manager, new NatsSubscriptionProps(subject, queueGroup), opts, cancellationToken)
     {
     }
 
@@ -150,6 +150,11 @@ public abstract class NatsSubBase
     }
 
     /// <summary>
+    /// A collection of properties to describe the subscription.
+    /// </summary>
+    public NatsSubscriptionProps SubscriptionProps => Props;
+
+    /// <summary>
     /// The subject name to subscribe to.
     /// </summary>
     public string Subject => Props.Subject.ToString();
@@ -183,15 +188,6 @@ public abstract class NatsSubBase
     protected INatsConnection Connection { get; }
 
     private NatsSubscriptionProps Props { get; }
-
-    /// <summary>
-    /// A collection of properties to describe the subscription.
-    /// </summary>
-    public NatsSubscriptionProps SubscriptionProps(string inboxPrefix)
-    {
-        Props.Subject.InboxPrefix = inboxPrefix;
-        return Props;
-    }
 
     /// <summary>
     /// Signals that the subscription is ready to receive messages.
@@ -294,7 +290,7 @@ public abstract class NatsSubBase
     [Obsolete("Nats processing props should be passed instead")]
     public virtual async ValueTask ReceiveAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
     {
-        await ReceiveAsync(new NatsProcessProps(subject, 0, "UNKNOWN"), headersBuffer, payloadBuffer).ConfigureAwait(false);
+        await ReceiveAsync(new NatsProcessProps(subject, 0), headersBuffer, payloadBuffer).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -391,7 +387,7 @@ public abstract class NatsSubBase
             throw new NotImplementedException("ReceiveInternalAsync should be implemented");
         }
 
-        var props = new NatsProcessProps(subject, 0, "UNKNOWN");
+        var props = new NatsProcessProps(subject, 0);
         props.SetReplyTo(replyTo);
         return ReceiveInternalAsync(props, headersBuffer, payloadBuffer);
     }

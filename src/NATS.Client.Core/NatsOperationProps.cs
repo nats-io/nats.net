@@ -2,25 +2,21 @@ namespace NATS.Client.Core;
 
 public record NatsOperationProps
 {
-    public NatsOperationProps(string subject, string inboxPrefix)
-        : this(new NatsSubject(subject, inboxPrefix))
-    {
-    }
-
-    public NatsOperationProps(string subjectTemplate, string subjectId, string inboxPrefix)
-        : this(new NatsSubject(subjectTemplate, "SubjectId", subjectId, inboxPrefix))
-    {
-    }
-
-    public NatsOperationProps(string subjectTemplate, Dictionary<string, object> properties, string inboxPrefix)
-        : this(new NatsSubject(subjectTemplate, properties, inboxPrefix))
-    {
-    }
-
-    public NatsOperationProps(NatsSubject subject)
+    internal NatsOperationProps(string subject)
+        : this(new NatsSubject(subject))
     {
         Subject = subject;
     }
 
-    public NatsSubject Subject { get; private set; }
+    internal NatsOperationProps(string subjectTemplate, string subjectId)
+        : this(new NatsSubject(subjectTemplate, "SubjectId", subjectId))
+    {
+    }
+
+    internal NatsOperationProps(string subjectTemplate, Dictionary<string, object> properties)
+        : this(new NatsSubject(subjectTemplate, properties))
+    {
+    }
+
+    public string Subject { get; private set; }
 }

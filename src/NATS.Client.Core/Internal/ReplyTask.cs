@@ -95,7 +95,7 @@ internal sealed class ReplyTaskFactory
     {
         deserializer ??= _serializerRegistry.GetDeserializer<TReply>();
         var id = Interlocked.Increment(ref _nextId);
-        
+
         string subject;
         if (_allocSubject)
         {
@@ -126,7 +126,7 @@ internal sealed class ReplyTaskFactory
 
     public bool TrySetResult(NatsProcessProps props, in ReadOnlySequence<byte> payloadBuffer, in ReadOnlySequence<byte>? headersBuffer)
     {
-        if (_replies.TryGetValue(props.SubjectNumber, out var rt))
+        if (_replies.TryGetValue(props.SubjectNumber(_connection.InboxPrefix), out var rt))
         {
             rt.SetResult(props, payloadBuffer, headersBuffer);
             return true;

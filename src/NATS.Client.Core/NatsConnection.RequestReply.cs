@@ -32,7 +32,7 @@ public partial class NatsConnection
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default)
     {
-        NatsPublishProps props = requestOpts?.Props ?? new NatsPublishProps(subject, InboxPrefix);
+        var props = requestOpts?.Props ?? new NatsPublishProps(subject, InboxPrefix);
         if (Telemetry.HasListeners())
         {
             using var activity = Telemetry.StartSendActivity($"{SpanDestinationName(subject)} {Telemetry.Constants.RequestReplyActivityName}", this, subject, null);
