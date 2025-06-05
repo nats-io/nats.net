@@ -381,7 +381,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         return default;
     }
 
-    public ValueTask SubscribeAsync(NatsSubscriptionProps props, int? maxMsgs, CancellationToken cancellationToken)
+    public ValueTask SubscribeAsync(NatsSubscribeProps props, int? maxMsgs, CancellationToken cancellationToken)
     {
         if (_trace)
         {
@@ -420,7 +420,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         return default;
     }
 
-    public ValueTask UnsubscribeAsync(NatsSubscriptionProps props, int? maxMsgs, CancellationToken cancellationToken)
+    public ValueTask UnsubscribeAsync(NatsUnsubscribeProps props, int? maxMsgs, CancellationToken cancellationToken)
     {
         if (_trace)
         {
@@ -866,7 +866,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
     }
 
-    private async ValueTask SubscribeStateMachineAsync(bool lockHeld, NatsSubscriptionProps props, int? maxMsgs, CancellationToken cancellationToken)
+    private async ValueTask SubscribeStateMachineAsync(bool lockHeld, NatsSubscribeProps props, int? maxMsgs, CancellationToken cancellationToken)
     {
         if (!lockHeld)
         {
@@ -903,7 +903,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
     }
 
-    private async ValueTask UnsubscribeStateMachineAsync(bool lockHeld, NatsSubscriptionProps props, int? maxMsgs, CancellationToken cancellationToken)
+    private async ValueTask UnsubscribeStateMachineAsync(bool lockHeld, NatsUnsubscribeProps props, int? maxMsgs, CancellationToken cancellationToken)
     {
         if (!lockHeld)
         {

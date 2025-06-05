@@ -297,10 +297,10 @@ public partial class NatsConnection : INatsConnection
     internal ValueTask PongAsync() => CommandWriter.PongAsync(CancellationToken.None);
 
     // called only internally
-    internal ValueTask SubscribeCoreAsync(NatsSubscriptionProps props, int? maxMsgs, CancellationToken cancellationToken)
+    internal ValueTask SubscribeCoreAsync(NatsSubscribeProps props, int? maxMsgs, CancellationToken cancellationToken)
         => CommandWriter.SubscribeAsync(props, maxMsgs, cancellationToken);
 
-    internal ValueTask UnsubscribeAsync(NatsSubscriptionProps props)
+    internal ValueTask UnsubscribeAsync(NatsUnsubscribeProps props)
     {
         try
         {

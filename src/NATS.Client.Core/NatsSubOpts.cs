@@ -68,5 +68,5 @@ public record NatsSubOpts
     /// </summary>
     public NatsSubChannelOpts? ChannelOpts { get; init; }
 
-    public NatsSubscriptionProps? Props { get; init; } = null;
+    internal NatsSubscribeProps? Props { get; init; } = null;
 }

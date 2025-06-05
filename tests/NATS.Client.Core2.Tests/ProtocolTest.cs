@@ -469,13 +469,13 @@ public class ProtocolTest
         private readonly Action<int> _callback;
 
         internal NatsSubReconnectTest(NatsConnection connection, string subject, string cmdSubject, Action<int> callback)
-            : base(connection, connection.SubscriptionManager, new NatsSubscriptionProps (subject), opts: default)
+            : base(connection, connection.SubscriptionManager, new NatsSubscribeProps(subject), opts: default)
         {
             _cmdSubject = cmdSubject;
             _callback = callback;
         }
 
-        internal override async ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter, NatsSubscriptionProps props)
+        internal override async ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter, NatsSubscribeProps props)
         {
             await base.WriteReconnectCommandsAsync(commandWriter, props);
 
@@ -486,6 +486,7 @@ public class ProtocolTest
             }
         }
 
+        [Obsolete]
         protected override ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
         {
             _callback(int.Parse(Encoding.UTF8.GetString(payloadBuffer.ToArray())));

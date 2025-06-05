@@ -17,14 +17,14 @@ public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
         NatsSubOpts? opts,
         INatsDeserialize<T> serializer,
         CancellationToken cancellationToken = default)
-        : this(connection, manager, new NatsSubscriptionProps(subject, queueGroup), opts, serializer, cancellationToken)
+        : this(connection, manager, new NatsSubscribeProps(subject, queueGroup), opts, serializer, cancellationToken)
     {
     }
 
     public NatsSub(
         INatsConnection connection,
         INatsSubscriptionManager manager,
-        NatsSubscriptionProps props,
+        NatsSubscribeProps props,
         NatsSubOpts? opts,
         INatsDeserialize<T> serializer,
         CancellationToken cancellationToken = default)

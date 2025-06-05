@@ -13,10 +13,11 @@ public partial class NatsConnection
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default)
     {
-        var props = requestOpts?.Props ?? new NatsPublishProps(subject, InboxPrefix);
+        var props = requestOpts?.Props ?? new NatsPublishProps(subject);
         props.SetReplyTo(NewInbox());
         replySerializer ??= Opts.SerializerRegistry.GetDeserializer<TReply>();
-        var subProps = new NatsSubscriptionProps(props.Subject);
+        var subProps = new NatsSubscribeProps(props.Subject);
+        subProps.SubscriptionId = _subscriptionManager.GetNextSid();
         var sub = new NatsSub<TReply>(this, _subscriptionManager.InboxSubBuilder, subProps, replyOpts, replySerializer);
         await AddSubAsync(sub, cancellationToken).ConfigureAwait(false);
 
@@ -37,7 +38,8 @@ public partial class NatsConnection
         CancellationToken cancellationToken = default)
     {
         replySerializer ??= Opts.SerializerRegistry.GetDeserializer<TReply>();
-        var subProps = replyOpts?.Props ?? new NatsSubscriptionProps(props.Subject);
+        var subProps = replyOpts?.Props ?? new NatsSubscribeProps(props.Subject);
+        subProps.SubscriptionId = _subscriptionManager.GetNextSid();
         var sub = new NatsSub<TReply>(this, _subscriptionManager.InboxSubBuilder, subProps, replyOpts, replySerializer);
         await AddSubAsync(sub, cancellationToken).ConfigureAwait(false);
 

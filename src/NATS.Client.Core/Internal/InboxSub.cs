@@ -12,7 +12,7 @@ internal class InboxSub : NatsSubBase
 
     public InboxSub(
         InboxSubBuilder inbox,
-        NatsSubscriptionProps props,
+        NatsSubscribeProps props,
         NatsSubOpts? opts,
         NatsConnection connection,
         INatsSubscriptionManager manager)
@@ -46,7 +46,7 @@ internal class InboxSubBuilder : INatsSubscriptionManager
 
     public InboxSubBuilder(ILogger<InboxSubBuilder> logger) => _logger = logger;
 
-    public InboxSub Build(NatsSubscriptionProps props, NatsSubOpts? opts, NatsConnection connection, INatsSubscriptionManager manager)
+    public InboxSub Build(NatsSubscribeProps props, NatsSubOpts? opts, NatsConnection connection, INatsSubscriptionManager manager)
     {
         return new InboxSub(this, props, opts, connection, manager);
     }

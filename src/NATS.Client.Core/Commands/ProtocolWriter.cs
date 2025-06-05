@@ -93,7 +93,7 @@ internal sealed class ProtocolWriter
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#sub
     // SUB <subject> [queue group] <sid>
-    public void WriteSubscribe(IBufferWriter<byte> writer, NatsSubscriptionProps props, int? maxMsgs)
+    public void WriteSubscribe(IBufferWriter<byte> writer, NatsSubscribeProps props, int? maxMsgs)
     {
         var sid = props.SubscriptionId;
         var subject = props.Subject.ToString();
@@ -150,7 +150,7 @@ internal sealed class ProtocolWriter
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#unsub
     // UNSUB <sid> [max_msgs]
-    public void WriteUnsubscribe(IBufferWriter<byte> writer, NatsSubscriptionProps probs, int? maxMessages)
+    public void WriteUnsubscribe(IBufferWriter<byte> writer, NatsUnsubscribeProps probs, int? maxMessages)
     {
         var sid = probs.SubscriptionId;
 

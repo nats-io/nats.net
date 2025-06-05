@@ -39,7 +39,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         TimeSpan expires,
         TimeSpan idle,
         NatsJSContext context,
-        NatsSubscriptionProps props,
+        NatsSubscribeProps props,
         string stream,
         string consumer,
         Func<INatsJSNotification, CancellationToken, Task>? notificationHandler,
@@ -179,7 +179,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         }
     }
 
-    internal override async ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter, NatsSubscriptionProps props)
+    internal override async ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter, NatsSubscribeProps props)
     {
         await base.WriteReconnectCommandsAsync(commandWriter, props);
         var request = new ConsumerGetnextRequest
@@ -191,12 +191,12 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
             MinPending = _priorityGroup?.MinPending ?? 0,
             MinAckPending = _priorityGroup?.MinAckPending ?? 0,
         };
-
+        var pubProps = new NatsPublishProps($"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}");
+        pubProps.SetReplyTo(Subject);
         await commandWriter.PublishAsync(
-            subject: $"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
+            props: pubProps,
             value: request,
             headers: default,
-            replyTo: Subject,
             serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
             cancellationToken: CancellationToken.None);
     }

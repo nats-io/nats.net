@@ -18,5 +18,9 @@ public record NatsPubOpts
     [Obsolete("All errors are now thrown as exceptions in PublishAsync")]
     public Action<Exception>? ErrorHandler { get; init; }
 
+    /// <summary>
+    /// Provides the properties to be used when publishing the message.
+    /// Key properties are the Subject and replyto
+    /// </summary>
     public NatsPublishProps? Props { get; init; } = null;
 }

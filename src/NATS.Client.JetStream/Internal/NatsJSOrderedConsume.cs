@@ -43,7 +43,7 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
         TimeSpan expires,
         TimeSpan idle,
         NatsJSContext context,
-        NatsSubscriptionProps props,
+        NatsSubscribeProps props,
         string stream,
         string consumer,
         INatsDeserialize<TMsg> serializer,
@@ -150,7 +150,7 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
         }
     }
 
-    internal override ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter, NatsSubscriptionProps props)
+    internal override ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter, NatsSubscribeProps props)
     {
         // Override normal subscription behavior to resubscribe on reconnect
         return default;
