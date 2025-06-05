@@ -7,17 +7,7 @@ public record NatsMessagingProps : NatsOperationProps
     {
     }
 
-    internal NatsMessagingProps(string subjectTemplate, string subjectId)
-        : base(subjectTemplate, subjectId)
-    {
-    }
-
-    internal NatsMessagingProps(string subjectTemplate, Dictionary<string, object> properties)
-        : base(subjectTemplate, properties)
-    {
-    }
-
-    public NatsSubject? ReplyTo { get; private set; } = null;
+    public string? ReplyTo { get; private set; } = null;
 
     internal int PayloadLength => TotalMessageLength - HeaderLength;
 
@@ -29,16 +19,11 @@ public record NatsMessagingProps : NatsOperationProps
 
     internal int TotalEnvelopeLength => TotalMessageLength + FramingLength;
 
-    public void SetReplyTo(string replyToTemplate, object replyToId)
-    {
-        SetReplyTo(new NatsSubject(replyToTemplate, "ReplyToId", replyToId));
-    }
-
     public void SetReplyTo(string? replyTo)
     {
         if (replyTo != null)
         {
-            SetReplyTo(new NatsSubject(replyTo));
+            ReplyTo = replyTo;
         }
     }
 }

@@ -41,20 +41,11 @@ public partial class NatsJSContext
     /// </summary>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>The account information based on the NATS connection credentials.</returns>
-    public ValueTask<AccountInfoResponse> GetAccountInfoAsync(CancellationToken cancellationToken = default)
-    {
-        var props = new NatsPublishProps(
-            "{prefix}.{entity}",
-            new Dictionary<string, object>()
-            {
-                { "prefix", Opts.Prefix },
-                { "entity", "INFO" },
-            });
-        return JSRequestResponseAsync<object, AccountInfoResponse>(
-            props: props,
+    public ValueTask<AccountInfoResponse> GetAccountInfoAsync(CancellationToken cancellationToken = default) =>
+        JSRequestResponseAsync<object, AccountInfoResponse>(
+            subject: $"{Opts.Prefix}.INFO",
             request: null,
             cancellationToken);
-    }
 
     /// <summary>
     /// Sends data to a stream associated with the subject.

@@ -245,12 +245,11 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                 MinPending = _priorityGroup?.MinPending ?? 0,
                 MinAckPending = _priorityGroup?.MinAckPending ?? 0,
             };
-            var prop = new NatsPublishProps($"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}");
-            prop.SetReplyTo(Subject);
             await commandWriter.PublishAsync(
-                props: prop,
+                subject: $"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
                 value: request,
                 headers: default,
+                replyTo: Subject,
                 serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
                 cancellationToken: CancellationToken.None);
 
