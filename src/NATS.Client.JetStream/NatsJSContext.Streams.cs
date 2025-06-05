@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using NATS.Client.Core;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
@@ -53,17 +52,8 @@ public partial class NatsJSContext
             config.Sources = sources;
         }
 
-        var props = new NatsPublishProps(
-            "{prefix}.{entity}.{action}.{id}",
-            new Dictionary<string, object>()
-            {
-                { "prefix", Opts.Prefix },
-                { "entity", "STREAM" },
-                { "action", "CREATE" },
-                { "id", config.Name },
-            });
         var response = await JSRequestResponseAsync<StreamConfig, StreamInfo>(
-            props: props,
+            subject: $"{Opts.Prefix}.STREAM.CREATE.{config.Name}",
             config,
             cancellationToken);
         return new NatsJSStream(this, response);
@@ -82,17 +72,8 @@ public partial class NatsJSContext
     public async ValueTask<INatsJSStream> CreateOrUpdateStreamAsync(StreamConfig config, CancellationToken cancellationToken = default)
     {
         ThrowIfInvalidStreamName(config.Name, nameof(config.Name));
-        var props = new NatsPublishProps(
-            "{prefix}.{entity}.{action}.{id}",
-            new Dictionary<string, object>()
-            {
-                { "prefix", Opts.Prefix },
-                { "entity", "STREAM" },
-                { "action", "UPDATE" },
-                { "id", config.Name },
-            });
         var response = await JSRequestAsync<StreamConfig, StreamUpdateResponse>(
-            props: props,
+            subject: $"{Opts.Prefix}.STREAM.UPDATE.{config.Name}",
             request: config,
             cancellationToken);
 
@@ -121,7 +102,7 @@ public partial class NatsJSContext
     {
         ThrowIfInvalidStreamName(stream);
         var response = await JSRequestResponseAsync<object, StreamMsgDeleteResponse>(
-            props: GetStreamProps("DELETE", stream),
+            subject: $"{Opts.Prefix}.STREAM.DELETE.{stream}",
             request: null,
             cancellationToken);
         return response.Success;
@@ -145,7 +126,7 @@ public partial class NatsJSContext
     {
         ThrowIfInvalidStreamName(stream);
         var response = await JSRequestResponseAsync<StreamPurgeRequest, StreamPurgeResponse>(
-            props: GetStreamProps("PURGE", stream),
+            subject: $"{Opts.Prefix}.STREAM.PURGE.{stream}",
             request: request,
             cancellationToken);
         return response;
@@ -168,18 +149,10 @@ public partial class NatsJSContext
         CancellationToken cancellationToken = default)
     {
         ThrowIfInvalidStreamName(stream);
-
-        var props = new NatsPublishProps(
-            "{prefix}.{entity}.{subentity}.{action}.{stream}",
-            new Dictionary<string, object>()
-            {
-                { "prefix", Opts.Prefix },
-                { "entity", "STREAM" },
-                { "subentity", "MSG" },
-                { "action", "DELETE" },
-                { "stream", stream },
-            });
-        var response = await JSRequestResponseAsync<StreamMsgDeleteRequest, StreamMsgDeleteResponse>(props, request, cancellationToken);
+        var response = await JSRequestResponseAsync<StreamMsgDeleteRequest, StreamMsgDeleteResponse>(
+            subject: $"{Opts.Prefix}.STREAM.MSG.DELETE.{stream}",
+            request: request,
+            cancellationToken);
         return response;
     }
 
@@ -201,7 +174,7 @@ public partial class NatsJSContext
     {
         ThrowIfInvalidStreamName(stream);
         var response = await JSRequestResponseAsync<StreamInfoRequest, StreamInfoResponse>(
-            props: GetStreamProps("INFO", stream),
+            subject: $"{Opts.Prefix}.STREAM.INFO.{stream}",
             request: request,
             cancellationToken);
         return new NatsJSStream(this, response);
@@ -223,7 +196,7 @@ public partial class NatsJSContext
     {
         ThrowIfInvalidStreamName(request.Name, nameof(request.Name));
         var response = await JSRequestResponseAsync<StreamConfig, StreamUpdateResponse>(
-            props: GetStreamProps("UPDATE", request.Name),
+            subject: $"{Opts.Prefix}.STREAM.UPDATE.{request.Name}",
             request: request,
             cancellationToken);
         return new NatsJSStream(this, response);
@@ -245,7 +218,7 @@ public partial class NatsJSContext
         while (!cancellationToken.IsCancellationRequested)
         {
             var response = await JSRequestResponseAsync<StreamListRequest, StreamListResponse>(
-                props: GetStreamProps("LIST"),
+                subject: $"{Opts.Prefix}.STREAM.LIST",
                 request: new StreamListRequest
                 {
                     Offset = offset,
@@ -275,7 +248,7 @@ public partial class NatsJSContext
         while (!cancellationToken.IsCancellationRequested)
         {
             var response = await JSRequestResponseAsync<StreamNamesRequest, StreamNamesResponse>(
-                props: GetStreamProps("NAMES"),
+                subject: $"{Opts.Prefix}.STREAM.NAMES",
                 request: new StreamNamesRequest
                 {
                     Subject = subject,
@@ -293,25 +266,5 @@ public partial class NatsJSContext
 
             offset += response.Streams.Count;
         }
-    }
-
-    private NatsPublishProps GetStreamProps(string action, string? consumer = default)
-    {
-        var template = "{prefix}.{entity}.{action}";
-        var values = new Dictionary<string, object>()
-            {
-                { "prefix", Opts.Prefix },
-                { "entity", "STREAM" },
-                { "action", action },
-            };
-        if (consumer != null)
-        {
-            template += ".{id}";
-            values.Add("id", consumer);
-        }
-
-        return new NatsPublishProps(
-            template,
-            values);
     }
 }

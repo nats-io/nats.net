@@ -192,12 +192,11 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
             MinAckPending = _priorityGroup?.MinAckPending ?? 0,
         };
 
-        var pubProps = new NatsPublishProps($"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}");
-        pubProps.SetReplyTo(Subject);
         await commandWriter.PublishAsync(
-            pubProps,
+            subject: $"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}",
             value: request,
             headers: default,
+            replyTo: Subject,
             serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
             cancellationToken: CancellationToken.None);
     }

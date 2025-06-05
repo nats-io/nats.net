@@ -287,7 +287,7 @@ public class NatsJSConsumer : INatsJSConsumer
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     public async ValueTask RefreshAsync(CancellationToken cancellationToken = default) =>
         Info = await _context.JSRequestResponseAsync<object, ConsumerInfo>(
-            props: GetConsumerProps("INFO", _stream, _consumer),
+            subject: $"{_context.Opts.Prefix}.CONSUMER.INFO.{_stream}.{_consumer}",
             request: null,
             cancellationToken).ConfigureAwait(false);
 
@@ -472,26 +472,5 @@ public class NatsJSConsumer : INatsJSConsumer
     {
         if (_deleted)
             throw new NatsJSException($"Consumer '{_stream}:{_consumer}' is deleted");
-    }
-
-    private NatsPublishProps GetConsumerProps(string action, string stream, string? consumer = default)
-    {
-        var template = "{prefix}.{entity}.{action}.{stream}";
-        var values = new Dictionary<string, object>()
-            {
-                { "prefix", _context.Opts.Prefix },
-                { "entity", "CONSUMER" },
-                { "action", action },
-                { "stream", stream },
-            };
-        if (consumer != null)
-        {
-            template += ".{id}";
-            values.Add("id", consumer);
-        }
-
-        return new NatsPublishProps(
-            template,
-            values);
     }
 }

@@ -14,12 +14,6 @@ public record NatsSubscriptionProps : NatsOperationProps
         SubscriptionId = subscriptionId;
     }
 
-    public NatsSubscriptionProps(string subjectTemplate, string subjectId, string? queueGroup = default)
-        : base(subjectTemplate, subjectId)
-    {
-        QueueGroup = queueGroup;
-    }
-
     public int SubscriptionId { get; set; }
 
     public string? QueueGroup { get; internal set; }
