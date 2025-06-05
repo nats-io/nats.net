@@ -191,7 +191,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
             MinPending = _priorityGroup?.MinPending ?? 0,
             MinAckPending = _priorityGroup?.MinAckPending ?? 0,
         };
-        
+
         var pubProps = new NatsPublishProps($"{_context.Opts.Prefix}.CONSUMER.MSG.NEXT.{_stream}.{_consumer}");
         pubProps.SetReplyTo(Subject);
         await commandWriter.PublishAsync(

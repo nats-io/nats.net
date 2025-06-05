@@ -2,18 +2,18 @@ namespace NATS.Client.Core;
 
 public record NatsMessagingProps : NatsOperationProps
 {
-    internal NatsMessagingProps(string subject, string inboxPrefix)
-        : base(subject, inboxPrefix)
+    internal NatsMessagingProps(string subject)
+        : base(subject)
     {
     }
 
-    internal NatsMessagingProps(string subjectTemplate, string subjectId, string inboxPrefix)
-        : base(subjectTemplate, subjectId, inboxPrefix)
+    internal NatsMessagingProps(string subjectTemplate, string subjectId)
+        : base(subjectTemplate, subjectId)
     {
     }
 
-    internal NatsMessagingProps(string subjectTemplate, Dictionary<string, object> properties, string inboxPrefix)
-        : base(subjectTemplate, properties, inboxPrefix)
+    internal NatsMessagingProps(string subjectTemplate, Dictionary<string, object> properties)
+        : base(subjectTemplate, properties)
     {
     }
 
@@ -31,14 +31,14 @@ public record NatsMessagingProps : NatsOperationProps
 
     public void SetReplyTo(string replyToTemplate, object replyToId)
     {
-        ReplyTo = new NatsSubject(replyToTemplate, "ReplyToId", replyToId, Subject.InboxPrefix);
+        SetReplyTo(new NatsSubject(replyToTemplate, "ReplyToId", replyToId));
     }
 
     public void SetReplyTo(string? replyTo)
     {
         if (replyTo != null)
         {
-            ReplyTo = new NatsSubject(replyTo);
+            SetReplyTo(new NatsSubject(replyTo));
         }
     }
 }

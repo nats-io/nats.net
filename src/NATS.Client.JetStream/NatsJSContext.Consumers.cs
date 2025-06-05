@@ -292,8 +292,6 @@ public partial class NatsJSContext : INatsJSContext
             values.Add("id", consumer);
         }
 
-        return new NatsPublishProps(
-            template,
-            values);
+        return new NatsPublishProps(template, values);
     }
 }

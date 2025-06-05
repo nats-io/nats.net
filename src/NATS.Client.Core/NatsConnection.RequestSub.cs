@@ -37,7 +37,7 @@ public partial class NatsConnection
         CancellationToken cancellationToken = default)
     {
         replySerializer ??= Opts.SerializerRegistry.GetDeserializer<TReply>();
-        var subProps = new NatsSubscriptionProps(props.Subject);
+        var subProps = replyOpts?.Props ?? new NatsSubscriptionProps(props.Subject);
         var sub = new NatsSub<TReply>(this, _subscriptionManager.InboxSubBuilder, subProps, replyOpts, replySerializer);
         await AddSubAsync(sub, cancellationToken).ConfigureAwait(false);
 

@@ -57,7 +57,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
             using var activity = Telemetry.StartSendActivity($"{_connection.SpanDestinationName(sub.Subject)} {Telemetry.Constants.SubscribeActivityName}", _connection, sub.Subject, null, null);
             try
             {
-                if (props.Subject.IsInbox)
+                if (props.IsInboxSubject(_connection.InboxPrefix))
                 {
                     if (sub.QueueGroup != null)
                     {
@@ -76,7 +76,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
             }
         }
 
-        if (props.Subject.IsInbox)
+        if (props.IsInboxSubject(_connection.InboxPrefix))
         {
             if (sub.QueueGroup != null)
             {
@@ -126,7 +126,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
         {
             try
             {
-                return _connection.UnsubscribeAsync(new NatsSubscriptionProps(props.SubscriptionId, props.Subject.InboxPrefix));
+                return _connection.UnsubscribeAsync(new NatsSubscriptionProps(props.SubscriptionId));
             }
             catch (Exception e)
             {
@@ -181,7 +181,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
             _logger.LogDebug(NatsLogEvents.Subscription, "Removing subscription {Subject}/{Sid}", sub.Subject, subMetadata.Sid);
         }
 
-        return _connection.UnsubscribeAsync(sub.SubscriptionProps(_connection.InboxPrefix));
+        return _connection.UnsubscribeAsync(sub.SubscriptionProps);
     }
 
     /// <summary>
@@ -216,7 +216,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
 
         foreach (var (sub, sid) in subs)
         {
-            await sub.WriteReconnectCommandsAsync(commandWriter, new NatsSubscriptionProps(sid, _connection.InboxPrefix)).ConfigureAwait(false);
+            await sub.WriteReconnectCommandsAsync(commandWriter, new NatsSubscriptionProps(sid)).ConfigureAwait(false);
 
             if (_debug)
             {
@@ -227,7 +227,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
 
     internal INatsSubscriptionManager GetManagerFor(NatsSubscriptionProps props)
     {
-        if (props.Subject.IsInbox)
+        if (props.IsInboxSubject(_connection.InboxPrefix))
             return InboxSubBuilder;
         return this;
     }
@@ -352,7 +352,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
             try
             {
                 _logger.LogWarning(NatsLogEvents.Subscription, "Unsubscribing orphan subscription {Sid}", sid);
-                await _connection.UnsubscribeAsync(new NatsSubscriptionProps(sid, _connection.InboxPrefix)).ConfigureAwait(false);
+                await _connection.UnsubscribeAsync(new NatsSubscriptionProps(sid)).ConfigureAwait(false);
             }
             catch (Exception e)
             {

@@ -17,7 +17,7 @@ public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
         NatsSubOpts? opts,
         INatsDeserialize<T> serializer,
         CancellationToken cancellationToken = default)
-        : this(connection, manager, new NatsSubscriptionProps(subject, "UNKNOWN", queueGroup), opts, serializer, cancellationToken)
+        : this(connection, manager, new NatsSubscriptionProps(subject, queueGroup), opts, serializer, cancellationToken)
     {
     }
 

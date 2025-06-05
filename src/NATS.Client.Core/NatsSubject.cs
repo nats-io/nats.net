@@ -6,34 +6,26 @@ public record NatsSubject
 {
     private string? _compiledSubject = null;
 
-    internal NatsSubject(string template, Dictionary<string, object> values, string? inboxPrefix = default)
+    internal NatsSubject(string template, Dictionary<string, object> values)
     {
         Values = values;
         Template = template;
-        InboxPrefix = inboxPrefix;
     }
 
-    internal NatsSubject(string subject, string? inboxPrefix = default)
-        : this(subject, [], inboxPrefix)
+    internal NatsSubject(string subject)
+        : this(subject, [])
     {
         _compiledSubject = subject;
     }
 
-    internal NatsSubject(string subject, string key, object value, string? inboxPrefix = default)
-        : this(subject, new Dictionary<string, object>() { { key, value } }, inboxPrefix)
+    public NatsSubject(string subject, string key, object value)
+        : this(subject, new Dictionary<string, object>() { { key, value } })
     {
     }
-
-    internal string? InboxPrefix { get; set; }
 
     internal string? Template { get; set; }
 
     internal Dictionary<string, object> Values { get; private set; }
-
-    internal bool IsInbox => !string.IsNullOrEmpty(InboxPrefix)
-        && InboxPrefix != null
-        && (Template?.StartsWith(InboxPrefix, StringComparison.Ordinal) == true ||
-            ToString().StartsWith(InboxPrefix, StringComparison.Ordinal));
 
     public override string ToString()
     {
@@ -66,4 +58,9 @@ public record NatsSubject
         var tokens = ToString().Split('.');
         return tokens.Length < 2 ? ToString() : $"{tokens[0]}.{tokens[1]}";
     }
+
+    internal bool IsInbox(string inboxPrefix) => !string.IsNullOrEmpty(inboxPrefix)
+        && inboxPrefix != null
+        && (Template?.StartsWith(inboxPrefix, StringComparison.Ordinal) == true ||
+            ToString().StartsWith(inboxPrefix, StringComparison.Ordinal));
 }

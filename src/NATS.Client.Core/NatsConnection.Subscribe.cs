@@ -9,7 +9,7 @@ public partial class NatsConnection
     public async IAsyncEnumerable<NatsMsg<T>> SubscribeAsync<T>(string subject, string? queueGroup = default, INatsDeserialize<T>? serializer = default, NatsSubOpts? opts = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         serializer ??= Opts.SerializerRegistry.GetDeserializer<T>();
-        var props = new NatsSubscriptionProps(subject, InboxPrefix, queueGroup);
+        var props = opts?.Props ?? new NatsSubscriptionProps(subject, InboxPrefix, queueGroup);
         await using var sub = new NatsSub<T>(this, _subscriptionManager.GetManagerFor(props), props, opts, serializer, cancellationToken);
         await AddSubAsync(sub, cancellationToken: cancellationToken).ConfigureAwait(false);
 
@@ -25,7 +25,7 @@ public partial class NatsConnection
     public async ValueTask<INatsSub<T>> SubscribeCoreAsync<T>(string subject, string? queueGroup = default, INatsDeserialize<T>? serializer = default, NatsSubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         serializer ??= Opts.SerializerRegistry.GetDeserializer<T>();
-        var props = new NatsSubscriptionProps(subject, InboxPrefix, queueGroup);
+        var props = opts?.Props ?? new NatsSubscriptionProps(subject, InboxPrefix, queueGroup);
         var sub = new NatsSub<T>(this, _subscriptionManager.GetManagerFor(props), props, opts, serializer, cancellationToken);
         await AddSubAsync(sub, cancellationToken).ConfigureAwait(false);
         return sub;
