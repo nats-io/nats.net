@@ -170,7 +170,7 @@ public class NatsJSStream : INatsJSStream
             subject: $"{_context.Opts.Prefix}.STREAM.INFO.{_name}",
             request: null,
             cancellationToken).ConfigureAwait(false);
-    
+
     public ValueTask<NatsMsg<T>> GetDirectAsync<T>(StreamMsgGetRequest request, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
         return _context.Connection.RequestAsync<StreamMsgGetRequest, T>(

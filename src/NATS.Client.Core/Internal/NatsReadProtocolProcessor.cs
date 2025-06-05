@@ -471,7 +471,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         msgHeader.Split(out var sidBytes, out msgHeader);
         msgHeader.Split(out var replyToOrSizeBytes, out msgHeader);
 
-        var props = new NatsProcessProps(Encoding.ASCII.GetString(subjectBytes), GetInt32(sidBytes), _connection.InboxPrefix)
+        var props = new NatsProcessProps(Encoding.ASCII.GetString(subjectBytes), GetInt32(sidBytes))
         {
             FramingLength = framingLength,
             HeaderLength = 0,
@@ -526,7 +526,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         msgHeader.Split(out var replyToOrHeaderLenBytes, out msgHeader);
         msgHeader.Split(out var headerLenOrTotalLenBytes, out msgHeader);
 
-        var props = new NatsProcessProps(Encoding.ASCII.GetString(subjectBytes), GetInt32(sidBytes), _connection.InboxPrefix)
+        var props = new NatsProcessProps(Encoding.ASCII.GetString(subjectBytes), GetInt32(sidBytes))
         {
             FramingLength = framingLength,
         };

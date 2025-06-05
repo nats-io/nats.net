@@ -46,7 +46,7 @@ public class LowLevelApiTest
         private readonly ITestOutputHelper _output;
 
         public NatsSubTest(string subject, NatsConnection connection, NatsSubCustomTestBuilder builder, ITestOutputHelper output, INatsSubscriptionManager manager)
-        : base(connection, manager, new NatsSubscriptionProps(subject), default, default)
+        : base(connection, manager, new NatsSubscribeProps(subject), default, default)
         {
             _builder = builder;
             _output = output;

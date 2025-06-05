@@ -15,7 +15,7 @@ public partial class NatsConnection
     /// <inheritdoc />
     public ValueTask PublishAsync<T>(string subject, T? data, NatsHeaders? headers = default, string? replyTo = default, INatsSerialize<T>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
-        var props = opts?.Props ?? new NatsPublishProps(subject, InboxPrefix);
+        var props = opts?.Props ?? new NatsPublishProps(subject);
         props.SetReplyTo(replyTo);
         return PublishAsync(props, data, headers, serializer, cancellationToken);
     }

@@ -23,7 +23,7 @@ internal class NatsKVWatchSub<T> : NatsSubBase
         : base(
             connection: context.Connection,
             manager: context.Connection.SubscriptionManager,
-            props: new NatsSubscriptionProps(context.NewBaseInbox()),
+            props: new NatsSubscribeProps(context.NewBaseInbox()),
             opts)
     {
         _context = context;

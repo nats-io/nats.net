@@ -6,7 +6,7 @@ using NATS.Client.Core.Commands;
 
 namespace NATS.Client.Core.Internal;
 
-internal record struct SidMetadata(NatsSubscriptionProps Properties, WeakReference<NatsSubBase> WeakReference);
+internal record struct SidMetadata(NatsSubscribeProps Properties, WeakReference<NatsSubBase> WeakReference);
 
 internal sealed record SubscriptionMetadata(int Sid);
 
@@ -41,7 +41,8 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
         _cleanupInterval = _connection.Opts.SubscriptionCleanUpInterval;
         _timer = Task.Run(CleanupAsync);
         InboxSubBuilder = new InboxSubBuilder(connection.Opts.LoggerFactory.CreateLogger<InboxSubBuilder>());
-        _inboxSubSentinel = new InboxSub(InboxSubBuilder, new NatsSubscriptionProps(nameof(_inboxSubSentinel), _connection.InboxPrefix), default, connection, this);
+        var sid = GetNextSid();
+        _inboxSubSentinel = new InboxSub(InboxSubBuilder, new NatsSubscribeProps(nameof(_inboxSubSentinel)) { SubscriptionId = sid }, default, connection, this);
         _inboxSub = _inboxSubSentinel;
     }
 
@@ -51,7 +52,13 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
 
     public ValueTask SubscribeAsync(NatsSubBase sub, CancellationToken cancellationToken)
     {
-        var props = new NatsSubscriptionProps(sub.Subject, _connection.InboxPrefix, sub.QueueGroup);
+        var props = sub.SubscriptionProps;
+
+        if (props.SubscriptionId == 0)
+        {
+            props.SubscriptionId = GetNextSid();
+        }
+
         if (Telemetry.HasListeners())
         {
             using var activity = Telemetry.StartSendActivity($"{_connection.SpanDestinationName(sub.Subject)} {Telemetry.Constants.SubscribeActivityName}", _connection, sub.Subject, null, null);
@@ -126,7 +133,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
         {
             try
             {
-                return _connection.UnsubscribeAsync(new NatsSubscriptionProps(props.SubscriptionId));
+                return _connection.UnsubscribeAsync(props?.Subscription ?? new NatsUnsubscribeProps(props.SubscriptionId));
             }
             catch (Exception e)
             {
@@ -216,7 +223,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
 
         foreach (var (sub, sid) in subs)
         {
-            await sub.WriteReconnectCommandsAsync(commandWriter, new NatsSubscriptionProps(sid)).ConfigureAwait(false);
+            await sub.WriteReconnectCommandsAsync(commandWriter, sub.SubscriptionProps).ConfigureAwait(false);
 
             if (_debug)
             {
@@ -225,7 +232,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
         }
     }
 
-    internal INatsSubscriptionManager GetManagerFor(NatsSubscriptionProps props)
+    internal INatsSubscriptionManager GetManagerFor(NatsSubscribeProps props)
     {
         if (props.IsInboxSubject(_connection.InboxPrefix))
             return InboxSubBuilder;
@@ -241,14 +248,14 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
             {
                 if (Interlocked.CompareExchange(ref _inboxSub, _inboxSubSentinel, _inboxSubSentinel) == _inboxSubSentinel)
                 {
-                    var inboxSubject = new NatsSubscriptionProps($"{_inboxPrefix}.*", _connection.InboxPrefix);
+                    var props = new NatsSubscribeProps($"{_inboxPrefix}.*");
+                    props.SubscriptionId = GetNextSid();
 
                     // We need to subscribe to the real inbox subject before we can register the internal subject.
                     // We use 'default' options here since options provided by the user are for the internal subscription.
                     // For example if the user provides a timeout, we don't want to timeout the real inbox subscription
                     // since it must live duration of the connection.
-                    _inboxSub = InboxSubBuilder.Build(inboxSubject, opts: default, _connection, manager: this);
-                    var props = new NatsSubscriptionProps(_inboxSub.Subject, _connection.InboxPrefix, _inboxSub.QueueGroup);
+                    _inboxSub = InboxSubBuilder.Build(props, opts: default, _connection, manager: this);
                     await SubscribeInternalAsync(
                         props,
                         _inboxSub,
@@ -262,16 +269,16 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
         }
     }
 
+    internal int GetNextSid() => Interlocked.Increment(ref _sid);
+
     private async ValueTask SubscribeInboxAsync(NatsSubBase sub, CancellationToken cancellationToken)
     {
         await InitializeInboxSubscriptionAsync(cancellationToken).ConfigureAwait(false);
         await InboxSubBuilder.RegisterAsync(sub).ConfigureAwait(false);
     }
 
-    private async ValueTask SubscribeInternalAsync(NatsSubscriptionProps props, NatsSubBase sub, CancellationToken cancellationToken)
+    private async ValueTask SubscribeInternalAsync(NatsSubscribeProps props, NatsSubBase sub, CancellationToken cancellationToken)
     {
-        props.SubscriptionId = GetNextSid();
-
         if (sub is InboxSub)
         {
             Interlocked.Exchange(ref _inboxSid, props.SubscriptionId);
@@ -308,8 +315,6 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
             throw;
         }
     }
-
-    private int GetNextSid() => Interlocked.Increment(ref _sid);
 
     private async Task CleanupAsync()
     {
@@ -352,7 +357,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
             try
             {
                 _logger.LogWarning(NatsLogEvents.Subscription, "Unsubscribing orphan subscription {Sid}", sid);
-                await _connection.UnsubscribeAsync(new NatsSubscriptionProps(sid)).ConfigureAwait(false);
+                await _connection.UnsubscribeAsync(new NatsUnsubscribeProps(sid)).ConfigureAwait(false);
             }
             catch (Exception e)
             {
