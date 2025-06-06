@@ -278,7 +278,7 @@ internal static class Telemetry
         public const string DestIsTemporary = "messaging.destination.temporary";
         public const string DestPubName = "messaging.destination_publish.name";
 
-        public const string QueueGroup = "messaging.nats.consumer.group";
+        public const string QueueGroup = "messaging.consumer.group.name";
         public const string ReplyTo = "messaging.nats.message.reply_to";
         public const string Subject = "messaging.nats.message.subject";
 
