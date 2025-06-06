@@ -323,12 +323,21 @@ internal sealed class NatsKVWatcher<T> : IAsyncDisposable
                             _logger.LogError(NatsKVLogEvents.Internal, "Internal error: unexpected command {Command}", subCommand);
                         }
                     }
+                    catch (TaskCanceledException)
+                    {
+                    }
+                    catch (OperationCanceledException)
+                    {
+                    }
                     catch (Exception e)
                     {
                         _logger.LogWarning(NatsKVLogEvents.Internal, e, "Command error");
                     }
                 }
             }
+        }
+        catch (TaskCanceledException)
+        {
         }
         catch (OperationCanceledException)
         {
