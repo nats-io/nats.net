@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using NATS.Client.Core;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
@@ -73,7 +74,7 @@ public partial class NatsJSContext
     {
         ThrowIfInvalidStreamName(config.Name, nameof(config.Name));
         var response = await JSRequestAsync<StreamConfig, StreamUpdateResponse>(
-            subject: $"{Opts.Prefix}.STREAM.UPDATE.{config.Name}",
+            props: new NatsPublishProps($"{Opts.Prefix}.STREAM.UPDATE.{config.Name}"),
             request: config,
             cancellationToken);
 
