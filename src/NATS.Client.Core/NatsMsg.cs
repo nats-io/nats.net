@@ -369,25 +369,6 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
 
         headers?.SetReadOnly();
 
-        T? data;
-        if (headers?.Error == null)
-        {
-            try
-            {
-                data = serializer.Deserialize(payloadBuffer);
-            }
-            catch (Exception e)
-            {
-                headers ??= new NatsHeaders();
-                headers.Error = new NatsDeserializeException(payloadBuffer.ToArray(), e);
-                data = default;
-            }
-        }
-        else
-        {
-            data = default;
-        }
-
         var size = subject.Length
                    + (replyTo?.Length ?? 0)
                    + (headersBuffer?.Length ?? 0)
@@ -416,6 +397,25 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
             {
                 headers.Activity = activity;
             }
+        }
+
+        T? data;
+        if (headers?.Error == null)
+        {
+            try
+            {
+                data = serializer.Deserialize(payloadBuffer);
+            }
+            catch (Exception e)
+            {
+                headers ??= new NatsHeaders();
+                headers.Error = new NatsDeserializeException(payloadBuffer.ToArray(), e);
+                data = default;
+            }
+        }
+        else
+        {
+            data = default;
         }
 
         return new NatsMsg<T>(subject, replyTo, (int)size, headers, data, connection, flags);

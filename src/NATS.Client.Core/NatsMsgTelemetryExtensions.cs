@@ -26,5 +26,7 @@ public static class NatsMsgTelemetryExtensions
             tags: tags);
     }
 
-    internal static ActivityContext GetActivityContext<T>(this in NatsMsg<T> msg) => msg.Headers?.Activity?.Context ?? default;
+    /// <summary>Gets the activity context associated with the NatsMsg.</summary>
+    public static ActivityContext GetActivityContext<T>(this in NatsMsg<T> msg) =>
+        msg.Headers?.Activity?.Context ?? default;
 }
