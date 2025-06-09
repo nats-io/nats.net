@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace NATS.Client.Core.Internal;
+namespace NATS.Client.Core;
 
 /// <summary>
 /// Options for the OpenTelemetry instrumentation.
