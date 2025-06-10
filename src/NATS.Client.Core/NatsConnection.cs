@@ -199,7 +199,8 @@ public partial class NatsConnection : INatsConnection
 
         if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
         {
-            await _subscriptionManager.InitializeInboxSubscriptionAsync(_disposedCts.Token).ConfigureAwait(false);
+            var props = new NatsSubscribeProps($"{InboxPrefix}.*");
+            await _subscriptionManager.InitializeInboxSubscriptionAsync(props, _disposedCts.Token).ConfigureAwait(false);
         }
     }
 
@@ -277,7 +278,7 @@ public partial class NatsConnection : INatsConnection
     {
         if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
         {
-            if (_subscriptionManager.InboxSid == props.SubscriptionId && props.IsReplyToRequest(InboxPrefix))
+            if (_subscriptionManager.InboxSid == props.Subscription?.SubscriptionId && props.IsReplyToRequest(InboxPrefix))
             {
                 if (_replyTaskFactory.TrySetResult(props, payloadBuffer, headersBuffer))
                 {

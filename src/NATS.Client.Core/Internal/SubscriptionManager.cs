@@ -17,7 +17,6 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
     private readonly bool _debug;
     private readonly object _gate = new();
     private readonly NatsConnection _connection;
-    private readonly string _inboxPrefix;
     private readonly ConcurrentDictionary<int, SidMetadata> _bySid = new();
     private readonly ConditionalWeakTable<NatsSubBase, SubscriptionMetadata> _bySub = new();
     private readonly CancellationTokenSource _cts;
@@ -33,7 +32,6 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
     public SubscriptionManager(NatsConnection connection, string inboxPrefix)
     {
         _connection = connection;
-        _inboxPrefix = inboxPrefix;
         _logger = _connection.Opts.LoggerFactory.CreateLogger<SubscriptionManager>();
         _debug = _logger.IsEnabled(LogLevel.Debug);
         _trace = _logger.IsEnabled(LogLevel.Trace);
@@ -41,8 +39,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
         _cleanupInterval = _connection.Opts.SubscriptionCleanUpInterval;
         _timer = Task.Run(CleanupAsync);
         InboxSubBuilder = new InboxSubBuilder(connection.Opts.LoggerFactory.CreateLogger<InboxSubBuilder>());
-        var sid = GetNextSid();
-        _inboxSubSentinel = new InboxSub(InboxSubBuilder, new NatsSubscribeProps(nameof(_inboxSubSentinel)) { SubscriptionId = sid }, default, connection, this);
+        _inboxSubSentinel = new InboxSub(InboxSubBuilder, new NatsSubscribeProps(nameof(_inboxSubSentinel)), default, connection, this);
         _inboxSub = _inboxSubSentinel;
     }
 
@@ -52,19 +49,12 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
 
     public ValueTask SubscribeAsync(NatsSubBase sub, CancellationToken cancellationToken)
     {
-        var props = sub.SubscriptionProps;
-
-        if (props.SubscriptionId == 0)
-        {
-            props.SubscriptionId = GetNextSid();
-        }
-
         if (Telemetry.HasListeners())
         {
             using var activity = Telemetry.StartSendActivity($"{_connection.SpanDestinationName(sub.Subject)} {Telemetry.Constants.SubscribeActivityName}", _connection, sub.Subject, null, null);
             try
             {
-                if (props.IsInboxSubject(_connection.InboxPrefix))
+                if (sub.SubscriptionProps.IsInboxSubject(_connection.InboxPrefix))
                 {
                     if (sub.QueueGroup != null)
                     {
@@ -74,7 +64,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
                     return SubscribeInboxAsync(sub, cancellationToken);
                 }
 
-                return SubscribeInternalAsync(props, sub, cancellationToken);
+                return SubscribeInternalAsync(sub, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -83,7 +73,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
             }
         }
 
-        if (props.IsInboxSubject(_connection.InboxPrefix))
+        if (sub.SubscriptionProps.IsInboxSubject(_connection.InboxPrefix))
         {
             if (sub.QueueGroup != null)
             {
@@ -93,7 +83,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
             return SubscribeInboxAsync(sub, cancellationToken);
         }
 
-        return SubscribeInternalAsync(props, sub, cancellationToken);
+        return SubscribeInternalAsync(sub, cancellationToken);
     }
 
     public ValueTask PublishToClientHandlersAsync(NatsProcessProps props, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
@@ -239,7 +229,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
         return this;
     }
 
-    internal async Task InitializeInboxSubscriptionAsync(CancellationToken cancellationToken)
+    internal async Task InitializeInboxSubscriptionAsync(NatsSubscribeProps props, CancellationToken cancellationToken = default)
     {
         if (Interlocked.CompareExchange(ref _inboxSub, _inboxSubSentinel, _inboxSubSentinel) == _inboxSubSentinel)
         {
@@ -248,18 +238,12 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
             {
                 if (Interlocked.CompareExchange(ref _inboxSub, _inboxSubSentinel, _inboxSubSentinel) == _inboxSubSentinel)
                 {
-                    var props = new NatsSubscribeProps($"{_inboxPrefix}.*");
-                    props.SubscriptionId = GetNextSid();
-
                     // We need to subscribe to the real inbox subject before we can register the internal subject.
                     // We use 'default' options here since options provided by the user are for the internal subscription.
                     // For example if the user provides a timeout, we don't want to timeout the real inbox subscription
                     // since it must live duration of the connection.
                     _inboxSub = InboxSubBuilder.Build(props, opts: default, _connection, manager: this);
-                    await SubscribeInternalAsync(
-                        props,
-                        _inboxSub,
-                        cancellationToken).ConfigureAwait(false);
+                    await SubscribeInternalAsync(_inboxSub, cancellationToken).ConfigureAwait(false);
                 }
             }
             finally
@@ -273,40 +257,45 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
 
     private async ValueTask SubscribeInboxAsync(NatsSubBase sub, CancellationToken cancellationToken)
     {
-        await InitializeInboxSubscriptionAsync(cancellationToken).ConfigureAwait(false);
+        await InitializeInboxSubscriptionAsync(sub.SubscriptionProps, cancellationToken).ConfigureAwait(false);
         await InboxSubBuilder.RegisterAsync(sub).ConfigureAwait(false);
     }
 
-    private async ValueTask SubscribeInternalAsync(NatsSubscribeProps props, NatsSubBase sub, CancellationToken cancellationToken)
+    private async ValueTask SubscribeInternalAsync(NatsSubBase sub, CancellationToken cancellationToken)
     {
+        if (sub.SubscriptionProps.UnsetSubscriptionId)
+        {
+            sub.SubscriptionProps.SubscriptionId = GetNextSid();
+        }
+
         if (sub is InboxSub)
         {
-            Interlocked.Exchange(ref _inboxSid, props.SubscriptionId);
+            Interlocked.Exchange(ref _inboxSid, sub.SubscriptionProps.SubscriptionId);
         }
 
         if (_debug)
         {
-            _logger.LogDebug(NatsLogEvents.Subscription, "New subscription {Subject}/{Sid}", sub.Subject, props.SubscriptionId);
+            _logger.LogDebug(NatsLogEvents.Subscription, "New subscription {Subject}/{Sid}", sub.Subject, sub.SubscriptionProps.SubscriptionId);
         }
 
         lock (_gate)
         {
-            _bySid[props.SubscriptionId] = new SidMetadata(Properties: props, WeakReference: new WeakReference<NatsSubBase>(sub));
+            _bySid[sub.SubscriptionProps.SubscriptionId] = new SidMetadata(Properties: sub.SubscriptionProps, WeakReference: new WeakReference<NatsSubBase>(sub));
 #if NETSTANDARD2_0
             lock (_bySub)
             {
                 if (_bySub.TryGetValue(sub, out _))
                     _bySub.Remove(sub);
-                _bySub.Add(sub, new SubscriptionMetadata(Sid: props.SubscriptionId));
+                _bySub.Add(sub, new SubscriptionMetadata(Sid: sub.SubscriptionProps.SubscriptionId));
             }
 #else
-            _bySub.AddOrUpdate(sub, new SubscriptionMetadata(Sid: props.SubscriptionId));
+            _bySub.AddOrUpdate(sub, new SubscriptionMetadata(Sid: sub.SubscriptionProps.SubscriptionId));
 #endif
         }
 
         try
         {
-            await _connection.SubscribeCoreAsync(props, sub.Opts?.MaxMsgs, cancellationToken).ConfigureAwait(false);
+            await _connection.SubscribeCoreAsync(sub.SubscriptionProps, sub.Opts?.MaxMsgs, cancellationToken).ConfigureAwait(false);
             await sub.ReadyAsync().ConfigureAwait(false);
         }
         catch

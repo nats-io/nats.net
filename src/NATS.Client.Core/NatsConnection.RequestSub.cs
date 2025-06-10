@@ -15,16 +15,7 @@ public partial class NatsConnection
     {
         var props = requestOpts?.Props ?? new NatsPublishProps(subject);
         props.SetReplyTo(NewInbox());
-        replySerializer ??= Opts.SerializerRegistry.GetDeserializer<TReply>();
-        var subProps = new NatsSubscribeProps(props.Subject);
-        subProps.SubscriptionId = _subscriptionManager.GetNextSid();
-        var sub = new NatsSub<TReply>(this, _subscriptionManager.InboxSubBuilder, subProps, replyOpts, replySerializer);
-        await AddSubAsync(sub, cancellationToken).ConfigureAwait(false);
-
-        requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
-        await PublishAsync(props, data, headers, requestSerializer, cancellationToken).ConfigureAwait(false);
-
-        return sub;
+        return await CreateRequestSubAsync(props, data, headers, requestSerializer, replySerializer, replyOpts, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
