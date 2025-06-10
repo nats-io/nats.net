@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <!-- NuGet Packaging -->
@@ -10,7 +10,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\NATS.Client.Core\NATS.Client.Core.csproj" />
+    <ProjectReference Include="..\NATS.Client.Abstractions\NATS.Client.Abstractions.csproj" />
   </ItemGroup>
 
+    <!--  Dependencies for net6.0 and net8.0 only -->
+    <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0' OR '$(TargetFramework)' == 'netstandard2.1'">
+        <PackageReference Include="System.Text.Json" Version="8.0.5"/>
+    </ItemGroup>
+    
 </Project>
