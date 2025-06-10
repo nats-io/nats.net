@@ -67,4 +67,6 @@ public record NatsSubOpts
     /// Allows Configuration of <see cref="Channel"/> options for a subscription.
     /// </summary>
     public NatsSubChannelOpts? ChannelOpts { get; init; }
+
+    internal NatsSubscribeProps? Props { get; init; } = null;
 }

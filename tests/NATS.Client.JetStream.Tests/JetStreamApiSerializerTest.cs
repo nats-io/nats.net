@@ -80,7 +80,7 @@ public class JetStreamApiSerializerTest
 
                     try
                     {
-                        var result = await js.TryJSRequestAsync<object, AccountInfoResponse>(apiSubject, null, ctsDone.Token);
+                        var result = await js.TryJSRequestAsync<object, AccountInfoResponse>(new NatsPublishProps(apiSubject), null, ctsDone.Token);
                     }
                     catch
                     {
