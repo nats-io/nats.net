@@ -804,14 +804,10 @@ internal sealed class CommandWriter : IAsyncDisposable
                 // standardize to an OperationCanceledException as if a cancellationToken was used
                 throw new OperationCanceledException();
             }
-            finally
-            {
-                _semLock.Release();
-            }
         }
-        catch
+        finally
         {
-            throw;
+            _semLock.Release();
         }
     }
 

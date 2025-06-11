@@ -49,7 +49,23 @@ internal sealed class ReplyTask : ReplyTaskBase, IDisposable
     {
         lock (_gate)
         {
-            _msg = new NatsRecievedEvent(Subject, replyTo, headersBuffer, payload);
+            var payloadValue = ReadOnlySequence<byte>.Empty;
+            if (payload.Length > 0)
+            {
+                var payloadData = new byte[payload.Length];
+                payload.CopyTo(payloadData);
+                payloadValue = new ReadOnlySequence<byte>(payloadData);
+            }
+
+            ReadOnlySequence<byte>? headerValue = null;
+            if (headersBuffer != null)
+            {
+                var headerData = new byte[headersBuffer.Value.Length];
+                headersBuffer.Value.CopyTo(headerData);
+                headerValue = new ReadOnlySequence<byte>(headerData);
+            }
+
+            _msg = new NatsRecievedEvent(Subject, replyTo, headerValue, payloadValue);
         }
 
         _tcs.TrySetResult();

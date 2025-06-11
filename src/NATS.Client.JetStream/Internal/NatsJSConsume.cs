@@ -252,6 +252,11 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                 data: request,
                 headers: default,
                 replyTo: Subject,
+                serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
+                opts: new NatsPubOpts()
+                {
+                    Priority = true,
+                },
                 cancellationToken: CancellationToken.None);
 
             ResetPending();

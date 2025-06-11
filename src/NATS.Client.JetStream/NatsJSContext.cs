@@ -203,7 +203,7 @@ public partial class NatsJSContext
 
                 if (msg.Data == null)
                 {
-                    return new NatsJSException("No response data received");
+                    return new NatsJSException("No response data received on attempt " + i + ", size: " + msg.Size + ", headers: " + msg.Headers?.Count + " and flags: " + msg.Flags);
                 }
 
                 return msg.Data;

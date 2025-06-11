@@ -68,6 +68,8 @@ public partial class NatsConnection : INatsConnection
     private Task? _publishEventsTask;
     private Task? _reconnectLoopTask;
 
+    private CommandWriter? _priorityCommandWriter = null;
+
     public NatsConnection()
         : this(NatsOpts.Default)
     {
@@ -324,7 +326,17 @@ public partial class NatsConnection : INatsConnection
     internal ValueTask PongAsync() => CommandWriter.PongAsync(CancellationToken.None);
 
     // called only internally
-    internal ValueTask SubscribeCoreAsync(int sid, string subject, string? queueGroup, int? maxMsgs, CancellationToken cancellationToken) => CommandWriter.SubscribeAsync(sid, subject, queueGroup, maxMsgs, cancellationToken);
+    internal ValueTask SubscribeCoreAsync(int sid, string subject, string? queueGroup, int? maxMsgs, bool priority, CancellationToken cancellationToken)
+    {
+        if (!priority || _priorityCommandWriter == null)
+        {
+            return CommandWriter.SubscribeAsync(sid, subject, queueGroup, maxMsgs, cancellationToken);
+        }
+        else
+        {
+            return _priorityCommandWriter.SubscribeAsync(sid, subject, queueGroup, maxMsgs, cancellationToken);
+        }
+    }
 
     internal ValueTask UnsubscribeAsync(int sid)
     {
@@ -537,6 +549,8 @@ public partial class NatsConnection : INatsConnection
 
             await using (var priorityCommandWriter = new PriorityCommandWriter(this, _pool, _socketConnection!, Opts, Counter, EnqueuePing))
             {
+                _priorityCommandWriter = priorityCommandWriter.CommandWriter;
+
                 // add CONNECT and PING command to priority lane
                 await priorityCommandWriter.CommandWriter.ConnectAsync(_clientOpts, CancellationToken.None).ConfigureAwait(false);
                 await priorityCommandWriter.CommandWriter.PingAsync(new PingCommand(_pool), CancellationToken.None).ConfigureAwait(false);
@@ -566,6 +580,9 @@ public partial class NatsConnection : INatsConnection
                     // wait for reconnect commands to complete
                     await reconnectTask.ConfigureAwait(false);
                 }
+
+                await _priorityCommandWriter.DisposeAsync().ConfigureAwait(false);
+                _priorityCommandWriter = null;
             }
 
             // create the socket writer

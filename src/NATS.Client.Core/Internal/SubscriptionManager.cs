@@ -299,7 +299,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
 
         try
         {
-            await _connection.SubscribeCoreAsync(sid, subject, queueGroup, opts?.MaxMsgs, cancellationToken).ConfigureAwait(false);
+            await _connection.SubscribeCoreAsync(sid, subject, queueGroup, opts?.MaxMsgs, false, cancellationToken).ConfigureAwait(false);
             await sub.ReadyAsync().ConfigureAwait(false);
         }
         catch
