@@ -67,19 +67,19 @@ public partial class NatsConnection
         {
             if (headers != null)
             {
-                headers?.SetReadOnly();
+                headers.SetReadOnly();
                 if (!_pool.TryRent(out headersBuffer))
                     headersBuffer = new NatsPooledBufferWriter<byte>(_arrayPoolInitialSize);
+
+                _headerWriter.Write(headersBuffer!, headers);
             }
 
             if (!_pool.TryRent(out payloadBuffer!))
                 payloadBuffer = new NatsPooledBufferWriter<byte>(_arrayPoolInitialSize);
 
-            if (headers != null)
-                _headerWriter.Write(headersBuffer!, headers);
-
             if (data != null)
                 serializer.Serialize(payloadBuffer, data);
+
             await DoPublishAsync(subject, headersBuffer?.WrittenMemory, payloadBuffer.WrittenMemory, replyTo, priority, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex)

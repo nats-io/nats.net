@@ -65,7 +65,7 @@ internal sealed class ReplyTask : ReplyTaskBase, IDisposable
                 headerValue = new ReadOnlySequence<byte>(headerData);
             }
 
-            _msg = new NatsRecievedEvent(Subject, replyTo, headerValue, payloadValue);
+            _msg = new NatsRecievedEvent(Subject, replyTo, headersBuffer, payload);
         }
 
         _tcs.TrySetResult();
