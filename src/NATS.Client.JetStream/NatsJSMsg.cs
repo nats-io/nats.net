@@ -84,6 +84,7 @@ public interface INatsJSMsg<out T>
     /// <param name="opts">A <see cref="NatsPubOpts"/> for publishing options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous send operation.</returns>
+    [Obsolete("ReplyAsync is not valid when using JetStream. The reply message will never reach the Requestor as NATS will reply to all JetStream publish by default.")]
     ValueTask ReplyAsync(NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
 
     /// <summary>
