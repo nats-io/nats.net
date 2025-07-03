@@ -76,8 +76,17 @@ public class NatsBuilder
             opts.Opts = optsFactory(provider, opts.Opts)));
 
     public NatsBuilder ConfigureConnection(Action<IServiceProvider, NatsConnection> configureConnection) =>
-        ConfigureOptions(builder => builder.Configure<IServiceProvider>((opts, provider) =>
-            opts.ConfigureConnection = configureConnection));
+        ConfigureOptions(builder =>
+            builder.Configure<IServiceProvider>((opts, provider) =>
+            {
+                var configure = opts.ConfigureConnection;
+                opts.ConfigureConnection = (serviceProvider, connection) =>
+                {
+                    configure?.Invoke(serviceProvider, connection);
+
+                    configureConnection(serviceProvider, connection);
+                };
+            }));
 
     public NatsBuilder ConfigureConnection(Action<NatsConnection> configureConnection) =>
         ConfigureConnection((_, connection) => configureConnection(connection));
