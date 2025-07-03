@@ -1,4 +1,5 @@
 using NATS.Client.JetStream;
+using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.KeyValueStore;
 
@@ -38,10 +39,11 @@ public class NatsKVKeyDeletedException : NatsKVException
 
 public class NatsKVWrongLastRevisionException : NatsKVException
 {
-    public NatsKVWrongLastRevisionException()
-        : base("Wrong last revision")
-    {
-    }
+    public NatsKVWrongLastRevisionException(ApiError error)
+        : base("Wrong last revision") =>
+        Error = error;
+
+    public ApiError Error { get; }
 }
 
 public class NatsKVCreateException : NatsKVException
