@@ -20,14 +20,14 @@ public class NatsOptsBuilder
 public class NatsBuilder
 {
     private readonly IServiceCollection _services;
-
+    private readonly OptionsBuilder<NatsOptsBuilder> _builder;
     private Func<IServiceProvider, int> _poolSizeConfigurer = _ => 1;
     private object? _diKey = null;
 
     public NatsBuilder(IServiceCollection services)
     {
         _services = services;
-        _services
+        _builder = _services
             .AddOptions<NatsOptsBuilder>()
             .Configure<IServiceProvider>((opts, provider) =>
             {
@@ -58,19 +58,19 @@ public class NatsBuilder
         return this;
     }
 
-    public NatsBuilder ConfigureOptions(Action<OptionsBuilder<NatsOptsBuilder>> builder)
+    public NatsBuilder ConfigureOptions(Action<OptionsBuilder<NatsOptsBuilder>> configure)
     {
-        builder(_services.AddOptions<NatsOptsBuilder>());
+        configure(_builder);
 
         return this;
     }
 
-    [Obsolete("Use ConfigureOptions(Action<OptionsBuilder<NatsOptsBuilder>> builder) instead.")]
+    [Obsolete("Use ConfigureOptions(Action<OptionsBuilder<NatsOptsBuilder>> configure) instead.")]
     public NatsBuilder ConfigureOptions(Func<NatsOpts, NatsOpts> optsFactory) =>
         ConfigureOptions(builder => builder.Configure(opts =>
             opts.Opts = optsFactory(opts.Opts)));
 
-    [Obsolete("Use ConfigureOptions(Action<OptionsBuilder<NatsOptsBuilder>> builder) instead.")]
+    [Obsolete("Use ConfigureOptions(Action<OptionsBuilder<NatsOptsBuilder>> configure) instead.")]
     public NatsBuilder ConfigureOptions(Func<IServiceProvider, NatsOpts, NatsOpts> optsFactory) =>
         ConfigureOptions(builder => builder.Configure<IServiceProvider>((opts, provider) =>
             opts.Opts = optsFactory(provider, opts.Opts)));
