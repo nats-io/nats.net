@@ -56,25 +56,6 @@ or
 $ docker run nats
 ```
 
-Reference [NATS.Net NuGet package](https://www.nuget.org/packages/NATS.Net) in your project:
-
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/IntroPage.cs#core-nats)]
-
-# [JetStream](#tab/jetstream)
-
-JetStream is the distributed persistence system built-in to the same NATS server binary. Messages published
-to JetStream are stored on the NATS JetStream server and can be retrieved by consumers any time after publishing.
-
-Start NATS server with JetStream enabled:
-
-```shell
-$ nats-server -js
-```
-or
-```shell
-$ docker run nats -js
-```
-
 Create two new console applications and reference [NATS.Net NuGet package](https://www.nuget.org/packages/NATS.Net/) in your projects:
 
 Publisher application:
@@ -120,6 +101,24 @@ _ = Task.Run(async () =>
 Console.WriteLine("Waiting for exchange rates. Press ENTER to exit.");
 Console.ReadLine();
 ```
+
+# [JetStream](#tab/jetstream)
+
+JetStream is the distributed persistence system built-in to the same NATS server binary. Messages published
+to JetStream are stored on the NATS JetStream server and can be retrieved by consumers any time after publishing.
+
+Start NATS server with JetStream enabled:
+
+```shell
+$ nats-server -js
+```
+or
+```shell
+$ docker run nats -js
+```
+Reference [NATS.Net NuGet package](https://www.nuget.org/packages/NATS.Net/) in your project:
+
+[!code-csharp[](../../../tests/NATS.Net.DocsExamples/IntroPage.cs#jetstream)]
 
 ---
 
