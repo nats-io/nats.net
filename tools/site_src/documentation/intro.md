@@ -75,9 +75,51 @@ or
 $ docker run nats -js
 ```
 
-Reference [NATS.Net NuGet package](https://www.nuget.org/packages/NATS.Net/) in your project:
+Create two new console applications and reference [NATS.Net NuGet package](https://www.nuget.org/packages/NATS.Net/) in your projects:
 
-[!code-csharp[](../../../tests/NATS.Net.DocsExamples/IntroPage.cs#jetstream)]
+Publisher application:
+```csharp
+await using var natsClient = new NatsClient();
+
+_ = Task.Run(async () =>
+{
+    while (true)
+    {
+        // Generate a random exchange rate from 1.00 to 2.00
+        double value = 1 + Random.Shared.NextDouble();
+
+        // Ensure it is 2 decimal places
+        value = Math.Round(value, 2);
+
+        // Publish it as GBPUSD
+        await natsClient.PublishAsync(subject: "GBPUSD", data: value);
+
+        // Output to console, then wait 1 second before sending another
+        Console.WriteLine($"Sent GBPUSD: {value} - press ENTER to exit.");
+        await Task.Delay(1000);
+    }
+});
+
+Console.ReadLine();
+```
+
+Subscriber application:
+```csharp
+// Create the client
+await using var natsClient = new NatsClient();
+
+_ = Task.Run(async () =>
+    {
+        // Wait for messages on the GBPUSD subject and write them to the console
+        await foreach (NatsMsg<double> msg in natsClient.SubscribeAsync<double>("GBPUSD"))
+        {
+            Console.WriteLine($"New exchange rate. {msg.Subject}: {msg.Data:F2} - press ENTER to exit.");
+        }
+    });
+
+Console.WriteLine("Waiting for exchange rates. Press ENTER to exit.");
+Console.ReadLine();
+```
 
 ---
 
