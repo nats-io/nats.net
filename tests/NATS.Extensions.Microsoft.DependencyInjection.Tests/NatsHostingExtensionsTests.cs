@@ -113,7 +113,32 @@ public class NatsHostingExtensionsTests
         var services = new ServiceCollection();
         services.AddNatsClient(nats =>
         {
+#pragma warning disable CS0618 // Type or member is obsolete
             nats.ConfigureOptions(opts => opts with { SerializerRegistry = mySerializerRegistry });
+#pragma warning restore CS0618 // Type or member is obsolete
+        });
+
+        var provider = services.BuildServiceProvider();
+        var nats = provider.GetRequiredService<INatsConnection>();
+
+        Assert.Same(mySerializerRegistry, nats.Opts.SerializerRegistry);
+
+        // You can only override this using .WithSubPendingChannelFullMode() on builder above
+        Assert.Equal(BoundedChannelFullMode.Wait, nats.Opts.SubPendingChannelFullMode);
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task AddNatsClient_WithSerializerExplicitlySet_optionsBuilder()
+    {
+        var mySerializerRegistry = new NatsJsonContextSerializerRegistry(MyJsonContext.Default);
+
+        var services = new ServiceCollection();
+        services.AddNatsClient(nats =>
+        {
+            nats.ConfigureOptions(builder => builder.Configure(opts =>
+                opts.Opts = opts.Opts with { SerializerRegistry = mySerializerRegistry }));
         });
 
         var provider = services.BuildServiceProvider();
@@ -140,7 +165,9 @@ public class NatsHostingExtensionsTests
             services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
             services.AddNatsClient(nats =>
             {
+#pragma warning disable CS0618 // Type or member is obsolete
                 nats.ConfigureOptions(opts => opts with { Url = server.Url });
+#pragma warning restore CS0618 // Type or member is obsolete
             });
 
             var provider = services.BuildServiceProvider();
@@ -162,7 +189,61 @@ public class NatsHostingExtensionsTests
             services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
             services.AddNatsClient(nats =>
             {
+#pragma warning disable CS0618 // Type or member is obsolete
                 nats.ConfigureOptions(opts => opts with { Url = server.Url });
+#pragma warning restore CS0618 // Type or member is obsolete
+                nats.WithSerializerRegistry(NatsDefaultSerializerRegistry.Default);
+            });
+
+            var provider = services.BuildServiceProvider();
+            var nats = provider.GetRequiredService<INatsConnection>();
+
+            var exception = await Assert.ThrowsAsync<NatsException>(async () =>
+            {
+                await nats.PublishAsync("foo", new MyAdHocData(1, "bar"), cancellationToken: cancellationToken);
+            });
+            Assert.Matches("Can't serialize.*MyAdHocData", exception.Message);
+        }
+    }
+
+    [Fact]
+    public async Task AddNatsClient_WithDefaultSerializer_optionsBuilder()
+    {
+        await using var server = await NatsServerProcess.StartAsync();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        // Default JSON serialization
+        {
+            var services = new ServiceCollection();
+            services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
+            services.AddNatsClient(nats =>
+            {
+                nats.ConfigureOptions(builder => builder.Configure(opts =>
+                    opts.Opts = opts.Opts with { Url = server.Url }));
+            });
+
+            var provider = services.BuildServiceProvider();
+            var nats = provider.GetRequiredService<INatsConnection>();
+
+            // Ad-hoc JSON serialization
+            await using var sub = await nats.SubscribeCoreAsync<MyAdHocData>("foo", cancellationToken: cancellationToken);
+            await nats.PingAsync(cancellationToken);
+            await nats.PublishAsync("foo", new MyAdHocData(1, "bar"), cancellationToken: cancellationToken);
+
+            var msg = await sub.Msgs.ReadAsync(cancellationToken);
+            Assert.Equal(1, msg.Data?.Id);
+            Assert.Equal("bar", msg.Data?.Name);
+        }
+
+        // Default raw serialization
+        {
+            var services = new ServiceCollection();
+            services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
+            services.AddNatsClient(nats =>
+            {
+                nats.ConfigureOptions(builder => builder.Configure(opts =>
+                    opts.Opts = opts.Opts with { Url = server.Url }));
                 nats.WithSerializerRegistry(NatsDefaultSerializerRegistry.Default);
             });
 
@@ -201,7 +282,37 @@ public class NatsHostingExtensionsTests
         services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
         services.AddNatsClient(nats =>
         {
+#pragma warning disable CS0618 // Type or member is obsolete
             nats.ConfigureOptions(opts => opts with { Url = server.Url });
+            nats.AddJsonSerialization(MyJsonContext.Default);
+#pragma warning restore CS0618 // Type or member is obsolete
+        });
+
+        var provider = services.BuildServiceProvider();
+        var nats = provider.GetRequiredService<INatsConnection>();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        await using var sub = await nats.SubscribeCoreAsync<MyData>("foo", cancellationToken: cancellationToken);
+        await nats.PingAsync(cancellationToken);
+        await nats.PublishAsync("foo", new MyData("bar"), cancellationToken: cancellationToken);
+
+        var msg = await sub.Msgs.ReadAsync(cancellationToken);
+        Assert.Equal("bar", msg.Data?.Name);
+    }
+
+    [Fact]
+    public async Task AddNatsClient_WithJsonSerializer_optionsBuilder()
+    {
+        await using var server = await NatsServerProcess.StartAsync();
+
+        var services = new ServiceCollection();
+        services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
+        services.AddNatsClient(nats =>
+        {
+            nats.ConfigureOptions(builder => builder.Configure(opts =>
+                opts.Opts = opts.Opts with { Url = server.Url }));
 #pragma warning disable CS0618 // Type or member is obsolete
             nats.AddJsonSerialization(MyJsonContext.Default);
 #pragma warning restore CS0618 // Type or member is obsolete
@@ -226,7 +337,12 @@ public class NatsHostingExtensionsTests
     {
         var services = new ServiceCollection();
         services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
-        services.AddNatsClient(nats => nats.ConfigureOptions(opts => opts with { Url = "url-set" }));
+        services.AddNatsClient(nats =>
+        {
+#pragma warning disable CS0618 // Type or member is obsolete
+            nats.ConfigureOptions(opts => opts with { Url = "url-set" });
+#pragma warning restore CS0618 // Type or member is obsolete
+        });
 
         var provider = services.BuildServiceProvider();
         var nats = provider.GetRequiredService<INatsConnection>();
@@ -237,14 +353,54 @@ public class NatsHostingExtensionsTests
     }
 
     [Fact]
+    public Task AddNatsClient_ConfigureOptionsSetsUrl_optionsBuilder()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
+        services.AddNatsClient(nats => nats.ConfigureOptions(builder => builder.Configure(opts =>
+            opts.Opts = opts.Opts with { Url = "url-set" })));
+
+        var provider = services.BuildServiceProvider();
+        var nats = provider.GetRequiredService<INatsConnection>();
+
+        Assert.Equal("url-set", nats.Opts.Url);
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task AddNatsClient_ConfigureOptionsSetsUrl_backwardsCompatibility()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
+        services.AddNatsClient(nats =>
+        {
+#pragma warning disable CS0618 // Type or member is obsolete
+            nats.ConfigureOptions(opts => opts with { Url = "url-set" });
+#pragma warning restore CS0618 // Type or member is obsolete
+            nats.ConfigureOptions(builder => builder.Configure(opts =>
+                opts.Opts = opts.Opts with { Url = $"new-{opts.Opts.Url}" }));
+        });
+
+        var provider = services.BuildServiceProvider();
+        var nats = provider.GetRequiredService<INatsConnection>();
+
+        Assert.Equal("new-url-set", nats.Opts.Url);
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task AddNatsClient_ConfigureOptionsSetsUrlResolvesServices()
     {
         var services = new ServiceCollection();
         services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
         services.AddSingleton<IMyResolvedService>(new MyResolvedService("url-set"));
-        services.AddNatsClient(nats => nats
-            .ConfigureOptions((_, opts) => opts) // Add multiple to test chaining
-            .ConfigureOptions((serviceProvider, opts) =>
+        services.AddNatsClient(nats =>
+        {
+#pragma warning disable CS0618 // Type or member is obsolete
+            nats.ConfigureOptions((_, opts) => opts); // Add multiple to test chaining
+            nats.ConfigureOptions((serviceProvider, opts) =>
             {
                 opts = opts with
                 {
@@ -252,7 +408,33 @@ public class NatsHostingExtensionsTests
                 };
 
                 return opts;
-            }));
+            });
+#pragma warning restore CS0618 // Type or member is obsolete
+        });
+
+        var provider = services.BuildServiceProvider();
+        var nats = provider.GetRequiredService<INatsConnection>();
+
+        Assert.Equal("url-set", nats.Opts.Url);
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task AddNatsClient_ConfigureOptionsSetsUrlResolvesServices_optionsBuilder()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
+        services.AddSingleton<IMyResolvedService>(new MyResolvedService("url-set"));
+        services.AddNatsClient(nats => nats
+            .ConfigureOptions(builder => { }) // Add multiple to test chaining
+            .ConfigureOptions(builder => builder.Configure<IServiceProvider>((opts, serviceProvider) =>
+            {
+                opts.Opts = opts.Opts with
+                {
+                    Url = serviceProvider.GetRequiredService<IMyResolvedService>().GetValue(),
+                };
+            })));
 
         var provider = services.BuildServiceProvider();
         var nats = provider.GetRequiredService<INatsConnection>();
