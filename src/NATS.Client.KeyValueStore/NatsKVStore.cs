@@ -660,7 +660,7 @@ public class NatsKVStore : INatsKVStore
         if (publishResult.Success)
         {
             var ack = publishResult.Value;
-            if (ack.Error is { ErrCode: 10071, Code: 400, Description: not null } && ack.Error.Description.StartsWith("wrong last sequence", StringComparison.OrdinalIgnoreCase))
+            if (ack.Error is { ErrCode: 10071, Code: 400, Description: not null } or { ErrCode: 10164, Code: 400, Description: not null } && ack.Error.Description.StartsWith("wrong last sequence", StringComparison.OrdinalIgnoreCase))
             {
                 return new NatsKVWrongLastRevisionException();
             }
