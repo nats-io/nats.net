@@ -159,6 +159,17 @@ public abstract partial class NatsConnectionTest
         yield return new object[]
         {
             new Auth(
+                "USER-CREDS (FROM CONTENT)",
+                "resources/configs/auth/operator.conf",
+                NatsOpts.Default with
+                {
+                    AuthOpts = NatsAuthOpts.Default with { Creds = System.IO.File.ReadAllText("resources/configs/auth/user.creds"), },
+                }),
+        };
+
+        yield return new object[]
+        {
+            new Auth(
                 "USER-CREDS (FROM FILE) (AuthCallback takes precedence over original file)",
                 "resources/configs/auth/operator.conf",
                 NatsOpts.Default with
