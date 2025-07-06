@@ -8,6 +8,7 @@ internal enum NatsAuthType
     Jwt,
     Nkey,
     CredsFile,
+    Creds,
     NkeyFile,
 }
 
@@ -35,6 +36,8 @@ public readonly struct NatsAuthCred
 
     public static NatsAuthCred FromNkey(string seed) => new(NatsAuthType.Nkey, string.Empty, seed);
 
+    public static NatsAuthCred FromCreds(string creds) => new(NatsAuthType.Creds, creds, string.Empty);
+
     public static NatsAuthCred FromCredsFile(string credFile) => new(NatsAuthType.CredsFile, credFile, string.Empty);
 
     public static NatsAuthCred FromNkeyFile(string nkeyFile) => new(NatsAuthType.NkeyFile, nkeyFile, string.Empty);
@@ -56,6 +59,8 @@ public record NatsAuthOpts
 
     public string? Seed { get; init; }
 
+    public string? Creds { get; init; }
+
     public string? CredsFile { get; init; }
 
     public string? NKeyFile { get; init; }
@@ -74,6 +79,7 @@ public record NatsAuthOpts
                                && string.IsNullOrEmpty(Jwt)
                                && string.IsNullOrEmpty(NKey)
                                && string.IsNullOrEmpty(Seed)
+                               && string.IsNullOrEmpty(Creds)
                                && string.IsNullOrEmpty(CredsFile)
                                && string.IsNullOrEmpty(NKeyFile)
                                && AuthCredCallback == null;
