@@ -207,7 +207,6 @@ public partial class NatsConnection : INatsConnection
     public void OnMessageDropped<T>(NatsSubBase natsSub, int pending, NatsMsg<T> msg)
     {
         var subject = msg.Subject;
-        _logger.LogWarning("Dropped message from {Subject} with {Pending} pending messages", subject, pending);
         _eventChannel.Writer.TryWrite((NatsEvent.MessageDropped, new NatsMessageDroppedEventArgs(natsSub, pending, subject, msg.ReplyTo, msg.Headers, msg.Data)));
     }
 
