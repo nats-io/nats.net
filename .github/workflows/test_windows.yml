@@ -33,6 +33,7 @@ jobs:
       - name: Setup dotnet
         uses: actions/setup-dotnet@v4
         with:
+          cache: true
           dotnet-version: |
             6.x
             8.x
