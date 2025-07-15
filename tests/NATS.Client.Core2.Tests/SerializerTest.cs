@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using NATS.Client.Core2.Tests;
 using NATS.Client.Serializers.Json;
 
@@ -289,9 +290,12 @@ public class SerializerTest
     [Fact]
     public async Task Deserialize_using_json_stream_serializer_registry()
     {
-        var jsonSerializerOptions = new JsonSerializerOptions();
-        jsonSerializerOptions.TypeInfoResolverChain.Add(TestSerializerContext1.Default);
-        jsonSerializerOptions.TypeInfoResolverChain.Add(TestSerializerContext2.Default);
+        var jsonSerializerOptions = new JsonSerializerOptions
+        {
+            TypeInfoResolver = JsonTypeInfoResolver.Combine(
+                TestSerializerContext1.Default,
+                TestSerializerContext2.Default),
+        };
 
         await using var nats = new NatsConnection(new NatsOpts
         {
