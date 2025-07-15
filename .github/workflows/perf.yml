@@ -1,54 +1,55 @@
-#name: Perf
-#
-#on:
-#  pull_request: {}
-#  push:
-#    branches:
-#    - main
-#
-#jobs:
-#  test:
-#    name: test
-#    strategy:
-#      fail-fast: false
-#      matrix:
-#        config:
-#          - branch: 'v2.9'
-#          - branch: 'v2.10'
-#          - branch: 'latest'
-#          - branch: 'main'
-#    runs-on: ubuntu-latest
-#    env:
-#      DOTNET_CLI_TELEMETRY_OPTOUT: 1
-#      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
-#      NUGET_XMLDOC_MODE: skip
-#    steps:
-#      - name: Set up Go
-#        uses: actions/setup-go@v4
-#
-#      - name: Install nats-server
-#        run: |
-#           go install github.com/nats-io/nats-server/v2@${{ matrix.config.branch }}
-#           go install github.com/nats-io/natscli/nats@latest
-#
-#      - name: Check nats
-#        run: |
-#          nats --version
-#          nats-server -v
-#
-#      - name: Checkout
-#        uses: actions/checkout@v4
-#
-#      - name: Setup dotnet
-#        uses: actions/setup-dotnet@v4
-#        with:
-#          dotnet-version: |
-#            6.x
-#            8.x
-#            9.x
-#
-#      - name: Release Build
-#        run: dotnet build -c Release tests/NATS.Client.Perf/NATS.Client.Perf.csproj
-#
-#      - name: Perf Test
-#        run: ./tests/NATS.Client.Perf/bin/Release/net8.0/NATS.Client.Perf
+name: Perf
+
+on:
+  pull_request: {}
+  push:
+    branches:
+    - main
+
+jobs:
+  test:
+    name: test
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - branch: 'v2.9'
+          - branch: 'v2.10'
+          - branch: 'latest'
+          - branch: 'main'
+    runs-on: ubuntu-latest
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+      NUGET_XMLDOC_MODE: skip
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with: { cache: true }
+
+      - name: Install nats-server
+        run: |
+           go install github.com/nats-io/nats-server/v2@${{ matrix.config.branch }}
+           go install github.com/nats-io/natscli/nats@latest
+
+      - name: Check nats
+        run: |
+          nats --version
+          nats-server -v
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup dotnet
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            6.x
+            8.x
+            9.x
+
+      - name: Release Build
+        run: dotnet build -c Release tests/NATS.Client.Perf/NATS.Client.Perf.csproj
+
+      - name: Perf Test
+        run: ./tests/NATS.Client.Perf/bin/Release/net8.0/NATS.Client.Perf
