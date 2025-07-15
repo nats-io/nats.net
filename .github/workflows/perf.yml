@@ -24,7 +24,8 @@ jobs:
       NUGET_XMLDOC_MODE: skip
     steps:
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
+        with: { cache: true }
 
       - name: Install nats-server
         run: |
