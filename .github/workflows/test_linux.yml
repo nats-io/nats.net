@@ -45,7 +45,9 @@ jobs:
             9.x
 
       - name: Build
-        run: dotnet build -c Release
+        run: |
+          cd tests
+          dotnet build -c Release
 
       - name: Test Core2
         run: |
