@@ -18,6 +18,7 @@
     <Project Path="NATS.Client.ObjectStore.Tests/NATS.Client.ObjectStore.Tests.csproj" />
     <Project Path="NATS.Client.Platform.Windows.Tests/NATS.Client.Platform.Windows.Tests.csproj" />
     <Project Path="NATS.Client.Services.Tests/NATS.Client.Services.Tests.csproj" />
+    <Project Path="NATS.Client.Simplified.Tests/NATS.Client.Simplified.Tests.csproj" />
     <Project Path="NATS.Client.TestUtilities/NATS.Client.TestUtilities.csproj" />
     <Project Path="NATS.Extensions.Microsoft.DependencyInjection.Tests/NATS.Extensions.Microsoft.DependencyInjection.Tests.csproj" />
     <Project Path="NATS.Net.OpenTelemetry.Tests/NATS.Net.OpenTelemetry.Tests.csproj" />
