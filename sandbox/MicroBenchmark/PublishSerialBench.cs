@@ -13,7 +13,7 @@ public class PublishSerialBench
 
     private NatsConnection _nats;
 
-    [Params(64, 512, 1024)]
+    [Params(64, 512, 1024, 1_000_000)]
     public int Iter { get; set; }
 
     [GlobalSetup]
