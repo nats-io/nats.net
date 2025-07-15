@@ -14,9 +14,9 @@ jobs:
       fail-fast: false
       matrix:
         config:
-#          - branch: 'v2.9'
-#          - branch: 'v2.10'
-#          - branch: 'latest'
+          - branch: 'v2.9'
+          - branch: 'v2.10'
+          - branch: 'latest'
           - branch: 'main'
     runs-on: windows-latest
     env:
@@ -39,7 +39,8 @@ jobs:
             9.x
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
+        with: { cache: true }
 
       - name: Install nats-server
         run: go install github.com/nats-io/nats-server/v2@${{ matrix.config.branch }}
