@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Text;
+using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
@@ -36,11 +37,13 @@ public class JetStreamApiSerializerTest
         // Keep reader buffers busy with lots of data which should not be
         // kept around and used by the JsonDocument deserializer.
         // Data reader
+        long syncData = 0;
         tasks.Add(Task.Run(
             async () =>
             {
                 await foreach (var unused in nats.SubscribeAsync<string>(dataSubject, cancellationToken: ctsDone.Token))
                 {
+                    Interlocked.Increment(ref syncData);
                 }
             },
             cts.Token));
@@ -57,49 +60,41 @@ public class JetStreamApiSerializerTest
             },
             cts.Token));
 
+        await Retry.Until("data reader is ready", () => Interlocked.CompareExchange(ref syncData, 0, 0) > 0);
+
         // Fake JS API responder
+        var syncApi = 0;
         tasks.Add(Task.Run(
             async () =>
             {
                 var json = JsonSerializer.Serialize(new AccountInfoResponse { Consumers = 1234 });
                 await foreach (var msg in nats.SubscribeAsync<object>(apiSubject, cancellationToken: ctsDone.Token))
                 {
+                    if (msg.ReplyTo == null)
+                    {
+                        Interlocked.Increment(ref syncApi);
+                        continue;
+                    }
+
                     await msg.ReplyAsync(json, cancellationToken: cts.Token);
                 }
             },
             cts.Token));
 
+        await Retry.Until(
+            "data api is ready",
+            () => Interlocked.CompareExchange(ref syncApi, 0, 0) > 0,
+            async () => await nats.PublishAsync(apiSubject, cancellationToken: cts.Token));
+
         // Fake JS API requester
-        tasks.Add(Task.Run(
-            async () =>
-            {
-                for (var i = 0; i < 100; i++)
-                {
-                    if (ctsDone.IsCancellationRequested)
-                        return;
+        for (var i = 0; i < 100; i++)
+        {
+            await js.TryJSRequestAsync<object, AccountInfoResponse>(apiSubject, null, cts.Token);
+        }
 
-                    try
-                    {
-                        var result = await js.TryJSRequestAsync<object, AccountInfoResponse>(apiSubject, null, ctsDone.Token);
-                    }
-                    catch
-                    {
-                        ctsDone.Cancel();
-                        throw;
-                    }
-                }
+        ctsDone.Cancel();
 
-                ctsDone.Cancel();
-            },
-            cts.Token));
-
-        // try
-        // {
-            await Task.WhenAll(tasks);
-        // }
-        // catch (TaskCanceledException)
-        // {
-        // }
+        await Task.WhenAll(tasks);
     }
 
     [Fact]
