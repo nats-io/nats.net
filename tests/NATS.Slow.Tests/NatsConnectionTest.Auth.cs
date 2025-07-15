@@ -132,15 +132,31 @@ public abstract partial class NatsConnectionTest
         yield return new object[]
         {
             new Auth(
-                "USER-CREDS (AuthCallback takes precedence over Jwt & Seed)",
+                "USER-CREDS (AuthCallback takes precedence over Creds or Jwt & Seed)",
                 "resources/configs/auth/operator.conf",
                 NatsOpts.Default with
                 {
                     AuthOpts = NatsAuthOpts.Default with
                     {
                         AuthCredCallback = async (_, _) => await Task.FromResult(NatsAuthCred.FromJwt("eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ.eyJqdGkiOiJOVDJTRkVIN0pNSUpUTzZIQ09GNUpYRFNDUU1WRlFNV0MyWjI1TFk3QVNPTklYTjZFVlhBIiwiaWF0IjoxNjc5MTQ0MDkwLCJpc3MiOiJBREpOSlpZNUNXQlI0M0NOSzJBMjJBMkxPSkVBSzJSS1RaTk9aVE1HUEVCRk9QVE5FVFBZTUlLNSIsIm5hbWUiOiJteS11c2VyIiwic3ViIjoiVUJPWjVMUVJPTEpRRFBBQUNYSk1VRkJaS0Q0R0JaSERUTFo3TjVQS1dSWFc1S1dKM0VBMlc0UloiLCJuYXRzIjp7InB1YiI6e30sInN1YiI6e30sInN1YnMiOi0xLCJkYXRhIjotMSwicGF5bG9hZCI6LTEsInR5cGUiOiJ1c2VyIiwidmVyc2lvbiI6Mn19.ElYEknDixe9pZdl55S9PjduQhhqR1OQLglI1JO7YK7ECYb1mLUjGd8ntcR7ISS04-_yhygSDzX8OS8buBIxMDA", "SUAJR32IC6D45J3URHJ5AOQZWBBO6QTID27NZQKXE3GC5U3SPFEYDJK6RQ")),
+                        Creds = File.ReadAllText("resources/configs/auth/user-invalid.creds"),
                         Jwt = "not a valid jwt",
                         Seed = "invalid nkey seed",
+                    },
+                }),
+        };
+
+        yield return new object[]
+        {
+            new Auth(
+                "USER-CREDS (FROM CONTENT) (takes precedence over CredsFile)",
+                "resources/configs/auth/operator.conf",
+                NatsOpts.Default with
+                {
+                    AuthOpts = NatsAuthOpts.Default with
+                    {
+                        CredsFile = "resources/configs/auth/user-invalid.creds",
+                        Creds = File.ReadAllText("resources/configs/auth/user.creds"),
                     },
                 }),
         };
@@ -167,6 +183,21 @@ public abstract partial class NatsConnectionTest
                     {
                         CredsFile = string.Empty,
                         AuthCredCallback = async (_, _) => await Task.FromResult(NatsAuthCred.FromCredsFile("resources/configs/auth/user.creds")),
+                    },
+                }),
+        };
+
+        yield return new object[]
+        {
+            new Auth(
+                "USER-CREDS (FROM CONTENT) (AuthCallback takes precedence over content)",
+                "resources/configs/auth/operator.conf",
+                NatsOpts.Default with
+                {
+                    AuthOpts = NatsAuthOpts.Default with
+                    {
+                        Creds = File.ReadAllText("resources/configs/auth/user-invalid.creds"),
+                        AuthCredCallback = async (_, _) => await Task.FromResult(NatsAuthCred.FromCreds(File.ReadAllText("resources/configs/auth/user.creds"))),
                     },
                 }),
         };
