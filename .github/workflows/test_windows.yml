@@ -49,7 +49,9 @@ jobs:
         run: nats-server -v
 
       - name: Build
-        run: dotnet build -c Release
+        run: |
+          cd tests
+          dotnet build -c Release
 
       # fails when target frameworks are run in parallel; run tests with -p:TestTfmsInParallel=false
 #      - name: Platform Test

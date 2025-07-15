@@ -1,0 +1,25 @@
+﻿<Solution>
+    <Project Path="../src/NATS.Client.Core/NATS.Client.Core.csproj" />
+    <Project Path="../src/NATS.Client.Hosting/NATS.Client.Hosting.csproj" />
+    <Project Path="../src/NATS.Client.JetStream/NATS.Client.JetStream.csproj" />
+    <Project Path="../src/NATS.Client.KeyValueStore/NATS.Client.KeyValueStore.csproj" />
+    <Project Path="../src/NATS.Client.ObjectStore/NATS.Client.ObjectStore.csproj" />
+    <Project Path="../src/NATS.Client.Serializers.Json/NATS.Client.Serializers.Json.csproj" />
+    <Project Path="../src/NATS.Client.Services/NATS.Client.Services.csproj" />
+    <Project Path="../src/NATS.Client.Simplified/NATS.Client.Simplified.csproj" />
+    <Project Path="../src/NATS.Extensions.Microsoft.DependencyInjection/NATS.Extensions.Microsoft.DependencyInjection.csproj" />
+    <Project Path="../src/NATS.Net/NATS.Net.csproj" />
+    <Project Path="NATS.Client.CheckNativeAot/NATS.Client.CheckNativeAot.csproj" />
+    <Project Path="NATS.Client.Core.Tests/NATS.Client.Core.Tests.csproj" />
+    <Project Path="NATS.Client.Core2.Tests/NATS.Client.Core2.Tests.csproj" />
+    <Project Path="NATS.Client.CoreUnit.Tests/NATS.Client.CoreUnit.Tests.csproj" />
+    <Project Path="NATS.Client.JetStream.Tests/NATS.Client.JetStream.Tests.csproj" />
+    <Project Path="NATS.Client.KeyValueStore.Tests/NATS.Client.KeyValueStore.Tests.csproj" />
+    <Project Path="NATS.Client.ObjectStore.Tests/NATS.Client.ObjectStore.Tests.csproj" />
+    <Project Path="NATS.Client.Platform.Windows.Tests/NATS.Client.Platform.Windows.Tests.csproj" />
+    <Project Path="NATS.Client.Services.Tests/NATS.Client.Services.Tests.csproj" />
+    <Project Path="NATS.Client.TestUtilities/NATS.Client.TestUtilities.csproj" />
+    <Project Path="NATS.Extensions.Microsoft.DependencyInjection.Tests/NATS.Extensions.Microsoft.DependencyInjection.Tests.csproj" />
+    <Project Path="NATS.Net.OpenTelemetry.Tests/NATS.Net.OpenTelemetry.Tests.csproj" />
+    <Project Path="NATS.Slow.Tests/NATS.Slow.Tests.csproj" />
+</Solution>
