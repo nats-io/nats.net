@@ -93,13 +93,13 @@ public class JetStreamApiSerializerTest
             },
             cts.Token));
 
-        try
-        {
+        // try
+        // {
             await Task.WhenAll(tasks);
-        }
-        catch (TaskCanceledException)
-        {
-        }
+        // }
+        // catch (TaskCanceledException)
+        // {
+        // }
     }
 
     [Fact]
