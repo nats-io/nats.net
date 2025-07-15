@@ -24,7 +24,8 @@ jobs:
       NUGET_XMLDOC_MODE: skip
     steps:
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
+        with: { cache: true }
 
       - name: Install nats-server
         run: go install github.com/nats-io/nats-server/v2@${{ matrix.config.branch }}
@@ -44,7 +45,9 @@ jobs:
             9.x
 
       - name: Build
-        run: dotnet build -c Release
+        run: |
+          cd tests
+          dotnet build -c Release
 
       - name: Test Core
         run: |
