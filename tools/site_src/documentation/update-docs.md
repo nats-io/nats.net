@@ -15,7 +15,7 @@ dotnet tool update -g docfx
 Generate API documentation and run local server:
 ```
 git clone https://github.com/nats-io/nats.net.git
-cd nats.net/docs
+cd nats.net/tools/site_src
 docfx docfx.json --serve
 ```
 

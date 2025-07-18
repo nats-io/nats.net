@@ -227,8 +227,12 @@ public class NatsKVStore : INatsKVStore
     }
 
     /// <inheritdoc />
-    public ValueTask<NatsResult<ulong>> TryUpdateAsync<T>(string key, T value, ulong revision, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
-        => TryUpdateInternalAsync(key, value, revision, TimeSpan.Zero, serializer, cancellationToken);
+    public ValueTask<NatsResult<ulong>> TryUpdateAsync<T>(string key, T value, ulong revision, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default) =>
+        TryUpdateInternalAsync(key, value, revision, TimeSpan.Zero, serializer, cancellationToken);
+
+    /// <inheritdoc />
+    public ValueTask<NatsResult<ulong>> TryUpdateAsync<T>(string key, T value, ulong revision, TimeSpan ttl, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default) =>
+        TryUpdateInternalAsync(key, value, revision, ttl, serializer, cancellationToken);
 
     /// <inheritdoc />
     public async ValueTask DeleteAsync(string key, NatsKVDeleteOpts? opts = default, CancellationToken cancellationToken = default)
