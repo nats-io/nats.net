@@ -227,8 +227,12 @@ public class NatsKVStore : INatsKVStore
     }
 
     /// <inheritdoc />
-    public ValueTask<NatsResult<ulong>> TryUpdateAsync<T>(string key, T value, ulong revision, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
-        => TryUpdateInternalAsync(key, value, revision, TimeSpan.Zero, serializer, cancellationToken);
+    public ValueTask<NatsResult<ulong>> TryUpdateAsync<T>(string key, T value, ulong revision, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default) =>
+        TryUpdateInternalAsync(key, value, revision, TimeSpan.Zero, serializer, cancellationToken);
+
+    /// <inheritdoc />
+    public ValueTask<NatsResult<ulong>> TryUpdateAsync<T>(string key, T value, ulong revision, TimeSpan ttl, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default) =>
+        TryUpdateInternalAsync(key, value, revision, ttl, serializer, cancellationToken);
 
     /// <inheritdoc />
     public async ValueTask DeleteAsync(string key, NatsKVDeleteOpts? opts = default, CancellationToken cancellationToken = default)
@@ -660,9 +664,9 @@ public class NatsKVStore : INatsKVStore
         if (publishResult.Success)
         {
             var ack = publishResult.Value;
-            if (ack.Error is { ErrCode: 10071, Code: 400, Description: not null } && ack.Error.Description.StartsWith("wrong last sequence", StringComparison.OrdinalIgnoreCase))
+            if (ack.Error is { ErrCode: 10071, Code: 400, Description: not null } or { ErrCode: 10164, Code: 400, Description: not null } && ack.Error.Description.StartsWith("wrong last sequence", StringComparison.OrdinalIgnoreCase))
             {
-                return new NatsKVWrongLastRevisionException();
+                return new NatsKVWrongLastRevisionException(ack.Error);
             }
             else if (ack.Error != null)
             {
@@ -721,9 +725,9 @@ public class NatsKVStore : INatsKVStore
         if (publishResult.Success)
         {
             var ack = publishResult.Value;
-            if (ack.Error is { ErrCode: 10071, Code: 400, Description: not null } && ack.Error.Description.StartsWith("wrong last sequence", StringComparison.OrdinalIgnoreCase))
+            if (ack.Error is { ErrCode: 10071, Code: 400, Description: not null } or { ErrCode: 10164, Code: 400, Description: not null } && ack.Error.Description.StartsWith("wrong last sequence", StringComparison.OrdinalIgnoreCase))
             {
-                return new NatsKVWrongLastRevisionException();
+                return new NatsKVWrongLastRevisionException(ack.Error);
             }
             else if (ack.Error != null)
             {
