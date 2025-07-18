@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using System.Threading.Channels;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Models;
@@ -462,9 +463,41 @@ public class NatsKVStore : INatsKVStore
             }
         }
 
-        await foreach (var entry in watcher.Entries.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        while (true)
         {
-            yield return entry;
+            bool waitToReadAsync;
+
+            if (_opts.WatcherThrowOnCancellation)
+            {
+                waitToReadAsync = await watcher.Entries.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                try
+                {
+                    waitToReadAsync = await watcher.Entries.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
+                }
+                catch (ChannelClosedException)
+                {
+                    break;
+                }
+                catch (TaskCanceledException)
+                {
+                    break;
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+            }
+
+            if (!waitToReadAsync)
+                break;
+
+            while (watcher.Entries.TryRead(out var msg))
+            {
+                yield return msg;
+            }
         }
     }
 
@@ -488,11 +521,43 @@ public class NatsKVStore : INatsKVStore
 
         await using var watcher = await WatchInternalAsync<T>([key], serializer, opts, cancellationToken);
 
-        await foreach (var entry in watcher.Entries.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        while (true)
         {
-            yield return entry;
-            if (entry.Delta == 0)
-                yield break;
+            bool waitToReadAsync;
+
+            if (_opts.WatcherThrowOnCancellation)
+            {
+                waitToReadAsync = await watcher.Entries.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                try
+                {
+                    waitToReadAsync = await watcher.Entries.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
+                }
+                catch (ChannelClosedException)
+                {
+                    break;
+                }
+                catch (TaskCanceledException)
+                {
+                    break;
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+            }
+
+            if (!waitToReadAsync)
+                break;
+
+            while (watcher.Entries.TryRead(out var entry))
+            {
+                yield return entry;
+                if (entry.Delta == 0)
+                    yield break;
+            }
         }
     }
 
@@ -527,12 +592,44 @@ public class NatsKVStore : INatsKVStore
             if (watcher.InitialConsumer.Info.NumPending == 0)
                 return;
 
-            await foreach (var entry in watcher.Entries.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+            while (true)
             {
-                if (entry.Operation is NatsKVOperation.Purge or NatsKVOperation.Del)
-                    deleted.Add(entry);
-                if (entry.Delta == 0)
-                    goto PURGE_LOOP_DONE;
+                bool waitToReadAsync;
+
+                if (_opts.WatcherThrowOnCancellation)
+                {
+                    waitToReadAsync = await watcher.Entries.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
+                }
+                else
+                {
+                    try
+                    {
+                        waitToReadAsync = await watcher.Entries.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (ChannelClosedException)
+                    {
+                        break;
+                    }
+                    catch (TaskCanceledException)
+                    {
+                        break;
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
+                }
+
+                if (!waitToReadAsync)
+                    break;
+
+                while (watcher.Entries.TryRead(out var entry))
+                {
+                    if (entry.Operation is NatsKVOperation.Purge or NatsKVOperation.Del)
+                        deleted.Add(entry);
+                    if (entry.Delta == 0)
+                        goto PURGE_LOOP_DONE;
+                }
             }
         }
 
@@ -572,12 +669,44 @@ public class NatsKVStore : INatsKVStore
         if (watcher.InitialConsumer.Info.NumPending == 0)
             yield break;
 
-        await foreach (var entry in watcher.Entries.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        while (true)
         {
-            if (entry.Operation is NatsKVOperation.Put)
-                yield return entry.Key;
-            if (entry.Delta == 0)
-                yield break;
+            bool waitToReadAsync;
+
+            if (_opts.WatcherThrowOnCancellation)
+            {
+                waitToReadAsync = await watcher.Entries.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                try
+                {
+                    waitToReadAsync = await watcher.Entries.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
+                }
+                catch (ChannelClosedException)
+                {
+                    break;
+                }
+                catch (TaskCanceledException)
+                {
+                    break;
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+            }
+
+            if (!waitToReadAsync)
+                break;
+
+            while (watcher.Entries.TryRead(out var entry))
+            {
+                if (entry.Operation is NatsKVOperation.Put)
+                    yield return entry.Key;
+                if (entry.Delta == 0)
+                    yield break;
+            }
         }
     }
 
