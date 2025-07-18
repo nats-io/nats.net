@@ -205,6 +205,10 @@ public class NatsKVStore : INatsKVStore
             // If our previous call errored because the last entry is deleted, then that's ok, we update with the deleted revision
             return await TryUpdateInternalAsync(key, value, deletedException.Revision, ttl, serializer, cancellationToken);
         }
+        else if (resultReadExisting.Error is NatsKVWrongLastRevisionException)
+        {
+            return await TryUpdateInternalAsync(key, value, revision: 0, ttl, serializer, cancellationToken);
+        }
         else
         {
             return resultReadExisting.Error;
