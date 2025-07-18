@@ -16,7 +16,7 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           for commit in $(git rev-list "origin/${{ github.base_ref }}".."${{ github.event.pull_request.head.sha }}"); do
-            if ! git verify-commit --raw $commit 2>&1 | grep -q SIG; then
+            if ! git verify-commit --raw $commit 2>&1 | grep -iq SIG; then
               echo "--------------------------------------------------------------"
               echo "Error: Commit $commit is not signed using GPG, SSH, or S/MIME"
               echo "https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits"
