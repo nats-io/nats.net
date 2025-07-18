@@ -10,4 +10,4 @@ public readonly record struct NatsInstrumentationContext(
     long? BodySize,
     long? Size,
     INatsConnection? Connection,
-    ActivityContext? ParentContext);
+    ActivityContext ParentContext);
