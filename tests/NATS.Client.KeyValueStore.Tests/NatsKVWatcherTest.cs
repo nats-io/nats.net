@@ -739,17 +739,36 @@ public class NatsKVWatcherTest
             _output.WriteLine($"LOG:{log.LogLevel}: {log.Message}");
         });
 
-        await using var nats1 = new NatsConnection(new NatsOpts { Url = _server.Url, LoggerFactory = loggerFactory });
+        await using var nats1 = new NatsConnection(new NatsOpts
+        {
+            Url = _server.Url,
+            LoggerFactory = loggerFactory,
+        });
         var prefix = _server.GetNextId();
         await nats1.ConnectRetryAsync();
         var js1 = new NatsJSContext(nats1);
-        var kv1 = new NatsKVContext(js1);
+        var kv1 = new NatsKVContext(js1, new NatsKVOpts
+        {
+            WatcherThrowOnCancellation = false,
+        });
         var s = await kv1.CreateStoreAsync($"{prefix}b1", cancellationToken);
-        var cts2 = new CancellationTokenSource(TimeSpan.FromSeconds(3));
 
-        // TODO: This throws an exception. I'm not able to observer warn logs:
+        var cts2 = new CancellationTokenSource(TimeSpan.FromSeconds(1));
         await foreach (var e in s.WatchAsync<string>(cancellationToken: cts2.Token).ConfigureAwait(false))
         {
         }
+
+        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+        {
+            var kv2 = new NatsKVContext(js1, new NatsKVOpts
+            {
+                // WatcherThrowOnCancellation = true, // Default
+            });
+            var s2 = await kv2.CreateStoreAsync($"{prefix}b1", cancellationToken);
+            var cts3 = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+            await foreach (var e in s2.WatchAsync<string>(cancellationToken: cts3.Token).ConfigureAwait(false))
+            {
+            }
+        });
     }
 }

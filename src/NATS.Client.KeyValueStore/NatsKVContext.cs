@@ -292,4 +292,10 @@ public class NatsKVOpts
     public static readonly NatsKVOpts Default = new();
 
     public bool UseDirectGetApiWithKeysInSubject { get; init; }
+
+    /// <summary>
+    /// Indicates whether the Watch operation should throw an exception if the cancellation token is triggered.
+    /// Default is true.
+    /// </summary>
+    public bool WatcherThrowOnCancellation { get; init; } = true;
 }
