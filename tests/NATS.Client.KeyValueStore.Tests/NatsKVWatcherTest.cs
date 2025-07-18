@@ -739,7 +739,7 @@ public class NatsKVWatcherTest
             _output.WriteLine($"LOG:{log.LogLevel}: {log.Message}");
         });
 
-        await using var nats1 = new NatsConnection(new NatsOpts { Url = _server.Url, LoggerFactory = loggerFactory});
+        await using var nats1 = new NatsConnection(new NatsOpts { Url = _server.Url, LoggerFactory = loggerFactory });
         var prefix = _server.GetNextId();
         await nats1.ConnectRetryAsync();
         var js1 = new NatsJSContext(nats1);
