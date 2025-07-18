@@ -1,6 +1,10 @@
 using System.Buffers;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using NATS.Client.Core2.Tests;
+using NATS.Client.Serializers.Json;
 
 // ReSharper disable RedundantTypeArgumentsOfMethod
 // ReSharper disable ReturnTypeCanBeNotNullable
@@ -283,6 +287,43 @@ public class SerializerTest
         Assert.Equal("something", result2.Data.Name);
     }
 
+    [Fact]
+    public async Task Deserialize_using_json_stream_serializer_registry()
+    {
+        var jsonSerializerOptions = new JsonSerializerOptions
+        {
+            TypeInfoResolver = JsonTypeInfoResolver.Combine(
+                TestSerializerContext1.Default,
+                TestSerializerContext2.Default),
+        };
+
+        await using var nats = new NatsConnection(new NatsOpts
+        {
+            Url = _server.Url,
+            SerializerRegistry = new NatsJsonContextOptionsSerializerRegistry(jsonSerializerOptions),
+        });
+        var prefix = _server.GetNextId();
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        await nats.ConnectAsync();
+
+        var sub1 = await nats.SubscribeCoreAsync<TestMessage1>($"{prefix}.1", cancellationToken: cancellationToken);
+        var sub2 = await nats.SubscribeCoreAsync<TestMessage2>($"{prefix}.2", cancellationToken: cancellationToken);
+
+        await nats.PublishAsync($"{prefix}.1", new TestMessage1("one"), cancellationToken: cancellationToken);
+        await nats.PublishAsync($"{prefix}.2", new TestMessage2("two"), cancellationToken: cancellationToken);
+
+        var result1 = await sub1.Msgs.ReadAsync(cancellationToken);
+        Assert.NotNull(result1.Data);
+        Assert.Equal("one", result1.Data.Name);
+
+        var result2 = await sub2.Msgs.ReadAsync(cancellationToken);
+        Assert.NotNull(result2.Data);
+        Assert.Equal("two", result2.Data.Name);
+    }
+
     private static void AssertByteArray(byte[] expected, byte[] actual)
     {
         Assert.Equal(expected.Length, actual.Length);
@@ -323,3 +364,15 @@ public class TestSerializerWithEmpty<T> : INatsSerializer<T>
 }
 
 public record TestData(string Name);
+
+public record TestMessage1(string Name);
+
+public record TestMessage2(string Name);
+
+[JsonSerializable(typeof(TestMessage1))]
+[JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault, WriteIndented = false)]
+internal partial class TestSerializerContext1 : JsonSerializerContext;
+
+[JsonSerializable(typeof(TestMessage2))]
+[JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault, WriteIndented = false)]
+internal partial class TestSerializerContext2 : JsonSerializerContext;

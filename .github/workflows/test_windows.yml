@@ -39,7 +39,8 @@ jobs:
             9.x
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
+        with: { cache: true }
 
       - name: Install nats-server
         run: go install github.com/nats-io/nats-server/v2@${{ matrix.config.branch }}
@@ -48,7 +49,9 @@ jobs:
         run: nats-server -v
 
       - name: Build
-        run: dotnet build -c Release
+        run: |
+          cd tests
+          dotnet build -c Release
 
       # fails when target frameworks are run in parallel; run tests with -p:TestTfmsInParallel=false
       - name: Platform Test
