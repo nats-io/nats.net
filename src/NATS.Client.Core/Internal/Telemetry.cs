@@ -17,7 +17,7 @@ internal static class Telemetry
         INatsConnection? connection,
         string subject,
         string? replyTo,
-        ActivityContext? parentContext = null)
+        ActivityContext parentContext = default)
     {
         if (!NatsActivities.HasListeners())
             return null;
@@ -78,7 +78,7 @@ internal static class Telemetry
         var activity = NatsActivities.StartActivity(
             name,
             kind: ActivityKind.Producer,
-            parentContext: parentContext ?? default,
+            parentContext: parentContext,
             tags: tags);
 
         if (activity is not null)
