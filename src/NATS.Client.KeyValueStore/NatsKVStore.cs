@@ -96,12 +96,9 @@ public class NatsKVStore : INatsKVStore
     public static NatsResult IsValidKey(string key) => TryValidateKey(key);
 
     /// <inheritdoc />
-    public ValueTask<ulong> PutAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default) => PutAsync<T>(key, value, default, serializer, cancellationToken);
-
-    /// <inheritdoc />
-    public async ValueTask<ulong> PutAsync<T>(string key, T value, TimeSpan ttl = default, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
+    public async ValueTask<ulong> PutAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
-        var result = await TryPutAsync(key, value, ttl, serializer, cancellationToken);
+        var result = await TryPutAsync(key, value, serializer, cancellationToken);
         if (!result.Success)
         {
             ThrowException(result.Error);
@@ -111,10 +108,7 @@ public class NatsKVStore : INatsKVStore
     }
 
     /// <inheritdoc />
-    public ValueTask<NatsResult<ulong>> TryPutAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default) => TryPutAsync<T>(key, value, default, serializer, cancellationToken);
-
-    /// <inheritdoc />
-    public async ValueTask<NatsResult<ulong>> TryPutAsync<T>(string key, T value, TimeSpan ttl = default, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
+    public async ValueTask<NatsResult<ulong>> TryPutAsync<T>(string key, T value, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
         var keyValidResult = TryValidateKey(key);
         if (!keyValidResult.Success)
@@ -122,16 +116,7 @@ public class NatsKVStore : INatsKVStore
             return keyValidResult.Error;
         }
 
-        NatsHeaders? headers = default;
-        if (ttl != default)
-        {
-            headers = new NatsHeaders
-            {
-                { NatsTTL, ToTTLString(ttl) },
-            };
-        }
-
-        var publishResult = await JetStreamContext.TryPublishAsync(_kvBucket + key, value, serializer: serializer, headers: headers, cancellationToken: cancellationToken);
+        var publishResult = await JetStreamContext.TryPublishAsync(_kvBucket + key, value, serializer: serializer, cancellationToken: cancellationToken);
         if (publishResult.Success)
         {
             var ack = publishResult.Value;
@@ -212,12 +197,9 @@ public class NatsKVStore : INatsKVStore
     }
 
     /// <inheritdoc />
-    public ValueTask<ulong> UpdateAsync<T>(string key, T value, ulong revision, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default) => UpdateAsync(key, value, revision, default, serializer, cancellationToken);
-
-    /// <inheritdoc />
-    public async ValueTask<ulong> UpdateAsync<T>(string key, T value, ulong revision, TimeSpan ttl = default, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
+    public async ValueTask<ulong> UpdateAsync<T>(string key, T value, ulong revision, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
-        var result = await TryUpdateInternalAsync(key, value, revision, ttl, serializer, cancellationToken);
+        var result = await TryUpdateInternalAsync(key, value, revision, default, serializer, cancellationToken);
         if (!result.Success)
         {
             ThrowException(result.Error);
@@ -229,10 +211,6 @@ public class NatsKVStore : INatsKVStore
     /// <inheritdoc />
     public ValueTask<NatsResult<ulong>> TryUpdateAsync<T>(string key, T value, ulong revision, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default) =>
         TryUpdateInternalAsync(key, value, revision, TimeSpan.Zero, serializer, cancellationToken);
-
-    /// <inheritdoc />
-    public ValueTask<NatsResult<ulong>> TryUpdateAsync<T>(string key, T value, ulong revision, TimeSpan ttl, INatsSerialize<T>? serializer = default, CancellationToken cancellationToken = default) =>
-        TryUpdateInternalAsync(key, value, revision, ttl, serializer, cancellationToken);
 
     /// <inheritdoc />
     public async ValueTask DeleteAsync(string key, NatsKVDeleteOpts? opts = default, CancellationToken cancellationToken = default)
