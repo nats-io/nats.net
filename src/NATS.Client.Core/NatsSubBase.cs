@@ -285,6 +285,15 @@ public abstract class NatsSubBase
             // Need to await to handle any exceptions
             await ReceiveInternalAsync(subject, replyTo, headersBuffer, payloadBuffer).ConfigureAwait(false);
         }
+        catch (TaskCanceledException)
+        {
+            // If there are cancellations, we don't want to throw an exception.
+            // These can happen if the subscription is disposed or unsubscribed while
+            // processing the message as part of a normal flow.
+        }
+        catch (OperationCanceledException)
+        {
+        }
         catch (ChannelClosedException)
         {
             // When user disposes or unsubscribes there maybe be messages still coming in

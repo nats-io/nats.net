@@ -117,7 +117,12 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
             }
             else
             {
-                _logger.LogWarning(NatsLogEvents.Subscription, "Can\'t find subscription for {Subject}/{Sid}", subject, sid);
+                // This can happen when a subscription is removed before the message is received. (there may be multiple messages in flight)
+                // Main scenarios are:
+                // (1) Request/Reply pattern where the request is sent and the reply is received after the subscription was removed due to a timeout.
+                // (2) JetStream consumer subscription was removed due to a timeout or cancellation before all the messages were received.
+                // Note this log level was set to warning before, however, it is not an error condition and can happen in normal operation, so debug is more appropriate.
+                _logger.LogDebug(NatsLogEvents.Subscription, "Can\'t find subscription for {Subject}/{Sid}", subject, sid);
             }
         }
 
