@@ -7,7 +7,7 @@ namespace NATS.Client.Core;
 /// </summary>
 public sealed class NatsInstrumentationOptions
 {
-    public static NatsInstrumentationOptions Default => new();
+    public static NatsInstrumentationOptions Default { get; } = new();
 
     /// <summary>
     /// Gets or sets a filter function that determines whether or not to collect telemetry on a per request basis.
