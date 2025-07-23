@@ -20,9 +20,9 @@ internal sealed class ActivityEndingJSMsgReader<T> : ChannelReader<NatsJSMsg<T>>
 {
     private readonly ChannelReader<NatsJSMsg<T>> _inner;
 
-    private readonly NatsJSConsume<T> _sub;
+    private readonly NatsSubBase _sub;
 
-    public ActivityEndingJSMsgReader(ChannelReader<NatsJSMsg<T>> inner, NatsJSConsume<T> sub)
+    public ActivityEndingJSMsgReader(ChannelReader<NatsJSMsg<T>> inner, NatsSubBase sub)
     {
         _inner = inner;
         _sub = sub;

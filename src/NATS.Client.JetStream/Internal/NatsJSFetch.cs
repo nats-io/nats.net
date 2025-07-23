@@ -76,7 +76,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         // sufficiently large value to avoid blocking socket reads in the
         // NATS connection).
         _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg>>(1000);
-        Msgs = _userMsgs.Reader;
+        Msgs = new ActivityEndingJSMsgReader<TMsg>(_userMsgs.Reader, this);
 
         if (_debug)
         {
