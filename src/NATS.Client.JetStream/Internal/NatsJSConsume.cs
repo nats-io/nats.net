@@ -136,7 +136,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         // sufficiently large value to avoid blocking socket reads in the
         // NATS connection).
         _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg>>(1000);
-        Msgs = new ActivityEndingJSMsgReader<TMsg>(_userMsgs.Reader, this);
+        Msgs = new ActivityEndingMsgReader<NatsJSMsg<TMsg>>(_userMsgs.Reader, this);
 
         // Capacity as 1 is enough here since it's used for signaling only.
         _pullRequests = Channel.CreateBounded<PullRequest>(1);
