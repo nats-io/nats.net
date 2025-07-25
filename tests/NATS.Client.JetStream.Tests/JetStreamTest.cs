@@ -1,5 +1,6 @@
 using NATS.Client.Core.Tests;
 using NATS.Client.JetStream.Models;
+using NATS.Client.Platform.Windows.Tests;
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -48,17 +49,13 @@ public class JetStreamTest
         await Assert.ThrowsAnyAsync<ArgumentException>(async () => await jsmContext.DeleteMessageAsync(streamName!, new StreamMsgDeleteRequest()));
     }
 
-    [Fact]
-    public async Task Create_stream_test()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Create_stream_test(NatsRequestReplyMode mode)
     {
-        await using var server = await NatsServer.StartAsync(
-            outputHelper: _output,
-            opts: new NatsServerOptsBuilder()
-                .UseTransport(TransportType.Tcp)
-                .Trace()
-                .UseJetStream()
-                .Build());
-        var nats = await server.CreateClientConnectionAsync(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestTimeout = TimeSpan.FromSeconds(10), RequestReplyMode = mode });
 
         // Happy user
         {

@@ -592,7 +592,13 @@ public class NatsObjStore : INatsObjStore
 
         await PublishMeta(meta, cancellationToken);
 
+#if NETSTANDARD2_0
+#pragma warning disable CS8604 // Possible null reference argument.
+#endif
         var response = await _stream.PurgeAsync(new StreamPurgeRequest { Filter = GetChunkSubject(meta.Nuid) }, cancellationToken);
+#if NETSTANDARD2_0
+#pragma warning restore CS8604 // Possible null reference argument.
+#endif
         if (!response.Success)
         {
             throw new NatsObjException("Can't purge object chunks");

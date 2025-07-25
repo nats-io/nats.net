@@ -1,4 +1,6 @@
 using NATS.Client.Core.Tests;
+using NATS.Client.Platform.Windows.Tests;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -7,13 +9,15 @@ public class MessageInterfaceTest
     [Fact]
     public async Task Using_message_interface()
     {
-        await using var server = await NatsServer.StartJSAsync();
-        await using var nats = await server.CreateClientConnectionAsync();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
+
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
-        await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
+        await js.CreateStreamAsync("s1", ["s1.*"], cts.Token);
 
         var ack = await js.PublishAsync("s1.foo", "test_msg", cancellationToken: cts.Token);
         ack.EnsureSuccess();

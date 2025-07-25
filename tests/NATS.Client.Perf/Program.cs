@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Channels;
 using NATS.Client.Core;
 using NATS.Client.Core.Tests;
+using NATS.Client.Platform.Windows.Tests;
 
 var t = new TestParams
 {
@@ -21,13 +22,14 @@ Console.WriteLine(t);
 
 var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
 
-await using var server = await NatsServer.StartAsync();
+await using var server = await NatsServerProcess.StartAsync();
+await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
 
 Console.WriteLine("\nRunning nats bench");
-var natsBenchTotalMsgs = await RunNatsBenchAsync(server.ClientUrl, t, cts.Token);
+var natsBenchTotalMsgs = await RunNatsBenchAsync(server.Url, t, cts.Token);
 
-await using var nats1 = await server.CreateClientConnectionAsync(NatsOpts.Default with { SubPendingChannelFullMode = BoundedChannelFullMode.Wait }, testLogger: false);
-await using var nats2 = await server.CreateClientConnectionAsync(testLogger: false);
+await using var nats1 = new NatsConnection(new NatsOpts { Url = server.Url, SubPendingChannelFullMode = BoundedChannelFullMode.Wait });
+await using var nats2 = new NatsConnection(new NatsOpts { Url = server.Url });
 
 await nats1.PingAsync();
 await nats2.PingAsync();

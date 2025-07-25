@@ -18,9 +18,9 @@ public class ManagingPage
         Console.WriteLine("NATS.Net.DocsExamples.JetStream.ManagingPage");
 
         #region js
-        await using var nc = new NatsClient();
+        await using NatsClient nc = new NatsClient();
 
-        var js = nc.CreateJetStreamContext();
+        INatsJSContext js = nc.CreateJetStreamContext();
         #endregion
 
         try
@@ -48,21 +48,21 @@ public class ManagingPage
         {
             #region consumer-create
             // Create or get a consumer
-            var consumer = await js.CreateOrUpdateConsumerAsync(stream: "ORDERS", new ConsumerConfig("order_processor"));
+            INatsJSConsumer consumer = await js.CreateOrUpdateConsumerAsync(stream: "ORDERS", new ConsumerConfig("order_processor"));
             #endregion
         }
 
         {
             #region consumer-get
             // Get an existing consumer
-            var consumer = await js.GetConsumerAsync(stream: "ORDERS", consumer: "order_processor");
+            INatsJSConsumer consumer = await js.GetConsumerAsync(stream: "ORDERS", consumer: "order_processor");
             #endregion
         }
 
         {
             #region consumer-durable
             // Create a durable consumer
-            var durableConfig = new ConsumerConfig("durable_processor");
+            ConsumerConfig durableConfig = new ConsumerConfig("durable_processor");
 
             // Same as above
             durableConfig = new ConsumerConfig
@@ -71,7 +71,7 @@ public class ManagingPage
                 DurableName = "durable_processor",
             };
 
-            var consumer = await js.CreateOrUpdateConsumerAsync(stream: "ORDERS", durableConfig);
+            INatsJSConsumer consumer = await js.CreateOrUpdateConsumerAsync(stream: "ORDERS", durableConfig);
 
             Console.WriteLine($"Consumer Name: {consumer.Info.Name}"); // durable_processor
             Console.WriteLine($"Consumer DurableName: {consumer.Info.Config.DurableName}"); // durable_processor
@@ -81,9 +81,9 @@ public class ManagingPage
         {
             #region consumer-ephemeral
             // Create an ephemeral consumer by not setting durable name
-            var ephemeralConfig = new ConsumerConfig();
+            ConsumerConfig ephemeralConfig = new ConsumerConfig();
 
-            var consumer = await js.CreateOrUpdateConsumerAsync(stream: "ORDERS", ephemeralConfig);
+            INatsJSConsumer consumer = await js.CreateOrUpdateConsumerAsync(stream: "ORDERS", ephemeralConfig);
 
             Console.WriteLine($"Consumer Name: {consumer.Info.Name}"); // e.g. Z8YlwrP9 (server assigned random name)
             #endregion

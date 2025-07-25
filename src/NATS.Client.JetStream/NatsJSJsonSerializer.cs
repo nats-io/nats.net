@@ -396,6 +396,57 @@ internal class NatsJSJsonNullableNanosecondsConverter : JsonConverter<TimeSpan?>
     }
 }
 
+internal class NatsJSJsonNullableCollectionNanosecondsConverter : JsonConverter<ICollection<TimeSpan>?>
+{
+    private readonly NatsJSJsonNanosecondsConverter _converter = new();
+
+    public override ICollection<TimeSpan>? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.Null)
+        {
+            return null;
+        }
+
+        if (reader.TokenType != JsonTokenType.StartArray)
+        {
+            throw new InvalidOperationException("Expected start of array");
+        }
+
+        var result = new List<TimeSpan>();
+
+        while (reader.Read())
+        {
+            if (reader.TokenType == JsonTokenType.EndArray)
+            {
+                return result;
+            }
+
+            result.Add(_converter.Read(ref reader, typeof(TimeSpan), options));
+        }
+
+        throw new InvalidOperationException("Expected end of array");
+    }
+
+    public override void Write(Utf8JsonWriter writer, ICollection<TimeSpan>? value, JsonSerializerOptions options)
+    {
+        if (value == null)
+        {
+            writer.WriteNullValue();
+        }
+        else
+        {
+            writer.WriteStartArray();
+
+            foreach (var timeSpan in value)
+            {
+                _converter.Write(writer, timeSpan, options);
+            }
+
+            writer.WriteEndArray();
+        }
+    }
+}
+
 internal class NatsJSJsonDateTimeOffsetConverter : JsonConverter<DateTimeOffset>
 {
     public override DateTimeOffset Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)

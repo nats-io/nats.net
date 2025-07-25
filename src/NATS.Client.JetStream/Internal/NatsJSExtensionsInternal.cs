@@ -21,6 +21,7 @@ internal static class NatsJSExtensionsInternal
             if (headers.MessageText.StartsWith("Exceeded MaxRequestBatch", StringComparison.OrdinalIgnoreCase)
                 || headers.MessageText.StartsWith("Exceeded MaxRequestExpires", StringComparison.OrdinalIgnoreCase)
                 || headers.MessageText.StartsWith("Exceeded MaxRequestMaxBytes", StringComparison.OrdinalIgnoreCase)
+                || headers.MessageText.StartsWith("Consumer is push based", StringComparison.OrdinalIgnoreCase)
                 || headers.MessageText.StartsWith("Exceeded MaxWaiting", StringComparison.OrdinalIgnoreCase))
                 return true;
         }

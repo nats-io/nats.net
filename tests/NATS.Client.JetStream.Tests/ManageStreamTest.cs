@@ -1,19 +1,32 @@
 using NATS.Client.Core.Tests;
+using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Models;
+using NATS.Client.Platform.Windows.Tests;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.JetStream.Tests;
 
+[Collection("nats-server")]
 public class ManageStreamTest
 {
     private readonly ITestOutputHelper _output;
+    private readonly NatsServerFixture _server;
 
-    public ManageStreamTest(ITestOutputHelper output) => _output = output;
-
-    [Fact]
-    public async Task Account_info_create_get_update_stream()
+    public ManageStreamTest(ITestOutputHelper output, NatsServerFixture server)
     {
-        await using var server = await NatsServer.StartJSAsync();
-        var nats = await server.CreateClientConnectionAsync();
+        _output = output;
+        _server = server;
+    }
+
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Account_info_create_get_update_stream(NatsRequestReplyMode mode)
+    {
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestReplyMode = mode });
+        await nats.ConnectRetryAsync();
+
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -56,85 +69,99 @@ public class ManageStreamTest
         }
     }
 
-    [Fact]
-    public async Task List_delete_stream()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task List_delete_stream(NatsRequestReplyMode mode)
     {
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
+        var prefix = _server.GetNextId() + "-";
+        await nats.ConnectRetryAsync();
 
-        await using var server = await NatsServer.StartJSAsync();
-        var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContext(nats);
 
-        await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
-        await js.CreateStreamAsync("s2", new[] { "s2.*" }, cts.Token);
-        await js.CreateStreamAsync("s3", new[] { "s3.*" }, cts.Token);
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
+        await js.CreateStreamAsync($"{prefix}s2", [$"{prefix}s2.*"], cts.Token);
+        await js.CreateStreamAsync($"{prefix}s3", [$"{prefix}s3.*"], cts.Token);
 
         // List
         {
             var list = new List<StreamInfo>();
             await foreach (var stream in js.ListStreamsAsync(cancellationToken: cts.Token))
             {
-                list.Add(stream.Info);
+                if (stream.Info.Config.Name!.StartsWith(prefix))
+                    list.Add(stream.Info);
             }
 
             Assert.Equal(3, list.Count);
-            Assert.Contains(list, s => s.Config.Name == "s1");
-            Assert.Contains(list, s => s.Config.Name == "s2");
-            Assert.Contains(list, s => s.Config.Name == "s3");
+            Assert.Contains(list, s => s.Config.Name == $"{prefix}s1");
+            Assert.Contains(list, s => s.Config.Name == $"{prefix}s2");
+            Assert.Contains(list, s => s.Config.Name == $"{prefix}s3");
         }
 
         // Delete
         {
-            var deleteResponse = await js.DeleteStreamAsync("s1", cts.Token);
+            var deleteResponse = await js.DeleteStreamAsync($"{prefix}s1", cts.Token);
             Assert.True(deleteResponse);
 
             var list = new List<StreamInfo>();
             await foreach (var stream in js.ListStreamsAsync(cancellationToken: cts.Token))
             {
-                list.Add(stream.Info);
+                if (stream.Info.Config.Name!.StartsWith(prefix))
+                    list.Add(stream.Info);
             }
 
-            Assert.DoesNotContain(list, s => s.Config.Name == "s1");
+            Assert.DoesNotContain(list, s => s.Config.Name == $"{prefix}s1");
         }
     }
 
-    [Fact]
-    public async Task Delete_one_msg()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Delete_one_msg(NatsRequestReplyMode mode)
     {
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
+        var prefix = _server.GetNextId();
+        await nats.ConnectRetryAsync();
 
-        await using var server = await NatsServer.StartJSAsync();
-        var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContext(nats);
 
-        await js.CreateStreamAsync("s1", new[] { "s1.*" }, cts.Token);
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-        var stream = await js.GetStreamAsync("s1", new StreamInfoRequest() { SubjectsFilter = "s1.Ü" }, cts.Token);
+        await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
+
+        var stream = await js.GetStreamAsync($"{prefix}s1", new StreamInfoRequest { SubjectsFilter = $"{prefix}s1.Ü" }, cts.Token);
         Assert.Null(stream.Info.State.Subjects);
 
-        await js.PublishAsync("s1.1", new byte[] { 1 }, cancellationToken: cts.Token);
-        await js.PublishAsync("s1.2", new byte[] { 2 }, cancellationToken: cts.Token);
-        await js.PublishAsync("s1.3", new byte[] { 3 }, cancellationToken: cts.Token);
+        await js.PublishAsync($"{prefix}s1.1", new byte[] { 1 }, cancellationToken: cts.Token);
+        await js.PublishAsync($"{prefix}s1.2", new byte[] { 2 }, cancellationToken: cts.Token);
+        await js.PublishAsync($"{prefix}s1.3", new byte[] { 3 }, cancellationToken: cts.Token);
 
-        stream = await js.GetStreamAsync("s1", new StreamInfoRequest() { SubjectsFilter = "s1.*" }, cts.Token);
+        stream = await js.GetStreamAsync($"{prefix}s1", new StreamInfoRequest { SubjectsFilter = $"{prefix}s1.*" }, cts.Token);
 
         Assert.Equal(3, stream.Info.State.Subjects?.Count);
 
-        var deleteResponse = await js.DeleteMessageAsync("s1", new StreamMsgDeleteRequest { Seq = 1 }, cts.Token);
+        var deleteResponse = await js.DeleteMessageAsync($"{prefix}s1", new StreamMsgDeleteRequest { Seq = 1 }, cts.Token);
         Assert.True(deleteResponse.Success);
 
-        stream = await js.GetStreamAsync("s1", new StreamInfoRequest() { SubjectsFilter = "s1.*" }, cts.Token);
+        stream = await js.GetStreamAsync($"{prefix}s1", new StreamInfoRequest { SubjectsFilter = $"{prefix}s1.*" }, cts.Token);
 
         Assert.Equal(2, stream.Info.State.Subjects?.Count);
     }
 
-    [Fact]
-    public async Task Create_or_update_stream_should_be_create_stream_if_stream_doesnt_exist()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Create_or_update_stream_should_be_create_stream_if_stream_doesnt_exist(NatsRequestReplyMode mode)
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-        await using var server = await NatsServer.StartJSAsync();
-        var nats = await server.CreateClientConnectionAsync();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestReplyMode = mode });
+        await nats.ConnectRetryAsync();
+
         var js = new NatsJSContext(nats);
 
         var streamConfig = new StreamConfig("s1", ["s1.*"])
@@ -148,16 +175,20 @@ public class ManageStreamTest
         Assert.Equal(1, accountInfoAfter.Streams);
     }
 
-    [Fact]
-    public async Task Create_or_update_stream_should_be_update_stream_if_stream_exist()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Create_or_update_stream_should_be_update_stream_if_stream_exist(NatsRequestReplyMode mode)
     {
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
+        var prefix = _server.GetNextId();
+        await nats.ConnectRetryAsync();
 
-        await using var server = await NatsServer.StartJSAsync();
-        var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContext(nats);
 
-        var streamConfig = new StreamConfig("s1", ["s1.*"])
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        var streamConfig = new StreamConfig($"{prefix}s1", [$"{prefix}s1.*"])
         { Storage = StreamConfigStorage.File, NoAck = false };
         var streamConfigForUpdated = streamConfig with { NoAck = true };
 
@@ -168,16 +199,20 @@ public class ManageStreamTest
         Assert.True(updatedStream.Info.Config.NoAck);
     }
 
-    [Fact]
-    public async Task Create_or_update_stream_should_be_throwing_update_operation_errors()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Create_or_update_stream_should_be_throwing_update_operation_errors(NatsRequestReplyMode mode)
     {
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
+        var prefix = _server.GetNextId();
+        await nats.ConnectRetryAsync();
 
-        await using var server = await NatsServer.StartJSAsync();
-        var nats = await server.CreateClientConnectionAsync();
         var js = new NatsJSContext(nats);
 
-        var streamConfig = new StreamConfig("s1", ["s1.*"])
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        var streamConfig = new StreamConfig($"{prefix}s1", [$"{prefix}s1.*"])
         { Storage = StreamConfigStorage.File };
         var streamConfigForUpdated = streamConfig with { Storage = StreamConfigStorage.Memory };
 

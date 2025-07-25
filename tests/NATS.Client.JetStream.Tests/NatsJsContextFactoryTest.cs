@@ -1,6 +1,8 @@
+using System.Net;
 using System.Text;
 using System.Threading.Channels;
 using NATS.Client.Core.Tests;
+using NATS.Client.Platform.Windows.Tests;
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -14,18 +16,12 @@ public class NatsJSContextFactoryTest
     public async Task Create_Context_Test()
     {
         // Arrange
-        await using var server = await NatsServer.StartAsync(
-            outputHelper: _output,
-            opts: new NatsServerOptsBuilder()
-                .UseTransport(TransportType.Tcp)
-                .Trace()
-                .UseJetStream()
-                .Build());
-        await using var connection = await server.CreateClientConnectionAsync(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestTimeout = TimeSpan.FromSeconds(10) });
         var factory = new NatsJSContextFactory();
 
         // Act
-        var context = factory.CreateContext(connection);
+        var context = factory.CreateContext(nats);
 
         // Assert
         context.Should().NotBeNull();
@@ -35,19 +31,13 @@ public class NatsJSContextFactoryTest
     public async Task Create_Context_WithOpts_Test()
     {
         // Arrange
-        await using var server = await NatsServer.StartAsync(
-            outputHelper: _output,
-            opts: new NatsServerOptsBuilder()
-                .UseTransport(TransportType.Tcp)
-                .Trace()
-                .UseJetStream()
-                .Build());
-        await using var connection = await server.CreateClientConnectionAsync(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestTimeout = TimeSpan.FromSeconds(10) });
         var factory = new NatsJSContextFactory();
-        var opts = new NatsJSOpts(connection.Opts);
+        var opts = new NatsJSOpts(nats.Opts);
 
         // Act
-        var context = factory.CreateContext(connection, opts);
+        var context = factory.CreateContext(nats, opts);
 
         // Assert
         context.Should().NotBeNull();
@@ -110,7 +100,7 @@ public class NatsJSContextFactoryTest
 
         public Func<(string Host, int Port), ValueTask<(string Host, int Port)>>? OnConnectingAsync { get; set; }
 
-        public Func<ISocketConnection, ValueTask<ISocketConnection>>? OnSocketAvailableAsync { get; set; }
+        public Func<INatsSocketConnection, ValueTask<INatsSocketConnection>>? OnSocketAvailableAsync { get; set; }
 
         public ValueTask<TimeSpan> PingAsync(CancellationToken cancellationToken = default) => throw new NotImplementedException();
 

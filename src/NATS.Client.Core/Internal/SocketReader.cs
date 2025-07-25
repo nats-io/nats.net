@@ -14,11 +14,11 @@ internal sealed class SocketReader
     private readonly Stopwatch _stopwatch = new Stopwatch();
     private readonly ILogger<SocketReader> _logger;
     private readonly bool _isTraceLogging;
-    private ISocketConnection _socketConnection;
+    private readonly SocketConnectionWrapper _socketConnection;
 
     private Memory<byte> _availableMemory;
 
-    public SocketReader(ISocketConnection socketConnection, int minimumBufferSize, ConnectionStatsCounter counter, ILoggerFactory loggerFactory)
+    public SocketReader(SocketConnectionWrapper socketConnection, int minimumBufferSize, ConnectionStatsCounter counter, ILoggerFactory loggerFactory)
     {
         _socketConnection = socketConnection;
         _minimumBufferSize = minimumBufferSize;

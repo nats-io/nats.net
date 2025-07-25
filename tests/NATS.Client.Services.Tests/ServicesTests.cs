@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using NATS.Client.Core.Tests;
+using NATS.Client.Platform.Windows.Tests;
 using NATS.Client.Services.Internal;
 using NATS.Client.Services.Models;
 
@@ -18,8 +19,8 @@ public class ServicesTests
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await using var server = await NatsServer.StartAsync();
-        await using var nats = await server.CreateClientConnectionAsync();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
         var svc = new NatsSvcContext(nats);
 
         await using var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
@@ -53,8 +54,8 @@ public class ServicesTests
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await using var server = await NatsServer.StartAsync();
-        await using var nats = await server.CreateClientConnectionAsync();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
         var svc = new NatsSvcContext(nats);
 
         await using var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
@@ -135,8 +136,8 @@ public class ServicesTests
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await using var server = await NatsServer.StartAsync();
-        await using var nats = await server.CreateClientConnectionAsync();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
         var svc = new NatsSvcContext(nats);
 
         await using var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
@@ -236,8 +237,8 @@ public class ServicesTests
     [Fact]
     public async Task Add_multiple_service_listeners_ping_info_and_stats()
     {
-        await using var server = await NatsServer.StartAsync();
-        await using var nats = await server.CreateClientConnectionAsync();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
         var svc = new NatsSvcContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -272,8 +273,8 @@ public class ServicesTests
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await using var server = await NatsServer.StartAsync();
-        await using var nats = await server.CreateClientConnectionAsync();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
         var svc = new NatsSvcContext(nats);
 
         await using var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
@@ -330,8 +331,8 @@ public class ServicesTests
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(200));
         var cancellationToken = cts.Token;
 
-        await using var server = await NatsServer.StartAsync();
-        await using var nats = await server.CreateClientConnectionAsync();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
         var svc = new NatsSvcContext(nats);
 
         await using var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
@@ -354,8 +355,8 @@ public class ServicesTests
     [Fact]
     public async Task Service_ids_unique()
     {
-        await using var server = await NatsServer.StartAsync();
-        await using var nats = await server.CreateClientConnectionAsync();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
         var svc = new NatsSvcContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
@@ -387,9 +388,9 @@ public class ServicesTests
     [Fact]
     public async Task Service_without_queue_group()
     {
-        await using var server = await NatsServer.StartAsync();
-        var (nats1, proxy) = server.CreateProxiedClientConnection();
-        await using var nats = nats1;
+        await using var server = await NatsServerProcess.StartAsync();
+        var proxy = new NatsProxy(server.Port);
+        await using var nats = new NatsConnection(new NatsOpts { Url = $"127.0.0.1:{proxy.Port}" });
         var svc = new NatsSvcContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
@@ -436,7 +437,7 @@ public class ServicesTests
             Assert.Equal(1, count);
         }
 
-        await proxy.FlushFramesAsync(nats);
+        await proxy.FlushFramesAsync(nats, clear: true, cts.Token);
 
         // Without any queue group
         {

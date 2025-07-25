@@ -168,6 +168,47 @@ public partial class NatsJSContext
 
         for (var i = 0; i < retryMax; i++)
         {
+            if (Connection.Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
+            {
+                var noReply = false;
+                NatsMsg<PubAckResponse> msg;
+                try
+                {
+                    msg = await Connection.RequestAsync<T, PubAckResponse>(
+                        subject: subject,
+                        data: data,
+                        headers: headers,
+                        requestSerializer: serializer,
+                        replySerializer: NatsJSJsonSerializer<PubAckResponse>.Default,
+                        requestOpts: opts,
+                        replyOpts: new NatsSubOpts { Timeout = Connection.Opts.RequestTimeout },
+                        cancellationToken).ConfigureAwait(false);
+                }
+                catch (NatsNoReplyException)
+                {
+                    noReply = true;
+                    msg = default;
+                }
+                catch (Exception ex)
+                {
+                    return ex;
+                }
+
+                if (noReply || msg.HasNoResponders)
+                {
+                    _logger.LogDebug(NatsJSLogEvents.PublishNoResponseRetry, "No response received, retrying {RetryCount}/{RetryMax}", i + 1, retryMax);
+                    await Task.Delay(retryWait, cancellationToken);
+                    continue;
+                }
+
+                if (msg.Data == null)
+                {
+                    return new NatsJSException("No response data received");
+                }
+
+                return msg.Data;
+            }
+
             await using var sub = await Connection.CreateRequestSubAsync<T, PubAckResponse>(
                     subject: subject,
                     data: data,
@@ -314,7 +355,7 @@ public partial class NatsJSContext
         }
 
 #if NETSTANDARD2_0
-        if (name.Contains(" ."))
+        if (name.Contains(".") || name.Contains(" "))
 #else
         var nameSpan = name.AsSpan();
         if (nameSpan.IndexOfAny(" .") >= 0)
@@ -351,6 +392,52 @@ public partial class NatsJSContext
         {
             // TODO: Can't validate using JSON serializer context at the moment.
             // Validator.ValidateObject(request, new ValidationContext(request));
+        }
+
+        if (Connection.Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
+        {
+            NatsMsg<NatsJSApiResult<TResponse>> msg;
+            try
+            {
+                msg = await Connection.RequestAsync<TRequest, NatsJSApiResult<TResponse>>(
+                    subject: subject,
+                    data: request,
+                    headers: null,
+                    replyOpts: new NatsSubOpts { Timeout = Connection.Opts.RequestTimeout },
+                    requestSerializer: NatsJSJsonSerializer<TRequest>.Default,
+                    replySerializer: NatsJSJsonDocumentSerializer<TResponse>.Default,
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
+            }
+            catch (NatsNoReplyException)
+            {
+                return new NatsJSApiNoResponseException();
+            }
+            catch (NatsException e)
+            {
+                return e;
+            }
+
+            if (msg.HasNoResponders)
+            {
+                return new NatsNoRespondersException();
+            }
+
+            if (msg.Error is { } messageError)
+            {
+                return messageError;
+            }
+
+            if (msg.Data.HasException)
+            {
+                return msg.Data.Exception;
+            }
+
+            if (msg.Data.HasError)
+            {
+                return new NatsJSResponse<TResponse>(null, msg.Data.Error);
+            }
+
+            return new NatsJSResponse<TResponse>(msg.Data.Value, null);
         }
 
         await using var sub = await Connection.CreateRequestSubAsync<TRequest, NatsJSApiResult<TResponse>>(

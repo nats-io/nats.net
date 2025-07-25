@@ -1,8 +1,5 @@
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
 using NATS.Client.TestUtilities;
 
@@ -67,7 +64,7 @@ public class WebSocketOptionsTest
                 ConfigureClientWebSocketOptions = (_, clientWsOpts, _) =>
                 {
                     clientWsOpts.SetRequestHeader("Header3", "Header3");
-                    return ValueTask.CompletedTask;
+                    return default;
                 },
             },
         });

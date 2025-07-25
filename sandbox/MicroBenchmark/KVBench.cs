@@ -16,10 +16,13 @@ public class KvBench
     private NatsKVContext _kv;
     private NatsKVStore _store;
 
+    [Params(NatsRequestReplyMode.Direct, NatsRequestReplyMode.SharedInbox)]
+    public NatsRequestReplyMode Mode { get; set; }
+
     [GlobalSetup]
     public async Task SetupAsync()
     {
-        _nats = new NatsConnection();
+        _nats = new NatsConnection(new NatsOpts { RequestReplyMode = Mode });
         _js = new NatsJSContext(_nats);
         _kv = new NatsKVContext(_js);
         _store = (NatsKVStore)(await _kv.CreateStoreAsync("benchmark"));

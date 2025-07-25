@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text;
 using System.Text.Json.Serialization;
+using NATS.Client.TestUtilities;
 
 namespace NATS.Client.Core.Tests;
 
@@ -426,7 +427,7 @@ public abstract partial class NatsConnectionTest
         nats.OnSocketAvailableAsync = socket =>
         {
             wasInvoked.Pulse();
-            return new ValueTask<ISocketConnection>(socket);
+            return new ValueTask<INatsSocketConnection>(socket);
         };
 
         // Act
@@ -448,7 +449,7 @@ public abstract partial class NatsConnectionTest
         nats.OnSocketAvailableAsync = socket =>
         {
             Interlocked.Increment(ref invocationCount);
-            return new ValueTask<ISocketConnection>(socket);
+            return new ValueTask<INatsSocketConnection>(socket);
         };
 
         // Simulate initial connection
@@ -610,7 +611,7 @@ public class SampleClass : IEquatable<SampleClass>
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(Id, Name);
+        return Id.GetHashCode() + Name.GetHashCode();
     }
 
     public override string ToString()

@@ -23,27 +23,38 @@ public class NatsServerProcess : IAsyncDisposable, IDisposable
     private readonly Process _process;
     private readonly string _scratch;
     private readonly bool _withJs;
+    private readonly string? _config;
+    private readonly int _port;
+    private bool _stopped;
 
-    private NatsServerProcess(Action<string> logger, Process process, string url, string scratch, bool withJs)
+    private NatsServerProcess(Action<string> logger, Process process, string url, string scratch, bool withJs, string? config, int port)
     {
         Url = url;
         _logger = logger;
         _process = process;
         _scratch = scratch;
         _withJs = withJs;
+        _config = config;
+        _port = port;
     }
 
     public string Url { get; }
 
-    public static ValueTask<NatsServerProcess> StartAsync(Action<string>? logger = null, string? config = null, bool withJs = true)
-        => new(Start(logger, config, withJs));
+    public int Pid => _process.Id;
 
-    public static NatsServerProcess Start(Action<string>? logger = null, string? config = null, bool withJs = true)
+    public string? Config => _config;
+
+    public int Port => new Uri(Url).Port;
+
+    public static ValueTask<NatsServerProcess> StartAsync(Action<string>? logger = null, string? config = null, bool withJs = true, int port = -1, string? scratch = null)
+        => new(Start(logger, config, withJs, port, scratch));
+
+    public static NatsServerProcess Start(Action<string>? logger = null, string? config = null, bool withJs = true, int port = -1, string? scratch = null)
     {
         var isLoggingEnabled = logger != null;
         var log = logger ?? (_ => { });
 
-        var scratch = Path.Combine(Path.GetTempPath(), "nats.net.tests", Guid.NewGuid().ToString());
+        scratch ??= Path.Combine(Path.GetTempPath(), "nats.net.tests", Guid.NewGuid().ToString());
 
         var portsFileDir = Path.Combine(scratch, "port");
         Directory.CreateDirectory(portsFileDir);
@@ -66,8 +77,8 @@ public class NatsServerProcess : IAsyncDisposable, IDisposable
         {
             FileName = natsServerExe,
             Arguments = withJs
-                ? $"{configFlag} -a 127.0.0.1 -p -1 -js -sd \"{sdEsc}\" --ports_file_dir \"{portsFileDirEsc}\""
-                : $"{configFlag} -a 127.0.0.1 -p -1 --ports_file_dir \"{portsFileDirEsc}\"",
+                ? $"{configFlag} -a 127.0.0.1 -p {port} -js -sd \"{sdEsc}\" --ports_file_dir \"{portsFileDirEsc}\""
+                : $"{configFlag} -a 127.0.0.1 -p {port} --ports_file_dir \"{portsFileDirEsc}\"",
             UseShellExecute = false,
             CreateNoWindow = false,
 
@@ -128,6 +139,7 @@ public class NatsServerProcess : IAsyncDisposable, IDisposable
         }
 
         var url = Regex.Match(ports, @"\w+://[\d\.]+:\d+").Groups[0].Value;
+        port = new Uri(url).Port;
         log($"ports={ports}");
         log($"url={url}");
 
@@ -136,7 +148,7 @@ public class NatsServerProcess : IAsyncDisposable, IDisposable
             try
             {
                 using var tcpClient = new TcpClient();
-                tcpClient.Connect("127.0.0.1", new Uri(url).Port);
+                tcpClient.Connect("127.0.0.1", port);
                 using var networkStream = tcpClient.GetStream();
                 using var streamReader = new StreamReader(networkStream);
                 var readLine = streamReader.ReadLine();
@@ -145,7 +157,7 @@ public class NatsServerProcess : IAsyncDisposable, IDisposable
                     continue;
                 }
 
-                return new NatsServerProcess(log, process, url, scratch, withJs);
+                return new NatsServerProcess(log, process, url, scratch, withJs, config, port);
             }
             catch
             {
@@ -164,6 +176,40 @@ public class NatsServerProcess : IAsyncDisposable, IDisposable
 
     public void Dispose()
     {
+        Stop();
+        for (var i = 0; i < 3; i++)
+        {
+            try
+            {
+                Directory.Delete(_scratch, recursive: true);
+                break;
+            }
+            catch
+            {
+                Thread.Sleep(100);
+            }
+        }
+
+        _process.Dispose();
+    }
+
+    public ValueTask<NatsServerProcess> RestartAsync()
+    {
+        Stop();
+        return StartAsync(_logger, _config, _withJs, _port, _scratch);
+    }
+
+    public ValueTask StopAsync()
+    {
+        Stop();
+        return default;
+    }
+
+    public void Stop()
+    {
+        if (_stopped)
+            return;
+
         for (var i = 0; i < 10; i++)
         {
             try
@@ -179,20 +225,10 @@ public class NatsServerProcess : IAsyncDisposable, IDisposable
                 break;
         }
 
-        for (var i = 0; i < 3; i++)
-        {
-            try
-            {
-                Directory.Delete(_scratch, recursive: true);
-                break;
-            }
-            catch
-            {
-                Thread.Sleep(100);
-            }
-        }
+        _stopped = true;
 
-        _process.Dispose();
+        // Give OS some time to clean up
+        Thread.Sleep(500);
     }
 }
 

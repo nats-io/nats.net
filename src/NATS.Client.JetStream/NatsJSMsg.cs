@@ -294,6 +294,9 @@ public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
         }
     }
 
+#if NETSTANDARD2_0
+#pragma warning disable CS8774 // Member 'ReplyTo' must have a non-null value when exiting..
+#endif
     [MemberNotNull(nameof(Connection))]
     [MemberNotNull(nameof(ReplyTo))]
     private void CheckPreconditions()
@@ -309,6 +312,9 @@ public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
         }
     }
 }
+#if NETSTANDARD2_0
+#pragma warning restore CS8774 // Member 'ReplyTo' must have a non-null value when exiting..
+#endif
 
 /// <summary>
 /// Options to be used when acknowledging messages received from a stream using a consumer.

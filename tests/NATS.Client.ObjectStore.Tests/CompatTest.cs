@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using NATS.Client.Core.Tests;
 using NATS.Client.ObjectStore.Models;
+using NATS.Client.Platform.Windows.Tests;
 
 namespace NATS.Client.ObjectStore.Tests;
 
@@ -10,8 +11,8 @@ public class CompatTest
     [Fact]
     public async Task Headers_serialization()
     {
-        await using var server = await NatsServer.StartJSAsync();
-        await using var nats = await server.CreateClientConnectionAsync();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
         var js = new NatsJSContext(nats);
         var ob = new NatsObjContext(js);
 

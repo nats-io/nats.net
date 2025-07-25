@@ -22,7 +22,7 @@ public class EnumJsonTests
         var bw = new NatsBufferWriter<byte>();
         serializer.Serialize(bw, new ConsumerConfig { AckPolicy = value });
 
-        var json = Encoding.UTF8.GetString(bw.WrittenSpan);
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         Assert.Contains(expected, json);
 
         var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory));
@@ -44,7 +44,7 @@ public class EnumJsonTests
         var bw = new NatsBufferWriter<byte>();
         serializer.Serialize(bw, new ConsumerConfig { DeliverPolicy = value });
 
-        var json = Encoding.UTF8.GetString(bw.WrittenSpan);
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         Assert.Contains(expected, json);
 
         var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory));
@@ -62,7 +62,7 @@ public class EnumJsonTests
         var bw = new NatsBufferWriter<byte>();
         serializer.Serialize(bw, new ConsumerConfig { ReplayPolicy = value });
 
-        var json = Encoding.UTF8.GetString(bw.WrittenSpan);
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         Assert.Contains(expected, json);
 
         var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory));
@@ -80,7 +80,7 @@ public class EnumJsonTests
         var bw = new NatsBufferWriter<byte>();
         serializer.Serialize(bw, new StreamConfig { Compression = value });
 
-        var json = Encoding.UTF8.GetString(bw.WrittenSpan);
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         if (value == default)
             Assert.DoesNotContain(expected, json);
         else
@@ -101,7 +101,7 @@ public class EnumJsonTests
         var bw = new NatsBufferWriter<byte>();
         serializer.Serialize(bw, new StreamConfig { Discard = value });
 
-        var json = Encoding.UTF8.GetString(bw.WrittenSpan);
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         if (value == default)
             Assert.DoesNotContain(expected, json);
         else
@@ -123,7 +123,7 @@ public class EnumJsonTests
         var bw = new NatsBufferWriter<byte>();
         serializer.Serialize(bw, new StreamConfig { Retention = value });
 
-        var json = Encoding.UTF8.GetString(bw.WrittenSpan);
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         Assert.Contains(expected, json);
 
         var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory));
@@ -141,7 +141,7 @@ public class EnumJsonTests
         var bw = new NatsBufferWriter<byte>();
         serializer.Serialize(bw, new StreamConfig { Storage = value });
 
-        var json = Encoding.UTF8.GetString(bw.WrittenSpan);
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         Assert.Contains(expected, json);
 
         var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory));
@@ -160,7 +160,7 @@ public class EnumJsonTests
         var bw = new NatsBufferWriter<byte>();
         serializer.Serialize(bw, new ConsumerCreateRequest { Action = value, StreamName = string.Empty });
 
-        var json = Encoding.UTF8.GetString(bw.WrittenSpan);
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         Assert.Contains(expected, json);
 
         var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory));

@@ -1,5 +1,6 @@
 using NATS.Client.Core.Tests;
 using NATS.Client.JetStream.Models;
+using NATS.Client.Platform.Windows.Tests;
 
 namespace NATS.Client.ObjectStore.Tests;
 
@@ -13,16 +14,10 @@ public class NatsObjContextFactoryTest
     public async Task Create_Context_Test()
     {
         // Arrange
-        await using var server = await NatsServer.StartAsync(
-            outputHelper: _output,
-            opts: new NatsServerOptsBuilder()
-                .UseTransport(TransportType.Tcp)
-                .Trace()
-                .UseJetStream()
-                .Build());
-        await using var connection = await server.CreateClientConnectionAsync(new NatsOpts { RequestTimeout = TimeSpan.FromSeconds(10) });
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestTimeout = TimeSpan.FromSeconds(10) });
         var jsFactory = new NatsJSContextFactory();
-        var jsContext = jsFactory.CreateContext(connection);
+        var jsContext = jsFactory.CreateContext(nats);
         var factory = new NatsObjContextFactory();
 
         // Act

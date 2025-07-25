@@ -1,3 +1,4 @@
+using NATS.Client.TestUtilities;
 using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.Core.Tests;

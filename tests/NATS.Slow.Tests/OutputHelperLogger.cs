@@ -41,7 +41,11 @@ public class OutputHelperLoggerFactory : ILoggerFactory
         }
 
 #if NET8_0_OR_GREATER
+#pragma warning disable CS8766 // Nullability of reference types in return type doesn't match implicitly implemented member (possibly because of nullability attributes).
+#pragma warning disable CS8633 // Nullability in constraints for type parameter doesn't match the constraints for type parameter in implicitly implemented interface method'.
         public IDisposable? BeginScope<TState>(TState state)
+#pragma warning restore CS8633 // Nullability in constraints for type parameter doesn't match the constraints for type parameter in implicitly implemented interface method'.
+#pragma warning restore CS8766 // Nullability of reference types in return type doesn't match implicitly implemented member (possibly because of nullability attributes).
             where TState : notnull
 #else
         public IDisposable BeginScope<TState>(TState state)
