@@ -181,7 +181,7 @@ public partial class NatsJSContext
                         requestSerializer: serializer,
                         replySerializer: NatsJSJsonSerializer<PubAckResponse>.Default,
                         requestOpts: opts,
-                        replyOpts: new NatsSubOpts { Timeout = Connection.Opts.RequestTimeout },
+                        replyOpts: new NatsSubOpts { Timeout = Opts.RequestTimeout ?? Connection.Opts.RequestTimeout },
                         cancellationToken).ConfigureAwait(false);
                 }
                 catch (NatsNoReplyException)
@@ -223,7 +223,7 @@ public partial class NatsJSContext
                         // is a reconnect to the cluster between the request and waiting for a response,
                         // without the timeout the publish call will hang forever since the server
                         // which received the request won't be there to respond anymore.
-                        Timeout = Connection.Opts.RequestTimeout,
+                        Timeout = Opts.RequestTimeout ?? Connection.Opts.RequestTimeout,
                     },
                     cancellationToken)
                 .ConfigureAwait(false);
@@ -314,7 +314,7 @@ public partial class NatsJSContext
                         // is a reconnect to the cluster between the request and waiting for a response,
                         // without the timeout the publish call will hang forever since the server
                         // which received the request won't be there to respond anymore.
-                        Timeout = Connection.Opts.RequestTimeout,
+                        Timeout = Opts.RequestTimeout ?? Connection.Opts.RequestTimeout,
 
                         // If JetStream is disabled, a no responders error will be returned
                         // No responders error might also happen when reconnecting to cluster
@@ -403,7 +403,7 @@ public partial class NatsJSContext
                     subject: subject,
                     data: request,
                     headers: null,
-                    replyOpts: new NatsSubOpts { Timeout = Connection.Opts.RequestTimeout },
+                    replyOpts: new NatsSubOpts { Timeout = Opts.RequestTimeout ?? Connection.Opts.RequestTimeout },
                     requestSerializer: NatsJSJsonSerializer<TRequest>.Default,
                     replySerializer: NatsJSJsonDocumentSerializer<TResponse>.Default,
                     cancellationToken: cancellationToken).ConfigureAwait(false);
@@ -444,7 +444,7 @@ public partial class NatsJSContext
                 subject: subject,
                 data: request,
                 headers: default,
-                replyOpts: new NatsSubOpts { Timeout = Connection.Opts.RequestTimeout },
+                replyOpts: new NatsSubOpts { Timeout = Opts.RequestTimeout ?? Connection.Opts.RequestTimeout },
                 requestSerializer: NatsJSJsonSerializer<TRequest>.Default,
                 replySerializer: NatsJSJsonDocumentSerializer<TResponse>.Default,
                 cancellationToken: cancellationToken)

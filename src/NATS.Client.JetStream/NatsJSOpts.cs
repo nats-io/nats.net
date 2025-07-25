@@ -8,7 +8,7 @@ namespace NATS.Client.JetStream;
 /// </summary>
 public record NatsJSOpts
 {
-    public NatsJSOpts(NatsOpts opts, string? apiPrefix = default, string? domain = default, AckOpts? ackOpts = default)
+    public NatsJSOpts(NatsOpts opts, string? apiPrefix = default, string? domain = default, AckOpts? ackOpts = default, TimeSpan? requestTimeout = default)
     {
         if (apiPrefix != null && domain != null)
         {
@@ -17,6 +17,7 @@ public record NatsJSOpts
 
         ApiPrefix = apiPrefix ?? "$JS.API";
         Domain = domain;
+        RequestTimeout = requestTimeout ?? opts.RequestTimeout;
     }
 
     /// <summary>
@@ -33,6 +34,11 @@ public record NatsJSOpts
     /// JetStream domain to use in JetStream API subjects. (default: null)
     /// </summary>
     public string? Domain { get; }
+
+    /// <summary>
+    /// Timeout for JetStream API calls.
+    /// </summary>
+    public TimeSpan? RequestTimeout { get; init; }
 
     /// <summary>
     /// Ask server for an acknowledgment.
