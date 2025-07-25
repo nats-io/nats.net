@@ -6,7 +6,6 @@ using NATS.Client.JetStream.Internal;
 
 namespace NATS.Client.JetStream;
 
-
 /// <summary>
 /// This interface provides an optional contract when passing
 /// messages to processing methods which is usually helpful in
