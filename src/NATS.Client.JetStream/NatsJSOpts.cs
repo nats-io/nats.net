@@ -38,7 +38,7 @@ public record NatsJSOpts
     /// <summary>
     /// Timeout for JetStream API calls.
     /// </summary>
-    public TimeSpan? RequestTimeout { get; init; }
+    public TimeSpan RequestTimeout { get; }
 
     /// <summary>
     /// Ask server for an acknowledgment.
