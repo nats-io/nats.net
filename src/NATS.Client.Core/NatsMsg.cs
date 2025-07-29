@@ -35,7 +35,7 @@ public enum NatsMsgFlags : byte
 /// </para>
 /// </remarks>
 /// <typeparam name="T">Data type of the payload</typeparam>
-public interface INatsMsg<T>
+public interface INatsMsg<T> : INatsMsg
 {
     /// <summary>The destination subject to publish to.</summary>
     string Subject { get; init; }
@@ -45,9 +45,6 @@ public interface INatsMsg<T>
 
     /// <summary>Message size in bytes.</summary>
     int Size { get; init; }
-
-    /// <summary>Pass additional information using name-value pairs.</summary>
-    NatsHeaders? Headers { get; init; }
 
     /// <summary>Serializable data object.</summary>
     T? Data { get; init; }

@@ -27,7 +27,7 @@ namespace NATS.Client.JetStream;
 /// </para>
 /// </remarks>
 /// <typeparam name="T">Data type of the payload</typeparam>
-public interface INatsJSMsg<out T>
+public interface INatsJSMsg<out T> : INatsMsg
 {
     /// <summary>
     /// Subject of the user message.
@@ -44,11 +44,6 @@ public interface INatsJSMsg<out T>
     /// </code>
     /// </remarks>
     int Size { get; }
-
-    /// <summary>
-    /// Headers of the user message if set.
-    /// </summary>
-    NatsHeaders? Headers { get; }
 
     /// <summary>
     /// Deserialized user data.
