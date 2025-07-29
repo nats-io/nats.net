@@ -496,7 +496,20 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         await foreach (var pr in _pullRequests.Reader.ReadAllAsync().ConfigureAwait(false))
         {
             var origin = $"pull-loop({pr.Origin})";
-            await CallMsgNextAsync(origin, pr.Request).ConfigureAwait(false);
+            try
+            {
+                await CallMsgNextAsync(origin, pr.Request).ConfigureAwait(false);
+            }
+            catch (Exception e)
+            {
+                if (_debug)
+                {
+                    _logger.LogDebug(NatsJSLogEvents.PullRequest, e, "Error during pull request issued for {Origin} {Batch}, {MaxBytes}", origin, pr.Request.Batch, pr.Request.MaxBytes);
+                }
+
+                continue;
+            }
+
             if (_debug)
             {
                 _logger.LogDebug(NatsJSLogEvents.PullRequest, "Pull request issued for {Origin} {Batch}, {MaxBytes}", origin, pr.Request.Batch, pr.Request.MaxBytes);
