@@ -26,6 +26,11 @@ public sealed class NatsNoReplyException : NatsException
     {
     }
 
+    public NatsNoReplyException(string subject)
+        : base("No reply received for subject " + subject)
+    {
+    }
+
     [DoesNotReturn]
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static void Throw() => throw new NatsNoReplyException();
