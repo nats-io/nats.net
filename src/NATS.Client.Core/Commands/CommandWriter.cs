@@ -158,8 +158,13 @@ internal sealed class CommandWriter : IAsyncDisposable
 
 #if NET8_0_OR_GREATER
         await _cts.CancelAsync().ConfigureAwait(false);
+        if (_ctsReader != null)
+        {
+            await _ctsReader.CancelAsync().ConfigureAwait(false);
+        }
 #else
         _cts.Cancel();
+        _ctsReader?.Cancel();
 #endif
 
         _channelLock.Writer.TryComplete();
