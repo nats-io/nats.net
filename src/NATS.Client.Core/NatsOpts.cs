@@ -183,6 +183,29 @@ public sealed record NatsOpts
     /// <seealso cref="INatsTlsUpgradeableSocketConnection"/>
     public INatsSocketConnectionFactory? SocketConnectionFactory { get; init; }
 
+    /// <summary>
+    /// Determines whether the client should retry connecting to the server during the initial connection
+    /// attempt if the connection fails. (default: <c>false</c>)
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This property controls the behavior of the initial connection process.
+    /// </para>
+    /// <para>
+    /// When set to <c>true</c>, the client will periodically retry connecting to the server based on the
+    /// configured retry intervals until a successful connection is established or the operation is explicitly canceled.
+    /// </para>
+    /// <para>
+    /// When set to <c>false</c> (default behavior), the client will not retry and will throw an exception
+    /// if the connection cannot be established initially.
+    /// </para>
+    /// <para>
+    /// The retry intervals are influenced by options such as <see cref="ReconnectWaitMin"/> and <see cref="ReconnectWaitMax"/>, with the potential addition of <see cref="ReconnectJitter"/> for randomized delays between retries.
+    /// This property is particularly useful in scenarios where transient network failures or server unavailability are expected during the first connection attempt.
+    /// </para>
+    /// </remarks>
+    public bool RetryOnInitialConnect { get; init; }
+
     internal NatsUri[] GetSeedUris(bool suppressRandomization = false)
     {
         var urls = Url.Split(',');
