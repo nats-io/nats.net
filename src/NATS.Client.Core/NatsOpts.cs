@@ -238,13 +238,26 @@ public static class NatsOptsExtensions
     /// </summary>
     /// <param name="opts">The NatsOpts instance containing configuration settings for intervals and jitter.</param>
     /// <param name="iter">The current attempt iteration, used to calculate the exponential delay.</param>
+    /// <param name="cancellationToken">Cancel back-off delay.</param>
     /// <returns>A task that completes after the calculated delay time has elapsed.</returns>
-    public static Task BackoffWithJitterAsync(this NatsOpts opts, int iter)
+    public static Task BackoffWithJitterAsync(this NatsOpts opts, int iter, CancellationToken cancellationToken = default)
     {
+        if (iter < 1)
+        {
+            // Ensure iter is at least 1 to avoid negative or zero delay calculations
+            iter = 1;
+        }
+
+        if (iter > 31)
+        {
+            // This is to prevent infinity in Math.Pow()
+            iter = 31;
+        }
+
         var baseDelay = opts.ReconnectWaitMin.TotalMilliseconds * Math.Pow(2, iter - 1);
         var jitter = opts.ReconnectJitter.TotalMilliseconds * Random.Shared.NextDouble();
 
         var delay = Math.Min(baseDelay + jitter, opts.ReconnectWaitMax.TotalMilliseconds);
-        return Task.Delay(TimeSpan.FromMilliseconds(delay));
+        return Task.Delay(TimeSpan.FromMilliseconds(delay), cancellationToken);
     }
 }
