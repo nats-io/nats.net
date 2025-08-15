@@ -352,21 +352,13 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                     {
                         _logger.LogDebug(NatsJSLogEvents.LeadershipChange, "Leadership Change");
                         _notificationChannel?.Notify(NatsJSLeadershipChangeNotification.Default);
-                        lock (_pendingGate)
-                        {
-                            _pendingBytes = 0;
-                            _pendingMsgs = 0;
-                        }
+                        ResetPending();
                     }
                     else if (headers.Code == 503)
                     {
                         _logger.LogDebug(NatsJSLogEvents.NoResponders, "503 no responders");
                         _notificationChannel?.Notify(NatsJSNoRespondersNotification.Default);
-                        lock (_pendingGate)
-                        {
-                            _pendingBytes = 0;
-                            _pendingMsgs = 0;
-                        }
+                        ResetPending();
                     }
                     else if (headers.HasTerminalJSError())
                     {
