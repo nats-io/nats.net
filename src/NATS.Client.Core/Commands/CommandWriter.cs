@@ -29,6 +29,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     // https://github.com/nats-io/nats.net/pull/383#discussion_r1484344102
     private const int MinSegmentSize = 16384;
 
+    private static readonly TimeSpan ReaderLoopDisposeTimeout = TimeSpan.FromSeconds(5);
     private readonly ILogger<CommandWriter> _logger;
     private readonly bool _trace;
     private readonly string _name;
@@ -158,13 +159,8 @@ internal sealed class CommandWriter : IAsyncDisposable
 
 #if NET8_0_OR_GREATER
         await _cts.CancelAsync().ConfigureAwait(false);
-        if (_ctsReader != null)
-        {
-            await _ctsReader.CancelAsync().ConfigureAwait(false);
-        }
 #else
         _cts.Cancel();
-        _ctsReader?.Cancel();
 #endif
 
         _channelLock.Writer.TryComplete();
@@ -178,7 +174,25 @@ internal sealed class CommandWriter : IAsyncDisposable
         }
 
         if (readerTask != null)
-            await readerTask.ConfigureAwait(false);
+        {
+            try
+            {
+                await readerTask.WaitAsync(ReaderLoopDisposeTimeout).ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+#if NET8_0_OR_GREATER
+                var ctsReader = _ctsReader;
+                if (ctsReader != null)
+                {
+                    await ctsReader.CancelAsync().ConfigureAwait(false);
+                }
+#else
+                _ctsReader?.Cancel();
+#endif
+                await readerTask.WaitAsync(ReaderLoopDisposeTimeout).ConfigureAwait(false);
+            }
+        }
     }
 
     public ValueTask ConnectAsync(ClientOpts connectOpts, CancellationToken cancellationToken)
