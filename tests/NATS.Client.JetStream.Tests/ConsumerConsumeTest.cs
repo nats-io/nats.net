@@ -3,8 +3,10 @@ using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Models;
+using NATS.Client.Platform.Windows.Tests;
 using NATS.Client.TestUtilities;
 using NATS.Client.TestUtilities2;
+using NATS.Net;
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -558,5 +560,51 @@ public class ConsumerConsumeTest
 
         // Should not have redeliveries
         Assert.Equal(2, count);
+    }
+
+    [Fact]
+    public async Task Consume_pending_reset_on_reconnect_when_using_ephemeral_consumer_503()
+    {
+        var logger = new InMemoryTestLoggerFactory(LogLevel.Debug);
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, LoggerFactory = logger });
+        await nats.ConnectRetryAsync();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+
+        var js = nats.CreateJetStreamContext();
+        await js.CreateStreamAsync(new StreamConfig("s1", ["s1.*"]), cts.Token);
+        var consumer = await js.CreateOrUpdateConsumerAsync("s1", new ConsumerConfig("c1") { MemStorage = true }, cts.Token);
+
+        _ = Task.Run(
+            async () =>
+            {
+                await foreach (var msg in consumer.ConsumeAsync<string>(cancellationToken: cts.Token))
+                {
+                }
+            },
+            cts.Token);
+
+        await Retry.Until(
+            "first pull request received",
+            () => logger.Logs.Any(m => m.EventId == NatsJSLogEvents.PullRequest));
+
+        await server.RestartAsync();
+
+        await Retry.Until(
+            reason: "more pull request received",
+            condition: () => logger.Logs.Count(m => m.EventId == NatsJSLogEvents.PullRequest) > 1,
+            retryDelay: TimeSpan.FromSeconds(1),
+            timeout: TimeSpan.FromSeconds(60));
+
+        // After reconnect, we should not flood with pull requests
+        // since the consumer should reset (zero-out) its pending messages.
+        // This is to prevent flooding the server with pull requests
+        // when the consumer is not receiving messages.
+        // Wait for a few seconds to ensure more pull requests are sent.
+        await Task.Delay(3000, cts.Token);
+
+        var pullRequestCount = logger.Logs.Count(m => m.EventId == NatsJSLogEvents.PullRequest);
+        pullRequestCount.Should().BeLessThanOrEqualTo(4, "should not flood with pull requests after reconnect");
     }
 }
