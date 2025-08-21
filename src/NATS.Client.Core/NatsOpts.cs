@@ -30,7 +30,12 @@ public enum NatsRequestReplyMode
 /// </summary>
 public sealed record NatsOpts
 {
-    public static readonly NatsOpts Default = new();
+    public static readonly NatsOpts Default = new()
+    {
+        WebSocketOpts = NatsWebSocketOpts.Default,
+        TlsOpts = NatsTlsOpts.Default,
+        AuthOpts = NatsAuthOpts.Default,
+    };
 
     /// <summary>
     /// NATS server URL to connect to. (default: nats://localhost:4222)
@@ -64,11 +69,11 @@ public sealed record NatsOpts
 
     public bool Headers { get; init; } = true;
 
-    public NatsAuthOpts AuthOpts { get; init; } = NatsAuthOpts.Default;
+    public NatsAuthOpts AuthOpts { get; init; } = new();
 
-    public NatsTlsOpts TlsOpts { get; init; } = NatsTlsOpts.Default;
+    public NatsTlsOpts TlsOpts { get; init; } = new();
 
-    public NatsWebSocketOpts WebSocketOpts { get; init; } = NatsWebSocketOpts.Default;
+    public NatsWebSocketOpts WebSocketOpts { get; init; } = new();
 
     public INatsSerializerRegistry SerializerRegistry { get; init; } = NatsDefaultSerializerRegistry.Default;
 
