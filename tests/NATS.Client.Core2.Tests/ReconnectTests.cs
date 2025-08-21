@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Tests;
 using NATS.Client.Platform.Windows.Tests;
 using NATS.Client.TestUtilities;
@@ -16,7 +16,6 @@ public class ReconnectTests(ITestOutputHelper output)
             var config = """
                          accounts: {
                            $SYS { users [{user: sys, password: sys}]}
-                           test { users [{user: foo, password: bar}]}
                          }
                          max_connections: 2
                          """;
@@ -66,7 +65,7 @@ public class ReconnectTests(ITestOutputHelper output)
         _ = Task.Run(async () => await nats2.RequestAsync<string>($"$SYS.REQ.SERVER.{nats2.ServerInfo!.Id}.RELOAD"));
 
         await Retry.Until(
-            "both connections are open",
+            "one client reconnects and both connections are open",
             () => nats1.ConnectionState == NatsConnectionState.Open && nats2.ConnectionState == NatsConnectionState.Open);
     }
 }
