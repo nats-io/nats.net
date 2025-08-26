@@ -170,7 +170,6 @@ public partial class NatsJSContext
         {
             if (Connection.Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
             {
-                var noReply = false;
                 NatsMsg<PubAckResponse> msg;
                 try
                 {
@@ -184,17 +183,12 @@ public partial class NatsJSContext
                         replyOpts: new NatsSubOpts { Timeout = Opts.RequestTimeout },
                         cancellationToken).ConfigureAwait(false);
                 }
-                catch (NatsNoReplyException)
-                {
-                    noReply = true;
-                    msg = default;
-                }
                 catch (Exception ex)
                 {
                     return ex;
                 }
 
-                if (noReply || msg.HasNoResponders)
+                if (msg.HasNoResponders)
                 {
                     _logger.LogDebug(NatsJSLogEvents.PublishNoResponseRetry, "No response received, retrying {RetryCount}/{RetryMax}", i + 1, retryMax);
                     await Task.Delay(retryWait, cancellationToken);
@@ -228,6 +222,7 @@ public partial class NatsJSContext
                     cancellationToken)
                 .ConfigureAwait(false);
 
+            var hasNoResponders = false;
             await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
             {
                 // If JetStream is disabled, a no responders error will be returned.
@@ -235,6 +230,7 @@ public partial class NatsJSContext
                 // We should retry in those cases.
                 if (msg.HasNoResponders)
                 {
+                    hasNoResponders = true;
                     break;
                 }
                 else if (msg.Data == null)
@@ -245,7 +241,7 @@ public partial class NatsJSContext
                 return msg.Data;
             }
 
-            if (i < retryMax)
+            if (hasNoResponders && i < retryMax)
             {
                 _logger.LogDebug(NatsJSLogEvents.PublishNoResponseRetry, "No response received, retrying {RetryCount}/{RetryMax}", i + 1, retryMax);
                 await Task.Delay(retryWait, cancellationToken);
