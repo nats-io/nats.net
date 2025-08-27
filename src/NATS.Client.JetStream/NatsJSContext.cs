@@ -246,13 +246,15 @@ public partial class NatsJSContext
             }
 
             // Only retry if there were 503 no responders error
-            if (!hasNoResponders)
+            if (hasNoResponders)
+            {
+                _logger.LogDebug(NatsJSLogEvents.PublishNoResponseRetry, "No response received, retrying {RetryCount}/{RetryMax}", i + 1, retryMax);
+                await Task.Delay(retryWait, cancellationToken);
+            }
+            else
             {
                 break;
             }
-
-            _logger.LogDebug(NatsJSLogEvents.PublishNoResponseRetry, "No response received, retrying {RetryCount}/{RetryMax}", i + 1, retryMax);
-            await Task.Delay(retryWait, cancellationToken);
         }
 
         // We throw a specific exception here for convenience so that the caller doesn't
