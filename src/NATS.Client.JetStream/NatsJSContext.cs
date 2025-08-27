@@ -183,7 +183,11 @@ public partial class NatsJSContext
                         replyOpts: new NatsSubOpts { Timeout = Opts.RequestTimeout },
                         cancellationToken).ConfigureAwait(false);
                 }
-                catch (Exception ex)
+                catch (NatsNoReplyException)
+                {
+                    return NatsJSPublishNoResponseException.Default;
+                }
+                catch (NatsException ex)
                 {
                     return ex;
                 }
@@ -241,16 +245,19 @@ public partial class NatsJSContext
                 return msg.Data;
             }
 
-            if (hasNoResponders && i < retryMax)
+            // Only retry if there were 503 no responders error
+            if (!hasNoResponders)
             {
-                _logger.LogDebug(NatsJSLogEvents.PublishNoResponseRetry, "No response received, retrying {RetryCount}/{RetryMax}", i + 1, retryMax);
-                await Task.Delay(retryWait, cancellationToken);
+                break;
             }
+
+            _logger.LogDebug(NatsJSLogEvents.PublishNoResponseRetry, "No response received, retrying {RetryCount}/{RetryMax}", i + 1, retryMax);
+            await Task.Delay(retryWait, cancellationToken);
         }
 
         // We throw a specific exception here for convenience so that the caller doesn't
         // have to check for the exception message etc.
-        return new NatsJSPublishNoResponseException();
+        return NatsJSPublishNoResponseException.Default;
     }
 
     public async ValueTask<NatsJSPublishConcurrentFuture> PublishConcurrentAsync<T>(

@@ -94,6 +94,8 @@ public class NatsJSApiException : NatsJSException
 
 public class NatsJSPublishNoResponseException : NatsJSException
 {
+    public static readonly NatsJSPublishNoResponseException Default = new();
+
     public NatsJSPublishNoResponseException()
         : base("No response received from the server")
     {
