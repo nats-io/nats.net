@@ -245,7 +245,7 @@ public class PublishTest
             await Retry.Until("ack received", () => proxy.Frames.Any(f => ackRegex.IsMatch(f.Message)));
         }
 
-        // Publish fails without retry. We only rety on 503 and not receiving any response
+        // Publish fails without retry. We only retry on 503 and not receiving any response
         // must not trigger a retry since we don't know for sure the publish is failed.
         {
             await proxy.FlushFramesAsync(nats, clear: true, cts.Token);
