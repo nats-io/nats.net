@@ -294,6 +294,12 @@ public class PublishTest
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestReplyMode = mode });
         var js = nats.CreateJetStreamContext();
         var result = await js.TryPublishAsync("foo", 1);
+        if (mode == NatsRequestReplyMode.Direct && result.Error != null && result.Error is not NatsJSPublishNoResponseException)
+        {
+            Console.WriteLine(result.Error);
+            throw result.Error;
+        }
+
         Assert.IsType<NatsJSPublishNoResponseException>(result.Error);
     }
 }
