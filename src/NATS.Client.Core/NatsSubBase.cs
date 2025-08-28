@@ -301,7 +301,7 @@ public abstract class NatsSubBase
             // interested in the messages anymore. Hence we ignore any messages being
             // fed into the channel and rejected.
         }
-        catch (Exception e)
+        catch (Exception e) when (!(e is SystemException))
         {
             _logger.LogError(NatsLogEvents.Subscription, e, "Error while processing message");
 
