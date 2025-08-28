@@ -25,6 +25,8 @@ public class NatsObjStore : INatsObjStore
     private const string NatsRollup = "Nats-Rollup";
     private const string RollupSubject = "sub";
 
+    // Disable retries as we want to fail fast and avoid duplicate chunks
+    private readonly NatsJSPubOpts _natsJSPubOpts = new() { RetryAttempts = 1 };
     private readonly NatsObjContext _objContext;
     private readonly INatsJSStream _stream;
 
@@ -255,7 +257,7 @@ public class NatsObjStore : INatsObjStore
                     var buffer = memoryOwner.Slice(0, currentChunkSize);
 
                     // Chunks
-                    var ack = await JetStreamContext.PublishAsync(GetChunkSubject(nuid), buffer, serializer: NatsRawSerializer<NatsMemoryOwner<byte>>.Default, cancellationToken: cancellationToken);
+                    var ack = await JetStreamContext.PublishAsync(GetChunkSubject(nuid), buffer, serializer: NatsRawSerializer<NatsMemoryOwner<byte>>.Default, opts: _natsJSPubOpts, cancellationToken: cancellationToken);
                     ack.EnsureSuccess();
 
                     if (eof)
@@ -608,7 +610,7 @@ public class NatsObjStore : INatsObjStore
     private async ValueTask PublishMeta(ObjectMetadata meta, CancellationToken cancellationToken)
     {
         var natsRollupHeaders = new NatsHeaders { { NatsRollup, RollupSubject } };
-        var ack = await JetStreamContext.PublishAsync(GetMetaSubject(meta.Name), meta, serializer: NatsObjJsonSerializer<ObjectMetadata>.Default, headers: natsRollupHeaders, cancellationToken: cancellationToken);
+        var ack = await JetStreamContext.PublishAsync(GetMetaSubject(meta.Name), meta, serializer: NatsObjJsonSerializer<ObjectMetadata>.Default, headers: natsRollupHeaders, opts: _natsJSPubOpts, cancellationToken: cancellationToken);
         ack.EnsureSuccess();
     }
 
