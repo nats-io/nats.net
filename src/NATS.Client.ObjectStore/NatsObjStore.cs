@@ -195,10 +195,10 @@ public class NatsObjStore : INatsObjStore
             await using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Read, leaveOpen))
 #endif
             {
+                using var memoryOwner = NatsMemoryOwner<byte>.Allocate(chunkSize);
+
                 while (true)
                 {
-                    var memoryOwner = NatsMemoryOwner<byte>.Allocate(chunkSize);
-
                     var memory = memoryOwner.Memory;
                     var currentChunkSize = 0;
                     var eof = false;
@@ -254,10 +254,10 @@ public class NatsObjStore : INatsObjStore
                         chunks++;
                     }
 
-                    var buffer = memoryOwner.Slice(0, currentChunkSize);
+                    var buffer = memoryOwner.Memory.Slice(0, currentChunkSize);
 
                     // Chunks
-                    var ack = await JetStreamContext.PublishAsync(GetChunkSubject(nuid), buffer, serializer: NatsRawSerializer<NatsMemoryOwner<byte>>.Default, opts: _natsJSPubOpts, cancellationToken: cancellationToken);
+                    var ack = await JetStreamContext.PublishAsync(GetChunkSubject(nuid), buffer, serializer: NatsRawSerializer<Memory<byte>>.Default, opts: _natsJSPubOpts, cancellationToken: cancellationToken);
                     ack.EnsureSuccess();
 
                     if (eof)
