@@ -183,7 +183,7 @@ public class PublishTest
     [Theory]
     [InlineData(NatsRequestReplyMode.Direct)]
     [InlineData(NatsRequestReplyMode.SharedInbox)]
-    public async Task Publish_retry_test(NatsRequestReplyMode mode)
+    public async Task Publish_retry_fails_when_no_response_is_received_from_server(NatsRequestReplyMode mode)
     {
         var retryCount = 0;
         var logger = new InMemoryTestLoggerFactory(LogLevel.Debug, log =>
@@ -245,44 +245,73 @@ public class PublishTest
             await Retry.Until("ack received", () => proxy.Frames.Any(f => ackRegex.IsMatch(f.Message)));
         }
 
-        // Publish fails once but succeeds after retry
+        // Publish fails without retry. We only retry on 503 and not receiving any response
+        // must not trigger a retry since we don't know for sure the publish is failed.
         {
             await proxy.FlushFramesAsync(nats, clear: true, cts.Token);
             Interlocked.Exchange(ref retryCount, 0);
             Interlocked.Exchange(ref swallowAcksCount, 1);
 
-            var ack = await js.PublishAsync($"{prefix}s1.foo", 1, opts: new NatsJSPubOpts { RetryAttempts = 2 }, cancellationToken: cts.Token);
-            ack.EnsureSuccess();
+            await Assert.ThrowsAnyAsync<NatsJSPublishNoResponseException>(async () =>
+            {
+                var ack = await js.PublishAsync($"{prefix}s1.foo", 1, opts: new NatsJSPubOpts { RetryAttempts = 2 }, cancellationToken: cts.Token);
+                ack.EnsureSuccess();
+            });
 
-            Assert.Equal(1, Volatile.Read(ref retryCount));
-            await Retry.Until("ack received", () => proxy.Frames.Count(f => ackRegex.IsMatch(f.Message)) == 2, timeout: TimeSpan.FromSeconds(20));
+            Assert.Equal(0, Volatile.Read(ref retryCount));
         }
+    }
 
-        // Publish fails twice but succeeds after a third retry when attempts is 3
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Publish_retry_on_503(NatsRequestReplyMode mode)
+    {
+        await using var server = await NatsServerProcess.StartAsync(withJs: false);
+        var retryCount = 0;
+        var logger = new InMemoryTestLoggerFactory(LogLevel.Debug, log =>
         {
-            await proxy.FlushFramesAsync(nats, clear: true, cts.Token);
-            Interlocked.Exchange(ref retryCount, 0);
-            Interlocked.Exchange(ref swallowAcksCount, 2);
+            if (log is { LogLevel: LogLevel.Debug } && log.EventId == NatsJSLogEvents.PublishNoResponseRetry)
+            {
+                Interlocked.Increment(ref retryCount);
+            }
+        });
 
-            var ack = await js.PublishAsync($"{prefix}s1.foo", 1, opts: new NatsJSPubOpts { RetryAttempts = 3 }, cancellationToken: cts.Token);
-            ack.EnsureSuccess();
-
-            Assert.Equal(2, Volatile.Read(ref retryCount));
-            await Retry.Until("ack received", () => proxy.Frames.Count(f => ackRegex.IsMatch(f.Message)) == 3, timeout: TimeSpan.FromSeconds(20));
-        }
-
-        // Publish fails even after two retries
+        await using var nats = new NatsConnection(new NatsOpts
         {
-            await proxy.FlushFramesAsync(nats, clear: true, cts.Token);
-            Interlocked.Exchange(ref retryCount, 0);
-            Interlocked.Exchange(ref swallowAcksCount, 2);
+            Url = server.Url,
+            ConnectTimeout = TimeSpan.FromSeconds(10),
+            RequestTimeout = TimeSpan.FromSeconds(3), // give enough time for retries to avoid NatsJSPublishNoResponseExceptions
+            LoggerFactory = logger,
+            RequestReplyMode = mode,
+        });
 
-            await Assert.ThrowsAsync<NatsJSPublishNoResponseException>(async () =>
-                await js.PublishAsync($"{prefix}s1.foo", 1, opts: new NatsJSPubOpts { RetryAttempts = 2 }, cancellationToken: cts.Token));
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        var js = new NatsJSContext(nats);
 
-            Assert.Equal(2, Volatile.Read(ref retryCount));
-            await Retry.Until("ack received", () => proxy.Frames.Count(f => ackRegex.IsMatch(f.Message)) == 2, timeout: TimeSpan.FromSeconds(20));
-        }
+        // Default is two attempts
+        await Assert.ThrowsAnyAsync<NatsJSPublishNoResponseException>(async () => await js.PublishAsync($"foo", 1, cancellationToken: cts.Token));
+        Assert.Equal(2, Volatile.Read(ref retryCount));
+
+        // Set to multiple attempts
+        var attempts = 5;
+        Interlocked.Exchange(ref retryCount, 0);
+        await Assert.ThrowsAnyAsync<NatsJSPublishNoResponseException>(async () =>
+        {
+            var opts = new NatsJSPubOpts { RetryAttempts = attempts };
+            await js.PublishAsync($"foo", 1, opts: opts, cancellationToken: cts.Token);
+        });
+        Assert.Equal(attempts, Volatile.Read(ref retryCount));
+
+        // Disable retries
+        attempts = 1;
+        Interlocked.Exchange(ref retryCount, 0);
+        await Assert.ThrowsAnyAsync<NatsJSPublishNoResponseException>(async () =>
+        {
+            var opts = new NatsJSPubOpts { RetryAttempts = attempts };
+            await js.PublishAsync($"foo", 1, opts: opts, cancellationToken: cts.Token);
+        });
+        Assert.Equal(attempts, Volatile.Read(ref retryCount));
     }
 
     [Theory]
