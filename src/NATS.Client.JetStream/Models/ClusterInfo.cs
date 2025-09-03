@@ -30,8 +30,39 @@ public record ClusterInfo
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public ICollection<PeerInfo>? Replicas { get; set; }
 
-    // TODO: These are 2.12 specific
-    // LeaderSince *time.Time  `json:"leader_since,omitempty"`
-    // SystemAcc   bool        `json:"system_account,omitempty"`
-    // TrafficAcc  string      `json:"traffic_account,omitempty"`
+    /// <summary>
+    /// Represents the duration of time since the cluster leader was elected.
+    /// </summary>
+    /// <remarks>Supported by server v2.12</remarks>
+    [System.Text.Json.Serialization.JsonPropertyName("leader_since")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+#if NET6_0
+    public DateTimeOffset LeaderSince { get; set; }
+#else
+    public DateTimeOffset LeaderSince { get; init; }
+#endif
+
+    /// <summary>
+    /// Indicates whether the account is a system account.
+    /// </summary>
+    /// <remarks>Supported by server v2.12</remarks>
+    [System.Text.Json.Serialization.JsonPropertyName("system_account")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+#if NET6_0
+    public bool SystemAccount { get; set; }
+#else
+    public bool SystemAccount { get; init; }
+#endif
+
+    /// <summary>
+    /// The traffic account associated with the cluster.
+    /// </summary>
+    /// <remarks>Supported by server v2.12</remarks>
+    [System.Text.Json.Serialization.JsonPropertyName("traffic_account")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+#if NET6_0
+    public string? TrafficAccount { get; set; }
+#else
+    public string? TrafficAccount { get; init; }
+#endif
 }
