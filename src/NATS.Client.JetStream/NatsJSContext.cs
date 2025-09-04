@@ -45,6 +45,7 @@ public partial class NatsJSContext
         JSRequestResponseAsync<object, AccountInfoResponse>(
             subject: $"{Opts.Prefix}.INFO",
             request: null,
+            apiLevel: default,
             cancellationToken);
 
     /// <summary>
@@ -337,11 +338,12 @@ public partial class NatsJSContext
     public async ValueTask<TResponse> JSRequestResponseAsync<TRequest, TResponse>(
         string subject,
         TRequest? request,
+        NatsJSApiLevel apiLevel = default,
         CancellationToken cancellationToken = default)
         where TRequest : class
         where TResponse : class
     {
-        var response = await JSRequestAsync<TRequest, TResponse>(subject, request, cancellationToken);
+        var response = await JSRequestAsync<TRequest, TResponse>(subject, request, apiLevel, cancellationToken);
         response.EnsureSuccess();
         return response.Response!;
     }
@@ -373,11 +375,12 @@ public partial class NatsJSContext
     internal async ValueTask<NatsJSResponse<TResponse>> JSRequestAsync<TRequest, TResponse>(
         string subject,
         TRequest? request,
+        NatsJSApiLevel apiLevel = default,
         CancellationToken cancellationToken = default)
         where TRequest : class
         where TResponse : class
     {
-        var result = await TryJSRequestAsync<TRequest, TResponse>(subject, request, cancellationToken).ConfigureAwait(false);
+        var result = await TryJSRequestAsync<TRequest, TResponse>(subject, request, apiLevel, cancellationToken).ConfigureAwait(false);
         if (!result.Success)
         {
             throw result.Error;
@@ -389,6 +392,7 @@ public partial class NatsJSContext
     internal async ValueTask<NatsResult<NatsJSResponse<TResponse>>> TryJSRequestAsync<TRequest, TResponse>(
         string subject,
         TRequest? request,
+        NatsJSApiLevel apiLevel = default,
         CancellationToken cancellationToken = default)
         where TRequest : class
         where TResponse : class
@@ -399,6 +403,16 @@ public partial class NatsJSContext
             // Validator.ValidateObject(request, new ValidationContext(request));
         }
 
+        NatsHeaders? headers;
+        if (apiLevel.IsSet())
+        {
+            headers = new NatsHeaders { [NatsJSApiLevel.Header] = apiLevel.GetHeaderValue() };
+        }
+        else
+        {
+            headers = null;
+        }
+
         if (Connection.Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
         {
             NatsMsg<NatsJSApiResult<TResponse>> msg;
@@ -407,7 +421,7 @@ public partial class NatsJSContext
                 msg = await Connection.RequestAsync<TRequest, NatsJSApiResult<TResponse>>(
                     subject: subject,
                     data: request,
-                    headers: null,
+                    headers: headers,
                     replyOpts: new NatsSubOpts { Timeout = Opts.RequestTimeout },
                     requestSerializer: NatsJSJsonSerializer<TRequest>.Default,
                     replySerializer: NatsJSJsonDocumentSerializer<TResponse>.Default,
@@ -448,7 +462,7 @@ public partial class NatsJSContext
         await using var sub = await Connection.CreateRequestSubAsync<TRequest, NatsJSApiResult<TResponse>>(
                 subject: subject,
                 data: request,
-                headers: default,
+                headers: headers,
                 replyOpts: new NatsSubOpts { Timeout = Opts.RequestTimeout },
                 requestSerializer: NatsJSJsonSerializer<TRequest>.Default,
                 replySerializer: NatsJSJsonDocumentSerializer<TResponse>.Default,

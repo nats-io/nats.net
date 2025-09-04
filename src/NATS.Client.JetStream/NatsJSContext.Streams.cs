@@ -55,6 +55,7 @@ public partial class NatsJSContext
         var response = await JSRequestResponseAsync<StreamConfig, StreamInfo>(
             subject: $"{Opts.Prefix}.STREAM.CREATE.{config.Name}",
             config,
+            apiLevel: default,
             cancellationToken);
         return new NatsJSStream(this, response);
     }
@@ -75,6 +76,7 @@ public partial class NatsJSContext
         var response = await JSRequestAsync<StreamConfig, StreamUpdateResponse>(
             subject: $"{Opts.Prefix}.STREAM.UPDATE.{config.Name}",
             request: config,
+            apiLevel: default,
             cancellationToken);
 
         if (response.Error is { Code: 404 })
@@ -104,6 +106,7 @@ public partial class NatsJSContext
         var response = await JSRequestResponseAsync<object, StreamMsgDeleteResponse>(
             subject: $"{Opts.Prefix}.STREAM.DELETE.{stream}",
             request: null,
+            apiLevel: default,
             cancellationToken);
         return response.Success;
     }
@@ -128,6 +131,7 @@ public partial class NatsJSContext
         var response = await JSRequestResponseAsync<StreamPurgeRequest, StreamPurgeResponse>(
             subject: $"{Opts.Prefix}.STREAM.PURGE.{stream}",
             request: request,
+            apiLevel: default,
             cancellationToken);
         return response;
     }
@@ -152,6 +156,7 @@ public partial class NatsJSContext
         var response = await JSRequestResponseAsync<StreamMsgDeleteRequest, StreamMsgDeleteResponse>(
             subject: $"{Opts.Prefix}.STREAM.MSG.DELETE.{stream}",
             request: request,
+            apiLevel: default,
             cancellationToken);
         return response;
     }
@@ -176,6 +181,7 @@ public partial class NatsJSContext
         var response = await JSRequestResponseAsync<StreamInfoRequest, StreamInfoResponse>(
             subject: $"{Opts.Prefix}.STREAM.INFO.{stream}",
             request: request,
+            apiLevel: default,
             cancellationToken);
         return new NatsJSStream(this, response);
     }
@@ -198,6 +204,7 @@ public partial class NatsJSContext
         var response = await JSRequestResponseAsync<StreamConfig, StreamUpdateResponse>(
             subject: $"{Opts.Prefix}.STREAM.UPDATE.{request.Name}",
             request: request,
+            apiLevel: default,
             cancellationToken);
         return new NatsJSStream(this, response);
     }
@@ -224,6 +231,7 @@ public partial class NatsJSContext
                     Offset = offset,
                     Subject = subject,
                 },
+                apiLevel: default,
                 cancellationToken);
 
             if (response.Streams.Count == 0)
@@ -254,6 +262,7 @@ public partial class NatsJSContext
                     Subject = subject,
                     Offset = offset,
                 },
+                apiLevel: default,
                 cancellationToken);
 
             if (response.Streams == null || response.Streams.Count == 0)

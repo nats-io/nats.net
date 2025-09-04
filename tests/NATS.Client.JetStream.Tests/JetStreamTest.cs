@@ -1,14 +1,21 @@
 using NATS.Client.Core.Tests;
+using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Models;
-using NATS.Client.Platform.Windows.Tests;
+using NATS.Net;
 
 namespace NATS.Client.JetStream.Tests;
 
+[Collection("nats-server")]
 public class JetStreamTest
 {
     private readonly ITestOutputHelper _output;
+    private readonly NatsServerFixture _server;
 
-    public JetStreamTest(ITestOutputHelper output) => _output = output;
+    public JetStreamTest(ITestOutputHelper output, NatsServerFixture server)
+    {
+        _output = output;
+        _server = server;
+    }
 
     [Theory]
     [InlineData("Invalid.DotName")]
@@ -54,8 +61,7 @@ public class JetStreamTest
     [InlineData(NatsRequestReplyMode.SharedInbox)]
     public async Task Create_stream_test(NatsRequestReplyMode mode)
     {
-        await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestTimeout = TimeSpan.FromSeconds(10), RequestReplyMode = mode });
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestTimeout = TimeSpan.FromSeconds(10), RequestReplyMode = mode });
 
         // Happy user
         {
@@ -180,6 +186,45 @@ public class JetStreamTest
 
             // stream not found
             Assert.Equal(10059, exception.Error.ErrCode);
+        }
+    }
+
+    [Fact]
+    public async Task Enforce_api_level()
+    {
+        var proxy = _server.CreateProxy();
+        await using var nats = new NatsConnection(new NatsOpts { Url = $"127.0.0.1:{proxy.Port}" });
+        var js = nats.CreateJetStreamContext();
+
+        // Default is not to send the header
+        {
+            Assert.Equal("0", NatsJSApiLevel.None.GetHeaderValue());
+            Assert.Equal("0", ((NatsJSApiLevel)default).GetHeaderValue());
+            Assert.False(NatsJSApiLevel.None.IsSet());
+
+            await proxy.FlushFramesAsync(nats, clear: true, CancellationToken.None);
+            var response = await js.JSRequestResponseAsync<StreamNamesRequest, StreamNamesResponse>(
+                subject: "$JS.API.STREAM.NAMES",
+                request: null,
+                apiLevel: default);
+            Assert.NotNull(response);
+            await proxy.FlushFramesAsync(nats, clear: false, CancellationToken.None);
+            Assert.Single(proxy.ClientFrames, f => f.Message.StartsWith("PUB"));
+        }
+
+        // Server would ignore the header if API level is not supported
+        {
+            await proxy.FlushFramesAsync(nats, clear: true, CancellationToken.None);
+            var response = await js.JSRequestResponseAsync<StreamNamesRequest, StreamNamesResponse>(
+                subject: "$JS.API.STREAM.NAMES",
+                request: null,
+                apiLevel: NatsJSApiLevel.V1);
+            Assert.NotNull(response);
+            await proxy.FlushFramesAsync(nats, clear: false, CancellationToken.None);
+
+            // Make sure the header is sent
+            Assert.Single(proxy.ClientFrames, f => f.Message.StartsWith("HPUB"));
+            Assert.Contains("Nats-Required-Api-Level: 1", proxy.ClientFrames.First(f => f.Message.StartsWith("HPUB")).Message);
         }
     }
 }
