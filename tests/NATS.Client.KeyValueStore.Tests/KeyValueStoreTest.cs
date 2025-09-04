@@ -518,7 +518,7 @@ public class KeyValueStoreTest
         Assert.Equal("This store does not support TTL", exception.Message);
 
         // Check API version
-        var info = await js.JSRequestResponseAsync<object, AccountInfoResponse>("$JS.API.INFO", null, cancellationToken);
+        var info = await js.JSRequestResponseAsync<object, AccountInfoResponse>("$JS.API.INFO", null, apiLevel: default, cancellationToken);
         Assert.True(info.Api.Level >= 1);
 
         // Config validation

@@ -174,18 +174,49 @@ public static class ServerVersionUtils
 {
     public static bool ServerVersionIsGreaterThenOrEqualTo(this NatsConnection nats, int major, int minor)
     {
+        var serverVersion = nats.GetServerVersion();
+
+        if (serverVersion.Major > major)
+            return true;
+
+        if (serverVersion.Major == major && serverVersion.Minor >= minor)
+            return true;
+
+        return false;
+    }
+
+    public static bool ServerVersionIsLessThen(this NatsConnection nats, int major, int minor)
+    {
+        var serverVersion = nats.GetServerVersion();
+
+        if (serverVersion.Major < major)
+            return true;
+
+        if (serverVersion.Major == major && serverVersion.Minor < minor)
+            return true;
+
+        return false;
+    }
+
+    public static bool ServerVersionIs(this NatsConnection nats, int major, int minor)
+    {
+        var serverVersion = nats.GetServerVersion();
+        return serverVersion.Major == major && serverVersion.Minor == minor;
+    }
+
+    public static (int Major, int Minor) GetServerVersion(this NatsConnection nats)
+    {
         var m = Regex.Match(nats.ServerInfo!.Version, @"^(\d+)\.(\d+)");
+
         if (m.Success && m.Groups.Count == 3)
         {
             if (int.TryParse(m.Groups[1].Value, out var serverMajor) && int.TryParse(m.Groups[2].Value, out var serverMinor))
             {
-                if (serverMajor > major)
-                    return true;
-                if (serverMajor == major && serverMinor >= minor)
-                    return true;
+                return (serverMajor, serverMinor);
             }
         }
 
-        return false;
+        throw new Exception("Failed to parse server version");
     }
+
 }

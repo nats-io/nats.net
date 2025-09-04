@@ -3,7 +3,6 @@ using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text.Json;
 using NATS.Client.Core;
-using NATS.Client.Core.Internal;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
@@ -289,6 +288,7 @@ public class NatsObjStore : INatsObjStore
                     {
                         Filter = GetChunkSubject(info.Nuid),
                     },
+                    apiLevel: default,
                     cancellationToken);
             }
             catch (NatsJSApiException e)
@@ -431,6 +431,7 @@ public class NatsObjStore : INatsObjStore
         var info = await JetStreamContext.JSRequestResponseAsync<object, StreamInfoResponse>(
             subject: $"{JetStreamContext.Opts.Prefix}.STREAM.INFO.{_stream.Info.Config.Name}",
             request: null,
+            apiLevel: default,
             cancellationToken).ConfigureAwait(false);
 
         var config = info.Config;
@@ -439,6 +440,7 @@ public class NatsObjStore : INatsObjStore
         var response = await JetStreamContext.JSRequestResponseAsync<StreamConfig, StreamUpdateResponse>(
             subject: $"{JetStreamContext.Opts.Prefix}.STREAM.UPDATE.{_stream.Info.Config.Name}",
             request: config,
+            apiLevel: default,
             cancellationToken);
 
         if (!response.Config.Sealed)
