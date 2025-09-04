@@ -3,35 +3,35 @@ namespace NATS.Client.JetStream.Models;
 public record ClusterInfo
 {
     /// <summary>
-    /// The cluster name
+    /// The cluster name.
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("name")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public string? Name { get; set; }
 
     /// <summary>
-    /// RAFT group name
+    /// In clustered environments the name of the Raft group managing the asset.
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("raft_group")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public string? RaftGroup { get; set; }
 
     /// <summary>
-    /// The server name of the RAFT leader
+    /// The server name of the RAFT leader.
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("leader")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public string? Leader { get; set; }
 
     /// <summary>
-    /// The members of the RAFT cluster
+    /// The members of the RAFT cluster.
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("replicas")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public ICollection<PeerInfo>? Replicas { get; set; }
 
     /// <summary>
-    /// Represents the duration of time since the cluster leader was elected.
+    /// The time that it was elected as leader (in RFC3339 format in JSON), absent when not the leader.
     /// </summary>
     /// <remarks>Supported by server v2.12</remarks>
     [System.Text.Json.Serialization.JsonPropertyName("leader_since")]
@@ -43,7 +43,8 @@ public record ClusterInfo
 #endif
 
     /// <summary>
-    /// Indicates whether the account is a system account.
+    /// Indicates if the TrafficAccount is the system account.
+    /// When true, replication traffic goes over the system account.
     /// </summary>
     /// <remarks>Supported by server v2.12</remarks>
     [System.Text.Json.Serialization.JsonPropertyName("system_account")]
@@ -55,7 +56,7 @@ public record ClusterInfo
 #endif
 
     /// <summary>
-    /// The traffic account associated with the cluster.
+    /// The account where the replication traffic goes over.
     /// </summary>
     /// <remarks>Supported by server v2.12</remarks>
     [System.Text.Json.Serialization.JsonPropertyName("traffic_account")]
