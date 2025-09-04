@@ -218,5 +218,4 @@ public static class ServerVersionUtils
 
         throw new Exception("Failed to parse server version");
     }
-
 }
