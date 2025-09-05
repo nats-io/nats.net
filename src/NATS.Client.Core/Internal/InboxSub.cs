@@ -123,7 +123,7 @@ internal class InboxSubBuilder : INatsSubscriptionManager
     {
         if (!_bySubject.TryGetValue(subject, out var subTable))
         {
-            _logger.LogWarning(NatsLogEvents.InboxSubscription, "Unregistered message inbox received for {Subject}", subject);
+            _logger.LogTrace(NatsLogEvents.InboxSubscription, "Unregistered message inbox received for {Subject}", subject);
             return;
         }
 
