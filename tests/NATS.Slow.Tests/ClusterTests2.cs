@@ -91,7 +91,7 @@ public class ClusterTests2
         Assert.NotNull(s1.Info.Cluster.RaftGroup);
         Assert.True(s1.Info.Cluster.RaftGroup.Length > 0);
 
-        if (nats.ServerVersionIsGreaterThenOrEqualTo(2, 12))
+        if (nats.ServerInfo.VersionMajorMinorIsGreaterThenOrEqualTo(2, 12))
         {
             var tolerance = TimeSpan.FromSeconds(10);
             Assert.True(s1.Info.Cluster.LeaderSince > started - tolerance);
