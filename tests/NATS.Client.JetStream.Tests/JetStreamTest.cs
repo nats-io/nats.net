@@ -212,7 +212,7 @@ public class JetStreamTest
             Assert.Single(proxy.ClientFrames, f => f.Message.StartsWith("PUB"));
         }
 
-        // Server would ignore the header if API level is not supported
+        // Server would ignore the header if API level header is not supported
         {
             await proxy.FlushFramesAsync(nats, clear: true, CancellationToken.None);
             var response = await js.JSRequestResponseAsync<StreamNamesRequest, StreamNamesResponse>(
@@ -225,6 +225,18 @@ public class JetStreamTest
             // Make sure the header is sent
             Assert.Single(proxy.ClientFrames, f => f.Message.StartsWith("HPUB"));
             Assert.Contains("Nats-Required-Api-Level: 1", proxy.ClientFrames.First(f => f.Message.StartsWith("HPUB")).Message);
+        }
+
+        // Server would error if API level is not supported
+        {
+            await proxy.FlushFramesAsync(nats, clear: true, CancellationToken.None);
+            var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () => await js.JSRequestResponseAsync<StreamNamesRequest, StreamNamesResponse>(
+                subject: "$JS.API.STREAM.NAMES",
+                request: null,
+                apiLevel: new NatsJSApiLevel(int.MaxValue)));
+            Assert.Equal(412, exception.Error.Code);
+            Assert.Equal(10185, exception.Error.ErrCode);
+            Assert.Equal("JetStream minimum api level required", exception.Error.Description);
         }
     }
 }

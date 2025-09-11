@@ -9,7 +9,7 @@ public readonly struct NatsJSApiLevel
 
     private readonly int _level = 0;
 
-    private NatsJSApiLevel(int level) => _level = level;
+    internal NatsJSApiLevel(int level) => _level = level;
 
     public bool IsSet() => _level > 0;
 
