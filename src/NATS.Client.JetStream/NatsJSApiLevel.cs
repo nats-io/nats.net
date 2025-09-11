@@ -1,4 +1,4 @@
-﻿namespace NATS.Client.JetStream;
+namespace NATS.Client.JetStream;
 
 public readonly struct NatsJSApiLevel
 {
