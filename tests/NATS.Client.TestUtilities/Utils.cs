@@ -172,20 +172,21 @@ public static class ServiceUtils
 
 public static class ServerVersionUtils
 {
-    public static bool ServerVersionIsGreaterThenOrEqualTo(this NatsConnection nats, int major, int minor)
+    public static bool VersionMajorMinorIsGreaterThenOrEqualTo(this INatsServerInfo? serverInfo, int major, int minor)
     {
-        var m = Regex.Match(nats.ServerInfo!.Version, @"^(\d+)\.(\d+)");
-        if (m.Success && m.Groups.Count == 3)
-        {
-            if (int.TryParse(m.Groups[1].Value, out var serverMajor) && int.TryParse(m.Groups[2].Value, out var serverMinor))
-            {
-                if (serverMajor > major)
-                    return true;
-                if (serverMajor == major && serverMinor >= minor)
-                    return true;
-            }
-        }
+        var testVersion = new SemanticVersioning.Version($"{major}.{minor}.0");
+        var serverVersion = new SemanticVersioning.Version(serverInfo!.Version);
+        if (serverVersion.Major > testVersion.Major)
+            return true;
+        if (serverVersion.Major < testVersion.Major)
+            return false;
+        return serverVersion.Minor >= testVersion.Minor;
+    }
 
-        return false;
+    public static bool VersionIsGreaterThenOrEqualTo(this INatsServerInfo? serverInfo, string version)
+    {
+        var testVersion = new SemanticVersioning.Version(version);
+        var serverVersion = new SemanticVersioning.Version(serverInfo!.Version);
+        return serverVersion >= testVersion;
     }
 }
