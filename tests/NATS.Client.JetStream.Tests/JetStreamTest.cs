@@ -228,6 +228,7 @@ public class JetStreamTest
         }
 
         // Server would error if API level is not supported
+        if (nats.ServerInfo.VersionMajorMinorIsGreaterThenOrEqualTo(2, 12))
         {
             await proxy.FlushFramesAsync(nats, clear: true, CancellationToken.None);
             var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () => await js.JSRequestResponseAsync<StreamNamesRequest, StreamNamesResponse>(
