@@ -27,7 +27,11 @@ public record StreamMsgGetRequest
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public string? NextBySubj { get; set; }
 
+    /// <summary>
+    /// No headers.
+    /// </summary>
+    /// <remarks>Supports counters</remarks>
     [System.Text.Json.Serialization.JsonPropertyName("no_hdr")]
-    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public bool NoHeaders { get; set; }
 }

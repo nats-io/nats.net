@@ -39,4 +39,12 @@ public record PubAckResponse
     [System.Text.Json.Serialization.JsonPropertyName("domain")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public string? Domain { get; set; }
+
+    /// <summary>
+    /// Value.
+    /// </summary>
+    /// <remarks>Supports counters</remarks>
+    [System.Text.Json.Serialization.JsonPropertyName("val")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public string? Value { get; set; }
 }
