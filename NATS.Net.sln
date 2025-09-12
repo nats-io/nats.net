@@ -23,18 +23,18 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{899BE3EA-C5CA-4394-9B62-C45CBFF3AF4E}"
 	ProjectSection(SolutionItems) = preProject
 		.editorconfig = .editorconfig
-		Directory.Build.props = Directory.Build.props
-		README.md = README.md
-		version.txt = version.txt
 		.gitattributes = .gitattributes
 		.gitignore = .gitignore
 		CODE-OF-CONDUCT.md = CODE-OF-CONDUCT.md
 		CONTRIBUTING.md = CONTRIBUTING.md
 		dependencies.md = dependencies.md
+		Directory.Build.props = Directory.Build.props
 		global.json = global.json
 		Icon.png = Icon.png
 		LICENSE = LICENSE
+		README.md = README.md
 		REPO_RENAME.md = REPO_RENAME.md
+		version.txt = version.txt
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NATS.Client.Hosting", "src\NATS.Client.Hosting\NATS.Client.Hosting.csproj", "{D3F09B30-1ED5-48C2-81CD-A2AD88E751AC}"
@@ -99,10 +99,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "workflows", "workflows", "{
 		.github\workflows\format.yml = .github\workflows\format.yml
 		.github\workflows\perf.yml = .github\workflows\perf.yml
 		.github\workflows\release.yml = .github\workflows\release.yml
-		.github\workflows\test_linux.yml = .github\workflows\test_linux.yml
-		.github\workflows\test_windows.yml = .github\workflows\test_windows.yml
-		.github\workflows\test_linux_core.yml = .github\workflows\test_linux_core.yml
 		.github\workflows\signoffs.yml = .github\workflows\signoffs.yml
+		.github\workflows\test_linux.yml = .github\workflows\test_linux.yml
+		.github\workflows\test_linux_core.yml = .github\workflows\test_linux_core.yml
+		.github\workflows\test_windows.yml = .github\workflows\test_windows.yml
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "examples", "examples", "{5BF3C0C5-94CA-4008-8DF5-890ED8E06990}"
@@ -150,6 +150,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.TlsFirst", "examples\Example.TlsFirst\Example.TlsFirst.csproj", "{0B6CBF18-D11C-4CC3-A50C-437A9F7E761D}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Slow.Tests", "tests\NATS.Slow.Tests\NATS.Slow.Tests.csproj", "{1F6C87C7-1911-4E96-ADB4-1EF27BD09C60}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.Abstractions", "src\NATS.Client.Abstractions\NATS.Client.Abstractions.csproj", "{71C2BC96-C104-4748-B6CF-E74BAC4E709D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -353,6 +355,10 @@ Global
 		{1F6C87C7-1911-4E96-ADB4-1EF27BD09C60}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1F6C87C7-1911-4E96-ADB4-1EF27BD09C60}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1F6C87C7-1911-4E96-ADB4-1EF27BD09C60}.Release|Any CPU.Build.0 = Release|Any CPU
+		{71C2BC96-C104-4748-B6CF-E74BAC4E709D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{71C2BC96-C104-4748-B6CF-E74BAC4E709D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{71C2BC96-C104-4748-B6CF-E74BAC4E709D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{71C2BC96-C104-4748-B6CF-E74BAC4E709D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -410,6 +416,7 @@ Global
 		{1EA44258-04FC-48D5-A60D-AE92214DEB1A} = {5BF3C0C5-94CA-4008-8DF5-890ED8E06990}
 		{0B6CBF18-D11C-4CC3-A50C-437A9F7E761D} = {5BF3C0C5-94CA-4008-8DF5-890ED8E06990}
 		{1F6C87C7-1911-4E96-ADB4-1EF27BD09C60} = {C526E8AB-739A-48D7-8FC4-048978C9B650}
+		{71C2BC96-C104-4748-B6CF-E74BAC4E709D} = {4827B3EC-73D8-436D-AE2A-5E29AC95FD0C}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {8CBB7278-D093-448E-B3DE-B5991209A1AA}
