@@ -26,4 +26,8 @@ public record StreamMsgGetRequest
     [System.Text.Json.Serialization.JsonPropertyName("next_by_subj")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public string? NextBySubj { get; set; }
+
+    [System.Text.Json.Serialization.JsonPropertyName("no_hdr")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    public bool NoHeaders { get; set; }
 }
