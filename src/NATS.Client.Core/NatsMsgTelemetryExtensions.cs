@@ -22,9 +22,11 @@ public static class NatsMsgTelemetryExtensions
         return Telemetry.NatsActivities.StartActivity(
             name,
             kind: ActivityKind.Internal,
-            parentContext: GetActivityContext(in msg),
+            parentContext: msg.Headers.GetActivityContext(),
             tags: tags);
     }
 
-    internal static ActivityContext GetActivityContext<T>(this in NatsMsg<T> msg) => msg.Headers?.Activity?.Context ?? default;
+    /// <summary>Gets the activity context carried by the NatsHeaders.</summary>
+    public static ActivityContext GetActivityContext(this NatsHeaders? headers) =>
+        headers?.Activity?.Context ?? default;
 }
