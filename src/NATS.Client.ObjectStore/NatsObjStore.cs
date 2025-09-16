@@ -332,7 +332,7 @@ public class NatsObjStore : INatsObjStore
         if (key != meta.Name)
         {
             var metaSubject = GetMetaSubject(key);
-            await _stream.PurgeAsync(new StreamPurgeRequest{ Filter = metaSubject }, cancellationToken).ConfigureAwait(false);
+            await _stream.PurgeAsync(new StreamPurgeRequest { Filter = metaSubject }, cancellationToken).ConfigureAwait(false);
         }
 
         return info;
