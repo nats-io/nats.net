@@ -328,6 +328,13 @@ public class NatsObjStore : INatsObjStore
 
         await PublishMeta(info, cancellationToken);
 
+        // Check if the name changed and purge the old meta record
+        if (key != meta.Name)
+        {
+            var metaSubject = GetMetaSubject(key);
+            await _stream.PurgeAsync(new StreamPurgeRequest { Filter = metaSubject }, cancellationToken).ConfigureAwait(false);
+        }
+
         return info;
     }
 
