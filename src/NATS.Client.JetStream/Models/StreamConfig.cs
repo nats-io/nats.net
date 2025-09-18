@@ -262,4 +262,12 @@ public record StreamConfig
     [System.Text.Json.Serialization.JsonPropertyName("metadata")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public IDictionary<string, string>? Metadata { get; set; }
+
+    /// <summary>
+    /// Allows the scheduling of messages.
+    /// </summary>
+    /// <remarks>This feature is only available on NATS server v2.12 and later.</remarks>
+    [System.Text.Json.Serialization.JsonPropertyName("allow_msg_schedules")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool AllowMsgSchedules { get; set; }
 }
