@@ -17,6 +17,7 @@ public enum NatsConnectionState
     Open,
     Connecting,
     Reconnecting,
+    Failed,
 }
 
 internal enum NatsEvent
@@ -26,6 +27,7 @@ internal enum NatsEvent
     ReconnectFailed,
     MessageDropped,
     LameDuckModeActivated,
+    ConnectionFailed,
 }
 
 public partial class NatsConnection : INatsConnection
