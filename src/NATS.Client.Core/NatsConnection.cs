@@ -178,6 +178,9 @@ public partial class NatsConnection : INatsConnection
         {
             try
             {
+                if (ConnectionState == NatsConnectionState.Failed)
+                    throw new NatsConnectionFailedException("Connection is in failed state");
+
                 if (ConnectionState == NatsConnectionState.Open)
                     return;
 
@@ -926,14 +929,20 @@ public partial class NatsConnection : INatsConnection
             }
 
             backoff = _backoff;
+
+            // After two auth errors we will not retry.
+            if (stop)
+            {
+                ConnectionState = NatsConnectionState.Failed;
+                throw new NatsConnectionFailedException("Maximum authentication attempts exceeded");
+            }
+
+            if (Opts.MaxReconnectRetry > 0 && retry > Opts.MaxReconnectRetry)
+            {
+                ConnectionState = NatsConnectionState.Failed;
+                throw new NatsConnectionFailedException("Maximum connection retry attempts exceeded");
+            }
         }
-
-        // After two auth errors we will not retry.
-        if (stop)
-            throw new NatsException("Won't retry anymore.");
-
-        if (Opts.MaxReconnectRetry > 0 && retry > Opts.MaxReconnectRetry)
-            throw new NatsException("Max connect retry exceeded.");
 
         var jitter = Random.Shared.NextDouble() * Opts.ReconnectJitter.TotalMilliseconds;
         var waitTime = TimeSpan.FromMilliseconds(jitter) + backoff;
