@@ -89,7 +89,7 @@ public class JetStreamApiSerializerTest
         // Fake JS API requester
         for (var i = 0; i < 100; i++)
         {
-            await js.TryJSRequestAsync<object, AccountInfoResponse>(apiSubject, null, cts.Token);
+            await js.TryJSRequestAsync<object, AccountInfoResponse>(apiSubject, null, apiLevel: default, cts.Token);
         }
 
         ctsDone.Cancel();

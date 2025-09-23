@@ -362,6 +362,7 @@ public interface INatsJSContext
     /// </summary>
     /// <param name="subject">The JetStream API subject to send the request to.</param>
     /// <param name="request">The request message object.</param>
+    /// <param name="apiLevel">Asserts whether the JetStream server that's responding supports this API level.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <typeparam name="TRequest">The type of the request message.</typeparam>
     /// <typeparam name="TResponse">The type of the response message.</typeparam>
@@ -369,6 +370,7 @@ public interface INatsJSContext
     ValueTask<TResponse> JSRequestResponseAsync<TRequest, TResponse>(
         string subject,
         TRequest? request,
+        NatsJSApiLevel apiLevel = default,
         CancellationToken cancellationToken = default)
         where TRequest : class
         where TResponse : class;
