@@ -428,6 +428,7 @@ public class RequestReplyTest
         reply.Subject.Length.Should().BeLessThan("_INBOX..".Length + (2 * 22));
         Assert.True(long.TryParse(reply.Subject.Split('.')[2], out var id));
         Assert.True(id > 0);
+        Assert.Null(reply.Error);
 
         // simple response check
         var json = JsonNode.Parse(reply.Data!)!;
