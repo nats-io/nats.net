@@ -118,7 +118,7 @@ public class CounterTest
         // When counter is disabled, the server returns an error
         Assert.NotNull(ack.Error);
         Assert.Equal(10168, ack.Error.ErrCode); // Error code for "message counters is disabled"
-        Assert.Contains("message counters is disabled", ack.Error.Description);
+        Assert.Contains("message counters are disabled", ack.Error.Description);
         Assert.Null(ack.Value); // Value should be null when counter is not enabled
         _output.WriteLine($"Error as expected: {ack.Error.Description}");
     }
