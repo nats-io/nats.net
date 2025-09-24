@@ -41,7 +41,8 @@ public record PubAckResponse
     public string? Domain { get; set; }
 
     /// <summary>
-    /// Gets or sets the value.
+    /// Contains the current counter value when publishing messages with counter headers.
+    /// This property is used in the context of the message counter feature.
     /// </summary>
     /// <remarks>Supported by server v2.12</remarks>
     [System.Text.Json.Serialization.JsonPropertyName("val")]
