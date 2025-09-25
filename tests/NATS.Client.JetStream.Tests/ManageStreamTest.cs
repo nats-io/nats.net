@@ -2,6 +2,7 @@ using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Models;
 using NATS.Client.Platform.Windows.Tests;
+using NATS.Client.TestUtilities;
 using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.JetStream.Tests;
@@ -218,5 +219,43 @@ public class ManageStreamTest
 
         await js.CreateOrUpdateStreamAsync(streamConfig, cts.Token);
         await Assert.ThrowsAsync<NatsJSApiException>(async () => await js.CreateOrUpdateStreamAsync(streamConfigForUpdated, cts.Token));
+    }
+
+    [SkipIfNatsServer(versionEarlierThan: "2.12")]
+    public async Task AllowMsgSchedules_property_should_be_set_on_stream()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
+        await nats.ConnectRetryAsync();
+
+        var js = new NatsJSContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        // Create a stream with AllowMsgSchedules enabled
+        var streamConfig = new StreamConfig($"{prefix}schedules", [$"{prefix}schedules.*"])
+        {
+            AllowMsgSchedules = true,
+        };
+
+        var stream = await js.CreateStreamAsync(streamConfig, cts.Token);
+
+        // Verify the property is set on the created stream
+        Assert.True(stream.Info.Config.AllowMsgSchedules);
+
+        // Get the stream and verify the property is persisted
+        var retrievedStream = await js.GetStreamAsync($"{prefix}schedules", cancellationToken: cts.Token);
+        Assert.True(retrievedStream.Info.Config.AllowMsgSchedules);
+
+        // Update stream with AllowMsgSchedules disabled should error
+        var updatedConfig = streamConfig with { AllowMsgSchedules = false };
+        var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () => await js.UpdateStreamAsync(updatedConfig, cts.Token));
+        Assert.Equal(500, exception.Error.Code);
+        Assert.Equal(10052, exception.Error.ErrCode);
+        Assert.Equal("message schedules can not be disabled", exception.Error.Description);
+
+        // Get the stream and verify the update has failed
+        var reRetrievedStream = await js.GetStreamAsync($"{prefix}schedules", cancellationToken: cts.Token);
+        Assert.True(reRetrievedStream.Info.Config.AllowMsgSchedules);
     }
 }

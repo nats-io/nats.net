@@ -270,4 +270,11 @@ public record StreamConfig
     [System.Text.Json.Serialization.JsonPropertyName("allow_msg_counter")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public bool AllowMsgCounter { get; set; }
+
+    /// <summary>
+    /// AllowMsgSchedules enables the scheduling of messages.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("allow_msg_schedules")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool AllowMsgSchedules { get; set; }
 }
