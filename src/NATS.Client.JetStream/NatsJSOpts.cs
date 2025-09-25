@@ -153,6 +153,13 @@ public record NatsJSConsumeOpts
     /// Defines a group name and constraints for minimum pending messages and acknowledgments.
     /// </summary>
     public NatsJSPriorityGroupOpts? PriorityGroup { get; init; }
+
+    /// <summary>
+    /// Maximum number of consecutive 503 "No Responders" errors before the consumer is considered deleted and consumption stops.
+    /// This helps detect when an ephemeral consumer has vanished on the server.
+    /// Set to -1 to disable this check. (default: 10)
+    /// </summary>
+    public int MaxConsecutive503Errors { get; init; } = 10;
 }
 
 /// <summary>
