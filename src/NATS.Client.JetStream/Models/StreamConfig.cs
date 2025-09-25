@@ -264,6 +264,14 @@ public record StreamConfig
     public IDictionary<string, string>? Metadata { get; set; }
 
     /// <summary>
+    /// Allow message counter.
+    /// </summary>
+    /// <remarks>Supported by server v2.12</remarks>
+    [System.Text.Json.Serialization.JsonPropertyName("allow_msg_counter")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool AllowMsgCounter { get; set; }
+
+    /// <summary>
     /// AllowAtomicPublish allows atomic batch publishing into the stream.
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("allow_atomic")]
