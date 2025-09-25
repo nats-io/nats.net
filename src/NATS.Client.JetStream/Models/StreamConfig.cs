@@ -262,4 +262,11 @@ public record StreamConfig
     [System.Text.Json.Serialization.JsonPropertyName("metadata")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public IDictionary<string, string>? Metadata { get; set; }
+
+    /// <summary>
+    /// AllowAtomicPublish allows atomic batch publishing into the stream.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("allow_atomic")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool AllowAtomicPublish { get; set; }
 }
