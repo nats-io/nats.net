@@ -2,6 +2,7 @@ using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Models;
 using NATS.Client.Platform.Windows.Tests;
+using NATS.Client.TestUtilities;
 using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.JetStream.Tests;
@@ -218,5 +219,61 @@ public class ManageStreamTest
 
         await js.CreateOrUpdateStreamAsync(streamConfig, cts.Token);
         await Assert.ThrowsAsync<NatsJSApiException>(async () => await js.CreateOrUpdateStreamAsync(streamConfigForUpdated, cts.Token));
+    }
+
+    [SkipIfNatsServer(versionEarlierThan: "2.12")]
+    public async Task PersistMode_property_should_be_set_on_stream()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
+        await nats.ConnectRetryAsync();
+
+        var js = new NatsJSContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        // Test 1: Create a stream with PersistMode set to Async
+        var streamConfigAsync = new StreamConfig($"{prefix}persist-async", [$"{prefix}persist-async.*"])
+        {
+            PersistMode = StreamConfigPersistMode.Async,
+        };
+
+        var streamAsync = await js.CreateStreamAsync(streamConfigAsync, cts.Token);
+
+        // Verify the property is set on the created stream
+        Assert.Equal(StreamConfigPersistMode.Async, streamAsync.Info.Config.PersistMode);
+
+        // Get the stream and verify the property is persisted
+        var retrievedStreamAsync = await js.GetStreamAsync($"{prefix}persist-async", cancellationToken: cts.Token);
+        Assert.Equal(StreamConfigPersistMode.Async, retrievedStreamAsync.Info.Config.PersistMode);
+
+        // Test 2: Create a stream with PersistMode set to Default
+        var streamConfigDefault = new StreamConfig($"{prefix}persist-default", [$"{prefix}persist-default.*"])
+        {
+            PersistMode = StreamConfigPersistMode.Default,
+        };
+
+        var streamDefault = await js.CreateStreamAsync(streamConfigDefault, cts.Token);
+
+        // Verify the property is set on the created stream
+        Assert.Equal(StreamConfigPersistMode.Default, streamDefault.Info.Config.PersistMode);
+
+        // Get the stream and verify the property is persisted
+        var retrievedStreamDefault = await js.GetStreamAsync($"{prefix}persist-default", cancellationToken: cts.Token);
+        Assert.Equal(StreamConfigPersistMode.Default, retrievedStreamDefault.Info.Config.PersistMode);
+
+        // Test 3: Verify that updating PersistMode throws an exception
+        var updatedConfig = streamConfigAsync with { PersistMode = StreamConfigPersistMode.Default };
+        var exception = await Assert.ThrowsAsync<NatsJSApiException>(
+            async () => await js.UpdateStreamAsync(updatedConfig, cts.Token));
+
+        // Verify the error message indicates persist mode cannot be changed
+        Assert.Contains("persist mode", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(500, exception.Error.Code);
+        Assert.Equal(10052, exception.Error.ErrCode);
+        Assert.Equal("stream configuration update can not change persist mode", exception.Error.Description);
+
+        var updatedAsync = await js.GetStreamAsync($"{prefix}persist-async", cancellationToken: cts.Token);
+        Assert.Equal(StreamConfigPersistMode.Async, updatedAsync.Info.Config.PersistMode);
     }
 }

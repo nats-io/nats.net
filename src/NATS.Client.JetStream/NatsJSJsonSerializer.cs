@@ -102,6 +102,7 @@ internal partial class NatsJSJsonSerializerContext : JsonSerializerContext
             new JsonStringEnumConverter<StreamConfigDiscard>(JsonNamingPolicy.SnakeCaseLower),
             new JsonStringEnumConverter<StreamConfigRetention>(JsonNamingPolicy.SnakeCaseLower),
             new JsonStringEnumConverter<StreamConfigStorage>(JsonNamingPolicy.SnakeCaseLower),
+            new JsonStringEnumConverter<StreamConfigPersistMode>(JsonNamingPolicy.SnakeCaseLower),
             new JsonStringEnumConverter<ConsumerCreateAction>(JsonNamingPolicy.SnakeCaseLower),
         },
     });
@@ -220,6 +221,17 @@ internal class NatsJSJsonStringEnumConverter<TEnum> : JsonConverter<TEnum>
                 return (TEnum)(object)ConsumerCreateAction.Update;
             default:
                 return (TEnum)(object)ConsumerCreateAction.CreateOrUpdate;
+            }
+        }
+
+        if (typeToConvert == typeof(StreamConfigPersistMode))
+        {
+            switch (stringValue)
+            {
+            case "default":
+                return (TEnum)(object)StreamConfigPersistMode.Default;
+            case "async":
+                return (TEnum)(object)StreamConfigPersistMode.Async;
             }
         }
 
@@ -342,6 +354,18 @@ internal class NatsJSJsonStringEnumConverter<TEnum> : JsonConverter<TEnum>
                 return;
             case ConsumerCreateAction.Update:
                 writer.WriteStringValue("update");
+                return;
+            }
+        }
+        else if (value is StreamConfigPersistMode streamConfigPersistMode)
+        {
+            switch (streamConfigPersistMode)
+            {
+            case StreamConfigPersistMode.Default:
+                writer.WriteStringValue("default");
+                return;
+            case StreamConfigPersistMode.Async:
+                writer.WriteStringValue("async");
                 return;
             }
         }
