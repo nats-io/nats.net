@@ -277,4 +277,11 @@ public record StreamConfig
     [System.Text.Json.Serialization.JsonPropertyName("allow_msg_schedules")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public bool AllowMsgSchedules { get; set; }
+
+    /// <summary>
+    /// AllowAtomicPublish allows atomic batch publishing into the stream.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("allow_atomic")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool AllowAtomicPublish { get; set; }
 }

@@ -258,4 +258,42 @@ public class ManageStreamTest
         var reRetrievedStream = await js.GetStreamAsync($"{prefix}schedules", cancellationToken: cts.Token);
         Assert.True(reRetrievedStream.Info.Config.AllowMsgSchedules);
     }
+
+    [SkipIfNatsServer(versionEarlierThan: "2.12")]
+    public async Task AllowAtomicPublish_property_should_be_set_on_stream()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
+        await nats.ConnectRetryAsync();
+
+        var js = new NatsJSContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        // Create a stream with AllowAtomicPublish enabled
+        var streamConfig = new StreamConfig($"{prefix}atomic", [$"{prefix}atomic.*"])
+        {
+            AllowAtomicPublish = true,
+        };
+
+        var stream = await js.CreateStreamAsync(streamConfig, cts.Token);
+
+        // Verify the property is set on the created stream
+        Assert.True(stream.Info.Config.AllowAtomicPublish);
+
+        // Get the stream and verify the property is persisted
+        var retrievedStream = await js.GetStreamAsync($"{prefix}atomic", cancellationToken: cts.Token);
+        Assert.True(retrievedStream.Info.Config.AllowAtomicPublish);
+
+        // Update stream with AllowAtomicPublish disabled
+        var updatedConfig = streamConfig with { AllowAtomicPublish = false };
+        var updatedStream = await js.UpdateStreamAsync(updatedConfig, cts.Token);
+
+        // Verify the property is updated
+        Assert.False(updatedStream.Info.Config.AllowAtomicPublish);
+
+        // Get the stream and verify the update is persisted
+        var reRetrievedStream = await js.GetStreamAsync($"{prefix}atomic", cancellationToken: cts.Token);
+        Assert.False(reRetrievedStream.Info.Config.AllowAtomicPublish);
+    }
 }
