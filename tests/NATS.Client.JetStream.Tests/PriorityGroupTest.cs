@@ -187,7 +187,8 @@ public class PriorityGroupTest
             await foreach (var msg in consumer.FetchAsync<int>(opts, cancellationToken: cts.Token))
             {
                 Assert.Equal(count++, msg.Data);
-                if (count == 3) break;
+                if (count == 3)
+                    break;
             }
 
             Assert.Equal(3, count);
@@ -205,7 +206,8 @@ public class PriorityGroupTest
             {
                 Assert.Equal(count + 3, msg.Data); // Should continue from where we left off
                 count++;
-                if (count == 2) break;
+                if (count == 2)
+                    break;
             }
 
             Assert.Equal(2, count);
