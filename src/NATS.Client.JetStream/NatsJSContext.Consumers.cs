@@ -269,9 +269,9 @@ public partial class NatsJSContext : INatsJSContext
         }
 
         // TODO: enum these values?
-        if (config.PriorityPolicy != null && config.PriorityPolicy != "none" && config.PriorityPolicy != "overflow" && config.PriorityPolicy != "pinned_client")
+        if (config.PriorityPolicy != null && config.PriorityPolicy != "none" && config.PriorityPolicy != "overflow" && config.PriorityPolicy != "pinned_client" && config.PriorityPolicy != "prioritized")
         {
-            throw new NatsJSException("Cannot create consumers with priority policy other than 'overflow', 'pinned_client', or 'none'.");
+            throw new NatsJSException("Cannot create consumers with priority policy other than 'overflow', 'pinned_client', 'prioritized', or 'none'.");
         }
 
         var response = await JSRequestResponseAsync<ConsumerCreateRequest, ConsumerInfo>(
