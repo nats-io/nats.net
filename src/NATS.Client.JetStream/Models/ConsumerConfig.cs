@@ -272,7 +272,7 @@ public record ConsumerConfig
 #endif
 
     /// <summary>
-    /// Specifies the priority policy for consumer message selection, such as prioritizing <c>overflow</c> or <c>pinned_client</c>.
+    /// Specifies the priority policy for consumer message selection, such as prioritizing <c>prioritized</c>, <c>overflow</c>, or <c>pinned_client</c>.
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("priority_policy")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
