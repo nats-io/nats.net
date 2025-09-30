@@ -284,4 +284,15 @@ public record StreamConfig
     [System.Text.Json.Serialization.JsonPropertyName("allow_atomic")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public bool AllowAtomicPublish { get; set; }
+
+    /// <summary>
+    /// PersistMode allows to opt-in to different persistence mode settings.
+    /// </summary>
+    /// <remarks>Supported by server v2.12</remarks>
+    [System.Text.Json.Serialization.JsonPropertyName("persist_mode")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+#if NET6_0
+    [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonStringEnumConverter<StreamConfigPersistMode>))]
+#endif
+    public StreamConfigPersistMode? PersistMode { get; set; }
 }
