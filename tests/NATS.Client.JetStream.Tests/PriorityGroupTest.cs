@@ -34,7 +34,7 @@ public class PriorityGroupTest
             ack.EnsureSuccess();
         }
 
-        var consumerConfig = new ConsumerConfig($"{prefix}c1") { PriorityGroups = ["jobs"], PriorityPolicy = "overflow", };
+        var consumerConfig = new ConsumerConfig($"{prefix}c1") { PriorityGroups = ["jobs"], PriorityPolicy = ConsumerConfigPriorityPolicy.Overflow, };
         var consumer = await js.CreateOrUpdateConsumerAsync($"{prefix}s1", consumerConfig, cancellationToken: cts.Token);
 
         // Err on no group
@@ -77,7 +77,7 @@ public class PriorityGroupTest
             ack.EnsureSuccess();
         }
 
-        var consumerConfig = new ConsumerConfig($"{prefix}c1") { PriorityGroups = ["jobs"], PriorityPolicy = "overflow", };
+        var consumerConfig = new ConsumerConfig($"{prefix}c1") { PriorityGroups = ["jobs"], PriorityPolicy = ConsumerConfigPriorityPolicy.Overflow, };
         var consumer = await js.CreateOrUpdateConsumerAsync($"{prefix}s1", consumerConfig, cancellationToken: cts.Token);
 
         // Err on no group
@@ -123,7 +123,7 @@ public class PriorityGroupTest
             ack.EnsureSuccess();
         }
 
-        var consumerConfig = new ConsumerConfig($"{prefix}c1") { PriorityGroups = ["jobs"], PriorityPolicy = "overflow", };
+        var consumerConfig = new ConsumerConfig($"{prefix}c1") { PriorityGroups = ["jobs"], PriorityPolicy = ConsumerConfigPriorityPolicy.Overflow, };
         var consumer = await js.CreateOrUpdateConsumerAsync($"{prefix}s1", consumerConfig, cancellationToken: cts.Token);
 
         // Err on no group
@@ -172,7 +172,7 @@ public class PriorityGroupTest
         var consumerConfig = new ConsumerConfig($"{prefix}c1")
         {
             PriorityGroups = ["jobs"],
-            PriorityPolicy = "prioritized",
+            PriorityPolicy = ConsumerConfigPriorityPolicy.Prioritized,
         };
         var consumer = await js.CreateOrUpdateConsumerAsync($"{prefix}s1", consumerConfig, cancellationToken: cts.Token);
 
@@ -229,11 +229,11 @@ public class PriorityGroupTest
         var consumerConfig = new ConsumerConfig($"{prefix}c1")
         {
             PriorityGroups = ["jobs"],
-            PriorityPolicy = "prioritized",
+            PriorityPolicy = ConsumerConfigPriorityPolicy.Prioritized,
         };
 
         var consumer = await js.CreateOrUpdateConsumerAsync($"{prefix}s1", consumerConfig, cancellationToken: cts.Token);
         Assert.NotNull(consumer);
-        Assert.Equal("prioritized", consumer.Info.Config.PriorityPolicy);
+        Assert.Equal(ConsumerConfigPriorityPolicy.Prioritized, consumer.Info.Config.PriorityPolicy);
     }
 }

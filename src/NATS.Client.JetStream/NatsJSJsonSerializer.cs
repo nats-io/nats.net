@@ -103,6 +103,7 @@ internal partial class NatsJSJsonSerializerContext : JsonSerializerContext
             new JsonStringEnumConverter<StreamConfigRetention>(JsonNamingPolicy.SnakeCaseLower),
             new JsonStringEnumConverter<StreamConfigStorage>(JsonNamingPolicy.SnakeCaseLower),
             new JsonStringEnumConverter<ConsumerCreateAction>(JsonNamingPolicy.SnakeCaseLower),
+            new JsonStringEnumConverter<ConsumerConfigPriorityPolicy>(JsonNamingPolicy.SnakeCaseLower),
         },
     });
 #endif
@@ -220,6 +221,19 @@ internal class NatsJSJsonStringEnumConverter<TEnum> : JsonConverter<TEnum>
                 return (TEnum)(object)ConsumerCreateAction.Update;
             default:
                 return (TEnum)(object)ConsumerCreateAction.CreateOrUpdate;
+            }
+        }
+
+        if (typeToConvert == typeof(ConsumerConfigPriorityPolicy))
+        {
+            switch (stringValue)
+            {
+            case "none":
+                return (TEnum)(object)ConsumerConfigPriorityPolicy.None;
+            case "prioritized":
+                return (TEnum)(object)ConsumerConfigPriorityPolicy.Prioritized;
+            case "overflow":
+                return (TEnum)(object)ConsumerConfigPriorityPolicy.Overflow;
             }
         }
 
@@ -342,6 +356,21 @@ internal class NatsJSJsonStringEnumConverter<TEnum> : JsonConverter<TEnum>
                 return;
             case ConsumerCreateAction.Update:
                 writer.WriteStringValue("update");
+                return;
+            }
+        }
+        else if (value is ConsumerConfigPriorityPolicy consumerConfigPriorityPolicy)
+        {
+            switch (consumerConfigPriorityPolicy)
+            {
+            case ConsumerConfigPriorityPolicy.None:
+                writer.WriteStringValue("none");
+                return;
+            case ConsumerConfigPriorityPolicy.Prioritized:
+                writer.WriteStringValue("prioritized");
+                return;
+            case ConsumerConfigPriorityPolicy.Overflow:
+                writer.WriteStringValue("overflow");
                 return;
             }
         }
