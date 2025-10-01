@@ -82,4 +82,17 @@ public record ConsumerGetnextRequest
     [System.Text.Json.Serialization.JsonPropertyName("id")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public string? Id { get; set; }
+
+    /// <summary>
+    /// Priority for message delivery when using prioritized priority policy.
+    /// </summary>
+    /// <remarks>
+    /// Lower values indicate higher priority (0 is the highest priority).
+    /// Maximum priority value is 9. This field is only used when the consumer
+    /// has PriorityPolicy set to "prioritized".
+    /// </remarks>
+    [System.Text.Json.Serialization.JsonPropertyName("priority")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [System.ComponentModel.DataAnnotations.Range(0, 9)]
+    public byte Priority { get; set; }
 }

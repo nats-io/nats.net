@@ -104,6 +104,7 @@ internal partial class NatsJSJsonSerializerContext : JsonSerializerContext
             new JsonStringEnumConverter<StreamConfigStorage>(JsonNamingPolicy.SnakeCaseLower),
             new JsonStringEnumConverter<StreamConfigPersistMode>(JsonNamingPolicy.SnakeCaseLower),
             new JsonStringEnumConverter<ConsumerCreateAction>(JsonNamingPolicy.SnakeCaseLower),
+            new JsonStringEnumConverter<ConsumerConfigPriorityPolicy>(JsonNamingPolicy.SnakeCaseLower),
         },
     });
 #endif
@@ -232,6 +233,19 @@ internal class NatsJSJsonStringEnumConverter<TEnum> : JsonConverter<TEnum>
                 return (TEnum)(object)StreamConfigPersistMode.Default;
             case "async":
                 return (TEnum)(object)StreamConfigPersistMode.Async;
+            }
+        }
+
+        if (typeToConvert == typeof(ConsumerConfigPriorityPolicy))
+        {
+            switch (stringValue)
+            {
+            case "none":
+                return (TEnum)(object)ConsumerConfigPriorityPolicy.None;
+            case "prioritized":
+                return (TEnum)(object)ConsumerConfigPriorityPolicy.Prioritized;
+            case "overflow":
+                return (TEnum)(object)ConsumerConfigPriorityPolicy.Overflow;
             }
         }
 
@@ -366,6 +380,21 @@ internal class NatsJSJsonStringEnumConverter<TEnum> : JsonConverter<TEnum>
                 return;
             case StreamConfigPersistMode.Async:
                 writer.WriteStringValue("async");
+                return;
+            }
+        }
+        else if (value is ConsumerConfigPriorityPolicy consumerConfigPriorityPolicy)
+        {
+            switch (consumerConfigPriorityPolicy)
+            {
+            case ConsumerConfigPriorityPolicy.None:
+                writer.WriteStringValue("none");
+                return;
+            case ConsumerConfigPriorityPolicy.Prioritized:
+                writer.WriteStringValue("prioritized");
+                return;
+            case ConsumerConfigPriorityPolicy.Overflow:
+                writer.WriteStringValue("overflow");
                 return;
             }
         }

@@ -252,4 +252,39 @@ public class EnumJsonTests
         var jsonOut3 = Encoding.UTF8.GetString(bw3.WrittenSpan.ToArray());
         Assert.DoesNotContain("persist_mode", jsonOut3);
     }
+
+    [Theory]
+    [InlineData(ConsumerConfigPriorityPolicy.None, "\"priority_policy\":\"none\"")]
+    [InlineData(ConsumerConfigPriorityPolicy.Prioritized, "\"priority_policy\":\"prioritized\"")]
+    [InlineData(ConsumerConfigPriorityPolicy.Overflow, "\"priority_policy\":\"overflow\"")]
+    public void ConsumerConfigPriorityPolicy_test(ConsumerConfigPriorityPolicy value, string expected)
+    {
+        var serializer = NatsJSJsonSerializer<ConsumerConfig>.Default;
+
+        var bw = new NatsBufferWriter<byte>();
+        serializer.Serialize(bw, new ConsumerConfig { PriorityPolicy = value });
+
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
+        Assert.Contains(expected, json);
+
+        var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory));
+        Assert.NotNull(result);
+        Assert.Equal(value, result.PriorityPolicy);
+    }
+
+    [Fact]
+    public void ConsumerConfigPriorityPolicy_null_test()
+    {
+        var serializer = NatsJSJsonSerializer<ConsumerConfig>.Default;
+
+        var bw = new NatsBufferWriter<byte>();
+        serializer.Serialize(bw, new ConsumerConfig { PriorityPolicy = null });
+
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
+        Assert.DoesNotContain("priority_policy", json);
+
+        var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory));
+        Assert.NotNull(result);
+        Assert.Null(result.PriorityPolicy);
+    }
 }
