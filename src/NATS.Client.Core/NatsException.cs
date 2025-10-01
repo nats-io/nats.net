@@ -63,3 +63,5 @@ public sealed class NatsPayloadTooLargeException : NatsException
     {
     }
 }
+
+public sealed class NatsConnectionFailedException(string message) : NatsException(message);

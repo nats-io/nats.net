@@ -103,6 +103,16 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
                             protocolException = pe;
                             goto CONSUME_LOOP;
                         }
+                        catch (NatsConnectionFailedException)
+                        {
+                            // Connection has permanently failed, stop consuming and rethrow
+                            throw;
+                        }
+                        catch (NatsJSException e) when (e is not NatsJSProtocolException and not NatsJSConnectionException and not NatsJSTimeoutException)
+                        {
+                            // Consumer-related errors (like 503 threshold exceeded), stop consuming and rethrow
+                            throw;
+                        }
                         catch (NatsJSConnectionException e)
                         {
                             _logger.LogWarning(NatsJSLogEvents.Retry, "{Error}. Retrying...", e.Message);
