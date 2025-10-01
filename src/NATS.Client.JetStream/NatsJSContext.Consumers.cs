@@ -263,17 +263,6 @@ public partial class NatsJSContext : INatsJSContext
             throw new NatsJSException("Cannot create consumers with multiple priority groups.");
         }
 
-        if (config.PriorityPolicy is "pinned_client")
-        {
-            throw new NotImplementedException("Pinned clients are not supported yet.");
-        }
-
-        // TODO: enum these values?
-        if (config.PriorityPolicy != null && config.PriorityPolicy != "none" && config.PriorityPolicy != "overflow" && config.PriorityPolicy != "pinned_client")
-        {
-            throw new NatsJSException("Cannot create consumers with priority policy other than 'overflow', 'pinned_client', or 'none'.");
-        }
-
         var response = await JSRequestResponseAsync<ConsumerCreateRequest, ConsumerInfo>(
             subject: subject,
             new ConsumerCreateRequest

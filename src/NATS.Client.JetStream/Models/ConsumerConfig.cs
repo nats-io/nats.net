@@ -272,16 +272,15 @@ public record ConsumerConfig
 #endif
 
     /// <summary>
-    /// Specifies the priority policy for consumer message selection, such as prioritizing <c>overflow</c> or <c>pinned_client</c>.
+    /// Specifies the priority policy for consumer message selection.
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("priority_policy")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    [System.ComponentModel.DataAnnotations.StringLength(int.MaxValue, MinimumLength = 1)]
-    [System.ComponentModel.DataAnnotations.RegularExpression(@"^[^.*>]+$")]
 #if NET6_0
-    public string? PriorityPolicy { get; set; }
+    [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonStringEnumConverter<ConsumerConfigPriorityPolicy>))]
+    public ConsumerConfigPriorityPolicy? PriorityPolicy { get; set; }
 #else
-    public string? PriorityPolicy { get; init; }
+    public ConsumerConfigPriorityPolicy? PriorityPolicy { get; init; }
 #endif
 
     /// <summary>

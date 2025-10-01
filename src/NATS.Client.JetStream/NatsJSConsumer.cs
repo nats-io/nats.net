@@ -336,6 +336,7 @@ public class NatsJSConsumer : INatsJSConsumer
                 Group = opts.PriorityGroup?.Group,
                 MinPending = opts.PriorityGroup?.MinPending ?? 0,
                 MinAckPending = opts.PriorityGroup?.MinAckPending ?? 0,
+                Priority = opts.PriorityGroup?.Priority ?? 0,
             },
             cancellationToken).ConfigureAwait(false);
 
@@ -438,6 +439,7 @@ public class NatsJSConsumer : INatsJSConsumer
                     Group = opts.PriorityGroup?.Group,
                     MinPending = opts.PriorityGroup?.MinPending ?? 0,
                     MinAckPending = opts.PriorityGroup?.MinAckPending ?? 0,
+                    Priority = opts.PriorityGroup?.Priority ?? 0,
                 }
                 : new ConsumerGetnextRequest
                 {
@@ -449,6 +451,7 @@ public class NatsJSConsumer : INatsJSConsumer
                     Group = opts.PriorityGroup?.Group,
                     MinPending = opts.PriorityGroup?.MinPending ?? 0,
                     MinAckPending = opts.PriorityGroup?.MinAckPending ?? 0,
+                    Priority = opts.PriorityGroup?.Priority ?? 0,
                 },
             cancellationToken).ConfigureAwait(false);
 
