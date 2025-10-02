@@ -220,6 +220,10 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
                     {
                         EndSubscription(NatsSubEndReason.NoMsgs);
                     }
+                    else if (headers is { Code: 408, Message: NatsHeaders.Messages.RequestsPending })
+                    {
+                        EndSubscription(NatsSubEndReason.RequestsPending);
+                    }
                     else if (headers is { Code: 408, Message: NatsHeaders.Messages.RequestTimeout })
                     {
                         EndSubscription(NatsSubEndReason.Timeout);
@@ -238,6 +242,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
                     }
                     else
                     {
+                        Console.WriteLine("HOLY SHIT");
                         _notificationChannel?.Notify(new NatsJSProtocolNotification("Unhandled protocol message", headers.Code, headers.MessageText));
                         _logger.LogWarning(NatsJSLogEvents.ProtocolMessage, "Unhandled protocol message: {Code} {Description}", headers.Code, headers.MessageText);
                     }
