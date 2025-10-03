@@ -170,7 +170,6 @@ public partial class NatsJSContext
         {
             if (Connection.Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
             {
-                var noReply = false;
                 NatsMsg<PubAckResponse> msg;
                 try
                 {
@@ -181,20 +180,19 @@ public partial class NatsJSContext
                         requestSerializer: serializer,
                         replySerializer: NatsJSJsonSerializer<PubAckResponse>.Default,
                         requestOpts: opts,
-                        replyOpts: new NatsSubOpts { Timeout = Connection.Opts.RequestTimeout },
+                        replyOpts: new NatsSubOpts { Timeout = Opts.RequestTimeout },
                         cancellationToken).ConfigureAwait(false);
                 }
                 catch (NatsNoReplyException)
                 {
-                    noReply = true;
-                    msg = default;
+                    return NatsJSPublishNoResponseException.Default;
                 }
-                catch (Exception ex)
+                catch (NatsException ex)
                 {
                     return ex;
                 }
 
-                if (noReply || msg.HasNoResponders)
+                if (msg.HasNoResponders)
                 {
                     _logger.LogDebug(NatsJSLogEvents.PublishNoResponseRetry, "No response received, retrying {RetryCount}/{RetryMax}", i + 1, retryMax);
                     await Task.Delay(retryWait, cancellationToken);
@@ -223,11 +221,12 @@ public partial class NatsJSContext
                         // is a reconnect to the cluster between the request and waiting for a response,
                         // without the timeout the publish call will hang forever since the server
                         // which received the request won't be there to respond anymore.
-                        Timeout = Connection.Opts.RequestTimeout,
+                        Timeout = Opts.RequestTimeout,
                     },
                     cancellationToken)
                 .ConfigureAwait(false);
 
+            var hasNoResponders = false;
             await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
             {
                 // If JetStream is disabled, a no responders error will be returned.
@@ -235,6 +234,7 @@ public partial class NatsJSContext
                 // We should retry in those cases.
                 if (msg.HasNoResponders)
                 {
+                    hasNoResponders = true;
                     break;
                 }
                 else if (msg.Data == null)
@@ -245,16 +245,21 @@ public partial class NatsJSContext
                 return msg.Data;
             }
 
-            if (i < retryMax)
+            // Only retry if there were 503 no responders error
+            if (hasNoResponders)
             {
                 _logger.LogDebug(NatsJSLogEvents.PublishNoResponseRetry, "No response received, retrying {RetryCount}/{RetryMax}", i + 1, retryMax);
                 await Task.Delay(retryWait, cancellationToken);
+            }
+            else
+            {
+                break;
             }
         }
 
         // We throw a specific exception here for convenience so that the caller doesn't
         // have to check for the exception message etc.
-        return new NatsJSPublishNoResponseException();
+        return NatsJSPublishNoResponseException.Default;
     }
 
     public async ValueTask<NatsJSPublishConcurrentFuture> PublishConcurrentAsync<T>(
@@ -314,7 +319,7 @@ public partial class NatsJSContext
                         // is a reconnect to the cluster between the request and waiting for a response,
                         // without the timeout the publish call will hang forever since the server
                         // which received the request won't be there to respond anymore.
-                        Timeout = Connection.Opts.RequestTimeout,
+                        Timeout = Opts.RequestTimeout,
 
                         // If JetStream is disabled, a no responders error will be returned
                         // No responders error might also happen when reconnecting to cluster
@@ -403,7 +408,7 @@ public partial class NatsJSContext
                     subject: subject,
                     data: request,
                     headers: null,
-                    replyOpts: new NatsSubOpts { Timeout = Connection.Opts.RequestTimeout },
+                    replyOpts: new NatsSubOpts { Timeout = Opts.RequestTimeout },
                     requestSerializer: NatsJSJsonSerializer<TRequest>.Default,
                     replySerializer: NatsJSJsonDocumentSerializer<TResponse>.Default,
                     cancellationToken: cancellationToken).ConfigureAwait(false);
@@ -444,7 +449,7 @@ public partial class NatsJSContext
                 subject: subject,
                 data: request,
                 headers: default,
-                replyOpts: new NatsSubOpts { Timeout = Connection.Opts.RequestTimeout },
+                replyOpts: new NatsSubOpts { Timeout = Opts.RequestTimeout },
                 requestSerializer: NatsJSJsonSerializer<TRequest>.Default,
                 replySerializer: NatsJSJsonDocumentSerializer<TResponse>.Default,
                 cancellationToken: cancellationToken)

@@ -8,7 +8,7 @@ namespace NATS.Client.JetStream;
 /// </summary>
 public record NatsJSOpts
 {
-    public NatsJSOpts(NatsOpts opts, string? apiPrefix = default, string? domain = default, AckOpts? ackOpts = default)
+    public NatsJSOpts(NatsOpts opts, string? apiPrefix = default, string? domain = default, AckOpts? ackOpts = default, TimeSpan? requestTimeout = default)
     {
         if (apiPrefix != null && domain != null)
         {
@@ -17,6 +17,7 @@ public record NatsJSOpts
 
         ApiPrefix = apiPrefix ?? "$JS.API";
         Domain = domain;
+        RequestTimeout = requestTimeout ?? opts.RequestTimeout;
     }
 
     /// <summary>
@@ -33,6 +34,11 @@ public record NatsJSOpts
     /// JetStream domain to use in JetStream API subjects. (default: null)
     /// </summary>
     public string? Domain { get; }
+
+    /// <summary>
+    /// Timeout for JetStream API calls.
+    /// </summary>
+    public TimeSpan RequestTimeout { get; }
 
     /// <summary>
     /// Ask server for an acknowledgment.
@@ -259,4 +265,14 @@ public record NatsJSPriorityGroupOpts
     /// When specified, this Pull request will only receive messages when the consumer has at least this many ack pending messages.
     /// </summary>
     public long MinAckPending { get; set; }
+
+    /// <summary>
+    /// Priority for message delivery when using prioritized priority policy.
+    /// </summary>
+    /// <remarks>
+    /// Lower values indicate higher priority (0 is the highest priority).
+    /// Maximum priority value is 9. This field is only used when the consumer
+    /// has PriorityPolicy set to "prioritized".
+    /// </remarks>
+    public byte Priority { get; init; }
 }

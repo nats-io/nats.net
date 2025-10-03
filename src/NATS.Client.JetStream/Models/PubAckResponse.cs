@@ -39,4 +39,13 @@ public record PubAckResponse
     [System.Text.Json.Serialization.JsonPropertyName("domain")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public string? Domain { get; set; }
+
+    /// <summary>
+    /// Contains the current counter value when publishing messages with counter headers.
+    /// This property is used in the context of the message counter feature.
+    /// </summary>
+    /// <remarks>Supported by server v2.12</remarks>
+    [System.Text.Json.Serialization.JsonPropertyName("val")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public string? Value { get; set; }
 }

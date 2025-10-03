@@ -285,6 +285,15 @@ public abstract class NatsSubBase
             // Need to await to handle any exceptions
             await ReceiveInternalAsync(subject, replyTo, headersBuffer, payloadBuffer).ConfigureAwait(false);
         }
+        catch (TaskCanceledException)
+        {
+            // If there are cancellations, we don't want to throw an exception.
+            // These can happen if the subscription is disposed or unsubscribed while
+            // processing the message as part of a normal flow.
+        }
+        catch (OperationCanceledException)
+        {
+        }
         catch (ChannelClosedException)
         {
             // When user disposes or unsubscribes there maybe be messages still coming in
@@ -292,7 +301,7 @@ public abstract class NatsSubBase
             // interested in the messages anymore. Hence we ignore any messages being
             // fed into the channel and rejected.
         }
-        catch (Exception e)
+        catch (Exception e) when (!(e is SystemException))
         {
             _logger.LogError(NatsLogEvents.Subscription, e, "Error while processing message");
 

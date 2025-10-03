@@ -14,8 +14,8 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - branch: 'v2.9'
           - branch: 'v2.10'
+          - branch: 'v2.11'
           - branch: 'latest'
           - branch: 'main'
     runs-on: windows-latest

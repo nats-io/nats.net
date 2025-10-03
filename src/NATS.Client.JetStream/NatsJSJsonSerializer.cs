@@ -102,7 +102,9 @@ internal partial class NatsJSJsonSerializerContext : JsonSerializerContext
             new JsonStringEnumConverter<StreamConfigDiscard>(JsonNamingPolicy.SnakeCaseLower),
             new JsonStringEnumConverter<StreamConfigRetention>(JsonNamingPolicy.SnakeCaseLower),
             new JsonStringEnumConverter<StreamConfigStorage>(JsonNamingPolicy.SnakeCaseLower),
+            new JsonStringEnumConverter<StreamConfigPersistMode>(JsonNamingPolicy.SnakeCaseLower),
             new JsonStringEnumConverter<ConsumerCreateAction>(JsonNamingPolicy.SnakeCaseLower),
+            new JsonStringEnumConverter<ConsumerConfigPriorityPolicy>(JsonNamingPolicy.SnakeCaseLower),
         },
     });
 #endif
@@ -220,6 +222,30 @@ internal class NatsJSJsonStringEnumConverter<TEnum> : JsonConverter<TEnum>
                 return (TEnum)(object)ConsumerCreateAction.Update;
             default:
                 return (TEnum)(object)ConsumerCreateAction.CreateOrUpdate;
+            }
+        }
+
+        if (typeToConvert == typeof(StreamConfigPersistMode))
+        {
+            switch (stringValue)
+            {
+            case "default":
+                return (TEnum)(object)StreamConfigPersistMode.Default;
+            case "async":
+                return (TEnum)(object)StreamConfigPersistMode.Async;
+            }
+        }
+
+        if (typeToConvert == typeof(ConsumerConfigPriorityPolicy))
+        {
+            switch (stringValue)
+            {
+            case "none":
+                return (TEnum)(object)ConsumerConfigPriorityPolicy.None;
+            case "prioritized":
+                return (TEnum)(object)ConsumerConfigPriorityPolicy.Prioritized;
+            case "overflow":
+                return (TEnum)(object)ConsumerConfigPriorityPolicy.Overflow;
             }
         }
 
@@ -342,6 +368,33 @@ internal class NatsJSJsonStringEnumConverter<TEnum> : JsonConverter<TEnum>
                 return;
             case ConsumerCreateAction.Update:
                 writer.WriteStringValue("update");
+                return;
+            }
+        }
+        else if (value is StreamConfigPersistMode streamConfigPersistMode)
+        {
+            switch (streamConfigPersistMode)
+            {
+            case StreamConfigPersistMode.Default:
+                writer.WriteStringValue("default");
+                return;
+            case StreamConfigPersistMode.Async:
+                writer.WriteStringValue("async");
+                return;
+            }
+        }
+        else if (value is ConsumerConfigPriorityPolicy consumerConfigPriorityPolicy)
+        {
+            switch (consumerConfigPriorityPolicy)
+            {
+            case ConsumerConfigPriorityPolicy.None:
+                writer.WriteStringValue("none");
+                return;
+            case ConsumerConfigPriorityPolicy.Prioritized:
+                writer.WriteStringValue("prioritized");
+                return;
+            case ConsumerConfigPriorityPolicy.Overflow:
+                writer.WriteStringValue("overflow");
                 return;
             }
         }

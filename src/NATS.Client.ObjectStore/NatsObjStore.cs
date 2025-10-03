@@ -25,6 +25,8 @@ public class NatsObjStore : INatsObjStore
     private const string NatsRollup = "Nats-Rollup";
     private const string RollupSubject = "sub";
 
+    // Disable retries as we want to fail fast and avoid duplicate chunks
+    private readonly NatsJSPubOpts _natsJSPubOpts = new() { RetryAttempts = 1 };
     private readonly NatsObjContext _objContext;
     private readonly INatsJSStream _stream;
 
@@ -193,10 +195,10 @@ public class NatsObjStore : INatsObjStore
             await using (var hashedStream = new CryptoStream(stream, sha256, CryptoStreamMode.Read, leaveOpen))
 #endif
             {
+                using var memoryOwner = NatsMemoryOwner<byte>.Allocate(chunkSize);
+
                 while (true)
                 {
-                    var memoryOwner = NatsMemoryOwner<byte>.Allocate(chunkSize);
-
                     var memory = memoryOwner.Memory;
                     var currentChunkSize = 0;
                     var eof = false;
@@ -252,10 +254,10 @@ public class NatsObjStore : INatsObjStore
                         chunks++;
                     }
 
-                    var buffer = memoryOwner.Slice(0, currentChunkSize);
+                    var buffer = memoryOwner.Memory.Slice(0, currentChunkSize);
 
                     // Chunks
-                    var ack = await JetStreamContext.PublishAsync(GetChunkSubject(nuid), buffer, serializer: NatsRawSerializer<NatsMemoryOwner<byte>>.Default, cancellationToken: cancellationToken);
+                    var ack = await JetStreamContext.PublishAsync(GetChunkSubject(nuid), buffer, serializer: NatsRawSerializer<Memory<byte>>.Default, opts: _natsJSPubOpts, cancellationToken: cancellationToken);
                     ack.EnsureSuccess();
 
                     if (eof)
@@ -325,6 +327,13 @@ public class NatsObjStore : INatsObjStore
         info.Headers = meta.Headers;
 
         await PublishMeta(info, cancellationToken);
+
+        // Check if the name changed and purge the old meta record
+        if (key != meta.Name)
+        {
+            var metaSubject = GetMetaSubject(key);
+            await _stream.PurgeAsync(new StreamPurgeRequest { Filter = metaSubject }, cancellationToken).ConfigureAwait(false);
+        }
 
         return info;
     }
@@ -608,7 +617,7 @@ public class NatsObjStore : INatsObjStore
     private async ValueTask PublishMeta(ObjectMetadata meta, CancellationToken cancellationToken)
     {
         var natsRollupHeaders = new NatsHeaders { { NatsRollup, RollupSubject } };
-        var ack = await JetStreamContext.PublishAsync(GetMetaSubject(meta.Name), meta, serializer: NatsObjJsonSerializer<ObjectMetadata>.Default, headers: natsRollupHeaders, cancellationToken: cancellationToken);
+        var ack = await JetStreamContext.PublishAsync(GetMetaSubject(meta.Name), meta, serializer: NatsObjJsonSerializer<ObjectMetadata>.Default, headers: natsRollupHeaders, opts: _natsJSPubOpts, cancellationToken: cancellationToken);
         ack.EnsureSuccess();
     }
 

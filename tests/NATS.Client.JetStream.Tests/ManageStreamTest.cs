@@ -2,6 +2,7 @@ using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Models;
 using NATS.Client.Platform.Windows.Tests;
+using NATS.Client.TestUtilities;
 using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.JetStream.Tests;
@@ -218,5 +219,162 @@ public class ManageStreamTest
 
         await js.CreateOrUpdateStreamAsync(streamConfig, cts.Token);
         await Assert.ThrowsAsync<NatsJSApiException>(async () => await js.CreateOrUpdateStreamAsync(streamConfigForUpdated, cts.Token));
+    }
+
+    [SkipIfNatsServer(versionEarlierThan: "2.12")]
+    public async Task AllowMsgSchedules_property_should_be_set_on_stream()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
+        await nats.ConnectRetryAsync();
+
+        var js = new NatsJSContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        // Create a stream with AllowMsgSchedules enabled
+        var streamConfig = new StreamConfig($"{prefix}schedules", [$"{prefix}schedules.*"])
+        {
+            AllowMsgSchedules = true,
+        };
+
+        var stream = await js.CreateStreamAsync(streamConfig, cts.Token);
+
+        // Verify the property is set on the created stream
+        Assert.True(stream.Info.Config.AllowMsgSchedules);
+
+        // Get the stream and verify the property is persisted
+        var retrievedStream = await js.GetStreamAsync($"{prefix}schedules", cancellationToken: cts.Token);
+        Assert.True(retrievedStream.Info.Config.AllowMsgSchedules);
+
+        // Update stream with AllowMsgSchedules disabled should error
+        var updatedConfig = streamConfig with { AllowMsgSchedules = false };
+        var exception = await Assert.ThrowsAsync<NatsJSApiException>(async () => await js.UpdateStreamAsync(updatedConfig, cts.Token));
+        Assert.Equal(500, exception.Error.Code);
+        Assert.Equal(10052, exception.Error.ErrCode);
+        Assert.Equal("message schedules can not be disabled", exception.Error.Description);
+
+        // Get the stream and verify the update has failed
+        var reRetrievedStream = await js.GetStreamAsync($"{prefix}schedules", cancellationToken: cts.Token);
+        Assert.True(reRetrievedStream.Info.Config.AllowMsgSchedules);
+    }
+
+    [SkipIfNatsServer(versionEarlierThan: "2.12")]
+    public async Task AllowAtomicPublish_property_should_be_set_on_stream()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
+        await nats.ConnectRetryAsync();
+
+        var js = new NatsJSContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        // Create a stream with AllowAtomicPublish enabled
+        var streamConfig = new StreamConfig($"{prefix}atomic", [$"{prefix}atomic.*"])
+        {
+            AllowAtomicPublish = true,
+        };
+
+        var stream = await js.CreateStreamAsync(streamConfig, cts.Token);
+
+        // Verify the property is set on the created stream
+        Assert.True(stream.Info.Config.AllowAtomicPublish);
+
+        // Get the stream and verify the property is persisted
+        var retrievedStream = await js.GetStreamAsync($"{prefix}atomic", cancellationToken: cts.Token);
+        Assert.True(retrievedStream.Info.Config.AllowAtomicPublish);
+
+        // Update stream with AllowAtomicPublish disabled
+        var updatedConfig = streamConfig with { AllowAtomicPublish = false };
+        var updatedStream = await js.UpdateStreamAsync(updatedConfig, cts.Token);
+
+        // Verify the property is updated
+        Assert.False(updatedStream.Info.Config.AllowAtomicPublish);
+
+        // Get the stream and verify the update is persisted
+        var reRetrievedStream = await js.GetStreamAsync($"{prefix}atomic", cancellationToken: cts.Token);
+        Assert.False(reRetrievedStream.Info.Config.AllowAtomicPublish);
+    }
+
+    [SkipIfNatsServer(versionEarlierThan: "2.12")]
+    public async Task PersistMode_property_should_be_set_on_stream()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
+        await nats.ConnectRetryAsync();
+
+        var js = new NatsJSContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        // Test 1: Create a stream with PersistMode set to Async
+        var streamConfigAsync = new StreamConfig($"{prefix}persist-async", [$"{prefix}persist-async.*"])
+        {
+            PersistMode = StreamConfigPersistMode.Async,
+        };
+
+        var streamAsync = await js.CreateStreamAsync(streamConfigAsync, cts.Token);
+
+        // Verify the property is set on the created stream
+        Assert.Equal(StreamConfigPersistMode.Async, streamAsync.Info.Config.PersistMode);
+
+        // Get the stream and verify the property is persisted
+        var retrievedStreamAsync = await js.GetStreamAsync($"{prefix}persist-async", cancellationToken: cts.Token);
+        Assert.Equal(StreamConfigPersistMode.Async, retrievedStreamAsync.Info.Config.PersistMode);
+
+        // Test 2: Create a stream with PersistMode set to Default
+        var streamConfigDefault = new StreamConfig($"{prefix}persist-default", [$"{prefix}persist-default.*"])
+        {
+            PersistMode = StreamConfigPersistMode.Default,
+        };
+
+        var streamDefault = await js.CreateStreamAsync(streamConfigDefault, cts.Token);
+
+        // Verify the property is set on the created stream
+        // Server v2.12 may return null for default value, which is acceptable
+        // The key is that we sent it in the request
+        Assert.True(
+            streamDefault.Info.Config.PersistMode == StreamConfigPersistMode.Default ||
+            streamDefault.Info.Config.PersistMode == null,
+            $"Expected PersistMode to be Default or null, but was {streamDefault.Info.Config.PersistMode}");
+
+        // Get the stream and verify the property
+        var retrievedStreamDefault = await js.GetStreamAsync($"{prefix}persist-default", cancellationToken: cts.Token);
+        Assert.True(
+            retrievedStreamDefault.Info.Config.PersistMode == StreamConfigPersistMode.Default ||
+            retrievedStreamDefault.Info.Config.PersistMode == null,
+            $"Expected PersistMode to be Default or null, but was {retrievedStreamDefault.Info.Config.PersistMode}");
+
+        // Test 3: Create a stream without PersistMode set (should be null)
+        var streamConfigNull = new StreamConfig($"{prefix}persist-null", [$"{prefix}persist-null.*"])
+        {
+            // PersistMode not set, should remain null
+        };
+
+        var streamNull = await js.CreateStreamAsync(streamConfigNull, cts.Token);
+        Assert.Null(streamNull.Info.Config.PersistMode);
+
+        // Verify the property might be null or server might return a default
+        // The key is that we didn't send it in the request
+        var retrievedStreamNull = await js.GetStreamAsync($"{prefix}persist-null", cancellationToken: cts.Token);
+        Assert.Null(retrievedStreamNull.Info.Config.PersistMode);
+
+        // Server behavior may vary - it might return null or a default value
+        // The important thing is our client didn't send persist_mode in the JSON
+
+        // Test 4: Verify that updating PersistMode throws an exception
+        var updatedConfig = streamConfigAsync with { PersistMode = StreamConfigPersistMode.Default };
+        var exception = await Assert.ThrowsAsync<NatsJSApiException>(
+            async () => await js.UpdateStreamAsync(updatedConfig, cts.Token));
+
+        // Verify the error message indicates persist mode cannot be changed
+        Assert.Contains("persist mode", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(500, exception.Error.Code);
+        Assert.Equal(10052, exception.Error.ErrCode);
+        Assert.Equal("stream configuration update can not change persist mode", exception.Error.Description);
+
+        var updatedAsync = await js.GetStreamAsync($"{prefix}persist-async", cancellationToken: cts.Token);
+        Assert.Equal(StreamConfigPersistMode.Async, updatedAsync.Info.Config.PersistMode);
     }
 }

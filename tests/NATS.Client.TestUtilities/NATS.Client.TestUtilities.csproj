@@ -11,6 +11,7 @@
   <ItemGroup>
     <PackageReference Include="FluentAssertions" Version="[7,8)" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="SemanticVersioning" Version="3.0.0" />
     <PackageReference Include="xunit.v3.extensibility.core" Version="1.0.1" />
     <PackageReference Include="System.Net.Http" Version="4.3.4" />
     <PackageReference Include="System.Text.RegularExpressions" Version="4.3.1" />
