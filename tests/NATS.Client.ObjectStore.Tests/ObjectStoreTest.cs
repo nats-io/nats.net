@@ -77,7 +77,7 @@ public class ObjectStoreTest
             var data = await store.GetInfoAsync("k1", cancellationToken: cancellationToken);
 
             var sha = Base64UrlEncoder.Encode(SHA256.HashData(buffer));
-            var size = buffer.Length;
+            var size = (ulong)buffer.Length;
             var chunks = Math.Ceiling(size / 10.0);
 
             Assert.Equal($"SHA-256={sha}", data.Digest);
@@ -97,7 +97,7 @@ public class ObjectStoreTest
             var data = await store.GetInfoAsync("k2", cancellationToken: cancellationToken);
 
             var sha = Base64UrlEncoder.Encode(SHA256.HashData(buffer));
-            var size = buffer.Length;
+            var size = (ulong)buffer.Length;
             var chunks = Math.Ceiling(size / 10.0);
 
             Assert.Equal($"SHA-256={sha}", data.Digest);
@@ -195,7 +195,7 @@ public class ObjectStoreTest
         await store.PutAsync("k1", new byte[] { 65, 66, 67 }, cancellationToken);
 
         var info = await store.GetInfoAsync("k1", cancellationToken: cancellationToken);
-        Assert.Equal(3, info.Size);
+        Assert.Equal(3M, info.Size);
 
         var bytes = await store.GetBytesAsync("k1", cancellationToken);
         Assert.Equal(bytes, new byte[] { 65, 66, 67 });
@@ -207,8 +207,8 @@ public class ObjectStoreTest
 
         var info2 = await store.GetInfoAsync("k1", showDeleted: true, cancellationToken: cancellationToken);
         Assert.True(info2.Deleted);
-        Assert.Equal(0, info2.Size);
-        Assert.Equal(0, info2.Chunks);
+        Assert.Equal(0M, info2.Size);
+        Assert.Equal(0M, info2.Chunks);
         Assert.Equal(string.Empty, info2.Digest);
 
         // Put again

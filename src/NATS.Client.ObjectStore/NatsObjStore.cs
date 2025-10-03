@@ -83,7 +83,7 @@ public class NatsObjStore : INatsObjStore
 
         string digest;
         var chunks = 0;
-        var size = 0;
+        ulong size = 0;
         using (var sha256 = SHA256.Create())
         {
 #if NETSTANDARD2_0
@@ -107,7 +107,7 @@ public class NatsObjStore : INatsObjStore
                     {
                         using var memoryOwner = msg.Data;
                         chunks++;
-                        size += memoryOwner.Memory.Length;
+                        size += (ulong)memoryOwner.Memory.Length;
 #if NETSTANDARD2_0
                         var segment = memoryOwner.DangerousGetArray();
                         await hashedStream.WriteAsync(segment.Array, segment.Offset, segment.Count, cancellationToken);
@@ -182,7 +182,7 @@ public class NatsObjStore : INatsObjStore
             meta.Options.MaxChunkSize = DefaultChunkSize;
         }
 
-        var size = 0;
+        ulong size = 0;
         var chunks = 0;
         var chunkSize = meta.Options.MaxChunkSize.Value;
 
@@ -250,7 +250,7 @@ public class NatsObjStore : INatsObjStore
 
                     if (currentChunkSize > 0)
                     {
-                        size += currentChunkSize;
+                        size += (ulong)currentChunkSize;
                         chunks++;
                     }
 

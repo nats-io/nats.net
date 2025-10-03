@@ -39,7 +39,7 @@ public record ObjectMetadata
     /// </summary>
     [JsonPropertyName("size")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    public int Size { get; set; }
+    public ulong Size { get; set; }
 
     /// <summary>
     /// Modified timestamp

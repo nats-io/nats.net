@@ -25,7 +25,7 @@ public class WatcherTest
         var watcher = Task.Run(
             async () =>
             {
-                var count = 0;
+                ulong count = 0;
                 await foreach (var info in store.WatchAsync(cancellationToken: cancellationToken))
                 {
                     count++;
