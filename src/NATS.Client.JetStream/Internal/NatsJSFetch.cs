@@ -220,6 +220,10 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
                     {
                         EndSubscription(NatsSubEndReason.NoMsgs);
                     }
+                    else if (headers is { Code: 408, Message: NatsHeaders.Messages.RequestsPending })
+                    {
+                        EndSubscription(NatsSubEndReason.RequestsPending);
+                    }
                     else if (headers is { Code: 408, Message: NatsHeaders.Messages.RequestTimeout })
                     {
                         EndSubscription(NatsSubEndReason.Timeout);

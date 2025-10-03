@@ -27,6 +27,7 @@ public class NatsHeaders : IDictionary<string, StringValues>
         NoMessages,
         RequestTimeout,
         MessageSizeExceedsMaxBytes,
+        RequestsPending,
     }
 
     // Uses C# compiler's optimization for static byte[] data
@@ -57,6 +58,10 @@ public class NatsHeaders : IDictionary<string, StringValues>
     // Message Size Exceeds MaxBytes
     internal static ReadOnlySpan<byte> MessageMessageSizeExceedsMaxBytes => new byte[] { 77, 101, 115, 115, 97, 103, 101, 32, 83, 105, 122, 101, 32, 69, 120, 99, 101, 101, 100, 115, 32, 77, 97, 120, 66, 121, 116, 101, 115 };
     internal static readonly string MessageMessageSizeExceedsMaxBytesStr = "Message Size Exceeds MaxBytes";
+
+    // Requests Pending
+    internal static ReadOnlySpan<byte> MessageRequestsPendingBytes => new byte[] { 82, 101, 113, 117, 101, 115, 116, 115, 32, 80, 101, 110, 100, 105, 110, 103 };
+    internal static readonly string MessageRequestsPendingStr = "Requests Pending";
 
     private static readonly string[] EmptyKeys = Array.Empty<string>();
     private static readonly StringValues[] EmptyValues = Array.Empty<StringValues>();
