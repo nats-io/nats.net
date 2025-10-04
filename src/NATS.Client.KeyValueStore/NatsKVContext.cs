@@ -65,7 +65,7 @@ public class NatsKVContext : INatsKVContext
 
         if (config.LimitMarkerTTL > TimeSpan.Zero)
         {
-            var info = await JetStreamContext.JSRequestResponseAsync<object, AccountInfoResponse>("$JS.API.INFO", null, cancellationToken);
+            var info = await JetStreamContext.JSRequestResponseAsync<object, AccountInfoResponse>("$JS.API.INFO", null, apiLevel: default, cancellationToken);
             if (info.Api.Level < 1)
             {
                 throw new NatsKVException("API doesn't support LimitMarkerTTL");
