@@ -17,4 +17,6 @@ public record NatsPubOpts
     /// </summary>
     [Obsolete("All errors are now thrown as exceptions in PublishAsync")]
     public Action<Exception>? ErrorHandler { get; init; }
+
+    internal bool Priority { get; set; } = false;
 }
