@@ -25,12 +25,12 @@ public class WatcherTest
         var watcher = Task.Run(
             async () =>
             {
-                ulong count = 0;
+                var count = 0;
                 await foreach (var info in store.WatchAsync(cancellationToken: cancellationToken))
                 {
                     count++;
                     signal.Pulse();
-                    Assert.Equal(count, info.Size);
+                    Assert.Equal((ulong)count, info.Size);
                     if (count == 3)
                         break;
                 }
