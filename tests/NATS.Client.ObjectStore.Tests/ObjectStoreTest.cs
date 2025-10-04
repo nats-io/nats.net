@@ -650,11 +650,17 @@ public class ObjectStoreTest
         var info = await store.GetInfoAsync("k1", cancellationToken: cancellationToken);
 
         // Verify Size is ulong
+#pragma warning disable IDE0007
+        // ReSharper disable once SuggestVarOrType_BuiltInTypes
         ulong size = info.Size; // Should compile without error
+#pragma warning restore IDE0007
         Assert.Equal(3UL, size);
 
         // Verify Chunks is uint
+#pragma warning disable IDE0007
+        // ReSharper disable once SuggestVarOrType_BuiltInTypes
         uint chunks = info.Chunks; // Should compile without error
+#pragma warning restore IDE0007
         Assert.Equal(1U, chunks);
     }
 }
