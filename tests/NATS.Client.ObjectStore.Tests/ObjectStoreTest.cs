@@ -622,4 +622,39 @@ public class ObjectStoreTest
             await b1.GetBytesAsync("name1", cancellationToken: cancellationToken);
         });
     }
+
+    [Fact]
+    public async Task Metadata_field_types_match_spec()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        var js = new NatsJSContext(nats);
+        var obj = new NatsObjContext(js);
+
+        var store = await obj.CreateObjectStoreAsync(new NatsObjConfig("b1"), cancellationToken);
+
+        // Test that Size property is ulong (uint64 in NATS spec)
+        var metadata = new ObjectMetadata { Name = "test" };
+        metadata.Size = ulong.MaxValue; // Should compile without error
+        Assert.Equal(18446744073709551615UL, metadata.Size);
+
+        // Test that Chunks property is uint (uint32 in NATS spec)
+        metadata.Chunks = uint.MaxValue; // Should compile without error
+        Assert.Equal(4294967295U, metadata.Chunks);
+
+        // Test with actual object metadata from store
+        await store.PutAsync("k1", new byte[] { 1, 2, 3 }, cancellationToken: cancellationToken);
+        var info = await store.GetInfoAsync("k1", cancellationToken: cancellationToken);
+
+        // Verify Size is ulong
+        ulong size = info.Size; // Should compile without error
+        Assert.Equal(3UL, size);
+
+        // Verify Chunks is uint
+        uint chunks = info.Chunks; // Should compile without error
+        Assert.Equal(1U, chunks);
+    }
 }
