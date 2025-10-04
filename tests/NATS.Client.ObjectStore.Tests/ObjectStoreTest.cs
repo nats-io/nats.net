@@ -208,7 +208,7 @@ public class ObjectStoreTest
         var info2 = await store.GetInfoAsync("k1", showDeleted: true, cancellationToken: cancellationToken);
         Assert.True(info2.Deleted);
         Assert.Equal(0UL, info2.Size);
-        Assert.Equal(0, info2.Chunks);
+        Assert.Equal(0U, info2.Chunks);
         Assert.Equal(string.Empty, info2.Digest);
 
         // Put again

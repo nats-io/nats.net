@@ -35,7 +35,8 @@ public record ObjectMetadata
     public string? Nuid { get; set; }
 
     /// <summary>
-    /// Max chunk size
+    /// The size of the object in bytes.
+    /// It only includes the size of the object itself, not the metadata.
     /// </summary>
     [JsonPropertyName("size")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
@@ -53,7 +54,7 @@ public record ObjectMetadata
     /// </summary>
     [JsonPropertyName("chunks")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    public int Chunks { get; set; }
+    public uint Chunks { get; set; }
 
     /// <summary>
     /// Object digest

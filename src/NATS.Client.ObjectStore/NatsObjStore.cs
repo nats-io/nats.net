@@ -183,7 +183,7 @@ public class NatsObjStore : INatsObjStore
         }
 
         ulong size = 0;
-        var chunks = 0;
+        uint chunks = 0;
         var chunkSize = meta.Options.MaxChunkSize.Value;
 
         string digest;
