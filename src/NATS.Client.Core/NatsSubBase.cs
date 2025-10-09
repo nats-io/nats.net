@@ -22,6 +22,7 @@ public enum NatsSubEndReason
     Cancelled,
     Exception,
     JetStreamError,
+    RequestsPending,
 }
 
 /// <summary>
