@@ -285,4 +285,14 @@ public record NatsJSPriorityGroupOpts
     /// When specified, this Pull request will only receive messages when the consumer has at least this many ack pending messages.
     /// </summary>
     public long MinAckPending { get; set; }
+
+    /// <summary>
+    /// Priority for message delivery when using prioritized priority policy.
+    /// </summary>
+    /// <remarks>
+    /// Lower values indicate higher priority (0 is the highest priority).
+    /// Maximum priority value is 9. This field is only used when the consumer
+    /// has PriorityPolicy set to "prioritized".
+    /// </remarks>
+    public byte Priority { get; init; }
 }

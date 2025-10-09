@@ -119,6 +119,11 @@ public class NatsHeaderParser
                 headers.Message = NatsHeaders.Messages.MessageSizeExceedsMaxBytes;
                 headers.MessageText = NatsHeaders.MessageMessageSizeExceedsMaxBytesStr;
             }
+            else if (headerLine.SequenceEqual(NatsHeaders.MessageRequestsPendingBytes))
+            {
+                headers.Message = NatsHeaders.Messages.RequestsPending;
+                headers.MessageText = NatsHeaders.MessageRequestsPendingStr;
+            }
             else
             {
                 headers.Message = NatsHeaders.Messages.Text;
