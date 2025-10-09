@@ -169,6 +169,7 @@ public class NatsJSStream : INatsJSStream
         Info = await _context.JSRequestResponseAsync<object, StreamInfoResponse>(
             subject: $"{_context.Opts.Prefix}.STREAM.INFO.{_name}",
             request: null,
+            apiLevel: default,
             cancellationToken).ConfigureAwait(false);
 
     public ValueTask<NatsMsg<T>> GetDirectAsync<T>(StreamMsgGetRequest request, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
@@ -185,6 +186,7 @@ public class NatsJSStream : INatsJSStream
         _context.JSRequestResponseAsync<StreamMsgGetRequest, StreamMsgGetResponse>(
             subject: $"{_context.Opts.Prefix}.STREAM.MSG.GET.{_name}",
             request: request,
+            apiLevel: default,
             cancellationToken);
 
     private void ThrowIfDeleted()

@@ -95,7 +95,7 @@ public class NatsObjContextFactoryTest
 
         public string NewBaseInbox() => throw new NotImplementedException();
 
-        public ValueTask<TResponse> JSRequestResponseAsync<TRequest, TResponse>(string subject, TRequest? request, CancellationToken cancellationToken = default)
+        public ValueTask<TResponse> JSRequestResponseAsync<TRequest, TResponse>(string subject, TRequest? request, NatsJSApiLevel apiLevel = default, CancellationToken cancellationToken = default)
             where TRequest : class
             where TResponse : class
             => throw new NotImplementedException();

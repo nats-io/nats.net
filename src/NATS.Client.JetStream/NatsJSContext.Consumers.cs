@@ -70,6 +70,7 @@ public partial class NatsJSContext : INatsJSContext
         var response = await JSRequestResponseAsync<object, ConsumerInfo>(
             subject: $"{Opts.Prefix}.CONSUMER.INFO.{stream}.{consumer}",
             request: null,
+            apiLevel: default,
             cancellationToken);
         return new NatsJSConsumer(this, response);
     }
@@ -86,6 +87,7 @@ public partial class NatsJSContext : INatsJSContext
             var response = await JSRequestResponseAsync<ConsumerListRequest, ConsumerListResponse>(
                 subject: $"{Opts.Prefix}.CONSUMER.LIST.{stream}",
                 new ConsumerListRequest { Offset = offset },
+                apiLevel: default,
                 cancellationToken);
 
             if (response.Consumers.Count == 0)
@@ -112,6 +114,7 @@ public partial class NatsJSContext : INatsJSContext
             var response = await JSRequestResponseAsync<ConsumerNamesRequest, ConsumerNamesResponse>(
                 subject: $"{Opts.Prefix}.CONSUMER.NAMES.{stream}",
                 new ConsumerNamesRequest { Offset = offset },
+                apiLevel: default,
                 cancellationToken);
 
             if (response.Consumers.Count == 0)
@@ -141,6 +144,7 @@ public partial class NatsJSContext : INatsJSContext
         var response = await JSRequestResponseAsync<object, ConsumerDeleteResponse>(
             subject: $"{Opts.Prefix}.CONSUMER.DELETE.{stream}.{consumer}",
             request: null,
+            apiLevel: default,
             cancellationToken);
         return response.Success;
     }
@@ -163,6 +167,7 @@ public partial class NatsJSContext : INatsJSContext
         var response = await JSRequestResponseAsync<ConsumerPauseRequest, ConsumerPauseResponse>(
             subject: $"{Opts.Prefix}.CONSUMER.PAUSE.{stream}.{consumer}",
             request: new ConsumerPauseRequest { PauseUntil = pauseUntil },
+            apiLevel: default,
             cancellationToken);
         return response;
     }
@@ -184,6 +189,7 @@ public partial class NatsJSContext : INatsJSContext
         var response = await JSRequestResponseAsync<object, ConsumerPauseResponse>(
             subject: $"{Opts.Prefix}.CONSUMER.PAUSE.{stream}.{consumer}",
             request: null,
+            apiLevel: default,
             cancellationToken);
         return !response.IsPaused;
     }
@@ -234,6 +240,7 @@ public partial class NatsJSContext : INatsJSContext
         return JSRequestResponseAsync<ConsumerCreateRequest, ConsumerInfo>(
             subject: subject,
             request,
+            apiLevel: default,
             cancellationToken);
     }
 
@@ -271,6 +278,7 @@ public partial class NatsJSContext : INatsJSContext
                 Config = config,
                 Action = action,
             },
+            apiLevel: default,
             cancellationToken);
 
         return new NatsJSConsumer(this, response);
