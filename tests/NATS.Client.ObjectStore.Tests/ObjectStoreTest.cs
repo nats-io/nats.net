@@ -82,7 +82,7 @@ public class ObjectStoreTest
 
             Assert.Equal($"SHA-256={sha}", data.Digest);
             Assert.Equal(chunks, data.Chunks);
-            Assert.Equal(size, data.Size);
+            Assert.Equal((ulong)size, data.Size);
         }
 
         // buffer with smaller last chunk
@@ -102,7 +102,7 @@ public class ObjectStoreTest
 
             Assert.Equal($"SHA-256={sha}", data.Digest);
             Assert.Equal(chunks, data.Chunks);
-            Assert.Equal(size, data.Size);
+            Assert.Equal((ulong)size, data.Size);
         }
 
         // Object name checks
@@ -195,7 +195,7 @@ public class ObjectStoreTest
         await store.PutAsync("k1", new byte[] { 65, 66, 67 }, cancellationToken);
 
         var info = await store.GetInfoAsync("k1", cancellationToken: cancellationToken);
-        Assert.Equal(3, info.Size);
+        Assert.Equal(3UL, info.Size);
 
         var bytes = await store.GetBytesAsync("k1", cancellationToken);
         Assert.Equal(bytes, new byte[] { 65, 66, 67 });
@@ -207,8 +207,8 @@ public class ObjectStoreTest
 
         var info2 = await store.GetInfoAsync("k1", showDeleted: true, cancellationToken: cancellationToken);
         Assert.True(info2.Deleted);
-        Assert.Equal(0, info2.Size);
-        Assert.Equal(0, info2.Chunks);
+        Assert.Equal(0UL, info2.Size);
+        Assert.Equal(0U, info2.Chunks);
         Assert.Equal(string.Empty, info2.Digest);
 
         // Put again
@@ -621,5 +621,46 @@ public class ObjectStoreTest
         {
             await b1.GetBytesAsync("name1", cancellationToken: cancellationToken);
         });
+    }
+
+    [Fact]
+    public async Task Metadata_field_types_match_spec()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        var js = new NatsJSContext(nats);
+        var obj = new NatsObjContext(js);
+
+        var store = await obj.CreateObjectStoreAsync(new NatsObjConfig("b1"), cancellationToken);
+
+        // Test that Size property is ulong (uint64 in NATS spec)
+        var metadata = new ObjectMetadata { Name = "test" };
+        metadata.Size = ulong.MaxValue; // Should compile without error
+        Assert.Equal(18446744073709551615UL, metadata.Size);
+
+        // Test that Chunks property is uint (uint32 in NATS spec)
+        metadata.Chunks = uint.MaxValue; // Should compile without error
+        Assert.Equal(4294967295U, metadata.Chunks);
+
+        // Test with actual object metadata from store
+        await store.PutAsync("k1", new byte[] { 1, 2, 3 }, cancellationToken: cancellationToken);
+        var info = await store.GetInfoAsync("k1", cancellationToken: cancellationToken);
+
+        // Verify Size is ulong
+#pragma warning disable IDE0007
+        // ReSharper disable once SuggestVarOrType_BuiltInTypes
+        ulong size = info.Size; // Should compile without error
+#pragma warning restore IDE0007
+        Assert.Equal(3UL, size);
+
+        // Verify Chunks is uint
+#pragma warning disable IDE0007
+        // ReSharper disable once SuggestVarOrType_BuiltInTypes
+        uint chunks = info.Chunks; // Should compile without error
+#pragma warning restore IDE0007
+        Assert.Equal(1U, chunks);
     }
 }
