@@ -190,10 +190,11 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
     {
         cancellationToken = CancellationTokenSource.CreateLinkedTokenSource(_cancellationToken, cancellationToken).Token;
         var processed = 0;
+        var bytesProcessed = 0;
 
         while (!cancellationToken.IsCancellationRequested)
         {
-            if (processed >= opts.MaxMsgs)
+            if (processed >= opts.MaxMsgs || bytesProcessed >= opts.MaxBytes)
                 yield break;
 
             var mismatch = false;
@@ -204,7 +205,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
 
             try
             {
-                var fetchOpts = opts with { MaxMsgs = opts.MaxMsgs - processed };
+                var fetchOpts = opts with { MaxMsgs = opts.MaxMsgs - processed, MaxBytes = opts.MaxBytes - bytesProcessed };
 
                 await foreach (var msg in consumer.FetchAsync(fetchOpts, serializer, cancellationToken))
                 {
@@ -223,6 +224,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
                     cseq = metadata.Sequence.Consumer;
 
                     processed++;
+                    bytesProcessed += msg.Size;
 
                     yield return msg;
                 }
@@ -250,10 +252,11 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
     {
         cancellationToken = CancellationTokenSource.CreateLinkedTokenSource(_cancellationToken, cancellationToken).Token;
         var processed = 0;
+        var bytesProcessed = 0;
 
         while (!cancellationToken.IsCancellationRequested)
         {
-            if (processed >= opts.MaxMsgs)
+            if (processed >= opts.MaxMsgs || bytesProcessed >= opts.MaxBytes)
                 yield break;
 
             var mismatch = false;
@@ -263,7 +266,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
 
             try
             {
-                var fetchOpts = opts with { MaxMsgs = opts.MaxMsgs - processed };
+                var fetchOpts = opts with { MaxMsgs = opts.MaxMsgs - processed, MaxBytes = opts.MaxBytes - bytesProcessed };
 
                 await foreach (var msg in consumer.FetchNoWaitAsync(fetchOpts, serializer, cancellationToken))
                 {
@@ -282,6 +285,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
                     cseq = metadata.Sequence.Consumer;
 
                     processed++;
+                    bytesProcessed += msg.Size;
 
                     yield return msg;
                 }
