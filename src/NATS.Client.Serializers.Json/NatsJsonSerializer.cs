@@ -29,7 +29,11 @@ public sealed class NatsJsonSerializer<T> : INatsSerializer<T>
     /// This serializer is not suitable for native AOT deployments since it might rely on reflection
     /// </remarks>
     public NatsJsonSerializer()
-        : this(new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull })
+#if NET6_0
+        : this(new JsonSerializerOptions())
+#else
+        : this(JsonSerializerOptions.Default)
+#endif
     {
     }
 
