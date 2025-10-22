@@ -72,9 +72,9 @@ public abstract class NatsSubBase
         _manager = manager;
         _pendingMsgs = opts is { MaxMsgs: > 0 } ? opts.MaxMsgs ?? -1 : -1;
         _countPendingMsgs = _pendingMsgs > 0;
-        _idleTimeout = opts?.IdleTimeout ?? default;
-        _startUpTimeout = opts?.StartUpTimeout ?? default;
-        _timeout = opts?.Timeout ?? default;
+        _idleTimeout = opts?.IdleTimeout ?? TimeSpan.Zero;
+        _startUpTimeout = opts?.StartUpTimeout ?? TimeSpan.Zero;
+        _timeout = opts?.Timeout ?? TimeSpan.Zero;
 
         Connection = connection;
         Subject = subject;
@@ -129,7 +129,7 @@ public abstract class NatsSubBase
                 Timeout.Infinite);
         }
 
-        if (_startUpTimeout != default)
+        if (_startUpTimeout != TimeSpan.Zero)
         {
             _startUpTimeoutTimer = new Timer(
                 static state =>
@@ -142,7 +142,7 @@ public abstract class NatsSubBase
                 Timeout.Infinite);
         }
 
-        if (_timeout != default)
+        if (_timeout != TimeSpan.Zero)
         {
             _timeoutTimer = new Timer(
                 static state =>
