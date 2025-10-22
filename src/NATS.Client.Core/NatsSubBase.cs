@@ -90,7 +90,7 @@ public abstract class NatsSubBase
 
 #if NETSTANDARD
         _tokenRegistration = cancellationToken.Register(
-            state =>
+            static state =>
             {
                 var self = (NatsSubBase)state!;
                 self.EndSubscription(NatsSubEndReason.Cancelled);
@@ -98,7 +98,7 @@ public abstract class NatsSubBase
             this);
 #else
         _tokenRegistration = cancellationToken.UnsafeRegister(
-            state =>
+            static state =>
             {
                 var self = (NatsSubBase)state!;
                 self.EndSubscription(NatsSubEndReason.Cancelled);
@@ -107,7 +107,7 @@ public abstract class NatsSubBase
 #endif
 
         // Only allocate timers if necessary to reduce GC pressure
-        if (_idleTimeout != default)
+        if (_idleTimeout != TimeSpan.Zero)
         {
             // Instead of Timers what we could've used here is a cancellation token source based loop
             // i.e. CancellationTokenSource.CancelAfter(TimeSpan) within a Task.Run(async delegate)
@@ -118,17 +118,41 @@ public abstract class NatsSubBase
             // chance to await the unsubscribe call but leaves us to deal with the created task.
             // Since awaiting unsubscribe isn't crucial Timer approach is currently acceptable.
             // If we need an async loop in the future cancellation token source approach can be used.
-            _idleTimeoutTimer = new Timer(_ => EndSubscription(NatsSubEndReason.IdleTimeout));
+            _idleTimeoutTimer = new Timer(
+                static state =>
+                {
+                    var self = (NatsSubBase)state!;
+                    self.EndSubscription(NatsSubEndReason.IdleTimeout);
+                },
+                this,
+                Timeout.Infinite,
+                Timeout.Infinite);
         }
 
         if (_startUpTimeout != default)
         {
-            _startUpTimeoutTimer = new Timer(_ => EndSubscription(NatsSubEndReason.StartUpTimeout));
+            _startUpTimeoutTimer = new Timer(
+                static state =>
+                {
+                    var self = (NatsSubBase)state!;
+                    self.EndSubscription(NatsSubEndReason.StartUpTimeout);
+                },
+                this,
+                Timeout.Infinite,
+                Timeout.Infinite);
         }
 
         if (_timeout != default)
         {
-            _timeoutTimer = new Timer(_ => EndSubscription(NatsSubEndReason.Timeout));
+            _timeoutTimer = new Timer(
+                static state =>
+                {
+                    var self = (NatsSubBase)state!;
+                    self.EndSubscription(NatsSubEndReason.Timeout);
+                },
+                this,
+                Timeout.Infinite,
+                Timeout.Infinite);
         }
     }
 
