@@ -195,7 +195,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
         var retry = 0;
         while (!cancellationToken.IsCancellationRequested)
         {
-            if (processed >= opts.MaxMsgs || bytesProcessed >= opts.MaxBytes)
+            if ((opts.MaxMsgs.HasValue && processed >= opts.MaxMsgs) || (opts.MaxBytes.HasValue && bytesProcessed >= opts.MaxBytes))
                 yield break;
 
             var mismatch = false;
@@ -263,7 +263,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
         var retry = 0;
         while (!cancellationToken.IsCancellationRequested)
         {
-            if (processed >= opts.MaxMsgs || bytesProcessed >= opts.MaxBytes)
+            if ((opts.MaxMsgs.HasValue && processed >= opts.MaxMsgs) || (opts.MaxBytes.HasValue && bytesProcessed >= opts.MaxBytes))
                 yield break;
 
             var mismatch = false;
