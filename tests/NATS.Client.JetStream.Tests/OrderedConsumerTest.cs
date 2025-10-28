@@ -270,6 +270,7 @@ public class OrderedConsumerTest
 
         // Wait for reconnect failure
         var exception = await Assert.ThrowsAsync<NatsConnectionFailedException>(async () => await consumeTask);
+
         // Message could be either from connection or from consume internal checks
         Assert.True(
             exception.Message.Contains("Connection is in failed state") ||
