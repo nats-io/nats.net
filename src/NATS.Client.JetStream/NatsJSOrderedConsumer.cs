@@ -130,7 +130,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
                             var expected = cseq + 1;
                             if (metadata.Sequence.Consumer != expected)
                             {
-                                _logger.LogWarning(NatsJSLogEvents.Retry, $"Consumer sequence mismatch. Expected {expected}, was {metadata.Sequence.Consumer}  Retrying...");
+                                _logger.LogWarning(NatsJSLogEvents.Retry, "Consumer sequence mismatch. Expected {Expected}, was {SequenceConsumer}. Retrying...", expected, metadata.Sequence.Consumer);
                                 goto CONSUME_LOOP;
                             }
 
@@ -192,6 +192,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
         var processed = 0;
         var bytesProcessed = 0;
 
+        var retry = 0;
         while (!cancellationToken.IsCancellationRequested)
         {
             if (processed >= opts.MaxMsgs || bytesProcessed >= opts.MaxBytes)
@@ -215,7 +216,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
                     var expected = cseq + 1;
                     if (metadata.Sequence.Consumer != expected)
                     {
-                        _logger.LogWarning(NatsJSLogEvents.Retry, $"Consumer sequence mismatch. Expected {expected}, was {metadata.Sequence.Consumer}  Retrying...");
+                        _logger.LogWarning(NatsJSLogEvents.Retry, "Consumer sequence mismatch. Expected {Expected}, was {SequenceConsumer}. Retrying...", expected, metadata.Sequence.Consumer);
                         mismatch = true;
                         break;
                     }
@@ -240,7 +241,12 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
             if (!mismatch)
                 yield break;
 
-            await Task.Delay(100, cancellationToken);
+            if (retry == _opts.MaxResetAttempts)
+            {
+                throw new NatsJSException("Maximum number of retry attempts reached.");
+            }
+
+            await _context.Connection.Opts.BackoffWithJitterAsync(retry++, cancellationToken);
         }
     }
 
@@ -254,6 +260,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
         var processed = 0;
         var bytesProcessed = 0;
 
+        var retry = 0;
         while (!cancellationToken.IsCancellationRequested)
         {
             if (processed >= opts.MaxMsgs || bytesProcessed >= opts.MaxBytes)
@@ -276,7 +283,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
                     var expected = cseq + 1;
                     if (metadata.Sequence.Consumer != expected)
                     {
-                        _logger.LogWarning(NatsJSLogEvents.Retry, $"Consumer sequence mismatch. Expected {expected}, was {metadata.Sequence.Consumer}  Retrying...");
+                        _logger.LogWarning(NatsJSLogEvents.Retry, "Consumer sequence mismatch. Expected {Expected}, was {SequenceConsumer}. Retrying...", expected, metadata.Sequence.Consumer);
                         mismatch = true;
                         break;
                     }
@@ -301,7 +308,12 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
             if (!mismatch)
                 yield break;
 
-            await Task.Delay(100, cancellationToken);
+            if (retry == _opts.MaxResetAttempts)
+            {
+                throw new NatsJSException("Maximum number of retry attempts reached.");
+            }
+
+            await _context.Connection.Opts.BackoffWithJitterAsync(retry++, cancellationToken);
         }
     }
 
