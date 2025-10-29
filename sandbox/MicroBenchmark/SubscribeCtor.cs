@@ -18,5 +18,5 @@ public class SubscribeCtor
 
     [Benchmark]
     public NatsSub<int> NewNatsSub()
-        => new(_natsConnection, null, null, null, _opts, null);
+        => new(_natsConnection, null!, null!, null, _opts, null!);
 }
