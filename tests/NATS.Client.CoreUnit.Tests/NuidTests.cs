@@ -10,6 +10,7 @@ public class NuidTests
     private static readonly Regex NuidRegex = new("[A-z0-9]{22}");
 
     private readonly ITestOutputHelper _outputHelper;
+    private int _result;
 
     public NuidTests(ITestOutputHelper outputHelper)
     {
@@ -119,7 +120,6 @@ public class NuidTests
     [Fact]
     public void GetNextNuid_PrefixRenewed_Char()
     {
-        var result = false;
         var firstNuid = new char[22];
         var secondNuid = new char[22];
 
@@ -129,15 +129,18 @@ public class NuidTests
             var maxSequential = 839299365868340224ul - increment - 1;
             SetSequentialAndIncrement(maxSequential, increment);
 
-            result = Nuid.TryWriteNuid(firstNuid);
-            result &= Nuid.TryWriteNuid(secondNuid);
+            if (Nuid.TryWriteNuid(firstNuid))
+                Interlocked.Increment(ref _result);
+
+            if (Nuid.TryWriteNuid(secondNuid))
+                Interlocked.Increment(ref _result);
         });
 
         executionThread.Start();
         executionThread.Join(1_000);
 
         // Assert
-        Assert.True(result);
+        Assert.Equal(2, Interlocked.CompareExchange(ref _result, 0, 0));
         Assert.False(firstNuid.AsSpan(0, 12).SequenceEqual(secondNuid.AsSpan(0, 12)));
     }
 
