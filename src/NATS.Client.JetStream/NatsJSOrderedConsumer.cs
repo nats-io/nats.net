@@ -79,6 +79,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
                 consumerName = consumer.Info.Name;
                 _logger.LogInformation(NatsJSLogEvents.NewConsumer, "Created {ConsumerName} with sequence {Seq}", consumerName, seq);
 
+                ulong cseq = 0;
                 NatsJSProtocolException? protocolException = default;
 
                 await using (var cc = await consumer.OrderedConsumeInternalAsync(serializer, opts, cancellationToken))
@@ -126,7 +127,15 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
                             if (msg.Metadata is not { } metadata)
                                 continue;
 
+                            var expected = cseq + 1;
+                            if (metadata.Sequence.Consumer != expected)
+                            {
+                                _logger.LogWarning(NatsJSLogEvents.Retry, "Consumer sequence mismatch. Expected {Expected}, was {SequenceConsumer}. Retrying...", expected, metadata.Sequence.Consumer);
+                                goto CONSUME_LOOP;
+                            }
+
                             seq = metadata.Sequence.Stream;
+                            cseq = metadata.Sequence.Consumer;
 
                             yield return msg;
                         }
@@ -180,23 +189,65 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         cancellationToken = CancellationTokenSource.CreateLinkedTokenSource(_cancellationToken, cancellationToken).Token;
+        var processed = 0;
+        var bytesProcessed = 0;
 
-        var consumer = await RecreateConsumer(_fetchConsumerName, _fetchSeq, cancellationToken);
-        _fetchConsumerName = consumer.Info.Name;
-
-        await foreach (var msg in consumer.FetchAsync(opts, serializer, cancellationToken))
+        var retry = 0;
+        while (!cancellationToken.IsCancellationRequested)
         {
-            if (msg.Metadata is not { } metadata)
-                continue;
+            if ((opts.MaxMsgs.HasValue && processed >= opts.MaxMsgs) || (opts.MaxBytes.HasValue && bytesProcessed >= opts.MaxBytes))
+                yield break;
 
-            _fetchSeq = metadata.Sequence.Stream;
-            yield return msg;
+            var mismatch = false;
+            ulong cseq = 0;
+
+            var consumer = await RecreateConsumer(_fetchConsumerName, _fetchSeq, cancellationToken);
+            _fetchConsumerName = consumer.Info.Name;
+
+            try
+            {
+                var fetchOpts = opts with { MaxMsgs = opts.MaxMsgs - processed, MaxBytes = opts.MaxBytes - bytesProcessed };
+
+                await foreach (var msg in consumer.FetchAsync(fetchOpts, serializer, cancellationToken))
+                {
+                    if (msg.Metadata is not { } metadata)
+                        continue;
+
+                    var expected = cseq + 1;
+                    if (metadata.Sequence.Consumer != expected)
+                    {
+                        _logger.LogWarning(NatsJSLogEvents.Retry, "Consumer sequence mismatch. Expected {Expected}, was {SequenceConsumer}. Retrying...", expected, metadata.Sequence.Consumer);
+                        mismatch = true;
+                        break;
+                    }
+
+                    _fetchSeq = metadata.Sequence.Stream;
+                    cseq = metadata.Sequence.Consumer;
+
+                    processed++;
+                    bytesProcessed += msg.Size;
+
+                    yield return msg;
+                }
+            }
+            finally
+            {
+                var deleted = await TryDeleteConsumer(_fetchConsumerName, cancellationToken);
+
+                if (deleted)
+                    _fetchConsumerName = string.Empty;
+            }
+
+            if (!mismatch)
+                yield break;
+
+            if (retry == _opts.MaxResetAttempts)
+            {
+                throw new NatsJSException("Maximum number of retry attempts reached.");
+            }
+
+            await _context.Connection.Opts.BackoffWithJitterAsync(retry++, cancellationToken);
         }
-
-        var deleted = await TryDeleteConsumer(_fetchConsumerName, cancellationToken);
-
-        if (deleted)
-            _fetchConsumerName = string.Empty;
     }
 
     /// <inheritdoc />
@@ -206,26 +257,63 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         cancellationToken = CancellationTokenSource.CreateLinkedTokenSource(_cancellationToken, cancellationToken).Token;
+        var processed = 0;
+        var bytesProcessed = 0;
 
-        var consumer = await RecreateConsumer(_fetchConsumerName, _fetchSeq, cancellationToken);
-        _fetchConsumerName = consumer.Info.Name;
-        try
+        var retry = 0;
+        while (!cancellationToken.IsCancellationRequested)
         {
-            await foreach (var msg in consumer.FetchNoWaitAsync(opts, serializer, cancellationToken))
+            if ((opts.MaxMsgs.HasValue && processed >= opts.MaxMsgs) || (opts.MaxBytes.HasValue && bytesProcessed >= opts.MaxBytes))
+                yield break;
+
+            var mismatch = false;
+            ulong cseq = 0;
+            var consumer = await RecreateConsumer(_fetchConsumerName, _fetchSeq, cancellationToken);
+            _fetchConsumerName = consumer.Info.Name;
+
+            try
             {
-                if (msg.Metadata is not { } metadata)
-                    continue;
+                var fetchOpts = opts with { MaxMsgs = opts.MaxMsgs - processed, MaxBytes = opts.MaxBytes - bytesProcessed };
 
-                _fetchSeq = metadata.Sequence.Stream;
-                yield return msg;
+                await foreach (var msg in consumer.FetchNoWaitAsync(fetchOpts, serializer, cancellationToken))
+                {
+                    if (msg.Metadata is not { } metadata)
+                        continue;
+
+                    var expected = cseq + 1;
+                    if (metadata.Sequence.Consumer != expected)
+                    {
+                        _logger.LogWarning(NatsJSLogEvents.Retry, "Consumer sequence mismatch. Expected {Expected}, was {SequenceConsumer}. Retrying...", expected, metadata.Sequence.Consumer);
+                        mismatch = true;
+                        break;
+                    }
+
+                    _fetchSeq = metadata.Sequence.Stream;
+                    cseq = metadata.Sequence.Consumer;
+
+                    processed++;
+                    bytesProcessed += msg.Size;
+
+                    yield return msg;
+                }
             }
-        }
-        finally
-        {
-            var deleted = await TryDeleteConsumer(_fetchConsumerName, cancellationToken);
+            finally
+            {
+                var deleted = await TryDeleteConsumer(_fetchConsumerName, cancellationToken);
 
-            if (deleted)
-                _fetchConsumerName = string.Empty;
+                if (deleted)
+                    _fetchConsumerName = string.Empty;
+            }
+
+            if (!mismatch)
+                yield break;
+
+            if (retry == _opts.MaxResetAttempts)
+            {
+                throw new NatsJSException("Maximum number of retry attempts reached.");
+            }
+
+            await _context.Connection.Opts.BackoffWithJitterAsync(retry++, cancellationToken);
         }
     }
 
