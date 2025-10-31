@@ -54,6 +54,8 @@ public class NatsJSConsumer : INatsJSConsumer
     /// <typeparam name="T">Message type to deserialize.</typeparam>
     /// <returns>Async enumerable of messages which can be used in a <c>await foreach</c> loop.</returns>
     /// <exception cref="NatsJSProtocolException">Consumer is deleted, it's push based or request sent to server is invalid.</exception>
+    /// <exception cref="NatsConnectionFailedException">Connection has permanently failed and cannot be recovered.</exception>
+    /// <exception cref="NatsJSException">Consumer-related errors, such as the consumer being deleted after too many consecutive 503 errors.</exception>
     public async IAsyncEnumerable<NatsJSMsg<T>> ConsumeAsync<T>(
         INatsDeserialize<T>? serializer = default,
         NatsJSConsumeOpts? opts = default,
@@ -74,6 +76,16 @@ public class NatsJSConsumer : INatsJSConsumer
             {
                 ready = false;
             }
+            catch (NatsConnectionFailedException)
+            {
+                // Connection has permanently failed, stop consuming and rethrow
+                throw;
+            }
+            catch (NatsJSException)
+            {
+                // Consumer-related errors (like 503 threshold exceeded), stop consuming and rethrow
+                throw;
+            }
 
             if (!ready)
                 yield break;
@@ -90,6 +102,16 @@ public class NatsJSConsumer : INatsJSConsumer
                 {
                     read = false;
                     jsMsg = default;
+                }
+                catch (NatsConnectionFailedException)
+                {
+                    // Connection has permanently failed, stop consuming and rethrow
+                    throw;
+                }
+                catch (NatsJSException)
+                {
+                    // Consumer-related errors (like 503 threshold exceeded), stop consuming and rethrow
+                    throw;
                 }
 
                 if (!read)
@@ -320,6 +342,7 @@ public class NatsJSConsumer : INatsJSConsumer
             idle: timeouts.IdleHeartbeat,
             notificationHandler: opts.NotificationHandler,
             priorityGroup: opts.PriorityGroup,
+            maxConsecutive503Errors: opts.MaxConsecutive503Errors,
             cancellationToken: cancellationToken);
 
         await _context.Connection.AddSubAsync(sub: sub, cancellationToken).ConfigureAwait(false);
@@ -336,6 +359,7 @@ public class NatsJSConsumer : INatsJSConsumer
                 Group = opts.PriorityGroup?.Group,
                 MinPending = opts.PriorityGroup?.MinPending ?? 0,
                 MinAckPending = opts.PriorityGroup?.MinAckPending ?? 0,
+                Priority = opts.PriorityGroup?.Priority ?? 0,
             },
             cancellationToken).ConfigureAwait(false);
 
@@ -438,6 +462,7 @@ public class NatsJSConsumer : INatsJSConsumer
                     Group = opts.PriorityGroup?.Group,
                     MinPending = opts.PriorityGroup?.MinPending ?? 0,
                     MinAckPending = opts.PriorityGroup?.MinAckPending ?? 0,
+                    Priority = opts.PriorityGroup?.Priority ?? 0,
                 }
                 : new ConsumerGetnextRequest
                 {
@@ -449,6 +474,7 @@ public class NatsJSConsumer : INatsJSConsumer
                     Group = opts.PriorityGroup?.Group,
                     MinPending = opts.PriorityGroup?.MinPending ?? 0,
                     MinAckPending = opts.PriorityGroup?.MinAckPending ?? 0,
+                    Priority = opts.PriorityGroup?.Priority ?? 0,
                 },
             cancellationToken).ConfigureAwait(false);
 

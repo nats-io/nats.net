@@ -13,8 +13,8 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - branch: 'v2.9'
           - branch: 'v2.10'
+          - branch: 'v2.11'
           - branch: 'latest'
           - branch: 'main'
     runs-on: ubuntu-latest
@@ -23,14 +23,12 @@ jobs:
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
       NUGET_XMLDOC_MODE: skip
     steps:
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with: { cache: true }
+
       - name: Install nats-server
-        run: |
-          branch=$(curl https://api.mtmk.dev/gh/v1/releases/tag/nats-io/nats-server/${{ matrix.config.branch }})
-          for i in 1 2 3
-          do
-            curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@$branch | PREFIX=. sh && break || sleep 30
-          done
-          sudo mv nats-server /usr/local/bin
+        run: go install github.com/nats-io/nats-server/v2@${{ matrix.config.branch }}
 
       - name: Check nats-server
         run: nats-server -v
@@ -47,7 +45,9 @@ jobs:
             9.x
 
       - name: Build
-        run: dotnet build -c Release
+        run: |
+          cd tests
+          dotnet build -c Release
 
       - name: Test Core2
         run: |

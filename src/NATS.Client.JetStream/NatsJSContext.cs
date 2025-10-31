@@ -168,6 +168,45 @@ public partial class NatsJSContext
 
         for (var i = 0; i < retryMax; i++)
         {
+            if (Connection.Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
+            {
+                NatsMsg<PubAckResponse> msg;
+                try
+                {
+                    msg = await Connection.RequestAsync<T, PubAckResponse>(
+                        subject: subject,
+                        data: data,
+                        headers: headers,
+                        requestSerializer: serializer,
+                        replySerializer: NatsJSJsonSerializer<PubAckResponse>.Default,
+                        requestOpts: opts,
+                        replyOpts: new NatsSubOpts { Timeout = Opts.RequestTimeout },
+                        cancellationToken).ConfigureAwait(false);
+                }
+                catch (NatsNoReplyException)
+                {
+                    return NatsJSPublishNoResponseException.Default;
+                }
+                catch (NatsException ex)
+                {
+                    return ex;
+                }
+
+                if (msg.HasNoResponders)
+                {
+                    _logger.LogDebug(NatsJSLogEvents.PublishNoResponseRetry, "No response received, retrying {RetryCount}/{RetryMax}", i + 1, retryMax);
+                    await Task.Delay(retryWait, cancellationToken);
+                    continue;
+                }
+
+                if (msg.Data == null)
+                {
+                    return new NatsJSException("No response data received");
+                }
+
+                return msg.Data;
+            }
+
             await using var sub = await Connection.CreateRequestSubAsync<T, PubAckResponse>(
                     subject: subject,
                     data: data,
@@ -182,11 +221,12 @@ public partial class NatsJSContext
                         // is a reconnect to the cluster between the request and waiting for a response,
                         // without the timeout the publish call will hang forever since the server
                         // which received the request won't be there to respond anymore.
-                        Timeout = Connection.Opts.RequestTimeout,
+                        Timeout = Opts.RequestTimeout,
                     },
                     cancellationToken)
                 .ConfigureAwait(false);
 
+            var hasNoResponders = false;
             await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
             {
                 // If JetStream is disabled, a no responders error will be returned.
@@ -194,6 +234,7 @@ public partial class NatsJSContext
                 // We should retry in those cases.
                 if (msg.HasNoResponders)
                 {
+                    hasNoResponders = true;
                     break;
                 }
                 else if (msg.Data == null)
@@ -204,16 +245,21 @@ public partial class NatsJSContext
                 return msg.Data;
             }
 
-            if (i < retryMax)
+            // Only retry if there were 503 no responders error
+            if (hasNoResponders)
             {
                 _logger.LogDebug(NatsJSLogEvents.PublishNoResponseRetry, "No response received, retrying {RetryCount}/{RetryMax}", i + 1, retryMax);
                 await Task.Delay(retryWait, cancellationToken);
+            }
+            else
+            {
+                break;
             }
         }
 
         // We throw a specific exception here for convenience so that the caller doesn't
         // have to check for the exception message etc.
-        return new NatsJSPublishNoResponseException();
+        return NatsJSPublishNoResponseException.Default;
     }
 
     public async ValueTask<NatsJSPublishConcurrentFuture> PublishConcurrentAsync<T>(
@@ -273,7 +319,7 @@ public partial class NatsJSContext
                         // is a reconnect to the cluster between the request and waiting for a response,
                         // without the timeout the publish call will hang forever since the server
                         // which received the request won't be there to respond anymore.
-                        Timeout = Connection.Opts.RequestTimeout,
+                        Timeout = Opts.RequestTimeout,
 
                         // If JetStream is disabled, a no responders error will be returned
                         // No responders error might also happen when reconnecting to cluster
@@ -353,11 +399,57 @@ public partial class NatsJSContext
             // Validator.ValidateObject(request, new ValidationContext(request));
         }
 
+        if (Connection.Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
+        {
+            NatsMsg<NatsJSApiResult<TResponse>> msg;
+            try
+            {
+                msg = await Connection.RequestAsync<TRequest, NatsJSApiResult<TResponse>>(
+                    subject: subject,
+                    data: request,
+                    headers: null,
+                    replyOpts: new NatsSubOpts { Timeout = Opts.RequestTimeout },
+                    requestSerializer: NatsJSJsonSerializer<TRequest>.Default,
+                    replySerializer: NatsJSJsonDocumentSerializer<TResponse>.Default,
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
+            }
+            catch (NatsNoReplyException)
+            {
+                return new NatsJSApiNoResponseException();
+            }
+            catch (NatsException e)
+            {
+                return e;
+            }
+
+            if (msg.HasNoResponders)
+            {
+                return new NatsNoRespondersException();
+            }
+
+            if (msg.Error is { } messageError)
+            {
+                return messageError;
+            }
+
+            if (msg.Data.HasException)
+            {
+                return msg.Data.Exception;
+            }
+
+            if (msg.Data.HasError)
+            {
+                return new NatsJSResponse<TResponse>(null, msg.Data.Error);
+            }
+
+            return new NatsJSResponse<TResponse>(msg.Data.Value, null);
+        }
+
         await using var sub = await Connection.CreateRequestSubAsync<TRequest, NatsJSApiResult<TResponse>>(
                 subject: subject,
                 data: request,
                 headers: default,
-                replyOpts: new NatsSubOpts { Timeout = Connection.Opts.RequestTimeout },
+                replyOpts: new NatsSubOpts { Timeout = Opts.RequestTimeout },
                 requestSerializer: NatsJSJsonSerializer<TRequest>.Default,
                 replySerializer: NatsJSJsonDocumentSerializer<TResponse>.Default,
                 cancellationToken: cancellationToken)

@@ -22,6 +22,7 @@ public enum NatsSubEndReason
     Cancelled,
     Exception,
     JetStreamError,
+    RequestsPending,
 }
 
 /// <summary>
@@ -71,9 +72,9 @@ public abstract class NatsSubBase
         _manager = manager;
         _pendingMsgs = opts is { MaxMsgs: > 0 } ? opts.MaxMsgs ?? -1 : -1;
         _countPendingMsgs = _pendingMsgs > 0;
-        _idleTimeout = opts?.IdleTimeout ?? default;
-        _startUpTimeout = opts?.StartUpTimeout ?? default;
-        _timeout = opts?.Timeout ?? default;
+        _idleTimeout = opts?.IdleTimeout ?? TimeSpan.Zero;
+        _startUpTimeout = opts?.StartUpTimeout ?? TimeSpan.Zero;
+        _timeout = opts?.Timeout ?? TimeSpan.Zero;
 
         Connection = connection;
         Subject = subject;
@@ -89,7 +90,7 @@ public abstract class NatsSubBase
 
 #if NETSTANDARD
         _tokenRegistration = cancellationToken.Register(
-            state =>
+            static state =>
             {
                 var self = (NatsSubBase)state!;
                 self.EndSubscription(NatsSubEndReason.Cancelled);
@@ -97,7 +98,7 @@ public abstract class NatsSubBase
             this);
 #else
         _tokenRegistration = cancellationToken.UnsafeRegister(
-            state =>
+            static state =>
             {
                 var self = (NatsSubBase)state!;
                 self.EndSubscription(NatsSubEndReason.Cancelled);
@@ -106,7 +107,7 @@ public abstract class NatsSubBase
 #endif
 
         // Only allocate timers if necessary to reduce GC pressure
-        if (_idleTimeout != default)
+        if (_idleTimeout != TimeSpan.Zero)
         {
             // Instead of Timers what we could've used here is a cancellation token source based loop
             // i.e. CancellationTokenSource.CancelAfter(TimeSpan) within a Task.Run(async delegate)
@@ -117,17 +118,41 @@ public abstract class NatsSubBase
             // chance to await the unsubscribe call but leaves us to deal with the created task.
             // Since awaiting unsubscribe isn't crucial Timer approach is currently acceptable.
             // If we need an async loop in the future cancellation token source approach can be used.
-            _idleTimeoutTimer = new Timer(_ => EndSubscription(NatsSubEndReason.IdleTimeout));
+            _idleTimeoutTimer = new Timer(
+                static state =>
+                {
+                    var self = (NatsSubBase)state!;
+                    self.EndSubscription(NatsSubEndReason.IdleTimeout);
+                },
+                this,
+                Timeout.Infinite,
+                Timeout.Infinite);
         }
 
-        if (_startUpTimeout != default)
+        if (_startUpTimeout != TimeSpan.Zero)
         {
-            _startUpTimeoutTimer = new Timer(_ => EndSubscription(NatsSubEndReason.StartUpTimeout));
+            _startUpTimeoutTimer = new Timer(
+                static state =>
+                {
+                    var self = (NatsSubBase)state!;
+                    self.EndSubscription(NatsSubEndReason.StartUpTimeout);
+                },
+                this,
+                Timeout.Infinite,
+                Timeout.Infinite);
         }
 
-        if (_timeout != default)
+        if (_timeout != TimeSpan.Zero)
         {
-            _timeoutTimer = new Timer(_ => EndSubscription(NatsSubEndReason.Timeout));
+            _timeoutTimer = new Timer(
+                static state =>
+                {
+                    var self = (NatsSubBase)state!;
+                    self.EndSubscription(NatsSubEndReason.Timeout);
+                },
+                this,
+                Timeout.Infinite,
+                Timeout.Infinite);
         }
     }
 
@@ -285,6 +310,15 @@ public abstract class NatsSubBase
             // Need to await to handle any exceptions
             await ReceiveInternalAsync(subject, replyTo, headersBuffer, payloadBuffer).ConfigureAwait(false);
         }
+        catch (TaskCanceledException)
+        {
+            // If there are cancellations, we don't want to throw an exception.
+            // These can happen if the subscription is disposed or unsubscribed while
+            // processing the message as part of a normal flow.
+        }
+        catch (OperationCanceledException)
+        {
+        }
         catch (ChannelClosedException)
         {
             // When user disposes or unsubscribes there maybe be messages still coming in
@@ -292,7 +326,7 @@ public abstract class NatsSubBase
             // interested in the messages anymore. Hence we ignore any messages being
             // fed into the channel and rejected.
         }
-        catch (Exception e)
+        catch (Exception e) when (!(e is SystemException))
         {
             _logger.LogError(NatsLogEvents.Subscription, e, "Error while processing message");
 

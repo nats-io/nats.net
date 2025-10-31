@@ -8,7 +8,7 @@ namespace NATS.Client.JetStream;
 /// </summary>
 public record NatsJSOpts
 {
-    public NatsJSOpts(NatsOpts opts, string? apiPrefix = default, string? domain = default, AckOpts? ackOpts = default)
+    public NatsJSOpts(NatsOpts opts, string? apiPrefix = default, string? domain = default, AckOpts? ackOpts = default, TimeSpan? requestTimeout = default)
     {
         if (apiPrefix != null && domain != null)
         {
@@ -17,6 +17,7 @@ public record NatsJSOpts
 
         ApiPrefix = apiPrefix ?? "$JS.API";
         Domain = domain;
+        RequestTimeout = requestTimeout ?? opts.RequestTimeout;
     }
 
     /// <summary>
@@ -33,6 +34,11 @@ public record NatsJSOpts
     /// JetStream domain to use in JetStream API subjects. (default: null)
     /// </summary>
     public string? Domain { get; }
+
+    /// <summary>
+    /// Timeout for JetStream API calls.
+    /// </summary>
+    public TimeSpan RequestTimeout { get; }
 
     /// <summary>
     /// Ask server for an acknowledgment.
@@ -147,6 +153,13 @@ public record NatsJSConsumeOpts
     /// Defines a group name and constraints for minimum pending messages and acknowledgments.
     /// </summary>
     public NatsJSPriorityGroupOpts? PriorityGroup { get; init; }
+
+    /// <summary>
+    /// Maximum number of consecutive 503 "No Responders" errors before the consumer is considered deleted and consumption stops.
+    /// This helps detect when an ephemeral consumer has vanished on the server.
+    /// Set to -1 to disable this check. (default: 10)
+    /// </summary>
+    public int MaxConsecutive503Errors { get; init; } = 10;
 }
 
 /// <summary>
@@ -232,12 +245,25 @@ public record NatsJSPubOpts : NatsPubOpts
     // lss *uint64 // Expected last sequence per subject
     public ulong? ExpectedLastSubjectSequence { get; init; }
 
-    // Publish retries for NoResponders err.
-    // rwait time.Duration // Retry wait between attempts
+    /// <summary>
+    /// Specifies the duration to wait between retry attempts for a failed publish operation.
+    /// See <see cref="RetryAttempts"/> for the number of retry attempts.
+    /// </summary>
     public TimeSpan RetryWaitBetweenAttempts { get; init; } = TimeSpan.FromMilliseconds(250);
 
-    // rnum  int           // Retry attempts
-    public int RetryAttempts { get; init; } = 2;
+    /// <summary>
+    /// Specifies the number of retry attempts to publish a message when a "NoResponders" error occurs.
+    /// The value defines how many additional attempts will be made after the initial publish attempt.
+    /// Default is not to retry (one attempt total).
+    /// </summary>
+    /// <remarks>
+    /// By default, this is set to 1, meaning that if the first publish attempt fails with a "NoResponders" error,
+    /// no more attempts will be made. Setting this to a higher value allows for more retries in case of transient issues.
+    /// Coupled with <see cref="RetryWaitBetweenAttempts"/>, this provides a mechanism to handle temporary unavailability of responders,
+    /// however, for more robust handling of such scenarios, consider implementing an exponential backoff strategy in your application logic,
+    /// or use an extension that supports it.
+    /// </remarks>
+    public int RetryAttempts { get; init; } = 1;
 }
 
 /// <summary>
@@ -259,4 +285,14 @@ public record NatsJSPriorityGroupOpts
     /// When specified, this Pull request will only receive messages when the consumer has at least this many ack pending messages.
     /// </summary>
     public long MinAckPending { get; set; }
+
+    /// <summary>
+    /// Priority for message delivery when using prioritized priority policy.
+    /// </summary>
+    /// <remarks>
+    /// Lower values indicate higher priority (0 is the highest priority).
+    /// Maximum priority value is 9. This field is only used when the consumer
+    /// has PriorityPolicy set to "prioritized".
+    /// </remarks>
+    public byte Priority { get; init; }
 }

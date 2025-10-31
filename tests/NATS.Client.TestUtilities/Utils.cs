@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Text.RegularExpressions;
 
 #if NATS_CORE2_TEST
 using NATS.Client.Core2.Tests.ExtraUtils.FrameworkPolyfillExtensions;
@@ -166,5 +167,26 @@ public static class ServiceUtils
         }
 
         return responses;
+    }
+}
+
+public static class ServerVersionUtils
+{
+    public static bool VersionMajorMinorIsGreaterThenOrEqualTo(this INatsServerInfo? serverInfo, int major, int minor)
+    {
+        var testVersion = new SemanticVersioning.Version($"{major}.{minor}.0");
+        var serverVersion = new SemanticVersioning.Version(serverInfo!.Version);
+        if (serverVersion.Major > testVersion.Major)
+            return true;
+        if (serverVersion.Major < testVersion.Major)
+            return false;
+        return serverVersion.Minor >= testVersion.Minor;
+    }
+
+    public static bool VersionIsGreaterThenOrEqualTo(this INatsServerInfo? serverInfo, string version)
+    {
+        var testVersion = new SemanticVersioning.Version(version);
+        var serverVersion = new SemanticVersioning.Version(serverInfo!.Version);
+        return serverVersion >= testVersion;
     }
 }

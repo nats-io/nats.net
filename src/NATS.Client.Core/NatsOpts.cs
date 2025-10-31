@@ -30,7 +30,12 @@ public enum NatsRequestReplyMode
 /// </summary>
 public sealed record NatsOpts
 {
-    public static readonly NatsOpts Default = new();
+    public static readonly NatsOpts Default = new()
+    {
+        WebSocketOpts = NatsWebSocketOpts.Default,
+        TlsOpts = NatsTlsOpts.Default,
+        AuthOpts = NatsAuthOpts.Default,
+    };
 
     /// <summary>
     /// NATS server URL to connect to. (default: nats://localhost:4222)
@@ -64,11 +69,11 @@ public sealed record NatsOpts
 
     public bool Headers { get; init; } = true;
 
-    public NatsAuthOpts AuthOpts { get; init; } = NatsAuthOpts.Default;
+    public NatsAuthOpts AuthOpts { get; init; } = new();
 
-    public NatsTlsOpts TlsOpts { get; init; } = NatsTlsOpts.Default;
+    public NatsTlsOpts TlsOpts { get; init; } = new();
 
-    public NatsWebSocketOpts WebSocketOpts { get; init; } = NatsWebSocketOpts.Default;
+    public NatsWebSocketOpts WebSocketOpts { get; init; } = new();
 
     public INatsSerializerRegistry SerializerRegistry { get; init; } = NatsDefaultSerializerRegistry.Default;
 
@@ -184,6 +189,29 @@ public sealed record NatsOpts
     public INatsSocketConnectionFactory? SocketConnectionFactory { get; init; }
 
     /// <summary>
+    /// Determines whether the client should retry connecting to the server during the initial connection
+    /// attempt if the connection fails. (default: <c>false</c>)
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This property controls the behavior of the initial connection process.
+    /// </para>
+    /// <para>
+    /// When set to <c>true</c>, the client will periodically retry connecting to the server based on the
+    /// configured retry intervals until a successful connection is established or the operation is explicitly canceled.
+    /// </para>
+    /// <para>
+    /// When set to <c>false</c> (default behavior), the client will not retry and will throw an exception
+    /// if the connection cannot be established initially.
+    /// </para>
+    /// <para>
+    /// The retry intervals are influenced by options such as <see cref="ReconnectWaitMin"/> and <see cref="ReconnectWaitMax"/>, with the potential addition of <see cref="ReconnectJitter"/> for randomized delays between retries.
+    /// This property is particularly useful in scenarios where transient network failures or server unavailability are expected during the first connection attempt.
+    /// </para>
+    /// </remarks>
+    public bool RetryOnInitialConnect { get; init; }
+
+    /// <summary>
     /// Provides an entry point for extending the behavior of the NATS client.
     /// </summary>
     /// <remarks>
@@ -249,13 +277,26 @@ public static class NatsOptsExtensions
     /// </summary>
     /// <param name="opts">The NatsOpts instance containing configuration settings for intervals and jitter.</param>
     /// <param name="iter">The current attempt iteration, used to calculate the exponential delay.</param>
+    /// <param name="cancellationToken">Cancel back-off delay.</param>
     /// <returns>A task that completes after the calculated delay time has elapsed.</returns>
-    public static Task BackoffWithJitterAsync(this NatsOpts opts, int iter)
+    public static Task BackoffWithJitterAsync(this NatsOpts opts, int iter, CancellationToken cancellationToken = default)
     {
+        if (iter < 1)
+        {
+            // Ensure iter is at least 1 to avoid negative or zero delay calculations
+            iter = 1;
+        }
+
+        if (iter > 31)
+        {
+            // This is to prevent infinity in Math.Pow()
+            iter = 31;
+        }
+
         var baseDelay = opts.ReconnectWaitMin.TotalMilliseconds * Math.Pow(2, iter - 1);
         var jitter = opts.ReconnectJitter.TotalMilliseconds * Random.Shared.NextDouble();
 
         var delay = Math.Min(baseDelay + jitter, opts.ReconnectWaitMax.TotalMilliseconds);
-        return Task.Delay(TimeSpan.FromMilliseconds(delay));
+        return Task.Delay(TimeSpan.FromMilliseconds(delay), cancellationToken);
     }
 }

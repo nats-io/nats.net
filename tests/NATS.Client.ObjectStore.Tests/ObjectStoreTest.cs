@@ -82,7 +82,7 @@ public class ObjectStoreTest
 
             Assert.Equal($"SHA-256={sha}", data.Digest);
             Assert.Equal(chunks, data.Chunks);
-            Assert.Equal(size, data.Size);
+            Assert.Equal((ulong)size, data.Size);
         }
 
         // buffer with smaller last chunk
@@ -102,7 +102,7 @@ public class ObjectStoreTest
 
             Assert.Equal($"SHA-256={sha}", data.Digest);
             Assert.Equal(chunks, data.Chunks);
-            Assert.Equal(size, data.Size);
+            Assert.Equal((ulong)size, data.Size);
         }
 
         // Object name checks
@@ -195,7 +195,7 @@ public class ObjectStoreTest
         await store.PutAsync("k1", new byte[] { 65, 66, 67 }, cancellationToken);
 
         var info = await store.GetInfoAsync("k1", cancellationToken: cancellationToken);
-        Assert.Equal(3, info.Size);
+        Assert.Equal(3UL, info.Size);
 
         var bytes = await store.GetBytesAsync("k1", cancellationToken);
         Assert.Equal(bytes, new byte[] { 65, 66, 67 });
@@ -207,8 +207,8 @@ public class ObjectStoreTest
 
         var info2 = await store.GetInfoAsync("k1", showDeleted: true, cancellationToken: cancellationToken);
         Assert.True(info2.Deleted);
-        Assert.Equal(0, info2.Size);
-        Assert.Equal(0, info2.Chunks);
+        Assert.Equal(0UL, info2.Size);
+        Assert.Equal(0U, info2.Chunks);
         Assert.Equal(string.Empty, info2.Digest);
 
         // Put again
@@ -553,5 +553,114 @@ public class ObjectStoreTest
         await store.PutAsync("my/random/data_1.bin", File.OpenRead(filename), cancellationToken: cancellationToken);
         await store.PutAsync("my/random/data_2.bin", File.OpenRead(filename), cancellationToken: cancellationToken);
         await store.PutAsync("my/random/data_3.bin", File.OpenRead(filename), cancellationToken: cancellationToken);
+    }
+
+    [Fact]
+    public async Task Rename_object_should_perge_old_named_meta()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        var js = new NatsJSContext(nats);
+        var ob = new NatsObjContext(js);
+
+        var b1 = await ob.CreateObjectStoreAsync(new NatsObjConfig("b1"), cancellationToken);
+
+        await b1.PutAsync("name1", [1, 2, 3], cancellationToken: cancellationToken);
+
+        var s1 = await js.GetStreamAsync("OBJ_b1", cancellationToken: cancellationToken);
+
+        async Task<List<NatsJSMsg<byte[]>>> GetAllMsgs()
+        {
+            var c = await s1.CreateOrderedConsumerAsync(cancellationToken: cancellationToken);
+            List<NatsJSMsg<byte[]>> msgs = new();
+            await foreach (var msg in c.ConsumeAsync<byte[]>(cancellationToken: cancellationToken))
+            {
+                msgs.Add(msg);
+                if (msg.Metadata?.NumPending == 0)
+                    break;
+            }
+
+            return msgs;
+        }
+
+        // Snapshot the stream before rename
+        var msgs1 = await GetAllMsgs();
+
+        // rename
+        await b1.UpdateMetaAsync("name1", new ObjectMetadata { Name = "name2" }, cancellationToken);
+
+        // Snapshot the stream after rename
+        var msgs2 = await GetAllMsgs();
+
+        Assert.Equal(2, msgs1.Count);
+        Assert.Equal(2, msgs2.Count);
+
+        // Check the sequence numbers
+        Assert.Equal(1, (int)msgs1[0].Metadata?.Sequence.Stream!);
+        Assert.Equal(2, (int)msgs1[1].Metadata?.Sequence.Stream!);
+
+        // after rename, the chunk message is the same, but the meta is new
+        // and the old meta is gone with sequence 2
+        Assert.Equal(1, (int)msgs2[0].Metadata?.Sequence.Stream!);
+        Assert.Equal(3, (int)msgs2[1].Metadata?.Sequence.Stream!);
+
+        // the first message is the chunk with the data, it should be the same
+        Assert.Equal(msgs1[0].Subject, msgs2[0].Subject);
+
+        // the second message is the meta, it should be different
+        // because we updated the name
+        Assert.NotEqual(msgs1[1].Subject, msgs2[1].Subject);
+
+        // Check we can get by the new name as well as the old name fails
+        var n2 = await b1.GetBytesAsync("name2", cancellationToken: cancellationToken);
+        Assert.Equal([1, 2, 3], n2);
+        await Assert.ThrowsAsync<NatsObjNotFoundException>(async () =>
+        {
+            await b1.GetBytesAsync("name1", cancellationToken: cancellationToken);
+        });
+    }
+
+    [Fact]
+    public async Task Metadata_field_types_match_spec()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        var js = new NatsJSContext(nats);
+        var obj = new NatsObjContext(js);
+
+        var store = await obj.CreateObjectStoreAsync(new NatsObjConfig("b1"), cancellationToken);
+
+        // Test that Size property is ulong (uint64 in NATS spec)
+        var metadata = new ObjectMetadata { Name = "test" };
+        metadata.Size = ulong.MaxValue; // Should compile without error
+        Assert.Equal(18446744073709551615UL, metadata.Size);
+
+        // Test that Chunks property is uint (uint32 in NATS spec)
+        metadata.Chunks = uint.MaxValue; // Should compile without error
+        Assert.Equal(4294967295U, metadata.Chunks);
+
+        // Test with actual object metadata from store
+        await store.PutAsync("k1", new byte[] { 1, 2, 3 }, cancellationToken: cancellationToken);
+        var info = await store.GetInfoAsync("k1", cancellationToken: cancellationToken);
+
+        // Verify Size is ulong
+#pragma warning disable IDE0007
+        // ReSharper disable once SuggestVarOrType_BuiltInTypes
+        ulong size = info.Size; // Should compile without error
+#pragma warning restore IDE0007
+        Assert.Equal(3UL, size);
+
+        // Verify Chunks is uint
+#pragma warning disable IDE0007
+        // ReSharper disable once SuggestVarOrType_BuiltInTypes
+        uint chunks = info.Chunks; // Should compile without error
+#pragma warning restore IDE0007
+        Assert.Equal(1U, chunks);
     }
 }

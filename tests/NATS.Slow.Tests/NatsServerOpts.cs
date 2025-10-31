@@ -22,6 +22,7 @@ public sealed class NatsServerOptsBuilder
     private bool _tlsVerify;
     private bool _enableJetStream;
     private string? _serverName;
+    private string? _clusterName;
     private string? _tlsServerCertFile;
     private string? _tlsServerKeyFile;
     private string? _tlsClientCertFile;
@@ -42,6 +43,7 @@ public sealed class NatsServerOptsBuilder
         TlsVerify = _tlsVerify,
         EnableJetStream = _enableJetStream,
         ServerName = _serverName,
+        ClusterName = _clusterName ?? "nats",
         ClientUrlUserName = _clientUrlUserName,
         ClientUrlPassword = _clientUrlPassword,
         TlsServerCertFile = _tlsServerCertFile,
@@ -111,6 +113,12 @@ public sealed class NatsServerOptsBuilder
     public NatsServerOptsBuilder WithServerName(string serverName)
     {
         _serverName = serverName;
+        return this;
+    }
+
+    public NatsServerOptsBuilder WithClusterName(string clusterName)
+    {
+        _clusterName = clusterName;
         return this;
     }
 
@@ -188,6 +196,8 @@ public sealed class NatsServerOpts : IDisposable
     public bool EnableJetStream { get; init; }
 
     public string? ServerName { get; init; }
+
+    public string ClusterName { get; init; } = "nats";
 
     public string? ServerHost { get; init; } = "127.0.0.1";
 
@@ -287,7 +297,7 @@ public sealed class NatsServerOpts : IDisposable
             if (EnableClustering)
             {
                 sb.AppendLine("cluster {");
-                sb.AppendLine("  name: nats");
+                sb.AppendLine($"  name: {ClusterName}");
                 sb.AppendLine($"  listen: {ServerHost}:{ClusteringPort}");
                 sb.AppendLine($"  routes: [{_routes}]");
                 sb.AppendLine("}");

@@ -222,7 +222,9 @@ internal sealed class NatsKVWatcher<T> : IAsyncDisposable
 
                                 if (headers is { Code: 100, MessageText: "FlowControl Request" })
                                 {
+#pragma warning disable CS0618 // Type or member is obsolete
                                     await msg.ReplyAsync(cancellationToken: _cancellationToken);
+#pragma warning restore CS0618 // Type or member is obsolete
                                     continue;
                                 }
                             }
@@ -323,12 +325,30 @@ internal sealed class NatsKVWatcher<T> : IAsyncDisposable
                             _logger.LogError(NatsKVLogEvents.Internal, "Internal error: unexpected command {Command}", subCommand);
                         }
                     }
+                    catch (ChannelClosedException)
+                    {
+                        throw;
+                    }
+                    catch (TaskCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
                     catch (Exception e)
                     {
                         _logger.LogWarning(NatsKVLogEvents.Internal, e, "Command error");
                     }
                 }
             }
+        }
+        catch (ChannelClosedException)
+        {
+        }
+        catch (TaskCanceledException)
+        {
         }
         catch (OperationCanceledException)
         {

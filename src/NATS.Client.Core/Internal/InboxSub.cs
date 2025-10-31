@@ -123,18 +123,29 @@ internal class InboxSubBuilder : INatsSubscriptionManager
     {
         if (!_bySubject.TryGetValue(subject, out var subTable))
         {
-            _logger.LogWarning(NatsLogEvents.InboxSubscription, "Unregistered message inbox received for {Subject}", subject);
+            _logger.LogTrace(NatsLogEvents.InboxSubscription, "Unregistered message inbox received for {Subject}", subject);
             return;
         }
 
 #if NETSTANDARD2_0
-        foreach (var weakReference in subTable)
+        WeakReference<NatsSubBase>[] weakReferences;
+        int subscriptionCount;
+        lock (subTable)
         {
-            if (weakReference.TryGetTarget(out var sub))
+            subscriptionCount = subTable.Count;
+            weakReferences = ArrayPool<WeakReference<NatsSubBase>>.Shared.Rent(subscriptionCount);
+            subTable.CopyTo(weakReferences, 0);
+        }
+
+        for (var i = 0; i < subscriptionCount; i++)
+        {
+            if (weakReferences[i].TryGetTarget(out var sub))
             {
                 await sub.ReceiveAsync(subject, replyTo, headersBuffer, payloadBuffer).ConfigureAwait(false);
             }
         }
+
+        ArrayPool<WeakReference<NatsSubBase>>.Shared.Return(weakReferences);
 #else
         foreach (var (sub, _) in subTable)
         {

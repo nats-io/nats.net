@@ -17,6 +17,7 @@ public enum NatsConnectionState
     Open,
     Connecting,
     Reconnecting,
+    Failed,
 }
 
 internal enum NatsEvent
@@ -26,6 +27,7 @@ internal enum NatsEvent
     ReconnectFailed,
     MessageDropped,
     LameDuckModeActivated,
+    ConnectionFailed,
 }
 
 public partial class NatsConnection : INatsConnection
@@ -37,6 +39,7 @@ public partial class NatsConnection : INatsConnection
     private readonly ILogger<NatsConnection> _logger;
     private readonly ObjectPool _pool;
     private readonly CancellationTokenSource _disposedCts;
+    private readonly CancellationTokenSource _initialConnectCts;
     private readonly string _name;
     private readonly TimeSpan _socketComponentDisposeTimeout = TimeSpan.FromSeconds(5);
     private readonly BoundedChannelOptions _defaultSubscriptionChannelOpts;
@@ -78,6 +81,7 @@ public partial class NatsConnection : INatsConnection
         ConnectionState = NatsConnectionState.Closed;
         _waitForOpenConnection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         _disposedCts = new CancellationTokenSource();
+        _initialConnectCts = new CancellationTokenSource();
         _pool = new ObjectPool(opts.ObjectPoolSize);
         _name = opts.Name;
         Counter = new ConnectionStatsCounter();
@@ -170,36 +174,60 @@ public partial class NatsConnection : INatsConnection
     /// </summary>
     public async ValueTask ConnectAsync()
     {
-        if (ConnectionState == NatsConnectionState.Open)
-            return;
-
-        TaskCompletionSource? waiter = null;
-        lock (_gate)
+        while (true)
         {
-            ThrowIfDisposed();
-            if (ConnectionState != NatsConnectionState.Closed)
+            try
             {
-                waiter = _waitForOpenConnection;
+                if (ConnectionState == NatsConnectionState.Failed)
+                    throw new NatsConnectionFailedException("Connection is in failed state");
+
+                if (ConnectionState == NatsConnectionState.Open)
+                    return;
+
+                TaskCompletionSource? waiter = null;
+                lock (_gate)
+                {
+                    ThrowIfDisposed();
+                    if (ConnectionState != NatsConnectionState.Closed)
+                    {
+                        waiter = _waitForOpenConnection;
+                    }
+                    else
+                    {
+                        // when closed, change state to connecting and only first connection try-to-connect.
+                        ConnectionState = NatsConnectionState.Connecting;
+                    }
+                }
+
+                if (waiter != null)
+                {
+                    await waiter.Task.ConfigureAwait(false);
+                    return;
+                }
+
+                // Only Closed(initial) state, can run initial connect.
+                await InitialConnectAsync().ConfigureAwait(false);
+
+                if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
+                {
+                    await _subscriptionManager.InitializeInboxSubscriptionAsync(_disposedCts.Token).ConfigureAwait(false);
+                }
             }
-            else
+            catch (NatsException)
             {
-                // when closed, change state to connecting and only first connection try-to-connect.
-                ConnectionState = NatsConnectionState.Connecting;
+                if (!Opts.RetryOnInitialConnect)
+                {
+                    throw;
+                }
+
+                try
+                {
+                    await WaitWithJitterAsync(_initialConnectCts.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                }
             }
-        }
-
-        if (waiter != null)
-        {
-            await waiter.Task.ConfigureAwait(false);
-            return;
-        }
-
-        // Only Closed(initial) state, can run initial connect.
-        await InitialConnectAsync().ConfigureAwait(false);
-
-        if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
-        {
-            await _subscriptionManager.InitializeInboxSubscriptionAsync(_disposedCts.Token).ConfigureAwait(false);
         }
     }
 
@@ -207,7 +235,6 @@ public partial class NatsConnection : INatsConnection
     public void OnMessageDropped<T>(NatsSubBase natsSub, int pending, NatsMsg<T> msg)
     {
         var subject = msg.Subject;
-        _logger.LogWarning("Dropped message from {Subject} with {Pending} pending messages", subject, pending);
         _eventChannel.Writer.TryWrite((NatsEvent.MessageDropped, new NatsMessageDroppedEventArgs(natsSub, pending, subject, msg.ReplyTo, msg.Headers, msg.Data)));
     }
 
@@ -255,8 +282,10 @@ public partial class NatsConnection : INatsConnection
             _waitForOpenConnection.TrySetCanceled();
 #if NET8_0_OR_GREATER
             await _disposedCts.CancelAsync().ConfigureAwait(false);
+            await _initialConnectCts.CancelAsync().ConfigureAwait(false);
 #else
             _disposedCts.Cancel();
+            _initialConnectCts.Cancel();
 #endif
         }
     }
@@ -411,6 +440,9 @@ public partial class NatsConnection : INatsConnection
             _pingTimerCancellationTokenSource = new CancellationTokenSource();
             StartPingTimer(_pingTimerCancellationTokenSource.Token);
             _waitForOpenConnection.TrySetResult();
+#pragma warning disable VSTHRD103
+            _initialConnectCts.Cancel();
+#pragma warning restore VSTHRD103
             _reconnectLoopTask = Task.Run(ReconnectLoop);
             _eventChannel.Writer.TryWrite((NatsEvent.ConnectionOpened, new NatsEventArgs(url?.ToString() ?? string.Empty)));
         }
@@ -714,7 +746,7 @@ public partial class NatsConnection : INatsConnection
                     _logger.LogDebug(NatsLogEvents.Connection, "Reconnect wait with jitter [{ReconnectCount}]", reconnectCount);
                 }
 
-                await WaitWithJitterAsync().ConfigureAwait(false);
+                await WaitWithJitterAsync(_disposedCts.Token).ConfigureAwait(false);
 
                 if (debug)
                 {
@@ -862,7 +894,7 @@ public partial class NatsConnection : INatsConnection
         return uri;
     }
 
-    private async Task WaitWithJitterAsync()
+    private async Task WaitWithJitterAsync(CancellationToken cancellationToken)
     {
         bool stop;
         int retry;
@@ -897,21 +929,27 @@ public partial class NatsConnection : INatsConnection
             }
 
             backoff = _backoff;
+
+            // After two auth errors we will not retry.
+            if (stop)
+            {
+                ConnectionState = NatsConnectionState.Failed;
+                throw new NatsConnectionFailedException("Maximum authentication attempts exceeded");
+            }
+
+            if (Opts.MaxReconnectRetry > 0 && retry > Opts.MaxReconnectRetry)
+            {
+                ConnectionState = NatsConnectionState.Failed;
+                throw new NatsConnectionFailedException("Maximum connection retry attempts exceeded");
+            }
         }
-
-        // After two auth errors we will not retry.
-        if (stop)
-            throw new NatsException("Won't retry anymore.");
-
-        if (Opts.MaxReconnectRetry > 0 && retry > Opts.MaxReconnectRetry)
-            throw new NatsException("Max connect retry exceeded.");
 
         var jitter = Random.Shared.NextDouble() * Opts.ReconnectJitter.TotalMilliseconds;
         var waitTime = TimeSpan.FromMilliseconds(jitter) + backoff;
         if (waitTime != TimeSpan.Zero)
         {
             _logger.LogTrace(NatsLogEvents.Connection, "Waiting {WaitMs}ms to reconnect", waitTime.TotalMilliseconds);
-            await Task.Delay(waitTime).ConfigureAwait(false);
+            await Task.Delay(waitTime, cancellationToken).ConfigureAwait(false);
         }
     }
 

@@ -30,7 +30,7 @@ public class WatcherTest
                 {
                     count++;
                     signal.Pulse();
-                    Assert.Equal(count, info.Size);
+                    Assert.Equal((ulong)count, info.Size);
                     if (count == 3)
                         break;
                 }

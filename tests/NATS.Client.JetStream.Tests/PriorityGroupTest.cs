@@ -34,7 +34,7 @@ public class PriorityGroupTest
             ack.EnsureSuccess();
         }
 
-        var consumerConfig = new ConsumerConfig($"{prefix}c1") { PriorityGroups = ["jobs"], PriorityPolicy = "overflow", };
+        var consumerConfig = new ConsumerConfig($"{prefix}c1") { PriorityGroups = ["jobs"], PriorityPolicy = ConsumerConfigPriorityPolicy.Overflow, };
         var consumer = await js.CreateOrUpdateConsumerAsync($"{prefix}s1", consumerConfig, cancellationToken: cts.Token);
 
         // Err on no group
@@ -77,7 +77,7 @@ public class PriorityGroupTest
             ack.EnsureSuccess();
         }
 
-        var consumerConfig = new ConsumerConfig($"{prefix}c1") { PriorityGroups = ["jobs"], PriorityPolicy = "overflow", };
+        var consumerConfig = new ConsumerConfig($"{prefix}c1") { PriorityGroups = ["jobs"], PriorityPolicy = ConsumerConfigPriorityPolicy.Overflow, };
         var consumer = await js.CreateOrUpdateConsumerAsync($"{prefix}s1", consumerConfig, cancellationToken: cts.Token);
 
         // Err on no group
@@ -123,7 +123,7 @@ public class PriorityGroupTest
             ack.EnsureSuccess();
         }
 
-        var consumerConfig = new ConsumerConfig($"{prefix}c1") { PriorityGroups = ["jobs"], PriorityPolicy = "overflow", };
+        var consumerConfig = new ConsumerConfig($"{prefix}c1") { PriorityGroups = ["jobs"], PriorityPolicy = ConsumerConfigPriorityPolicy.Overflow, };
         var consumer = await js.CreateOrUpdateConsumerAsync($"{prefix}s1", consumerConfig, cancellationToken: cts.Token);
 
         // Err on no group
@@ -150,5 +150,90 @@ public class PriorityGroupTest
                     break;
             }
         }
+    }
+
+    [SkipIfNatsServer(versionEarlierThan: "2.12")]
+    public async Task Fetch_from_prioritized_group_with_priority()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var js = new NatsJSContext(nats);
+        var prefix = _server.GetNextId();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.>"], cts.Token);
+
+        for (var i = 0; i < 10; i++)
+        {
+            var ack = await js.PublishAsync($"{prefix}s1.{i}", i, cancellationToken: cts.Token);
+            ack.EnsureSuccess();
+        }
+
+        var consumerConfig = new ConsumerConfig($"{prefix}c1")
+        {
+            PriorityGroups = ["jobs"],
+            PriorityPolicy = ConsumerConfigPriorityPolicy.Prioritized,
+        };
+        var consumer = await js.CreateOrUpdateConsumerAsync($"{prefix}s1", consumerConfig, cancellationToken: cts.Token);
+
+        // Test with priority 5
+        {
+            var opts = new NatsJSFetchOpts
+            {
+                MaxMsgs = 3,
+                PriorityGroup = new NatsJSPriorityGroupOpts { Group = "jobs", Priority = 5 },
+            };
+            var count = 0;
+            await foreach (var msg in consumer.FetchAsync<int>(opts, cancellationToken: cts.Token))
+            {
+                Assert.Equal(count++, msg.Data);
+                if (count == 3)
+                    break;
+            }
+
+            Assert.Equal(3, count);
+        }
+
+        // Test with priority 0 (highest priority)
+        {
+            var opts = new NatsJSFetchOpts
+            {
+                MaxMsgs = 2,
+                PriorityGroup = new NatsJSPriorityGroupOpts { Group = "jobs", Priority = 0 },
+            };
+            var count = 0;
+            await foreach (var msg in consumer.FetchAsync<int>(opts, cancellationToken: cts.Token))
+            {
+                Assert.Equal(count + 3, msg.Data); // Should continue from where we left off
+                count++;
+                if (count == 2)
+                    break;
+            }
+
+            Assert.Equal(2, count);
+        }
+    }
+
+    [SkipIfNatsServer(versionEarlierThan: "2.12")]
+    public async Task Consumer_with_prioritized_policy_validation()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var js = new NatsJSContext(nats);
+        var prefix = _server.GetNextId();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.>"], cts.Token);
+
+        // Test that prioritized policy is accepted
+        var consumerConfig = new ConsumerConfig($"{prefix}c1")
+        {
+            PriorityGroups = ["jobs"],
+            PriorityPolicy = ConsumerConfigPriorityPolicy.Prioritized,
+        };
+
+        var consumer = await js.CreateOrUpdateConsumerAsync($"{prefix}s1", consumerConfig, cancellationToken: cts.Token);
+        Assert.NotNull(consumer);
+        Assert.Equal(ConsumerConfigPriorityPolicy.Prioritized, consumer.Info.Config.PriorityPolicy);
     }
 }

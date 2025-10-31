@@ -15,15 +15,26 @@ internal class UserCredentials
         Token = authOpts.Token;
         AuthCredCallback = authOpts.AuthCredCallback;
 
+#if NETSTANDARD2_0
+#pragma warning disable CS8604 // Possible null reference argument.
+#endif
         if (!string.IsNullOrEmpty(authOpts.CredsFile))
         {
             (Jwt, Seed) = LoadCredsFile(authOpts.CredsFile);
+        }
+
+        if (!string.IsNullOrEmpty(authOpts.Creds))
+        {
+            (Jwt, Seed) = LoadCredsContent(authOpts.Creds);
         }
 
         if (!string.IsNullOrEmpty(authOpts.NKeyFile))
         {
             (Seed, NKey) = LoadNKeyFile(authOpts.NKeyFile);
         }
+#if NETSTANDARD2_0
+#pragma warning restore CS8604 // Possible null reference argument.
+#endif
     }
 
     public string? Jwt { get; }
@@ -81,11 +92,21 @@ internal class UserCredentials
                 opts.JWT = authCred.Value;
                 seed = authCred.Secret;
                 break;
+#if NETSTANDARD2_0
+#pragma warning disable CS8604 // Possible null reference argument for parameter...
+#endif
             case NatsAuthType.Nkey:
                 if (!string.IsNullOrEmpty(authCred.Secret))
                 {
                     seed = authCred.Secret;
                     opts.NKey = NKeys.PublicKeyFromSeed(seed);
+                }
+
+                break;
+            case NatsAuthType.Creds:
+                if (!string.IsNullOrEmpty(authCred.Value))
+                {
+                    (opts.JWT, seed) = LoadCredsContent(authCred.Value);
                 }
 
                 break;
@@ -104,6 +125,9 @@ internal class UserCredentials
 
                 break;
             }
+#if NETSTANDARD2_0
+#pragma warning restore CS8604 // Possible null reference argument for parameter...
+#endif
         }
         else
         {
@@ -115,11 +139,36 @@ internal class UserCredentials
         opts.Sig = info is { AuthRequired: true, Nonce: { } } ? Sign(info.Nonce, seed) : null;
     }
 
+    private (string, string) LoadCredsContent(string creds)
+    {
+        try
+        {
+            using var reader = new StringReader(creds);
+            return ParseCreds(reader);
+        }
+        catch (NatsException e)
+        {
+            throw new NatsException("Error loading credentials", e);
+        }
+    }
+
     private (string, string) LoadCredsFile(string path)
+    {
+        try
+        {
+            using var reader = new StreamReader(path);
+            return ParseCreds(reader);
+        }
+        catch (NatsException e)
+        {
+            throw new NatsException($"Error loading creds file '{path}': {e.Message}", e);
+        }
+    }
+
+    private (string, string) ParseCreds(TextReader reader)
     {
         string? jwt = null;
         string? seed = null;
-        using var reader = new StreamReader(path);
         while (reader.ReadLine()?.Trim() is { } line)
         {
             if (line.StartsWith("-----BEGIN NATS USER JWT-----"))
@@ -137,9 +186,9 @@ internal class UserCredentials
         }
 
         if (jwt == null)
-            throw new NatsException($"Can't find JWT while loading creds file ${path}");
+            throw new NatsException($"Can't find JWT in credentials");
         if (seed == null)
-            throw new NatsException($"Can't find NKEY seed while loading creds file ${path}");
+            throw new NatsException($"Can't find NKEY in credentials");
 
         return (jwt, seed);
     }

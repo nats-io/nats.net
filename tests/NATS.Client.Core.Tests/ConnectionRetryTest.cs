@@ -27,8 +27,10 @@ public class ConnectionRetryTest
         await server.StopAsync();
 
         await signal;
-        var exception = await Assert.ThrowsAsync<NatsException>(async () => await nats.PingAsync(cts.Token));
-        Assert.Equal("Max connect retry exceeded.", exception.Message);
+        var exception = await Assert.ThrowsAsync<NatsConnectionFailedException>(async () => await nats.PingAsync(cts.Token));
+        Assert.True(exception.Message is
+            "Maximum connection retry attempts exceeded"
+            or "Connection is in failed state");
     }
 
     [Fact]
@@ -153,5 +155,30 @@ public class ConnectionRetryTest
         // check to ensure that the loss was < 1%
         var loss = 100.0 - (100.0 * received / sent);
         Assert.True(loss <= 1.0, $"message loss of {loss:F}% was above 1% - {sent} sent, {received} received");
+    }
+
+    [Fact]
+    public async Task Retry_initial_connect()
+    {
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var connection1 = new NatsConnection(new NatsOpts { Url = server.Url });
+        await using var connection2 = new NatsConnection(new NatsOpts { Url = server.Url, RetryOnInitialConnect = true });
+
+        await server.StopAsync();
+
+        // Preserve the original connection behavior
+        await Assert.ThrowsAsync<NatsException>(async () => await connection1.ConnectAsync());
+
+        var taskStarted = new WaitSignal();
+        var connecting = Task.Run(async () =>
+        {
+            taskStarted.Pulse();
+            await connection2.ConnectAsync();
+        });
+
+        await taskStarted;
+        await server.RestartAsync();
+
+        await connecting;
     }
 }
