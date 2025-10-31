@@ -186,6 +186,7 @@ public sealed record NatsOpts
     /// For the library to handle TLS upgrade automatically, implement the <see cref="INatsTlsUpgradeableSocketConnection"/> interface.
     /// </summary>
     /// <seealso cref="INatsTlsUpgradeableSocketConnection"/>
+    [Obsolete("Use ExtensionPoints.SocketConnectionFactory instead.")]
     public INatsSocketConnectionFactory? SocketConnectionFactory { get; init; }
 
     /// <summary>

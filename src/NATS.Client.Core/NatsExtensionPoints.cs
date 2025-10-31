@@ -8,15 +8,17 @@ public interface INatsMsgInterceptorFactory
 {
 }
 
-public interface INatsConnectionFactory
+public interface INatsRequestReplyProviderFactory
 {
 }
 
 public record NatsExtensionPoints
 {
-    public INatsConnectionFactory? ConnectionFactory { get; init; }
+    public INatsSocketConnectionFactory? SocketConnectionFactory { get; init; }
 
     public INatsMsgInterceptorFactory? MsgInterceptorFactory { get; init; }
 
     public INatsSubscriptionManagerFactory? SubscriptionManagerFactory { get; init; }
+
+    public INatsRequestReplyProviderFactory? RequestReplyProviderFactory { get; init; }
 }

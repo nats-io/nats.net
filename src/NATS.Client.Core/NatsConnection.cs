@@ -461,7 +461,7 @@ public partial class NatsConnection : INatsConnection
             }
         }
 
-        var connectionFactory = Opts.SocketConnectionFactory ?? (uri.IsWebSocket ? WebSocketFactory.Default : TcpFactory.Default);
+        var connectionFactory = Opts.ExtensionPoints?.SocketConnectionFactory ?? Opts.SocketConnectionFactory ?? (uri.IsWebSocket ? WebSocketFactory.Default : TcpFactory.Default);
         _logger.LogInformation(NatsLogEvents.Connection, "Connect to NATS using {FactoryType} {Uri}", connectionFactory.GetType().Name, uri);
         using var timeoutCts = new CancellationTokenSource(Opts.ConnectTimeout);
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(_disposedCts.Token, timeoutCts.Token);

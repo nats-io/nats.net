@@ -9,13 +9,19 @@ public class ExtensionPointsTest
         {
             ExtensionPoints = new NatsExtensionPoints
             {
-                ConnectionFactory = new TestHostConnectionFactory(),
+                SocketConnectionFactory = new TestSocketConnectionFactory(),
                 MsgInterceptorFactory = new TestMsgInterceptorFactory(),
                 SubscriptionManagerFactory = new TestSubscriptionManagerFactory(),
+                RequestReplyProviderFactory = new TestRequestReplyProviderFactory(),
             },
         };
         await using var connection = new NatsConnection(opts);
     }
+}
+
+public class TestSocketConnectionFactory : INatsSocketConnectionFactory
+{
+    public ValueTask<INatsSocketConnection> ConnectAsync(Uri uri, NatsOpts opts, CancellationToken cancellationToken) => throw new NotImplementedException();
 }
 
 public class TestSubscriptionManagerFactory : INatsSubscriptionManagerFactory
@@ -26,6 +32,6 @@ public class TestMsgInterceptorFactory : INatsMsgInterceptorFactory
 {
 }
 
-public class TestHostConnectionFactory : INatsConnectionFactory
+public class TestRequestReplyProviderFactory : INatsRequestReplyProviderFactory
 {
 }
