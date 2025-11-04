@@ -19,6 +19,17 @@ public partial class NatsJSContext
         StreamConfig config,
         CancellationToken cancellationToken = default)
     {
+        config = AdjustStreamConfigForDomain(config);
+
+        var response = await JSRequestResponseAsync<StreamConfig, StreamInfo>(
+            subject: $"{Opts.Prefix}.STREAM.CREATE.{config.Name}",
+            config,
+            cancellationToken);
+        return new NatsJSStream(this, response);
+    }
+
+    private static StreamConfig AdjustStreamConfigForDomain(StreamConfig config)
+    {
         ThrowIfInvalidStreamName(config.Name, nameof(config.Name));
 
         // keep caller's config intact.
@@ -52,11 +63,7 @@ public partial class NatsJSContext
             config.Sources = sources;
         }
 
-        var response = await JSRequestResponseAsync<StreamConfig, StreamInfo>(
-            subject: $"{Opts.Prefix}.STREAM.CREATE.{config.Name}",
-            config,
-            cancellationToken);
-        return new NatsJSStream(this, response);
+        return config;
     }
 
     /// <summary>
@@ -71,7 +78,7 @@ public partial class NatsJSContext
     /// <exception cref="ArgumentNullException">The name in <paramref name="config"/> is <c>null</c>.</exception>
     public async ValueTask<INatsJSStream> CreateOrUpdateStreamAsync(StreamConfig config, CancellationToken cancellationToken = default)
     {
-        ThrowIfInvalidStreamName(config.Name, nameof(config.Name));
+        config = AdjustStreamConfigForDomain(config);
         var response = await JSRequestAsync<StreamConfig, StreamUpdateResponse>(
             subject: $"{Opts.Prefix}.STREAM.UPDATE.{config.Name}",
             request: config,
@@ -194,7 +201,7 @@ public partial class NatsJSContext
         StreamConfig request,
         CancellationToken cancellationToken = default)
     {
-        ThrowIfInvalidStreamName(request.Name, nameof(request.Name));
+        request = AdjustStreamConfigForDomain(request);
         var response = await JSRequestResponseAsync<StreamConfig, StreamUpdateResponse>(
             subject: $"{Opts.Prefix}.STREAM.UPDATE.{request.Name}",
             request: request,
