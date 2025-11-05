@@ -500,7 +500,7 @@ public partial class NatsJSContext
             return;
         }
 
-        if (streamSource.External != null)
+        if (streamSource.External?.Deliver is { Length: > 0 })
         {
             throw new ArgumentException("Both domain and external are set");
         }
