@@ -12,7 +12,7 @@ public class StreamDomainAdjustmentTest(NatsServerFixture server)
     [Fact]
     public async Task Stream_operations_should_convert_domain_to_external_api()
     {
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var cancellationToken = cts.Token;
 
         // Track captured payloads for each operation
@@ -94,7 +94,7 @@ public class StreamDomainAdjustmentTest(NatsServerFixture server)
         await nats.ConnectRetryAsync();
 
         var js = new NatsJSContext(nats);
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
         // Create an aggregate stream with Domain on Sources
         var streamConfig = new StreamConfig($"{prefix}aggregate", [$"{prefix}aggregate.*"])
@@ -134,7 +134,7 @@ public class StreamDomainAdjustmentTest(NatsServerFixture server)
         await nats.ConnectRetryAsync();
 
         var js = new NatsJSContext(nats);
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
         // Create aggregate stream WITHOUT Domain
         var streamConfig = new StreamConfig($"{prefix}aggregate", [$"{prefix}aggregate.*"])
@@ -192,7 +192,7 @@ public class StreamDomainAdjustmentTest(NatsServerFixture server)
         await nats.ConnectRetryAsync();
 
         var js = new NatsJSContext(nats);
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
         // CreateOrUpdate aggregate stream with Domain on Sources
         var streamConfig = new StreamConfig($"{prefix}aggregate", [$"{prefix}aggregate.*"])
