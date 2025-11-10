@@ -452,7 +452,8 @@ public partial class NatsConnection : INatsConnection
             target = await OnConnectingAsync(target).ConfigureAwait(false);
             if (target.Host != uri.Host || target.Port != uri.Port)
             {
-                uri = uri with { Uri = new UriBuilder(uri.Uri) { Host = target.Host, Port = target.Port, }.Uri };
+                var modifiedUri = new UriBuilder(uri.Uri) { Host = target.Host, Port = target.Port }.Uri;
+                uri = new NatsUri(modifiedUri.ToString(), uri.IsSeed, uri.Uri.Scheme);
             }
         }
 
