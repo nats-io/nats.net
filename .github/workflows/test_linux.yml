@@ -68,7 +68,7 @@ jobs:
           killall nats-server 2> /dev/null | echo -n
           nats-server -v
           cd tests/NATS.Client.JetStream.Tests
-          dotnet test -c Release --no-build --logger "console;verbosity=detailed"
+          dotnet test -c Release --no-build --logger "console;verbosity=diagnostic"
 
       - name: Test KeyValueStore
         run: |
