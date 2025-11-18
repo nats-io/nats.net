@@ -13,9 +13,9 @@ jobs:
       fail-fast: false
       matrix:
         config:
-#          - branch: 'v2.10'
-#          - branch: 'v2.11'
-#          - branch: 'latest'
+          - branch: 'v2.10'
+          - branch: 'v2.11'
+          - branch: 'latest'
           - branch: 'main'
     runs-on: ubuntu-latest
     env:
@@ -49,26 +49,26 @@ jobs:
           cd tests
           dotnet build -c Release
 
-#      - name: Test Core2
-#        run: |
-#          killall nats-server 2> /dev/null | echo -n
-#          nats-server -v
-#          cd tests/NATS.Client.Core2.Tests
-#          dotnet test -c Release --no-build
+      - name: Test Core2
+        run: |
+          killall nats-server 2> /dev/null | echo -n
+          nats-server -v
+          cd tests/NATS.Client.Core2.Tests
+          dotnet test -c Release --no-build
 
-#      - name: Test CoreUnit
-#        run: |
-#          killall nats-server 2> /dev/null | echo -n
-#          nats-server -v
-#          cd tests/NATS.Client.CoreUnit.Tests
-#          dotnet test -c Release --no-build
+      - name: Test CoreUnit
+        run: |
+          killall nats-server 2> /dev/null | echo -n
+          nats-server -v
+          cd tests/NATS.Client.CoreUnit.Tests
+          dotnet test -c Release --no-build
 
       - name: Test JetStream
         run: |
           killall nats-server 2> /dev/null | echo -n
           nats-server -v
           cd tests/NATS.Client.JetStream.Tests
-          dotnet test -c Release --no-build --logger "console;verbosity=diagnostic" --filter "Consumer_config"
+          dotnet test -c Release --no-build
 
       - name: Test KeyValueStore
         run: |

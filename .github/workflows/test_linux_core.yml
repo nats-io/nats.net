@@ -1,64 +1,64 @@
-#name: Test Linux Core
-#
-#on:
-#  pull_request: {}
-#  push:
-#    branches:
-#    - main
-#
-#jobs:
-#  linux_test:
-#    name: Linux
-#    strategy:
-#      fail-fast: false
-#      matrix:
-#        config:
-#          - branch: 'v2.10'
-#          - branch: 'v2.11'
-#          - branch: 'latest'
-#          - branch: 'main'
-#    runs-on: ubuntu-latest
-#    env:
-#      DOTNET_CLI_TELEMETRY_OPTOUT: 1
-#      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
-#      NUGET_XMLDOC_MODE: skip
-#    steps:
-#      - name: Set up Go
-#        uses: actions/setup-go@v5
-#        with: { cache: true }
-#
-#      - name: Install nats-server
-#        run: go install github.com/nats-io/nats-server/v2@${{ matrix.config.branch }}
-#
-#      - name: Check nats-server
-#        run: nats-server -v
-#
-#      - name: Checkout
-#        uses: actions/checkout@v4
-#
-#      - name: Setup dotnet
-#        uses: actions/setup-dotnet@v4
-#        with:
-#          dotnet-version: |
-#            6.x
-#            8.x
-#            9.x
-#
-#      - name: Build
-#        run: |
-#          cd tests
-#          dotnet build -c Release
-#
-#      - name: Test Core
-#        run: |
-#          killall nats-server 2> /dev/null | echo -n
-#          nats-server -v
-#          cd tests/NATS.Client.Core.Tests
-#          dotnet test -c Release --no-build
-#
-#      - name: Test Slow
-#        run: |
-#            killall nats-server 2> /dev/null | echo -n
-#            nats-server -v
-#            cd tests/NATS.Slow.Tests
-#            dotnet test -c Release --no-build
+name: Test Linux Core
+
+on:
+  pull_request: {}
+  push:
+    branches:
+    - main
+
+jobs:
+  linux_test:
+    name: Linux
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - branch: 'v2.10'
+          - branch: 'v2.11'
+          - branch: 'latest'
+          - branch: 'main'
+    runs-on: ubuntu-latest
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+      NUGET_XMLDOC_MODE: skip
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with: { cache: true }
+
+      - name: Install nats-server
+        run: go install github.com/nats-io/nats-server/v2@${{ matrix.config.branch }}
+
+      - name: Check nats-server
+        run: nats-server -v
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup dotnet
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            6.x
+            8.x
+            9.x
+
+      - name: Build
+        run: |
+          cd tests
+          dotnet build -c Release
+
+      - name: Test Core
+        run: |
+          killall nats-server 2> /dev/null | echo -n
+          nats-server -v
+          cd tests/NATS.Client.Core.Tests
+          dotnet test -c Release --no-build
+
+      - name: Test Slow
+        run: |
+            killall nats-server 2> /dev/null | echo -n
+            nats-server -v
+            cd tests/NATS.Slow.Tests
+            dotnet test -c Release --no-build
