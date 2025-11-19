@@ -67,9 +67,17 @@ public partial class NatsConnection
 
     private async ValueTask ConnectAndPublishAsync<T>(string subject, T? data, NatsHeaders? headers, string? replyTo, INatsSerialize<T> serializer, CancellationToken cancellationToken)
     {
-        using var cts1 = new CancellationTokenSource(Opts.CommandTimeout);
-        using var cts2 = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, cts1.Token);
-        await ConnectAsync().AsTask().WaitAsync(cts2.Token).ConfigureAwait(false);
+        if (Opts.PublishTimeoutOnDisconnected)
+        {
+            using var cts1 = new CancellationTokenSource(Opts.CommandTimeout);
+            using var cts2 = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, cts1.Token);
+            await ConnectAsync().AsTask().WaitAsync(cts2.Token).ConfigureAwait(false);
+        }
+        else
+        {
+            await ConnectAsync().AsTask().WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         await CommandWriter.PublishAsync(subject, data, headers, replyTo, serializer, cancellationToken).ConfigureAwait(false);
     }
 }
