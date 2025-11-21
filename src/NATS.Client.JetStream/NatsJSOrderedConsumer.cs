@@ -59,7 +59,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
     /// <typeparam name="T">Serialized message data type.</typeparam>
     /// <returns>Asynchronous enumeration which can be used in a <c>await foreach</c> loop.</returns>
     /// <exception cref="NatsJSProtocolException">There was a JetStream server error.</exception>
-    public async IAsyncEnumerable<NatsJSMsg<T>> ConsumeAsync<T>(
+    public async IAsyncEnumerable<INatsJSMsg<T>> ConsumeAsync<T>(
         INatsDeserialize<T>? serializer = default,
         NatsJSConsumeOpts? opts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -193,7 +193,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel fetch operation.</param>
     /// <typeparam name="T">Serialized message data type.</typeparam>
     /// <returns>Asynchronous enumeration which can be used in a <c>await foreach</c> loop.</returns>
-    public async IAsyncEnumerable<NatsJSMsg<T>> FetchAsync<T>(
+    public async IAsyncEnumerable<INatsJSMsg<T>> FetchAsync<T>(
         NatsJSFetchOpts opts,
         INatsDeserialize<T>? serializer = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -261,7 +261,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
     }
 
     /// <inheritdoc />
-    public async IAsyncEnumerable<NatsJSMsg<T>> FetchNoWaitAsync<T>(
+    public async IAsyncEnumerable<INatsJSMsg<T>> FetchNoWaitAsync<T>(
         NatsJSFetchOpts opts,
         INatsDeserialize<T>? serializer = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -335,7 +335,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the underlying fetch operation.</param>
     /// <typeparam name="T">Serialized message data type.</typeparam>
     /// <returns>The next NATS JetStream message in order.</returns>
-    public async ValueTask<NatsJSMsg<T>?> NextAsync<T>(INatsDeserialize<T>? serializer = default, NatsJSNextOpts? opts = default, CancellationToken cancellationToken = default)
+    public async ValueTask<INatsJSMsg<T>?> NextAsync<T>(INatsDeserialize<T>? serializer = default, NatsJSNextOpts? opts = default, CancellationToken cancellationToken = default)
     {
         opts ??= _context.Opts.DefaultNextOpts;
 
