@@ -186,6 +186,7 @@ public sealed record NatsOpts
     /// For the library to handle TLS upgrade automatically, implement the <see cref="INatsTlsUpgradeableSocketConnection"/> interface.
     /// </summary>
     /// <seealso cref="INatsTlsUpgradeableSocketConnection"/>
+    [Obsolete("Use ExtensionPoints.SocketConnectionFactory instead.")]
     public INatsSocketConnectionFactory? SocketConnectionFactory { get; init; }
 
     /// <summary>
@@ -210,6 +211,17 @@ public sealed record NatsOpts
     /// </para>
     /// </remarks>
     public bool RetryOnInitialConnect { get; init; }
+
+    /// <summary>
+    /// Provides an entry point for extending the behavior of the NATS client.
+    /// </summary>
+    /// <remarks>
+    /// This property allows customization of various internal aspects of the NATS client,
+    /// including connection management, message interception, and subscription handling.
+    /// By utilizing <see cref="NatsExtensionPoints"/>, you can provide implementations
+    /// for specific interfaces to override default behaviors.
+    /// </remarks>
+    public NatsExtensionPoints? ExtensionPoints { get; init; }
 
     internal NatsUri[] GetSeedUris(bool suppressRandomization = false)
     {
