@@ -311,6 +311,7 @@ public class NatsJSConsumer : INatsJSConsumer
         Info = await _context.JSRequestResponseAsync<object, ConsumerInfo>(
             subject: $"{_context.Opts.Prefix}.CONSUMER.INFO.{_stream}.{_consumer}",
             request: null,
+            apiLevel: default,
             cancellationToken).ConfigureAwait(false);
 
     internal async ValueTask<NatsJSConsume<T>> ConsumeInternalAsync<T>(INatsDeserialize<T>? serializer = default, NatsJSConsumeOpts? opts = default, CancellationToken cancellationToken = default)
