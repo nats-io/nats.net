@@ -400,7 +400,15 @@ public partial class NatsConnection : INatsConnection
             lock (_gate)
             {
                 ConnectionState = NatsConnectionState.Closed; // allow retry connect
-                _waitForOpenConnection.TrySetException(exception); // throw for waiter
+
+                // throw for the waiter
+                if (_waitForOpenConnection.TrySetException(exception))
+                {
+                    // Suppress unobserved exceptions as the exceptions will surface elsewhere,
+                    // the exception is thrown below as well.
+                    _ = _waitForOpenConnection.Task.Exception;
+                }
+
                 _waitForOpenConnection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             }
 
@@ -420,7 +428,15 @@ public partial class NatsConnection : INatsConnection
             lock (_gate)
             {
                 ConnectionState = NatsConnectionState.Closed; // allow retry connect
-                _waitForOpenConnection.TrySetException(exception); // throw for waiter
+
+                // throw for the waiter
+                if (_waitForOpenConnection.TrySetException(exception))
+                {
+                    // Suppress unobserved exceptions as the exceptions will surface elsewhere,
+                    // the exception is thrown below as well.
+                    _ = _waitForOpenConnection.Task.Exception;
+                }
+
                 _waitForOpenConnection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             }
 
