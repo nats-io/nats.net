@@ -41,10 +41,12 @@ public partial class NatsConnection : INatsConnection
     private readonly CancellationTokenSource _disposedCts;
     private readonly CancellationTokenSource _initialConnectCts;
     private readonly string _name;
+    private readonly int _arrayPoolInitialSize;
     private readonly TimeSpan _socketComponentDisposeTimeout = TimeSpan.FromSeconds(5);
     private readonly BoundedChannelOptions _defaultSubscriptionChannelOpts;
     private readonly Channel<(NatsEvent, NatsEventArgs)> _eventChannel;
     private readonly ClientOpts _clientOpts;
+    private readonly HeaderWriter _headerWriter;
     private readonly SubscriptionManager _subscriptionManager;
     private readonly ReplyTaskFactory _replyTaskFactory;
 
@@ -69,6 +71,8 @@ public partial class NatsConnection : INatsConnection
     private Task? _publishEventsTask;
     private Task? _reconnectLoopTask;
 
+    private CommandWriter? _priorityCommandWriter = null;
+
     public NatsConnection()
         : this(NatsOpts.Default)
     {
@@ -85,11 +89,16 @@ public partial class NatsConnection : INatsConnection
         _pool = new ObjectPool(opts.ObjectPoolSize);
         _name = opts.Name;
         Counter = new ConnectionStatsCounter();
-        CommandWriter = new CommandWriter("main", this, _pool, Opts, Counter, EnqueuePing);
+
+        // Derive ArrayPool rent size from buffer size to
+        // avoid defining another option.
+        _arrayPoolInitialSize = opts.WriterBufferSize / 256;
+        CommandWriter = new CommandWriter("main", this, Opts, Counter, EnqueuePing);
         InboxPrefix = NewInbox(opts.InboxPrefix);
         _subscriptionManager = new SubscriptionManager(this, InboxPrefix);
         _replyTaskFactory = new ReplyTaskFactory(this);
         _clientOpts = ClientOpts.Create(Opts);
+        _headerWriter = new HeaderWriter(opts.HeaderEncoding);
         HeaderParser = new NatsHeaderParser(opts.HeaderEncoding);
         _defaultSubscriptionChannelOpts = new BoundedChannelOptions(opts.SubPendingChannelCapacity)
         {
@@ -346,7 +355,17 @@ public partial class NatsConnection : INatsConnection
     internal ValueTask PongAsync() => CommandWriter.PongAsync(CancellationToken.None);
 
     // called only internally
-    internal ValueTask SubscribeCoreAsync(int sid, string subject, string? queueGroup, int? maxMsgs, CancellationToken cancellationToken) => CommandWriter.SubscribeAsync(sid, subject, queueGroup, maxMsgs, cancellationToken);
+    internal ValueTask SubscribeCoreAsync(int sid, string subject, string? queueGroup, int? maxMsgs, bool priority, CancellationToken cancellationToken)
+    {
+        if (!priority || _priorityCommandWriter == null)
+        {
+            return CommandWriter.SubscribeAsync(sid, subject, queueGroup, maxMsgs, cancellationToken);
+        }
+        else
+        {
+            return _priorityCommandWriter.SubscribeAsync(sid, subject, queueGroup, maxMsgs, cancellationToken);
+        }
+    }
 
     internal ValueTask UnsubscribeAsync(int sid)
     {
@@ -578,6 +597,8 @@ public partial class NatsConnection : INatsConnection
 
             await using (var priorityCommandWriter = new PriorityCommandWriter(this, _pool, _socketConnection!, Opts, Counter, EnqueuePing))
             {
+                _priorityCommandWriter = priorityCommandWriter.CommandWriter;
+
                 // add CONNECT and PING command to priority lane
                 await priorityCommandWriter.CommandWriter.ConnectAsync(_clientOpts, CancellationToken.None).ConfigureAwait(false);
                 await priorityCommandWriter.CommandWriter.PingAsync(new PingCommand(_pool), CancellationToken.None).ConfigureAwait(false);
@@ -607,6 +628,9 @@ public partial class NatsConnection : INatsConnection
                     // wait for reconnect commands to complete
                     await reconnectTask.ConfigureAwait(false);
                 }
+
+                await _priorityCommandWriter.DisposeAsync().ConfigureAwait(false);
+                _priorityCommandWriter = null;
             }
 
             // create the socket writer
