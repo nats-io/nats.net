@@ -35,24 +35,4 @@ public static class FluentAssertionsExtension
     {
         source.ToArray().Should().Equal(elements);
     }
-
-    public static GenericCollectionAssertions<T> Should<T>(this Memory<T> source)
-    {
-        return source.ToArray().Should();
-    }
-
-    public static GenericCollectionAssertions<T> Should<T>(this ReadOnlyMemory<T> source)
-    {
-        return source.ToArray().Should();
-    }
-
-    public static GenericCollectionAssertions<T> Should<T>(this Span<T> source)
-    {
-        return source.ToArray().Should();
-    }
-
-    public static GenericCollectionAssertions<T> Should<T>(this ReadOnlySpan<T> source)
-    {
-        return source.ToArray().Should();
-    }
 }
