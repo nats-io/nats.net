@@ -41,9 +41,59 @@ thrown by the client library, for example:
 
 * Consumer is deleted by another application or operator
 * Connection to NATS server is interrupted (mainly for next and fetch methods, consume method can recover)
+* Connection permanently fails after max reconnect retries are exceeded (`NatsConnectionFailedException`)
+* Ephemeral consumer has been deleted (detected via consecutive 503 errors)
 * Client pull request is invalid
 * Account permissions have changed
 * Cluster leader changed
+
+### Connection Failure Handling
+
+When the connection to the NATS server permanently fails (e.g., max reconnect retries exceeded), the consume method
+will throw a `NatsConnectionFailedException`. This exception indicates that the connection cannot be recovered and
+the application should handle the failure appropriately:
+
+```csharp
+try
+{
+    await foreach (var msg in consumer.ConsumeAsync<MyData>())
+    {
+        // Process message
+        await msg.AckAsync();
+    }
+}
+catch (NatsConnectionFailedException ex)
+{
+    // Connection has permanently failed and cannot be recovered
+    // Application should handle this scenario (e.g., shutdown gracefully, alert operators)
+    logger.LogError(ex, "NATS connection permanently failed");
+}
+```
+
+### Ephemeral Consumer Detection
+
+For ephemeral consumers, the client library can detect when the consumer has been deleted by monitoring
+consecutive 503 "No Responders" errors. By default, if 10 consecutive 503 errors are received, the consume
+method will throw a `NatsJSException` indicating the consumer appears to be deleted. You can configure this
+threshold or disable it entirely:
+
+```csharp
+// Configure 503 error threshold
+var opts = new NatsJSConsumeOpts
+{
+    MaxMsgs = 1000,
+    MaxConsecutive503Errors = 5,  // Throw after 5 consecutive 503 errors
+};
+
+// Disable 503 error detection
+var optsDisabled = new NatsJSConsumeOpts
+{
+    MaxMsgs = 1000,
+    MaxConsecutive503Errors = -1,  // Disable detection
+};
+```
+
+### General Error Handling
 
 A naive implementation might try to recover from errors assuming they are temporary e.g. the stream or the consumer
 will be created eventually:
