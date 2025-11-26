@@ -19,38 +19,7 @@ public partial class NatsJSContext
         StreamConfig config,
         CancellationToken cancellationToken = default)
     {
-        ThrowIfInvalidStreamName(config.Name, nameof(config.Name));
-
-        // keep caller's config intact.
-        config = config with { };
-
-        // If we have a mirror and an external domain, convert to ext.APIPrefix.
-        if (config.Mirror != null && !string.IsNullOrEmpty(config.Mirror.Domain))
-        {
-            config.Mirror = config.Mirror with { };
-            ConvertDomain(config.Mirror);
-        }
-
-        // Check sources for the same.
-        if (config.Sources != null && config.Sources.Count > 0)
-        {
-            ICollection<StreamSource>? sources = [];
-            foreach (var ss in config.Sources)
-            {
-                if (!string.IsNullOrEmpty(ss.Domain))
-                {
-                    var remappedDomainSource = ss with { };
-                    ConvertDomain(remappedDomainSource);
-                    sources.Add(remappedDomainSource);
-                }
-                else
-                {
-                    sources.Add(ss);
-                }
-            }
-
-            config.Sources = sources;
-        }
+        config = AdjustStreamConfigForDomain(config);
 
         var response = await JSRequestResponseAsync<StreamConfig, StreamInfo>(
             subject: $"{Opts.Prefix}.STREAM.CREATE.{config.Name}",
@@ -71,7 +40,7 @@ public partial class NatsJSContext
     /// <exception cref="ArgumentNullException">The name in <paramref name="config"/> is <c>null</c>.</exception>
     public async ValueTask<INatsJSStream> CreateOrUpdateStreamAsync(StreamConfig config, CancellationToken cancellationToken = default)
     {
-        ThrowIfInvalidStreamName(config.Name, nameof(config.Name));
+        config = AdjustStreamConfigForDomain(config);
         var response = await JSRequestAsync<StreamConfig, StreamUpdateResponse>(
             subject: $"{Opts.Prefix}.STREAM.UPDATE.{config.Name}",
             request: config,
@@ -194,7 +163,7 @@ public partial class NatsJSContext
         StreamConfig request,
         CancellationToken cancellationToken = default)
     {
-        ThrowIfInvalidStreamName(request.Name, nameof(request.Name));
+        request = AdjustStreamConfigForDomain(request);
         var response = await JSRequestResponseAsync<StreamConfig, StreamUpdateResponse>(
             subject: $"{Opts.Prefix}.STREAM.UPDATE.{request.Name}",
             request: request,
@@ -266,5 +235,43 @@ public partial class NatsJSContext
 
             offset += response.Streams.Count;
         }
+    }
+
+    private static StreamConfig AdjustStreamConfigForDomain(StreamConfig config)
+    {
+        ThrowIfInvalidStreamName(config.Name, nameof(config.Name));
+
+        // keep caller's config intact.
+        config = config with { };
+
+        // If we have a mirror and an external domain, convert to ext.APIPrefix.
+        if (config.Mirror != null && !string.IsNullOrEmpty(config.Mirror.Domain))
+        {
+            config.Mirror = config.Mirror with { };
+            ConvertDomain(config.Mirror);
+        }
+
+        // Check sources for the same.
+        if (config.Sources != null && config.Sources.Count > 0)
+        {
+            ICollection<StreamSource>? sources = [];
+            foreach (var ss in config.Sources)
+            {
+                if (!string.IsNullOrEmpty(ss.Domain))
+                {
+                    var remappedDomainSource = ss with { };
+                    ConvertDomain(remappedDomainSource);
+                    sources.Add(remappedDomainSource);
+                }
+                else
+                {
+                    sources.Add(ss);
+                }
+            }
+
+            config.Sources = sources;
+        }
+
+        return config;
     }
 }
