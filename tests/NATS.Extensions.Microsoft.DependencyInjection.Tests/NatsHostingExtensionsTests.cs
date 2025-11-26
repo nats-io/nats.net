@@ -594,6 +594,64 @@ public class NatsHostingExtensionsTests
                 Assert.NotSame(obj1, obj2);
         }
     }
+
+    /// <summary>
+    /// Test for GitHub issue #1003: NatsOptsBuilder options are overwritten when multiple keyed clients are registered.
+    /// When injecting NATS twice with different keys, each injection should use its own configuration,
+    /// not the configuration from another injection.
+    /// </summary>
+    /// <see href="https://github.com/nats-io/nats.net/issues/1003"/>
+    [Fact]
+    public void AddNats_KeyedConnections_ShouldUseTheirOwnConfiguration()
+    {
+        var key1 = "FirstNATS";
+        var key2 = "SecondNATS";
+        var url1 = "nats://first:4222";
+        var url2 = "nats://second:4222";
+
+        var services = new ServiceCollection();
+        services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
+
+        // Register first NATS client with key1 and url1
+        services.AddNatsClient(builder => builder
+            .WithKey(key1)
+            .ConfigureOptions(optionsBuilder =>
+                optionsBuilder.Configure(opts =>
+                    opts.Opts = opts.Opts with { Url = url1 })));
+
+        // Register second NATS client with key2 and url2
+        services.AddNatsClient(builder => builder
+            .WithKey(key2)
+            .ConfigureOptions(optionsBuilder =>
+                optionsBuilder.Configure(opts =>
+                    opts.Opts = opts.Opts with { Url = url2 })));
+
+        var provider = services.BuildServiceProvider();
+
+        // Resolve both keyed connections
+        var nats1 = provider.GetRequiredKeyedService<INatsConnection>(key1);
+        var nats2 = provider.GetRequiredKeyedService<INatsConnection>(key2);
+
+        // Each connection should have its own configured URL
+        Assert.Equal(url1, nats1.Opts.Url);
+        Assert.Equal(url2, nats2.Opts.Url);
+    }
+
+    [Fact]
+    public void AddNats_WithKey_ThrowsIfCalledAfterConfigureOptions()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+        {
+            services.AddNatsClient(builder => builder
+                .ConfigureOptions(opts => { }) // Called first
+                .WithKey("TestKey"));          // Should throw
+        });
+
+        Assert.Contains("WithKey must be called before", exception.Message);
+    }
 #endif
 }
 
