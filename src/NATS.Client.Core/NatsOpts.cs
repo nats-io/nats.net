@@ -212,7 +212,7 @@ public sealed record NatsOpts
     /// The default is <c>false</c>, meaning publish will not throw on disconnected state
     /// and will wait to publish the message until reconnected.
     /// </summary>
-    public bool PublishTimeoutOnDisconnected { get; set; } = false;
+    public bool PublishTimeoutOnDisconnected { get; init; } = false;
 
     internal NatsUri[] GetSeedUris(bool suppressRandomization = false)
     {
