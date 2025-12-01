@@ -180,6 +180,64 @@ public class PublishTest
         }
     }
 
+    [SkipIfNatsServer(versionEarlierThan: "2.12")]
+    public async Task Publish_expected_last_subject_sequence_subject_test()
+    {
+        await using var nats = new NatsConnection(new NatsOpts
+        {
+            Url = _server.Url,
+            ConnectTimeout = TimeSpan.FromSeconds(10),
+        });
+        await nats.ConnectRetryAsync();
+        var prefix = _server.GetNextId();
+
+        var js = new NatsJSContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        await js.CreateStreamAsync($"{prefix}s1", new[] { $"{prefix}s1.>" }, cts.Token);
+
+        // Publish to subject1
+        var ack1 = await js.PublishAsync(
+            subject: $"{prefix}s1.filter.subject1",
+            data: 1,
+            cancellationToken: cts.Token);
+        Assert.Null(ack1.Error);
+
+        // Publish to subject2
+        var ack2 = await js.PublishAsync(
+            subject: $"{prefix}s1.filter.subject2",
+            data: 2,
+            cancellationToken: cts.Token);
+        Assert.Null(ack2.Error);
+
+        // Publish to subject1 again, using ExpectedLastSubjectSequenceSubject to check against subject2's last sequence
+        var ack3 = await js.PublishAsync(
+            subject: $"{prefix}s1.filter.subject1",
+            data: 3,
+            opts: new NatsJSPubOpts
+            {
+                ExpectedLastSubjectSequence = ack2.Seq,
+                ExpectedLastSubjectSequenceSubject = $"{prefix}s1.filter.subject2",
+            },
+            cancellationToken: cts.Token);
+        Assert.Null(ack3.Error);
+
+        // Publish with stale sequence for subject2 should fail
+        var ack4 = await js.PublishAsync(
+            subject: $"{prefix}s1.filter.subject1",
+            data: 4,
+            opts: new NatsJSPubOpts
+            {
+                ExpectedLastSubjectSequence = ack1.Seq, // stale sequence
+                ExpectedLastSubjectSequenceSubject = $"{prefix}s1.filter.subject2",
+            },
+            cancellationToken: cts.Token);
+        Assert.Equal(400, ack4.Error?.Code);
+        Assert.Equal(10071, ack4.Error?.ErrCode);
+        Assert.Matches(@"wrong last sequence: \d+", ack4.Error?.Description);
+    }
+
     [Theory]
     [InlineData(NatsRequestReplyMode.Direct)]
     [InlineData(NatsRequestReplyMode.SharedInbox)]
