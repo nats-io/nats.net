@@ -160,6 +160,12 @@ public partial class NatsJSContext
                 headers ??= new NatsHeaders();
                 headers["Nats-Expected-Last-Subject-Sequence"] = opts.ExpectedLastSubjectSequence.ToString();
             }
+
+            if (opts.ExpectedLastSubjectSequenceSubject != null)
+            {
+                headers ??= new NatsHeaders();
+                headers["Nats-Expected-Last-Subject-Sequence-Subject"] = opts.ExpectedLastSubjectSequenceSubject;
+            }
         }
 
         opts ??= NatsJSPubOpts.Default;
@@ -300,6 +306,12 @@ public partial class NatsJSContext
             {
                 headers ??= new NatsHeaders();
                 headers["Nats-Expected-Last-Subject-Sequence"] = opts.ExpectedLastSubjectSequence.ToString();
+            }
+
+            if (opts.ExpectedLastSubjectSequenceSubject != null)
+            {
+                headers ??= new NatsHeaders();
+                headers["Nats-Expected-Last-Subject-Sequence-Subject"] = opts.ExpectedLastSubjectSequenceSubject;
             }
         }
 
