@@ -246,6 +246,8 @@ internal class NatsJSJsonStringEnumConverter<TEnum> : JsonConverter<TEnum>
                 return (TEnum)(object)ConsumerConfigPriorityPolicy.Prioritized;
             case "overflow":
                 return (TEnum)(object)ConsumerConfigPriorityPolicy.Overflow;
+            case "pinned_client":
+                return (TEnum)(object)ConsumerConfigPriorityPolicy.PinnedClient;
             }
         }
 
@@ -395,6 +397,9 @@ internal class NatsJSJsonStringEnumConverter<TEnum> : JsonConverter<TEnum>
                 return;
             case ConsumerConfigPriorityPolicy.Overflow:
                 writer.WriteStringValue("overflow");
+                return;
+            case ConsumerConfigPriorityPolicy.PinnedClient:
+                writer.WriteStringValue("pinned_client");
                 return;
             }
         }
