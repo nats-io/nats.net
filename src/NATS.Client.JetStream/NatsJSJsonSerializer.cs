@@ -32,6 +32,8 @@ public static class NatsJSJsonSerializer<T>
 [JsonSerializable(typeof(ConsumerNamesResponse))]
 [JsonSerializable(typeof(ConsumerPauseRequest))]
 [JsonSerializable(typeof(ConsumerPauseResponse))]
+[JsonSerializable(typeof(ConsumerUnpinRequest))]
+[JsonSerializable(typeof(ConsumerUnpinResponse))]
 [JsonSerializable(typeof(ErrorResponse))]
 [JsonSerializable(typeof(ExternalStreamSource))]
 [JsonSerializable(typeof(IterableRequest))]

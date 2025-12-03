@@ -25,4 +25,5 @@ public static class NatsJSLogEvents
     public static readonly EventId Retry = new(2019, nameof(Retry));
     public static readonly EventId NoResponders = new(2020, nameof(NoResponders));
     public static readonly EventId MessageSizeExceedsMaxBytes = new(2021, nameof(MessageSizeExceedsMaxBytes));
+    public static readonly EventId PinIdMismatch = new(2022, nameof(PinIdMismatch));
 }
