@@ -206,6 +206,14 @@ public sealed record NatsOpts
     /// </remarks>
     public bool RetryOnInitialConnect { get; init; }
 
+    /// <summary>
+    /// Gets or sets a value indicating whether publish would throw an exception
+    /// when the connection is disconnected and the <see cref="CommandTimeout"/> is reached.
+    /// The default is <c>false</c>, meaning publish will not throw on disconnected state
+    /// and will wait to publish the message until reconnected.
+    /// </summary>
+    public bool PublishTimeoutOnDisconnected { get; init; } = false;
+
     internal NatsUri[] GetSeedUris(bool suppressRandomization = false)
     {
         var urls = Url.Split(',');

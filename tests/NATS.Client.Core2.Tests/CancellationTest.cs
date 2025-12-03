@@ -89,4 +89,93 @@ public class CancellationTest
             }
         });
     }
+
+    [Fact]
+    public async Task PublishTimeoutOnDisconnected_WhenEnabled_ThrowsOnTimeout()
+    {
+        var server = await NatsServerProcess.StartAsync();
+
+        await using var conn = new NatsConnection(new NatsOpts
+        {
+            Url = server.Url,
+            CommandTimeout = TimeSpan.FromMilliseconds(500),
+            PublishTimeoutOnDisconnected = true,
+        });
+        await conn.ConnectAsync();
+
+        // Kill the server
+        await server.DisposeAsync();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        // Wait for reconnect loop to kick in
+        while (conn.ConnectionState != NatsConnectionState.Reconnecting)
+        {
+            await Task.Delay(1, cts.Token);
+        }
+
+        // PublishAsync should throw TaskCanceledException due to CommandTimeout
+        await Assert.ThrowsAsync<TaskCanceledException>(() => conn.PublishAsync("test", "data").AsTask());
+    }
+
+    [Fact]
+    public async Task PublishTimeoutOnDisconnected_WhenDisabled_WaitsIndefinitely()
+    {
+        var server = await NatsServerProcess.StartAsync();
+
+        await using var conn = new NatsConnection(new NatsOpts
+        {
+            Url = server.Url,
+            PublishTimeoutOnDisconnected = false, // default
+        });
+        await conn.ConnectAsync();
+
+        // Kill the server
+        await server.DisposeAsync();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        // Wait for reconnect loop to kick in
+        while (conn.ConnectionState != NatsConnectionState.Reconnecting)
+        {
+            await Task.Delay(1, cts.Token);
+        }
+
+        // With option disabled, publish waits indefinitely - user cancellation should work
+        var userCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
+
+        // Should throw TaskCanceledException (user-initiated cancellation)
+        await Assert.ThrowsAsync<TaskCanceledException>(() => conn.PublishAsync("test", "data", cancellationToken: userCts.Token).AsTask());
+    }
+
+    [Fact]
+    public async Task PublishTimeoutOnDisconnected_UserCancellation_StillWorks()
+    {
+        var server = await NatsServerProcess.StartAsync();
+
+        await using var conn = new NatsConnection(new NatsOpts
+        {
+            Url = server.Url,
+            CommandTimeout = TimeSpan.FromSeconds(30), // Long timeout
+            PublishTimeoutOnDisconnected = true,
+        });
+        await conn.ConnectAsync();
+
+        // Kill the server
+        await server.DisposeAsync();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        // Wait for reconnect loop to kick in
+        while (conn.ConnectionState != NatsConnectionState.Reconnecting)
+        {
+            await Task.Delay(1, cts.Token);
+        }
+
+        // User cancellation should still work even with PublishTimeoutOnDisconnected enabled
+        var userCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
+
+        // Should throw TaskCanceledException (user-initiated cancellation) before CommandTimeout
+        await Assert.ThrowsAsync<TaskCanceledException>(() => conn.PublishAsync("test", "data", cancellationToken: userCts.Token).AsTask());
+    }
 }
