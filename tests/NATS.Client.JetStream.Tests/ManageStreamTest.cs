@@ -377,4 +377,64 @@ public class ManageStreamTest
         var updatedAsync = await js.GetStreamAsync($"{prefix}persist-async", cancellationToken: cts.Token);
         Assert.Equal(StreamConfigPersistMode.Async, updatedAsync.Info.Config.PersistMode);
     }
+
+    [SkipIfNatsServer(versionEarlierThan: "2.12")]
+    public async Task Remove_mirror_config_to_promote_stream()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
+        await nats.ConnectRetryAsync();
+
+        var js = new NatsJSContext(nats);
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        // Create source stream
+        await js.CreateStreamAsync(
+            new StreamConfig($"{prefix}SOURCE", [$"{prefix}foo"]),
+            cts.Token);
+
+        // Publish some messages to source
+        for (var i = 0; i < 10; i++)
+        {
+            await js.PublishAsync($"{prefix}foo", new byte[] { (byte)i }, cancellationToken: cts.Token);
+        }
+
+        // Create mirror stream
+        var mirror = await js.CreateStreamAsync(
+            new StreamConfig
+            {
+                Name = $"{prefix}MIRROR",
+                Mirror = new StreamSource { Name = $"{prefix}SOURCE" },
+            },
+            cts.Token);
+
+        Assert.NotNull(mirror.Info.Config.Mirror);
+        Assert.Equal($"{prefix}SOURCE", mirror.Info.Config.Mirror.Name);
+
+        // Wait for mirror to catch up
+        await Retry.Until(
+            "mirror caught up",
+            async () =>
+            {
+                await mirror.RefreshAsync(cts.Token);
+                return mirror.Info.State.Messages == 10;
+            },
+            timeout: TimeSpan.FromSeconds(10));
+
+        // Remove mirror configuration - promote to regular stream
+        var promoted = await js.UpdateStreamAsync(
+            new StreamConfig
+            {
+                Name = $"{prefix}MIRROR",
+                Subjects = [$"{prefix}bar"],
+            },
+            cts.Token);
+
+        // Verify mirror is null after promotion
+        Assert.Null(promoted.Info.Config.Mirror);
+        Assert.Contains($"{prefix}bar", promoted.Info.Config.Subjects!);
+
+        // Verify messages are retained after promotion
+        Assert.Equal(10, promoted.Info.State.Messages);
+    }
 }
