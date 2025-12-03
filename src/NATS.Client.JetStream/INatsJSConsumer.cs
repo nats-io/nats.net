@@ -82,6 +82,16 @@ public interface INatsJSConsumer
     ValueTask RefreshAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Unpins this consumer from the current pinned client.
+    /// </summary>
+    /// <param name="group">The priority group name to unpin.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
+    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    ValueTask UnpinAsync(string group, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Consume a set number of messages from the stream using this consumer.
     /// Returns immediately if no messages are available.
     /// </summary>

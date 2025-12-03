@@ -67,6 +67,8 @@ public class NatsKVContextFactoryTest
 
         public ValueTask<bool> ResumeConsumerAsync(string stream, string consumer, CancellationToken cancellationToken = default) => throw new NotImplementedException();
 
+        public ValueTask UnpinConsumerAsync(string stream, string consumer, string group, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+
         public ValueTask<AccountInfoResponse> GetAccountInfoAsync(CancellationToken cancellationToken = default) => throw new NotImplementedException();
 
         public ValueTask<PubAckResponse> PublishAsync<T>(string subject, T? data, INatsSerialize<T>? serializer = default, NatsJSPubOpts? opts = default, NatsHeaders? headers = default, CancellationToken cancellationToken = default) => throw new NotImplementedException();

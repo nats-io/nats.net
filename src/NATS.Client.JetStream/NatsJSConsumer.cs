@@ -14,7 +14,9 @@ public class NatsJSConsumer : INatsJSConsumer
     private readonly NatsJSContext _context;
     private readonly string _stream;
     private readonly string _consumer;
+    private readonly object _pinIdLock = new();
     private volatile bool _deleted;
+    private string? _pinId;
 
     internal NatsJSConsumer(NatsJSContext context, ConsumerInfo info)
     {
@@ -291,6 +293,38 @@ public class NatsJSConsumer : INatsJSConsumer
             request: null,
             cancellationToken).ConfigureAwait(false);
 
+    /// <inheritdoc />
+    public async ValueTask UnpinAsync(string group, CancellationToken cancellationToken = default)
+    {
+        ThrowIfDeleted();
+        await _context.UnpinConsumerAsync(_stream, _consumer, group, cancellationToken).ConfigureAwait(false);
+        SetPinId(null);
+    }
+
+    /// <summary>
+    /// Gets the current pin ID for pinned client priority policy.
+    /// </summary>
+    /// <returns>The pin ID or null if not pinned.</returns>
+    internal string? GetPinId()
+    {
+        lock (_pinIdLock)
+        {
+            return _pinId;
+        }
+    }
+
+    /// <summary>
+    /// Sets the pin ID for pinned client priority policy.
+    /// </summary>
+    /// <param name="pinId">The pin ID to set, or null to clear.</param>
+    internal void SetPinId(string? pinId)
+    {
+        lock (_pinIdLock)
+        {
+            _pinId = pinId;
+        }
+    }
+
     internal async ValueTask<NatsJSConsume<T>> ConsumeInternalAsync<T>(INatsDeserialize<T>? serializer = default, NatsJSConsumeOpts? opts = default, CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
@@ -320,6 +354,7 @@ public class NatsJSConsumer : INatsJSConsumer
             idle: timeouts.IdleHeartbeat,
             notificationHandler: opts.NotificationHandler,
             priorityGroup: opts.PriorityGroup,
+            jsConsumer: this,
             cancellationToken: cancellationToken);
 
         await _context.Connection.AddSubAsync(sub: sub, cancellationToken).ConfigureAwait(false);
@@ -337,6 +372,7 @@ public class NatsJSConsumer : INatsJSConsumer
                 MinPending = opts.PriorityGroup?.MinPending ?? 0,
                 MinAckPending = opts.PriorityGroup?.MinAckPending ?? 0,
                 Priority = opts.PriorityGroup?.Priority ?? 0,
+                Id = GetPinId(),
             },
             cancellationToken).ConfigureAwait(false);
 
@@ -421,6 +457,7 @@ public class NatsJSConsumer : INatsJSConsumer
             notificationHandler: opts.NotificationHandler,
             idle: timeouts.IdleHeartbeat,
             priorityGroup: opts.PriorityGroup,
+            jsConsumer: this,
             cancellationToken: cancellationToken);
 
         await _context.Connection.AddSubAsync(sub: sub, cancellationToken).ConfigureAwait(false);
@@ -440,6 +477,7 @@ public class NatsJSConsumer : INatsJSConsumer
                     MinPending = opts.PriorityGroup?.MinPending ?? 0,
                     MinAckPending = opts.PriorityGroup?.MinAckPending ?? 0,
                     Priority = opts.PriorityGroup?.Priority ?? 0,
+                    Id = GetPinId(),
                 }
                 : new ConsumerGetnextRequest
                 {
@@ -452,6 +490,7 @@ public class NatsJSConsumer : INatsJSConsumer
                     MinPending = opts.PriorityGroup?.MinPending ?? 0,
                     MinAckPending = opts.PriorityGroup?.MinAckPending ?? 0,
                     Priority = opts.PriorityGroup?.Priority ?? 0,
+                    Id = GetPinId(),
                 },
             cancellationToken).ConfigureAwait(false);
 

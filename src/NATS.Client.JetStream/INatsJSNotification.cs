@@ -33,4 +33,18 @@ public record NatsJSMessageSizeExceedsMaxBytesNotification : INatsJSNotification
     public string Name => "Message Size Exceeds MaxBytes";
 }
 
+/// <summary>
+/// Notification sent when the server reports a pin ID mismatch for pinned client priority policy.
+/// </summary>
+/// <remarks>
+/// This notification indicates that the client's pin ID doesn't match what the server expects.
+/// The client should clear its pin ID and retry the request to get a new pin.
+/// </remarks>
+public record NatsJSPinIdMismatchNotification : INatsJSNotification
+{
+    public static readonly NatsJSPinIdMismatchNotification Default = new();
+
+    public string Name => "Pin ID Mismatch";
+}
+
 public record NatsJSProtocolNotification(string Name, int HeaderCode, string HeaderMessageText) : INatsJSNotification;

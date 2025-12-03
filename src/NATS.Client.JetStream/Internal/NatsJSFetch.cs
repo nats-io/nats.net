@@ -22,6 +22,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
     private readonly Timer _hbTimer;
     private readonly Timer _expiresTimer;
     private readonly NatsJSNotificationChannel? _notificationChannel;
+    private readonly NatsJSConsumer? _jsConsumer;
 
     private readonly long _maxMsgs;
     private readonly long _maxBytes;
@@ -47,6 +48,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         INatsDeserialize<TMsg> serializer,
         NatsSubOpts? opts,
         NatsJSPriorityGroupOpts? priorityGroup,
+        NatsJSConsumer? jsConsumer,
         CancellationToken cancellationToken)
         : base(context.Connection, context.Connection.SubscriptionManager, subject, queueGroup, opts)
     {
@@ -57,6 +59,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         _consumer = consumer;
         _serializer = serializer;
         _priorityGroup = priorityGroup;
+        _jsConsumer = jsConsumer;
 
         if (notificationHandler is { } handler)
         {
@@ -191,6 +194,8 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
             Group = _priorityGroup?.Group,
             MinPending = _priorityGroup?.MinPending ?? 0,
             MinAckPending = _priorityGroup?.MinAckPending ?? 0,
+            Priority = _priorityGroup?.Priority ?? 0,
+            Id = _jsConsumer?.GetPinId(),
         };
 
         await commandWriter.PublishAsync(
@@ -235,6 +240,13 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
                     else if (headers is { Code: 100, Message: NatsHeaders.Messages.IdleHeartbeat })
                     {
                     }
+                    else if (headers.Code == 423)
+                    {
+                        // 423 Pin ID mismatch - clear the pin ID
+                        _logger.LogDebug(NatsJSLogEvents.PinIdMismatch, "Pin ID Mismatch");
+                        _jsConsumer?.SetPinId(null);
+                        _notificationChannel?.Notify(NatsJSPinIdMismatchNotification.Default);
+                    }
                     else if (headers.HasTerminalJSError())
                     {
                         _userMsgs.Writer.TryComplete(new NatsJSProtocolException(headers.Code, headers.Message, headers.MessageText));
@@ -272,6 +284,16 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
                     Connection.HeaderParser,
                     _serializer),
                 _context);
+
+            // Handle Nats-Pin-Id header for pinned client priority policy
+            if (_jsConsumer != null && msg.Headers != null && msg.Headers.TryGetValue("Nats-Pin-Id", out var pinIdValues))
+            {
+                var pinId = pinIdValues.ToString();
+                if (!string.IsNullOrEmpty(pinId))
+                {
+                    _jsConsumer.SetPinId(pinId);
+                }
+            }
 
             _pendingMsgs--;
             _pendingBytes -= msg.Size;

@@ -126,4 +126,12 @@ public record ConsumerInfo
     [System.Text.Json.Serialization.JsonPropertyName("push_bound")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public bool PushBound { get; set; }
+
+    /// <summary>
+    /// Information about the currently defined priority groups.
+    /// </summary>
+    /// <remarks>This feature is only available on NATS server v2.11 and later.</remarks>
+    [System.Text.Json.Serialization.JsonPropertyName("priority_groups")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public ICollection<PriorityGroupState>? PriorityGroups { get; set; }
 }
