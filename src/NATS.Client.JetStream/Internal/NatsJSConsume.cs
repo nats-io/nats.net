@@ -361,10 +361,8 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                     }
                     else if (headers.Code == 423)
                     {
-                        // 423 Pin ID mismatch - clear the pin ID and reset pending to get a new pin
                         _logger.LogDebug(NatsJSLogEvents.PinIdMismatch, "Pin ID Mismatch");
-                        _jsConsumer?.SetPinId(null);
-                        _notificationChannel?.Notify(NatsJSPinIdMismatchNotification.Default);
+                        NatsJSExtensionsInternal.HandlePinIdMismatch(_jsConsumer, _notificationChannel);
                         ResetPending();
                     }
                     else if (headers.Code == 503)
@@ -413,15 +411,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                     _serializer),
                 _context);
 
-            // Handle Nats-Pin-Id header for pinned client priority policy
-            if (_jsConsumer != null && msg.Headers != null && msg.Headers.TryGetValue("Nats-Pin-Id", out var pinIdValues))
-            {
-                var pinId = pinIdValues.ToString();
-                if (!string.IsNullOrEmpty(pinId))
-                {
-                    _jsConsumer.SetPinId(pinId);
-                }
-            }
+            NatsJSExtensionsInternal.TrySetPinIdFromHeaders(msg.Headers, _jsConsumer);
 
             // Stop feeding the user if we are disposed.
             // We need to exit as soon as possible.

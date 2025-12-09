@@ -242,10 +242,14 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
                     }
                     else if (headers.Code == 423)
                     {
-                        // 423 Pin ID mismatch - clear the pin ID
                         _logger.LogDebug(NatsJSLogEvents.PinIdMismatch, "Pin ID Mismatch");
-                        _jsConsumer?.SetPinId(null);
-                        _notificationChannel?.Notify(NatsJSPinIdMismatchNotification.Default);
+                        NatsJSExtensionsInternal.HandlePinIdMismatch(_jsConsumer, _notificationChannel);
+                    }
+                    else if (headers.Code == 503)
+                    {
+                        _logger.LogDebug(NatsJSLogEvents.NoResponders, "503 no responders");
+                        _notificationChannel?.Notify(NatsJSNoRespondersNotification.Default);
+                        EndSubscription(NatsSubEndReason.None);
                     }
                     else if (headers.HasTerminalJSError())
                     {
@@ -285,15 +289,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
                     _serializer),
                 _context);
 
-            // Handle Nats-Pin-Id header for pinned client priority policy
-            if (_jsConsumer != null && msg.Headers != null && msg.Headers.TryGetValue("Nats-Pin-Id", out var pinIdValues))
-            {
-                var pinId = pinIdValues.ToString();
-                if (!string.IsNullOrEmpty(pinId))
-                {
-                    _jsConsumer.SetPinId(pinId);
-                }
-            }
+            NatsJSExtensionsInternal.TrySetPinIdFromHeaders(msg.Headers, _jsConsumer);
 
             _pendingMsgs--;
             _pendingBytes -= msg.Size;
