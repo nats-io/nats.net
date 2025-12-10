@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
+using NATS.Client.JetStream.Models;
 using NATS.Client.Platform.Windows.Tests;
 using NATS.Client.TestUtilities2;
 
@@ -67,7 +68,17 @@ public class OrderedConsumerTest
         {
             for (var j = 0; j < 3; j++)
             {
-                var ack = await js.PublishAsync("s1.foo", i, opts: new NatsJSPubOpts { MsgId = $"{i}" }, cancellationToken: cts.Token);
+                PubAckResponse ack;
+                try
+                {
+                    ack = await js.PublishAsync("s1.foo", i, opts: new NatsJSPubOpts { MsgId = $"{i}" }, cancellationToken: cts.Token);
+                }
+                catch (NatsException)
+                {
+                    await Task.Delay(100, cts.Token);
+                    continue;
+                }
+
                 if (ack.IsSuccess())
                     return;
                 await Task.Delay(100, cts.Token);
