@@ -1,5 +1,6 @@
 using NATS.Client.Core2.Tests;
 using NATS.Client.Platform.Windows.Tests;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.Core.Tests;
 
@@ -20,7 +21,7 @@ public class CancellationTest
     public async Task CommandTimeoutTest()
     {
         await using var conn = new NatsConnection(NatsOpts.Default with { Url = _server.Url, CommandTimeout = TimeSpan.FromMilliseconds(1) });
-        await conn.ConnectAsync();
+        await conn.ConnectRetryAsync();
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
@@ -50,7 +51,7 @@ public class CancellationTest
         var server = await NatsServerProcess.StartAsync();
 
         await using var conn = new NatsConnection(new NatsOpts { Url = server.Url });
-        await conn.ConnectAsync();
+        await conn.ConnectRetryAsync();
 
         // kill the server
         await server.DisposeAsync();
@@ -101,7 +102,7 @@ public class CancellationTest
             CommandTimeout = TimeSpan.FromMilliseconds(500),
             PublishTimeoutOnDisconnected = true,
         });
-        await conn.ConnectAsync();
+        await conn.ConnectRetryAsync();
 
         // Kill the server
         await server.DisposeAsync();
@@ -128,7 +129,7 @@ public class CancellationTest
             Url = server.Url,
             PublishTimeoutOnDisconnected = false, // default
         });
-        await conn.ConnectAsync();
+        await conn.ConnectRetryAsync();
 
         // Kill the server
         await server.DisposeAsync();
@@ -159,7 +160,7 @@ public class CancellationTest
             CommandTimeout = TimeSpan.FromSeconds(30), // Long timeout
             PublishTimeoutOnDisconnected = true,
         });
-        await conn.ConnectAsync();
+        await conn.ConnectRetryAsync();
 
         // Kill the server
         await server.DisposeAsync();
