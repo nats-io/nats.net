@@ -165,9 +165,10 @@ internal class NatsJSOrderedPushConsumer<T>
         _msgChannel.Writer.TryComplete();
 
         using var cts = new CancellationTokenSource(_opts.CleanupTimeout);
+        using var ctsLinked = CancellationTokenSource.CreateLinkedTokenSource(cts.Token, _cancellationToken);
         try
         {
-            await _context.DeleteConsumerAsync(_stream, Consumer, cts.Token);
+            await _context.DeleteConsumerAsync(_stream, Consumer, ctsLinked.Token);
         }
         catch (OperationCanceledException)
         {
