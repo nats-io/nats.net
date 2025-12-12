@@ -493,12 +493,18 @@ public class ServicesTests
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
         var cancellationToken = cts.Token;
 
+        // Service stoppes and disposed normally when connection is open
         var s1 = await svc.AddServiceAsync($"s1", "1.0.0", cancellationToken: cancellationToken);
         await s1.StopAsync(cancellationToken);
         await s1.DisposeAsync();
 
-        var s2 = await svc.AddServiceAsync($"s1", "1.0.0", cancellationToken: cancellationToken);
+        // Service stop/dispose should not hang when connection is closed
+        var s2 = await svc.AddServiceAsync($"s2", "1.0.0", cancellationToken: cancellationToken);
+
+        // Stop the server to close the connection
         await server.StopAsync();
+
+        // Check that StopAsync does not hang
         var task = s2.StopAsync(cancellationToken).AsTask();
         var timeoutTask = Task.Delay(TimeSpan.FromSeconds(60), cancellationToken);
         await Task.WhenAny(task, timeoutTask).ContinueWith(
@@ -512,6 +518,7 @@ public class ServicesTests
                 return task;
             },
             cancellationToken).Unwrap();
+
         await s2.DisposeAsync();
     }
 }
