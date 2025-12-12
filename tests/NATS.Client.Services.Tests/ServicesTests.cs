@@ -4,6 +4,7 @@ using NATS.Client.Core.Tests;
 using NATS.Client.Platform.Windows.Tests;
 using NATS.Client.Services.Internal;
 using NATS.Client.Services.Models;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.Services.Tests;
 
@@ -479,5 +480,38 @@ public class ServicesTests
             // Two replies because of the absence of any queue groups
             Assert.Equal(2, count);
         }
+    }
+
+    [Fact]
+    public async Task Service_dispose_should_not_hang_when_connection_is_not_open()
+    {
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
+        var svc = new NatsSvcContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
+        var cancellationToken = cts.Token;
+
+        var s1 = await svc.AddServiceAsync($"s1", "1.0.0", cancellationToken: cancellationToken);
+        await s1.StopAsync(cancellationToken);
+        await s1.DisposeAsync();
+
+        var s2 = await svc.AddServiceAsync($"s1", "1.0.0", cancellationToken: cancellationToken);
+        await server.StopAsync();
+        var task = s2.StopAsync(cancellationToken).AsTask();
+        var timeoutTask = Task.Delay(TimeSpan.FromSeconds(60), cancellationToken);
+        await Task.WhenAny(task, timeoutTask).ContinueWith(
+            completedTask =>
+            {
+                if (completedTask.Result == timeoutTask)
+                {
+                    throw new Exception("Service hanged!");
+                }
+
+                return task;
+            },
+            cancellationToken).Unwrap();
+        await s2.DisposeAsync();
     }
 }
