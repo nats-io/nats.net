@@ -87,6 +87,7 @@ public class Subscribe
         }
     }
 
+#if !NET481
     [Benchmark]
     public async Task CoreReadAll()
     {
@@ -102,6 +103,7 @@ public class Subscribe
             }
         }
     }
+#endif
 
     // limit pub to the same rate across benchmarks
     // pub in batches so that groups of messages are available

@@ -36,6 +36,12 @@ internal sealed class ProtocolWriter
     private static readonly ulong PongNewLine = BinaryPrimitives.ReadUInt64LittleEndian("PONG\r\n  "u8);
     private static readonly ulong UnsubSpace = BinaryPrimitives.ReadUInt64LittleEndian("UNSUB   "u8);
 
+#if NET8_0_OR_GREATER
+    private static readonly SearchValues<char> WhitespaceChars = SearchValues.Create([' ', '\r', '\n', '\t']);
+#else
+    private static readonly char[] WhitespaceChars = [' ', '\r', '\n', '\t'];
+#endif
+
     private readonly Encoding _subjectEncoding;
 
     public ProtocolWriter(Encoding subjectEncoding) => _subjectEncoding = subjectEncoding;
@@ -79,6 +85,12 @@ internal sealed class ProtocolWriter
     // HPUB <subject> [reply-to] <#header bytes> <#total bytes>\r\n[headers]\r\n\r\n[payload]\r\n
     public void WritePublish(IBufferWriter<byte> writer, string subject, string? replyTo, ReadOnlyMemory<byte>? headers, ReadOnlyMemory<byte> payload)
     {
+        CheckSubjectForWhitespace(subject);
+        if (replyTo != null)
+        {
+            CheckSubjectForWhitespace(replyTo);
+        }
+
         if (headers == null)
         {
             WritePub(writer, subject, replyTo, payload);
@@ -93,6 +105,12 @@ internal sealed class ProtocolWriter
     // SUB <subject> [queue group] <sid>
     public void WriteSubscribe(IBufferWriter<byte> writer, int sid, string subject, string? queueGroup, int? maxMsgs)
     {
+        CheckSubjectForWhitespace(subject);
+        if (queueGroup != null)
+        {
+            CheckSubjectForWhitespace(queueGroup);
+        }
+
         // 'SUB '                       + subject                                +' '+ sid                +'\r\n'
         var ctrlLen = SubSpaceLength + _subjectEncoding.GetByteCount(subject) + 1 + MaxIntStringLength + NewLineLength;
 
@@ -187,6 +205,18 @@ internal sealed class ProtocolWriter
     // optimization detailed here: https://github.com/nats-io/nats.net/issues/320#issuecomment-1886165748
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void ThrowOnUtf8FormatFail() => throw new NatsException("Can not format integer.");
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void ThrowOnSubjectFormatFail() => throw new NatsException("Subject cannot be empty or contain whitespace.");
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void CheckSubjectForWhitespace(ReadOnlySpan<char> subject)
+    {
+        if (subject.IsEmpty || subject.IndexOfAny(WhitespaceChars) >= 0)
+        {
+            ThrowOnSubjectFormatFail();
+        }
+    }
 
     // PUB <subject> [reply-to] <#bytes>\r\n[payload]\r\n
     private void WritePub(IBufferWriter<byte> writer, string subject, string? replyTo, ReadOnlyMemory<byte> payload)
