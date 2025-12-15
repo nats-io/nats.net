@@ -227,18 +227,35 @@ internal sealed class ProtocolWriter
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void ThrowOnBadQueueGroup() => throw new NatsException("Queue group is invalid.");
 
-    // Validates subjects: no whitespace, no empty tokens (.foo, foo., foo..bar)
-    // Matches Go client's badSubject() validation
+    // Validates subjects: no whitespace (protocol-breaking characters)
+    // Uses adaptive algorithm: manual loop for short subjects (< 16 chars) with
+    // branch-predicted early exit, SIMD-optimized IndexOfAny for longer subjects.
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void ValidateSubject(ReadOnlySpan<char> subject)
     {
-        if (subject.IsEmpty ||
-            subject.IndexOfAny(WhitespaceChars) >= 0 ||
-            subject[0] == '.' ||
-            subject[^1] == '.' ||
-            subject.IndexOf("..") >= 0)
+        if (subject.IsEmpty)
         {
             ThrowOnBadSubject();
+        }
+
+        if (subject.Length < 16)
+        {
+            // Fast path for short subjects - branch predictor learns most chars are > ' '
+            foreach (var c in subject)
+            {
+                if (c <= ' ' && (c == ' ' || c == '\t' || c == '\r' || c == '\n'))
+                {
+                    ThrowOnBadSubject();
+                }
+            }
+        }
+        else
+        {
+            // SIMD path for long subjects
+            if (subject.IndexOfAny(WhitespaceChars) >= 0)
+            {
+                ThrowOnBadSubject();
+            }
         }
     }
 

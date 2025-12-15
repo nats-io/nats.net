@@ -9,7 +9,7 @@ namespace MicroBenchmark;
 [SimpleJob(RuntimeMoniker.Net80)]
 public class SubjectValidationBench
 {
-    private const int MessageCount = 1024;
+    private const int MessageCount = 100_000;
     private const string ShortSubject = "foo.bar.baz";
     private const string LongSubject = "org.company.division.team.project.service.module.component.action.event.type.version.region";
     private const string ShortReplyTo = "reply.to.subject";

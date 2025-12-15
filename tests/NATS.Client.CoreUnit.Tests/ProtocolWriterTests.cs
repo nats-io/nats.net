@@ -62,23 +62,6 @@ public class ProtocolWriterTests
         action.Should().Throw<NatsException>().WithMessage("Subject is invalid.");
     }
 
-    // Dot token validation (matches Go client's badSubject)
-    [Theory]
-    [InlineData(".foo")]
-    [InlineData("foo.")]
-    [InlineData(".")]
-    [InlineData("..")]
-    [InlineData("foo..bar")]
-    [InlineData("foo...bar")]
-    [InlineData(".foo.bar")]
-    [InlineData("foo.bar.")]
-    public void WritePublish_SubjectWithInvalidDots_Throws(string subject)
-    {
-        using var writer = new NatsBufferWriter<byte>();
-        var action = () => _protocolWriter.WritePublish(writer, subject, null, null, ReadOnlyMemory<byte>.Empty);
-        action.Should().Throw<NatsException>().WithMessage("Subject is invalid.");
-    }
-
     // Subscribe tests
     [Fact]
     public void WriteSubscribe_ValidSubject_DoesNotThrow()
@@ -96,7 +79,7 @@ public class ProtocolWriterTests
         action.Should().NotThrow();
     }
 
-    // Queue group can have dots (unlike subjects, no token validation)
+    // Queue group can have dots
     [Theory]
     [InlineData("queue.group")]
     [InlineData(".queue")]
@@ -149,24 +132,10 @@ public class ProtocolWriterTests
         action.Should().Throw<NatsException>().WithMessage("Queue group is invalid.");
     }
 
-    [Theory]
-    [InlineData(".foo")]
-    [InlineData("foo.")]
-    [InlineData("foo..bar")]
-    public void WriteSubscribe_SubjectWithInvalidDots_Throws(string subject)
-    {
-        using var writer = new NatsBufferWriter<byte>();
-        var action = () => _protocolWriter.WriteSubscribe(writer, 1, subject, null, null);
-        action.Should().Throw<NatsException>().WithMessage("Subject is invalid.");
-    }
-
     // SkipSubjectValidation tests
     [Theory]
     [InlineData("foo bar")]
     [InlineData("foo\tbar")]
-    [InlineData(".foo")]
-    [InlineData("foo.")]
-    [InlineData("foo..bar")]
     public void WritePublish_WithSkipValidation_DoesNotThrow(string subject)
     {
         using var writer = new NatsBufferWriter<byte>();
@@ -177,9 +146,6 @@ public class ProtocolWriterTests
     [Theory]
     [InlineData("foo bar")]
     [InlineData("foo\tbar")]
-    [InlineData(".foo")]
-    [InlineData("foo.")]
-    [InlineData("foo..bar")]
     public void WriteSubscribe_WithSkipValidation_DoesNotThrow(string subject)
     {
         using var writer = new NatsBufferWriter<byte>();
