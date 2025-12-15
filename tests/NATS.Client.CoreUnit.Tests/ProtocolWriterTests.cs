@@ -24,6 +24,21 @@ public class ProtocolWriterTests
         action.Should().NotThrow();
     }
 
+    // Wildcard subjects should be valid
+    [Theory]
+    [InlineData("foo.*")]
+    [InlineData("foo.>")]
+    [InlineData("*")]
+    [InlineData(">")]
+    [InlineData("foo.*.bar")]
+    [InlineData("foo.bar.>")]
+    public void WritePublish_WildcardSubject_DoesNotThrow(string subject)
+    {
+        using var writer = new NatsBufferWriter<byte>();
+        var action = () => _protocolWriter.WritePublish(writer, subject, null, null, ReadOnlyMemory<byte>.Empty);
+        action.Should().NotThrow();
+    }
+
     // Whitespace validation for subjects
     [Theory]
     [InlineData("foo bar")]
@@ -59,6 +74,14 @@ public class ProtocolWriterTests
     {
         using var writer = new NatsBufferWriter<byte>();
         var action = () => _protocolWriter.WritePublish(writer, string.Empty, null, null, ReadOnlyMemory<byte>.Empty);
+        action.Should().Throw<NatsException>().WithMessage("Subject is invalid.");
+    }
+
+    [Fact]
+    public void WritePublish_EmptyReplyTo_Throws()
+    {
+        using var writer = new NatsBufferWriter<byte>();
+        var action = () => _protocolWriter.WritePublish(writer, "foo.bar", string.Empty, null, ReadOnlyMemory<byte>.Empty);
         action.Should().Throw<NatsException>().WithMessage("Subject is invalid.");
     }
 

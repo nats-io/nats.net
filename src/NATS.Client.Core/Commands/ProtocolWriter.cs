@@ -38,8 +38,8 @@ internal sealed class ProtocolWriter
 
     // Used for subject/replyTo/queueGroup validation to prevent protocol-breaking whitespace.
     // Static field ensures zero allocations per call. SearchValues (NET8+) uses SIMD vectorization;
-    // char[] (older TFMs) uses optimized IndexOfAny for <=5 chars. Adds ~5% overhead to full publish
-    // operations with zero GC pressure - acceptable trade-off for input safety.
+    // char[] (older TFMs) uses optimized IndexOfAny for <=5 chars. Adds ~3% overhead on .NET 8
+    // and ~5% on .NET Framework to full publish operations, with zero GC pressure.
 #if NET8_0_OR_GREATER
     private static readonly SearchValues<char> WhitespaceChars = SearchValues.Create([' ', '\r', '\n', '\t']);
 #else
