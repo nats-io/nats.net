@@ -71,7 +71,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         _counter = counter;
         _defaultCommandTimeout = overrideCommandTimeout ?? opts.CommandTimeout;
         _enqueuePing = enqueuePing;
-        _protocolWriter = new ProtocolWriter(opts.SubjectEncoding);
+        _protocolWriter = new ProtocolWriter(opts.SubjectEncoding, opts.SkipSubjectValidation);
         _channelLock = Channel.CreateBounded<int>(1);
         _channelSize = Channel.CreateUnbounded<int>(new UnboundedChannelOptions { SingleWriter = true, SingleReader = true });
         _headerWriter = new HeaderWriter(opts.HeaderEncoding);

@@ -6,6 +6,7 @@ namespace NATS.Client.CoreUnit.Tests;
 public class ProtocolWriterTests
 {
     private readonly ProtocolWriter _protocolWriter = new(Encoding.UTF8);
+    private readonly ProtocolWriter _protocolWriterNoValidation = new(Encoding.UTF8, skipSubjectValidation: true);
 
     [Fact]
     public void WritePublish_ValidSubject_DoesNotThrow()
@@ -157,5 +158,42 @@ public class ProtocolWriterTests
         using var writer = new NatsBufferWriter<byte>();
         var action = () => _protocolWriter.WriteSubscribe(writer, 1, subject, null, null);
         action.Should().Throw<NatsException>().WithMessage("Subject is invalid.");
+    }
+
+    // SkipSubjectValidation tests
+    [Theory]
+    [InlineData("foo bar")]
+    [InlineData("foo\tbar")]
+    [InlineData(".foo")]
+    [InlineData("foo.")]
+    [InlineData("foo..bar")]
+    public void WritePublish_WithSkipValidation_DoesNotThrow(string subject)
+    {
+        using var writer = new NatsBufferWriter<byte>();
+        var action = () => _protocolWriterNoValidation.WritePublish(writer, subject, null, null, ReadOnlyMemory<byte>.Empty);
+        action.Should().NotThrow();
+    }
+
+    [Theory]
+    [InlineData("foo bar")]
+    [InlineData("foo\tbar")]
+    [InlineData(".foo")]
+    [InlineData("foo.")]
+    [InlineData("foo..bar")]
+    public void WriteSubscribe_WithSkipValidation_DoesNotThrow(string subject)
+    {
+        using var writer = new NatsBufferWriter<byte>();
+        var action = () => _protocolWriterNoValidation.WriteSubscribe(writer, 1, subject, null, null);
+        action.Should().NotThrow();
+    }
+
+    [Theory]
+    [InlineData("queue group")]
+    [InlineData("queue\tgroup")]
+    public void WriteSubscribe_QueueGroupWithSkipValidation_DoesNotThrow(string queueGroup)
+    {
+        using var writer = new NatsBufferWriter<byte>();
+        var action = () => _protocolWriterNoValidation.WriteSubscribe(writer, 1, "foo.bar", queueGroup, null);
+        action.Should().NotThrow();
     }
 }

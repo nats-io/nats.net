@@ -214,6 +214,22 @@ public sealed record NatsOpts
     /// </summary>
     public bool PublishTimeoutOnDisconnected { get; init; } = false;
 
+    /// <summary>
+    /// Gets or sets a value indicating whether to skip full subject validation.
+    /// The default is <c>false</c>, meaning subjects are fully validated for whitespace and empty tokens.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// When set to <c>false</c> (default), subjects are validated to ensure they don't contain
+    /// whitespace characters (space, tab, CR, LF) and don't have empty tokens (e.g., ".foo", "foo.", "foo..bar").
+    /// </para>
+    /// <para>
+    /// When set to <c>true</c>, only empty subject validation is performed, which can improve
+    /// performance in high-throughput scenarios where subjects are known to be valid.
+    /// </para>
+    /// </remarks>
+    public bool SkipSubjectValidation { get; init; } = false;
+
     internal NatsUri[] GetSeedUris(bool suppressRandomization = false)
     {
         var urls = Url.Split(',');

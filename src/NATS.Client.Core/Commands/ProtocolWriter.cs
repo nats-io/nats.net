@@ -47,8 +47,13 @@ internal sealed class ProtocolWriter
 #endif
 
     private readonly Encoding _subjectEncoding;
+    private readonly bool _skipSubjectValidation;
 
-    public ProtocolWriter(Encoding subjectEncoding) => _subjectEncoding = subjectEncoding;
+    public ProtocolWriter(Encoding subjectEncoding, bool skipSubjectValidation = false)
+    {
+        _subjectEncoding = subjectEncoding;
+        _skipSubjectValidation = skipSubjectValidation;
+    }
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#connect
     // CONNECT {["option_name":option_value],...}
@@ -89,10 +94,13 @@ internal sealed class ProtocolWriter
     // HPUB <subject> [reply-to] <#header bytes> <#total bytes>\r\n[headers]\r\n\r\n[payload]\r\n
     public void WritePublish(IBufferWriter<byte> writer, string subject, string? replyTo, ReadOnlyMemory<byte>? headers, ReadOnlyMemory<byte> payload)
     {
-        ValidateSubject(subject);
-        if (replyTo != null)
+        if (!_skipSubjectValidation)
         {
-            ValidateSubject(replyTo);
+            ValidateSubject(subject);
+            if (replyTo != null)
+            {
+                ValidateSubject(replyTo);
+            }
         }
 
         if (headers == null)
@@ -109,10 +117,13 @@ internal sealed class ProtocolWriter
     // SUB <subject> [queue group] <sid>
     public void WriteSubscribe(IBufferWriter<byte> writer, int sid, string subject, string? queueGroup, int? maxMsgs)
     {
-        ValidateSubject(subject);
-        if (queueGroup != null)
+        if (!_skipSubjectValidation)
         {
-            ValidateQueueGroup(queueGroup);
+            ValidateSubject(subject);
+            if (queueGroup != null)
+            {
+                ValidateQueueGroup(queueGroup);
+            }
         }
 
         // 'SUB '                       + subject                                +' '+ sid                +'\r\n'
