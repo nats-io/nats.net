@@ -39,7 +39,7 @@ public class ProtocolWriterTests
         action.Should().NotThrow();
     }
 
-    // Whitespace validation for subjects
+    // Whitespace validation for subjects (short path < 16 chars)
     [Theory]
     [InlineData("foo bar")]
     [InlineData("foo\tbar")]
@@ -49,7 +49,21 @@ public class ProtocolWriterTests
     [InlineData("\tfoo")]
     [InlineData("\rfoo")]
     [InlineData("\nfoo")]
-    public void WritePublish_SubjectWithWhitespace_Throws(string subject)
+    public void WritePublish_ShortSubjectWithWhitespace_Throws(string subject)
+    {
+        using var writer = new NatsBufferWriter<byte>();
+        var action = () => _protocolWriter.WritePublish(writer, subject, null, null, ReadOnlyMemory<byte>.Empty);
+        action.Should().Throw<NatsException>().WithMessage("Subject is invalid.");
+    }
+
+    // Whitespace validation for subjects (long path >= 16 chars, SIMD)
+    [Theory]
+    [InlineData("foo.bar.baz.qux witespace")]
+    [InlineData("foo.bar.baz.qux\twithtab")]
+    [InlineData("foo.bar.baz.qux\rwithcr")]
+    [InlineData("foo.bar.baz.qux\nwithlf")]
+    [InlineData(" foo.bar.baz.qux.start")]
+    public void WritePublish_LongSubjectWithWhitespace_Throws(string subject)
     {
         using var writer = new NatsBufferWriter<byte>();
         var action = () => _protocolWriter.WritePublish(writer, subject, null, null, ReadOnlyMemory<byte>.Empty);
