@@ -361,6 +361,13 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     public ValueTask RefreshAsync(CancellationToken cancellationToken = default) => default;
 
+    /// <summary>
+    /// For ordered consumer this is a no-op since ordered consumers use ephemeral consumers.
+    /// </summary>
+    /// <param name="group">The priority group name to unpin.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    public ValueTask UnpinAsync(string group, CancellationToken cancellationToken = default) => default;
+
     private async Task<NatsJSConsumer> RecreateConsumer(string consumer, ulong seq, CancellationToken cancellationToken)
     {
         var consumerOpts = _opts;

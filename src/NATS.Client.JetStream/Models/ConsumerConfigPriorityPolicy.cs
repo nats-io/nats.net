@@ -19,4 +19,9 @@ public enum ConsumerConfigPriorityPolicy
     /// Messages overflow to the next available consumer.
     /// </summary>
     Overflow = 2,
+
+    /// <summary>
+    /// Consumer is pinned to a specific client.
+    /// </summary>
+    PinnedClient = 3,
 }

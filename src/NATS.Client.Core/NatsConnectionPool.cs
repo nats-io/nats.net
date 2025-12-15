@@ -41,7 +41,7 @@ public sealed class NatsConnectionPool : INatsConnectionPool
     public INatsConnection GetConnection()
     {
         var i = Interlocked.Increment(ref _index);
-        return _connections[i % _connections.Length];
+        return _connections[(uint)i % _connections.Length];
     }
 
     public IEnumerable<INatsConnection> GetConnections()

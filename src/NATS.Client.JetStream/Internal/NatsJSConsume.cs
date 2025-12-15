@@ -31,6 +31,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
     private readonly Timer _timer;
     private readonly Task _pullTask;
     private readonly NatsJSNotificationChannel? _notificationChannel;
+    private readonly NatsJSConsumer? _jsConsumer;
 
     private readonly long _maxMsgs;
     private readonly TimeSpan _expires;
@@ -64,6 +65,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         NatsSubOpts? opts,
         NatsJSPriorityGroupOpts? priorityGroup,
         int maxConsecutive503Errors,
+        NatsJSConsumer? jsConsumer,
         CancellationToken cancellationToken)
         : base(context.Connection, context.Connection.SubscriptionManager, subject, queueGroup, opts)
     {
@@ -76,6 +78,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         _serializer = serializer;
         _priorityGroup = priorityGroup;
         _maxConsecutive503Errors = maxConsecutive503Errors;
+        _jsConsumer = jsConsumer;
 
         if (notificationHandler is { } handler)
         {
@@ -264,6 +267,8 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                 Group = _priorityGroup?.Group,
                 MinPending = _priorityGroup?.MinPending ?? 0,
                 MinAckPending = _priorityGroup?.MinAckPending ?? 0,
+                Priority = _priorityGroup?.Priority ?? 0,
+                Id = _jsConsumer?.GetPinId(),
             };
 
             await commandWriter.PublishAsync(
@@ -373,6 +378,12 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                         _notificationChannel?.Notify(NatsJSLeadershipChangeNotification.Default);
                         ResetPending();
                     }
+                    else if (headers.Code == 423)
+                    {
+                        _logger.LogDebug(NatsJSLogEvents.PinIdMismatch, "Pin ID Mismatch");
+                        NatsJSExtensionsInternal.HandlePinIdMismatch(_jsConsumer, _notificationChannel);
+                        ResetPending();
+                    }
                     else if (headers.Code == 503)
                     {
                         _consecutive503Errors++;
@@ -431,6 +442,8 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                     Connection.HeaderParser,
                     _serializer),
                 _context);
+
+            NatsJSExtensionsInternal.TrySetPinIdFromHeaders(msg.Headers, _jsConsumer);
 
             // Stop feeding the user if we are disposed.
             // We need to exit as soon as possible.
@@ -511,6 +524,8 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
             Group = _priorityGroup?.Group,
             MinPending = _priorityGroup?.MinPending ?? 0,
             MinAckPending = _priorityGroup?.MinAckPending ?? 0,
+            Priority = _priorityGroup?.Priority ?? 0,
+            Id = _jsConsumer?.GetPinId(),
         },
         Origin = origin,
     });

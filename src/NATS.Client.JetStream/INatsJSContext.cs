@@ -162,6 +162,20 @@ public interface INatsJSContext
     ValueTask<bool> ResumeConsumerAsync(string stream, string consumer, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Unpin a consumer from the currently pinned client.
+    /// </summary>
+    /// <param name="stream">Stream name where consumer is associated to.</param>
+    /// <param name="consumer">Consumer name to be unpinned.</param>
+    /// <param name="group">The priority group name to unpin.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
+    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
+    /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
+    ValueTask UnpinConsumerAsync(string stream, string consumer, string group, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Calls JetStream Account Info API.
     /// </summary>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>

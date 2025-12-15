@@ -249,6 +249,13 @@ public record NatsJSPubOpts : NatsPubOpts
     /// Specifies the duration to wait between retry attempts for a failed publish operation.
     /// See <see cref="RetryAttempts"/> for the number of retry attempts.
     /// </summary>
+    // Expected last sequence subject filter (allows wildcard subjects)
+    public string? ExpectedLastSubjectSequenceSubject { get; init; }
+
+    /// <summary>
+    /// Specifies the duration to wait between retry attempts for a failed publish operation.
+    /// See <see cref="RetryAttempts"/> for the number of retry attempts.
+    /// </summary>
     public TimeSpan RetryWaitBetweenAttempts { get; init; } = TimeSpan.FromMilliseconds(250);
 
     /// <summary>
