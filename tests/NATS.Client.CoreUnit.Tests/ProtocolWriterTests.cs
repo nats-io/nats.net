@@ -23,16 +23,21 @@ public class ProtocolWriterTests
         action.Should().NotThrow();
     }
 
+    // Whitespace validation for subjects
     [Theory]
     [InlineData("foo bar")]
     [InlineData("foo\tbar")]
     [InlineData("foo\rbar")]
     [InlineData("foo\nbar")]
+    [InlineData(" foo")]
+    [InlineData("\tfoo")]
+    [InlineData("\rfoo")]
+    [InlineData("\nfoo")]
     public void WritePublish_SubjectWithWhitespace_Throws(string subject)
     {
         using var writer = new NatsBufferWriter<byte>();
         var action = () => _protocolWriter.WritePublish(writer, subject, null, null, ReadOnlyMemory<byte>.Empty);
-        action.Should().Throw<NatsException>().WithMessage("Subject cannot be empty or contain whitespace.");
+        action.Should().Throw<NatsException>().WithMessage("Subject is invalid.");
     }
 
     [Theory]
@@ -44,9 +49,36 @@ public class ProtocolWriterTests
     {
         using var writer = new NatsBufferWriter<byte>();
         var action = () => _protocolWriter.WritePublish(writer, "foo.bar", replyTo, null, ReadOnlyMemory<byte>.Empty);
-        action.Should().Throw<NatsException>().WithMessage("Subject cannot be empty or contain whitespace.");
+        action.Should().Throw<NatsException>().WithMessage("Subject is invalid.");
     }
 
+    // Empty subject validation
+    [Fact]
+    public void WritePublish_EmptySubject_Throws()
+    {
+        using var writer = new NatsBufferWriter<byte>();
+        var action = () => _protocolWriter.WritePublish(writer, string.Empty, null, null, ReadOnlyMemory<byte>.Empty);
+        action.Should().Throw<NatsException>().WithMessage("Subject is invalid.");
+    }
+
+    // Dot token validation (matches Go client's badSubject)
+    [Theory]
+    [InlineData(".foo")]
+    [InlineData("foo.")]
+    [InlineData(".")]
+    [InlineData("..")]
+    [InlineData("foo..bar")]
+    [InlineData("foo...bar")]
+    [InlineData(".foo.bar")]
+    [InlineData("foo.bar.")]
+    public void WritePublish_SubjectWithInvalidDots_Throws(string subject)
+    {
+        using var writer = new NatsBufferWriter<byte>();
+        var action = () => _protocolWriter.WritePublish(writer, subject, null, null, ReadOnlyMemory<byte>.Empty);
+        action.Should().Throw<NatsException>().WithMessage("Subject is invalid.");
+    }
+
+    // Subscribe tests
     [Fact]
     public void WriteSubscribe_ValidSubject_DoesNotThrow()
     {
@@ -63,6 +95,19 @@ public class ProtocolWriterTests
         action.Should().NotThrow();
     }
 
+    // Queue group can have dots (unlike subjects, no token validation)
+    [Theory]
+    [InlineData("queue.group")]
+    [InlineData(".queue")]
+    [InlineData("queue.")]
+    [InlineData("queue..group")]
+    public void WriteSubscribe_QueueGroupWithDots_DoesNotThrow(string queueGroup)
+    {
+        using var writer = new NatsBufferWriter<byte>();
+        var action = () => _protocolWriter.WriteSubscribe(writer, 1, "foo.bar", queueGroup, null);
+        action.Should().NotThrow();
+    }
+
     [Theory]
     [InlineData("foo bar")]
     [InlineData("foo\tbar")]
@@ -72,7 +117,7 @@ public class ProtocolWriterTests
     {
         using var writer = new NatsBufferWriter<byte>();
         var action = () => _protocolWriter.WriteSubscribe(writer, 1, subject, null, null);
-        action.Should().Throw<NatsException>().WithMessage("Subject cannot be empty or contain whitespace.");
+        action.Should().Throw<NatsException>().WithMessage("Subject is invalid.");
     }
 
     [Theory]
@@ -84,29 +129,7 @@ public class ProtocolWriterTests
     {
         using var writer = new NatsBufferWriter<byte>();
         var action = () => _protocolWriter.WriteSubscribe(writer, 1, "foo.bar", queueGroup, null);
-        action.Should().Throw<NatsException>().WithMessage("Subject cannot be empty or contain whitespace.");
-    }
-
-    // Test for whitespace at the START of strings (index 0)
-    [Theory]
-    [InlineData(" foo")]
-    [InlineData("\tfoo")]
-    [InlineData("\rfoo")]
-    [InlineData("\nfoo")]
-    public void WritePublish_SubjectWithLeadingWhitespace_Throws(string subject)
-    {
-        using var writer = new NatsBufferWriter<byte>();
-        var action = () => _protocolWriter.WritePublish(writer, subject, null, null, ReadOnlyMemory<byte>.Empty);
-        action.Should().Throw<NatsException>().WithMessage("Subject cannot be empty or contain whitespace.");
-    }
-
-    // Test for empty strings
-    [Fact]
-    public void WritePublish_EmptySubject_Throws()
-    {
-        using var writer = new NatsBufferWriter<byte>();
-        var action = () => _protocolWriter.WritePublish(writer, string.Empty, null, null, ReadOnlyMemory<byte>.Empty);
-        action.Should().Throw<NatsException>().WithMessage("Subject cannot be empty or contain whitespace.");
+        action.Should().Throw<NatsException>().WithMessage("Queue group is invalid.");
     }
 
     [Fact]
@@ -114,6 +137,25 @@ public class ProtocolWriterTests
     {
         using var writer = new NatsBufferWriter<byte>();
         var action = () => _protocolWriter.WriteSubscribe(writer, 1, string.Empty, null, null);
-        action.Should().Throw<NatsException>().WithMessage("Subject cannot be empty or contain whitespace.");
+        action.Should().Throw<NatsException>().WithMessage("Subject is invalid.");
+    }
+
+    [Fact]
+    public void WriteSubscribe_EmptyQueueGroup_Throws()
+    {
+        using var writer = new NatsBufferWriter<byte>();
+        var action = () => _protocolWriter.WriteSubscribe(writer, 1, "foo.bar", string.Empty, null);
+        action.Should().Throw<NatsException>().WithMessage("Queue group is invalid.");
+    }
+
+    [Theory]
+    [InlineData(".foo")]
+    [InlineData("foo.")]
+    [InlineData("foo..bar")]
+    public void WriteSubscribe_SubjectWithInvalidDots_Throws(string subject)
+    {
+        using var writer = new NatsBufferWriter<byte>();
+        var action = () => _protocolWriter.WriteSubscribe(writer, 1, subject, null, null);
+        action.Should().Throw<NatsException>().WithMessage("Subject is invalid.");
     }
 }

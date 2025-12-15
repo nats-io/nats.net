@@ -89,10 +89,10 @@ internal sealed class ProtocolWriter
     // HPUB <subject> [reply-to] <#header bytes> <#total bytes>\r\n[headers]\r\n\r\n[payload]\r\n
     public void WritePublish(IBufferWriter<byte> writer, string subject, string? replyTo, ReadOnlyMemory<byte>? headers, ReadOnlyMemory<byte> payload)
     {
-        CheckSubjectForWhitespace(subject);
+        ValidateSubject(subject);
         if (replyTo != null)
         {
-            CheckSubjectForWhitespace(replyTo);
+            ValidateSubject(replyTo);
         }
 
         if (headers == null)
@@ -109,10 +109,10 @@ internal sealed class ProtocolWriter
     // SUB <subject> [queue group] <sid>
     public void WriteSubscribe(IBufferWriter<byte> writer, int sid, string subject, string? queueGroup, int? maxMsgs)
     {
-        CheckSubjectForWhitespace(subject);
+        ValidateSubject(subject);
         if (queueGroup != null)
         {
-            CheckSubjectForWhitespace(queueGroup);
+            ValidateQueueGroup(queueGroup);
         }
 
         // 'SUB '                       + subject                                +' '+ sid                +'\r\n'
@@ -211,14 +211,34 @@ internal sealed class ProtocolWriter
     private static void ThrowOnUtf8FormatFail() => throw new NatsException("Can not format integer.");
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ThrowOnSubjectFormatFail() => throw new NatsException("Subject cannot be empty or contain whitespace.");
+    private static void ThrowOnBadSubject() => throw new NatsException("Subject is invalid.");
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void ThrowOnBadQueueGroup() => throw new NatsException("Queue group is invalid.");
+
+    // Validates subjects: no whitespace, no empty tokens (.foo, foo., foo..bar)
+    // Matches Go client's badSubject() validation
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void CheckSubjectForWhitespace(ReadOnlySpan<char> subject)
+    private static void ValidateSubject(ReadOnlySpan<char> subject)
     {
-        if (subject.IsEmpty || subject.IndexOfAny(WhitespaceChars) >= 0)
+        if (subject.IsEmpty ||
+            subject.IndexOfAny(WhitespaceChars) >= 0 ||
+            subject[0] == '.' ||
+            subject[^1] == '.' ||
+            subject.IndexOf("..") >= 0)
         {
-            ThrowOnSubjectFormatFail();
+            ThrowOnBadSubject();
+        }
+    }
+
+    // Validates queue groups: no whitespace only (dots are allowed)
+    // Matches Go client's badQueue() validation
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void ValidateQueueGroup(ReadOnlySpan<char> queueGroup)
+    {
+        if (queueGroup.IsEmpty || queueGroup.IndexOfAny(WhitespaceChars) >= 0)
+        {
+            ThrowOnBadQueueGroup();
         }
     }
 
