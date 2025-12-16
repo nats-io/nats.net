@@ -188,6 +188,16 @@ public partial class NatsJSContext : INatsJSContext
         return !response.IsPaused;
     }
 
+    /// <inheritdoc />
+    public async ValueTask UnpinConsumerAsync(string stream, string consumer, string group, CancellationToken cancellationToken = default)
+    {
+        ThrowIfInvalidStreamName(stream);
+        await JSRequestResponseAsync<ConsumerUnpinRequest, ConsumerUnpinResponse>(
+            subject: $"{Opts.Prefix}.CONSUMER.UNPIN.{stream}.{consumer}",
+            request: new ConsumerUnpinRequest { Group = group },
+            cancellationToken);
+    }
+
     internal ValueTask<ConsumerInfo> CreateOrderedConsumerInternalAsync(
         string stream,
         NatsJSOrderedConsumerOpts opts,

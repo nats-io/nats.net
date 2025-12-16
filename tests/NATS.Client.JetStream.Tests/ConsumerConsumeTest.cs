@@ -283,7 +283,7 @@ public class ConsumerConsumeTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 
         var js = new NatsJSContext(nats);
-        var stream = await js.CreateStreamAsync($"{prefix}s1", new[] { $"{prefix}s1.*" }, cts.Token);
+        await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
         var consumer = (NatsJSConsumer)await js.CreateOrUpdateConsumerAsync($"{prefix}s1", $"{prefix}c1", cancellationToken: cts.Token);
 
         var consumerOpts = new NatsJSConsumeOpts
@@ -303,27 +303,26 @@ public class ConsumerConsumeTest
 
         var signal1 = new WaitSignal();
         var signal2 = new WaitSignal();
-        var reader = Task.Run(async () =>
-        {
-            await foreach (var msg in cc.Msgs.ReadAllAsync(cts.Token))
+        var reader = Task.Run(
+            async () =>
             {
-                await msg.AckAsync(cancellationToken: cts.Token);
-                signal1.Pulse();
-                await signal2;
+                await foreach (var msg in cc.Msgs.ReadAllAsync(cts.Token))
+                {
+                    await msg.AckAsync(cancellationToken: cts.Token);
+                    signal1.Pulse();
+                    await signal2;
 
-                // dispose will end the loop
-            }
-        });
+                    // dispose will end the loop
+                }
+            },
+            cts.Token);
 
         await signal1;
 
-        // Dispose waits for all the pending messages to be delivered to the loop
-        // since the channel reader carries on reading the messages in its internal queue.
-        await cc.DisposeAsync();
-
-        // At this point we should only have ACKed one message
+        // Wait until all 10 messages have been delivered to the consumer
+        // (NumAckPending == 9 means 10 delivered, 1 acked by reader, 9 pending)
         await Retry.Until(
-            "ack pending 9",
+            "all messages delivered",
             async () =>
             {
                 var c = await js.GetConsumerAsync($"{prefix}s1", $"{prefix}c1", cts.Token);
@@ -331,6 +330,13 @@ public class ConsumerConsumeTest
             },
             retryDelay: TimeSpan.FromSeconds(1),
             timeout: TimeSpan.FromSeconds(30));
+
+        // Now dispose - all messages are safely in the channel.
+        // Dispose waits for all the pending messages to be delivered to the loop
+        // since the channel reader carries on reading the messages in its internal queue.
+        await cc.DisposeAsync();
+
+        // At this point we should only have ACKed one message
         await consumer.RefreshAsync(cts.Token);
         Assert.Equal(9, consumer.Info.NumAckPending);
 

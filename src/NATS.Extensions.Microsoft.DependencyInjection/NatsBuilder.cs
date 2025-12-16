@@ -20,29 +20,31 @@ public class NatsOptsBuilder
 public class NatsBuilder
 {
     private readonly IServiceCollection _services;
-    private readonly OptionsBuilder<NatsOptsBuilder> _builder;
+    private OptionsBuilder<NatsOptsBuilder>? _builder;
     private Func<IServiceProvider, int> _poolSizeConfigurer = _ => 1;
     private object? _diKey = null;
+    private string _optionsName = Options.DefaultName;
 
     public NatsBuilder(IServiceCollection services)
     {
         _services = services;
-        _builder = _services
-            .AddOptions<NatsOptsBuilder>()
-            .Configure<IServiceProvider>((opts, provider) =>
-            {
-                opts.Opts = opts.Opts with
-                {
-                    LoggerFactory = provider.GetService<ILoggerFactory>() ?? NullLoggerFactory.Instance,
-                    SubPendingChannelFullMode = BoundedChannelFullMode.Wait,
-                };
-
-                if (ReferenceEquals(opts.Opts.SerializerRegistry, NatsOpts.Default.SerializerRegistry))
-                {
-                    opts.Opts = opts.Opts with { SerializerRegistry = NatsClientDefaultSerializerRegistry.Default, };
-                }
-            });
     }
+
+    private OptionsBuilder<NatsOptsBuilder> Builder => _builder ??= _services
+        .AddOptions<NatsOptsBuilder>(_optionsName)
+        .Configure<IServiceProvider>((opts, provider) =>
+        {
+            opts.Opts = opts.Opts with
+            {
+                LoggerFactory = provider.GetService<ILoggerFactory>() ?? NullLoggerFactory.Instance,
+                SubPendingChannelFullMode = BoundedChannelFullMode.Wait,
+            };
+
+            if (ReferenceEquals(opts.Opts.SerializerRegistry, NatsOpts.Default.SerializerRegistry))
+            {
+                opts.Opts = opts.Opts with { SerializerRegistry = NatsClientDefaultSerializerRegistry.Default, };
+            }
+        });
 
     public NatsBuilder WithPoolSize(int size)
     {
@@ -60,7 +62,7 @@ public class NatsBuilder
 
     public NatsBuilder ConfigureOptions(Action<OptionsBuilder<NatsOptsBuilder>> configure)
     {
-        configure(_builder);
+        configure(Builder);
 
         return this;
     }
@@ -109,7 +111,13 @@ public class NatsBuilder
 #if NET8_0_OR_GREATER
     public NatsBuilder WithKey(object key)
     {
+        if (_builder != null)
+        {
+            throw new InvalidOperationException("WithKey must be called before ConfigureOptions or other configuration methods.");
+        }
+
         _diKey = key;
+        _optionsName = key.ToString() ?? Options.DefaultName;
 
         return this;
     }
@@ -150,6 +158,9 @@ public class NatsBuilder
 
     internal IServiceCollection Build()
     {
+        // Ensure the options builder is initialized to register the options infrastructure
+        _ = Builder;
+
         if (_diKey == null)
         {
             _services.TryAddSingleton<NatsConnectionPool>(provider => PoolFactory(provider));
@@ -187,7 +198,8 @@ public class NatsBuilder
 
     private NatsConnectionPool PoolFactory(IServiceProvider provider, object? diKey = null)
     {
-        var options = provider.GetRequiredService<IOptions<NatsOptsBuilder>>().Value;
+        var optionsName = diKey?.ToString() ?? Options.DefaultName;
+        var options = provider.GetRequiredService<IOptionsMonitor<NatsOptsBuilder>>().Get(optionsName);
 
         return new NatsConnectionPool(_poolSizeConfigurer(provider), options.Opts, con => options.ConfigureConnection?.Invoke(provider, con));
     }

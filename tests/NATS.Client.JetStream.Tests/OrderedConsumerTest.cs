@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
+using NATS.Client.JetStream.Models;
 using NATS.Client.Platform.Windows.Tests;
 using NATS.Client.TestUtilities2;
 
@@ -63,6 +64,32 @@ public class OrderedConsumerTest
 
         var stream = await js.CreateStreamAsync("s1", ["s1.*"], cts.Token);
 
+        async Task PublishWithId(int i)
+        {
+            for (var j = 0; j < 3; j++)
+            {
+                PubAckResponse ack;
+                try
+                {
+                    ack = await js.PublishAsync("s1.foo", i, opts: new NatsJSPubOpts { MsgId = $"{i}" }, cancellationToken: cts.Token);
+                }
+                catch (NatsException)
+                {
+                    await Task.Delay(100, cts.Token);
+                    continue;
+                }
+
+                if (ack.IsSuccess())
+                    return;
+                await Task.Delay(100, cts.Token);
+                if (ack.Duplicate)
+                    break;
+                ack.EnsureSuccess();
+            }
+
+            throw new Exception("Publish failed after retries");
+        }
+
         for (var i = 0; i < 50; i++)
         {
             if (i % 10 == 0)
@@ -70,10 +97,10 @@ public class OrderedConsumerTest
                 server = await server.RestartAsync();
             }
 
-            (await js.PublishAsync("s1.foo", i, cancellationToken: cts.Token)).EnsureSuccess();
+            await PublishWithId(i);
         }
 
-        (await js.PublishAsync("s1.foo", -1, cancellationToken: cts.Token)).EnsureSuccess();
+        await PublishWithId(-1);
 
         var consumer = (NatsJSOrderedConsumer)await stream.CreateOrderedConsumerAsync(cancellationToken: cts.Token);
 
@@ -228,5 +255,192 @@ public class OrderedConsumerTest
                 i++;
             }
         }
+    }
+
+    [Fact]
+    public async Task Fetch_recovers_from_consumer_deletion()
+    {
+        await using var nats = _server.CreateNatsConnection();
+        await nats.ConnectRetryAsync();
+        var prefix = _server.GetNextId();
+
+        var js = new NatsJSContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var stream = await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
+
+        // Publish 20 messages
+        for (var i = 0; i < 20; i++)
+        {
+            await js.PublishAsync($"{prefix}s1.foo", i, cancellationToken: cts.Token);
+        }
+
+        var consumer = (NatsJSOrderedConsumer)await stream.CreateOrderedConsumerAsync(cancellationToken: cts.Token);
+
+        var count = 0;
+        var fetchOpts = new NatsJSFetchOpts
+        {
+            MaxMsgs = 5,
+            Expires = TimeSpan.FromSeconds(3),
+        };
+
+        await foreach (var msg in consumer.FetchAsync<int>(opts: fetchOpts, cancellationToken: cts.Token))
+        {
+            Assert.Equal(count, msg.Data);
+            count++;
+
+            // After receiving 3 messages, delete the consumer to force sequence mismatch
+            if (count == 3)
+            {
+                var consumerName = consumer.Info.Name;
+                _output.WriteLine($"Deleting consumer {consumerName} after message {count}");
+                await js.DeleteConsumerAsync($"{prefix}s1", consumerName, cts.Token);
+            }
+        }
+
+        // Should have received all 5 messages despite consumer deletion
+        Assert.Equal(5, count);
+    }
+
+    [Fact]
+    public async Task Consume_recovers_from_consumer_deletion()
+    {
+        await using var nats = _server.CreateNatsConnection();
+        await nats.ConnectRetryAsync();
+        var prefix = _server.GetNextId();
+
+        var js = new NatsJSContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var stream = await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
+
+        // Publish 20 messages
+        for (var i = 0; i < 20; i++)
+        {
+            await js.PublishAsync($"{prefix}s1.foo", i, cancellationToken: cts.Token);
+        }
+
+        var consumer = (NatsJSOrderedConsumer)await stream.CreateOrderedConsumerAsync(cancellationToken: cts.Token);
+
+        var count = 0;
+        var consumeOpts = new NatsJSConsumeOpts
+        {
+            MaxMsgs = 3,
+            Expires = TimeSpan.FromSeconds(3),
+        };
+
+        await foreach (var msg in consumer.ConsumeAsync<int>(opts: consumeOpts, cancellationToken: cts.Token))
+        {
+            Assert.Equal(count, msg.Data);
+            count++;
+
+            // After receiving 8 messages, delete the consumer to force sequence mismatch
+            if (count == 8)
+            {
+                var consumerName = consumer.Info.Name;
+                _output.WriteLine($"Deleting consumer {consumerName} after message {count}");
+                await js.DeleteConsumerAsync($"{prefix}s1", consumerName, cts.Token);
+            }
+
+            if (count == 20)
+                break;
+        }
+
+        // Should have received all 20 messages despite consumer deletion
+        Assert.Equal(20, count);
+    }
+
+    [Fact]
+    public async Task FetchNoWait_recovers_from_consumer_deletion()
+    {
+        await using var nats = _server.CreateNatsConnection();
+        await nats.ConnectRetryAsync();
+        var prefix = _server.GetNextId();
+
+        var js = new NatsJSContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var stream = await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
+
+        // Publish 15 messages
+        for (var i = 0; i < 15; i++)
+        {
+            await js.PublishAsync($"{prefix}s1.foo", i, cancellationToken: cts.Token);
+        }
+
+        var consumer = (NatsJSOrderedConsumer)await stream.CreateOrderedConsumerAsync(cancellationToken: cts.Token);
+
+        var count = 0;
+        var fetchOpts = new NatsJSFetchOpts
+        {
+            MaxMsgs = 10,
+        };
+
+        await foreach (var msg in consumer.FetchNoWaitAsync<int>(opts: fetchOpts, cancellationToken: cts.Token))
+        {
+            Assert.Equal(count, msg.Data);
+            count++;
+
+            // After receiving 5 messages, delete the consumer to force sequence mismatch
+            if (count == 5)
+            {
+                var consumerName = consumer.Info.Name;
+                _output.WriteLine($"Deleting consumer {consumerName} after message {count}");
+                await js.DeleteConsumerAsync($"{prefix}s1", consumerName, cts.Token);
+            }
+        }
+
+        // Should have received all 10 messages despite consumer deletion
+        Assert.Equal(10, count);
+    }
+
+    [Fact]
+    public async Task Fetch_maxbytes_with_consumer_deletion()
+    {
+        await using var nats = _server.CreateNatsConnection();
+        await nats.ConnectRetryAsync();
+        var prefix = _server.GetNextId();
+
+        var js = new NatsJSContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var stream = await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
+
+        // Publish 20 messages
+        for (var i = 0; i < 20; i++)
+        {
+            await js.PublishAsync($"{prefix}s1.foo", i, cancellationToken: cts.Token);
+        }
+
+        var consumer = (NatsJSOrderedConsumer)await stream.CreateOrderedConsumerAsync(cancellationToken: cts.Token);
+
+        var count = 0;
+        var fetchOpts = new NatsJSFetchOpts
+        {
+            MaxBytes = 1024, // Use MaxBytes instead of MaxMsgs
+            Expires = TimeSpan.FromSeconds(3),
+        };
+
+        await foreach (var msg in consumer.FetchAsync<int>(opts: fetchOpts, cancellationToken: cts.Token))
+        {
+            Assert.Equal(count, msg.Data);
+            count++;
+
+            // After receiving 5 messages, delete the consumer to force sequence mismatch
+            if (count == 5)
+            {
+                var consumerName = consumer.Info.Name;
+                _output.WriteLine($"Deleting consumer {consumerName} after message {count}");
+                await js.DeleteConsumerAsync($"{prefix}s1", consumerName, cts.Token);
+            }
+        }
+
+        // Should have received messages up to MaxBytes limit, with recovery after deletion
+        _output.WriteLine($"Received {count} messages with MaxBytes mode");
+        Assert.True(count > 5, "Should have received messages after consumer deletion");
     }
 }

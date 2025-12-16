@@ -238,6 +238,9 @@ public record NatsJSPubOpts : NatsPubOpts
     // lss *uint64 // Expected last sequence per subject
     public ulong? ExpectedLastSubjectSequence { get; init; }
 
+    // Expected last sequence subject filter (allows wildcard subjects)
+    public string? ExpectedLastSubjectSequenceSubject { get; init; }
+
     // Publish retries for NoResponders err.
     // rwait time.Duration // Retry wait between attempts
     public TimeSpan RetryWaitBetweenAttempts { get; init; } = TimeSpan.FromMilliseconds(250);
