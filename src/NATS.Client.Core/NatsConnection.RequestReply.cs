@@ -108,7 +108,7 @@ public partial class NatsConnection
             cancellationToken: cancellationToken);
 
     /// <inheritdoc />
-    public async IAsyncEnumerable<NatsMsg<TReply>> RequestManyAsync<TRequest, TReply>(
+    public IAsyncEnumerable<NatsMsg<TReply>> RequestManyAsync<TRequest, TReply>(
         string subject,
         TRequest? data,
         NatsHeaders? headers = default,
@@ -116,13 +116,28 @@ public partial class NatsConnection
         INatsDeserialize<TReply>? replySerializer = default,
         NatsPubOpts? requestOpts = default,
         NatsSubOpts? replyOpts = default,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default)
     {
+        // Validate synchronously before returning the async enumerable
+        // so that invalid subjects throw immediately when RequestManyAsync is called
         if (!Opts.SkipSubjectValidation)
         {
             SubjectValidator.ValidateSubject(subject);
         }
 
+        return RequestManyInternalAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken);
+    }
+
+    private async IAsyncEnumerable<NatsMsg<TReply>> RequestManyInternalAsync<TRequest, TReply>(
+        string subject,
+        TRequest? data,
+        NatsHeaders? headers,
+        INatsSerialize<TRequest>? requestSerializer,
+        INatsDeserialize<TReply>? replySerializer,
+        NatsPubOpts? requestOpts,
+        NatsSubOpts? replyOpts,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
         replyOpts = SetReplyManyOptsDefaults(replyOpts);
         await using var sub = await CreateRequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
             .ConfigureAwait(false);

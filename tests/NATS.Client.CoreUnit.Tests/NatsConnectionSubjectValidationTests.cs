@@ -236,4 +236,64 @@ public class NatsConnectionSubjectValidationTests
         var action = async () => await nats.CreateRequestSubAsync<string, string>(subject, "data");
         await action.Should().ThrowAsync<NatsException>().WithMessage("Subject is invalid.");
     }
+
+    // Tests that verify exceptions are thrown SYNCHRONOUSLY (before any await/iteration)
+    // This is critical for good user experience - users should get immediate feedback
+    [Fact]
+    public void SubscribeAsync_ThrowsSynchronously_BeforeIteration()
+    {
+        var nats = new NatsConnection(OptsWithValidation);
+
+        // Exception should be thrown HERE, when calling SubscribeAsync,
+        // NOT when iterating the result
+        var exception = Assert.Throws<NatsException>(() =>
+        {
+            _ = nats.SubscribeAsync<string>("foo bar"); // No await, no iteration
+        });
+
+        Assert.Equal("Subject is invalid.", exception.Message);
+    }
+
+    [Fact]
+    public void SubscribeAsync_QueueGroup_ThrowsSynchronously_BeforeIteration()
+    {
+        var nats = new NatsConnection(OptsWithValidation);
+
+        var exception = Assert.Throws<NatsException>(() =>
+        {
+            _ = nats.SubscribeAsync<string>("valid.subject", queueGroup: "queue group");
+        });
+
+        Assert.Equal("Queue group is invalid.", exception.Message);
+    }
+
+    [Fact]
+    public void SubscribeCoreAsync_ThrowsSynchronously_BeforeAwait()
+    {
+        var nats = new NatsConnection(OptsWithValidation);
+
+        // Exception should be thrown HERE, when calling SubscribeCoreAsync,
+        // NOT when awaiting the result
+        var exception = Assert.Throws<NatsException>(() =>
+        {
+            _ = nats.SubscribeCoreAsync<string>("foo bar"); // No await
+        });
+
+        Assert.Equal("Subject is invalid.", exception.Message);
+    }
+
+    [Fact]
+    public void RequestManyAsync_ThrowsSynchronously_BeforeIteration()
+    {
+        var nats = new NatsConnection(OptsWithValidation);
+
+        // Exception should be thrown HERE, when calling RequestManyAsync,
+        // NOT when iterating the result
+        var exception = Assert.Throws<NatsException>(() =>
+        {
+            _ = nats.RequestManyAsync<string, string>("foo bar", "data");
+        });
+
+        Assert.Equal("Subject is invalid.", exception.Message);
+    }
 }
