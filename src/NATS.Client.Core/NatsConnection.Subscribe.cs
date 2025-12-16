@@ -19,6 +19,19 @@ public partial class NatsConnection
         return SubscribeInternalAsync<T>(subject, queueGroup, serializer, opts, cancellationToken);
     }
 
+    /// <inheritdoc />
+    public ValueTask<INatsSub<T>> SubscribeCoreAsync<T>(string subject, string? queueGroup = default, INatsDeserialize<T>? serializer = default, NatsSubOpts? opts = default, CancellationToken cancellationToken = default)
+    {
+        // Validate synchronously so invalid subjects throw immediately
+        if (!Opts.SkipSubjectValidation)
+        {
+            SubjectValidator.ValidateSubject(subject);
+            SubjectValidator.ValidateQueueGroup(queueGroup);
+        }
+
+        return SubscribeCoreInternalAsync<T>(subject, queueGroup, serializer, opts, cancellationToken);
+    }
+
     private async IAsyncEnumerable<NatsMsg<T>> SubscribeInternalAsync<T>(string subject, string? queueGroup, INatsDeserialize<T>? serializer, NatsSubOpts? opts, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         serializer ??= Opts.SerializerRegistry.GetDeserializer<T>();
@@ -32,19 +45,6 @@ public partial class NatsConnection
         {
             yield return msg;
         }
-    }
-
-    /// <inheritdoc />
-    public ValueTask<INatsSub<T>> SubscribeCoreAsync<T>(string subject, string? queueGroup = default, INatsDeserialize<T>? serializer = default, NatsSubOpts? opts = default, CancellationToken cancellationToken = default)
-    {
-        // Validate synchronously so invalid subjects throw immediately
-        if (!Opts.SkipSubjectValidation)
-        {
-            SubjectValidator.ValidateSubject(subject);
-            SubjectValidator.ValidateQueueGroup(queueGroup);
-        }
-
-        return SubscribeCoreInternalAsync<T>(subject, queueGroup, serializer, opts, cancellationToken);
     }
 
     private async ValueTask<INatsSub<T>> SubscribeCoreInternalAsync<T>(string subject, string? queueGroup, INatsDeserialize<T>? serializer, NatsSubOpts? opts, CancellationToken cancellationToken)

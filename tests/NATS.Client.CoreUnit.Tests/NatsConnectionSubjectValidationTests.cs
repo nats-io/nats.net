@@ -69,7 +69,7 @@ public class NatsConnectionSubjectValidationTests
         await using var nats = new NatsConnection(OptsWithValidation);
         var action = async () =>
         {
-            await foreach (var _ in nats.SubscribeAsync<string>(subject))
+            await foreach (var unused in nats.SubscribeAsync<string>(subject))
             {
                 // Should not reach here
             }
@@ -83,7 +83,7 @@ public class NatsConnectionSubjectValidationTests
         await using var nats = new NatsConnection(OptsWithValidation);
         var action = async () =>
         {
-            await foreach (var _ in nats.SubscribeAsync<string>(string.Empty))
+            await foreach (var unused in nats.SubscribeAsync<string>(string.Empty))
             {
                 // Should not reach here
             }
@@ -99,7 +99,7 @@ public class NatsConnectionSubjectValidationTests
         await using var nats = new NatsConnection(OptsWithValidation);
         var action = async () =>
         {
-            await foreach (var _ in nats.SubscribeAsync<string>("foo.bar", queueGroup: queueGroup))
+            await foreach (var unused in nats.SubscribeAsync<string>("foo.bar", queueGroup: queueGroup))
             {
                 // Should not reach here
             }
@@ -113,7 +113,7 @@ public class NatsConnectionSubjectValidationTests
         await using var nats = new NatsConnection(OptsWithValidation);
         var action = async () =>
         {
-            await foreach (var _ in nats.SubscribeAsync<string>("foo.bar", queueGroup: string.Empty))
+            await foreach (var unused in nats.SubscribeAsync<string>("foo.bar", queueGroup: string.Empty))
             {
                 // Should not reach here
             }
@@ -177,7 +177,7 @@ public class NatsConnectionSubjectValidationTests
         Func<Task> action = async () =>
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
-            await foreach (var _ in nats.SubscribeAsync<string>(subject, cancellationToken: cts.Token))
+            await foreach (var unused in nats.SubscribeAsync<string>(subject, cancellationToken: cts.Token))
             {
                 // Should not reach here
             }

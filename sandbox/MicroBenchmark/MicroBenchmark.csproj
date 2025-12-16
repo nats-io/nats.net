@@ -13,6 +13,8 @@
 
     <ItemGroup>
         <PackageReference Include="BenchmarkDotNet" Version="0.14.0" />
+        <!-- Resolve version conflict between BenchmarkDotNet dependencies on net481 -->
+        <PackageReference Include="System.Reflection.Metadata" Version="8.0.1" Condition="'$(TargetFramework)' == 'net481'" />
         <PackageReference Include="StackExchange.Redis" Version="2.8.24" />
         <PackageReference Include="ZLogger" Version="2.5.10" />
         <PackageReference Include="NATS.Client" Version="1.1.6" />
