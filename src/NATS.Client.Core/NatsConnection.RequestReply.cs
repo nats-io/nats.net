@@ -33,6 +33,11 @@ public partial class NatsConnection
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default)
     {
+        if (!Opts.SkipSubjectValidation)
+        {
+            SubjectValidator.ValidateSubject(subject);
+        }
+
         if (Telemetry.HasListeners())
         {
             using var activity = Telemetry.StartSendActivity($"{SpanDestinationName(subject)} {Telemetry.Constants.RequestReplyActivityName}", this, subject, null);
@@ -113,6 +118,11 @@ public partial class NatsConnection
         NatsSubOpts? replyOpts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        if (!Opts.SkipSubjectValidation)
+        {
+            SubjectValidator.ValidateSubject(subject);
+        }
+
         replyOpts = SetReplyManyOptsDefaults(replyOpts);
         await using var sub = await CreateRequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
             .ConfigureAwait(false);

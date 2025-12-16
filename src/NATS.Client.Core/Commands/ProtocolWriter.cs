@@ -36,23 +36,11 @@ internal sealed class ProtocolWriter
     private static readonly ulong PongNewLine = BinaryPrimitives.ReadUInt64LittleEndian("PONG\r\n  "u8);
     private static readonly ulong UnsubSpace = BinaryPrimitives.ReadUInt64LittleEndian("UNSUB   "u8);
 
-    // Used for subject/replyTo/queueGroup validation to prevent protocol-breaking whitespace.
-    // Static field ensures zero allocations per call. SearchValues (NET8+) uses SIMD vectorization;
-    // char[] (older TFMs) uses optimized IndexOfAny for <=5 chars. Adds ~3% overhead on .NET 8
-    // and ~5% on .NET Framework to full publish operations, with zero GC pressure.
-#if NET8_0_OR_GREATER
-    private static readonly SearchValues<char> WhitespaceChars = SearchValues.Create([' ', '\r', '\n', '\t']);
-#else
-    private static readonly char[] WhitespaceChars = [' ', '\r', '\n', '\t'];
-#endif
-
     private readonly Encoding _subjectEncoding;
-    private readonly bool _skipSubjectValidation;
 
-    public ProtocolWriter(Encoding subjectEncoding, bool skipSubjectValidation = false)
+    public ProtocolWriter(Encoding subjectEncoding)
     {
         _subjectEncoding = subjectEncoding;
-        _skipSubjectValidation = skipSubjectValidation;
     }
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#connect
@@ -94,15 +82,6 @@ internal sealed class ProtocolWriter
     // HPUB <subject> [reply-to] <#header bytes> <#total bytes>\r\n[headers]\r\n\r\n[payload]\r\n
     public void WritePublish(IBufferWriter<byte> writer, string subject, string? replyTo, ReadOnlyMemory<byte>? headers, ReadOnlyMemory<byte> payload)
     {
-        if (!_skipSubjectValidation)
-        {
-            ValidateSubject(subject);
-            if (replyTo != null)
-            {
-                ValidateSubject(replyTo);
-            }
-        }
-
         if (headers == null)
         {
             WritePub(writer, subject, replyTo, payload);
@@ -117,15 +96,6 @@ internal sealed class ProtocolWriter
     // SUB <subject> [queue group] <sid>
     public void WriteSubscribe(IBufferWriter<byte> writer, int sid, string subject, string? queueGroup, int? maxMsgs)
     {
-        if (!_skipSubjectValidation)
-        {
-            ValidateSubject(subject);
-            if (queueGroup != null)
-            {
-                ValidateQueueGroup(queueGroup);
-            }
-        }
-
         // 'SUB '                       + subject                                +' '+ sid                +'\r\n'
         var ctrlLen = SubSpaceLength + _subjectEncoding.GetByteCount(subject) + 1 + MaxIntStringLength + NewLineLength;
 
@@ -220,55 +190,6 @@ internal sealed class ProtocolWriter
     // optimization detailed here: https://github.com/nats-io/nats.net/issues/320#issuecomment-1886165748
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void ThrowOnUtf8FormatFail() => throw new NatsException("Can not format integer.");
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ThrowOnBadSubject() => throw new NatsException("Subject is invalid.");
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ThrowOnBadQueueGroup() => throw new NatsException("Queue group is invalid.");
-
-    // Validates subjects: no whitespace (protocol-breaking characters)
-    // Uses adaptive algorithm: manual loop for short subjects (< 16 chars) with
-    // branch-predicted early exit, SIMD-optimized IndexOfAny for longer subjects.
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void ValidateSubject(ReadOnlySpan<char> subject)
-    {
-        if (subject.IsEmpty)
-        {
-            ThrowOnBadSubject();
-        }
-
-        if (subject.Length < 16)
-        {
-            // Fast path for short subjects - branch predictor learns most chars are > ' '
-            foreach (var c in subject)
-            {
-                if (c <= ' ' && (c == ' ' || c == '\t' || c == '\r' || c == '\n'))
-                {
-                    ThrowOnBadSubject();
-                }
-            }
-        }
-        else
-        {
-            // SIMD path for long subjects
-            if (subject.IndexOfAny(WhitespaceChars) >= 0)
-            {
-                ThrowOnBadSubject();
-            }
-        }
-    }
-
-    // Validates queue groups: no whitespace only (dots are allowed)
-    // Matches Go client's badQueue() validation
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void ValidateQueueGroup(ReadOnlySpan<char> queueGroup)
-    {
-        if (queueGroup.IsEmpty || queueGroup.IndexOfAny(WhitespaceChars) >= 0)
-        {
-            ThrowOnBadQueueGroup();
-        }
-    }
 
     // PUB <subject> [reply-to] <#bytes>\r\n[payload]\r\n
     private void WritePub(IBufferWriter<byte> writer, string subject, string? replyTo, ReadOnlyMemory<byte> payload)

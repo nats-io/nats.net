@@ -8,6 +8,12 @@ public partial class NatsConnection
     /// <inheritdoc />
     public ValueTask PublishAsync(string subject, NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
+        if (!Opts.SkipSubjectValidation)
+        {
+            SubjectValidator.ValidateSubject(subject);
+            SubjectValidator.ValidateReplyTo(replyTo);
+        }
+
         if (Telemetry.HasListeners())
         {
             using var activity = Telemetry.StartSendActivity($"{SpanDestinationName(subject)} {Telemetry.Constants.PublishActivityName}", this, subject, replyTo);
@@ -35,6 +41,12 @@ public partial class NatsConnection
     /// <inheritdoc />
     public ValueTask PublishAsync<T>(string subject, T? data, NatsHeaders? headers = default, string? replyTo = default, INatsSerialize<T>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
+        if (!Opts.SkipSubjectValidation)
+        {
+            SubjectValidator.ValidateSubject(subject);
+            SubjectValidator.ValidateReplyTo(replyTo);
+        }
+
         if (Telemetry.HasListeners())
         {
             using var activity = Telemetry.StartSendActivity($"{SpanDestinationName(subject)} {Telemetry.Constants.PublishActivityName}", this, subject, replyTo);

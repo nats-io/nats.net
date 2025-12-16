@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
+using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
 
@@ -8,6 +9,12 @@ public partial class NatsConnection
     /// <inheritdoc />
     public async IAsyncEnumerable<NatsMsg<T>> SubscribeAsync<T>(string subject, string? queueGroup = default, INatsDeserialize<T>? serializer = default, NatsSubOpts? opts = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        if (!Opts.SkipSubjectValidation)
+        {
+            SubjectValidator.ValidateSubject(subject);
+            SubjectValidator.ValidateQueueGroup(queueGroup);
+        }
+
         serializer ??= Opts.SerializerRegistry.GetDeserializer<T>();
 
         await using var sub = new NatsSub<T>(this, _subscriptionManager.GetManagerFor(subject), subject, queueGroup, opts, serializer, cancellationToken);
@@ -24,6 +31,12 @@ public partial class NatsConnection
     /// <inheritdoc />
     public async ValueTask<INatsSub<T>> SubscribeCoreAsync<T>(string subject, string? queueGroup = default, INatsDeserialize<T>? serializer = default, NatsSubOpts? opts = default, CancellationToken cancellationToken = default)
     {
+        if (!Opts.SkipSubjectValidation)
+        {
+            SubjectValidator.ValidateSubject(subject);
+            SubjectValidator.ValidateQueueGroup(queueGroup);
+        }
+
         serializer ??= Opts.SerializerRegistry.GetDeserializer<T>();
         var sub = new NatsSub<T>(this, _subscriptionManager.GetManagerFor(subject), subject, queueGroup, opts, serializer, cancellationToken);
         await AddSubAsync(sub, cancellationToken).ConfigureAwait(false);

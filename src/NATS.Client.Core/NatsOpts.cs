@@ -216,19 +216,19 @@ public sealed record NatsOpts
 
     /// <summary>
     /// Gets or sets a value indicating whether to skip subject validation.
-    /// The default is <c>false</c>, meaning subjects are validated for whitespace and empty strings.
+    /// The default is <c>true</c>, meaning subject validation is disabled.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// When set to <c>false</c> (default), subjects are validated to ensure they are not empty
-    /// and don't contain whitespace characters (space, tab, CR, LF).
+    /// When set to <c>true</c> (default), all subject validation is bypassed.
     /// </para>
     /// <para>
-    /// When set to <c>true</c>, all subject validation is bypassed. This can improve
-    /// performance in high-throughput scenarios where subjects are known to be valid.
+    /// When set to <c>false</c>, subjects are validated to ensure they are not empty
+    /// and don't contain whitespace characters (space, tab, CR, LF). This can help
+    /// catch invalid subjects early but adds minor overhead.
     /// </para>
     /// </remarks>
-    public bool SkipSubjectValidation { get; init; } = false;
+    public bool SkipSubjectValidation { get; init; } = true;
 
     internal NatsUri[] GetSeedUris(bool suppressRandomization = false)
     {

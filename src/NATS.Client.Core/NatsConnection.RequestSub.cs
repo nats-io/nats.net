@@ -1,3 +1,5 @@
+using NATS.Client.Core.Internal;
+
 namespace NATS.Client.Core;
 
 public partial class NatsConnection
@@ -13,6 +15,11 @@ public partial class NatsConnection
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default)
     {
+        if (!Opts.SkipSubjectValidation)
+        {
+            SubjectValidator.ValidateSubject(subject);
+        }
+
         var replyTo = NewInbox();
 
         replySerializer ??= Opts.SerializerRegistry.GetDeserializer<TReply>();
