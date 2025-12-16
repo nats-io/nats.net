@@ -1,4 +1,4 @@
-﻿namespace NATS.Client.CoreUnit.Tests;
+namespace NATS.Client.CoreUnit.Tests;
 
 public class SubjectValidatorTests
 {
