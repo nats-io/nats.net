@@ -38,7 +38,10 @@ internal sealed class ProtocolWriter
 
     private readonly Encoding _subjectEncoding;
 
-    public ProtocolWriter(Encoding subjectEncoding) => _subjectEncoding = subjectEncoding;
+    public ProtocolWriter(Encoding subjectEncoding)
+    {
+        _subjectEncoding = subjectEncoding;
+    }
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#connect
     // CONNECT {["option_name":option_value],...}

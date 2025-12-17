@@ -33,6 +33,11 @@ public partial class NatsConnection
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default)
     {
+        if (!Opts.SkipSubjectValidation)
+        {
+            SubjectValidator.ValidateSubject(subject);
+        }
+
         if (Telemetry.HasListeners())
         {
             using var activity = Telemetry.StartSendActivity($"{SpanDestinationName(subject)} {Telemetry.Constants.RequestReplyActivityName}", this, subject, null);
@@ -103,7 +108,7 @@ public partial class NatsConnection
             cancellationToken: cancellationToken);
 
     /// <inheritdoc />
-    public async IAsyncEnumerable<NatsMsg<TReply>> RequestManyAsync<TRequest, TReply>(
+    public IAsyncEnumerable<NatsMsg<TReply>> RequestManyAsync<TRequest, TReply>(
         string subject,
         TRequest? data,
         NatsHeaders? headers = default,
@@ -111,16 +116,16 @@ public partial class NatsConnection
         INatsDeserialize<TReply>? replySerializer = default,
         NatsPubOpts? requestOpts = default,
         NatsSubOpts? replyOpts = default,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default)
     {
-        replyOpts = SetReplyManyOptsDefaults(replyOpts);
-        await using var sub = await CreateRequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
-            .ConfigureAwait(false);
-
-        await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        // Validate synchronously before returning the async enumerable
+        // so that invalid subjects throw immediately when RequestManyAsync is called
+        if (!Opts.SkipSubjectValidation)
         {
-            yield return msg;
+            SubjectValidator.ValidateSubject(subject);
         }
+
+        return RequestManyInternalAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken);
     }
 
     [SkipLocalsInit]
@@ -146,6 +151,26 @@ public partial class NatsConnection
         WriteBuffer(buffer, (prefix, totalPrefixLength));
         return buffer.ToString();
 #endif
+    }
+
+    private async IAsyncEnumerable<NatsMsg<TReply>> RequestManyInternalAsync<TRequest, TReply>(
+        string subject,
+        TRequest? data,
+        NatsHeaders? headers,
+        INatsSerialize<TRequest>? requestSerializer,
+        INatsDeserialize<TReply>? replySerializer,
+        NatsPubOpts? requestOpts,
+        NatsSubOpts? replyOpts,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        replyOpts = SetReplyManyOptsDefaults(replyOpts);
+        await using var sub = await CreateRequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
+            .ConfigureAwait(false);
+
+        await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        {
+            yield return msg;
+        }
     }
 
     private NatsSubOpts SetReplyOptsDefaults(NatsSubOpts? replyOpts)
