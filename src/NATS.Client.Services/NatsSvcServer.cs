@@ -60,7 +60,18 @@ public class NatsSvcServer : INatsSvcServer
         }
 
         // Drain buffers
-        await _nats.PingAsync(cancellationToken);
+        // Ping only when connection is open, otherwise ping hangs waiting for reconnection.
+        // This is problematic when stopping a service during connection issues
+        // or if the server is stopped especially in a test environment.
+        if (_nats.ConnectionState == NatsConnectionState.Open)
+        {
+            // We're stopping, so timeout quickly in case connection state changes
+            // which means we don't care about flushing any buffers anymore
+            // it's just a best effort attempt
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token, cancellationToken);
+            linkedCts.CancelAfter(_nats.Opts.ConnectTimeout);
+            await _nats.PingAsync(linkedCts.Token).ConfigureAwait(false);
+        }
 
         foreach (var ep in _endPoints.Values)
         {
