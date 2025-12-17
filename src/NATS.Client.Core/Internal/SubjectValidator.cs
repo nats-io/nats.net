@@ -33,7 +33,7 @@ internal static class SubjectValidator
             ThrowOnBadSubject();
         }
 
-        ValidateSubjectSpan(subject.AsSpan());
+        ValidateSubjectSpan(subject);
     }
 
     /// <summary>
@@ -51,7 +51,7 @@ internal static class SubjectValidator
                 ThrowOnBadSubject();
             }
 
-            ValidateSubjectSpan(replyTo.AsSpan());
+            ValidateSubjectSpan(replyTo);
         }
     }
 
