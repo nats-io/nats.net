@@ -67,6 +67,12 @@ public abstract class NatsSubBase
         NatsSubOpts? opts,
         CancellationToken cancellationToken = default)
     {
+        if (!connection.Opts.SkipSubjectValidation)
+        {
+            SubjectValidator.ValidateSubject(subject);
+            SubjectValidator.ValidateQueueGroup(queueGroup);
+        }
+
         _logger = connection.Opts.LoggerFactory.CreateLogger<NatsSubBase>();
         _debug = _logger.IsEnabled(LogLevel.Debug);
         _manager = manager;
