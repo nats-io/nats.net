@@ -1,3 +1,4 @@
+#if !NET481
 using BenchmarkDotNet.Attributes;
 using NATS.Client.Core;
 
@@ -43,3 +44,4 @@ public class RequestReplyBench
         return result;
     }
 }
+#endif

@@ -39,6 +39,12 @@ internal record NatsJSOrderedPushConsumerOpts
     public ConsumerConfigDeliverPolicy DeliverPolicy { get; init; } = ConsumerConfigDeliverPolicy.All;
 
     public bool HeadersOnly { get; init; } = false;
+
+    /// <summary>
+    /// Timeout for cleanup operations during disposal (e.g. deleting ephemeral consumers).
+    /// If the server is slow or unresponsive, disposal will not block longer than this.
+    /// </summary>
+    public TimeSpan CleanupTimeout { get; init; } = TimeSpan.FromSeconds(5);
 }
 
 internal class NatsJSOrderedPushConsumer<T>
@@ -158,7 +164,20 @@ internal class NatsJSOrderedPushConsumer<T>
 
         _msgChannel.Writer.TryComplete();
 
-        await _context.DeleteConsumerAsync(_stream, Consumer, _cancellationToken);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(_cancellationToken);
+        cts.CancelAfter(_opts.CleanupTimeout);
+        try
+        {
+            await _context.DeleteConsumerAsync(_stream, Consumer, cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // Timeout - server will clean up ephemeral consumer automatically
+        }
+        catch (NatsJSApiException)
+        {
+            // Consumer may already be gone, that's fine
+        }
     }
 
     internal void Init()

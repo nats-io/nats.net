@@ -2,15 +2,19 @@
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
-        <TargetFramework>net8.0</TargetFramework>
+        <TargetFrameworks>net8.0</TargetFrameworks>
+        <TargetFrameworks Condition="'$(OS)' == 'Windows_NT'">$(TargetFrameworks);net481</TargetFrameworks>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <IsPackable>false</IsPackable>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <LangVersion>12</LangVersion>
     </PropertyGroup>
 
     <ItemGroup>
         <PackageReference Include="BenchmarkDotNet" Version="0.14.0" />
+        <!-- Resolve version conflict between BenchmarkDotNet dependencies on net481 -->
+        <PackageReference Include="System.Reflection.Metadata" Version="8.0.1" Condition="'$(TargetFramework)' == 'net481'" />
         <PackageReference Include="StackExchange.Redis" Version="2.8.24" />
         <PackageReference Include="ZLogger" Version="2.5.10" />
         <PackageReference Include="NATS.Client" Version="1.1.6" />
