@@ -521,4 +521,57 @@ public class ServicesTests
 
         await s2.DisposeAsync();
     }
+
+    [Theory]
+    [InlineData("foo bar")]
+    [InlineData("foo\tbar")]
+    public async Task AddEndpoint_SubjectWithWhitespace_ThrowsWhenValidationEnabled(string subject)
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, SkipSubjectValidation = false });
+        var svc = new NatsSvcContext(nats);
+
+        await using var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
+
+        var exception = await Assert.ThrowsAsync<NatsException>(async () =>
+        {
+            await s1.AddEndpointAsync<int>(
+                subject: subject,
+                handler: _ => ValueTask.CompletedTask,
+                cancellationToken: cancellationToken);
+        });
+
+        Assert.Equal("Subject is invalid.", exception.Message);
+    }
+
+    [Theory]
+    [InlineData("queue group")]
+    [InlineData("queue\tgroup")]
+    public async Task AddEndpoint_QueueGroupWithWhitespace_ThrowsWhenValidationEnabled(string queueGroup)
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, SkipSubjectValidation = false });
+        var svc = new NatsSvcContext(nats);
+
+        await using var s1 = await svc.AddServiceAsync(
+            new NatsSvcConfig("s1", "1.0.0") { UseQueueGroup = false },
+            cancellationToken: cancellationToken);
+
+        var exception = await Assert.ThrowsAsync<NatsException>(async () =>
+        {
+            await s1.AddEndpointAsync<int>(
+                subject: "valid.subject",
+                queueGroup: queueGroup,
+                handler: _ => ValueTask.CompletedTask,
+                cancellationToken: cancellationToken);
+        });
+
+        Assert.Equal("Queue group is invalid.", exception.Message);
+    }
 }
