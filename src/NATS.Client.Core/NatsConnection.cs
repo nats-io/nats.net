@@ -46,7 +46,6 @@ public partial class NatsConnection : INatsConnection
     private readonly Channel<(NatsEvent, NatsEventArgs)> _eventChannel;
     private readonly ClientOpts _clientOpts;
     private readonly SubscriptionManager _subscriptionManager;
-    private readonly ReplyTaskFactory _replyTaskFactory;
 
     private ServerInfo? _writableServerInfo;
     private int _pongCount;
@@ -88,7 +87,6 @@ public partial class NatsConnection : INatsConnection
         CommandWriter = new CommandWriter("main", this, _pool, Opts, Counter, EnqueuePing);
         InboxPrefix = NewInbox(opts.InboxPrefix);
         _subscriptionManager = new SubscriptionManager(this, InboxPrefix);
-        _replyTaskFactory = new ReplyTaskFactory(this);
         _clientOpts = ClientOpts.Create(Opts);
         HeaderParser = new NatsHeaderParser(opts.HeaderEncoding);
         _defaultSubscriptionChannelOpts = new BoundedChannelOptions(opts.SubPendingChannelCapacity)
@@ -304,37 +302,6 @@ public partial class NatsConnection : INatsConnection
 
     internal ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
     {
-        if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
-        {
-            // Direct mode, check if the subject is an inbox
-            // and if so, check if the subject is a reply to a request
-            // by checking if the subject length is less than two NUIDs + dots
-            // e.g. _INBOX.Hu5HPpWesrJhvQq2NG3YJ6.Hu5HPpWesrJhvQq2NG3YLw
-            //  vs. _INBOX.Hu5HPpWesrJhvQq2NG3YJ6.1234
-            // otherwise, it's not a reply in direct mode.
-            if (_subscriptionManager.InboxSid == sid && subject.Length < InboxPrefix.Length + 1 + 22 + 1 + 22)
-            {
-                var idString = subject.AsSpan().Slice(InboxPrefix.Length + 1)
-#if NETSTANDARD2_0
-                    .ToString()
-#endif
-                ;
-
-                if (long.TryParse(idString, out var id))
-                {
-                    if (_replyTaskFactory.TrySetResult(id, replyTo, payloadBuffer, headersBuffer))
-                    {
-                        return default;
-                    }
-
-                    // if we can't set the result, either the task is already timed out or
-                    // it's not a reply to a request.
-                }
-
-                // if we can't parse the id, it's not a reply.
-            }
-        }
-
         return _subscriptionManager.PublishToClientHandlersAsync(subject, replyTo, sid, headersBuffer, payloadBuffer);
     }
 
