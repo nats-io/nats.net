@@ -41,3 +41,11 @@ public class NatsLameDuckModeActivatedEventArgs : NatsEventArgs
 
     public Uri Uri { get; }
 }
+
+public class NatsServerErrorEventArgs : NatsEventArgs
+{
+    public NatsServerErrorEventArgs(string error)
+        : base($"Server error {error}") => Error = error;
+
+    public string Error { get; }
+}
