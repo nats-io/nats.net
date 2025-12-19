@@ -30,10 +30,10 @@ public class CancellationTest
         var stopToken = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var stallTask = conn.CommandWriter.TestStallFlushAsync(TimeSpan.FromSeconds(10), stopToken.Token);
 
-        // commands that call ConnectAsync throw OperationCanceledException
-        await Assert.ThrowsAsync<OperationCanceledException>(() => conn.PingAsync(cancellationToken).AsTask());
-        await Assert.ThrowsAsync<OperationCanceledException>(() => conn.PublishAsync("test", cancellationToken: cancellationToken).AsTask());
-        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+        // commands that call ConnectAsync throw NatsTimeoutException
+        await Assert.ThrowsAsync<NatsTimeoutException>(() => conn.PingAsync(cancellationToken).AsTask());
+        await Assert.ThrowsAsync<NatsTimeoutException>(() => conn.PublishAsync("test", cancellationToken: cancellationToken).AsTask());
+        await Assert.ThrowsAsync<NatsTimeoutException>(async () =>
         {
             await foreach (var unused in conn.SubscribeAsync<string>("test", cancellationToken: cancellationToken))
             {

@@ -725,7 +725,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         {
             if (!await _semLock.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
             {
-                throw new OperationCanceledException();
+                NatsTimeoutException.Throw();
             }
         }
 
@@ -747,8 +747,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         catch (TimeoutException)
         {
             // WaitAsync throws a TimeoutException when the TimeSpan is exceeded
-            // standardize to an OperationCanceledException as if a cancellationToken was used
-            throw new OperationCanceledException();
+            NatsTimeoutException.Throw();
         }
         finally
         {
@@ -762,7 +761,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         {
             if (!await _semLock.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
             {
-                throw new OperationCanceledException();
+                NatsTimeoutException.Throw();
             }
         }
 
@@ -785,8 +784,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         catch (TimeoutException)
         {
             // WaitAsync throws a TimeoutException when the TimeSpan is exceeded
-            // standardize to an OperationCanceledException as if a cancellationToken was used
-            throw new OperationCanceledException();
+            NatsTimeoutException.Throw();
         }
         finally
         {
@@ -800,7 +798,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         {
             if (!await _semLock.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
             {
-                throw new OperationCanceledException();
+                NatsTimeoutException.Throw();
             }
         }
 
@@ -822,8 +820,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         catch (TimeoutException)
         {
             // WaitAsync throws a TimeoutException when the TimeSpan is exceeded
-            // standardize to an OperationCanceledException as if a cancellationToken was used
-            throw new OperationCanceledException();
+            NatsTimeoutException.Throw();
         }
         finally
         {
@@ -842,7 +839,7 @@ internal sealed class CommandWriter : IAsyncDisposable
             {
                 if (!await _semLock.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
                 {
-                    throw new OperationCanceledException();
+                    NatsTimeoutException.Throw();
                 }
             }
 
@@ -864,8 +861,7 @@ internal sealed class CommandWriter : IAsyncDisposable
             catch (TimeoutException)
             {
                 // WaitAsync throws a TimeoutException when the TimeSpan is exceeded
-                // standardize to an OperationCanceledException as if a cancellationToken was used
-                throw new OperationCanceledException();
+                NatsTimeoutException.Throw();
             }
             finally
             {
@@ -891,7 +887,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         {
             if (!await _semLock.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
             {
-                throw new OperationCanceledException();
+                NatsTimeoutException.Throw();
             }
         }
 
@@ -913,8 +909,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         catch (TimeoutException)
         {
             // WaitAsync throws a TimeoutException when the TimeSpan is exceeded
-            // standardize to an OperationCanceledException as if a cancellationToken was used
-            throw new OperationCanceledException();
+            NatsTimeoutException.Throw();
         }
         finally
         {
@@ -928,7 +923,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         {
             if (!await _semLock.WaitAsync(_defaultCommandTimeout, cancellationToken).ConfigureAwait(false))
             {
-                throw new OperationCanceledException();
+                NatsTimeoutException.Throw();
             }
         }
 
@@ -950,8 +945,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         catch (TimeoutException)
         {
             // WaitAsync throws a TimeoutException when the TimeSpan is exceeded
-            // standardize to an OperationCanceledException as if a cancellationToken was used
-            throw new OperationCanceledException();
+            NatsTimeoutException.Throw();
         }
         finally
         {
