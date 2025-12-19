@@ -471,7 +471,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         msgHeader.Split(out var sidBytes, out msgHeader);
         msgHeader.Split(out var replyToOrSizeBytes, out msgHeader);
 
-        var subject = Encoding.ASCII.GetString(subjectBytes);
+        var subject = Encoding.UTF8.GetString(subjectBytes);
 
         if (msgHeader.Length == 0)
         {
@@ -486,7 +486,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
 
             var sid = GetInt32(sidBytes);
             var payloadLength = GetInt32(bytesSlice);
-            var replyTo = Encoding.ASCII.GetString(replyToBytes);
+            var replyTo = Encoding.UTF8.GetString(replyToBytes);
             return (subject, sid, payloadLength, replyTo);
         }
     }
@@ -526,7 +526,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         msgHeader.Split(out var replyToOrHeaderLenBytes, out msgHeader);
         msgHeader.Split(out var headerLenOrTotalLenBytes, out msgHeader);
 
-        var subject = Encoding.ASCII.GetString(subjectBytes);
+        var subject = Encoding.UTF8.GetString(subjectBytes);
         var sid = GetInt32(sidBytes);
 
         // We don't have the optional reply-to field
@@ -541,7 +541,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         else
         {
             var replyToBytes = replyToOrHeaderLenBytes;
-            var replyTo = Encoding.ASCII.GetString(replyToBytes);
+            var replyTo = Encoding.UTF8.GetString(replyToBytes);
 
             var headerLen = GetInt32(headerLenOrTotalLenBytes);
 
@@ -578,12 +578,12 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
     internal static class ServerOpCodes
     {
         // All sent by server commands as int(first 4 characters(includes space, newline)).
-        public const int Info = 1330007625;  // Encoding.ASCII.GetBytes("INFO") |> MemoryMarshal.Read<int>
-        public const int Msg = 541545293;    // Encoding.ASCII.GetBytes("MSG ") |> MemoryMarshal.Read<int>
-        public const int HMsg = 1196641608;  // Encoding.ASCII.GetBytes("HMSG") |> MemoryMarshal.Read<int>
-        public const int Ping = 1196312912;  // Encoding.ASCII.GetBytes("PING") |> MemoryMarshal.Read<int>
-        public const int Pong = 1196314448;  // Encoding.ASCII.GetBytes("PONG") |> MemoryMarshal.Read<int>
-        public const int Ok = 223039275;     // Encoding.ASCII.GetBytes("+OK\r") |> MemoryMarshal.Read<int>
-        public const int Error = 1381123373; // Encoding.ASCII.GetBytes("-ERR") |> MemoryMarshal.Read<int>
+        public const int Info = 1330007625;  // Encoding.UTF8.GetBytes("INFO") |> MemoryMarshal.Read<int>
+        public const int Msg = 541545293;    // Encoding.UTF8.GetBytes("MSG ") |> MemoryMarshal.Read<int>
+        public const int HMsg = 1196641608;  // Encoding.UTF8.GetBytes("HMSG") |> MemoryMarshal.Read<int>
+        public const int Ping = 1196312912;  // Encoding.UTF8.GetBytes("PING") |> MemoryMarshal.Read<int>
+        public const int Pong = 1196314448;  // Encoding.UTF8.GetBytes("PONG") |> MemoryMarshal.Read<int>
+        public const int Ok = 223039275;     // Encoding.UTF8.GetBytes("+OK\r") |> MemoryMarshal.Read<int>
+        public const int Error = 1381123373; // Encoding.UTF8.GetBytes("-ERR") |> MemoryMarshal.Read<int>
     }
 }
