@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <!-- NuGet Packaging -->
@@ -31,16 +31,16 @@
         <PackageReference Include="System.Memory" Version="4.5.5"/>
         <PackageReference Include="System.Buffers" Version="4.5.1"/>
         <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="8.0.0"/>
+        <PackageReference Include="Microsoft.Bcl.Memory" Version="9.0.0"/>
         <!--  Nerdbank.Streams for SequenceReader support https://github.com/dotnet/standard/issues/1493  -->
         <PackageReference Include="Nerdbank.Streams" Version="2.10.72"/>
-        <PackageReference Include="IndexRange" Version="1.0.3"/>
     </ItemGroup>
 
     <!--  Dependencies for prior to net8.0-->
     <ItemGroup Condition="!$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net8.0'))">
         <PackageReference Include="System.Text.Json" Version="8.0.5"/>
     </ItemGroup>
-    
+
     <!--  Dependencies for prior to net9.0-->
     <ItemGroup Condition="!$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net9.0'))">
         <PackageReference Include="System.IO.Pipelines" Version="8.0.0"/>
