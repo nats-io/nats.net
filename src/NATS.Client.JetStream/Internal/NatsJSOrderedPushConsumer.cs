@@ -232,7 +232,9 @@ internal class NatsJSOrderedPushConsumer<T>
 
                                     if (headers is { Code: 100, MessageText: "FlowControl Request" })
                                     {
+#pragma warning disable CS0618 // Type or member is obsolete
                                         await msg.ReplyAsync(cancellationToken: _cancellationToken);
+#pragma warning restore CS0618 // Type or member is obsolete
                                     }
                                 }
                             }

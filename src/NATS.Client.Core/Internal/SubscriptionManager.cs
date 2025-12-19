@@ -53,7 +53,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
     {
         if (Telemetry.HasListeners())
         {
-            using var activity = Telemetry.StartSendActivity($"{_connection.SpanDestinationName(sub.Subject)} {Telemetry.Constants.SubscribeActivityName}", _connection, sub.Subject, null, null);
+            using var activity = Telemetry.StartSendActivity($"{_connection.SpanDestinationName(sub.Subject)} {Telemetry.Constants.SubscribeActivityName}", _connection, sub.Subject, null);
             try
             {
                 if (IsInboxSubject(sub.Subject))

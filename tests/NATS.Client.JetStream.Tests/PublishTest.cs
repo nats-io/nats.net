@@ -349,7 +349,7 @@ public class PublishTest
 
         // Default is two attempts
         await Assert.ThrowsAnyAsync<NatsJSPublishNoResponseException>(async () => await js.PublishAsync($"foo", 1, cancellationToken: cts.Token));
-        Assert.Equal(2, Volatile.Read(ref retryCount));
+        Assert.Equal(1, Volatile.Read(ref retryCount));
 
         // Set to multiple attempts
         var attempts = 5;

@@ -40,11 +40,13 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
     private readonly long _thresholdMsgs;
     private readonly long _maxBytes;
     private readonly long _thresholdBytes;
+    private readonly int _maxConsecutive503Errors;
 
     private readonly object _pendingGate = new();
     private long _pendingMsgs;
     private long _pendingBytes;
     private int _disposed;
+    private int _consecutive503Errors;
 
     public NatsJSConsume(
         long maxMsgs,
@@ -62,6 +64,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         INatsDeserialize<TMsg> serializer,
         NatsSubOpts? opts,
         NatsJSPriorityGroupOpts? priorityGroup,
+        int maxConsecutive503Errors,
         NatsJSConsumer? jsConsumer,
         CancellationToken cancellationToken)
         : base(context.Connection, context.Connection.SubscriptionManager, subject, queueGroup, opts)
@@ -74,6 +77,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         _consumer = consumer;
         _serializer = serializer;
         _priorityGroup = priorityGroup;
+        _maxConsecutive503Errors = maxConsecutive503Errors;
         _jsConsumer = jsConsumer;
 
         if (notificationHandler is { } handler)
@@ -117,6 +121,14 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                     return;
                 }
 
+                if (self.Connection.ConnectionState == NatsConnectionState.Failed)
+                {
+                    // Connection has permanently failed, complete the channel with exception
+                    self._userMsgs.Writer.TryComplete(new NatsConnectionFailedException("Connection is in failed state"));
+                    self.CompleteStop();
+                    return;
+                }
+
                 if (self.Connection.ConnectionState == NatsConnectionState.Open)
                 {
                     self.Pull("heartbeat-timeout", self._maxMsgs, self._maxBytes);
@@ -139,7 +151,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         // sufficiently large value to avoid blocking socket reads in the
         // NATS connection).
         _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg>>(1000);
-        Msgs = _userMsgs.Reader;
+        Msgs = new ActivityEndingMsgReader<NatsJSMsg<TMsg>>(_userMsgs.Reader, this);
 
         // Capacity as 1 is enough here since it's used for signaling only.
         _pullRequests = Channel.CreateBounded<PullRequest>(1);
@@ -218,6 +230,13 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
 
         if (_cancellationToken.IsCancellationRequested)
             return;
+
+        // Don't attempt to reconnect if connection has permanently failed
+        if (Connection.ConnectionState == NatsConnectionState.Failed)
+        {
+            _userMsgs.Writer.TryComplete(new NatsConnectionFailedException("Connection is in failed state"));
+            return;
+        }
 
         long maxMsgs = 0;
         long maxBytes = 0;
@@ -367,9 +386,19 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                     }
                     else if (headers.Code == 503)
                     {
-                        _logger.LogDebug(NatsJSLogEvents.NoResponders, "503 no responders");
+                        _consecutive503Errors++;
+                        _logger.LogDebug(NatsJSLogEvents.NoResponders, "503 no responders (count: {Count})", _consecutive503Errors);
                         _notificationChannel?.Notify(NatsJSNoRespondersNotification.Default);
                         ResetPending();
+
+                        // If we've had too many consecutive 503 errors, the consumer likely no longer exists
+                        // Check against configured threshold (set to -1 to disable)
+                        if (_maxConsecutive503Errors > 0 && _consecutive503Errors >= _maxConsecutive503Errors)
+                        {
+                            _logger.LogWarning(NatsJSLogEvents.NoResponders, "Consumer appears to be deleted after {Count} consecutive 503 errors", _consecutive503Errors);
+                            _userMsgs.Writer.TryComplete(new NatsJSException($"Consumer appears to be deleted after {_consecutive503Errors} consecutive 503 errors"));
+                            EndSubscription(NatsSubEndReason.JetStreamError);
+                        }
                     }
                     else if (headers.HasTerminalJSError())
                     {
@@ -400,6 +429,9 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         }
         else
         {
+            // Reset 503 error counter on successful message
+            _consecutive503Errors = 0;
+
             var msg = new NatsJSMsg<TMsg>(
                 NatsMsg<TMsg>.Build(
                     subject,
@@ -502,10 +534,23 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
     {
         await foreach (var pr in _pullRequests.Reader.ReadAllAsync().ConfigureAwait(false))
         {
+            // Check if connection has failed before attempting pull
+            if (Connection.ConnectionState == NatsConnectionState.Failed)
+            {
+                _userMsgs.Writer.TryComplete(new NatsConnectionFailedException("Connection is in failed state"));
+                break;
+            }
+
             var origin = $"pull-loop({pr.Origin})";
             try
             {
                 await CallMsgNextAsync(origin, pr.Request).ConfigureAwait(false);
+            }
+            catch (NatsConnectionFailedException)
+            {
+                // Connection has failed, propagate to user channel and stop
+                _userMsgs.Writer.TryComplete(new NatsConnectionFailedException("Connection is in failed state"));
+                break;
             }
             catch (Exception e)
             {

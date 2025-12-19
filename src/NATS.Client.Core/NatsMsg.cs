@@ -35,7 +35,7 @@ public enum NatsMsgFlags : byte
 /// </para>
 /// </remarks>
 /// <typeparam name="T">Data type of the payload</typeparam>
-public interface INatsMsg<T>
+public interface INatsMsg<T> : INatsMsg
 {
     /// <summary>The destination subject to publish to.</summary>
     string Subject { get; init; }
@@ -45,9 +45,6 @@ public interface INatsMsg<T>
 
     /// <summary>Message size in bytes.</summary>
     int Size { get; init; }
-
-    /// <summary>Pass additional information using name-value pairs.</summary>
-    NatsHeaders? Headers { get; init; }
 
     /// <summary>Serializable data object.</summary>
     T? Data { get; init; }
@@ -369,25 +366,6 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
 
         headers?.SetReadOnly();
 
-        T? data;
-        if (headers?.Error == null)
-        {
-            try
-            {
-                data = serializer.Deserialize(payloadBuffer);
-            }
-            catch (Exception e)
-            {
-                headers ??= new NatsHeaders();
-                headers.Error = new NatsDeserializeException(payloadBuffer.ToArray(), e);
-                data = default;
-            }
-        }
-        else
-        {
-            data = default;
-        }
-
         var size = subject.Length
                    + (replyTo?.Length ?? 0)
                    + (headersBuffer?.Length ?? 0)
@@ -416,6 +394,25 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
             {
                 headers.Activity = activity;
             }
+        }
+
+        T? data;
+        if (headers?.Error == null)
+        {
+            try
+            {
+                data = serializer.Deserialize(payloadBuffer);
+            }
+            catch (Exception e)
+            {
+                headers ??= new NatsHeaders();
+                headers.Error = new NatsDeserializeException(payloadBuffer.ToArray(), e);
+                data = default;
+            }
+        }
+        else
+        {
+            data = default;
         }
 
         return new NatsMsg<T>(subject, replyTo, (int)size, headers, data, connection, flags);

@@ -56,7 +56,9 @@ public class NatsJSConsumer : INatsJSConsumer
     /// <typeparam name="T">Message type to deserialize.</typeparam>
     /// <returns>Async enumerable of messages which can be used in a <c>await foreach</c> loop.</returns>
     /// <exception cref="NatsJSProtocolException">Consumer is deleted, it's push based or request sent to server is invalid.</exception>
-    public async IAsyncEnumerable<NatsJSMsg<T>> ConsumeAsync<T>(
+    /// <exception cref="NatsConnectionFailedException">Connection has permanently failed and cannot be recovered.</exception>
+    /// <exception cref="NatsJSException">Consumer-related errors, such as the consumer being deleted after too many consecutive 503 errors.</exception>
+    public async IAsyncEnumerable<INatsJSMsg<T>> ConsumeAsync<T>(
         INatsDeserialize<T>? serializer = default,
         NatsJSConsumeOpts? opts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -76,6 +78,16 @@ public class NatsJSConsumer : INatsJSConsumer
             {
                 ready = false;
             }
+            catch (NatsConnectionFailedException)
+            {
+                // Connection has permanently failed, stop consuming and rethrow
+                throw;
+            }
+            catch (NatsJSException)
+            {
+                // Consumer-related errors (like 503 threshold exceeded), stop consuming and rethrow
+                throw;
+            }
 
             if (!ready)
                 yield break;
@@ -92,6 +104,16 @@ public class NatsJSConsumer : INatsJSConsumer
                 {
                     read = false;
                     jsMsg = default;
+                }
+                catch (NatsConnectionFailedException)
+                {
+                    // Connection has permanently failed, stop consuming and rethrow
+                    throw;
+                }
+                catch (NatsJSException)
+                {
+                    // Consumer-related errors (like 503 threshold exceeded), stop consuming and rethrow
+                    throw;
                 }
 
                 if (!read)
@@ -138,7 +160,7 @@ public class NatsJSConsumer : INatsJSConsumer
     /// }
     /// </code>
     /// </example>
-    public async ValueTask<NatsJSMsg<T>?> NextAsync<T>(INatsDeserialize<T>? serializer = default, NatsJSNextOpts? opts = default, CancellationToken cancellationToken = default)
+    public async ValueTask<INatsJSMsg<T>?> NextAsync<T>(INatsDeserialize<T>? serializer = default, NatsJSNextOpts? opts = default, CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
         opts ??= _context.Opts.DefaultNextOpts;
@@ -165,7 +187,7 @@ public class NatsJSConsumer : INatsJSConsumer
     }
 
     /// <inheritdoc />
-    public async IAsyncEnumerable<NatsJSMsg<T>> FetchAsync<T>(
+    public async IAsyncEnumerable<INatsJSMsg<T>> FetchAsync<T>(
         NatsJSFetchOpts opts,
         INatsDeserialize<T>? serializer = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -262,7 +284,7 @@ public class NatsJSConsumer : INatsJSConsumer
     /// }
     /// </code>
     /// </example>
-    public async IAsyncEnumerable<NatsJSMsg<T>> FetchNoWaitAsync<T>(
+    public async IAsyncEnumerable<INatsJSMsg<T>> FetchNoWaitAsync<T>(
         NatsJSFetchOpts opts,
         INatsDeserialize<T>? serializer = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -354,6 +376,7 @@ public class NatsJSConsumer : INatsJSConsumer
             idle: timeouts.IdleHeartbeat,
             notificationHandler: opts.NotificationHandler,
             priorityGroup: opts.PriorityGroup,
+            maxConsecutive503Errors: opts.MaxConsecutive503Errors,
             jsConsumer: this,
             cancellationToken: cancellationToken);
 

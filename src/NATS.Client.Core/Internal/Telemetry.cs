@@ -6,21 +6,33 @@ namespace NATS.Client.Core.Internal;
 // https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/#messaging-attributes
 internal static class Telemetry
 {
-    internal static readonly ActivitySource NatsActivities = new(name: NatsActivitySource);
-
-    private const string NatsActivitySource = "NATS.Net";
+    public const string NatsActivitySource = "NATS.Net";
+    public static readonly ActivitySource NatsActivities = new(name: NatsActivitySource);
     private static readonly object BoxedTrue = true;
 
-    internal static bool HasListeners() => NatsActivities.HasListeners();
+    public static bool HasListeners() => NatsActivities.HasListeners();
 
-    internal static Activity? StartSendActivity(
+    public static Activity? StartSendActivity(
         string name,
         INatsConnection? connection,
         string subject,
         string? replyTo,
-        ActivityContext? parentContext = null)
+        ActivityContext parentContext = default)
     {
         if (!NatsActivities.HasListeners())
+            return null;
+
+        var instrumentationContext = new NatsInstrumentationContext(
+            Subject: subject,
+            Headers: null,
+            ReplyTo: replyTo,
+            QueueGroup: null,
+            BodySize: null,
+            Size: null,
+            Connection: connection,
+            ParentContext: parentContext);
+
+        if (NatsInstrumentationOptions.Default.Filter is { } filter && !filter(instrumentationContext))
             return null;
 
         KeyValuePair<string, object?>[] tags;
@@ -63,14 +75,19 @@ internal static class Telemetry
                 tags[3] = new KeyValuePair<string, object?>(Constants.ReplyTo, replyTo);
         }
 
-        return NatsActivities.StartActivity(
+        var activity = NatsActivities.StartActivity(
             name,
             kind: ActivityKind.Producer,
-            parentContext: parentContext ?? default,
+            parentContext: parentContext,
             tags: tags);
+
+        if (activity is not null)
+            NatsInstrumentationOptions.Default.Enrich?.Invoke(activity, instrumentationContext);
+
+        return activity;
     }
 
-    internal static void AddTraceContextHeaders(Activity? activity, ref NatsHeaders? headers)
+    public static void AddTraceContextHeaders(Activity? activity, ref NatsHeaders? headers)
     {
         if (activity is null)
             return;
@@ -87,7 +104,7 @@ internal static class Telemetry
                     return;
                 }
 
-                // There are cases where headers reused internally (e.g. JetStream publish retry)
+                // There are cases where headers reused publicly (e.g. JetStream publish retry)
                 // there may also be cases where application can reuse the same header
                 // in which case we should still be able to overwrite headers with telemetry fields
                 // even though headers would be set to readonly before being passed down in publish methods.
@@ -95,7 +112,7 @@ internal static class Telemetry
             });
     }
 
-    internal static Activity? StartReceiveActivity(
+    public static Activity? StartReceiveActivity(
         INatsConnection? connection,
         string name,
         string subscriptionSubject,
@@ -107,6 +124,22 @@ internal static class Telemetry
         NatsHeaders? headers)
     {
         if (!NatsActivities.HasListeners())
+            return null;
+
+        if (headers is null || !TryParseTraceContext(headers, out var context))
+            context = default;
+
+        var instrumentationContext = new NatsInstrumentationContext(
+            Subject: subject,
+            Headers: headers,
+            ReplyTo: replyTo,
+            QueueGroup: queueGroup,
+            BodySize: bodySize,
+            Size: size,
+            Connection: connection,
+            ParentContext: context);
+
+        if (NatsInstrumentationOptions.Default.Filter is { } filter && !filter(instrumentationContext))
             return null;
 
         KeyValuePair<string, object?>[] tags;
@@ -162,17 +195,19 @@ internal static class Telemetry
                 tags[9] = new KeyValuePair<string, object?>(Constants.ReplyTo, replyTo);
         }
 
-        if (headers is null || !TryParseTraceContext(headers, out var context))
-            context = default;
-
-        return NatsActivities.StartActivity(
+        var activity = NatsActivities.StartActivity(
             name,
             kind: ActivityKind.Consumer,
             parentContext: context,
             tags: tags);
+
+        if (activity is not null)
+            NatsInstrumentationOptions.Default.Enrich?.Invoke(activity, instrumentationContext);
+
+        return activity;
     }
 
-    internal static void SetException(Activity? activity, Exception exception)
+    public static void SetException(Activity? activity, Exception exception)
     {
         if (activity is null)
             return;
@@ -251,11 +286,14 @@ internal static class Telemetry
             },
             out var traceParent,
             out var traceState);
-
+#if NETSTANDARD2_0_OR_GREATER || NET7_0_OR_GREATER
+        return ActivityContext.TryParse(traceParent, traceState, isRemote: true, out context);
+#else
         return ActivityContext.TryParse(traceParent, traceState, out context);
+#endif
     }
 
-    internal class Constants
+    public class Constants
     {
         public const string True = "true";
         public const string False = "false";
@@ -278,7 +316,7 @@ internal static class Telemetry
         public const string DestIsTemporary = "messaging.destination.temporary";
         public const string DestPubName = "messaging.destination_publish.name";
 
-        public const string QueueGroup = "messaging.nats.consumer.group";
+        public const string QueueGroup = "messaging.consumer.group.name";
         public const string ReplyTo = "messaging.nats.message.reply_to";
         public const string Subject = "messaging.nats.message.subject";
 

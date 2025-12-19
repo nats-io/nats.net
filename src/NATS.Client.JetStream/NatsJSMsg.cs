@@ -27,7 +27,7 @@ namespace NATS.Client.JetStream;
 /// </para>
 /// </remarks>
 /// <typeparam name="T">Data type of the payload</typeparam>
-public interface INatsJSMsg<out T>
+public interface INatsJSMsg<out T> : INatsMsg
 {
     /// <summary>
     /// Subject of the user message.
@@ -44,11 +44,6 @@ public interface INatsJSMsg<out T>
     /// </code>
     /// </remarks>
     int Size { get; }
-
-    /// <summary>
-    /// Headers of the user message if set.
-    /// </summary>
-    NatsHeaders? Headers { get; }
 
     /// <summary>
     /// Deserialized user data.
@@ -84,6 +79,7 @@ public interface INatsJSMsg<out T>
     /// <param name="opts">A <see cref="NatsPubOpts"/> for publishing options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous send operation.</returns>
+    [Obsolete("ReplyAsync is not valid when using JetStream. The reply message will never reach the Requestor as NATS will reply to all JetStream publish by default.")]
     ValueTask ReplyAsync(NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -208,6 +204,7 @@ public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
     /// <param name="opts">A <see cref="NatsPubOpts"/> for publishing options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous send operation.</returns>
+    [Obsolete("ReplyAsync is not valid when using JetStream. The reply message will never reach the Requestor as NATS will reply to all JetStream publish by default.")]
     public ValueTask ReplyAsync(NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default) =>
         _msg.ReplyAsync(headers, replyTo, opts, cancellationToken);
 
