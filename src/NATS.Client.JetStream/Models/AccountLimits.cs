@@ -7,16 +7,16 @@ public record AccountLimits
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("max_memory")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
-    [System.ComponentModel.DataAnnotations.Range(-1, int.MaxValue)]
-    public int MaxMemory { get; set; }
+    [System.ComponentModel.DataAnnotations.Range(-1, ulong.MaxValue)]
+    public long MaxMemory { get; set; }
 
     /// <summary>
     /// The maximum amount of File storage Stream Messages may consume
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("max_storage")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
-    [System.ComponentModel.DataAnnotations.Range(-1, int.MaxValue)]
-    public int MaxStorage { get; set; }
+    [System.ComponentModel.DataAnnotations.Range(-1, long.MaxValue)]
+    public long MaxStorage { get; set; }
 
     /// <summary>
     /// The maximum number of Streams an account can create
@@ -53,14 +53,14 @@ public record AccountLimits
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("memory_max_stream_bytes")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    [System.ComponentModel.DataAnnotations.Range(-1, int.MaxValue)]
-    public int MemoryMaxStreamBytes { get; set; } = -1;
+    [System.ComponentModel.DataAnnotations.Range(-1, long.MaxValue)]
+    public long MemoryMaxStreamBytes { get; set; } = -1;
 
     /// <summary>
     /// The maximum size any single storage based stream may be
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("storage_max_stream_bytes")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    [System.ComponentModel.DataAnnotations.Range(-1, int.MaxValue)]
-    public int StorageMaxStreamBytes { get; set; } = -1;
+    [System.ComponentModel.DataAnnotations.Range(-1, long.MaxValue)]
+    public long StorageMaxStreamBytes { get; set; } = -1;
 }
