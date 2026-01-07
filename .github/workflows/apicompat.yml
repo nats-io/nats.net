@@ -24,4 +24,4 @@ jobs:
           dotnet-version: 8.x
 
       - name: Run API Compatibility Check
-        run: ./scripts/apicompat.sh --build
+        run: bash scripts/apicompat.sh --build
