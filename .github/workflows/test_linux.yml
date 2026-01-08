@@ -146,3 +146,8 @@ jobs:
             cd tests/NATS.Net.DocsExamples
             dotnet run
 
+      - name: Check ABI Compatibility (Type Forwarding)
+        run: |
+            cd tests/NATS.Client.CheckAbi
+            bash run-abi-check.sh
+
