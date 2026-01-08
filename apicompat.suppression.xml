@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- https://learn.microsoft.com/dotnet/fundamentals/package-validation/diagnostic-ids -->
+<!-- These are intentional TFM-specific polyfill types that differ between netstandard2.0 and newer TFMs -->
+<Suppressions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <!-- SslClientAuthenticationOptions is a polyfill for netstandard2.0 where the BCL type doesn't exist -->
+  <Suppression>
+    <DiagnosticId>CP0001</DiagnosticId>
+    <Target>T:NATS.Client.Core.SslClientAuthenticationOptions</Target>
+  </Suppression>
+  <!-- ConfigureClientAuthentication uses the polyfill type in its signature -->
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:NATS.Client.Core.NatsTlsOpts.get_ConfigureClientAuthentication</Target>
+  </Suppression>
+  <!-- AddNats has an extra 'key' parameter in net8.0+ for keyed DI services -->
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:NATS.Client.Hosting.NatsHostingExtensions.AddNats(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.Int32,System.Func{NATS.Client.Core.NatsOpts,NATS.Client.Core.NatsOpts},System.Action{NATS.Client.Core.NatsConnection})</Target>
+  </Suppression>
+</Suppressions>

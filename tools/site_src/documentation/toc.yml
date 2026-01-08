@@ -42,6 +42,8 @@
       href: advanced/security.md
     - name: AOT Deployments
       href: advanced/aot.md
+    - name: Platform Compatibility
+      href: advanced/platform-compatibility.md
 
 - name: Updating Documentation
   href: update-docs.md
