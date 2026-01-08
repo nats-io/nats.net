@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using NATS.Client.JetStream;
+using NATS.Client.JetStream.Models;
 using NATS.Client.Platform.Windows.Tests;
 
 namespace NATS.Client.Core.Tests;
@@ -26,6 +28,49 @@ public class OpenTelemetryTest
         await sub.Msgs.ReadAsync(cts.Token);
 
         AssertActivityData("foo", activities);
+    }
+
+    [Fact]
+    public async Task JetStream_consume_start_activity_with_interface()
+    {
+        var activities = new List<Activity>();
+        using var activityListener = StartActivityListener(activities);
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        var js = new NatsJSContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        await js.CreateStreamAsync(new StreamConfig { Name = "test-stream", Subjects = ["test.>"] }, cts.Token);
+        await js.CreateOrUpdateConsumerAsync("test-stream", new ConsumerConfig("test-consumer"), cts.Token);
+
+        await js.PublishAsync("test.subject", "test-message", cancellationToken: cts.Token);
+
+        var consumer = await js.GetConsumerAsync("test-stream", "test-consumer", cts.Token);
+
+        await foreach (var msg in consumer.ConsumeAsync<string>(cancellationToken: cts.Token))
+        {
+            // Test StartActivity on INatsJSMsg<T> interface (the fix for issue #1026)
+            using var activity = msg.StartActivity("test.consume");
+            Assert.NotNull(activity);
+            Assert.Equal("test.consume", activity.OperationName);
+
+            await msg.AckAsync(cancellationToken: cts.Token);
+            break;
+        }
+
+        // Verify the publish activity was recorded
+        var publishActivity = activities.FirstOrDefault(x => x.OperationName == "test.subject publish");
+        Assert.NotNull(publishActivity);
+
+        // Verify our custom activity was recorded
+        var consumeActivity = activities.FirstOrDefault(x => x.OperationName == "test.consume");
+        Assert.NotNull(consumeActivity);
+        Assert.Equal(ActivityKind.Internal, consumeActivity.Kind);
+
+        // Verify the parent relationship (consume activity should have publish as parent via trace context)
+        Assert.Equal(publishActivity.TraceId, consumeActivity.TraceId);
     }
 
     private static ActivityListener StartActivityListener(List<Activity> activities)
