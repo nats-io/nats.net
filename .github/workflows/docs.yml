@@ -7,18 +7,12 @@ on:
       - main
 
 permissions:
-  contents: write
-  pages: write
-  id-token: write
+  contents: read
 
 jobs:
   update-docs:
     name: docfx
     runs-on: ubuntu-latest
-    # if: contains(github.event.head_commit.message, '[nats:update-docs]')
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
