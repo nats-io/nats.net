@@ -14,12 +14,8 @@
       <ProjectReference Include="..\..\src\NATS.Net\NATS.Net.csproj" />
     </ItemGroup>
 
-    <!-- Reference pre-built NATS.Client.CheckAbiTransientLib.dll (compiled against 2.6.0) -->
     <ItemGroup>
-      <Reference Include="NATS.Client.CheckAbiTransientLib">
-        <HintPath>..\NATS.Client.CheckAbiTransientLib\bin\Release\net8.0\NATS.Client.CheckAbiTransientLib.dll</HintPath>
-        <Private>true</Private>
-      </Reference>
+      <ProjectReference Include="..\NATS.Client.CheckAbiTransientLib\NATS.Client.CheckAbiTransientLib.csproj" />
     </ItemGroup>
 
 </Project>

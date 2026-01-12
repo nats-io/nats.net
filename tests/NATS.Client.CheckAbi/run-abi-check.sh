@@ -16,6 +16,7 @@ echo ""
 
 # Step 1: Build CheckAbiTransientLib against 2.6.0 NuGet package
 echo "[1/3] Building NATS.Client.CheckAbiTransientLib against NATS.Net 2.6.0..."
+dotnet clean
 dotnet build "$TRANSIENT_LIB_CSPROJ" -c Release
 
 # Step 2: Build AbiCheck (references local 2.7.0 source + TransientLib.dll)

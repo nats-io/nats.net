@@ -144,6 +144,7 @@ jobs:
             killall nats-server 2> /dev/null | echo -n
             nats-server -v
             nats-server -js &
+            dotnet build # make sure docs build works
             cd tests/NATS.Net.DocsExamples
             dotnet run
 
