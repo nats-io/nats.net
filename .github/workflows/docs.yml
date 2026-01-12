@@ -1,6 +1,7 @@
 ﻿name: Update Docs
 
 on:
+  pull_request: {}
   push:
     branches:
       - main
@@ -33,12 +34,13 @@ jobs:
       - run: dotnet build
       - run: dotnet tool update -g docfx
       - run: docfx tools/site_src/docfx.json
+      - run: find _site
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: _site
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+#      - name: Upload artifact
+#        uses: actions/upload-pages-artifact@v3
+#        with:
+#          path: _site
+#
+#      - name: Deploy to GitHub Pages
+#        id: deployment
+#        uses: actions/deploy-pages@v4
