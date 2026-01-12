@@ -151,5 +151,17 @@ jobs:
       - name: Check ABI Compatibility (Type Forwarding)
         run: |
             cd tests/NATS.Client.CheckAbi
+
+            # Negative test: remove type forwarders and verify the check FAILS
+            mv ../../src/NATS.Client.Core/TypeForwarders.cs ../../src/NATS.Client.Core/TypeForwarders.cs.bak
+            if bash run-abi-check.sh; then
+              mv ../../src/NATS.Client.Core/TypeForwarders.cs.bak ../../src/NATS.Client.Core/TypeForwarders.cs
+              echo "ERROR: ABI check should have failed without type forwarders!"
+              exit 1
+            fi
+            echo "OK: ABI check correctly failed without type forwarders"
+
+            # Positive test: restore type forwarders and verify the check PASSES
+            mv ../../src/NATS.Client.Core/TypeForwarders.cs.bak ../../src/NATS.Client.Core/TypeForwarders.cs
             bash run-abi-check.sh
 
