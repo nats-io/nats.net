@@ -95,3 +95,4 @@ essentially sent back to back after they're picked up from internal queues and b
 - [Serialization](serialization.md) is the process of converting an object into a format that can be stored or transmitted.
 - [Security](security.md) is an important aspect of any distributed system. NATS provides a number of security features to help you secure your applications.
 - [AOT Deployment](aot.md) is a way to deploy your applications as native platform executables, which produces faster startup times and better performance in most cases.
+- [Platform Compatibility](platform-compatibility.md) documents API differences across target frameworks (.NET Standard, .NET 6, .NET 8).
