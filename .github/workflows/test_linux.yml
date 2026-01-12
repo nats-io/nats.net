@@ -1,153 +1,154 @@
-#name: Test Linux
-#
-#on:
-#  pull_request: {}
-#  push:
-#    branches:
-#    - main
-#
-#jobs:
-#  linux_test:
-#    name: Linux
-#    strategy:
-#      fail-fast: false
-#      matrix:
-#        config:
-#          - branch: 'v2.10'
-#          - branch: 'v2.11'
-#          - branch: 'latest'
-#          - branch: 'main'
-#    runs-on: ubuntu-latest
-#    env:
-#      DOTNET_CLI_TELEMETRY_OPTOUT: 1
-#      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
-#      NUGET_XMLDOC_MODE: skip
-#    steps:
-#      - name: Set up Go
-#        uses: actions/setup-go@v5
-#        with: { cache: true }
-#
-#      - name: Install nats-server
-#        run: go install github.com/nats-io/nats-server/v2@${{ matrix.config.branch }}
-#
-#      - name: Check nats-server
-#        run: nats-server -v
-#
-#      - name: Checkout
-#        uses: actions/checkout@v4
-#
-#      - name: Setup dotnet
-#        uses: actions/setup-dotnet@v4
-#        with:
-#          dotnet-version: |
-#            6.x
-#            8.x
-#            9.x
-#
-#      - name: Build
-#        run: |
-#          cd tests
-#          dotnet build -c Release
-#
-#      - name: Test Core2
-#        run: |
-#          killall nats-server 2> /dev/null | echo -n
-#          nats-server -v
-#          cd tests/NATS.Client.Core2.Tests
-#          dotnet test -c Release --no-build
-#
-#      - name: Test CoreUnit
-#        run: |
-#          killall nats-server 2> /dev/null | echo -n
-#          nats-server -v
-#          cd tests/NATS.Client.CoreUnit.Tests
-#          dotnet test -c Release --no-build
-#
-#      - name: Test JetStream
-#        run: |
-#          killall nats-server 2> /dev/null | echo -n
-#          nats-server -v
-#          cd tests/NATS.Client.JetStream.Tests
-#          dotnet test -c Release --no-build
-#
-#      - name: Test KeyValueStore
-#        run: |
-#          killall nats-server 2> /dev/null | echo -n
-#          nats-server -v
-#          cd tests/NATS.Client.KeyValueStore.Tests
-#          dotnet test -c Release --no-build
-#
-#      - name: Test Object Store
-#        run: |
-#          killall nats-server 2> /dev/null | echo -n
-#          nats-server -v
-#          cd tests/NATS.Client.ObjectStore.Tests
-#          dotnet test -c Release --no-build
-#
-#      - name: Test Services
-#        run: |
-#          killall nats-server 2> /dev/null | echo -n
-#          nats-server -v
-#          cd tests/NATS.Client.Services.Tests
-#          dotnet test -c Release --no-build
-#
-#      - name: Test Simplified
-#        run: |
-#            killall nats-server 2> /dev/null | echo -n
-#            nats-server -v
-#            cd tests/NATS.Client.Simplified.Tests
-#            dotnet test -c Release --no-build
-#
-#      - name: Test OpenTelemetry
-#        run: |
-#          killall nats-server 2> /dev/null | echo -n
-#          nats-server -v
-#          cd tests/NATS.Net.OpenTelemetry.Tests
-#          dotnet test -c Release --no-build
-#
-#      - name: Test DependencyInjection
-#        run: |
-#          killall nats-server 2> /dev/null | echo -n
-#          nats-server -v
-#          cd tests/NATS.Extensions.Microsoft.DependencyInjection.Tests
-#          dotnet test -c Release --no-build
-#
-#      - name: Check Native AOT
-#        run: |
-#          killall nats-server 2> /dev/null | echo -n
-#          nats-server -v
-#
-#          cd tests/NATS.Client.CheckNativeAot
-#          rm -rf bin obj
-#
-#          # temporarily ignore MsQuicApi warnings
-#          dotnet publish -r linux-x64 -c Release -o dist | grep -v MsQuicApi | tee output.txt
-#
-#          # check for warnings
-#          grep -i warning output.txt && exit 1
-#
-#          cd dist
-#          ls -lh
-#
-#          # make sure it's executable
-#          file NATS.Client.CheckNativeAot
-#          file NATS.Client.CheckNativeAot | grep ELF || exit 1
-#
-#          # can't be less than a meg
-#          ls --size NATS.Client.CheckNativeAot | perl -lne'/(\d+)/; exit(1) if $1 < 1024' || exit 1
-#
-#          ./NATS.Client.CheckNativeAot
-#
-#      - name: Check Documentation Examples
-#        run: |
-#            killall nats-server 2> /dev/null | echo -n
-#            nats-server -v
-#            nats-server -js &
-#            cd tests/NATS.Net.DocsExamples
-#            dotnet run
-#
-#      - name: Check ABI Compatibility (Type Forwarding)
-#        run: |
-#            cd tests/NATS.Client.CheckAbi
-#            bash run-abi-check.sh
-#
+name: Test Linux
+
+on:
+  pull_request: {}
+  push:
+    branches:
+    - main
+
+jobs:
+  linux_test:
+    name: Linux
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - branch: 'v2.10'
+          - branch: 'v2.11'
+          - branch: 'latest'
+          - branch: 'main'
+    runs-on: ubuntu-latest
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+      NUGET_XMLDOC_MODE: skip
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with: { cache: true }
+
+      - name: Install nats-server
+        run: go install github.com/nats-io/nats-server/v2@${{ matrix.config.branch }}
+
+      - name: Check nats-server
+        run: nats-server -v
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup dotnet
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            6.x
+            8.x
+            9.x
+
+      - name: Build
+        run: |
+          # Check that both Debug and Release builds work
+          dotnet build -c Debug
+          dotnet build -c Release
+
+      - name: Test Core2
+        run: |
+          killall nats-server 2> /dev/null | echo -n
+          nats-server -v
+          cd tests/NATS.Client.Core2.Tests
+          dotnet test -c Release --no-build
+
+      - name: Test CoreUnit
+        run: |
+          killall nats-server 2> /dev/null | echo -n
+          nats-server -v
+          cd tests/NATS.Client.CoreUnit.Tests
+          dotnet test -c Release --no-build
+
+      - name: Test JetStream
+        run: |
+          killall nats-server 2> /dev/null | echo -n
+          nats-server -v
+          cd tests/NATS.Client.JetStream.Tests
+          dotnet test -c Release --no-build
+
+      - name: Test KeyValueStore
+        run: |
+          killall nats-server 2> /dev/null | echo -n
+          nats-server -v
+          cd tests/NATS.Client.KeyValueStore.Tests
+          dotnet test -c Release --no-build
+
+      - name: Test Object Store
+        run: |
+          killall nats-server 2> /dev/null | echo -n
+          nats-server -v
+          cd tests/NATS.Client.ObjectStore.Tests
+          dotnet test -c Release --no-build
+
+      - name: Test Services
+        run: |
+          killall nats-server 2> /dev/null | echo -n
+          nats-server -v
+          cd tests/NATS.Client.Services.Tests
+          dotnet test -c Release --no-build
+
+      - name: Test Simplified
+        run: |
+            killall nats-server 2> /dev/null | echo -n
+            nats-server -v
+            cd tests/NATS.Client.Simplified.Tests
+            dotnet test -c Release --no-build
+
+      - name: Test OpenTelemetry
+        run: |
+          killall nats-server 2> /dev/null | echo -n
+          nats-server -v
+          cd tests/NATS.Net.OpenTelemetry.Tests
+          dotnet test -c Release --no-build
+
+      - name: Test DependencyInjection
+        run: |
+          killall nats-server 2> /dev/null | echo -n
+          nats-server -v
+          cd tests/NATS.Extensions.Microsoft.DependencyInjection.Tests
+          dotnet test -c Release --no-build
+
+      - name: Check Native AOT
+        run: |
+          killall nats-server 2> /dev/null | echo -n
+          nats-server -v
+
+          cd tests/NATS.Client.CheckNativeAot
+          rm -rf bin obj
+
+          # temporarily ignore MsQuicApi warnings
+          dotnet publish -r linux-x64 -c Release -o dist | grep -v MsQuicApi | tee output.txt
+
+          # check for warnings
+          grep -i warning output.txt && exit 1
+
+          cd dist
+          ls -lh
+
+          # make sure it's executable
+          file NATS.Client.CheckNativeAot
+          file NATS.Client.CheckNativeAot | grep ELF || exit 1
+
+          # can't be less than a meg
+          ls --size NATS.Client.CheckNativeAot | perl -lne'/(\d+)/; exit(1) if $1 < 1024' || exit 1
+
+          ./NATS.Client.CheckNativeAot
+
+      - name: Check Documentation Examples
+        run: |
+            killall nats-server 2> /dev/null | echo -n
+            nats-server -v
+            nats-server -js &
+            cd tests/NATS.Net.DocsExamples
+            dotnet run
+
+      - name: Check ABI Compatibility (Type Forwarding)
+        run: |
+            cd tests/NATS.Client.CheckAbi
+            bash run-abi-check.sh
+

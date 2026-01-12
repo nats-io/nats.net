@@ -1,90 +1,91 @@
-#name: Test Windows
-#
-#on:
-#  pull_request: {}
-#  push:
-#    branches:
-#    - main
-#
-#jobs:
-#
-#  windows_test:
-#    name: Windows
-#    strategy:
-#      fail-fast: false
-#      matrix:
-#        config:
-#          - branch: 'v2.10'
-#          - branch: 'v2.11'
-#          - branch: 'latest'
-#          - branch: 'main'
-#    runs-on: windows-latest
-#    env:
-#      DOTNET_CLI_TELEMETRY_OPTOUT: 1
-#      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
-#      NUGET_XMLDOC_MODE: skip
-#      MSYS_NO_PATHCONV: 1
-#    steps:
-#      - name: Checkout
-#        uses: actions/checkout@v4
-#        with:
-#          fetch-depth: 0
-#
-#      - name: Setup dotnet
-#        uses: actions/setup-dotnet@v4
-#        with:
-#          dotnet-version: |
-#            6.x
-#            8.x
-#            9.x
-#
-#      - name: Set up Go
-#        uses: actions/setup-go@v5
-#        with: { cache: true }
-#
-#      - name: Install nats-server
-#        run: go install github.com/nats-io/nats-server/v2@${{ matrix.config.branch }}
-#
-#      - name: Check nats-server
-#        run: nats-server -v
-#
-#      - name: Build
-#        run: |
-#          cd tests
-#          dotnet build -c Release
-#
-#      # fails when target frameworks are run in parallel; run tests with -p:TestTfmsInParallel=false
-#      - name: Platform Test
-#        run: |
-#          tasklist | grep -i nats-server && taskkill -F -IM nats-server.exe
-#          nats-server.exe -v
-#          cd tests\NATS.Client.Platform.Windows.Tests
-#          dotnet test -c Release --no-build -p:TestTfmsInParallel=false
-#
-#      - name: Test Core2
-#        run: |
-#          tasklist | grep -i nats-server && taskkill -F -IM nats-server.exe
-#          nats-server.exe -v
-#          cd tests/NATS.Client.Core2.Tests
-#          dotnet test -c Release --no-build
-#
-#      - name: Test CoreUnit
-#        run: |
-#          tasklist | grep -i nats-server && taskkill -F -IM nats-server.exe
-#          nats-server.exe -v
-#          cd tests/NATS.Client.CoreUnit.Tests
-#          dotnet test -c Release --no-build
-#
-#      - name: Test JetStream
-#        run: |
-#            tasklist | grep -i nats-server && taskkill -F -IM nats-server.exe
-#            nats-server.exe -v
-#            cd tests/NATS.Client.JetStream.Tests
-#            dotnet test -c Release --no-build
-#
-#      - name: Test DependencyInjection
-#        run: |
-#          tasklist | grep -i nats-server && taskkill -F -IM nats-server.exe
-#          nats-server.exe -v
-#          cd tests/NATS.Extensions.Microsoft.DependencyInjection.Tests
-#          dotnet test -c Release --no-build
+name: Test Windows
+
+on:
+  pull_request: {}
+  push:
+    branches:
+    - main
+
+jobs:
+
+  windows_test:
+    name: Windows
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - branch: 'v2.10'
+          - branch: 'v2.11'
+          - branch: 'latest'
+          - branch: 'main'
+    runs-on: windows-latest
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+      NUGET_XMLDOC_MODE: skip
+      MSYS_NO_PATHCONV: 1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup dotnet
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            6.x
+            8.x
+            9.x
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with: { cache: true }
+
+      - name: Install nats-server
+        run: go install github.com/nats-io/nats-server/v2@${{ matrix.config.branch }}
+
+      - name: Check nats-server
+        run: nats-server -v
+
+      - name: Build
+        run: |
+          # Check that both Debug and Release builds work
+          dotnet build -c Debug
+          dotnet build -c Release
+
+      # fails when target frameworks are run in parallel; run tests with -p:TestTfmsInParallel=false
+      - name: Platform Test
+        run: |
+          tasklist | grep -i nats-server && taskkill -F -IM nats-server.exe
+          nats-server.exe -v
+          cd tests\NATS.Client.Platform.Windows.Tests
+          dotnet test -c Release --no-build -p:TestTfmsInParallel=false
+
+      - name: Test Core2
+        run: |
+          tasklist | grep -i nats-server && taskkill -F -IM nats-server.exe
+          nats-server.exe -v
+          cd tests/NATS.Client.Core2.Tests
+          dotnet test -c Release --no-build
+
+      - name: Test CoreUnit
+        run: |
+          tasklist | grep -i nats-server && taskkill -F -IM nats-server.exe
+          nats-server.exe -v
+          cd tests/NATS.Client.CoreUnit.Tests
+          dotnet test -c Release --no-build
+
+      - name: Test JetStream
+        run: |
+            tasklist | grep -i nats-server && taskkill -F -IM nats-server.exe
+            nats-server.exe -v
+            cd tests/NATS.Client.JetStream.Tests
+            dotnet test -c Release --no-build
+
+      - name: Test DependencyInjection
+        run: |
+          tasklist | grep -i nats-server && taskkill -F -IM nats-server.exe
+          nats-server.exe -v
+          cd tests/NATS.Extensions.Microsoft.DependencyInjection.Tests
+          dotnet test -c Release --no-build

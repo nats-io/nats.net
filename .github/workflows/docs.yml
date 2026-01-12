@@ -1,18 +1,23 @@
 ﻿name: Update Docs
 
 on:
-  pull_request: {}
   push:
     branches:
       - main
 
 permissions:
-  contents: read
+  contents: write
+  pages: write
+  id-token: write
 
 jobs:
   update-docs:
     name: docfx
     runs-on: ubuntu-latest
+    # if: contains(github.event.head_commit.message, '[nats:update-docs]')
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,13 +33,12 @@ jobs:
       - run: dotnet build
       - run: dotnet tool update -g docfx
       - run: docfx tools/site_src/docfx.json
-      - run: find _site
 
-#      - name: Upload artifact
-#        uses: actions/upload-pages-artifact@v3
-#        with:
-#          path: _site
-#
-#      - name: Deploy to GitHub Pages
-#        id: deployment
-#        uses: actions/deploy-pages@v4
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
