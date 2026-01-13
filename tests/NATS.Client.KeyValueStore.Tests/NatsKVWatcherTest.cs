@@ -327,11 +327,7 @@ public class NatsKVWatcherTest
     [Fact]
     public async Task Watch_push_consumer_flow_control()
     {
-        await using var nats = new NatsConnection(new NatsOpts
-        {
-            Url = _server.Url,
-            SubPendingChannelCapacity = 10_000,
-        });
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
         var prefix = _server.GetNextId();
 
         var js = new NatsJSContext(nats);
