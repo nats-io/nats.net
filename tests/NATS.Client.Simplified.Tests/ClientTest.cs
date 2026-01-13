@@ -230,14 +230,14 @@ public class ClientTest
     public void Client_opts_default_pending()
     {
         var client = new NatsClient(new NatsOpts());
-        Assert.Equal(BoundedChannelFullMode.Wait, client.Connection.Opts.SubPendingChannelFullMode);
+        Assert.Equal(BoundedChannelFullMode.DropNewest, client.Connection.Opts.SubPendingChannelFullMode);
     }
 
     [Fact]
     public void Client_opts_set_pending()
     {
-        var client = new NatsClient(new NatsOpts(), pending: BoundedChannelFullMode.DropNewest);
-        Assert.Equal(BoundedChannelFullMode.DropNewest, client.Connection.Opts.SubPendingChannelFullMode);
+        var client = new NatsClient(new NatsOpts(), pending: BoundedChannelFullMode.DropOldest);
+        Assert.Equal(BoundedChannelFullMode.DropOldest, client.Connection.Opts.SubPendingChannelFullMode);
     }
 
     private record MyData(int Id, string Name);
