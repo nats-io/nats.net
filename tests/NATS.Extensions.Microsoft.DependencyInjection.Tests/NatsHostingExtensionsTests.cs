@@ -124,7 +124,7 @@ public class NatsHostingExtensionsTests
         Assert.Same(mySerializerRegistry, nats.Opts.SerializerRegistry);
 
         // You can only override this using .WithSubPendingChannelFullMode() on builder above
-        Assert.Equal(BoundedChannelFullMode.DropNewest, nats.Opts.SubPendingChannelFullMode);
+        Assert.Equal(BoundedChannelFullMode.Wait, nats.Opts.SubPendingChannelFullMode);
 
         return Task.CompletedTask;
     }
