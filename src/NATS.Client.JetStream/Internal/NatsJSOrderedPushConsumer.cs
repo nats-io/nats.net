@@ -127,24 +127,22 @@ internal class NatsJSOrderedPushConsumer<T>
                     if (sub != null)
                     {
                         // cmd.Msg is guaranteed to be valid when Command == Msg
-                        _nats.OnMessageDropped(sub, _commandChannel.Reader.Count, cmd.Msg!.Msg);
+                        _nats.OnMessageDropped(sub, _commandChannel?.Reader.Count ?? 0, cmd.Msg.Msg);
                     }
                 }
             });
 
         // Message channel also uses DropNewest to prevent blocking the command processing loop.
-        Channel<NatsJSMsg<T>>? msgChannel = null;
-        msgChannel = Channel.CreateBounded<NatsJSMsg<T>>(
+        _msgChannel = Channel.CreateBounded<NatsJSMsg<T>>(
             _nats.GetBoundedChannelOpts(subOpts?.ChannelOpts),
             msg =>
             {
                 var sub = _sub;
                 if (sub != null)
                 {
-                    _nats.OnMessageDropped(sub, msgChannel?.Reader.Count ?? 0, msg.Msg);
+                    _nats.OnMessageDropped(sub, _msgChannel?.Reader.Count ?? 0, msg.Msg);
                 }
             });
-        _msgChannel = msgChannel;
 
         // A single request to create the consumer is enough because we don't want to create a new consumer
         // back to back in case the consumer is being recreated due to a timeout and a mismatch in consumer

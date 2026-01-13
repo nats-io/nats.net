@@ -15,7 +15,6 @@ public class SlowConsumerTest
     {
         // This test verifies that when an Object Store consumer is slow (not reading chunks),
         // the connection should NOT be blocked. Pings and pub/sub should continue to work.
-
         using var testCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var cancellationToken = testCts.Token;
 
@@ -199,14 +198,26 @@ public class SlowConsumerTest
         public TaskCompletionSource FirstWriteReceived => _firstWriteReceived;
 
         public override bool CanRead => false;
-        public override bool CanSeek => false;
-        public override bool CanWrite => true;
-        public override long Length => 0;
-        public override long Position { get => 0; set { } }
 
-        public override void Flush() { }
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => true;
+
+        public override long Length => 0;
+
+        public override long Position
+        {
+            get => 0; set { }
+        }
+
+        public override void Flush()
+        {
+        }
+
         public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
         public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
         public override void SetLength(long value) => throw new NotSupportedException();
 
         public override void Write(byte[] buffer, int offset, int count)

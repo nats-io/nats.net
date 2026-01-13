@@ -22,7 +22,6 @@ public class SlowConsumerTest
         // the connection should NOT be blocked. Instead:
         // 1. Messages should be dropped (OnMessageDropped triggered)
         // 2. Other operations (like Ping and pub/sub) should continue to work
-
         await using var nats = new NatsConnection(new NatsOpts
         {
             Url = _server.Url,

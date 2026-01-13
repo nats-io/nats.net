@@ -23,7 +23,6 @@ public class SlowConsumerTest
         // the connection should NOT be blocked. Instead:
         // 1. Messages should be dropped (OnMessageDropped triggered)
         // 2. Other operations (like Ping and pub/sub) should continue to work
-
         await using var nats = new NatsConnection(new NatsOpts
         {
             Url = _server.Url,
@@ -236,15 +235,17 @@ public class SlowConsumerTest
 
         // MaxMsgs = 5 means channel capacity = 10, which will overflow with 100 messages
         var fetchStarted = new TaskCompletionSource();
-        var fetchTask = Task.Run(async () =>
-        {
-            var opts = new NatsJSFetchOpts { MaxMsgs = 5 };
-            await foreach (var msg in consumer.FetchAsync<byte[]>(opts: opts, cancellationToken: consumerCts.Token))
+        var fetchTask = Task.Run(
+            async () =>
             {
-                fetchStarted.TrySetResult();
-                await Task.Delay(Timeout.Infinite, consumerCts.Token);
-            }
-        }, consumerCts.Token);
+                var opts = new NatsJSFetchOpts { MaxMsgs = 5 };
+                await foreach (var msg in consumer.FetchAsync<byte[]>(opts: opts, cancellationToken: consumerCts.Token))
+                {
+                    fetchStarted.TrySetResult();
+                    await Task.Delay(Timeout.Infinite, consumerCts.Token);
+                }
+            },
+            consumerCts.Token);
 
         await fetchStarted.Task;
         await Task.Delay(500);
