@@ -528,11 +528,12 @@ public class NatsJSConsumer : INatsJSConsumer
             ChannelOpts = new NatsSubChannelOpts
             {
                 // Keep capacity large enough not to block the socket reads.
-                // This might delay message acknowledgements on slow consumers
-                // but it's crucial to keep the reads flowing on the main
-                // NATS TCP connection.
+                // Uses connection's default FullMode (typically DropNewest) to avoid
+                // blocking the main NATS TCP connection on slow consumers.
                 Capacity = maxMsgs > 0 ? maxMsgs * 2 : 1_000,
-                FullMode = BoundedChannelFullMode.Wait,
+
+                // FullMode intentionally not set - uses connection's SubPendingChannelFullMode
+                // (default: DropNewest) to prevent slow consumers from blocking socket reads.
             },
         };
 

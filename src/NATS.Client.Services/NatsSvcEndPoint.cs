@@ -141,7 +141,13 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
         Metadata = metadata;
         _cancellationToken = cancellationToken;
         _serializer = serializer;
-        _channel = Channel.CreateBounded<NatsSvcMsg<T>>(128);
+
+        // Use DropNewest mode with drop callback to avoid blocking the socket reader
+        Channel<NatsSvcMsg<T>>? channel = null;
+        channel = Channel.CreateBounded<NatsSvcMsg<T>>(
+            _nats.GetBoundedChannelOpts(opts?.ChannelOpts),
+            svcMsg => _nats.OnMessageDropped(this, channel?.Reader.Count ?? 0, svcMsg.Msg));
+        _channel = channel;
         _handlerTask = Task.Run(HandlerLoop);
     }
 
