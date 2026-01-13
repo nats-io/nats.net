@@ -116,11 +116,7 @@ internal sealed class NatsKVWatcher<T> : IAsyncDisposable
                 }
             });
 
-        // Entry channel also uses DropNewest to prevent blocking the command processing loop.
-        // Dropped entries mean the consumer is too slow; the watcher's sequence tracking
-        // will detect the gap and recreate the consumer to recover.
-        _entryChannel = Channel.CreateBounded<NatsKVEntry<T>>(
-            _nats.GetBoundedChannelOpts(subOpts?.ChannelOpts));
+        _entryChannel = Channel.CreateBounded<NatsKVEntry<T>>(1000);
 
         // A single request to create the consumer is enough because we don't want to create a new consumer
         // back to back in case the consumer is being recreated due to a timeout and a mismatch in consumer
@@ -313,29 +309,12 @@ internal sealed class NatsKVWatcher<T> : IAsyncDisposable
                                         Error = msg.Error,
                                     };
 
-                                    // Try to write to the entry channel
-                                    // If the channel is full, TryWrite returns false
-                                    // In that case, we DON'T update _sequenceStream so recovery can re-fetch
-                                    if (_entryChannel.Writer.TryWrite(entry))
-                                    {
-                                        // Only update sequence after successful write
 #if NETSTANDARD
-                                        InterlockedEx.Exchange(ref _sequenceStream, metadata.Sequence.Stream);
+                                    InterlockedEx.Exchange(ref _sequenceStream, metadata.Sequence.Stream);
 #else
-                                        Interlocked.Exchange(ref _sequenceStream, metadata.Sequence.Stream);
+                                    Interlocked.Exchange(ref _sequenceStream, metadata.Sequence.Stream);
 #endif
-                                    }
-                                    else
-                                    {
-                                        // Entry was dropped - notify and trigger recovery
-                                        if (_sub != null)
-                                        {
-                                            _nats.OnMessageDropped(_sub, _entryChannel.Reader.Count, msg.Msg);
-                                        }
-
-                                        CreateSub("entry-channel-full");
-                                        _logger.LogWarning(NatsKVLogEvents.RecreateConsumer, "Entry channel full, recreating consumer");
-                                    }
+                                    await _entryChannel.Writer.WriteAsync(entry, _cancellationToken);
                                 }
                                 else
                                 {
