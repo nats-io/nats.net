@@ -37,6 +37,7 @@ public class NatsBuilder
             opts.Opts = opts.Opts with
             {
                 LoggerFactory = provider.GetService<ILoggerFactory>() ?? NullLoggerFactory.Instance,
+                SubPendingChannelFullMode = BoundedChannelFullMode.Wait,
             };
 
             if (ReferenceEquals(opts.Opts.SerializerRegistry, NatsOpts.Default.SerializerRegistry))
@@ -129,7 +130,8 @@ public class NatsBuilder
     /// <returns>Builder to allow method chaining.</returns>
     /// <remarks>
     /// This will be applied to options overriding values set for <c>SubPendingChannelFullMode</c> in options.
-    /// By default, the pending messages channel will drop the newest message when full (<c>DropNewest</c>).
+    /// By default, the pending messages channel will wait for space to be available when full.
+    /// Note that this is not the same as <c>NatsOpts</c> default <c>SubPendingChannelFullMode</c> which is <c>DropNewest</c>.
     /// </remarks>
     public NatsBuilder WithSubPendingChannelFullMode(BoundedChannelFullMode pending) =>
         ConfigureOptions(builder => builder.Configure(opts => opts.Opts = opts.Opts with
