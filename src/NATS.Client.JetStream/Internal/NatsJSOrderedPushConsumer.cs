@@ -132,17 +132,7 @@ internal class NatsJSOrderedPushConsumer<T>
                 }
             });
 
-        // Message channel also uses DropNewest to prevent blocking the command processing loop.
-        _msgChannel = Channel.CreateBounded<NatsJSMsg<T>>(
-            _nats.GetBoundedChannelOpts(subOpts?.ChannelOpts),
-            msg =>
-            {
-                var sub = _sub;
-                if (sub != null)
-                {
-                    _nats.OnMessageDropped(sub, _msgChannel?.Reader.Count ?? 0, msg.Msg);
-                }
-            });
+        _msgChannel = Channel.CreateBounded<NatsJSMsg<T>>(1);
 
         // A single request to create the consumer is enough because we don't want to create a new consumer
         // back to back in case the consumer is being recreated due to a timeout and a mismatch in consumer
@@ -289,30 +279,12 @@ internal class NatsJSOrderedPushConsumer<T>
 
                                     if (!IsDone)
                                     {
-                                        // Try to write to the message channel
-                                        // If the channel is full, TryWrite returns false
-                                        // In that case, we DON'T update _sequenceStream so recovery can re-fetch
-                                        if (_msgChannel.Writer.TryWrite(msg))
-                                        {
-                                            // Only update sequence after successful write
 #if NETSTANDARD
-                                            InterlockedEx.Exchange(ref _sequenceStream, metadata.Sequence.Stream);
+                                        InterlockedEx.Exchange(ref _sequenceStream, metadata.Sequence.Stream);
 #else
-                                            Interlocked.Exchange(ref _sequenceStream, metadata.Sequence.Stream);
+                                        Interlocked.Exchange(ref _sequenceStream, metadata.Sequence.Stream);
 #endif
-                                        }
-                                        else
-                                        {
-                                            // Message was dropped - notify and trigger recovery
-                                            var sub = _sub;
-                                            if (sub != null)
-                                            {
-                                                _nats.OnMessageDropped(sub, _msgChannel.Reader.Count, msg.Msg);
-                                            }
-
-                                            CreateSub("message-channel-full");
-                                            _logger.LogWarning(NatsJSLogEvents.RecreateConsumer, "Message channel full, recreating consumer");
-                                        }
+                                        await _msgChannel.Writer.WriteAsync(msg, _cancellationToken).ConfigureAwait(false);
                                     }
                                 }
                                 else
