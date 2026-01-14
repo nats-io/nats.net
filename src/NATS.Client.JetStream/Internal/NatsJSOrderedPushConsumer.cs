@@ -114,10 +114,24 @@ internal class NatsJSOrderedPushConsumer<T>
             Timeout.Infinite,
             Timeout.Infinite);
 
-        // Channel size 1 is enough because we want backpressure to go all the way to the subscription
-        // so that we get most accurate view of the stream. We can keep them as 1 until we find a case
-        // where it's not enough due to performance for example.
-        _commandChannel = Channel.CreateBounded<NatsJSOrderedPushConsumerMsg<T>>(1);
+        // Use connection's channel options (default DropNewest) to avoid blocking socket reads.
+        // When messages are dropped from command channel, notify via OnMessageDropped callback.
+        _commandChannel = Channel.CreateBounded<NatsJSOrderedPushConsumerMsg<T>>(
+            _nats.GetBoundedChannelOpts(subOpts?.ChannelOpts),
+            cmd =>
+            {
+                // Only notify for actual messages, not control commands like Ready
+                if (cmd.Command == NatsJSOrderedPushConsumerCommand.Msg)
+                {
+                    var sub = _sub;
+                    if (sub != null)
+                    {
+                        // cmd.Msg is guaranteed to be valid when Command == Msg
+                        _nats.OnMessageDropped(sub, _commandChannel?.Reader.Count ?? 0, cmd.Msg.Msg);
+                    }
+                }
+            });
+
         _msgChannel = Channel.CreateBounded<NatsJSMsg<T>>(1);
 
         // A single request to create the consumer is enough because we don't want to create a new consumer
@@ -263,26 +277,14 @@ internal class NatsJSOrderedPushConsumer<T>
                                         continue;
                                     }
 
-                                    // Increment the sequence before writing to the channel in case the channel is full
-                                    // and the writer is waiting for the reader to read the message. This way the sequence
-                                    // will be correctly incremented in case the timeout kicks in and recreated the consumer.
-#if NETSTANDARD
-                                    InterlockedEx.Exchange(ref _sequenceStream, metadata.Sequence.Stream);
-#else
-                                    Interlocked.Exchange(ref _sequenceStream, metadata.Sequence.Stream);
-#endif
-
                                     if (!IsDone)
                                     {
-                                        try
-                                        {
-                                            await _msgChannel.Writer.WriteAsync(msg, _cancellationToken);
-                                        }
-                                        catch
-                                        {
-                                            if (!IsDone)
-                                                throw;
-                                        }
+#if NETSTANDARD
+                                        InterlockedEx.Exchange(ref _sequenceStream, metadata.Sequence.Stream);
+#else
+                                        Interlocked.Exchange(ref _sequenceStream, metadata.Sequence.Stream);
+#endif
+                                        await _msgChannel.Writer.WriteAsync(msg, _cancellationToken).ConfigureAwait(false);
                                     }
                                 }
                                 else

@@ -146,15 +146,19 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
             Timeout.Infinite,
             Timeout.Infinite);
 
-        // This channel is used to pass messages
-        // to the user from the subscription channel (which should be set to a
-        // sufficiently large value to avoid blocking socket reads in the
-        // NATS connection).
-        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg>>(1000);
+        // This channel is used to pass messages to the user from the subscription.
+        // Uses connection's channel options (default DropNewest) to avoid blocking socket reads.
+        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg>>(
+            Connection.GetBoundedChannelOpts(opts?.ChannelOpts),
+            msg => Connection.OnMessageDropped(this, _userMsgs?.Reader.Count ?? 0, msg.Msg));
         Msgs = new ActivityEndingMsgReader<NatsJSMsg<TMsg>>(_userMsgs.Reader, this);
 
         // Capacity as 1 is enough here since it's used for signaling only.
-        _pullRequests = Channel.CreateBounded<PullRequest>(1);
+        // Uses DropOldest to avoid blocking - old pull requests are superseded by new ones.
+        _pullRequests = Channel.CreateBounded<PullRequest>(new BoundedChannelOptions(1)
+        {
+            FullMode = BoundedChannelFullMode.DropOldest,
+        });
         _pullTask = Task.Run(PullLoop);
 
         ResetPending();

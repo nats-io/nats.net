@@ -103,9 +103,19 @@ internal sealed class NatsKVWatcher<T> : IAsyncDisposable
             Timeout.Infinite,
             Timeout.Infinite);
 
-        // Keep the channel size large enough to avoid blocking the connection
-        // TCP receiver thread in case other operations are in-flight.
-        _commandChannel = Channel.CreateBounded<NatsKVWatchCommandMsg<T>>(1000);
+        // Use connection's channel options (default DropNewest) to avoid blocking socket reads.
+        // When messages are dropped from command channel, notify via OnMessageDropped callback.
+        _commandChannel = Channel.CreateBounded<NatsKVWatchCommandMsg<T>>(
+            _nats.GetBoundedChannelOpts(subOpts?.ChannelOpts),
+            cmd =>
+            {
+                // Only notify for actual messages, not control commands like Ready
+                if (cmd.Command == NatsKVWatchCommand.Msg && _sub != null)
+                {
+                    _nats.OnMessageDropped(_sub, _commandChannel?.Reader.Count ?? 0, cmd.Msg.Msg);
+                }
+            });
+
         _entryChannel = Channel.CreateBounded<NatsKVEntry<T>>(1000);
 
         // A single request to create the consumer is enough because we don't want to create a new consumer
@@ -299,15 +309,11 @@ internal sealed class NatsKVWatcher<T> : IAsyncDisposable
                                         Error = msg.Error,
                                     };
 
-                                    // Increment the sequence before writing to the channel in case the channel is full
-                                    // and the writer is waiting for the reader to read the message. This way the sequence
-                                    // will be correctly incremented in case the timeout kicks in and recreated the consumer.
 #if NETSTANDARD
                                     InterlockedEx.Exchange(ref _sequenceStream, metadata.Sequence.Stream);
 #else
                                     Interlocked.Exchange(ref _sequenceStream, metadata.Sequence.Stream);
 #endif
-
                                     await _entryChannel.Writer.WriteAsync(entry, _cancellationToken);
                                 }
                                 else
