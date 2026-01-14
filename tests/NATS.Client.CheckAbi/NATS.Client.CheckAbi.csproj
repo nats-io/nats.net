@@ -14,10 +14,18 @@
       <ProjectReference Include="..\..\src\NATS.Net\NATS.Net.csproj" />
     </ItemGroup>
 
+    <!-- Force TransientLib to build first (build-order dependency only, not a compile reference) -->
+    <ItemGroup>
+      <ProjectReference Include="..\NATS.Client.CheckAbiTransientLib\NATS.Client.CheckAbiTransientLib.csproj">
+        <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+        <Private>false</Private>
+      </ProjectReference>
+    </ItemGroup>
+
     <!-- Reference pre-built NATS.Client.CheckAbiTransientLib.dll (compiled against 2.6.0) -->
     <ItemGroup>
       <Reference Include="NATS.Client.CheckAbiTransientLib">
-        <HintPath>..\NATS.Client.CheckAbiTransientLib\bin\Release\net8.0\NATS.Client.CheckAbiTransientLib.dll</HintPath>
+        <HintPath>..\NATS.Client.CheckAbiTransientLib\bin\$(Configuration)\net8.0\NATS.Client.CheckAbiTransientLib.dll</HintPath>
         <Private>true</Private>
       </Reference>
     </ItemGroup>

@@ -46,7 +46,8 @@ jobs:
 
       - name: Build
         run: |
-          cd tests
+          # Check that both Debug and Release builds work
+          dotnet build -c Debug
           dotnet build -c Release
 
       - name: Test Core2
@@ -143,11 +144,24 @@ jobs:
             killall nats-server 2> /dev/null | echo -n
             nats-server -v
             nats-server -js &
+            dotnet build # make sure docs build works
             cd tests/NATS.Net.DocsExamples
             dotnet run
 
       - name: Check ABI Compatibility (Type Forwarding)
         run: |
             cd tests/NATS.Client.CheckAbi
+
+            # Negative test: remove type forwarders and verify the check FAILS
+            mv ../../src/NATS.Client.Core/TypeForwarders.cs ../../src/NATS.Client.Core/TypeForwarders.cs.bak
+            if bash run-abi-check.sh; then
+              mv ../../src/NATS.Client.Core/TypeForwarders.cs.bak ../../src/NATS.Client.Core/TypeForwarders.cs
+              echo "ERROR: ABI check should have failed without type forwarders!"
+              exit 1
+            fi
+            echo "OK: ABI check correctly failed without type forwarders"
+
+            # Positive test: restore type forwarders and verify the check PASSES
+            mv ../../src/NATS.Client.Core/TypeForwarders.cs.bak ../../src/NATS.Client.Core/TypeForwarders.cs
             bash run-abi-check.sh
 
