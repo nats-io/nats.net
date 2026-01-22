@@ -125,9 +125,10 @@ public interface INatsJSMsg<out T> : INatsMsg
     /// Instructs the server to stop redelivery of the message without acknowledging it as successfully processed.
     /// </summary>
     /// <param name="opts">Ack options.</param>
+    /// <param name="reason">Optional reason for termination, included in JetStream advisory events. Requires NATS Server 2.10.4+.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the call.</param>
     /// <returns>A <see cref="ValueTask"/> representing the async call.</returns>
-    ValueTask AckTerminateAsync(AckOpts? opts = default, CancellationToken cancellationToken = default);
+    ValueTask AckTerminateAsync(AckOpts? opts = default, string? reason = null, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -136,6 +137,10 @@ public interface INatsJSMsg<out T> : INatsMsg
 /// <typeparam name="T">User message type</typeparam>
 public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
 {
+#if NETSTANDARD2_0
+    private static readonly byte[] TermPrefix = { (byte)'+', (byte)'T', (byte)'E', (byte)'R', (byte)'M', (byte)' ' };
+#endif
+
     private readonly INatsJSContext _context;
     private readonly NatsMsg<T> _msg;
     private readonly Lazy<NatsJSMsgMetadata?> _replyToDateTimeAndSeq;
@@ -262,9 +267,42 @@ public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
     /// Instructs the server to stop redelivery of the message without acknowledging it as successfully processed.
     /// </summary>
     /// <param name="opts">Ack options.</param>
+    /// <param name="reason">Optional reason for termination, included in JetStream advisory events. Requires NATS Server 2.10.4+.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the call.</param>
     /// <returns>A <see cref="ValueTask"/> representing the async call.</returns>
-    public ValueTask AckTerminateAsync(AckOpts? opts = default, CancellationToken cancellationToken = default) => SendAckAsync(NatsJSConstants.AckTerminate, opts, cancellationToken);
+    public ValueTask AckTerminateAsync(AckOpts? opts = default, string? reason = null, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrEmpty(reason))
+        {
+            return SendAckAsync(NatsJSConstants.AckTerminate, opts, cancellationToken);
+        }
+
+        return AckTerminateWithReasonAsync(reason!, opts, cancellationToken);
+    }
+
+    private async ValueTask AckTerminateWithReasonAsync(string reason, AckOpts? opts, CancellationToken cancellationToken)
+    {
+        var reasonByteCount = Encoding.ASCII.GetByteCount(reason);
+        var totalLength = 6 + reasonByteCount; // "+TERM " is 6 bytes
+
+        var buffer = ArrayPool<byte>.Shared.Rent(totalLength);
+        try
+        {
+#if NETSTANDARD2_0
+            Buffer.BlockCopy(TermPrefix, 0, buffer, 0, 6);
+            Encoding.ASCII.GetBytes(reason, 0, reason.Length, buffer, 6);
+#else
+            "+TERM "u8.CopyTo(buffer.AsSpan());
+            Encoding.ASCII.GetBytes(reason.AsSpan(), buffer.AsSpan(6));
+#endif
+
+            await SendAckAsync(new ReadOnlySequence<byte>(buffer, 0, totalLength), opts, cancellationToken);
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
+    }
 
     private async ValueTask SendAckAsync(ReadOnlySequence<byte> payload, AckOpts? opts = default, CancellationToken cancellationToken = default)
     {
