@@ -299,6 +299,8 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
             if (Volatile.Read(ref _disposed) == 0)
             {
                 await _userMsgs.Writer.WriteAsync(msg).ConfigureAwait(false);
+
+                ResetSlowConsumer();
             }
         }
 

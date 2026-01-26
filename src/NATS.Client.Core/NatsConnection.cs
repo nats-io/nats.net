@@ -28,6 +28,7 @@ internal enum NatsEvent
     MessageDropped,
     LameDuckModeActivated,
     ConnectionFailed,
+    SlowConsumerDetected,
 }
 
 public partial class NatsConnection : INatsConnection
@@ -112,6 +113,8 @@ public partial class NatsConnection : INatsConnection
     public event AsyncEventHandler<NatsEventArgs>? ReconnectFailed;
 
     public event AsyncEventHandler<NatsMessageDroppedEventArgs>? MessageDropped;
+
+    public event AsyncEventHandler<NatsSlowConsumerEventArgs>? SlowConsumerDetected;
 
     public event AsyncEventHandler<NatsLameDuckModeActivatedEventArgs>? LameDuckModeActivated;
 
@@ -236,6 +239,16 @@ public partial class NatsConnection : INatsConnection
     {
         var subject = msg.Subject;
         _eventChannel.Writer.TryWrite((NatsEvent.MessageDropped, new NatsMessageDroppedEventArgs(natsSub, pending, subject, msg.ReplyTo, msg.Headers, msg.Data)));
+
+        if (natsSub.TryMarkSlowConsumer())
+        {
+            _eventChannel.Writer.TryWrite((NatsEvent.SlowConsumerDetected, new NatsSlowConsumerEventArgs(natsSub)));
+
+            if (!Opts.SuppressMessageDroppedEventWarnings)
+            {
+                _logger.LogWarning(NatsLogEvents.Subscription, "Slow consumer detected on subscription {Subject}", natsSub.Subject);
+            }
+        }
     }
 
     /// <inheritdoc />
@@ -860,6 +873,9 @@ public partial class NatsConnection : INatsConnection
                         break;
                     case NatsEvent.MessageDropped when MessageDropped != null && args is NatsMessageDroppedEventArgs error:
                         await MessageDropped.InvokeAsync(this, error).ConfigureAwait(false);
+                        break;
+                    case NatsEvent.SlowConsumerDetected when SlowConsumerDetected != null && args is NatsSlowConsumerEventArgs slowConsumer:
+                        await SlowConsumerDetected.InvokeAsync(this, slowConsumer).ConfigureAwait(false);
                         break;
                     case NatsEvent.LameDuckModeActivated when LameDuckModeActivated != null && args is NatsLameDuckModeActivatedEventArgs uri:
                         await LameDuckModeActivated.InvokeAsync(this, uri).ConfigureAwait(false);

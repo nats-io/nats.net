@@ -26,6 +26,13 @@ public interface INatsConnection : INatsClient
     event AsyncEventHandler<NatsMessageDroppedEventArgs>? MessageDropped;
 
     /// <summary>
+    /// Event that is raised when a slow consumer is detected on a subscription.
+    /// This event fires once per "episode" - when the subscription transitions into a slow consumer state.
+    /// It will fire again if the subscription recovers (successfully processes a message) and then becomes slow again.
+    /// </summary>
+    event AsyncEventHandler<NatsSlowConsumerEventArgs>? SlowConsumerDetected;
+
+    /// <summary>
     /// Event that is raised when server goes into Lame Duck Mode.
     /// </summary>
     public event AsyncEventHandler<NatsLameDuckModeActivatedEventArgs>? LameDuckModeActivated;

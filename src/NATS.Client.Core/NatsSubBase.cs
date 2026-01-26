@@ -49,6 +49,7 @@ public abstract class NatsSubBase
     private int _endReasonRaw;
     private int _pendingMsgs;
     private Exception? _exception;
+    private int _isSlowConsumer;
 
     /// <summary>
     /// Creates a new instance of <see cref="NatsSubBase"/>.
@@ -358,6 +359,12 @@ public abstract class NatsSubBase
     internal void ClearException() => Interlocked.Exchange(ref _exception, null);
 
     /// <summary>
+    /// Marks this subscription as a slow consumer. Returns true if this was a state transition
+    /// (i.e., the subscription was not previously marked as a slow consumer).
+    /// </summary>
+    internal bool TryMarkSlowConsumer() => Interlocked.CompareExchange(ref _isSlowConsumer, 1, 0) == 0;
+
+    /// <summary>
     /// Write commands when reconnecting.
     /// </summary>
     /// <remarks>
@@ -382,6 +389,12 @@ public abstract class NatsSubBase
     /// <param name="payloadBuffer">Raw payload bytes.</param>
     /// <returns></returns>
     protected abstract ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer);
+
+    /// <summary>
+    /// Resets the slow consumer state, allowing another slow consumer event to be raised
+    /// if the subscription becomes slow again.
+    /// </summary>
+    protected void ResetSlowConsumer() => Volatile.Write(ref _isSlowConsumer, 0);
 
     /// <summary>
     /// Sets the exception that caused the subscription to end.
