@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Platform.Windows.Tests;
 using NATS.Client.TestUtilities;
@@ -157,5 +156,62 @@ public class AuthErrorTest
         }
 
         await server.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task Auth_err_then_connection_recreation_does_not_cause_unobserved_exception()
+    {
+        // Arrange
+        var exceptionThrown = false;
+
+        var confFile = $"{nameof(Auth_err_then_connection_recreation_does_not_cause_unobserved_exception)}_server.conf";
+        var confContents = """
+                           authorization: {
+                               users: [
+                                   {user: a, password: b}
+                               ]
+                           }
+                           """;
+
+        // Act
+        TaskScheduler.UnobservedTaskException += (_, _) =>
+        {
+            exceptionThrown = true;
+        };
+
+        File.WriteAllText(path: confFile, contents: confContents);
+
+        var server = await NatsServerProcess.StartAsync(config: confFile);
+
+        await Task.Run(async () =>
+        {
+            for (var i = 0; i < 2; i++)
+            {
+                var conn = new NatsConnection(new NatsOpts
+                {
+                    Url = server.Url,
+                });
+
+                try
+                {
+                    await conn.ConnectAsync();
+                }
+                catch (NatsException)
+                {
+                }
+                finally
+                {
+                    await conn.DisposeAsync();
+                }
+            }
+        });
+
+        await Task.Delay(100);
+
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+
+        // Assert
+        Assert.False(exceptionThrown);
     }
 }

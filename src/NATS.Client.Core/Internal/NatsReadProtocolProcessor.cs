@@ -298,8 +298,8 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
             catch (SocketClosedException e)
             {
                 _logger.LogDebug(NatsLogEvents.Protocol, e, "Socket closed during read loop");
-                _waitForInfoSignal.TrySetException(e);
-                _waitForPongOrErrorSignal.TrySetException(e);
+                _waitForInfoSignal.TrySetObservedException(e);
+                _waitForPongOrErrorSignal.TrySetObservedException(e);
                 return;
             }
             catch (Exception ex)
@@ -379,14 +379,14 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                 var newPosition = newBuffer.PositionOf((byte)'\n');
                 var error = ParseError(newBuffer.Slice(0, newBuffer.GetOffset(newPosition!.Value) - 1));
                 _logger.LogError(NatsLogEvents.Protocol, "Server error {Error}", error);
-                _waitForPongOrErrorSignal.TrySetException(new NatsServerException(error));
+                _waitForPongOrErrorSignal.TrySetObservedException(new NatsServerException(error));
                 return newBuffer.Slice(newBuffer.GetPosition(1, newPosition!.Value));
             }
             else
             {
                 var error = ParseError(buffer.Slice(0, buffer.GetOffset(position.Value) - 1));
                 _logger.LogError(NatsLogEvents.Protocol, "Server error {Error}", error);
-                _waitForPongOrErrorSignal.TrySetException(new NatsServerException(error));
+                _waitForPongOrErrorSignal.TrySetObservedException(new NatsServerException(error));
                 return buffer.Slice(buffer.GetPosition(1, position.Value));
             }
         }

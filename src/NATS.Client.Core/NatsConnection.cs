@@ -407,13 +407,7 @@ public partial class NatsConnection : INatsConnection
                 ConnectionState = NatsConnectionState.Closed; // allow retry connect
 
                 // throw for the waiter
-                if (_waitForOpenConnection.TrySetException(exception))
-                {
-                    // Suppress unobserved exceptions as the exceptions will surface elsewhere,
-                    // the exception is thrown below as well.
-                    _ = _waitForOpenConnection.Task.Exception;
-                }
-
+                _waitForOpenConnection.TrySetObservedException(exception);
                 _waitForOpenConnection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             }
 
@@ -435,13 +429,7 @@ public partial class NatsConnection : INatsConnection
                 ConnectionState = NatsConnectionState.Closed; // allow retry connect
 
                 // throw for the waiter
-                if (_waitForOpenConnection.TrySetException(exception))
-                {
-                    // Suppress unobserved exceptions as the exceptions will surface elsewhere,
-                    // the exception is thrown below as well.
-                    _ = _waitForOpenConnection.Task.Exception;
-                }
-
+                _waitForOpenConnection.TrySetObservedException(exception);
                 _waitForOpenConnection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             }
 
@@ -788,7 +776,7 @@ public partial class NatsConnection : INatsConnection
         }
         catch (Exception ex)
         {
-            _waitForOpenConnection.TrySetException(ex);
+            _waitForOpenConnection.TrySetObservedException(ex);
             try
             {
                 if (!IsDisposed)
