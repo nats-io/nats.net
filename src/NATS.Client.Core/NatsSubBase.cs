@@ -391,10 +391,20 @@ public abstract class NatsSubBase
     protected abstract ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer);
 
     /// <summary>
-    /// Resets the slow consumer state, allowing another slow consumer event to be raised
-    /// if the subscription becomes slow again.
+    /// Resets the slow consumer state if the channel has drained, allowing another
+    /// slow consumer event to be raised if the subscription becomes slow again.
     /// </summary>
-    protected void ResetSlowConsumer() => Volatile.Write(ref _isSlowConsumer, 0);
+    /// <param name="pendingMsgCount">The current number of messages pending in the channel.</param>
+    protected void ResetSlowConsumer(int pendingMsgCount)
+    {
+        // Only reset when the channel is nearly empty, indicating the consumer has caught up.
+        // This prevents the SlowConsumerDetected event from firing repeatedly during a
+        // single slow consumer episode.
+        if (pendingMsgCount <= 1)
+        {
+            Volatile.Write(ref _isSlowConsumer, 0);
+        }
+    }
 
     /// <summary>
     /// Sets the exception that caused the subscription to end.

@@ -300,7 +300,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
             {
                 await _userMsgs.Writer.WriteAsync(msg).ConfigureAwait(false);
 
-                ResetSlowConsumer();
+                ResetSlowConsumer(_userMsgs.Reader.Count);
             }
         }
 

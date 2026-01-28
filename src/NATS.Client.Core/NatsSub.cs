@@ -45,7 +45,7 @@ public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
 
         await _msgs.Writer.WriteAsync(natsMsg).ConfigureAwait(false);
 
-        ResetSlowConsumer();
+        ResetSlowConsumer(_msgs.Reader.Count);
         DecrementMaxMsgs();
     }
 

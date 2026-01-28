@@ -216,7 +216,7 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
 
         await _channel.Writer.WriteAsync(new NatsSvcMsg<T>(msg, this, exception), _cancellationToken);
 
-        ResetSlowConsumer();
+        ResetSlowConsumer(_channel.Reader.Count);
     }
 
     protected override void TryComplete() => _channel.Writer.TryComplete();

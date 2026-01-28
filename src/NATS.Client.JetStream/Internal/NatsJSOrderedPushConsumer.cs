@@ -445,7 +445,7 @@ internal class NatsJSOrderedPushConsumerSub<T> : NatsSubBase
     private readonly INatsConnection _nats;
     private readonly NatsHeaderParser _headerParser;
     private readonly INatsDeserialize<T> _serializer;
-    private readonly ChannelWriter<NatsJSOrderedPushConsumerMsg<T>> _commands;
+    private readonly Channel<NatsJSOrderedPushConsumerMsg<T>> _commandChannel;
 
     public NatsJSOrderedPushConsumerSub(
         INatsJSContext context,
@@ -465,14 +465,14 @@ internal class NatsJSOrderedPushConsumerSub<T> : NatsSubBase
         _serializer = serializer;
         _nats = context.Connection;
         _headerParser = _nats.HeaderParser;
-        _commands = commandChannel.Writer;
+        _commandChannel = commandChannel;
         _nats.ConnectionOpened += OnConnectionOpened;
     }
 
     public override async ValueTask ReadyAsync()
     {
         await base.ReadyAsync();
-        await _commands.WriteAsync(new NatsJSOrderedPushConsumerMsg<T> { Command = NatsJSOrderedPushConsumerCommand.Ready }, _cancellationToken).ConfigureAwait(false);
+        await _commandChannel.Writer.WriteAsync(new NatsJSOrderedPushConsumerMsg<T> { Command = NatsJSOrderedPushConsumerCommand.Ready }, _cancellationToken).ConfigureAwait(false);
     }
 
     public override ValueTask DisposeAsync()
@@ -488,9 +488,9 @@ internal class NatsJSOrderedPushConsumerSub<T> : NatsSubBase
         ReadOnlySequence<byte> payloadBuffer)
     {
         var msg = new NatsJSMsg<T>(NatsMsg<T>.Build(subject, replyTo, headersBuffer, payloadBuffer, _nats, _headerParser, _serializer), _context);
-        await _commands.WriteAsync(new NatsJSOrderedPushConsumerMsg<T> { Command = NatsJSOrderedPushConsumerCommand.Msg, Msg = msg }, _cancellationToken).ConfigureAwait(false);
+        await _commandChannel.Writer.WriteAsync(new NatsJSOrderedPushConsumerMsg<T> { Command = NatsJSOrderedPushConsumerCommand.Msg, Msg = msg }, _cancellationToken).ConfigureAwait(false);
 
-        ResetSlowConsumer();
+        ResetSlowConsumer(_commandChannel.Reader.Count);
     }
 
     protected override void TryComplete()
@@ -500,7 +500,7 @@ internal class NatsJSOrderedPushConsumerSub<T> : NatsSubBase
     private ValueTask OnConnectionOpened(object? sender, NatsEventArgs args)
     {
         // result is discarded, so this code is assumed to not be failing
-        _ = _commands.TryWrite(new NatsJSOrderedPushConsumerMsg<T> { Command = NatsJSOrderedPushConsumerCommand.Ready });
+        _ = _commandChannel.Writer.TryWrite(new NatsJSOrderedPushConsumerMsg<T> { Command = NatsJSOrderedPushConsumerCommand.Ready });
         return default;
     }
 }
