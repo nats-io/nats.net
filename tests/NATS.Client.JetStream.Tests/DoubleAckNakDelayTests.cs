@@ -91,4 +91,78 @@ public class DoubleAckNakDelayTests
             Assert.Fail("No message received");
         }
     }
+
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Terminate_without_reason(NatsRequestReplyMode mode)
+    {
+        var proxy = _server.CreateProxy();
+        await using var nats = proxy.CreateNatsConnection(mode);
+        await nats.ConnectRetryAsync();
+        var prefix = _server.GetNextId();
+
+        var js = new NatsJSContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
+        var consumer = await js.CreateOrUpdateConsumerAsync($"{prefix}s1", $"{prefix}c1", cancellationToken: cts.Token);
+
+        var ack = await js.PublishAsync($"{prefix}s1.foo", 42, cancellationToken: cts.Token);
+        ack.EnsureSuccess();
+        var next = await consumer.NextAsync<int>(cancellationToken: cts.Token);
+        if (next is { } msg)
+        {
+            await msg.AckTerminateAsync(cancellationToken: cts.Token);
+            Assert.Equal(42, msg.Data);
+
+            await Retry.Until("seen TERM", () => proxy.Frames.Any(f => f.Message.StartsWith("PUB $JS.ACK")));
+
+            var termFrame = proxy.Frames.Single(f => f.Message.StartsWith("PUB $JS.ACK"));
+
+            Assert.Matches(@"\+TERM\s*$", termFrame.Message);
+        }
+        else
+        {
+            Assert.Fail("No message received");
+        }
+    }
+
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Terminate_with_reason(NatsRequestReplyMode mode)
+    {
+        var proxy = _server.CreateProxy();
+        await using var nats = proxy.CreateNatsConnection(mode);
+        await nats.ConnectRetryAsync();
+        var prefix = _server.GetNextId();
+
+        var js = new NatsJSContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
+        var consumer = await js.CreateOrUpdateConsumerAsync($"{prefix}s1", $"{prefix}c1", cancellationToken: cts.Token);
+
+        var ack = await js.PublishAsync($"{prefix}s1.foo", 42, cancellationToken: cts.Token);
+        ack.EnsureSuccess();
+        var next = await consumer.NextAsync<int>(cancellationToken: cts.Token);
+        if (next is { } msg)
+        {
+            await msg.AckTerminateAsync(reason: "test failure reason", cancellationToken: cts.Token);
+            Assert.Equal(42, msg.Data);
+
+            await Retry.Until("seen TERM", () => proxy.Frames.Any(f => f.Message.StartsWith("PUB $JS.ACK")));
+
+            var termFrame = proxy.Frames.Single(f => f.Message.StartsWith("PUB $JS.ACK"));
+
+            Assert.Contains("+TERM test failure reason", termFrame.Message);
+        }
+        else
+        {
+            Assert.Fail("No message received");
+        }
+    }
 }
