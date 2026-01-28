@@ -56,6 +56,8 @@ internal class NatsKVWatchSub<T> : NatsSubBase
     {
         var msg = new NatsJSMsg<T>(NatsMsg<T>.Build(subject, replyTo, headersBuffer, payloadBuffer, _nats, _headerParser, _serializer), _context);
         await _commands.WriteAsync(new NatsKVWatchCommandMsg<T> { Command = NatsKVWatchCommand.Msg, Msg = msg }, _cancellationToken).ConfigureAwait(false);
+
+        ResetSlowConsumer();
     }
 
     protected override void TryComplete()

@@ -244,7 +244,7 @@ public partial class NatsConnection : INatsConnection
         {
             _eventChannel.Writer.TryWrite((NatsEvent.SlowConsumerDetected, new NatsSlowConsumerEventArgs(natsSub)));
 
-            if (!Opts.SuppressMessageDroppedEventWarnings)
+            if (!Opts.SuppressSlowConsumerWarnings)
             {
                 _logger.LogWarning(NatsLogEvents.Subscription, "Slow consumer detected on subscription {Subject}", natsSub.Subject);
             }

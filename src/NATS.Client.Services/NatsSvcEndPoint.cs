@@ -186,7 +186,7 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
     internal ValueTask StartAsync(CancellationToken cancellationToken) =>
         _nats.AddSubAsync(this, cancellationToken);
 
-    protected override ValueTask ReceiveInternalAsync(
+    protected override async ValueTask ReceiveInternalAsync(
         string subject,
         string? replyTo,
         ReadOnlySequence<byte>? headersBuffer,
@@ -214,7 +214,9 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
             _logger.LogWarning(NatsSvcLogEvents.Endpoint, exception, "Endpoint {Name} error receiving message", Name);
         }
 
-        return _channel.Writer.WriteAsync(new NatsSvcMsg<T>(msg, this, exception), _cancellationToken);
+        await _channel.Writer.WriteAsync(new NatsSvcMsg<T>(msg, this, exception), _cancellationToken);
+
+        ResetSlowConsumer();
     }
 
     protected override void TryComplete() => _channel.Writer.TryComplete();

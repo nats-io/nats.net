@@ -250,7 +250,7 @@ public sealed record NatsOpts
     /// events will still fire regardless of this setting.
     /// </para>
     /// </remarks>
-    public bool SuppressMessageDroppedEventWarnings { get; init; } = false;
+    public bool SuppressSlowConsumerWarnings { get; init; } = false;
 
     internal NatsUri[] GetSeedUris(bool suppressRandomization = false)
     {
