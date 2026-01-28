@@ -199,7 +199,7 @@ public class SlowConsumerTest
         // recovers (channel drains to near empty) and then becomes slow again.
         // We block the consumer during each burst to ensure deterministic behavior:
         // 1. Block consumer, publish burst → all drops happen together, exactly 1 slow consumer event
-        // 2. Unblock, wait for channel to drain (recovery)
+        // 2. Unblock, wait for recovery marker message (proves channel drained)
         // 3. Block again, publish burst → exactly 1 more slow consumer event
         await using var nats = new NatsConnection(new NatsOpts
         {
@@ -228,7 +228,7 @@ public class SlowConsumerTest
         var cancellationToken = cts.Token;
 
         var sync = 0;
-        var processedCount = 0;
+        var recoveryMarkerReceived = 0;
         var signal = new WaitSignal();
 
         // Start a subscription that blocks on signal for data messages
@@ -248,11 +248,17 @@ public class SlowConsumerTest
                         break;
                     }
 
+                    if (msg.Subject == "recovery.marker")
+                    {
+                        // Marker message indicates channel has drained
+                        Interlocked.Increment(ref recoveryMarkerReceived);
+                        _output.WriteLine("Recovery marker received");
+                        continue;
+                    }
+
                     // Wait for signal before processing - this blocks the consumer
                     await signal;
-
-                    var count = Interlocked.Increment(ref processedCount);
-                    _output.WriteLine($"Processed #{count}: {msg.Data}");
+                    _output.WriteLine($"Processed: {msg.Data}");
                 }
             },
             cancellationToken);
@@ -283,13 +289,13 @@ public class SlowConsumerTest
         _output.WriteLine("=== Recovery: Unblocking consumer ===");
         signal.Pulse();
 
-        // Wait for all queued messages to be processed (channel capacity is 3)
+        // Send marker message and wait for it - this proves the channel has drained
         await Retry.Until(
-            "channel drained",
-            () => Volatile.Read(ref processedCount) >= 3);
+            "recovery marker received",
+            () => Volatile.Read(ref recoveryMarkerReceived) >= 1,
+            async () => await nats.PublishAsync("recovery.marker", cancellationToken: cancellationToken));
 
-        var processedAfterRecovery = Volatile.Read(ref processedCount);
-        _output.WriteLine($"After recovery - Processed: {processedAfterRecovery}");
+        _output.WriteLine("Recovery complete - channel drained");
 
         // === Episode 2: Block again and burst more messages ===
         _output.WriteLine("=== Episode 2: Bursting more messages (consumer blocked) ===");
