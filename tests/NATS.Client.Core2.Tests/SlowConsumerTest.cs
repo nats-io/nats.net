@@ -197,10 +197,10 @@ public class SlowConsumerTest
     {
         // This test verifies that SlowConsumerDetected fires again if the SAME subscription
         // recovers (channel drains to near empty) and then becomes slow again.
-        // The subscription processes messages slowly (with delay), allowing us to:
-        // 1. Overflow the channel (fire slow consumer)
-        // 2. Wait for channel to drain (recovery)
-        // 3. Overflow again (fire slow consumer again)
+        // We block the consumer during each burst to ensure deterministic behavior:
+        // 1. Block consumer, publish burst → all drops happen together, exactly 1 slow consumer event
+        // 2. Unblock, wait for channel to drain (recovery)
+        // 3. Block again, publish burst → exactly 1 more slow consumer event
         await using var nats = new NatsConnection(new NatsOpts
         {
             Url = _server.Url,
@@ -229,9 +229,9 @@ public class SlowConsumerTest
 
         var sync = 0;
         var processedCount = 0;
-        var processingDelay = 50; // ms per message
+        var signal = new WaitSignal();
 
-        // Start a slow subscription that processes messages with delay
+        // Start a subscription that blocks on signal for data messages
         var subscription = Task.Run(
             async () =>
             {
@@ -248,8 +248,9 @@ public class SlowConsumerTest
                         break;
                     }
 
-                    // Process slowly to allow channel to fill up during bursts
-                    await Task.Delay(processingDelay, cancellationToken);
+                    // Wait for signal before processing - this blocks the consumer
+                    await signal;
+
                     var count = Interlocked.Increment(ref processedCount);
                     _output.WriteLine($"Processed #{count}: {msg.Data}");
                 }
@@ -262,8 +263,8 @@ public class SlowConsumerTest
             () => Volatile.Read(ref sync) > 0,
             async () => await nats.PublishAsync("recovery.sync", cancellationToken: cancellationToken));
 
-        // === Episode 1: Burst of messages to overflow channel ===
-        _output.WriteLine("=== Episode 1: Bursting messages ===");
+        // === Episode 1: Burst of messages while consumer is blocked ===
+        _output.WriteLine("=== Episode 1: Bursting messages (consumer blocked) ===");
         for (var i = 0; i < 20; i++)
         {
             await nats.PublishAsync("recovery.data", $"episode1-{i}", cancellationToken: cancellationToken);
@@ -278,11 +279,11 @@ public class SlowConsumerTest
         var slowConsumerAfterEpisode1 = Volatile.Read(ref slowConsumerCount);
         _output.WriteLine($"After episode 1 burst - Dropped: {droppedAfterEpisode1}, SlowConsumer: {slowConsumerAfterEpisode1}");
 
-        // === Recovery: Wait for subscription to drain the channel ===
-        _output.WriteLine("=== Recovery: Waiting for channel to drain ===");
+        // === Recovery: Unblock consumer and wait for channel to drain ===
+        _output.WriteLine("=== Recovery: Unblocking consumer ===");
+        signal.Pulse();
 
-        // Wait for enough messages to be processed so the channel drains (capacity is 3)
-        // We need at least 3 messages processed for the channel to be empty
+        // Wait for all queued messages to be processed (channel capacity is 3)
         await Retry.Until(
             "channel drained",
             () => Volatile.Read(ref processedCount) >= 3);
@@ -290,8 +291,10 @@ public class SlowConsumerTest
         var processedAfterRecovery = Volatile.Read(ref processedCount);
         _output.WriteLine($"After recovery - Processed: {processedAfterRecovery}");
 
-        // === Episode 2: Another burst to overflow channel again ===
-        _output.WriteLine("=== Episode 2: Bursting more messages ===");
+        // === Episode 2: Block again and burst more messages ===
+        _output.WriteLine("=== Episode 2: Bursting more messages (consumer blocked) ===");
+        signal = new WaitSignal(); // New signal to block again
+
         for (var i = 0; i < 20; i++)
         {
             await nats.PublishAsync("recovery.data", $"episode2-{i}", cancellationToken: cancellationToken);
@@ -307,6 +310,7 @@ public class SlowConsumerTest
         _output.WriteLine($"After episode 2 burst - Dropped: {droppedAfterEpisode2}, SlowConsumer: {slowConsumerAfterEpisode2}");
 
         // Cleanup
+        signal.Pulse();
         await nats.PublishAsync("recovery.end", cancellationToken: cancellationToken);
 
         try
