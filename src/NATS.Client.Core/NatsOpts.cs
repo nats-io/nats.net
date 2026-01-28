@@ -243,7 +243,7 @@ public sealed record NatsOpts
     /// <para>
     /// When a subscription becomes a slow consumer (dropping messages due to channel capacity limits),
     /// a warning is logged once. The warning will be logged again if the subscription recovers
-    /// (successfully processes a message) and then becomes slow again.
+    /// (channel drains to nearly empty) and then becomes slow again.
     /// </para>
     /// <para>
     /// Note that the <see cref="NatsConnection.MessageDropped"/> and <see cref="NatsConnection.SlowConsumerDetected"/>
