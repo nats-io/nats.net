@@ -83,6 +83,8 @@ public class NatsJSContextFactoryTest
 
         public event AsyncEventHandler<NatsMessageDroppedEventArgs>? MessageDropped;
 
+        public event AsyncEventHandler<NatsSlowConsumerEventArgs>? SlowConsumerDetected;
+
         public event AsyncEventHandler<NatsLameDuckModeActivatedEventArgs>? LameDuckModeActivated;
 #pragma warning restore CS0067
 

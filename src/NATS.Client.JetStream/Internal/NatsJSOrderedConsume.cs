@@ -314,6 +314,8 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
                 // the message to the user to be processed. Writer will be completed
                 // when the user calls Stop() or when the subscription is closed.
                 await _userMsgs.Writer.WriteAsync(msg).ConfigureAwait(false);
+
+                ResetSlowConsumer(_userMsgs.Reader.Count);
             }
         }
 

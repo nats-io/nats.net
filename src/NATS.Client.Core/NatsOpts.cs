@@ -235,6 +235,23 @@ public sealed record NatsOpts
     /// </remarks>
     public bool SkipSubjectValidation { get; init; } = true;
 
+    /// <summary>
+    /// Gets or sets a value indicating whether to suppress warning logs when a slow consumer is detected.
+    /// The default is <c>false</c>, meaning warnings will be logged once per slow consumer episode.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// When a subscription becomes a slow consumer (dropping messages due to channel capacity limits),
+    /// a warning is logged once. The warning will be logged again if the subscription recovers
+    /// (channel drains to nearly empty) and then becomes slow again.
+    /// </para>
+    /// <para>
+    /// Note that the <see cref="NatsConnection.MessageDropped"/> and <see cref="NatsConnection.SlowConsumerDetected"/>
+    /// events will still fire regardless of this setting.
+    /// </para>
+    /// </remarks>
+    public bool SuppressSlowConsumerWarnings { get; init; } = false;
+
     internal NatsUri[] GetSeedUris(bool suppressRandomization = false)
     {
         var urls = Url.Split(',');
