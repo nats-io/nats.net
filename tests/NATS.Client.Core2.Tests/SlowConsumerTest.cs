@@ -228,6 +228,7 @@ public class SlowConsumerTest
         var cancellationToken = cts.Token;
 
         var sync = 0;
+        var processedCount = 0;
         var recoveryMarkerReceived = 0;
         var signal = new WaitSignal();
 
@@ -258,6 +259,7 @@ public class SlowConsumerTest
 
                     // Wait for signal before processing - this blocks the consumer
                     await signal;
+                    Interlocked.Increment(ref processedCount);
                     _output.WriteLine($"Processed: {msg.Data}");
                 }
             },
@@ -289,11 +291,17 @@ public class SlowConsumerTest
         _output.WriteLine("=== Recovery: Unblocking consumer ===");
         signal.Pulse();
 
-        // Send marker message and wait for it - this proves the channel has drained
+        // Wait for at least one data message to be processed, ensuring channel has started draining
+        await Retry.Until(
+            "at least one message processed",
+            () => Volatile.Read(ref processedCount) >= 1);
+
+        // Send a single marker message and wait for it - this proves the channel has fully drained
+        // We don't use Retry.Until for publishing because we don't want multiple markers queued
+        await nats.PublishAsync("recovery.marker", cancellationToken: cancellationToken);
         await Retry.Until(
             "recovery marker received",
-            () => Volatile.Read(ref recoveryMarkerReceived) >= 1,
-            async () => await nats.PublishAsync("recovery.marker", cancellationToken: cancellationToken));
+            () => Volatile.Read(ref recoveryMarkerReceived) >= 1);
 
         _output.WriteLine("Recovery complete - channel drained");
 
