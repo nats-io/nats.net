@@ -24,7 +24,10 @@ public static class ServiceApp
 
         Console.WriteLine("Service App is starting...");
 
-        await using var nats = new NatsConnection();
+        await using var nats = new NatsConnection(new NatsOpts
+        {
+            RequestReplyMode = NatsRequestReplyMode.Direct,
+        });
 
         await foreach (var msg in nats.SubscribeAsync<string>("greet.>"))
         {

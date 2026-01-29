@@ -50,7 +50,12 @@ public partial class NatsConnection
                     using var rt = _replyTaskFactory.CreateReplyTask(replySerializer, replyOpts.Timeout);
                     requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
                     await PublishAsync(subject, data, headers, rt.Subject, requestSerializer, requestOpts, cancellationToken).ConfigureAwait(false);
-                    return await rt.GetResultAsync(cancellationToken).ConfigureAwait(false);
+                    var msg = await rt.GetResultAsync(cancellationToken).ConfigureAwait(false);
+
+                    // Dispose activity from headers to avoid leaking it
+                    msg.Headers?.Activity?.Dispose();
+
+                    return msg;
                 }
 
                 await using var sub1 = await CreateRequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
