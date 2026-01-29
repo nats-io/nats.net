@@ -113,9 +113,25 @@ public sealed record NatsOpts
 
     public TimeSpan SubscriptionCleanUpInterval { get; init; } = TimeSpan.FromMinutes(5);
 
+    /// <summary>
+    /// Gets or sets encoding used for NATS message header names and values. (default: ASCII)
+    /// </summary>
+    /// <remarks>
+    /// NATS headers follow HTTP/1.1 conventions where header field values are
+    /// restricted to visible US-ASCII characters per RFC 9110. Use base64 encoding
+    /// for non-ASCII data in header values.
+    /// </remarks>
     public Encoding HeaderEncoding { get; init; } = Encoding.ASCII;
 
-    public Encoding SubjectEncoding { get; init; } = Encoding.ASCII;
+    /// <summary>
+    /// Gets or sets encoding used for NATS subjects and reply-to addresses. (default: UTF-8)
+    /// </summary>
+    /// <remarks>
+    /// The NATS protocol specifies that subjects are UTF-8 encoded on the wire.
+    /// UTF-8 is backwards compatible with ASCII, so existing ASCII-only subjects
+    /// are unaffected by this default.
+    /// </remarks>
+    public Encoding SubjectEncoding { get; init; } = Encoding.UTF8;
 
     public bool WaitUntilSent { get; init; } = false;
 
