@@ -28,6 +28,7 @@ internal enum NatsEvent
     MessageDropped,
     LameDuckModeActivated,
     ConnectionFailed,
+    SlowConsumerDetected,
 }
 
 public partial class NatsConnection : INatsConnection
@@ -112,6 +113,8 @@ public partial class NatsConnection : INatsConnection
     public event AsyncEventHandler<NatsEventArgs>? ReconnectFailed;
 
     public event AsyncEventHandler<NatsMessageDroppedEventArgs>? MessageDropped;
+
+    public event AsyncEventHandler<NatsSlowConsumerEventArgs>? SlowConsumerDetected;
 
     public event AsyncEventHandler<NatsLameDuckModeActivatedEventArgs>? LameDuckModeActivated;
 
@@ -236,6 +239,16 @@ public partial class NatsConnection : INatsConnection
     {
         var subject = msg.Subject;
         _eventChannel.Writer.TryWrite((NatsEvent.MessageDropped, new NatsMessageDroppedEventArgs(natsSub, pending, subject, msg.ReplyTo, msg.Headers, msg.Data)));
+
+        if (natsSub.TryMarkSlowConsumer())
+        {
+            _eventChannel.Writer.TryWrite((NatsEvent.SlowConsumerDetected, new NatsSlowConsumerEventArgs(natsSub)));
+
+            if (!Opts.SuppressSlowConsumerWarnings)
+            {
+                _logger.LogWarning(NatsLogEvents.Subscription, "Slow consumer detected on subscription {Subject}", natsSub.Subject);
+            }
+        }
     }
 
     /// <inheritdoc />
@@ -407,13 +420,7 @@ public partial class NatsConnection : INatsConnection
                 ConnectionState = NatsConnectionState.Closed; // allow retry connect
 
                 // throw for the waiter
-                if (_waitForOpenConnection.TrySetException(exception))
-                {
-                    // Suppress unobserved exceptions as the exceptions will surface elsewhere,
-                    // the exception is thrown below as well.
-                    _ = _waitForOpenConnection.Task.Exception;
-                }
-
+                _waitForOpenConnection.TrySetObservedException(exception);
                 _waitForOpenConnection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             }
 
@@ -435,13 +442,7 @@ public partial class NatsConnection : INatsConnection
                 ConnectionState = NatsConnectionState.Closed; // allow retry connect
 
                 // throw for the waiter
-                if (_waitForOpenConnection.TrySetException(exception))
-                {
-                    // Suppress unobserved exceptions as the exceptions will surface elsewhere,
-                    // the exception is thrown below as well.
-                    _ = _waitForOpenConnection.Task.Exception;
-                }
-
+                _waitForOpenConnection.TrySetObservedException(exception);
                 _waitForOpenConnection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             }
 
@@ -788,7 +789,7 @@ public partial class NatsConnection : INatsConnection
         }
         catch (Exception ex)
         {
-            _waitForOpenConnection.TrySetException(ex);
+            _waitForOpenConnection.TrySetObservedException(ex);
             try
             {
                 if (!IsDisposed)
@@ -860,6 +861,9 @@ public partial class NatsConnection : INatsConnection
                         break;
                     case NatsEvent.MessageDropped when MessageDropped != null && args is NatsMessageDroppedEventArgs error:
                         await MessageDropped.InvokeAsync(this, error).ConfigureAwait(false);
+                        break;
+                    case NatsEvent.SlowConsumerDetected when SlowConsumerDetected != null && args is NatsSlowConsumerEventArgs slowConsumer:
+                        await SlowConsumerDetected.InvokeAsync(this, slowConsumer).ConfigureAwait(false);
                         break;
                     case NatsEvent.LameDuckModeActivated when LameDuckModeActivated != null && args is NatsLameDuckModeActivatedEventArgs uri:
                         await LameDuckModeActivated.InvokeAsync(this, uri).ConfigureAwait(false);

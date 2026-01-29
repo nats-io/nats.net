@@ -41,3 +41,14 @@ public class NatsLameDuckModeActivatedEventArgs : NatsEventArgs
 
     public Uri Uri { get; }
 }
+
+public class NatsSlowConsumerEventArgs : NatsEventArgs
+{
+    public NatsSlowConsumerEventArgs(NatsSubBase subscription)
+        : base($"Slow consumer detected on subscription {subscription.Subject}")
+    {
+        Subscription = subscription;
+    }
+
+    public NatsSubBase Subscription { get; }
+}

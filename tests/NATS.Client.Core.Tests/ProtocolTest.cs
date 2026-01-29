@@ -21,7 +21,7 @@ public class ProtocolTest
 
         var signal = new WaitSignal();
         var counts = 0;
-        _ = Task.Run(
+        var subscribeTask = Task.Run(
             async () =>
             {
                 var count = 0;
@@ -52,7 +52,7 @@ public class ProtocolTest
 
         var r = 0;
         var payload = new byte[size];
-        _ = Task.Run(
+        var publishTask = Task.Run(
             async () =>
             {
                 while (!cts.Token.IsCancellationRequested)
@@ -94,6 +94,10 @@ public class ProtocolTest
 
             await Retry.Until("subject count goes up", () => Volatile.Read(ref counts) > subjectCount, timeout: TimeSpan.FromSeconds(60));
         }
+
+        cts.Cancel();
+        await subscribeTask;
+        await publishTask;
 
         foreach (var log in logger.Logs.Where(x => x.EventId == NatsLogEvents.Protocol && x.LogLevel == LogLevel.Error))
         {

@@ -97,4 +97,254 @@ public class SlowConsumerTest
         Volatile.Read(ref count).Should().BeLessThan(20);
         Volatile.Read(ref lost).Should().BeGreaterThan(0);
     }
+
+    [Fact]
+    public async Task SlowConsumerDetected_fires_once_per_episode()
+    {
+        // This test verifies that SlowConsumerDetected event fires only once
+        // when a subscription becomes a slow consumer, not on every dropped message.
+        await using var nats = new NatsConnection(new NatsOpts
+        {
+            Url = _server.Url,
+            SubPendingChannelCapacity = 3,
+        });
+
+        var droppedCount = 0;
+        var slowConsumerCount = 0;
+        NatsSubBase? slowConsumerSub = null;
+
+        nats.MessageDropped += (_, e) =>
+        {
+            Interlocked.Increment(ref droppedCount);
+            _output.WriteLine($"MessageDropped: {e.Subject}");
+            return default;
+        };
+
+        nats.SlowConsumerDetected += (_, e) =>
+        {
+            Interlocked.Increment(ref slowConsumerCount);
+            slowConsumerSub = e.Subscription;
+            _output.WriteLine($"SlowConsumerDetected: {e.Subscription.Subject}");
+            return default;
+        };
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        var sync = 0;
+        var signal = new WaitSignal();
+
+        // Start a slow subscription that blocks after receiving sync message
+        var subscription = Task.Run(
+            async () =>
+            {
+                await foreach (var msg in nats.SubscribeAsync<string>("test.>", cancellationToken: cancellationToken))
+                {
+                    if (msg.Subject == "test.sync")
+                    {
+                        Interlocked.Increment(ref sync);
+                        await signal; // Block here to cause slow consumer
+                        continue;
+                    }
+
+                    if (msg.Subject == "test.end")
+                    {
+                        break;
+                    }
+                }
+            },
+            cancellationToken);
+
+        // Wait for subscription to be ready
+        await Retry.Until(
+            "subscription is ready",
+            () => Volatile.Read(ref sync) > 0,
+            async () => await nats.PublishAsync("test.sync", "sync", cancellationToken: cancellationToken));
+
+        // Publish many messages to trigger multiple drops
+        for (var i = 0; i < 20; i++)
+        {
+            await nats.PublishAsync("test.data", $"msg{i}", cancellationToken: cancellationToken);
+        }
+
+        // Wait for messages to be dropped
+        await Retry.Until(
+            "messages are dropped",
+            () => Volatile.Read(ref droppedCount) > 1);
+
+        // Release the subscription
+        signal.Pulse();
+
+        await Retry.Until(
+            "subscription ended",
+            () => true,
+            async () => await nats.PublishAsync("test.end", cancellationToken: cancellationToken));
+
+        await subscription;
+
+        _output.WriteLine($"Dropped: {droppedCount}, SlowConsumerDetected: {slowConsumerCount}");
+
+        // Key assertion: SlowConsumerDetected should fire exactly once,
+        // even though multiple messages were dropped
+        Volatile.Read(ref droppedCount).Should().BeGreaterThan(1, "multiple messages should be dropped");
+        Volatile.Read(ref slowConsumerCount).Should().Be(1, "SlowConsumerDetected should fire only once per episode");
+        slowConsumerSub.Should().NotBeNull();
+        slowConsumerSub!.Subject.Should().Be("test.>");
+    }
+
+    [Fact]
+    public async Task SlowConsumerDetected_fires_again_after_recovery()
+    {
+        // This test verifies that SlowConsumerDetected fires again if the SAME subscription
+        // recovers (channel drains to near empty) and then becomes slow again.
+        // We block the consumer during each burst to ensure deterministic behavior:
+        // 1. Block consumer, publish burst → all drops happen together, exactly 1 slow consumer event
+        // 2. Unblock, wait for recovery marker message (proves channel drained)
+        // 3. Block again, publish burst → exactly 1 more slow consumer event
+        await using var nats = new NatsConnection(new NatsOpts
+        {
+            Url = _server.Url,
+            SubPendingChannelCapacity = 3,
+        });
+
+        var droppedCount = 0;
+        var slowConsumerCount = 0;
+
+        nats.MessageDropped += (_, e) =>
+        {
+            Interlocked.Increment(ref droppedCount);
+            _output.WriteLine($"MessageDropped: {e.Subject}");
+            return default;
+        };
+
+        nats.SlowConsumerDetected += (_, e) =>
+        {
+            var count = Interlocked.Increment(ref slowConsumerCount);
+            _output.WriteLine($"SlowConsumerDetected #{count}: {e.Subscription.Subject}");
+            return default;
+        };
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cancellationToken = cts.Token;
+
+        var sync = 0;
+        var processedCount = 0;
+        var recoveryMarkerReceived = 0;
+        var signal = new WaitSignal();
+
+        // Start a subscription that blocks on signal for data messages
+        var subscription = Task.Run(
+            async () =>
+            {
+                await foreach (var msg in nats.SubscribeAsync<string>("recovery.>", cancellationToken: cancellationToken))
+                {
+                    if (msg.Subject == "recovery.sync")
+                    {
+                        Interlocked.Increment(ref sync);
+                        continue;
+                    }
+
+                    if (msg.Subject == "recovery.end")
+                    {
+                        break;
+                    }
+
+                    if (msg.Subject == "recovery.marker")
+                    {
+                        // Marker message indicates channel has drained
+                        Interlocked.Increment(ref recoveryMarkerReceived);
+                        _output.WriteLine("Recovery marker received");
+                        continue;
+                    }
+
+                    // Wait for signal before processing - this blocks the consumer
+                    await signal;
+                    Interlocked.Increment(ref processedCount);
+                    _output.WriteLine($"Processed: {msg.Data}");
+                }
+            },
+            cancellationToken);
+
+        // Wait for subscription to be ready
+        await Retry.Until(
+            "subscription is ready",
+            () => Volatile.Read(ref sync) > 0,
+            async () => await nats.PublishAsync("recovery.sync", cancellationToken: cancellationToken));
+
+        // === Episode 1: Burst of messages while consumer is blocked ===
+        _output.WriteLine("=== Episode 1: Bursting messages (consumer blocked) ===");
+        for (var i = 0; i < 20; i++)
+        {
+            await nats.PublishAsync("recovery.data", $"episode1-{i}", cancellationToken: cancellationToken);
+        }
+
+        // Wait for drops to happen
+        await Retry.Until(
+            "episode 1 drops",
+            () => Volatile.Read(ref droppedCount) > 0);
+
+        var droppedAfterEpisode1 = Volatile.Read(ref droppedCount);
+        var slowConsumerAfterEpisode1 = Volatile.Read(ref slowConsumerCount);
+        _output.WriteLine($"After episode 1 burst - Dropped: {droppedAfterEpisode1}, SlowConsumer: {slowConsumerAfterEpisode1}");
+
+        // === Recovery: Unblock consumer and wait for channel to drain ===
+        _output.WriteLine("=== Recovery: Unblocking consumer ===");
+        signal.Pulse();
+
+        // Wait for at least one data message to be processed, ensuring channel has started draining
+        await Retry.Until(
+            "at least one message processed",
+            () => Volatile.Read(ref processedCount) >= 1);
+
+        // Send a single marker message and wait for it - this proves the channel has fully drained
+        // We don't use Retry.Until for publishing because we don't want multiple markers queued
+        await nats.PublishAsync("recovery.marker", cancellationToken: cancellationToken);
+        await Retry.Until(
+            "recovery marker received",
+            () => Volatile.Read(ref recoveryMarkerReceived) >= 1);
+
+        _output.WriteLine("Recovery complete - channel drained");
+
+        // === Episode 2: Block again and burst more messages ===
+        _output.WriteLine("=== Episode 2: Bursting more messages (consumer blocked) ===");
+        signal = new WaitSignal(); // New signal to block again
+
+        for (var i = 0; i < 20; i++)
+        {
+            await nats.PublishAsync("recovery.data", $"episode2-{i}", cancellationToken: cancellationToken);
+        }
+
+        // Wait for more drops and the second slow consumer event
+        await Retry.Until(
+            "episode 2 drops",
+            () => Volatile.Read(ref droppedCount) > droppedAfterEpisode1 && Volatile.Read(ref slowConsumerCount) >= 2);
+
+        var droppedAfterEpisode2 = Volatile.Read(ref droppedCount);
+        var slowConsumerAfterEpisode2 = Volatile.Read(ref slowConsumerCount);
+        _output.WriteLine($"After episode 2 burst - Dropped: {droppedAfterEpisode2}, SlowConsumer: {slowConsumerAfterEpisode2}");
+
+        // Cleanup
+        signal.Pulse();
+        await nats.PublishAsync("recovery.end", cancellationToken: cancellationToken);
+
+        try
+        {
+            await subscription.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+        }
+        catch (TimeoutException)
+        {
+            _output.WriteLine("Subscription cleanup timed out");
+        }
+
+        // Assertions
+        // Note: Due to race conditions between the socket reader and subscription task,
+        // the exact number of slow consumer events can vary. The key behaviors we verify:
+        // 1. Events fire when drops occur
+        // 2. Events can fire again after recovery (total increases between episodes)
+        droppedAfterEpisode1.Should().BeGreaterThan(0, "messages should be dropped in episode 1");
+        slowConsumerAfterEpisode1.Should().BeGreaterThanOrEqualTo(1, "SlowConsumerDetected should fire in episode 1");
+
+        droppedAfterEpisode2.Should().BeGreaterThan(droppedAfterEpisode1, "more messages should be dropped in episode 2");
+        slowConsumerAfterEpisode2.Should().BeGreaterThan(slowConsumerAfterEpisode1, "SlowConsumerDetected should fire again after recovery");
+    }
 }
