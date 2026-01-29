@@ -5,28 +5,27 @@ public class SocketConnectionWrapperTests
     [Fact]
     public async Task SignalDisconnected_DoesNotCause_UnobservedException()
     {
-        // Flush any pending unobserved exceptions from other tests or framework
-        // code so they don't cause false positives when we GC.Collect below.
-        GC.Collect();
-        GC.WaitForPendingFinalizers();
-        GC.Collect();
-        await Task.Delay(100);
-
         // Arrange
-        var exceptionThrown = false;
+        var sentinel = "SocketConnectionWrapperTests_" + Guid.NewGuid().ToString("N");
+        var unobservedException = default(AggregateException);
         var socketConnection = new FakeSocketConnection();
         var socket = new SocketConnectionWrapper(socketConnection);
 
         void Handler(object? sender, UnobservedTaskExceptionEventArgs args)
         {
-            exceptionThrown = true;
+            // Only track exceptions from our code; ignore unrelated unobserved
+            // exceptions from the runtime, xUnit, or other tests.
+            if (args.Exception?.InnerExceptions.Any(e => e.Message == sentinel) == true)
+            {
+                unobservedException = args.Exception;
+            }
         }
 
         TaskScheduler.UnobservedTaskException += Handler;
         try
         {
             // Act
-            socket.SignalDisconnected(new Exception("test"));
+            socket.SignalDisconnected(new Exception(sentinel));
             await socket.DisposeAsync();
             socket = null;
             socketConnection = null;
@@ -38,7 +37,7 @@ public class SocketConnectionWrapperTests
             GC.Collect();
 
             // Assert
-            Assert.False(exceptionThrown);
+            Assert.Null(unobservedException);
         }
         finally
         {
