@@ -21,12 +21,14 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
     private readonly Task _infoParsed; // wait for an upgrade
     private readonly ConcurrentQueue<PingCommand> _pingCommands; // wait for pong
     private readonly ILogger<NatsReadProtocolProcessor> _logger;
+    private readonly Encoding _subjectEncoding;
     private readonly bool _trace;
     private int _disposed;
 
     public NatsReadProtocolProcessor(SocketConnectionWrapper socketConnection, NatsConnection connection, TaskCompletionSource waitForInfoSignal, TaskCompletionSource waitForPongOrErrorSignal, Task infoParsed)
     {
         _connection = connection;
+        _subjectEncoding = connection.Opts.SubjectEncoding;
         _logger = connection.Opts.LoggerFactory.CreateLogger<NatsReadProtocolProcessor>();
         _trace = _logger.IsEnabled(LogLevel.Trace);
         _waitForInfoSignal = waitForInfoSignal;
@@ -471,7 +473,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         msgHeader.Split(out var sidBytes, out msgHeader);
         msgHeader.Split(out var replyToOrSizeBytes, out msgHeader);
 
-        var subject = Encoding.ASCII.GetString(subjectBytes);
+        var subject = _subjectEncoding.GetString(subjectBytes);
 
         if (msgHeader.Length == 0)
         {
@@ -486,7 +488,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
 
             var sid = GetInt32(sidBytes);
             var payloadLength = GetInt32(bytesSlice);
-            var replyTo = Encoding.ASCII.GetString(replyToBytes);
+            var replyTo = _subjectEncoding.GetString(replyToBytes);
             return (subject, sid, payloadLength, replyTo);
         }
     }
@@ -526,7 +528,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         msgHeader.Split(out var replyToOrHeaderLenBytes, out msgHeader);
         msgHeader.Split(out var headerLenOrTotalLenBytes, out msgHeader);
 
-        var subject = Encoding.ASCII.GetString(subjectBytes);
+        var subject = _subjectEncoding.GetString(subjectBytes);
         var sid = GetInt32(sidBytes);
 
         // We don't have the optional reply-to field
@@ -541,7 +543,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         else
         {
             var replyToBytes = replyToOrHeaderLenBytes;
-            var replyTo = Encoding.ASCII.GetString(replyToBytes);
+            var replyTo = _subjectEncoding.GetString(replyToBytes);
 
             var headerLen = GetInt32(headerLenOrTotalLenBytes);
 
