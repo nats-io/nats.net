@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using NATS.Client.JetStream;
+using NATS.Client.JetStream.Models;
 using NATS.Client.Platform.Windows.Tests;
 
 namespace NATS.Client.Core.Tests;
@@ -12,8 +14,7 @@ public class OpenTelemetryTest
     [Fact]
     public async Task Publish_subscribe_activities()
     {
-        var activities = new List<Activity>();
-        using var activityListener = StartActivityListener(activities);
+        using var tracker = new ActivityTracker();
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
 
@@ -25,21 +26,84 @@ public class OpenTelemetryTest
 
         await sub.Msgs.ReadAsync(cts.Token);
 
-        AssertActivityData("foo", activities);
+        AssertActivityData("foo", tracker.Started);
+        tracker.AssertAllStopped();
     }
 
-    private static ActivityListener StartActivityListener(List<Activity> activities)
+    [Fact]
+    public async Task JetStream_consume_start_activity_with_interface()
     {
-        var activityListener = new ActivityListener();
-        activityListener.Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded;
-        activityListener.SampleUsingParentId = (ref ActivityCreationOptions<string> _) => ActivitySamplingResult.AllDataAndRecorded;
-        activityListener.ShouldListenTo = activitySource => activitySource.Name.StartsWith("NATS.Net");
-        activityListener.ActivityStarted = activities.Add;
-        ActivitySource.AddActivityListener(activityListener);
-        return activityListener;
+        using var tracker = new ActivityTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        var js = new NatsJSContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        await js.CreateStreamAsync(new StreamConfig { Name = "test-stream", Subjects = ["test.>"] }, cts.Token);
+        await js.CreateOrUpdateConsumerAsync("test-stream", new ConsumerConfig("test-consumer"), cts.Token);
+
+        await js.PublishAsync("test.subject", "test-message", cancellationToken: cts.Token);
+
+        var consumer = await js.GetConsumerAsync("test-stream", "test-consumer", cts.Token);
+
+        await foreach (var msg in consumer.ConsumeAsync<string>(cancellationToken: cts.Token))
+        {
+            // Test StartActivity on INatsJSMsg<T> interface (the fix for issue #1026)
+            using var activity = msg.StartActivity("test.consume");
+            Assert.NotNull(activity);
+            Assert.Equal("test.consume", activity.OperationName);
+
+            await msg.AckAsync(cancellationToken: cts.Token);
+            break;
+        }
+
+        // Verify the publish activity was recorded
+        var publishActivity = tracker.Started.FirstOrDefault(x => x.OperationName == "test.subject publish");
+        Assert.NotNull(publishActivity);
+
+        // Verify our custom activity was recorded
+        var consumeActivity = tracker.Started.FirstOrDefault(x => x.OperationName == "test.consume");
+        Assert.NotNull(consumeActivity);
+        Assert.Equal(ActivityKind.Internal, consumeActivity.Kind);
+
+        // Verify the parent relationship (consume activity should have publish as parent via trace context)
+        Assert.Equal(publishActivity.TraceId, consumeActivity.TraceId);
+
+        tracker.AssertAllStopped();
     }
 
-    private void AssertActivityData(string subject, List<Activity> activityList)
+    [Fact]
+    public async Task Direct_request_reply_receive_activity_is_disposed()
+    {
+        using var tracker = new ActivityTracker();
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts
+        {
+            Url = server.Url,
+            RequestReplyMode = NatsRequestReplyMode.Direct,
+        });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var sub = await nats.SubscribeCoreAsync<int>("foo.direct", cancellationToken: cts.Token);
+        var reg = sub.Register(async msg =>
+        {
+            await msg.ReplyAsync(msg.Data * 2, cancellationToken: cts.Token);
+        });
+
+        var reply = await nats.RequestAsync<int, int>("foo.direct", 21, cancellationToken: cts.Token);
+        Assert.Equal(42, reply.Data);
+
+        tracker.AssertAllStopped();
+
+        await sub.DisposeAsync();
+        await reg;
+    }
+
+    private void AssertActivityData(string subject, IReadOnlyList<Activity> activityList)
     {
         var activities = activityList.ToArray();
         Assert.NotEmpty(activities);
@@ -71,5 +135,46 @@ public class OpenTelemetryTest
         var tag = activity.GetTagItem(name) as string;
         Assert.NotNull(tag);
         Assert.False(string.IsNullOrEmpty(tag));
+    }
+
+    private sealed class ActivityTracker : IDisposable
+    {
+        private readonly List<Activity> _started = new();
+        private readonly List<Activity> _stopped = new();
+        private readonly ActivityListener _listener;
+
+        public ActivityTracker()
+        {
+            _listener = new ActivityListener
+            {
+                Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+                SampleUsingParentId = (ref ActivityCreationOptions<string> _) => ActivitySamplingResult.AllDataAndRecorded,
+                ShouldListenTo = source => source.Name.StartsWith("NATS.Net"),
+                ActivityStarted = _started.Add,
+                ActivityStopped = _stopped.Add,
+            };
+            ActivitySource.AddActivityListener(_listener);
+        }
+
+        public IReadOnlyList<Activity> Started => _started;
+
+        public IReadOnlyList<Activity> Stopped => _stopped;
+
+        public void AssertAllStopped()
+        {
+            Assert.NotEmpty(_started);
+
+            var leaked = _started
+                .Where(started => !_stopped.Any(stopped => stopped.Id == started.Id))
+                .ToList();
+
+            if (leaked.Count > 0)
+            {
+                var details = string.Join("\n", leaked.Select(a => $"  [{a.Kind}] {a.OperationName} id={a.Id}"));
+                Assert.Fail($"Activity leak detected. {leaked.Count} activity(s) started but never stopped:\n{details}");
+            }
+        }
+
+        public void Dispose() => _listener.Dispose();
     }
 }

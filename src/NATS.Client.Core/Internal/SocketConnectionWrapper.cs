@@ -20,7 +20,7 @@ internal record SocketConnectionWrapper(INatsSocketConnection InnerSocket) : INa
         _sem.Wait();
         try
         {
-            _waitForClosedSource.TrySetException(exception);
+            _waitForClosedSource.TrySetObservedException(exception);
         }
         finally
         {

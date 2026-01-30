@@ -27,8 +27,10 @@ public class ConnectionRetryTest
         await server.StopAsync();
 
         await signal;
-        var exception = await Assert.ThrowsAsync<NatsException>(async () => await nats.PingAsync(cts.Token));
-        Assert.Equal("Max connect retry exceeded.", exception.Message);
+        var exception = await Assert.ThrowsAsync<NatsConnectionFailedException>(async () => await nats.PingAsync(cts.Token));
+        Assert.True(exception.Message is
+            "Maximum connection retry attempts exceeded"
+            or "Connection is in failed state");
     }
 
     [Fact]

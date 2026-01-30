@@ -39,6 +39,12 @@ internal record NatsJSOrderedPushConsumerOpts
     public ConsumerConfigDeliverPolicy DeliverPolicy { get; init; } = ConsumerConfigDeliverPolicy.All;
 
     public bool HeadersOnly { get; init; } = false;
+
+    /// <summary>
+    /// Timeout for cleanup operations during disposal (e.g. deleting ephemeral consumers).
+    /// If the server is slow or unresponsive, disposal will not block longer than this.
+    /// </summary>
+    public TimeSpan CleanupTimeout { get; init; } = TimeSpan.FromSeconds(5);
 }
 
 internal class NatsJSOrderedPushConsumer<T>
@@ -108,10 +114,24 @@ internal class NatsJSOrderedPushConsumer<T>
             Timeout.Infinite,
             Timeout.Infinite);
 
-        // Channel size 1 is enough because we want backpressure to go all the way to the subscription
-        // so that we get most accurate view of the stream. We can keep them as 1 until we find a case
-        // where it's not enough due to performance for example.
-        _commandChannel = Channel.CreateBounded<NatsJSOrderedPushConsumerMsg<T>>(1);
+        // Use connection's channel options (default DropNewest) to avoid blocking socket reads.
+        // When messages are dropped from command channel, notify via OnMessageDropped callback.
+        _commandChannel = Channel.CreateBounded<NatsJSOrderedPushConsumerMsg<T>>(
+            _nats.GetBoundedChannelOpts(subOpts?.ChannelOpts),
+            cmd =>
+            {
+                // Only notify for actual messages, not control commands like Ready
+                if (cmd.Command == NatsJSOrderedPushConsumerCommand.Msg)
+                {
+                    var sub = _sub;
+                    if (sub != null)
+                    {
+                        // cmd.Msg is guaranteed to be valid when Command == Msg
+                        _nats.OnMessageDropped(sub, _commandChannel?.Reader.Count ?? 0, cmd.Msg.Msg);
+                    }
+                }
+            });
+
         _msgChannel = Channel.CreateBounded<NatsJSMsg<T>>(1);
 
         // A single request to create the consumer is enough because we don't want to create a new consumer
@@ -158,7 +178,20 @@ internal class NatsJSOrderedPushConsumer<T>
 
         _msgChannel.Writer.TryComplete();
 
-        await _context.DeleteConsumerAsync(_stream, Consumer, _cancellationToken);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(_cancellationToken);
+        cts.CancelAfter(_opts.CleanupTimeout);
+        try
+        {
+            await _context.DeleteConsumerAsync(_stream, Consumer, cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // Timeout - server will clean up ephemeral consumer automatically
+        }
+        catch (NatsJSApiException)
+        {
+            // Consumer may already be gone, that's fine
+        }
     }
 
     internal void Init()
@@ -213,7 +246,9 @@ internal class NatsJSOrderedPushConsumer<T>
 
                                     if (headers is { Code: 100, MessageText: "FlowControl Request" })
                                     {
+#pragma warning disable CS0618 // Type or member is obsolete
                                         await msg.ReplyAsync(cancellationToken: _cancellationToken);
+#pragma warning restore CS0618 // Type or member is obsolete
                                     }
                                 }
                             }
@@ -242,26 +277,14 @@ internal class NatsJSOrderedPushConsumer<T>
                                         continue;
                                     }
 
-                                    // Increment the sequence before writing to the channel in case the channel is full
-                                    // and the writer is waiting for the reader to read the message. This way the sequence
-                                    // will be correctly incremented in case the timeout kicks in and recreated the consumer.
-#if NETSTANDARD
-                                    InterlockedEx.Exchange(ref _sequenceStream, metadata.Sequence.Stream);
-#else
-                                    Interlocked.Exchange(ref _sequenceStream, metadata.Sequence.Stream);
-#endif
-
                                     if (!IsDone)
                                     {
-                                        try
-                                        {
-                                            await _msgChannel.Writer.WriteAsync(msg, _cancellationToken);
-                                        }
-                                        catch
-                                        {
-                                            if (!IsDone)
-                                                throw;
-                                        }
+#if NETSTANDARD
+                                        InterlockedEx.Exchange(ref _sequenceStream, metadata.Sequence.Stream);
+#else
+                                        Interlocked.Exchange(ref _sequenceStream, metadata.Sequence.Stream);
+#endif
+                                        await _msgChannel.Writer.WriteAsync(msg, _cancellationToken).ConfigureAwait(false);
                                     }
                                 }
                                 else
@@ -422,7 +445,7 @@ internal class NatsJSOrderedPushConsumerSub<T> : NatsSubBase
     private readonly INatsConnection _nats;
     private readonly NatsHeaderParser _headerParser;
     private readonly INatsDeserialize<T> _serializer;
-    private readonly ChannelWriter<NatsJSOrderedPushConsumerMsg<T>> _commands;
+    private readonly Channel<NatsJSOrderedPushConsumerMsg<T>> _commandChannel;
 
     public NatsJSOrderedPushConsumerSub(
         INatsJSContext context,
@@ -442,14 +465,14 @@ internal class NatsJSOrderedPushConsumerSub<T> : NatsSubBase
         _serializer = serializer;
         _nats = context.Connection;
         _headerParser = _nats.HeaderParser;
-        _commands = commandChannel.Writer;
+        _commandChannel = commandChannel;
         _nats.ConnectionOpened += OnConnectionOpened;
     }
 
     public override async ValueTask ReadyAsync()
     {
         await base.ReadyAsync();
-        await _commands.WriteAsync(new NatsJSOrderedPushConsumerMsg<T> { Command = NatsJSOrderedPushConsumerCommand.Ready }, _cancellationToken).ConfigureAwait(false);
+        await _commandChannel.Writer.WriteAsync(new NatsJSOrderedPushConsumerMsg<T> { Command = NatsJSOrderedPushConsumerCommand.Ready }, _cancellationToken).ConfigureAwait(false);
     }
 
     public override ValueTask DisposeAsync()
@@ -465,7 +488,9 @@ internal class NatsJSOrderedPushConsumerSub<T> : NatsSubBase
         ReadOnlySequence<byte> payloadBuffer)
     {
         var msg = new NatsJSMsg<T>(NatsMsg<T>.Build(subject, replyTo, headersBuffer, payloadBuffer, _nats, _headerParser, _serializer), _context);
-        await _commands.WriteAsync(new NatsJSOrderedPushConsumerMsg<T> { Command = NatsJSOrderedPushConsumerCommand.Msg, Msg = msg }, _cancellationToken).ConfigureAwait(false);
+        await _commandChannel.Writer.WriteAsync(new NatsJSOrderedPushConsumerMsg<T> { Command = NatsJSOrderedPushConsumerCommand.Msg, Msg = msg }, _cancellationToken).ConfigureAwait(false);
+
+        ResetSlowConsumer(_commandChannel.Reader.Count);
     }
 
     protected override void TryComplete()
@@ -475,7 +500,7 @@ internal class NatsJSOrderedPushConsumerSub<T> : NatsSubBase
     private ValueTask OnConnectionOpened(object? sender, NatsEventArgs args)
     {
         // result is discarded, so this code is assumed to not be failing
-        _ = _commands.TryWrite(new NatsJSOrderedPushConsumerMsg<T> { Command = NatsJSOrderedPushConsumerCommand.Ready });
+        _ = _commandChannel.Writer.TryWrite(new NatsJSOrderedPushConsumerMsg<T> { Command = NatsJSOrderedPushConsumerCommand.Ready });
         return default;
     }
 }

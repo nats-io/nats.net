@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Tests;
 using NATS.Client.Platform.Windows.Tests;
 using NATS.Client.TestUtilities;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.Core2.Tests;
 
@@ -25,10 +26,10 @@ public class ReconnectTests(ITestOutputHelper output)
         await using var server = await NatsServerProcess.StartAsync(config: confFile, withJs: false);
 
         await using var nats1 = new NatsConnection(new NatsOpts { Url = server.Url, LoggerFactory = logger, AuthOpts = new NatsAuthOpts { Username = "sys", Password = "sys" } });
-        await nats1.ConnectAsync();
+        await nats1.ConnectRetryAsync();
 
         await using var nats2 = new NatsConnection(new NatsOpts { Url = server.Url, LoggerFactory = logger, AuthOpts = new NatsAuthOpts { Username = "sys", Password = "sys" } });
-        await nats2.ConnectAsync();
+        await nats2.ConnectRetryAsync();
 
         await using var nats3 = new NatsConnection(new NatsOpts { Url = server.Url, AuthOpts = new NatsAuthOpts { Username = "sys", Password = "sys" } });
         await Assert.ThrowsAsync<NatsException>(async () => await nats3.ConnectAsync());

@@ -153,6 +153,13 @@ public record NatsJSConsumeOpts
     /// Defines a group name and constraints for minimum pending messages and acknowledgments.
     /// </summary>
     public NatsJSPriorityGroupOpts? PriorityGroup { get; init; }
+
+    /// <summary>
+    /// Maximum number of consecutive 503 "No Responders" errors before the consumer is considered deleted and consumption stops.
+    /// This helps detect when an ephemeral consumer has vanished on the server.
+    /// Set to -1 to disable this check. (default: 10)
+    /// </summary>
+    public int MaxConsecutive503Errors { get; init; } = 10;
 }
 
 /// <summary>
@@ -238,12 +245,32 @@ public record NatsJSPubOpts : NatsPubOpts
     // lss *uint64 // Expected last sequence per subject
     public ulong? ExpectedLastSubjectSequence { get; init; }
 
-    // Publish retries for NoResponders err.
-    // rwait time.Duration // Retry wait between attempts
+    /// <summary>
+    /// Specifies the duration to wait between retry attempts for a failed publish operation.
+    /// See <see cref="RetryAttempts"/> for the number of retry attempts.
+    /// </summary>
+    // Expected last sequence subject filter (allows wildcard subjects)
+    public string? ExpectedLastSubjectSequenceSubject { get; init; }
+
+    /// <summary>
+    /// Specifies the duration to wait between retry attempts for a failed publish operation.
+    /// See <see cref="RetryAttempts"/> for the number of retry attempts.
+    /// </summary>
     public TimeSpan RetryWaitBetweenAttempts { get; init; } = TimeSpan.FromMilliseconds(250);
 
-    // rnum  int           // Retry attempts
-    public int RetryAttempts { get; init; } = 2;
+    /// <summary>
+    /// Specifies the number of retry attempts to publish a message when a "NoResponders" error occurs.
+    /// The value defines how many additional attempts will be made after the initial publish attempt.
+    /// Default is not to retry (one attempt total).
+    /// </summary>
+    /// <remarks>
+    /// By default, this is set to 1, meaning that if the first publish attempt fails with a "NoResponders" error,
+    /// no more attempts will be made. Setting this to a higher value allows for more retries in case of transient issues.
+    /// Coupled with <see cref="RetryWaitBetweenAttempts"/>, this provides a mechanism to handle temporary unavailability of responders,
+    /// however, for more robust handling of such scenarios, consider implementing an exponential backoff strategy in your application logic,
+    /// or use an extension that supports it.
+    /// </remarks>
+    public int RetryAttempts { get; init; } = 1;
 }
 
 /// <summary>

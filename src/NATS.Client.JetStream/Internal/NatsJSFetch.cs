@@ -22,6 +22,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
     private readonly Timer _hbTimer;
     private readonly Timer _expiresTimer;
     private readonly NatsJSNotificationChannel? _notificationChannel;
+    private readonly NatsJSConsumer? _jsConsumer;
 
     private readonly long _maxMsgs;
     private readonly long _maxBytes;
@@ -47,6 +48,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         INatsDeserialize<TMsg> serializer,
         NatsSubOpts? opts,
         NatsJSPriorityGroupOpts? priorityGroup,
+        NatsJSConsumer? jsConsumer,
         CancellationToken cancellationToken)
         : base(context.Connection, context.Connection.SubscriptionManager, subject, queueGroup, opts)
     {
@@ -57,6 +59,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         _consumer = consumer;
         _serializer = serializer;
         _priorityGroup = priorityGroup;
+        _jsConsumer = jsConsumer;
 
         if (notificationHandler is { } handler)
         {
@@ -71,12 +74,12 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         _pendingMsgs = _maxMsgs;
         _pendingBytes = _maxBytes;
 
-        // This channel is used to pass messages
-        // to the user from the subscription channel (which should be set to a
-        // sufficiently large value to avoid blocking socket reads in the
-        // NATS connection).
-        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg>>(1000);
-        Msgs = _userMsgs.Reader;
+        // This channel is used to pass messages to the user from the subscription.
+        // Uses connection's channel options (default DropNewest) to avoid blocking socket reads.
+        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg>>(
+            Connection.GetBoundedChannelOpts(opts?.ChannelOpts),
+            msg => Connection.OnMessageDropped(this, _userMsgs?.Reader.Count ?? 0, msg.Msg));
+        Msgs = new ActivityEndingMsgReader<NatsJSMsg<TMsg>>(_userMsgs.Reader, this);
 
         if (_debug)
         {
@@ -191,6 +194,8 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
             Group = _priorityGroup?.Group,
             MinPending = _priorityGroup?.MinPending ?? 0,
             MinAckPending = _priorityGroup?.MinAckPending ?? 0,
+            Priority = _priorityGroup?.Priority ?? 0,
+            Id = _jsConsumer?.GetPinId(),
         };
 
         await commandWriter.PublishAsync(
@@ -235,6 +240,17 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
                     else if (headers is { Code: 100, Message: NatsHeaders.Messages.IdleHeartbeat })
                     {
                     }
+                    else if (headers.Code == 423)
+                    {
+                        _logger.LogDebug(NatsJSLogEvents.PinIdMismatch, "Pin ID Mismatch");
+                        NatsJSExtensionsInternal.HandlePinIdMismatch(_jsConsumer, _notificationChannel);
+                    }
+                    else if (headers.Code == 503)
+                    {
+                        _logger.LogDebug(NatsJSLogEvents.NoResponders, "503 no responders");
+                        _notificationChannel?.Notify(NatsJSNoRespondersNotification.Default);
+                        EndSubscription(NatsSubEndReason.None);
+                    }
                     else if (headers.HasTerminalJSError())
                     {
                         _userMsgs.Writer.TryComplete(new NatsJSProtocolException(headers.Code, headers.Message, headers.MessageText));
@@ -273,6 +289,8 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
                     _serializer),
                 _context);
 
+            NatsJSExtensionsInternal.TrySetPinIdFromHeaders(msg.Headers, _jsConsumer);
+
             _pendingMsgs--;
             _pendingBytes -= msg.Size;
 
@@ -281,6 +299,8 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
             if (Volatile.Read(ref _disposed) == 0)
             {
                 await _userMsgs.Writer.WriteAsync(msg).ConfigureAwait(false);
+
+                ResetSlowConsumer(_userMsgs.Reader.Count);
             }
         }
 

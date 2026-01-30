@@ -49,6 +49,7 @@ public abstract class NatsSubBase
     private int _endReasonRaw;
     private int _pendingMsgs;
     private Exception? _exception;
+    private int _isSlowConsumer;
 
     /// <summary>
     /// Creates a new instance of <see cref="NatsSubBase"/>.
@@ -67,6 +68,12 @@ public abstract class NatsSubBase
         NatsSubOpts? opts,
         CancellationToken cancellationToken = default)
     {
+        if (!connection.Opts.SkipSubjectValidation)
+        {
+            SubjectValidator.ValidateSubject(subject);
+            SubjectValidator.ValidateQueueGroup(queueGroup);
+        }
+
         _logger = connection.Opts.LoggerFactory.CreateLogger<NatsSubBase>();
         _debug = _logger.IsEnabled(LogLevel.Debug);
         _manager = manager;
@@ -352,6 +359,12 @@ public abstract class NatsSubBase
     internal void ClearException() => Interlocked.Exchange(ref _exception, null);
 
     /// <summary>
+    /// Marks this subscription as a slow consumer. Returns true if this was a state transition
+    /// (i.e., the subscription was not previously marked as a slow consumer).
+    /// </summary>
+    internal bool TryMarkSlowConsumer() => Interlocked.CompareExchange(ref _isSlowConsumer, 1, 0) == 0;
+
+    /// <summary>
     /// Write commands when reconnecting.
     /// </summary>
     /// <remarks>
@@ -376,6 +389,22 @@ public abstract class NatsSubBase
     /// <param name="payloadBuffer">Raw payload bytes.</param>
     /// <returns></returns>
     protected abstract ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer);
+
+    /// <summary>
+    /// Resets the slow consumer state if the channel has drained, allowing another
+    /// slow consumer event to be raised if the subscription becomes slow again.
+    /// </summary>
+    /// <param name="pendingMsgCount">The current number of messages pending in the channel.</param>
+    protected void ResetSlowConsumer(int pendingMsgCount)
+    {
+        // Only reset when the channel is nearly empty, indicating the consumer has caught up.
+        // This prevents the SlowConsumerDetected event from firing repeatedly during a
+        // single slow consumer episode.
+        if (pendingMsgCount <= 1)
+        {
+            Volatile.Write(ref _isSlowConsumer, 0);
+        }
+    }
 
     /// <summary>
     /// Sets the exception that caused the subscription to end.

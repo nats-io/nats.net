@@ -4,6 +4,7 @@ using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.Core.Commands;
+using NATS.Client.Core.Internal;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Internal;
@@ -97,7 +98,7 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
         _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg>>(
             Connection.GetBoundedChannelOpts(opts?.ChannelOpts),
             msg => Connection.OnMessageDropped(this, _userMsgs?.Reader.Count ?? 0, msg.Msg));
-        Msgs = _userMsgs.Reader;
+        Msgs = new ActivityEndingMsgReader<NatsJSMsg<TMsg>>(_userMsgs.Reader, this);
 
         // Pull request channel is set as unbounded because we don't want to drop
         // them and minimize potential lock contention.
@@ -313,6 +314,8 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
                 // the message to the user to be processed. Writer will be completed
                 // when the user calls Stop() or when the subscription is closed.
                 await _userMsgs.Writer.WriteAsync(msg).ConfigureAwait(false);
+
+                ResetSlowConsumer(_userMsgs.Reader.Count);
             }
         }
 

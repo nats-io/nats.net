@@ -17,6 +17,7 @@ public enum NatsConnectionState
     Open,
     Connecting,
     Reconnecting,
+    Failed,
 }
 
 internal enum NatsEvent
@@ -26,6 +27,8 @@ internal enum NatsEvent
     ReconnectFailed,
     MessageDropped,
     LameDuckModeActivated,
+    ConnectionFailed,
+    SlowConsumerDetected,
 }
 
 public partial class NatsConnection : INatsConnection
@@ -112,6 +115,8 @@ public partial class NatsConnection : INatsConnection
 
     public event AsyncEventHandler<NatsMessageDroppedEventArgs>? MessageDropped;
 
+    public event AsyncEventHandler<NatsSlowConsumerEventArgs>? SlowConsumerDetected;
+
     public event AsyncEventHandler<NatsLameDuckModeActivatedEventArgs>? LameDuckModeActivated;
 
     public INatsConnection Connection => this;
@@ -177,6 +182,9 @@ public partial class NatsConnection : INatsConnection
         {
             try
             {
+                if (ConnectionState == NatsConnectionState.Failed)
+                    throw new NatsConnectionFailedException("Connection is in failed state");
+
                 if (ConnectionState == NatsConnectionState.Open)
                     return;
 
@@ -232,6 +240,16 @@ public partial class NatsConnection : INatsConnection
     {
         var subject = msg.Subject;
         _eventChannel.Writer.TryWrite((NatsEvent.MessageDropped, new NatsMessageDroppedEventArgs(natsSub, pending, subject, msg.ReplyTo, msg.Headers, msg.Data)));
+
+        if (natsSub.TryMarkSlowConsumer())
+        {
+            _eventChannel.Writer.TryWrite((NatsEvent.SlowConsumerDetected, new NatsSlowConsumerEventArgs(natsSub)));
+
+            if (!Opts.SuppressSlowConsumerWarnings)
+            {
+                _logger.LogWarning(NatsLogEvents.Subscription, "Slow consumer detected on subscription {Subject}", natsSub.Subject);
+            }
+        }
     }
 
     /// <inheritdoc />
@@ -414,13 +432,7 @@ public partial class NatsConnection : INatsConnection
                 ConnectionState = NatsConnectionState.Closed; // allow retry connect
 
                 // throw for the waiter
-                if (_waitForOpenConnection.TrySetException(exception))
-                {
-                    // Suppress unobserved exceptions as the exceptions will surface elsewhere,
-                    // the exception is thrown below as well.
-                    _ = _waitForOpenConnection.Task.Exception;
-                }
-
+                _waitForOpenConnection.TrySetObservedException(exception);
                 _waitForOpenConnection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             }
 
@@ -442,13 +454,7 @@ public partial class NatsConnection : INatsConnection
                 ConnectionState = NatsConnectionState.Closed; // allow retry connect
 
                 // throw for the waiter
-                if (_waitForOpenConnection.TrySetException(exception))
-                {
-                    // Suppress unobserved exceptions as the exceptions will surface elsewhere,
-                    // the exception is thrown below as well.
-                    _ = _waitForOpenConnection.Task.Exception;
-                }
-
+                _waitForOpenConnection.TrySetObservedException(exception);
                 _waitForOpenConnection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             }
 
@@ -540,7 +546,7 @@ public partial class NatsConnection : INatsConnection
         {
             // Wait for an INFO message from server. If we land on a dead socket and server response
             // can't be received, this will throw a timeout exception and we will retry the connection.
-            await waitForInfoSignal.Task.WaitAsync(Opts.RequestTimeout).ConfigureAwait(false);
+            await waitForInfoSignal.Task.WaitAsync(Opts.ConnectTimeout).ConfigureAwait(false);
 
             // check to see if we should upgrade to TLS
             if (_socketConnection!.InnerSocket is INatsTlsUpgradeableSocketConnection tlsUpgradeableSocket)
@@ -802,7 +808,7 @@ public partial class NatsConnection : INatsConnection
         }
         catch (Exception ex)
         {
-            _waitForOpenConnection.TrySetException(ex);
+            _waitForOpenConnection.TrySetObservedException(ex);
             try
             {
                 if (!IsDisposed)
@@ -874,6 +880,9 @@ public partial class NatsConnection : INatsConnection
                         break;
                     case NatsEvent.MessageDropped when MessageDropped != null && args is NatsMessageDroppedEventArgs error:
                         await MessageDropped.InvokeAsync(this, error).ConfigureAwait(false);
+                        break;
+                    case NatsEvent.SlowConsumerDetected when SlowConsumerDetected != null && args is NatsSlowConsumerEventArgs slowConsumer:
+                        await SlowConsumerDetected.InvokeAsync(this, slowConsumer).ConfigureAwait(false);
                         break;
                     case NatsEvent.LameDuckModeActivated when LameDuckModeActivated != null && args is NatsLameDuckModeActivatedEventArgs uri:
                         await LameDuckModeActivated.InvokeAsync(this, uri).ConfigureAwait(false);
@@ -959,14 +968,20 @@ public partial class NatsConnection : INatsConnection
             }
 
             backoff = _backoff;
+
+            // After two auth errors we will not retry.
+            if (stop)
+            {
+                ConnectionState = NatsConnectionState.Failed;
+                throw new NatsConnectionFailedException("Maximum authentication attempts exceeded");
+            }
+
+            if (Opts.MaxReconnectRetry > 0 && retry > Opts.MaxReconnectRetry)
+            {
+                ConnectionState = NatsConnectionState.Failed;
+                throw new NatsConnectionFailedException("Maximum connection retry attempts exceeded");
+            }
         }
-
-        // After two auth errors we will not retry.
-        if (stop)
-            throw new NatsException("Won't retry anymore.");
-
-        if (Opts.MaxReconnectRetry > 0 && retry > Opts.MaxReconnectRetry)
-            throw new NatsException("Max connect retry exceeded.");
 
         var jitter = Random.Shared.NextDouble() * Opts.ReconnectJitter.TotalMilliseconds;
         var waitTime = TimeSpan.FromMilliseconds(jitter) + backoff;

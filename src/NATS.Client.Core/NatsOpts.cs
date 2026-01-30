@@ -30,7 +30,12 @@ public enum NatsRequestReplyMode
 /// </summary>
 public sealed record NatsOpts
 {
-    public static readonly NatsOpts Default = new();
+    public static readonly NatsOpts Default = new()
+    {
+        WebSocketOpts = NatsWebSocketOpts.Default,
+        TlsOpts = NatsTlsOpts.Default,
+        AuthOpts = NatsAuthOpts.Default,
+    };
 
     /// <summary>
     /// NATS server URL to connect to. (default: nats://localhost:4222)
@@ -64,11 +69,11 @@ public sealed record NatsOpts
 
     public bool Headers { get; init; } = true;
 
-    public NatsAuthOpts AuthOpts { get; init; } = NatsAuthOpts.Default;
+    public NatsAuthOpts AuthOpts { get; init; } = new();
 
-    public NatsTlsOpts TlsOpts { get; init; } = NatsTlsOpts.Default;
+    public NatsTlsOpts TlsOpts { get; init; } = new();
 
-    public NatsWebSocketOpts WebSocketOpts { get; init; } = NatsWebSocketOpts.Default;
+    public NatsWebSocketOpts WebSocketOpts { get; init; } = new();
 
     public INatsSerializerRegistry SerializerRegistry { get; init; } = NatsDefaultSerializerRegistry.Default;
 
@@ -108,9 +113,25 @@ public sealed record NatsOpts
 
     public TimeSpan SubscriptionCleanUpInterval { get; init; } = TimeSpan.FromMinutes(5);
 
+    /// <summary>
+    /// Gets or sets encoding used for NATS message header names and values. (default: ASCII)
+    /// </summary>
+    /// <remarks>
+    /// NATS headers follow HTTP/1.1 conventions where header field values are
+    /// restricted to visible US-ASCII characters per RFC 9110. Use base64 encoding
+    /// for non-ASCII data in header values.
+    /// </remarks>
     public Encoding HeaderEncoding { get; init; } = Encoding.ASCII;
 
-    public Encoding SubjectEncoding { get; init; } = Encoding.ASCII;
+    /// <summary>
+    /// Gets or sets encoding used for NATS subjects and reply-to addresses. (default: UTF-8)
+    /// </summary>
+    /// <remarks>
+    /// The NATS protocol specifies that subjects are UTF-8 encoded on the wire.
+    /// UTF-8 is backwards compatible with ASCII, so existing ASCII-only subjects
+    /// are unaffected by this default.
+    /// </remarks>
+    public Encoding SubjectEncoding { get; init; } = Encoding.UTF8;
 
     public bool WaitUntilSent { get; init; } = false;
 
@@ -205,6 +226,47 @@ public sealed record NatsOpts
     /// </para>
     /// </remarks>
     public bool RetryOnInitialConnect { get; init; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether publish would throw an exception
+    /// when the connection is disconnected and the <see cref="CommandTimeout"/> is reached.
+    /// The default is <c>false</c>, meaning publish will not throw on disconnected state
+    /// and will wait to publish the message until reconnected.
+    /// </summary>
+    public bool PublishTimeoutOnDisconnected { get; init; } = false;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether to skip subject validation.
+    /// The default is <c>true</c>, meaning subject validation is disabled.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// When set to <c>true</c> (default), all subject validation is bypassed.
+    /// </para>
+    /// <para>
+    /// When set to <c>false</c>, subjects are validated to ensure they are not empty
+    /// and don't contain whitespace characters (space, tab, CR, LF). This can help
+    /// catch invalid subjects early but adds minor overhead.
+    /// </para>
+    /// </remarks>
+    public bool SkipSubjectValidation { get; init; } = true;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether to suppress warning logs when a slow consumer is detected.
+    /// The default is <c>false</c>, meaning warnings will be logged once per slow consumer episode.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// When a subscription becomes a slow consumer (dropping messages due to channel capacity limits),
+    /// a warning is logged once. The warning will be logged again if the subscription recovers
+    /// (channel drains to nearly empty) and then becomes slow again.
+    /// </para>
+    /// <para>
+    /// Note that the <see cref="NatsConnection.MessageDropped"/> and <see cref="NatsConnection.SlowConsumerDetected"/>
+    /// events will still fire regardless of this setting.
+    /// </para>
+    /// </remarks>
+    public bool SuppressSlowConsumerWarnings { get; init; } = false;
 
     internal NatsUri[] GetSeedUris(bool suppressRandomization = false)
     {
