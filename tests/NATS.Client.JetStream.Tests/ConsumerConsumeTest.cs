@@ -961,6 +961,76 @@ public class ConsumerConsumeTest
     }
 
     [Fact]
+    public async Task Consume_buffered_messages_with_slow_processing_still_detects_503_after_server_restart()
+    {
+        // When messages are buffered and being slowly processed, the heartbeat timer
+        // is the only mechanism to drive new pull requests after 503 (since ResetPending
+        // sets pending to max, preventing CheckPending from issuing pulls).
+        // We verify that even with slow message processing, the 503 threshold is
+        // eventually hit via timer-driven pulls after the consumer vanishes.
+        var logger = new InMemoryTestLoggerFactory(LogLevel.Debug);
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, LoggerFactory = logger });
+        await nats.ConnectRetryAsync();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+
+        var js = nats.CreateJetStreamContext();
+        await js.CreateStreamAsync(new StreamConfig("s1", ["s1.*"]), cts.Token);
+        var consumer = await js.CreateOrUpdateConsumerAsync("s1", new ConsumerConfig("c1") { MemStorage = true }, cts.Token);
+
+        // Publish many messages so the buffer has data to process slowly
+        for (var i = 0; i < 20; i++)
+        {
+            var ack = await js.PublishAsync("s1.foo", i, cancellationToken: cts.Token);
+            ack.EnsureSuccess();
+        }
+
+        var firstMessageConsumed = new WaitSignal(TimeSpan.FromSeconds(30));
+        var messagesProcessed = 0;
+
+        var consumeTask = Task.Run(async () =>
+        {
+            var opts = new NatsJSConsumeOpts
+            {
+                MaxMsgs = 100,
+                MaxConsecutive503Errors = 3,
+                IdleHeartbeat = TimeSpan.FromSeconds(1),
+                Expires = TimeSpan.FromSeconds(2),
+            };
+
+            await foreach (var msg in consumer.ConsumeAsync<int>(opts: opts, cancellationToken: cts.Token))
+            {
+                await msg.AckAsync(cancellationToken: cts.Token);
+                var count = Interlocked.Increment(ref messagesProcessed);
+                firstMessageConsumed.Pulse();
+
+                // Slow processing on all messages
+                await Task.Delay(TimeSpan.FromMilliseconds(500), cts.Token);
+            }
+        });
+
+        // Wait until messages start flowing, then restart server
+        await firstMessageConsumed;
+
+        await server.RestartAsync();
+
+        // Even though the consumer is slowly processing buffered messages,
+        // the 503 detection should still terminate ConsumeAsync.
+        // After restart, the MemStorage consumer is gone, so timer-driven pulls
+        // return 503 and accumulate until the threshold is hit.
+        var exception = await Assert.ThrowsAnyAsync<NatsJSException>(async () => await consumeTask);
+        Assert.Contains("503", exception.Message);
+
+        // Verify some messages were processed before termination
+        Assert.True(messagesProcessed > 0, "Should have processed at least one message");
+
+        // Verify 503 errors accumulated
+        var noResponderLogs = logger.Logs.Count(m => m.EventId == NatsJSLogEvents.NoResponders);
+        Assert.True(noResponderLogs > 0, "Should have logged NoResponders events");
+    }
+
+    [Fact]
     public async Task Consume_503_counter_accumulates_across_heartbeat_timer_pulls()
     {
         var logger = new InMemoryTestLoggerFactory(LogLevel.Debug);
