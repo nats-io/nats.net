@@ -117,5 +117,25 @@ public class OptsUrlTests
         Assert.Equal("t,", opts.AuthOpts.Token);
     }
 
+    [Fact]
+    public void ToString_reflects_uri_changed_via_with_expression()
+    {
+        var original = new NatsUri("host1:4222", true);
+        Assert.Equal("nats://host1:4222", original.ToString());
+
+        var modified = original with { Uri = new UriBuilder(original.Uri) { Host = "host2", Port = 5222 }.Uri };
+        Assert.Equal("nats://host2:5222", modified.ToString());
+    }
+
+    [Fact]
+    public void ToString_reflects_uri_changed_via_with_expression_redacted()
+    {
+        var original = new NatsUri("u:p@host1:4222", true);
+        Assert.Equal("nats://u:***@host1:4222", original.ToString());
+
+        var modified = original with { Uri = new UriBuilder(original.Uri) { Host = "host2", Port = 5222 }.Uri };
+        Assert.Equal("nats://u:***@host2:5222", modified.ToString());
+    }
+
     private static string GetUrisAsRedactedString(NatsOpts opts) => string.Join(",", opts.GetSeedUris(true).Select(u => u.ToString()));
 }

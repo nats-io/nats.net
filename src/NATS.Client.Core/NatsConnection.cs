@@ -60,7 +60,6 @@ public partial class NatsConnection : INatsConnection
     private CancellationTokenSource? _pingTimerCancellationTokenSource;
     private volatile NatsUri? _currentConnectUri;
     private volatile NatsUri? _lastSeedConnectUri;
-    private volatile NatsUri? _lastAttemptResolvedUri;
     private NatsReadProtocolProcessor? _socketReader;
     private TaskCompletionSource _waitForOpenConnection;
     private UserCredentials? _userCredentials;
@@ -400,33 +399,22 @@ public partial class NatsConnection : INatsConnection
             _userCredentials = new UserCredentials(Opts.AuthOpts);
         }
 
-        var attemptedUris = new List<NatsUri>();
-
         foreach (var uri in uris)
         {
             try
             {
-                var resolvedUri = await ConnectSocketAsync(uri).ConfigureAwait(false);
-                attemptedUris.Add(resolvedUri);
-                _currentConnectUri = resolvedUri; // set only after success
+                await ConnectSocketAsync(uri).ConfigureAwait(false);
                 break;
             }
             catch (Exception ex)
             {
-                var failedResolvedUri = _lastAttemptResolvedUri ?? uri; // local cache from ConnectSocketAsync
-                attemptedUris.Add(failedResolvedUri);
-                _logger.LogError(NatsLogEvents.Connection, ex, "Fail to connect NATS {Url}", failedResolvedUri);
-                _currentConnectUri = null; // ensure cleared on failure
-            }
-            finally
-            {
-                _lastAttemptResolvedUri = null;
+                _logger.LogError(NatsLogEvents.Connection, ex, "Fail to connect NATS {Url}", uri);
             }
         }
 
         if (_socketConnection == null)
         {
-            var exception = new NatsException("can not connect uris: " + string.Join(",", attemptedUris.Select(x => x.ToString())));
+            var exception = new NatsException("can not connect uris: " + string.Join(",", uris.Select(x => x.ToString())));
             lock (_gate)
             {
                 ConnectionState = NatsConnectionState.Closed; // allow retry connect
@@ -477,7 +465,7 @@ public partial class NatsConnection : INatsConnection
         }
     }
 
-    private async Task<NatsUri> ConnectSocketAsync(NatsUri uri)
+    private async Task ConnectSocketAsync(NatsUri uri)
     {
         var target = (uri.Host, uri.Port);
         if (OnConnectingAsync != null)
@@ -486,15 +474,9 @@ public partial class NatsConnection : INatsConnection
             target = await OnConnectingAsync(target).ConfigureAwait(false);
             if (target.Host != uri.Host || target.Port != uri.Port)
             {
-                var modifiedUri = new UriBuilder(uri.Uri) { Host = target.Host, Port = target.Port }.Uri;
-                var newUri = new NatsUri(modifiedUri.ToString(), uri.IsSeed, uri.Uri.Scheme);
-                _logger.LogDebug(NatsLogEvents.Connection, "OnConnectingAsync override: {Original} -> {Resolved}", uri.Uri, newUri.Uri);
-                uri = newUri;
+                uri = uri with { Uri = new UriBuilder(uri.Uri) { Host = target.Host, Port = target.Port, }.Uri };
             }
         }
-
-        // Keep for failure logging.
-        _lastAttemptResolvedUri = uri;
 
         var connectionFactory = Opts.SocketConnectionFactory ?? (uri.IsWebSocket ? WebSocketFactory.Default : TcpFactory.Default);
         _logger.LogInformation(NatsLogEvents.Connection, "Connect to NATS using {FactoryType} {Uri}", connectionFactory.GetType().Name, uri);
@@ -525,8 +507,7 @@ public partial class NatsConnection : INatsConnection
             _socketConnection = _socketConnection with { InnerSocket = await OnSocketAvailableAsync(_socketConnection.InnerSocket).ConfigureAwait(false) };
         }
 
-        // Caller assigns _currentConnectUri.
-        return uri;
+        _currentConnectUri = uri;
     }
 
     private async ValueTask SetupReaderWriterAsync(bool reconnect)
