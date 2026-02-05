@@ -224,7 +224,7 @@ public class TimeSpanJsonTests
     [InlineData("00:00:01.234", "\"active\":1234000000\\b")]
     public void StreamSourceInfoActive_test(string value, string expected)
     {
-        var time = TimeSpan.Parse(value);
+        TimeSpan? time = TimeSpan.Parse(value);
         var serializer = NatsJSJsonSerializer<StreamSourceInfo>.Default;
 
         var bw = new NatsBufferWriter<byte>();
@@ -242,19 +242,39 @@ public class TimeSpanJsonTests
     public void StreamSourceInfoActive_minus_one_indicates_no_activity()
     {
         // When NATS server returns -1 for Active, it means there has been no activity
-        // This should be distinguishable from a genuine zero value
+        // This should be deserialized as null to distinguish from a genuine zero value
         var serializer = NatsJSJsonSerializer<StreamSourceInfo>.Default;
 
         var jsonWithMinusOne = """{"name":"test","lag":0,"active":-1}"""u8;
         var resultMinusOne = serializer.Deserialize(new ReadOnlySequence<byte>(jsonWithMinusOne.ToArray()));
         Assert.NotNull(resultMinusOne);
+        Assert.Null(resultMinusOne.Active);
 
         var jsonWithZero = """{"name":"test","lag":0,"active":0}"""u8;
         var resultZero = serializer.Deserialize(new ReadOnlySequence<byte>(jsonWithZero.ToArray()));
         Assert.NotNull(resultZero);
+        Assert.Equal(TimeSpan.Zero, resultZero.Active);
 
-        // These should be different, but currently both become TimeSpan.Zero
+        // These are now properly different
         Assert.NotEqual(resultZero.Active, resultMinusOne.Active);
+    }
+
+    [Fact]
+    public void StreamSourceInfoActive_null_roundtrip()
+    {
+        // Test roundtrip: null serializes as -1, and -1 deserializes back to null
+        var serializer = NatsJSJsonSerializer<StreamSourceInfo>.Default;
+
+        // Serialize null -> should produce -1
+        var bw = new NatsBufferWriter<byte>();
+        serializer.Serialize(bw, new StreamSourceInfo { Name = "test", Active = null });
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
+        Assert.Contains("\"active\":-1", json);
+
+        // Deserialize -1 -> should produce null
+        var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory));
+        Assert.NotNull(result);
+        Assert.Null(result.Active);
     }
 
     [Theory]
@@ -309,8 +329,7 @@ public class TimeSpanJsonTests
     [Fact]
     public async Task StreamSourceInfo_active_minus_one_from_real_server()
     {
-        // This test demonstrates the bug by connecting to a real NATS server
-        // and inspecting the raw JSON response
+        // This test verifies that -1 from the server is correctly handled
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
         var prefix = _server.GetNextId();
         await nats.ConnectRetryAsync();
@@ -351,12 +370,8 @@ public class TimeSpanJsonTests
         // Now check what the deserialized object says
         _output.WriteLine($"Deserialized Mirror.Active: {mirror.Info.Mirror?.Active}");
 
-        // This demonstrates the bug: -1 gets converted to TimeSpan.Zero
-        // In the future, this should be null when the property is made nullable
-        Assert.Equal(TimeSpan.Zero, mirror.Info.Mirror?.Active);
-
-        // After we fix the bug, this test should be updated to:
-        // Assert.Null(mirror.Info.Mirror?.Active);
+        // -1 is now correctly deserialized as null (no activity)
+        Assert.Null(mirror.Info.Mirror?.Active);
     }
 
     private class BackoffTestData : TheoryData<int, List<TimeSpan>?, string>
