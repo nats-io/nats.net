@@ -45,12 +45,12 @@ public record StreamSourceInfo
     public long Lag { get; set; }
 
     /// <summary>
-    /// When last the mirror had activity, in nanoseconds. Value will be -1 when there has been no activity.
+    /// When last the mirror had activity, in nanoseconds. Value will be null when there has been no activity.
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("active")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
-    [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonNanosecondsConverter))]
-    public TimeSpan Active { get; set; }
+    [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonNullableNanosecondsWithMinusOneConverter))]
+    public TimeSpan? Active { get; set; }
 
     [System.Text.Json.Serialization.JsonPropertyName("external")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]

@@ -3,12 +3,27 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using NATS.Client.Core;
+using NATS.Client.Core.Tests;
+using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Models;
+using NATS.Client.TestUtilities;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.JetStream.Tests;
 
+[Collection("nats-server")]
 public class TimeSpanJsonTests
 {
+    private readonly ITestOutputHelper _output;
+    private readonly NatsServerFixture _server;
+
+    public TimeSpanJsonTests(ITestOutputHelper output, NatsServerFixture server)
+    {
+        _output = output;
+        _server = server;
+    }
+
     [Fact]
     public void NatsJSJsonDateTimeOffsetConverter_serialize_UTC_offset_as_Z()
     {
@@ -209,7 +224,7 @@ public class TimeSpanJsonTests
     [InlineData("00:00:01.234", "\"active\":1234000000\\b")]
     public void StreamSourceInfoActive_test(string value, string expected)
     {
-        var time = TimeSpan.Parse(value);
+        TimeSpan? time = TimeSpan.Parse(value);
         var serializer = NatsJSJsonSerializer<StreamSourceInfo>.Default;
 
         var bw = new NatsBufferWriter<byte>();
@@ -221,6 +236,45 @@ public class TimeSpanJsonTests
         var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory));
         Assert.NotNull(result);
         Assert.Equal(time, result.Active);
+    }
+
+    [Fact]
+    public void StreamSourceInfoActive_minus_one_indicates_no_activity()
+    {
+        // When NATS server returns -1 for Active, it means there has been no activity
+        // This should be deserialized as null to distinguish from a genuine zero value
+        var serializer = NatsJSJsonSerializer<StreamSourceInfo>.Default;
+
+        var jsonWithMinusOne = """{"name":"test","lag":0,"active":-1}"""u8;
+        var resultMinusOne = serializer.Deserialize(new ReadOnlySequence<byte>(jsonWithMinusOne.ToArray()));
+        Assert.NotNull(resultMinusOne);
+        Assert.Null(resultMinusOne.Active);
+
+        var jsonWithZero = """{"name":"test","lag":0,"active":0}"""u8;
+        var resultZero = serializer.Deserialize(new ReadOnlySequence<byte>(jsonWithZero.ToArray()));
+        Assert.NotNull(resultZero);
+        Assert.Equal(TimeSpan.Zero, resultZero.Active);
+
+        // These are now properly different
+        Assert.NotEqual(resultZero.Active, resultMinusOne.Active);
+    }
+
+    [Fact]
+    public void StreamSourceInfoActive_null_roundtrip()
+    {
+        // Test roundtrip: null serializes as -1, and -1 deserializes back to null
+        var serializer = NatsJSJsonSerializer<StreamSourceInfo>.Default;
+
+        // Serialize null -> should produce -1
+        var bw = new NatsBufferWriter<byte>();
+        serializer.Serialize(bw, new StreamSourceInfo { Name = "test", Active = null });
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
+        Assert.Contains("\"active\":-1", json);
+
+        // Deserialize -1 -> should produce null
+        var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory));
+        Assert.NotNull(result);
+        Assert.Null(result.Active);
     }
 
     [Theory]
@@ -270,6 +324,54 @@ public class TimeSpanJsonTests
         var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory));
         Assert.NotNull(result);
         Assert.Equal(timeSpans, result.Backoff);
+    }
+
+    [Fact]
+    public async Task StreamSourceInfo_active_minus_one_from_real_server()
+    {
+        // This test verifies that -1 from the server is correctly handled
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
+        await nats.ConnectRetryAsync();
+
+        var js = new NatsJSContext(nats);
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        // Create source stream (but don't publish any messages to it)
+        await js.CreateStreamAsync(
+            new StreamConfig($"{prefix}SOURCE", [$"{prefix}foo"]),
+            cts.Token);
+
+        // Create mirror stream immediately - no messages have been mirrored yet
+        var mirror = await js.CreateStreamAsync(
+            new StreamConfig
+            {
+                Name = $"{prefix}MIRROR",
+                Mirror = new StreamSource { Name = $"{prefix}SOURCE" },
+            },
+            cts.Token);
+
+        // Get the raw JSON response by making the API request directly
+        var subject = $"$JS.API.STREAM.INFO.{prefix}MIRROR";
+        var reply = await nats.RequestAsync<string, string>(
+            subject,
+            string.Empty,
+            replySerializer: NatsRawSerializer<string>.Default,
+            cancellationToken: cts.Token);
+
+        var rawJson = reply.Data;
+        Assert.NotNull(rawJson);
+        _output.WriteLine("Raw JSON response:");
+        _output.WriteLine(rawJson);
+
+        // Verify the raw JSON contains "active":-1 (no activity yet)
+        Assert.Contains("\"active\":-1", rawJson);
+
+        // Now check what the deserialized object says
+        _output.WriteLine($"Deserialized Mirror.Active: {mirror.Info.Mirror?.Active}");
+
+        // -1 is now correctly deserialized as null (no activity)
+        Assert.Null(mirror.Info.Mirror?.Active);
     }
 
     private class BackoffTestData : TheoryData<int, List<TimeSpan>?, string>
