@@ -163,6 +163,7 @@ public class NatsJSConsumer : INatsJSConsumer
     public async ValueTask<INatsJSMsg<T>?> NextAsync<T>(INatsDeserialize<T>? serializer = default, NatsJSNextOpts? opts = default, CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
+        ThrowIfPinned("next");
         opts ??= _context.Opts.DefaultNextOpts;
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
@@ -193,6 +194,7 @@ public class NatsJSConsumer : INatsJSConsumer
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
+        ThrowIfPinned("fetch");
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
         await using var fc = await FetchInternalAsync<T>(opts, serializer, cancellationToken).ConfigureAwait(false);
@@ -290,6 +292,7 @@ public class NatsJSConsumer : INatsJSConsumer
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
+        ThrowIfPinned("fetch");
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
         await using var fc = await FetchInternalAsync<T>(opts with { NoWait = true }, serializer, cancellationToken).ConfigureAwait(false);
@@ -541,5 +544,11 @@ public class NatsJSConsumer : INatsJSConsumer
     {
         if (_deleted)
             throw new NatsJSException($"Consumer '{_stream}:{_consumer}' is deleted");
+    }
+
+    private void ThrowIfPinned(string operation)
+    {
+        if (Info.Config.PriorityPolicy == ConsumerConfigPriorityPolicy.PinnedClient)
+            throw new NatsJSException($"Pinned client priority policy is not allowed with {operation}. Use Consume instead.");
     }
 }
