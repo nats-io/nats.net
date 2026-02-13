@@ -384,9 +384,9 @@ internal class Base32
 
     public static byte[] Decode(ReadOnlySpan<char> input)
     {
-        if (input == null || input.Length == 0)
+        if (input.Length == 0)
         {
-            throw new ArgumentNullException(nameof(input));
+            throw new ArgumentException("Input must not be empty.", nameof(input));
         }
 
         // input = input.TrimEnd('='); //remove padding characters
