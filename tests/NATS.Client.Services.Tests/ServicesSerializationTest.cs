@@ -2,10 +2,10 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Channels;
 using NATS.Client.Core.Tests;
-using NATS.Client.Platform.Windows.Tests;
 using NATS.Client.Serializers.Json;
 using NATS.Client.Services.Internal;
 using NATS.Client.Services.Models;
+using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.Services.Tests;
 

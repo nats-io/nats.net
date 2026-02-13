@@ -5,9 +5,9 @@ using NATS.Client.Core.Tests;
 using NATS.Client.JetStream.Models;
 using NATS.Client.ObjectStore.Internal;
 using NATS.Client.ObjectStore.Models;
-using NATS.Client.Platform.Windows.Tests;
 using NATS.Client.Serializers.Json;
 using NATS.Client.TestUtilities;
+using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.ObjectStore.Tests;
 

@@ -2,7 +2,7 @@ using System.Net;
 using System.Text;
 using System.Threading.Channels;
 using NATS.Client.Core.Tests;
-using NATS.Client.Platform.Windows.Tests;
+using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.JetStream.Tests;
 
