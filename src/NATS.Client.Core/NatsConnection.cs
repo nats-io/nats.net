@@ -315,7 +315,7 @@ public partial class NatsConnection : INatsConnection
 
     internal NatsStats GetStats() => Counter.ToStats();
 
-    internal ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
+    internal ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte> headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
     {
         if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
         {

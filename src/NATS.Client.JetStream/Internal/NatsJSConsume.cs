@@ -290,17 +290,17 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
     protected override async ValueTask ReceiveInternalAsync(
         string subject,
         string? replyTo,
-        ReadOnlySequence<byte>? headersBuffer,
+        ReadOnlySequence<byte> headersBuffer,
         ReadOnlySequence<byte> payloadBuffer)
     {
         ResetHeartbeatTimer();
 
         if (subject == Subject)
         {
-            if (headersBuffer.HasValue)
+            if (headersBuffer.Length > 0)
             {
                 var headers = new NatsHeaders();
-                if (Connection.HeaderParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), headers))
+                if (Connection.HeaderParser.ParseHeaders(new SequenceReader<byte>(headersBuffer), headers))
                 {
                     if (_maxBytes == 0 && headers.TryGetValue("Nats-Pending-Messages", out var natsPendingMsgs))
                     {
@@ -420,7 +420,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                     _logger.LogError(
                         NatsJSLogEvents.Headers,
                         "Can't parse headers: {HeadersBuffer}",
-                        Encoding.ASCII.GetString(headersBuffer.Value.ToArray()));
+                        Encoding.ASCII.GetString(headersBuffer.ToArray()));
                     throw new NatsJSException("Can't parse headers");
                 }
             }

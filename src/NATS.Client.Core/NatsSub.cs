@@ -32,7 +32,7 @@ public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
 
     private INatsDeserialize<T> Serializer { get; }
 
-    protected override async ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
+    protected override async ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte> headersBuffer, ReadOnlySequence<byte> payloadBuffer)
     {
         var natsMsg = NatsMsg<T>.Build(
             subject,
