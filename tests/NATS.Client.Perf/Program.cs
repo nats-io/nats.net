@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Channels;
 using NATS.Client.Core;
 using NATS.Client.Core.Tests;
-using NATS.Client.Platform.Windows.Tests;
+using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 var t = new TestParams
 {

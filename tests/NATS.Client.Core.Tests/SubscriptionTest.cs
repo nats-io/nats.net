@@ -1,5 +1,5 @@
 using System.Net;
-using NATS.Client.Platform.Windows.Tests;
+using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.Core.Tests;
 

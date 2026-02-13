@@ -1,3 +1,5 @@
+using Synadia.Orbit.Testing.NatsServerProcessManager;
+
 namespace NATS.Client.Platform.Windows.Tests;
 
 public class BaseNatsServerFixture : IDisposable

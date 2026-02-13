@@ -3,9 +3,9 @@ using System.Threading.Channels;
 using NATS.Client.Core;
 using NATS.Client.Core.Tests;
 using NATS.Client.JetStream.Models;
-using NATS.Client.Platform.Windows.Tests;
 using NATS.Client.Serializers.Json;
 using NATS.Net;
+using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 // ReSharper disable AccessToDisposedClosure
 namespace NATS.Client.Simplified.Tests;

@@ -2,9 +2,9 @@ using System.Diagnostics;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
-using NATS.Client.Platform.Windows.Tests;
 using NATS.Client.TestUtilities;
 using NATS.Client.TestUtilities2;
+using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.Core.Tests;
 
