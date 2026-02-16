@@ -399,6 +399,7 @@ public partial class NatsConnection : INatsConnection
             _userCredentials = new UserCredentials(Opts.AuthOpts);
         }
 
+        var attemptedUris = new List<NatsUri>();
         foreach (var uri in uris)
         {
             try
@@ -408,13 +409,15 @@ public partial class NatsConnection : INatsConnection
             }
             catch (Exception ex)
             {
-                _logger.LogError(NatsLogEvents.Connection, ex, "Fail to connect NATS {Url}", uri);
+                var attempted = _currentConnectUri ?? uri;
+                attemptedUris.Add(attempted);
+                _logger.LogError(NatsLogEvents.Connection, ex, "Fail to connect NATS {Url}", attempted);
             }
         }
 
         if (_socketConnection == null)
         {
-            var exception = new NatsException("can not connect uris: " + string.Join(",", uris.Select(x => x.ToString())));
+            var exception = new NatsException("can not connect uris: " + string.Join(",", attemptedUris.Select(x => x.ToString())));
             lock (_gate)
             {
                 ConnectionState = NatsConnectionState.Closed; // allow retry connect
@@ -467,6 +470,8 @@ public partial class NatsConnection : INatsConnection
 
     private async Task ConnectSocketAsync(NatsUri uri)
     {
+        _currentConnectUri = uri;
+
         var target = (uri.Host, uri.Port);
         if (OnConnectingAsync != null)
         {
@@ -475,6 +480,7 @@ public partial class NatsConnection : INatsConnection
             if (target.Host != uri.Host || target.Port != uri.Port)
             {
                 uri = uri with { Uri = new UriBuilder(uri.Uri) { Host = target.Host, Port = target.Port, }.Uri };
+                _currentConnectUri = uri;
             }
         }
 
@@ -506,8 +512,6 @@ public partial class NatsConnection : INatsConnection
             _logger.LogInformation(NatsLogEvents.Connection, "Invoke OnSocketAvailable after connecting to NATS {Uri}", uri);
             _socketConnection = _socketConnection with { InnerSocket = await OnSocketAvailableAsync(_socketConnection.InnerSocket).ConfigureAwait(false) };
         }
-
-        _currentConnectUri = uri;
     }
 
     private async ValueTask SetupReaderWriterAsync(bool reconnect)
@@ -753,9 +757,10 @@ public partial class NatsConnection : INatsConnection
                     return;
                 }
 
-                _logger.LogWarning(NatsLogEvents.Connection, ex, "Failed to connect NATS {Url} [{ReconnectCount}]", url, reconnectCount);
+                var attempted = _currentConnectUri ?? url;
+                _logger.LogWarning(NatsLogEvents.Connection, ex, "Failed to connect NATS {Url} [{ReconnectCount}]", attempted, reconnectCount);
 
-                _eventChannel.Writer.TryWrite((NatsEvent.ReconnectFailed, new NatsEventArgs(url?.ToString() ?? string.Empty)));
+                _eventChannel.Writer.TryWrite((NatsEvent.ReconnectFailed, new NatsEventArgs(attempted?.ToString() ?? string.Empty)));
 
                 if (debug)
                 {
