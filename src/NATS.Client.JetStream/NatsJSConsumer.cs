@@ -350,6 +350,7 @@ public class NatsJSConsumer : INatsJSConsumer
     internal async ValueTask<NatsJSConsume<T>> ConsumeInternalAsync<T>(INatsDeserialize<T>? serializer = default, NatsJSConsumeOpts? opts = default, CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
+        cancellationToken.ThrowIfCancellationRequested();
 
         opts ??= new NatsJSConsumeOpts();
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
@@ -457,6 +458,7 @@ public class NatsJSConsumer : INatsJSConsumer
         CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
+        cancellationToken.ThrowIfCancellationRequested();
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
         var inbox = _context.NewBaseInbox();
