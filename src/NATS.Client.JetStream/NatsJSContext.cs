@@ -187,10 +187,15 @@ public partial class NatsJSContext
 
             if (opts.ScheduleTTL != null)
             {
+                if (opts.ScheduleTTL.Value != TimeSpan.MaxValue && opts.ScheduleTTL.Value < TimeSpan.FromSeconds(1))
+                {
+                    throw new ArgumentOutOfRangeException(nameof(opts.ScheduleTTL), "ScheduleTTL must be at least 1 second or TimeSpan.MaxValue.");
+                }
+
                 headers ??= new NatsHeaders();
                 headers["Nats-Schedule-TTL"] = opts.ScheduleTTL == TimeSpan.MaxValue
                     ? "never"
-                    : $"{(int)opts.ScheduleTTL.Value.TotalSeconds:D}s";
+                    : $"{(long)opts.ScheduleTTL.Value.TotalSeconds:D}s";
             }
         }
 
@@ -360,10 +365,15 @@ public partial class NatsJSContext
 
             if (opts.ScheduleTTL != null)
             {
+                if (opts.ScheduleTTL.Value != TimeSpan.MaxValue && opts.ScheduleTTL.Value < TimeSpan.FromSeconds(1))
+                {
+                    throw new ArgumentOutOfRangeException(nameof(opts.ScheduleTTL), "ScheduleTTL must be at least 1 second or TimeSpan.MaxValue.");
+                }
+
                 headers ??= new NatsHeaders();
                 headers["Nats-Schedule-TTL"] = opts.ScheduleTTL == TimeSpan.MaxValue
                     ? "never"
-                    : $"{(int)opts.ScheduleTTL.Value.TotalSeconds:D}s";
+                    : $"{(long)opts.ScheduleTTL.Value.TotalSeconds:D}s";
             }
         }
 
