@@ -437,4 +437,298 @@ public class ManageStreamTest
         // Verify messages are retained after promotion
         Assert.Equal(10, promoted.Info.State.Messages);
     }
+
+    [SkipIfNatsServer(versionEarlierThan: "2.14")]
+    public async Task Schedule_source_should_publish_sourced_data_to_target()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
+        await nats.ConnectRetryAsync();
+
+        var js = new NatsJSContext(nats);
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        // Create a stream with AllowMsgSchedules and AllowMsgTTL enabled
+        var streamConfig = new StreamConfig($"{prefix}s1", [$"{prefix}foo.*"])
+        {
+            AllowMsgSchedules = true,
+            AllowMsgTTL = true,
+            AllowDirect = true,
+        };
+
+        await js.CreateStreamAsync(streamConfig, cts.Token);
+
+        // Publish a data message with headers
+        var dataHeaders = new NatsHeaders { { "Header", "Value" } };
+        await js.PublishAsync($"{prefix}foo.data", "data", headers: dataHeaders, cancellationToken: cts.Token);
+
+        // Publish a scheduled message with source and TTL
+        await js.PublishAsync(
+            $"{prefix}foo.schedule",
+            (byte[]?)null,
+            opts: new NatsJSPubOpts
+            {
+                Schedule = "@at 1970-01-01T00:00:00Z",
+                ScheduleTarget = $"{prefix}foo.publish",
+                ScheduleSource = $"{prefix}foo.data",
+                ScheduleTTL = TimeSpan.FromMinutes(5),
+            },
+            cancellationToken: cts.Token);
+
+        // Wait for the scheduled message to be published and schedule purged
+        var stream = await js.GetStreamAsync($"{prefix}s1", cancellationToken: cts.Token);
+        await Retry.Until(
+            "scheduled message published and schedule purged",
+            async () =>
+            {
+                await stream.RefreshAsync(cts.Token);
+                return stream.Info.State.LastSeq == 3 && stream.Info.State.Messages == 2;
+            },
+            timeout: TimeSpan.FromSeconds(10));
+
+        // Verify the sourced message has the correct data and headers
+        var msg = await stream.GetDirectAsync<string>(
+            new StreamMsgGetRequest { LastBySubj = $"{prefix}foo.publish" },
+            cancellationToken: cts.Token);
+
+        Assert.Equal("data", msg.Data);
+        Assert.NotNull(msg.Headers);
+        Assert.Equal($"{prefix}foo.schedule", msg.Headers["Nats-Scheduler"].ToString());
+        Assert.Equal("purge", msg.Headers["Nats-Schedule-Next"].ToString());
+        Assert.Equal("300s", msg.Headers["Nats-TTL"].ToString());
+        Assert.Equal("Value", msg.Headers["Header"].ToString());
+
+        // Schedule headers should be stripped from the produced message
+        Assert.False(msg.Headers.ContainsKey("Nats-Schedule"));
+        Assert.False(msg.Headers.ContainsKey("Nats-Schedule-Target"));
+        Assert.False(msg.Headers.ContainsKey("Nats-Schedule-Source"));
+        Assert.False(msg.Headers.ContainsKey("Nats-Schedule-TTL"));
+    }
+
+    [SkipIfNatsServer(versionEarlierThan: "2.14")]
+    public async Task Schedule_ttl_without_allow_msg_ttl_should_return_error()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
+        await nats.ConnectRetryAsync();
+
+        var js = new NatsJSContext(nats);
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        // Create stream with schedules but WITHOUT AllowMsgTTL
+        var streamConfig = new StreamConfig($"{prefix}s1", [$"{prefix}foo.*"])
+        {
+            AllowMsgSchedules = true,
+        };
+
+        await js.CreateStreamAsync(streamConfig, cts.Token);
+
+        // Publishing a scheduled message with TTL should fail when AllowMsgTTL is disabled
+        var ack = await js.PublishAsync(
+            $"{prefix}foo.schedule",
+            (byte[]?)null,
+            opts: new NatsJSPubOpts
+            {
+                Schedule = "@at 1970-01-01T00:00:00Z",
+                ScheduleTarget = $"{prefix}foo.publish",
+                ScheduleTTL = TimeSpan.FromSeconds(30),
+            },
+            cancellationToken: cts.Token);
+
+        Assert.NotNull(ack.Error);
+        Assert.Equal(400, ack.Error.Code);
+        Assert.Equal(10166, ack.Error.ErrCode); // per-message TTL is disabled
+    }
+
+    [SkipIfNatsServer(versionEarlierThan: "2.14")]
+    public async Task Schedule_source_invalid_should_return_error()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
+        await nats.ConnectRetryAsync();
+
+        var js = new NatsJSContext(nats);
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        var streamConfig = new StreamConfig($"{prefix}s1", [$"{prefix}foo.*"])
+        {
+            AllowMsgSchedules = true,
+        };
+
+        await js.CreateStreamAsync(streamConfig, cts.Token);
+
+        // Source matching the schedule subject should be invalid
+        var ack = await js.PublishAsync(
+            $"{prefix}foo.schedule",
+            (byte[]?)null,
+            opts: new NatsJSPubOpts
+            {
+                Schedule = "@at 1970-01-01T00:00:00Z",
+                ScheduleTarget = $"{prefix}foo.publish",
+                ScheduleSource = $"{prefix}foo.schedule",
+            },
+            cancellationToken: cts.Token);
+
+        Assert.NotNull(ack.Error);
+        Assert.Equal(400, ack.Error.Code);
+        Assert.Equal(10203, ack.Error.ErrCode);
+
+        // Source matching the target subject should be invalid
+        ack = await js.PublishAsync(
+            $"{prefix}foo.schedule",
+            (byte[]?)null,
+            opts: new NatsJSPubOpts
+            {
+                Schedule = "@at 1970-01-01T00:00:00Z",
+                ScheduleTarget = $"{prefix}foo.publish",
+                ScheduleSource = $"{prefix}foo.publish",
+            },
+            cancellationToken: cts.Token);
+
+        Assert.NotNull(ack.Error);
+        Assert.Equal(400, ack.Error.Code);
+        Assert.Equal(10203, ack.Error.ErrCode);
+
+        // Wildcard source (* ) should be invalid
+        ack = await js.PublishAsync(
+            $"{prefix}foo.schedule",
+            (byte[]?)null,
+            opts: new NatsJSPubOpts
+            {
+                Schedule = "@at 1970-01-01T00:00:00Z",
+                ScheduleTarget = $"{prefix}foo.publish",
+                ScheduleSource = $"{prefix}foo.*",
+            },
+            cancellationToken: cts.Token);
+
+        Assert.NotNull(ack.Error);
+        Assert.Equal(400, ack.Error.Code);
+        Assert.Equal(10203, ack.Error.ErrCode);
+
+        // Wildcard source (>) should be invalid
+        ack = await js.PublishAsync(
+            $"{prefix}foo.schedule",
+            (byte[]?)null,
+            opts: new NatsJSPubOpts
+            {
+                Schedule = "@at 1970-01-01T00:00:00Z",
+                ScheduleTarget = $"{prefix}foo.publish",
+                ScheduleSource = $"{prefix}foo.>",
+            },
+            cancellationToken: cts.Token);
+
+        Assert.NotNull(ack.Error);
+        Assert.Equal(400, ack.Error.Code);
+        Assert.Equal(10203, ack.Error.ErrCode);
+    }
+
+    [SkipIfNatsServer(versionEarlierThan: "2.14")]
+    public async Task Schedule_without_source_should_publish_to_target()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
+        await nats.ConnectRetryAsync();
+
+        var js = new NatsJSContext(nats);
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var streamConfig = new StreamConfig($"{prefix}s1", [$"{prefix}foo.*"])
+        {
+            AllowMsgSchedules = true,
+            AllowDirect = true,
+        };
+
+        await js.CreateStreamAsync(streamConfig, cts.Token);
+
+        // Publish a scheduled message without source — the schedule message's own data is used
+        var schedHeaders = new NatsHeaders { { "Custom", "MyValue" } };
+        await js.PublishAsync(
+            $"{prefix}foo.schedule",
+            "scheduled-payload",
+            opts: new NatsJSPubOpts
+            {
+                Schedule = "@at 1970-01-01T00:00:00Z",
+                ScheduleTarget = $"{prefix}foo.publish",
+            },
+            headers: schedHeaders,
+            cancellationToken: cts.Token);
+
+        var stream = await js.GetStreamAsync($"{prefix}s1", cancellationToken: cts.Token);
+        await Retry.Until(
+            "scheduled message published and schedule purged",
+            async () =>
+            {
+                await stream.RefreshAsync(cts.Token);
+                return stream.Info.State.LastSeq == 2 && stream.Info.State.Messages == 1;
+            },
+            timeout: TimeSpan.FromSeconds(10));
+
+        // Verify the produced message has the schedule message's own data and custom headers
+        var msg = await stream.GetDirectAsync<string>(
+            new StreamMsgGetRequest { LastBySubj = $"{prefix}foo.publish" },
+            cancellationToken: cts.Token);
+
+        Assert.Equal("scheduled-payload", msg.Data);
+        Assert.NotNull(msg.Headers);
+        Assert.Equal($"{prefix}foo.schedule", msg.Headers["Nats-Scheduler"].ToString());
+        Assert.Equal("purge", msg.Headers["Nats-Schedule-Next"].ToString());
+        Assert.Equal("MyValue", msg.Headers["Custom"].ToString());
+
+        // Schedule headers should be stripped
+        Assert.False(msg.Headers.ContainsKey("Nats-Schedule"));
+        Assert.False(msg.Headers.ContainsKey("Nats-Schedule-Target"));
+    }
+
+    [SkipIfNatsServer(versionEarlierThan: "2.14")]
+    public async Task Schedule_source_not_found_should_remove_schedule()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
+        await nats.ConnectRetryAsync();
+
+        var js = new NatsJSContext(nats);
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var streamConfig = new StreamConfig($"{prefix}s1", [$"{prefix}foo.*"])
+        {
+            AllowMsgSchedules = true,
+        };
+
+        await js.CreateStreamAsync(streamConfig, cts.Token);
+
+        // Publish a scheduled message with a source subject that has no messages
+        var ack = await js.PublishAsync(
+            $"{prefix}foo.schedule",
+            (byte[]?)null,
+            opts: new NatsJSPubOpts
+            {
+                Schedule = "@at 1970-01-01T00:00:00Z",
+                ScheduleTarget = $"{prefix}foo.publish",
+                ScheduleSource = $"{prefix}foo.data",
+            },
+            cancellationToken: cts.Token);
+
+        Assert.Null(ack.Error);
+        Assert.Equal(1UL, ack.Seq);
+
+        // The schedule fires but finds no source message, so it's removed from the scheduler.
+        // The schedule message itself remains in the store (remove() only clears scheduler state).
+        // Since this is a negative test (proving nothing happens), we wait for the scheduler
+        // to have had a chance to fire, then verify no new message was produced.
+        var stream = await js.GetStreamAsync($"{prefix}s1", cancellationToken: cts.Token);
+        await Retry.Until(
+            "no new message produced after scheduler fires",
+            async () =>
+            {
+                await Task.Delay(TimeSpan.FromSeconds(1), cts.Token).ConfigureAwait(false);
+                await stream.RefreshAsync(cts.Token);
+                return stream.Info.State.LastSeq == 1 && stream.Info.State.Messages == 1;
+            },
+            timeout: TimeSpan.FromSeconds(10));
+    }
 }

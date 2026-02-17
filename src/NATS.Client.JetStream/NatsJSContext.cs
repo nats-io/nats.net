@@ -166,6 +166,32 @@ public partial class NatsJSContext
                 headers ??= new NatsHeaders();
                 headers["Nats-Expected-Last-Subject-Sequence-Subject"] = opts.ExpectedLastSubjectSequenceSubject;
             }
+
+            if (opts.Schedule != null)
+            {
+                headers ??= new NatsHeaders();
+                headers["Nats-Schedule"] = opts.Schedule;
+            }
+
+            if (opts.ScheduleTarget != null)
+            {
+                headers ??= new NatsHeaders();
+                headers["Nats-Schedule-Target"] = opts.ScheduleTarget;
+            }
+
+            if (opts.ScheduleSource != null)
+            {
+                headers ??= new NatsHeaders();
+                headers["Nats-Schedule-Source"] = opts.ScheduleSource;
+            }
+
+            if (opts.ScheduleTTL != null)
+            {
+                headers ??= new NatsHeaders();
+                headers["Nats-Schedule-TTL"] = opts.ScheduleTTL == TimeSpan.MaxValue
+                    ? "never"
+                    : $"{(int)opts.ScheduleTTL.Value.TotalSeconds:D}s";
+            }
         }
 
         opts ??= NatsJSPubOpts.Default;
@@ -312,6 +338,32 @@ public partial class NatsJSContext
             {
                 headers ??= new NatsHeaders();
                 headers["Nats-Expected-Last-Subject-Sequence-Subject"] = opts.ExpectedLastSubjectSequenceSubject;
+            }
+
+            if (opts.Schedule != null)
+            {
+                headers ??= new NatsHeaders();
+                headers["Nats-Schedule"] = opts.Schedule;
+            }
+
+            if (opts.ScheduleTarget != null)
+            {
+                headers ??= new NatsHeaders();
+                headers["Nats-Schedule-Target"] = opts.ScheduleTarget;
+            }
+
+            if (opts.ScheduleSource != null)
+            {
+                headers ??= new NatsHeaders();
+                headers["Nats-Schedule-Source"] = opts.ScheduleSource;
+            }
+
+            if (opts.ScheduleTTL != null)
+            {
+                headers ??= new NatsHeaders();
+                headers["Nats-Schedule-TTL"] = opts.ScheduleTTL == TimeSpan.MaxValue
+                    ? "never"
+                    : $"{(int)opts.ScheduleTTL.Value.TotalSeconds:D}s";
             }
         }
 

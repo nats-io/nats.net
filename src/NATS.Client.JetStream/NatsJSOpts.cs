@@ -271,6 +271,40 @@ public record NatsJSPubOpts : NatsPubOpts
     /// or use an extension that supports it.
     /// </remarks>
     public int RetryAttempts { get; init; } = 1;
+
+    /// <summary>
+    /// Sets the <c>Nats-Schedule</c> header for scheduling message delivery.
+    /// </summary>
+    /// <remarks>
+    /// Supports cron expressions (e.g. <c>"0 0 * * *"</c>), interval patterns (e.g. <c>"@every 5m"</c>),
+    /// or one-time schedules (e.g. <c>"@at 2024-01-01T00:00:00Z"</c>).
+    /// Requires the stream to have <c>AllowMsgSchedules</c> enabled.
+    /// </remarks>
+    public string? Schedule { get; init; }
+
+    /// <summary>
+    /// Sets the <c>Nats-Schedule-Target</c> header specifying the subject where the scheduled message will be published.
+    /// </summary>
+    public string? ScheduleTarget { get; init; }
+
+    /// <summary>
+    /// Sets the <c>Nats-Schedule-Source</c> header specifying a subject from which to source the last message's data and headers
+    /// when the schedule fires.
+    /// </summary>
+    /// <remarks>
+    /// The source subject must be a literal (no wildcards), and must not match the schedule or target subjects.
+    /// Requires the stream to have <c>AllowMsgSchedules</c> enabled.
+    /// </remarks>
+    public string? ScheduleSource { get; init; }
+
+    /// <summary>
+    /// Sets the <c>Nats-Schedule-TTL</c> header specifying the TTL for messages produced by the schedule.
+    /// </summary>
+    /// <remarks>
+    /// Minimum value is 1 second. Use <see cref="TimeSpan.MaxValue"/> to indicate the message should never expire.
+    /// Requires the stream to have <c>AllowMsgTTL</c> enabled.
+    /// </remarks>
+    public TimeSpan? ScheduleTTL { get; init; }
 }
 
 /// <summary>
