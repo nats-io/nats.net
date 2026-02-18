@@ -78,7 +78,7 @@ namespace NATS.Client.Core.NaCl.Internal.Ed25519Ref10
             hasher.Update(sig, sigoffset, 32);
             hasher.Update(pk, pkoffset, 32);
             hasher.Update(m, moffset, mlen);
-            h = hasher.Finalize();
+            h = hasher.FinalizeHash();
 
             ScalarOperations.sc_reduce(h);
 
