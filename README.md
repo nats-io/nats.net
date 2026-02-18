@@ -7,6 +7,10 @@
 
 # NATS .NET
 
+> [!IMPORTANT]
+> **NATS .NET v3 is in development on the [`release/3.0`](https://github.com/nats-io/nats.net/tree/release/3.0) branch!**
+> v3 adds .NET 10 support and drops .NET 6.0. Target frameworks: `netstandard2.0`, `netstandard2.1`, `net8.0`, `net10.0`.
+
 NATS .NET is a client library designed to connect to the NATS messaging server,
 fully supporting all NATS features.
 It integrates seamlessly with modern .NET asynchronous interfaces such as
@@ -17,18 +21,13 @@ async enumerables and channels, and leverages advanced .NET memory, buffer and I
 **Additionally check out [NATS by example](https://natsbyexample.com) - An evolving collection of runnable, cross-client reference examples for NATS.**
 
 > [!NOTE]
-> **We are not testing with .NET 6.0 target anymore** even though it is still targeted by the library.
-> This is to reduce the number of test runs and speed up the CI process as well as to prepare for
-> the next major version, possibly dropping .NET 6.0 support.
-
-> [!NOTE]
 > **Don't confuse NuGet packages!**
 > NATS .NET package on NuGet is called [NATS.Net](https://www.nuget.org/packages/NATS.Net).
 > There is another package called `NATS.Client` which is the older version of the client library
 > and will be deprecated eventually.
 
 > [!TIP]
-> NATS .NET now supports **.NET Standard** 2.0 and 2.1 along with .NET 6.0 and 8.0,
+> NATS .NET supports **.NET Standard** 2.0 and 2.1 along with .NET 8.0 and 10.0,
 > which means you can also use it with **.NET Framework** 4.6.2+ and **Unity** 2018.1+.
 
 ### What is NATS?
@@ -44,7 +43,7 @@ Head over to [NATS documentation](https://docs.nats.io/nats-concepts/overview) f
 ## NATS .NET Goals
 
 - Only support Async I/O (async/await)
-- Target .NET Standard 2.0, 2.1, and the two most recent .NET LTS releases (currently .NET 6.0 & .NET 8.0)
+- Target .NET Standard 2.0, 2.1, and the two most recent .NET LTS releases (currently .NET 8.0 & .NET 10.0)
 
 ## Packages
 
