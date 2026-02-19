@@ -11,9 +11,9 @@
 #pragma warning disable SA1405
 
 // Enable init only setters
-#if NET5_0_OR_GREATER
+#if !NETSTANDARD
 [assembly: System.Runtime.CompilerServices.TypeForwardedTo(typeof(System.Runtime.CompilerServices.IsExternalInit))]
-#elif NETSTANDARD
+#else
 
 namespace System.Runtime.CompilerServices
 {
@@ -160,6 +160,7 @@ namespace NATS.Client.Core.Internal.NetStandardExtensions
         private readonly Timer _timer;
         private readonly TimeSpan _period;
         private TaskCompletionSource<bool> _tcs;
+        private CancellationTokenRegistration _ctr;
         private bool _disposed;
 
         public PeriodicTimer(TimeSpan period)
@@ -179,7 +180,10 @@ namespace NATS.Client.Core.Internal.NetStandardExtensions
             if (cancellationToken.IsCancellationRequested)
                 return Task.FromCanceled<bool>(cancellationToken);
 
-            cancellationToken.Register(() => _tcs.TrySetCanceled(cancellationToken));
+#pragma warning disable VSTHRD103
+            _ctr.Dispose();
+#pragma warning restore VSTHRD103
+            _ctr = cancellationToken.Register(() => _tcs.TrySetCanceled(cancellationToken));
 
             return _tcs.Task;
         }
@@ -187,6 +191,7 @@ namespace NATS.Client.Core.Internal.NetStandardExtensions
         public void Dispose()
         {
             _disposed = true;
+            _ctr.Dispose();
             _timer.Dispose();
             _tcs.TrySetResult(false); // Signal no more ticks will occur
         }
@@ -200,7 +205,7 @@ namespace NATS.Client.Core.Internal.NetStandardExtensions
 
     internal static class ReadOnlySequenceExtensions
     {
-        // Adapted from .NET 6.0 implementation
+        // Adapted from .NET runtime implementation
         internal static long GetOffset<T>(this in ReadOnlySequence<T> sequence, SequencePosition position)
         {
             var positionSequenceObject = position.GetObject();
@@ -256,12 +261,29 @@ namespace NATS.Client.Core.Internal.NetStandardExtensions
     internal static class EncodingExtensionsCommon
     {
         internal static string GetString(this Encoding encoding, in ReadOnlySequence<byte> buffer)
-            => encoding.GetString(buffer.ToArray());
+        {
+            if (buffer.IsSingleSegment)
+            {
+#if NETSTANDARD2_0
+                return encoding.GetString(buffer.First.Span);
+#else
+                return encoding.GetString(buffer.FirstSpan);
+#endif
+            }
+
+            return encoding.GetString(buffer.ToArray());
+        }
 
         internal static void GetBytes(this Encoding encoding, string chars, IBufferWriter<byte> bw)
         {
-            var buffer = encoding.GetBytes(chars);
-            bw.Write(buffer);
+            var byteCount = encoding.GetByteCount(chars);
+            var span = bw.GetSpan(byteCount);
+#if NETSTANDARD2_0
+            encoding.GetBytes(chars, span);
+#else
+            encoding.GetBytes(chars.AsSpan(), span);
+#endif
+            bw.Advance(byteCount);
         }
     }
 
@@ -304,16 +326,31 @@ namespace NATS.Client.Core.Internal.NetStandardExtensions
 
     internal static class EncodingExtensions
     {
-        internal static int GetBytes(this Encoding encoding, string chars, Span<byte> bytes)
+        internal static unsafe int GetBytes(this Encoding encoding, string chars, Span<byte> bytes)
         {
-            var buffer = encoding.GetBytes(chars);
-            buffer.AsSpan().CopyTo(bytes);
-            return buffer.Length;
+            if (chars.Length == 0)
+            {
+                return 0;
+            }
+
+            fixed (char* charPtr = chars)
+            {
+                fixed (byte* bytePtr = bytes)
+                {
+                    return encoding.GetBytes(charPtr, chars.Length, bytePtr, bytes.Length);
+                }
+            }
         }
 
-        internal static string GetString(this Encoding encoding, in ReadOnlySpan<byte> buffer)
+        internal static unsafe string GetString(this Encoding encoding, in ReadOnlySpan<byte> buffer)
         {
-            return encoding.GetString(buffer.ToArray());
+            if (buffer.IsEmpty)
+                return string.Empty;
+
+            fixed (byte* ptr = buffer)
+            {
+                return encoding.GetString(ptr, buffer.Length);
+            }
         }
     }
 
