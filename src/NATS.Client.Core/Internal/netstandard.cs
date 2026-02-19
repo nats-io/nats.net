@@ -177,15 +177,23 @@ namespace NATS.Client.Core.Internal.NetStandardExtensions
 
             _timer.Change(_period, Timeout.InfiniteTimeSpan);
 
-            if (cancellationToken.IsCancellationRequested)
-                return Task.FromCanceled<bool>(cancellationToken);
-
 #pragma warning disable VSTHRD103
             _ctr.Dispose();
 #pragma warning restore VSTHRD103
-            _ctr = cancellationToken.Register(() => _tcs.TrySetCanceled(cancellationToken));
 
-            return _tcs.Task;
+            if (cancellationToken.IsCancellationRequested)
+                return Task.FromCanceled<bool>(cancellationToken);
+
+            var tcs = _tcs;
+            _ctr = cancellationToken.Register(
+                static state =>
+                {
+                    var source = (TaskCompletionSource<bool>)state!;
+                    source.TrySetCanceled();
+                },
+                tcs);
+
+            return tcs.Task;
         }
 
         public void Dispose()
