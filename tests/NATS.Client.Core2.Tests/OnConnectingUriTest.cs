@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Logging;
 using NATS.Client.TestUtilities;
-using Synadia.Orbit.Testing.NatsServerProcessManager;
 using NATS.Client.TestUtilities2;
+using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.Core2.Tests;
 
