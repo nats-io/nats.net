@@ -198,7 +198,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                                 buffer = buffer.Slice(buffer.GetPosition(3, positionBeforePayload.Value));
                             }
 
-                            await _connection.PublishToClientHandlersAsync(subject, replyTo, sid, null, ReadOnlySequence<byte>.Empty).ConfigureAwait(false);
+                            await _connection.PublishToClientHandlersAsync(subject, replyTo, sid, ReadOnlySequence<byte>.Empty, ReadOnlySequence<byte>.Empty).ConfigureAwait(false);
                         }
                         else
                         {
@@ -219,7 +219,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
 
                             buffer = buffer.Slice(buffer.GetPosition(2, payloadSlice.End)); // payload + \r\n
 
-                            await _connection.PublishToClientHandlersAsync(subject, replyTo, sid, null, payloadSlice).ConfigureAwait(false);
+                            await _connection.PublishToClientHandlersAsync(subject, replyTo, sid, ReadOnlySequence<byte>.Empty, payloadSlice).ConfigureAwait(false);
                         }
                     }
                     else if (code == ServerOpCodes.HMsg)

@@ -189,7 +189,7 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
     protected override async ValueTask ReceiveInternalAsync(
         string subject,
         string? replyTo,
-        ReadOnlySequence<byte>? headersBuffer,
+        ReadOnlySequence<byte> headersBuffer,
         ReadOnlySequence<byte> payloadBuffer)
     {
         NatsMsg<T> msg;
