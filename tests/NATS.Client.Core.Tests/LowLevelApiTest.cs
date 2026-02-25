@@ -1,6 +1,6 @@
 using System.Buffers;
 using System.Text;
-using NATS.Client.Platform.Windows.Tests;
+using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.Core.Tests;
 

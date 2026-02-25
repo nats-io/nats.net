@@ -36,6 +36,8 @@
 - name: Advanced Options
   href: advanced/intro.md
   items:
+    - name: Slow Consumers
+      href: advanced/slow-consumers.md
     - name: Serialization
       href: advanced/serialization.md
     - name: Security

@@ -3,9 +3,9 @@ using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
 using NATS.Client.KeyValueStore.Internal;
-using NATS.Client.Platform.Windows.Tests;
 using NATS.Client.TestUtilities;
 using NATS.Client.TestUtilities2;
+using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.KeyValueStore.Tests;
 

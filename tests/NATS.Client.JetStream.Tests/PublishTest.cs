@@ -2,10 +2,10 @@ using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
-using NATS.Client.Platform.Windows.Tests;
 using NATS.Client.TestUtilities;
 using NATS.Client.TestUtilities2;
 using NATS.Net;
+using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.JetStream.Tests;
 

@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Models;
-using NATS.Client.Platform.Windows.Tests;
+using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.Core.Tests;
 
