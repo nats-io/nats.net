@@ -52,7 +52,7 @@ internal static class Telemetry
             tags[4] = new KeyValuePair<string, object?>(Constants.ServerAddress, conn.ServerInfo.Host);
             tags[5] = new KeyValuePair<string, object?>(Constants.ServerPort, serverPort);
             tags[6] = new KeyValuePair<string, object?>(Constants.NetworkProtoName, "nats");
-            tags[7] = new KeyValuePair<string, object?>(Constants.NetworkProtoVersion, conn.ServerInfo.ProtocolVersion.ToString());
+            tags[7] = new KeyValuePair<string, object?>(Constants.NetworkTransport, "tcp");
             tags[8] = new KeyValuePair<string, object?>(Constants.NetworkPeerAddress, conn.ServerInfo.Host);
             tags[9] = new KeyValuePair<string, object?>(Constants.NetworkPeerPort, serverPort);
             tags[10] = new KeyValuePair<string, object?>(Constants.NetworkLocalAddress, conn.ServerInfo.ClientIp);
@@ -167,7 +167,7 @@ internal static class Telemetry
             tags[10] = new KeyValuePair<string, object?>(Constants.ServerAddress, conn.ServerInfo.Host);
             tags[11] = new KeyValuePair<string, object?>(Constants.ServerPort, serverPort);
             tags[12] = new KeyValuePair<string, object?>(Constants.NetworkProtoName, "nats");
-            tags[13] = new KeyValuePair<string, object?>(Constants.NetworkProtoVersion, conn.ServerInfo.ProtocolVersion.ToString());
+            tags[13] = new KeyValuePair<string, object?>(Constants.NetworkTransport, "tcp");
             tags[14] = new KeyValuePair<string, object?>(Constants.NetworkPeerAddress, conn.ServerInfo.Host);
             tags[15] = new KeyValuePair<string, object?>(Constants.NetworkPeerPort, serverPort);
             tags[16] = new KeyValuePair<string, object?>(Constants.NetworkLocalAddress, conn.ServerInfo.ClientIp);
@@ -323,7 +323,7 @@ internal static class Telemetry
         public const string ServerAddress = "server.address";
         public const string ServerPort = "server.port";
         public const string NetworkProtoName = "network.protocol.name";
-        public const string NetworkProtoVersion = "network.protocol.version";
+        public const string NetworkTransport = "network.transport";
         public const string NetworkPeerAddress = "network.peer.address";
         public const string NetworkPeerPort = "network.peer.port";
         public const string NetworkLocalAddress = "network.local.address";
