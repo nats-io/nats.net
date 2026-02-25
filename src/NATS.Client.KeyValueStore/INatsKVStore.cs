@@ -3,6 +3,10 @@ using NATS.Client.JetStream;
 
 namespace NATS.Client.KeyValueStore;
 
+/// <summary>
+/// Represents a NATS Key-Value Store bucket.
+/// </summary>
+/// <seealso href="https://www.nuget.org/packages/Synadia.Orbit.KeyValueStore.Extensions">KV codec extensions for typed serialization</seealso>
 public interface INatsKVStore
 {
     /// <summary>
