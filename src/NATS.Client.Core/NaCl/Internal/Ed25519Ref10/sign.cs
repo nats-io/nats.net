@@ -29,13 +29,13 @@ namespace NATS.Client.Core.NaCl.Internal.Ed25519Ref10
 		    using var hasher = new Sha512();
 			{
                 hasher.Update(sk, skoffset, 32);
-			    az = hasher.Finalize();
+			    az = hasher.FinalizeHash();
 			    ScalarOperations.sc_clamp(az, 0);
 
 			    hasher.Init();
 				hasher.Update(az, 32, 32);
 				hasher.Update(m, moffset, mlen);
-				r = hasher.Finalize();
+				r = hasher.FinalizeHash();
 
 				ScalarOperations.sc_reduce(r);
 				GroupOperations.ge_scalarmult_base(out R, r, 0);
@@ -45,7 +45,7 @@ namespace NATS.Client.Core.NaCl.Internal.Ed25519Ref10
 				hasher.Update(sig, sigoffset, 32);
 				hasher.Update(sk, skoffset + 32, 32);
 				hasher.Update(m, moffset, mlen);
-				hram = hasher.Finalize();
+				hram = hasher.FinalizeHash();
 
 				ScalarOperations.sc_reduce(hram);
 				var s = new byte[32];//todo: remove allocation
