@@ -55,7 +55,8 @@ Head over to [NATS documentation](https://docs.nats.io/nats-concepts/overview) f
 - **NATS.Client.Services**: [Services](https://docs.nats.io/using-nats/developer/services)
 - **NATS.Client.Simplified**: simplify common use cases especially for beginners
 - **NATS.Client.Serializers.Json**: JSON serializer for ad-hoc types
-- **NATS.Extensions.Microsoft.DependencyInjection**: extension to configure DI container
+- **NATS.Client.Hosting**: DI integration for AOT-compatible and minimal-dependency scenarios
+- **NATS.Extensions.Microsoft.DependencyInjection**: DI integration with ad-hoc JSON serialization enabled by default
 
 ## Contributing
 
