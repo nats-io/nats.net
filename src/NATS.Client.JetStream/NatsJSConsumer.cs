@@ -26,9 +26,7 @@ public class NatsJSConsumer : INatsJSConsumer
         _consumer = Info.Name;
     }
 
-    /// <summary>
-    /// Consumer info object as retrieved from NATS JetStream server at the time this object was created, updated or refreshed.
-    /// </summary>
+    /// <inheritdoc />
     public ConsumerInfo Info { get; private set; }
 
     /// <summary>
@@ -306,12 +304,7 @@ public class NatsJSConsumer : INatsJSConsumer
         }
     }
 
-    /// <summary>
-    /// Retrieve the consumer info from the server and update this consumer.
-    /// </summary>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
-    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <inheritdoc />
     public async ValueTask RefreshAsync(CancellationToken cancellationToken = default) =>
         Info = await _context.JSRequestResponseAsync<object, ConsumerInfo>(
             subject: $"{_context.Opts.Prefix}.CONSUMER.INFO.{_stream}.{_consumer}",
