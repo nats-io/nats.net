@@ -10,6 +10,10 @@ jobs:
   docs-preview:
     name: docs-preview
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      statuses: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
