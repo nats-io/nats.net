@@ -97,10 +97,12 @@ public interface INatsJSContext
     /// </para>
     /// <para>
     /// If you need to track consumer progress at runtime (e.g., pending message count, sequence numbers, or delivery attempts),
-    /// use <see cref="INatsJSMsg{T}.Metadata"/> on each received message instead. It provides
+    /// use <see cref="INatsJSMsg{T}.Metadata"/> on each received message instead. When available, it provides
     /// <see cref="NatsJSMsgMetadata.NumPending"/>, <see cref="NatsJSMsgMetadata.NumDelivered"/>,
     /// <see cref="NatsJSMsgMetadata.Sequence"/>, and <see cref="NatsJSMsgMetadata.Timestamp"/>
-    /// without requiring a server round-trip.
+    /// without requiring a server round-trip. Note that <see cref="INatsJSMsg{T}.Metadata"/> can be <c>null</c>
+    /// (for example, if the reply subject cannot be parsed), so callers should always check for <c>null</c> before
+    /// accessing its properties.
     /// </para>
     /// <para>
     /// Prefer using <see cref="CreateOrUpdateConsumerAsync"/> or <see cref="CreateConsumerAsync"/> to obtain a consumer
