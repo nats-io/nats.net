@@ -102,10 +102,11 @@ public interface INatsJSConsumer
     /// </para>
     /// <para>
     /// For tracking consumer progress (e.g., pending message count, sequence numbers, or delivery attempts),
-    /// use <see cref="INatsJSMsg{T}.Metadata"/> on each received message instead. It provides
-    /// <see cref="NatsJSMsgMetadata.NumPending"/>, <see cref="NatsJSMsgMetadata.NumDelivered"/>,
-    /// <see cref="NatsJSMsgMetadata.Sequence"/>, and <see cref="NatsJSMsgMetadata.Timestamp"/>
-    /// without requiring a server round-trip.
+    /// use <see cref="INatsJSMsg{T}.Metadata"/> on each received message instead. Note that
+    /// <see cref="INatsJSMsg{T}.Metadata"/> is nullable and should be checked for <c>null</c> before accessing
+    /// its properties. When non-null, it provides <see cref="NatsJSMsgMetadata.NumPending"/>,
+    /// <see cref="NatsJSMsgMetadata.NumDelivered"/>, <see cref="NatsJSMsgMetadata.Sequence"/>, and
+    /// <see cref="NatsJSMsgMetadata.Timestamp"/> without requiring a server round-trip.
     /// </para>
     /// </remarks>
     ValueTask RefreshAsync(CancellationToken cancellationToken = default);
