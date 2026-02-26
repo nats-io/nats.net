@@ -16,10 +16,12 @@ public interface INatsJSConsumer
     /// significant load on the NATS cluster at scale, lead to API timeouts, and degrade overall system performance.
     /// </para>
     /// <para>
-    /// Instead, use <see cref="INatsJSMsg{T}.Metadata"/> available on each received message, which provides
+    /// Instead, prefer using <see cref="INatsJSMsg{T}.Metadata"/>, when available, on each received message. When
+    /// <see cref="INatsJSMsg{T}.Metadata"/> is not <c>null</c>, it exposes
     /// <see cref="NatsJSMsgMetadata.NumPending"/>, <see cref="NatsJSMsgMetadata.NumDelivered"/>,
     /// <see cref="NatsJSMsgMetadata.Sequence"/>, and <see cref="NatsJSMsgMetadata.Timestamp"/>
-    /// without requiring a server round-trip.
+    /// without requiring a server round-trip. Callers should check that <c>Metadata</c> is not <c>null</c> before
+    /// accessing these properties.
     /// </para>
     /// </remarks>
     ConsumerInfo Info { get; }
