@@ -16,8 +16,8 @@
         </PackageReference>
     </ItemGroup>
 
-    <!--  Dependencies for prior to net5.0-->
-    <ItemGroup Condition="!$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net5.0'))">
+    <!--  Dependencies for prior to net8.0-->
+    <ItemGroup Condition="!$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net8.0'))">
         <PackageReference Include="System.Threading.Channels" Version="8.0.0"/>
         <PackageReference Include="System.Diagnostics.DiagnosticSource" Version="8.0.1"/>
         <PackageReference Include="Nullable" Version="1.3.1">
