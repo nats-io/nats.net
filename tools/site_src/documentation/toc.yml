@@ -44,6 +44,8 @@
       href: advanced/security.md
     - name: AOT Deployments
       href: advanced/aot.md
+    - name: OpenTelemetry
+      href: advanced/opentelemetry.md
     - name: Platform Compatibility
       href: advanced/platform-compatibility.md
 
