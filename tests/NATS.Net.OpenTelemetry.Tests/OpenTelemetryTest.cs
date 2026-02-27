@@ -128,6 +128,14 @@ public class OpenTelemetryTest
         AssertStringTagNotNullOrEmpty(sendActivity, "network.peer.address");
         AssertStringTagNotNullOrEmpty(sendActivity, "network.local.address");
         AssertStringTagNotNullOrEmpty(sendActivity, "server.address");
+
+        // Verify network.transport is set on both activities
+        Assert.Equal("tcp", sendActivity.GetTagItem("network.transport") as string);
+        Assert.Equal("tcp", receiveActivity.GetTagItem("network.transport") as string);
+
+        // Verify network.protocol.version is no longer present
+        Assert.Null(sendActivity.GetTagItem("network.protocol.version"));
+        Assert.Null(receiveActivity.GetTagItem("network.protocol.version"));
     }
 
     private void AssertStringTagNotNullOrEmpty(Activity activity, string name)
