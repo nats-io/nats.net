@@ -17,7 +17,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\NATS.Net\NATS.Net.csproj" />
+      <ProjectReference Include="..\NATS.Client.Simplified\NATS.Client.Simplified.csproj" />
     </ItemGroup>
 
 </Project>
