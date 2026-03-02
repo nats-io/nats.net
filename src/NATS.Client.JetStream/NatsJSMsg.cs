@@ -93,15 +93,10 @@ public interface INatsJSMsg<out T> : INatsMsg
     /// <summary>
     /// Signals that the message will not be processed now and processing can move onto the next message.
     /// </summary>
-    /// <param name="delay">Delay redelivery of the message.</param>
-    /// <param name="opts">Ack options.</param>
+    /// <param name="opts">Ack options including <see cref="AckOpts.NakDelay"/>.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the call.</param>
     /// <returns>A <see cref="ValueTask"/> representing the async call.</returns>
-    /// <remarks>
-    /// Messages rejected using <c>-NAK</c> will be resent by the NATS JetStream server after the configured timeout
-    /// or the delay parameter if it's specified.
-    /// </remarks>
-    ValueTask NakAsync(AckOpts? opts = null, TimeSpan delay = default, CancellationToken cancellationToken = default);
+    ValueTask NakAsync(AckOpts? opts = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Indicates that work is ongoing and the wait period should be extended.
@@ -128,15 +123,6 @@ public interface INatsJSMsg<out T> : INatsMsg
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the call.</param>
     /// <returns>A <see cref="ValueTask"/> representing the async call.</returns>
     ValueTask AckTerminateAsync(AckOpts? opts = null, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Instructs the server to stop redelivery of the message without acknowledging it as successfully processed.
-    /// </summary>
-    /// <param name="reason">Optional reason for termination, included in JetStream advisory events. Requires NATS Server 2.10.4+.</param>
-    /// <param name="opts">Ack options.</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the call.</param>
-    /// <returns>A <see cref="ValueTask"/> representing the async call.</returns>
-    ValueTask AckTerminateAsync(string reason, AckOpts? opts = null, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -194,17 +180,15 @@ public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
     public ValueTask AckAsync(AckOpts? opts = null, CancellationToken cancellationToken = default) => SendAckAsync(NatsJSConstants.Ack, opts, cancellationToken);
 
     /// <inheritdoc />
-    public ValueTask NakAsync(AckOpts? opts = null, TimeSpan delay = default, CancellationToken cancellationToken = default)
+    public ValueTask NakAsync(AckOpts? opts = null, CancellationToken cancellationToken = default)
     {
+        var delay = opts?.NakDelay ?? TimeSpan.Zero;
+
         if (delay == TimeSpan.Zero)
-        {
             return SendAckAsync(NatsJSConstants.Nak, opts, cancellationToken);
-        }
-        else
-        {
-            var nakDelayed = new ReadOnlySequence<byte>(Encoding.ASCII.GetBytes($"-NAK {{\"delay\": {delay.ToNanos()}}}"));
-            return SendAckAsync(nakDelayed, opts, cancellationToken);
-        }
+
+        var nakDelayed = new ReadOnlySequence<byte>(Encoding.ASCII.GetBytes($"-NAK {{\"delay\": {delay.ToNanos()}}}"));
+        return SendAckAsync(nakDelayed, opts, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -212,21 +196,9 @@ public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
 
     /// <inheritdoc />
     public ValueTask AckTerminateAsync(AckOpts? opts = null, CancellationToken cancellationToken = default)
-        => AckTerminateInternalAsync(opts, null, cancellationToken);
-
-    /// <inheritdoc />
-    public ValueTask AckTerminateAsync(string reason, AckOpts? opts = null, CancellationToken cancellationToken = default)
-        => AckTerminateInternalAsync(opts, reason, cancellationToken);
-
-    private ValueTask AckTerminateInternalAsync(AckOpts? opts, string? reason, CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrEmpty(reason))
-        {
-            return SendAckAsync(NatsJSConstants.AckTerminate, opts, cancellationToken);
-        }
-
-        return AckTerminateWithReasonAsync(reason!, opts, cancellationToken);
-    }
+        => string.IsNullOrEmpty(opts?.TerminateReason)
+            ? SendAckAsync(NatsJSConstants.AckTerminate, opts, cancellationToken)
+            : AckTerminateWithReasonAsync(opts!.Value.TerminateReason!, opts, cancellationToken);
 
     private async ValueTask AckTerminateWithReasonAsync(string reason, AckOpts? opts, CancellationToken cancellationToken)
     {
@@ -308,6 +280,17 @@ public readonly record struct AckOpts
     /// Ask server for an acknowledgment
     /// </summary>
     public bool? DoubleAck { get; init; }
+
+    /// <summary>
+    /// Delay for Nak before redelivery
+    /// </summary>
+    public TimeSpan? NakDelay { get; init; }
+
+    /// <summary>
+    /// Reason for AckTerminate
+    /// Requires NATS Server 2.10.4+.
+    /// </summary>
+    public string? TerminateReason { get; init; }
 }
 
 #if NETSTANDARD2_0

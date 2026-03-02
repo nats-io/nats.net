@@ -151,7 +151,7 @@ public class DoubleAckNakDelayTests
         var next = await consumer.NextAsync<int>(cancellationToken: cts.Token);
         if (next is { } msg)
         {
-            await msg.AckTerminateAsync(reason: "test failure reason", cancellationToken: cts.Token);
+            await msg.AckTerminateAsync("test failure reason", cancellationToken: cts.Token);
             Assert.Equal(42, msg.Data);
 
             await Retry.Until("seen TERM", () => proxy.Frames.Any(f => f.Message.StartsWith("PUB $JS.ACK")));
