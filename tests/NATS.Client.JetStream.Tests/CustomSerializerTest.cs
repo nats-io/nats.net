@@ -75,13 +75,13 @@ public class CustomSerializerTest
 
     private class Level42Serializer<T> : INatsSerializer<T>
     {
-        public void Serialize(IBufferWriter<byte> bufferWriter, T value)
+        public void Serialize(IBufferWriter<byte> bufferWriter, T value, INatsHeaders? headers)
         {
             bufferWriter.Write(new byte[] { 42 });
             bufferWriter.Advance(1);
         }
 
-        public T Deserialize(in ReadOnlySequence<byte> buffer) => (T)(object)new byte[] { 42 };
+        public T Deserialize(in ReadOnlySequence<byte> buffer, INatsHeaders? headers) => (T)(object)new byte[] { 42 };
 
         public INatsSerializer<T> CombineWith(INatsSerializer<T> next) => throw new NotImplementedException();
     }

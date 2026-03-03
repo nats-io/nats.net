@@ -76,7 +76,7 @@ public class NatsMsgTests
         var msg = builder.Msg;
 
         var bufferWriter = new NatsPooledBufferWriter<byte>(256);
-        serializer.Serialize(bufferWriter, data);
+        serializer.Serialize(bufferWriter, data, null);
         var serializedSize = bufferWriter.WrittenCount;
 
         var expectedSize = subject.Length + (replyTo?.Length ?? 0) + headers.GetBytesLength() + serializedSize;

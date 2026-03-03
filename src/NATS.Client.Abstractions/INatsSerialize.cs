@@ -27,7 +27,8 @@ public interface INatsSerialize<in T>
     /// </summary>
     /// <param name="bufferWriter">Buffer to write the serialized data.</param>
     /// <param name="value">Object to be serialized.</param>
-    void Serialize(IBufferWriter<byte> bufferWriter, T value);
+    /// <param name="headers">Optional NATS headers associated with the message.</param>
+    void Serialize(IBufferWriter<byte> bufferWriter, T value, INatsHeaders? headers);
 }
 
 /// <summary>
@@ -40,8 +41,9 @@ public interface INatsDeserialize<out T>
     /// Deserialize value from buffer.
     /// </summary>
     /// <param name="buffer">Buffer with the serialized data.</param>
+    /// <param name="headers">Optional NATS headers associated with the message.</param>
     /// <returns>Deserialized object</returns>
-    T? Deserialize(in ReadOnlySequence<byte> buffer);
+    T? Deserialize(in ReadOnlySequence<byte> buffer, INatsHeaders? headers);
 }
 
 public interface INatsSerializerRegistry

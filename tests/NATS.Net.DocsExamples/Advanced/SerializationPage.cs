@@ -236,7 +236,7 @@ public class MyProtoBufSerializer<T> : INatsSerializer<T>
 {
     public static readonly INatsSerializer<T> Default = new MyProtoBufSerializer<T>();
 
-    public void Serialize(IBufferWriter<byte> bufferWriter, T value)
+    public void Serialize(IBufferWriter<byte> bufferWriter, T value, INatsHeaders? headers)
     {
         if (value is IMessage message)
         {
@@ -248,7 +248,7 @@ public class MyProtoBufSerializer<T> : INatsSerializer<T>
         }
     }
 
-    public T? Deserialize(in ReadOnlySequence<byte> buffer)
+    public T? Deserialize(in ReadOnlySequence<byte> buffer, INatsHeaders? headers)
     {
         if (typeof(T) == typeof(Greeting))
         {

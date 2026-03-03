@@ -27,10 +27,10 @@ Console.WriteLine();
 Console.WriteLine("Testing TransientLib.MySerializer (compiled against 2.6.0):");
 var serializer = new MySerializer();
 var buffer = new ArrayBufferWriter<byte>();
-serializer.Serialize(buffer, "hello from transient dependency");
+serializer.Serialize(buffer, "hello from transient dependency", null);
 Console.WriteLine($"  Serialized to {buffer.WrittenCount} bytes");
 
-var deserialized = serializer.Deserialize(new ReadOnlySequence<byte>(buffer.WrittenSpan.ToArray()));
+var deserialized = serializer.Deserialize(new ReadOnlySequence<byte>(buffer.WrittenSpan.ToArray()), null);
 Console.WriteLine($"  Deserialized: '{deserialized}'");
 
 Console.WriteLine();

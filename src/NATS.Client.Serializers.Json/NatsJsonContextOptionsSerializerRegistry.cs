@@ -20,7 +20,7 @@ public class NatsJsonOptionsSerializer<T>(JsonSerializerOptions options) : INats
     [ThreadStatic]
     private static Utf8JsonWriter? jsonWriter;
 
-    public void Serialize(IBufferWriter<byte> bufferWriter, T value)
+    public void Serialize(IBufferWriter<byte> bufferWriter, T value, INatsHeaders? headers)
     {
         Utf8JsonWriter writer;
         if (jsonWriter == null)
@@ -38,7 +38,7 @@ public class NatsJsonOptionsSerializer<T>(JsonSerializerOptions options) : INats
         writer.Reset(NullBufferWriter.Instance);
     }
 
-    public T? Deserialize(in ReadOnlySequence<byte> buffer)
+    public T? Deserialize(in ReadOnlySequence<byte> buffer, INatsHeaders? headers)
     {
         if (buffer.Length == 0)
         {

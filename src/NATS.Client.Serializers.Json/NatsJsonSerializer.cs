@@ -52,7 +52,7 @@ public sealed class NatsJsonSerializer<T> : INatsSerializer<T>
     public INatsSerializer<T> CombineWith(INatsSerializer<T> next) => throw new NotSupportedException();
 
     /// <inheritdoc />
-    public void Serialize(IBufferWriter<byte> bufferWriter, T? value)
+    public void Serialize(IBufferWriter<byte> bufferWriter, T? value, INatsHeaders? headers)
     {
         Utf8JsonWriter writer;
         if (_jsonWriter == null)
@@ -71,7 +71,7 @@ public sealed class NatsJsonSerializer<T> : INatsSerializer<T>
     }
 
     /// <inheritdoc />
-    public T? Deserialize(in ReadOnlySequence<byte> buffer)
+    public T? Deserialize(in ReadOnlySequence<byte> buffer, INatsHeaders? headers)
     {
         if (buffer.Length == 0)
         {

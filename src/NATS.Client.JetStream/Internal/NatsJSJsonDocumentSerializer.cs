@@ -8,7 +8,7 @@ internal sealed class NatsJSJsonDocumentSerializer<T> : INatsDeserialize<NatsJSA
 {
     public static readonly NatsJSJsonDocumentSerializer<T> Default = new();
 
-    public NatsJSApiResult<T> Deserialize(in ReadOnlySequence<byte> buffer)
+    public NatsJSApiResult<T> Deserialize(in ReadOnlySequence<byte> buffer, INatsHeaders? headers)
     {
         if (buffer.Length == 0)
         {
