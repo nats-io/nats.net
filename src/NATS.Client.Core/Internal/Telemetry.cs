@@ -286,11 +286,7 @@ internal static class Telemetry
             },
             out var traceParent,
             out var traceState);
-#if NETSTANDARD2_0_OR_GREATER || NET7_0_OR_GREATER
         return ActivityContext.TryParse(traceParent, traceState, isRemote: true, out context);
-#else
-        return ActivityContext.TryParse(traceParent, traceState, out context);
-#endif
     }
 
     public class Constants
