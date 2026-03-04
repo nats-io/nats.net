@@ -15,6 +15,7 @@ using System.Text;
 using System.Text.Json.Serialization;
 using Google.Protobuf;
 using Google.Protobuf.Reflection;
+using Microsoft.Extensions.Primitives;
 using NATS.Client.Core;
 
 namespace NATS.Net.DocsExamples.Advanced;
@@ -303,7 +304,7 @@ public class MyHeaderAwareSerializer<T> : INatsSerializer<T>
     {
         // Read the content-type header to determine how to deserialize
         if (headers != null
-            && headers.TryGetValue("Content-Type", out var contentType)
+            && headers.TryGetValue("Content-Type", out StringValues contentType)
             && contentType.ToString() == "application/json")
         {
             return _jsonSerializer.Deserialize(buffer, headers);
