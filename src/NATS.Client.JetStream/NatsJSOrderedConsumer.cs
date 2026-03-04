@@ -64,6 +64,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
         NatsJSConsumeOpts? opts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         opts ??= _context.Opts.DefaultConsumeOpts;
         var consumerName = string.Empty;
         var notificationHandler = opts.NotificationHandler;
@@ -198,6 +199,8 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
         INatsDeserialize<T>? serializer = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         cancellationToken = CancellationTokenSource.CreateLinkedTokenSource(_cancellationToken, cancellationToken).Token;
         var processed = 0;
         var bytesProcessed = 0;
@@ -266,6 +269,8 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
         INatsDeserialize<T>? serializer = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         cancellationToken = CancellationTokenSource.CreateLinkedTokenSource(_cancellationToken, cancellationToken).Token;
         var processed = 0;
         var bytesProcessed = 0;

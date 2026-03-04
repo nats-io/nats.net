@@ -89,6 +89,26 @@ public interface INatsJSContext
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
     /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
+    /// <remarks>
+    /// <para>
+    /// <b>Warning:</b> This method issues a <c>$JS.API.CONSUMER.INFO</c> request to the server on every call.
+    /// Calling it frequently (e.g., in a message-processing loop or on a short timer) can cause significant load
+    /// on the NATS cluster, lead to API timeouts, and degrade performance for all clients.
+    /// </para>
+    /// <para>
+    /// If you need to track consumer progress at runtime (e.g., pending message count, sequence numbers, or delivery attempts),
+    /// use <see cref="INatsJSMsg{T}.Metadata"/> on each received message instead. When available, it provides
+    /// <see cref="NatsJSMsgMetadata.NumPending"/>, <see cref="NatsJSMsgMetadata.NumDelivered"/>,
+    /// <see cref="NatsJSMsgMetadata.Sequence"/>, and <see cref="NatsJSMsgMetadata.Timestamp"/>
+    /// without requiring a server round-trip. Note that <see cref="INatsJSMsg{T}.Metadata"/> can be <c>null</c>
+    /// (for example, if the reply subject cannot be parsed), so callers should always check for <c>null</c> before
+    /// accessing its properties.
+    /// </para>
+    /// <para>
+    /// Prefer using <see cref="CreateOrUpdateConsumerAsync"/> or <see cref="CreateConsumerAsync"/> to obtain a consumer
+    /// handle. Reserve this method for cases where you need to retrieve a consumer that was already created separately.
+    /// </para>
+    /// </remarks>
     ValueTask<INatsJSConsumer> GetConsumerAsync(string stream, string consumer, CancellationToken cancellationToken = default);
 
     /// <summary>

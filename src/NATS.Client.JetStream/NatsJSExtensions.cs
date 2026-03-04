@@ -38,4 +38,10 @@ public static class NatsJSExtensions
 #endif
         return ack.Error == null && !ack.Duplicate;
     }
+
+    public static ValueTask NakAsync<T>(this INatsJSMsg<T> msg, TimeSpan delay, CancellationToken cancellationToken = default)
+        => msg.NakAsync(new AckOpts { NakDelay = delay }, cancellationToken);
+
+    public static ValueTask AckTerminateAsync<T>(this INatsJSMsg<T> msg, string reason, CancellationToken cancellationToken = default)
+        => msg.AckTerminateAsync(new AckOpts { TerminateReason = reason }, cancellationToken);
 }

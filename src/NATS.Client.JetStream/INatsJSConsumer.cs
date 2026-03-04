@@ -9,6 +9,21 @@ public interface INatsJSConsumer
     /// <summary>
     /// Consumer info object as retrieved from NATS JetStream server at the time this object was created, updated or refreshed.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Warning:</b> Avoid calling <see cref="RefreshAsync"/> or <see cref="INatsJSContext.GetConsumerAsync"/> repeatedly in a loop
+    /// to refresh this property. Each call issues a <c>$JS.API.CONSUMER.INFO</c> request to the server, which can cause
+    /// significant load on the NATS cluster at scale, lead to API timeouts, and degrade overall system performance.
+    /// </para>
+    /// <para>
+    /// Instead, prefer using <see cref="INatsJSMsg{T}.Metadata"/>, when available, on each received message. When
+    /// <see cref="INatsJSMsg{T}.Metadata"/> is not <c>null</c>, it exposes
+    /// <see cref="NatsJSMsgMetadata.NumPending"/>, <see cref="NatsJSMsgMetadata.NumDelivered"/>,
+    /// <see cref="NatsJSMsgMetadata.Sequence"/>, and <see cref="NatsJSMsgMetadata.Timestamp"/>
+    /// without requiring a server round-trip. Callers should check that <c>Metadata</c> is not <c>null</c> before
+    /// accessing these properties.
+    /// </para>
+    /// </remarks>
     ConsumerInfo Info { get; }
 
     /// <summary>
@@ -79,6 +94,21 @@ public interface INatsJSConsumer
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <remarks>
+    /// <para>
+    /// <b>Warning:</b> This method issues a <c>$JS.API.CONSUMER.INFO</c> request to the server on every call.
+    /// Calling it frequently (e.g., in a message-processing loop or on a short timer) can cause significant load
+    /// on the NATS cluster, lead to API timeouts, and degrade performance for all clients.
+    /// </para>
+    /// <para>
+    /// For tracking consumer progress (e.g., pending message count, sequence numbers, or delivery attempts),
+    /// use <see cref="INatsJSMsg{T}.Metadata"/> on each received message instead. Note that
+    /// <see cref="INatsJSMsg{T}.Metadata"/> is nullable and should be checked for <c>null</c> before accessing
+    /// its properties. When non-null, it provides <see cref="NatsJSMsgMetadata.NumPending"/>,
+    /// <see cref="NatsJSMsgMetadata.NumDelivered"/>, <see cref="NatsJSMsgMetadata.Sequence"/>, and
+    /// <see cref="NatsJSMsgMetadata.Timestamp"/> without requiring a server round-trip.
+    /// </para>
+    /// </remarks>
     ValueTask RefreshAsync(CancellationToken cancellationToken = default);
 
     /// <summary>

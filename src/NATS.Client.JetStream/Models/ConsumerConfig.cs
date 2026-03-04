@@ -111,6 +111,7 @@ public record ConsumerConfig
     /// <summary>
     /// Filter the stream by a single subjects
     /// </summary>
+    /// <seealso href="https://www.nuget.org/packages/Synadia.Orbit.PCGroups">Partitioned consumer groups with subject-based partitioning</seealso>
     [System.Text.Json.Serialization.JsonPropertyName("filter_subject")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public string? FilterSubject { get; set; }
@@ -118,6 +119,7 @@ public record ConsumerConfig
     /// <summary>
     /// Filter the stream by multiple subjects
     /// </summary>
+    /// <seealso href="https://www.nuget.org/packages/Synadia.Orbit.PCGroups">Partitioned consumer groups with multi-subject partitioning</seealso>
     [System.Text.Json.Serialization.JsonPropertyName("filter_subjects")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public ICollection<string>? FilterSubjects { get; set; }
