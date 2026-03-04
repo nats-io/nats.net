@@ -26,9 +26,7 @@ public class NatsJSConsumer : INatsJSConsumer
         _consumer = Info.Name;
     }
 
-    /// <summary>
-    /// Consumer info object as retrieved from NATS JetStream server at the time this object was created, updated or refreshed.
-    /// </summary>
+    /// <inheritdoc />
     public ConsumerInfo Info { get; private set; }
 
     /// <summary>
@@ -163,6 +161,7 @@ public class NatsJSConsumer : INatsJSConsumer
     public async ValueTask<INatsJSMsg<T>?> NextAsync<T>(INatsDeserialize<T>? serializer = default, NatsJSNextOpts? opts = default, CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
+        ThrowIfPinned("next");
         opts ??= _context.Opts.DefaultNextOpts;
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
@@ -193,6 +192,7 @@ public class NatsJSConsumer : INatsJSConsumer
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
+        ThrowIfPinned("fetch");
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
         await using var fc = await FetchInternalAsync<T>(opts, serializer, cancellationToken).ConfigureAwait(false);
@@ -290,6 +290,7 @@ public class NatsJSConsumer : INatsJSConsumer
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
+        ThrowIfPinned("fetch");
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
         await using var fc = await FetchInternalAsync<T>(opts with { NoWait = true }, serializer, cancellationToken).ConfigureAwait(false);
@@ -303,12 +304,7 @@ public class NatsJSConsumer : INatsJSConsumer
         }
     }
 
-    /// <summary>
-    /// Retrieve the consumer info from the server and update this consumer.
-    /// </summary>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
-    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <inheritdoc />
     public async ValueTask RefreshAsync(CancellationToken cancellationToken = default) =>
         Info = await _context.JSRequestResponseAsync<object, ConsumerInfo>(
             subject: $"{_context.Opts.Prefix}.CONSUMER.INFO.{_stream}.{_consumer}",
@@ -350,6 +346,7 @@ public class NatsJSConsumer : INatsJSConsumer
     internal async ValueTask<NatsJSConsume<T>> ConsumeInternalAsync<T>(INatsDeserialize<T>? serializer = default, NatsJSConsumeOpts? opts = default, CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
+        cancellationToken.ThrowIfCancellationRequested();
 
         opts ??= new NatsJSConsumeOpts();
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
@@ -457,6 +454,7 @@ public class NatsJSConsumer : INatsJSConsumer
         CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
+        cancellationToken.ThrowIfCancellationRequested();
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
         var inbox = _context.NewBaseInbox();
@@ -541,5 +539,11 @@ public class NatsJSConsumer : INatsJSConsumer
     {
         if (_deleted)
             throw new NatsJSException($"Consumer '{_stream}:{_consumer}' is deleted");
+    }
+
+    private void ThrowIfPinned(string operation)
+    {
+        if (Info.Config.PriorityPolicy == ConsumerConfigPriorityPolicy.PinnedClient)
+            throw new NatsJSException($"Pinned client priority policy is not allowed with {operation}. Use Consume instead.");
     }
 }

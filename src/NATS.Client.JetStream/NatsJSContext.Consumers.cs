@@ -53,17 +53,7 @@ public partial class NatsJSContext : INatsJSContext
         return await CreateOrUpdateConsumerInternalAsync(stream, config, ConsumerCreateAction.Update, cancellationToken);
     }
 
-    /// <summary>
-    /// Gets consumer information from the server and creates a NATS JetStream consumer <see cref="NatsJSConsumer"/>.
-    /// </summary>
-    /// <param name="stream">Stream name where consumer is associated to.</param>
-    /// <param name="consumer">Consumer name.</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <returns>The NATS JetStream consumer object which can be used retrieving data from the stream.</returns>
-    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
-    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
-    /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
-    /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
+    /// <inheritdoc />
     public async ValueTask<INatsJSConsumer> GetConsumerAsync(string stream, string consumer, CancellationToken cancellationToken = default)
     {
         ThrowIfInvalidStreamName(stream);

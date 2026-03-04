@@ -1,4 +1,3 @@
-using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Models;
 using NATS.Client.TestUtilities;
@@ -18,7 +17,7 @@ public class PinnedClientTest
     }
 
     [SkipIfNatsServer(versionEarlierThan: "2.11")]
-    public async Task Pinned_client_basic_flow_with_fetch()
+    public async Task Pinned_client_basic_flow_with_consume()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
         var js = new NatsJSContext(nats);
@@ -45,16 +44,16 @@ public class PinnedClientTest
         };
         var consumer1 = await js.CreateOrUpdateConsumerAsync($"{prefix}s1", consumerConfig, cancellationToken: cts.Token);
 
-        // First consumer fetches - becomes pinned
+        // First consumer consumes - becomes pinned
         string? pinId = null;
         var count1 = 0;
         {
-            var opts = new NatsJSFetchOpts
+            var opts = new NatsJSConsumeOpts
             {
                 MaxMsgs = 5,
                 PriorityGroup = new NatsJSPriorityGroupOpts { Group = "workers" },
             };
-            await foreach (var msg in consumer1.FetchAsync<int>(opts, cancellationToken: cts.Token))
+            await foreach (var msg in consumer1.ConsumeAsync<int>(opts: opts, cancellationToken: cts.Token))
             {
                 count1++;
 
@@ -73,32 +72,16 @@ public class PinnedClientTest
                 {
                     Assert.Equal(pinId, currentPinId);
                 }
+
+                await msg.AckAsync(cancellationToken: cts.Token);
+                if (count1 == 5)
+                    break;
             }
         }
 
         Assert.Equal(5, count1);
         Assert.NotNull(pinId);
         _output.WriteLine($"First consumer got {count1} messages with pin ID: {pinId}");
-
-        // Second consumer context (same consumer name) tries to fetch - should get no messages
-        var consumer2 = await js.GetConsumerAsync($"{prefix}s1", $"{prefix}c1", cts.Token);
-        var count2 = 0;
-        {
-            var opts = new NatsJSFetchOpts
-            {
-                MaxMsgs = 5,
-                Expires = TimeSpan.FromSeconds(2),
-                PriorityGroup = new NatsJSPriorityGroupOpts { Group = "workers" },
-            };
-            await foreach (var msg in consumer2.FetchAsync<int>(opts, cancellationToken: cts.Token))
-            {
-                count2++;
-            }
-        }
-
-        // Second consumer should get no messages while first is pinned
-        Assert.Equal(0, count2);
-        _output.WriteLine($"Second consumer got {count2} messages (expected 0 while pinned)");
     }
 
     [SkipIfNatsServer(versionEarlierThan: "2.11")]
@@ -126,20 +109,23 @@ public class PinnedClientTest
         };
         var consumer1 = (NatsJSConsumer)await js.CreateOrUpdateConsumerAsync($"{prefix}s1", consumerConfig, cancellationToken: cts.Token);
 
-        // First consumer fetches and becomes pinned
+        // First consumer consumes and becomes pinned
         string? firstPinId = null;
         {
-            var opts = new NatsJSFetchOpts
+            var opts = new NatsJSConsumeOpts
             {
-                MaxMsgs = 3,
+                MaxMsgs = 1,
                 PriorityGroup = new NatsJSPriorityGroupOpts { Group = "workers" },
             };
-            await foreach (var msg in consumer1.FetchAsync<int>(opts, cancellationToken: cts.Token))
+            await foreach (var msg in consumer1.ConsumeAsync<int>(opts: opts, cancellationToken: cts.Token))
             {
                 if (msg.Headers != null && msg.Headers.TryGetValue("Nats-Pin-Id", out var pinIdValues))
                 {
                     firstPinId = pinIdValues.ToString();
                 }
+
+                await msg.AckAsync(cancellationToken: cts.Token);
+                break;
             }
         }
 
@@ -155,18 +141,22 @@ public class PinnedClientTest
         string? secondPinId = null;
         var count2 = 0;
         {
-            var opts = new NatsJSFetchOpts
+            var opts = new NatsJSConsumeOpts
             {
                 MaxMsgs = 3,
                 PriorityGroup = new NatsJSPriorityGroupOpts { Group = "workers" },
             };
-            await foreach (var msg in consumer2.FetchAsync<int>(opts, cancellationToken: cts.Token))
+            await foreach (var msg in consumer2.ConsumeAsync<int>(opts: opts, cancellationToken: cts.Token))
             {
                 count2++;
                 if (msg.Headers != null && msg.Headers.TryGetValue("Nats-Pin-Id", out var pinIdValues))
                 {
                     secondPinId = pinIdValues.ToString();
                 }
+
+                await msg.AckAsync(cancellationToken: cts.Token);
+                if (count2 == 3)
+                    break;
             }
         }
 
@@ -176,65 +166,83 @@ public class PinnedClientTest
         _output.WriteLine($"Second consumer got {count2} messages with new pin ID: {secondPinId}");
     }
 
-    [SkipIfNatsServer(versionEarlierThan: "2.11")]
-    public async Task Pinned_client_requires_priority_group_on_fetch()
+    [Fact]
+    public async Task Pinned_client_not_allowed_with_fetch()
     {
-        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var nats = new NatsConnection();
         var js = new NatsJSContext(nats);
-        var prefix = _server.GetNextId();
 
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-
-        await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.>"], cts.Token);
-
-        var consumerConfig = new ConsumerConfig($"{prefix}c1")
+        var consumer = new NatsJSConsumer(js, new ConsumerInfo
         {
-            PriorityGroups = ["workers"],
-            PriorityPolicy = ConsumerConfigPriorityPolicy.PinnedClient,
-        };
-        var consumer = await js.CreateOrUpdateConsumerAsync($"{prefix}s1", consumerConfig, cancellationToken: cts.Token);
+            StreamName = "s1",
+            Name = "c1",
+            Config = new ConsumerConfig("c1")
+            {
+                PriorityPolicy = ConsumerConfigPriorityPolicy.PinnedClient,
+            },
+        });
 
-        // Fetch without priority group should fail
-        var exception = await Assert.ThrowsAsync<NatsJSProtocolException>(async () =>
+        var exception = await Assert.ThrowsAsync<NatsJSException>(async () =>
         {
-            var opts = new NatsJSFetchOpts { MaxMsgs = 5 };
-            await foreach (var msg in consumer.FetchAsync<int>(opts, cancellationToken: cts.Token))
+            await foreach (var msg in consumer.FetchAsync<int>(new NatsJSFetchOpts { MaxMsgs = 1 }))
             {
             }
         });
 
-        Assert.Equal(400, exception.HeaderCode);
-        Assert.Contains("Priority Group", exception.HeaderMessageText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("fetch", exception.Message);
+        Assert.Contains("Pinned", exception.Message);
     }
 
-    [SkipIfNatsServer(versionEarlierThan: "2.11")]
-    public async Task Pinned_client_requires_priority_group_on_next()
+    [Fact]
+    public async Task Pinned_client_not_allowed_with_fetch_no_wait()
     {
-        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var nats = new NatsConnection();
         var js = new NatsJSContext(nats);
-        var prefix = _server.GetNextId();
 
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-
-        await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.>"], cts.Token);
-
-        await js.PublishAsync($"{prefix}s1.1", 1, cancellationToken: cts.Token);
-
-        var consumerConfig = new ConsumerConfig($"{prefix}c1")
+        var consumer = new NatsJSConsumer(js, new ConsumerInfo
         {
-            PriorityGroups = ["workers"],
-            PriorityPolicy = ConsumerConfigPriorityPolicy.PinnedClient,
-        };
-        var consumer = await js.CreateOrUpdateConsumerAsync($"{prefix}s1", consumerConfig, cancellationToken: cts.Token);
-
-        // Next without priority group should fail
-        var exception = await Assert.ThrowsAsync<NatsJSProtocolException>(async () =>
-        {
-            await consumer.NextAsync<int>(cancellationToken: cts.Token);
+            StreamName = "s1",
+            Name = "c1",
+            Config = new ConsumerConfig("c1")
+            {
+                PriorityPolicy = ConsumerConfigPriorityPolicy.PinnedClient,
+            },
         });
 
-        Assert.Equal(400, exception.HeaderCode);
-        Assert.Contains("Priority Group", exception.HeaderMessageText, StringComparison.OrdinalIgnoreCase);
+        var exception = await Assert.ThrowsAsync<NatsJSException>(async () =>
+        {
+            await foreach (var msg in consumer.FetchNoWaitAsync<int>(new NatsJSFetchOpts { MaxMsgs = 1 }))
+            {
+            }
+        });
+
+        Assert.Contains("fetch", exception.Message);
+        Assert.Contains("Pinned", exception.Message);
+    }
+
+    [Fact]
+    public async Task Pinned_client_not_allowed_with_next()
+    {
+        var nats = new NatsConnection();
+        var js = new NatsJSContext(nats);
+
+        var consumer = new NatsJSConsumer(js, new ConsumerInfo
+        {
+            StreamName = "s1",
+            Name = "c1",
+            Config = new ConsumerConfig("c1")
+            {
+                PriorityPolicy = ConsumerConfigPriorityPolicy.PinnedClient,
+            },
+        });
+
+        var exception = await Assert.ThrowsAsync<NatsJSException>(async () =>
+        {
+            await consumer.NextAsync<int>();
+        });
+
+        Assert.Contains("next", exception.Message);
+        Assert.Contains("Pinned", exception.Message);
     }
 
     [SkipIfNatsServer(versionEarlierThan: "2.11")]
@@ -255,15 +263,15 @@ public class PinnedClientTest
         };
         var consumer = await js.CreateOrUpdateConsumerAsync($"{prefix}s1", consumerConfig, cancellationToken: cts.Token);
 
-        // Fetch with invalid priority group should fail
+        // Consume with invalid priority group should fail
         var exception = await Assert.ThrowsAsync<NatsJSProtocolException>(async () =>
         {
-            var opts = new NatsJSFetchOpts
+            var opts = new NatsJSConsumeOpts
             {
                 MaxMsgs = 5,
                 PriorityGroup = new NatsJSPriorityGroupOpts { Group = "invalid_group" },
             };
-            await foreach (var msg in consumer.FetchAsync<int>(opts, cancellationToken: cts.Token))
+            await foreach (var msg in consumer.ConsumeAsync<int>(opts: opts, cancellationToken: cts.Token))
             {
             }
         });
@@ -299,36 +307,40 @@ public class PinnedClientTest
         // First consumer gets pinned
         var consumer1 = await js.GetConsumerAsync($"{prefix}s1", $"{prefix}c1", cts.Token);
         {
-            var opts = new NatsJSFetchOpts
+            var opts = new NatsJSConsumeOpts
             {
-                MaxMsgs = 2,
+                MaxMsgs = 1,
                 PriorityGroup = new NatsJSPriorityGroupOpts { Group = "workers" },
             };
-            await foreach (var msg in consumer1.FetchAsync<int>(opts, cancellationToken: cts.Token))
+            await foreach (var msg in consumer1.ConsumeAsync<int>(opts: opts, cancellationToken: cts.Token))
             {
-                // Get pinned
+                await msg.AckAsync(cancellationToken: cts.Token);
+                break;
             }
         }
 
         // Unpin via context method
         await js.UnpinConsumerAsync($"{prefix}s1", $"{prefix}c1", "workers", cts.Token);
 
-        // Another consumer can now fetch
+        // Another consumer can now consume
         var consumer2 = await js.GetConsumerAsync($"{prefix}s1", $"{prefix}c1", cts.Token);
-        var count = 0;
+        var count2 = 0;
         {
-            var opts = new NatsJSFetchOpts
+            var opts = new NatsJSConsumeOpts
             {
                 MaxMsgs = 3,
                 PriorityGroup = new NatsJSPriorityGroupOpts { Group = "workers" },
             };
-            await foreach (var msg in consumer2.FetchAsync<int>(opts, cancellationToken: cts.Token))
+            await foreach (var msg in consumer2.ConsumeAsync<int>(opts: opts, cancellationToken: cts.Token))
             {
-                count++;
+                count2++;
+                await msg.AckAsync(cancellationToken: cts.Token);
+                if (count2 == 3)
+                    break;
             }
         }
 
-        Assert.True(count > 0, "Consumer should receive messages after context unpin");
+        Assert.True(count2 > 0, "Consumer should receive messages after context unpin");
     }
 
     [SkipIfNatsServer(versionEarlierThan: "2.11")]
@@ -357,16 +369,17 @@ public class PinnedClientTest
         Assert.NotNull(consumer.Info.Config.PriorityGroups);
         Assert.Contains("workers", consumer.Info.Config.PriorityGroups);
 
-        // Fetch to get pinned
+        // Consume to get pinned
         {
-            var opts = new NatsJSFetchOpts
+            var opts = new NatsJSConsumeOpts
             {
                 MaxMsgs = 1,
                 PriorityGroup = new NatsJSPriorityGroupOpts { Group = "workers" },
             };
-            await foreach (var msg in consumer.FetchAsync<int>(opts, cancellationToken: cts.Token))
+            await foreach (var msg in consumer.ConsumeAsync<int>(opts: opts, cancellationToken: cts.Token))
             {
-                // Gets pinned
+                await msg.AckAsync(cancellationToken: cts.Token);
+                break;
             }
         }
 

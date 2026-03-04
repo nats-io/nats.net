@@ -133,6 +133,7 @@ public interface INatsConnection : INatsClient
     /// <remarks>
     /// if reply option's timeout is not defined then it will be set to NatsOpts.RequestTimeout.
     /// </remarks>
+    /// <seealso href="https://www.nuget.org/packages/Synadia.Orbit.Core.Extensions">RequestManyWithSentinelAsync for custom stop conditions</seealso>
     IAsyncEnumerable<NatsMsg<TReply>> RequestManyAsync<TRequest, TReply>(
         string subject,
         TRequest? data,

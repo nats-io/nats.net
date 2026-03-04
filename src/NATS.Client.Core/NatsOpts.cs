@@ -28,6 +28,7 @@ public enum NatsRequestReplyMode
 /// <summary>
 /// Immutable options for NatsConnection, you can configure via `with` operator.
 /// </summary>
+/// <seealso href="https://www.nuget.org/packages/Synadia.Orbit.NatsContext">Load NatsOpts from NATS CLI context files</seealso>
 public sealed record NatsOpts
 {
     public static readonly NatsOpts Default = new()
