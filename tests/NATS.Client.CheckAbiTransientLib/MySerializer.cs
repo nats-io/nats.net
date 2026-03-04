@@ -14,13 +14,13 @@ public class MySerializer : INatsSerializer<string>
         return typeof(INatsSerialize<>).Assembly.GetName().Name!;
     }
 
-    public void Serialize(IBufferWriter<byte> bufferWriter, string value, INatsHeaders? headers)
+    public void Serialize(IBufferWriter<byte> bufferWriter, string value)
     {
         var bytes = System.Text.Encoding.UTF8.GetBytes(value);
         bufferWriter.Write(bytes);
     }
 
-    public string? Deserialize(in ReadOnlySequence<byte> buffer, INatsHeaders? headers)
+    public string? Deserialize(in ReadOnlySequence<byte> buffer)
     {
         return System.Text.Encoding.UTF8.GetString(buffer.ToArray());
     }

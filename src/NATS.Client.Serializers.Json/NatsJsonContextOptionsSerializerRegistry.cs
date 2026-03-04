@@ -20,6 +20,13 @@ public class NatsJsonOptionsSerializer<T>(JsonSerializerOptions options) : INats
     [ThreadStatic]
     private static Utf8JsonWriter? jsonWriter;
 
+#pragma warning disable CS0618 // Type or member is obsolete
+
+    public void Serialize(IBufferWriter<byte> bufferWriter, T value) => Serialize(bufferWriter, value, null);
+
+    public T? Deserialize(in ReadOnlySequence<byte> buffer) => Deserialize(buffer, null);
+#pragma warning restore CS0618
+
     public void Serialize(IBufferWriter<byte> bufferWriter, T value, INatsHeaders? headers)
     {
         Utf8JsonWriter writer;

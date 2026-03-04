@@ -49,6 +49,15 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
     /// <param name="next">The next serializer in chain.</param>
     public NatsUtf8PrimitivesSerializer(INatsSerializer<T>? next = default) => _next = next;
 
+#pragma warning disable CS0618 // Type or member is obsolete
+
+    /// <inheritdoc />
+    public void Serialize(IBufferWriter<byte> bufferWriter, T value) => Serialize(bufferWriter, value, null);
+
+    /// <inheritdoc />
+    public T? Deserialize(in ReadOnlySequence<byte> buffer) => Deserialize(buffer, null);
+#pragma warning restore CS0618
+
     /// <inheritdoc />
     public INatsSerializer<T> CombineWith(INatsSerializer<T>? next) => new NatsUtf8PrimitivesSerializer<T>(next);
 
@@ -569,6 +578,15 @@ public class NatsRawSerializer<T> : INatsSerializer<T>
     /// <param name="next">Next serializer in chain.</param>
     public NatsRawSerializer(INatsSerializer<T>? next = default) => _next = next;
 
+#pragma warning disable CS0618 // Type or member is obsolete
+
+    /// <inheritdoc />
+    public void Serialize(IBufferWriter<byte> bufferWriter, T value) => Serialize(bufferWriter, value, null);
+
+    /// <inheritdoc />
+    public T? Deserialize(in ReadOnlySequence<byte> buffer) => Deserialize(buffer, null);
+#pragma warning restore CS0618
+
     /// <inheritdoc />
     public INatsSerializer<T> CombineWith(INatsSerializer<T>? next) => new NatsRawSerializer<T>(next);
 
@@ -723,6 +741,15 @@ public sealed class NatsJsonContextSerializer<T> : INatsSerializer<T>
         : this(new[] { context }, next)
     {
     }
+
+#pragma warning disable CS0618 // Type or member is obsolete
+
+    /// <inheritdoc />
+    public void Serialize(IBufferWriter<byte> bufferWriter, T value) => Serialize(bufferWriter, value, null);
+
+    /// <inheritdoc />
+    public T? Deserialize(in ReadOnlySequence<byte> buffer) => Deserialize(buffer, null);
+#pragma warning restore CS0618
 
     /// <inheritdoc />
     public INatsSerializer<T> CombineWith(INatsSerializer<T> next) => new NatsJsonContextSerializer<T>(_contexts, next);

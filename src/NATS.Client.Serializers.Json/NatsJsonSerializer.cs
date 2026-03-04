@@ -48,6 +48,15 @@ public sealed class NatsJsonSerializer<T> : INatsSerializer<T>
     /// </summary>
     public static NatsJsonSerializer<T> Default { get; } = new();
 
+#pragma warning disable CS0618 // Type or member is obsolete
+
+    /// <inheritdoc />
+    public void Serialize(IBufferWriter<byte> bufferWriter, T? value) => Serialize(bufferWriter, value, null);
+
+    /// <inheritdoc />
+    public T? Deserialize(in ReadOnlySequence<byte> buffer) => Deserialize(buffer, null);
+#pragma warning restore CS0618
+
     /// <inheritdoc />
     public INatsSerializer<T> CombineWith(INatsSerializer<T> next) => throw new NotSupportedException();
 

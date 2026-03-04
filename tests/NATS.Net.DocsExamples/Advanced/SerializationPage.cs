@@ -278,6 +278,44 @@ public class MixedSerializerRegistry : INatsSerializerRegistry
 }
 #endregion
 
+#region header-aware-serializer
+public class MyHeaderAwareSerializer<T> : INatsSerializer<T>
+{
+    private readonly NatsJsonContextSerializer<T> _jsonSerializer;
+
+    public MyHeaderAwareSerializer(JsonSerializerContext context)
+    {
+        _jsonSerializer = new NatsJsonContextSerializer<T>(context);
+    }
+
+    public void Serialize(IBufferWriter<byte> bufferWriter, T value, INatsHeaders? headers)
+    {
+        // Set a content-type header so the deserializer knows the format
+        if (headers is NatsHeaders mutableHeaders)
+        {
+            mutableHeaders["Content-Type"] = "application/json";
+        }
+
+        _jsonSerializer.Serialize(bufferWriter, value, headers);
+    }
+
+    public T? Deserialize(in ReadOnlySequence<byte> buffer, INatsHeaders? headers)
+    {
+        // Read the content-type header to determine how to deserialize
+        if (headers != null
+            && headers.TryGetValue("Content-Type", out var contentType)
+            && contentType.ToString() == "application/json")
+        {
+            return _jsonSerializer.Deserialize(buffer, headers);
+        }
+
+        throw new NatsException($"Unsupported content type for {typeof(T)}");
+    }
+
+    public INatsSerializer<T> CombineWith(INatsSerializer<T> next) => throw new NotImplementedException();
+}
+#endregion
+
 // Fake protobuf message.
 // Normally, this would be generated using protobuf compiler.
 public class Greeting : IBufferMessage

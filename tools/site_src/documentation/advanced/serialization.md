@@ -75,6 +75,10 @@ You can also set the serializer for a specific subscription or publish call:
 You can also provide your own serializer by implementing the [`INatsSerializer<T>`](xref:NATS.Client.Core.INatsSerializer`1) interface. This is useful if you need to
 support a custom serialization format or if you need to support multiple serialization formats.
 
+On .NET 8+, you only need to implement one overload of `Serialize` and `Deserialize` thanks to default interface methods (DIMs).
+If you implement the headers overload, the old headerless overload is provided automatically (and vice versa).
+On older targets (netstandard2.0/2.1), both overloads must be implemented explicitly.
+
 Here is an example of a custom serializer that uses the Google ProtoBuf serializer to serialize and deserialize:
 
 [!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/SerializationPage.cs#custom-serializer)]
@@ -82,6 +86,16 @@ Here is an example of a custom serializer that uses the Google ProtoBuf serializ
 You can then use the custom serializer as the default for the connection:
 
 [!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/SerializationPage.cs#custom)]
+
+## Using Headers in Serializers
+
+The `Serialize` and `Deserialize` methods receive an optional [`INatsHeaders`](xref:NATS.Client.Core.INatsHeaders) parameter,
+allowing serializers to read or modify NATS headers during serialization. This can be used for scenarios like
+content-type negotiation, encoding metadata, or any other header-driven serialization logic.
+
+Here is an example of a serializer that writes a content-type header during serialization and uses it during deserialization:
+
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/SerializationPage.cs#header-aware-serializer)]
 
 ## Using Multiple Serializers (chaining)
 

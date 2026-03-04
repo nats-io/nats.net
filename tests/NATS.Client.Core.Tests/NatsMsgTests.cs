@@ -148,6 +148,14 @@ public class NatsMsgTests
     {
         private readonly NatsJsonSerializer<T> _inner = new();
 
+#if !NET8_0_OR_GREATER
+#pragma warning disable CS0618 // Type or member is obsolete
+        public void Serialize(IBufferWriter<byte> bufferWriter, T value) => Serialize(bufferWriter, value, null);
+
+        public T? Deserialize(in ReadOnlySequence<byte> buffer) => Deserialize(buffer, null);
+#pragma warning restore CS0618
+#endif
+
         public void Serialize(IBufferWriter<byte> bufferWriter, T value, INatsHeaders? headers)
         {
             // Write a header-based prefix before the JSON payload
