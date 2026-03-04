@@ -519,7 +519,7 @@ public class NatsMsgBuilder<T>
                 if (Serializer != null && Data != null)
                 {
                     var bufferWriter = new NatsPooledBufferWriter<byte>(SerializationBufferSize);
-                    Serializer.Serialize(bufferWriter, Data, null);
+                    Serializer.Serialize(bufferWriter, Data, Headers);
                     size = bufferWriter.WrittenMemory.Length;
                 }
 
