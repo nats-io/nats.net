@@ -48,11 +48,20 @@ public sealed class NatsJsonSerializer<T> : INatsSerializer<T>
     /// </summary>
     public static NatsJsonSerializer<T> Default { get; } = new();
 
+#pragma warning disable CS0618 // Type or member is obsolete
+
+    /// <inheritdoc />
+    public void Serialize(IBufferWriter<byte> bufferWriter, T? value) => Serialize(bufferWriter, value, null);
+
+    /// <inheritdoc />
+    public T? Deserialize(in ReadOnlySequence<byte> buffer) => Deserialize(buffer, null);
+#pragma warning restore CS0618
+
     /// <inheritdoc />
     public INatsSerializer<T> CombineWith(INatsSerializer<T> next) => throw new NotSupportedException();
 
     /// <inheritdoc />
-    public void Serialize(IBufferWriter<byte> bufferWriter, T? value)
+    public void Serialize(IBufferWriter<byte> bufferWriter, T? value, INatsHeaders? headers)
     {
         Utf8JsonWriter writer;
         if (_jsonWriter == null)
@@ -71,7 +80,7 @@ public sealed class NatsJsonSerializer<T> : INatsSerializer<T>
     }
 
     /// <inheritdoc />
-    public T? Deserialize(in ReadOnlySequence<byte> buffer)
+    public T? Deserialize(in ReadOnlySequence<byte> buffer, INatsHeaders? headers)
     {
         if (buffer.Length == 0)
         {

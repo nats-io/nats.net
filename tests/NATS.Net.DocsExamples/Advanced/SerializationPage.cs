@@ -15,6 +15,7 @@ using System.Text;
 using System.Text.Json.Serialization;
 using Google.Protobuf;
 using Google.Protobuf.Reflection;
+using Microsoft.Extensions.Primitives;
 using NATS.Client.Core;
 
 namespace NATS.Net.DocsExamples.Advanced;
@@ -236,7 +237,13 @@ public class MyProtoBufSerializer<T> : INatsSerializer<T>
 {
     public static readonly INatsSerializer<T> Default = new MyProtoBufSerializer<T>();
 
-    public void Serialize(IBufferWriter<byte> bufferWriter, T value)
+#pragma warning disable CS0618 // Type or member is obsolete
+    public void Serialize(IBufferWriter<byte> bufferWriter, T value) => Serialize(bufferWriter, value, null);
+
+    public T? Deserialize(in ReadOnlySequence<byte> buffer) => Deserialize(buffer, null);
+#pragma warning restore CS0618
+
+    public void Serialize(IBufferWriter<byte> bufferWriter, T value, INatsHeaders? headers)
     {
         if (value is IMessage message)
         {
@@ -248,7 +255,7 @@ public class MyProtoBufSerializer<T> : INatsSerializer<T>
         }
     }
 
-    public T? Deserialize(in ReadOnlySequence<byte> buffer)
+    public T? Deserialize(in ReadOnlySequence<byte> buffer, INatsHeaders? headers)
     {
         if (typeof(T) == typeof(Greeting))
         {
@@ -275,6 +282,50 @@ public class MixedSerializerRegistry : INatsSerializerRegistry
     public INatsSerialize<T> GetSerializer<T>() => new NatsJsonContextSerializer<T>(MyJsonContext.Default, next: MyProtoBufSerializer<T>.Default);
 
     public INatsDeserialize<T> GetDeserializer<T>() => new NatsJsonContextSerializer<T>(MyJsonContext.Default, next: MyProtoBufSerializer<T>.Default);
+}
+#endregion
+
+#region header-aware-serializer
+public class MyHeaderAwareSerializer<T> : INatsSerializer<T>
+{
+    private readonly NatsJsonContextSerializer<T> _jsonSerializer;
+
+    public MyHeaderAwareSerializer(JsonSerializerContext context)
+    {
+        _jsonSerializer = new NatsJsonContextSerializer<T>(context);
+    }
+
+#pragma warning disable CS0618 // Type or member is obsolete
+    public void Serialize(IBufferWriter<byte> bufferWriter, T value) => Serialize(bufferWriter, value, null);
+
+    public T? Deserialize(in ReadOnlySequence<byte> buffer) => Deserialize(buffer, null);
+#pragma warning restore CS0618
+
+    public void Serialize(IBufferWriter<byte> bufferWriter, T value, INatsHeaders? headers)
+    {
+        // Set a content-type header so the deserializer knows the format
+        if (headers is NatsHeaders mutableHeaders)
+        {
+            mutableHeaders["Content-Type"] = "application/json";
+        }
+
+        _jsonSerializer.Serialize(bufferWriter, value, headers);
+    }
+
+    public T? Deserialize(in ReadOnlySequence<byte> buffer, INatsHeaders? headers)
+    {
+        // Read the content-type header to determine how to deserialize
+        if (headers != null
+            && headers.TryGetValue("Content-Type", out StringValues contentType)
+            && contentType.ToString() == "application/json")
+        {
+            return _jsonSerializer.Deserialize(buffer, headers);
+        }
+
+        throw new NatsException($"Unsupported content type for {typeof(T)}");
+    }
+
+    public INatsSerializer<T> CombineWith(INatsSerializer<T> next) => throw new NotImplementedException();
 }
 #endregion
 

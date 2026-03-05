@@ -101,7 +101,7 @@ public class JetStreamApiSerializerTest
     public void Deserialize_value()
     {
         var serializer = NatsJSJsonDocumentSerializer<AccountInfoResponse>.Default;
-        var result = serializer.Deserialize(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes("""{"memory":1}""")));
+        var result = serializer.Deserialize(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes("""{"memory":1}""")), null);
         result.Value.Memory.Should().Be(1);
     }
 
@@ -109,7 +109,7 @@ public class JetStreamApiSerializerTest
     public void Deserialize_empty_buffer()
     {
         var serializer = NatsJSJsonDocumentSerializer<AccountInfoResponse>.Default;
-        var result = serializer.Deserialize(ReadOnlySequence<byte>.Empty);
+        var result = serializer.Deserialize(ReadOnlySequence<byte>.Empty, null);
         result.Exception.Message.Should().Be("Buffer is empty");
     }
 
@@ -117,7 +117,7 @@ public class JetStreamApiSerializerTest
     public void Deserialize_error()
     {
         var serializer = NatsJSJsonDocumentSerializer<AccountInfoResponse>.Default;
-        var result = serializer.Deserialize(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes("""{"error":{"code":2}}""")));
+        var result = serializer.Deserialize(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes("""{"error":{"code":2}}""")), null);
         result.Error.Code.Should().Be(2);
     }
 }

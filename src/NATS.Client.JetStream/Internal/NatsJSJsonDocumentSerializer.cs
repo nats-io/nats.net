@@ -8,7 +8,12 @@ internal sealed class NatsJSJsonDocumentSerializer<T> : INatsDeserialize<NatsJSA
 {
     public static readonly NatsJSJsonDocumentSerializer<T> Default = new();
 
-    public NatsJSApiResult<T> Deserialize(in ReadOnlySequence<byte> buffer)
+#pragma warning disable CS0618 // Type or member is obsolete
+
+    public NatsJSApiResult<T> Deserialize(in ReadOnlySequence<byte> buffer) => Deserialize(buffer, null);
+#pragma warning restore CS0618
+
+    public NatsJSApiResult<T> Deserialize(in ReadOnlySequence<byte> buffer, INatsHeaders? headers)
     {
         if (buffer.Length == 0)
         {

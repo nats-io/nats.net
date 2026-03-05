@@ -49,11 +49,20 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
     /// <param name="next">The next serializer in chain.</param>
     public NatsUtf8PrimitivesSerializer(INatsSerializer<T>? next = default) => _next = next;
 
+#pragma warning disable CS0618 // Type or member is obsolete
+
+    /// <inheritdoc />
+    public void Serialize(IBufferWriter<byte> bufferWriter, T value) => Serialize(bufferWriter, value, null);
+
+    /// <inheritdoc />
+    public T? Deserialize(in ReadOnlySequence<byte> buffer) => Deserialize(buffer, null);
+#pragma warning restore CS0618
+
     /// <inheritdoc />
     public INatsSerializer<T> CombineWith(INatsSerializer<T>? next) => new NatsUtf8PrimitivesSerializer<T>(next);
 
     /// <inheritdoc />
-    public void Serialize(IBufferWriter<byte> bufferWriter, T value)
+    public void Serialize(IBufferWriter<byte> bufferWriter, T value, INatsHeaders? headers)
     {
         if (value is string str)
         {
@@ -335,11 +344,11 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
             throw new NatsException($"Can't serialize {typeof(T)}");
         }
 
-        _next.Serialize(bufferWriter, value);
+        _next.Serialize(bufferWriter, value, headers);
     }
 
     /// <inheritdoc />
-    public T? Deserialize(in ReadOnlySequence<byte> buffer)
+    public T? Deserialize(in ReadOnlySequence<byte> buffer, INatsHeaders? headers)
     {
         if (typeof(T) == typeof(string))
         {
@@ -550,7 +559,7 @@ public class NatsUtf8PrimitivesSerializer<T> : INatsSerializer<T>
             throw new NatsException($"Can't deserialize {typeof(T)}");
         }
 
-        return _next.Deserialize(buffer);
+        return _next.Deserialize(buffer, headers);
     }
 }
 
@@ -569,11 +578,20 @@ public class NatsRawSerializer<T> : INatsSerializer<T>
     /// <param name="next">Next serializer in chain.</param>
     public NatsRawSerializer(INatsSerializer<T>? next = default) => _next = next;
 
+#pragma warning disable CS0618 // Type or member is obsolete
+
+    /// <inheritdoc />
+    public void Serialize(IBufferWriter<byte> bufferWriter, T value) => Serialize(bufferWriter, value, null);
+
+    /// <inheritdoc />
+    public T? Deserialize(in ReadOnlySequence<byte> buffer) => Deserialize(buffer, null);
+#pragma warning restore CS0618
+
     /// <inheritdoc />
     public INatsSerializer<T> CombineWith(INatsSerializer<T>? next) => new NatsRawSerializer<T>(next);
 
     /// <inheritdoc />
-    public void Serialize(IBufferWriter<byte> bufferWriter, T value)
+    public void Serialize(IBufferWriter<byte> bufferWriter, T value, INatsHeaders? headers)
     {
         if (value is byte[] bytes)
         {
@@ -630,11 +648,11 @@ public class NatsRawSerializer<T> : INatsSerializer<T>
             throw new NatsException($"Can't serialize {typeof(T)}");
         }
 
-        _next.Serialize(bufferWriter, value);
+        _next.Serialize(bufferWriter, value, headers);
     }
 
     /// <inheritdoc />
-    public T? Deserialize(in ReadOnlySequence<byte> buffer)
+    public T? Deserialize(in ReadOnlySequence<byte> buffer, INatsHeaders? headers)
     {
         if (typeof(T) == typeof(byte[]))
         {
@@ -678,7 +696,7 @@ public class NatsRawSerializer<T> : INatsSerializer<T>
             throw new NatsException($"Can't deserialize {typeof(T)}");
         }
 
-        return _next.Deserialize(buffer);
+        return _next.Deserialize(buffer, headers);
     }
 }
 
@@ -724,11 +742,20 @@ public sealed class NatsJsonContextSerializer<T> : INatsSerializer<T>
     {
     }
 
+#pragma warning disable CS0618 // Type or member is obsolete
+
+    /// <inheritdoc />
+    public void Serialize(IBufferWriter<byte> bufferWriter, T value) => Serialize(bufferWriter, value, null);
+
+    /// <inheritdoc />
+    public T? Deserialize(in ReadOnlySequence<byte> buffer) => Deserialize(buffer, null);
+#pragma warning restore CS0618
+
     /// <inheritdoc />
     public INatsSerializer<T> CombineWith(INatsSerializer<T> next) => new NatsJsonContextSerializer<T>(_contexts, next);
 
     /// <inheritdoc />
-    public void Serialize(IBufferWriter<byte> bufferWriter, T value)
+    public void Serialize(IBufferWriter<byte> bufferWriter, T value, INatsHeaders? headers)
     {
         foreach (var context in _contexts)
         {
@@ -757,11 +784,11 @@ public sealed class NatsJsonContextSerializer<T> : INatsSerializer<T>
             throw new NatsException($"Can't serialize {typeof(T)}");
         }
 
-        _next.Serialize(bufferWriter, value);
+        _next.Serialize(bufferWriter, value, headers);
     }
 
     /// <inheritdoc />
-    public T? Deserialize(in ReadOnlySequence<byte> buffer)
+    public T? Deserialize(in ReadOnlySequence<byte> buffer, INatsHeaders? headers)
     {
         if (buffer.Length == 0)
         {
@@ -778,7 +805,7 @@ public sealed class NatsJsonContextSerializer<T> : INatsSerializer<T>
         }
 
         if (_next != null)
-            return _next.Deserialize(buffer);
+            return _next.Deserialize(buffer, headers);
 
         throw new NatsException($"Can't deserialize {typeof(T)}");
     }
