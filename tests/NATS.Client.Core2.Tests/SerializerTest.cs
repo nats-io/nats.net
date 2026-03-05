@@ -343,13 +343,11 @@ public class TestSerializerRegistry : INatsSerializerRegistry
 
 public class TestSerializer<T> : INatsSerializer<T>
 {
-#if !NET8_0_OR_GREATER
 #pragma warning disable CS0618 // Type or member is obsolete
     public void Serialize(IBufferWriter<byte> bufferWriter, T? value) => Serialize(bufferWriter, value, null);
 
     public T? Deserialize(in ReadOnlySequence<byte> buffer) => Deserialize(buffer, null);
 #pragma warning restore CS0618
-#endif
 
     public void Serialize(IBufferWriter<byte> bufferWriter, T? value, INatsHeaders? headers) => throw new TestSerializerException();
 
@@ -362,13 +360,11 @@ public class TestSerializerException : Exception;
 
 public class TestSerializerWithEmpty<T> : INatsSerializer<T>
 {
-#if !NET8_0_OR_GREATER
 #pragma warning disable CS0618 // Type or member is obsolete
     public void Serialize(IBufferWriter<byte> bufferWriter, T value) => Serialize(bufferWriter, value, null);
 
     public T? Deserialize(in ReadOnlySequence<byte> buffer) => Deserialize(buffer, null);
 #pragma warning restore CS0618
-#endif
 
     public T? Deserialize(in ReadOnlySequence<byte> buffer, INatsHeaders? headers) => (T)(object)(buffer.IsEmpty
         ? new TestData("__EMPTY__")
