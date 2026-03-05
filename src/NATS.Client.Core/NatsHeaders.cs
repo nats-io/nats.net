@@ -15,7 +15,7 @@ namespace NATS.Client.Core;
 [SuppressMessage("StyleCop.CSharp.LayoutRules", "SA1516:Elements should be separated by blank line", Justification = "Keep class format as is for reference")]
 [SuppressMessage("StyleCop.CSharp.LayoutRules", "SA1513:Closing brace should be followed by blank line", Justification = "Keep class format as is for reference")]
 [SuppressMessage("StyleCop.CSharp.OrderingRules", "SA1214:Readonly fields should appear before non-readonly fields", Justification = "Keep class format as is for reference")]
-public class NatsHeaders : INatsHeaders, IDictionary<string, StringValues>
+public class NatsHeaders : INatsHeaders
 {
     public enum Messages
     {
