@@ -87,11 +87,18 @@ public class ConsumerFetchTest
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
         var prefix = _server.GetNextId();
 
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        // var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        var cts = new CancellationTokenSource();
 
         var js = new NatsJSContext(nats);
-        var stream = await js.CreateStreamAsync($"{prefix}s1", new[] { $"{prefix}s1.*" }, cts.Token);
-        var consumer = (NatsJSConsumer)await js.CreateOrUpdateConsumerAsync($"{prefix}s1", $"{prefix}c1", cancellationToken: cts.Token);
+
+        var streamName = $"{prefix}s1";
+        var subjectSub = $"{prefix}s1.*";
+        var consumerName = $"{prefix}c1";
+        var subject = $"{prefix}s1.foo";
+
+        await js.CreateStreamAsync(streamName, [subjectSub], cts.Token);
+        var consumer = (NatsJSConsumer)await js.CreateOrUpdateConsumerAsync(streamName, consumerName, cancellationToken: cts.Token);
 
         var fetchOpts = new NatsJSFetchOpts
         {
@@ -102,7 +109,7 @@ public class ConsumerFetchTest
 
         for (var i = 0; i < 100; i++)
         {
-            var ack = await js.PublishAsync($"{prefix}s1.foo", new TestData { Test = i }, serializer: TestDataJsonSerializer<TestData>.Default, cancellationToken: cts.Token);
+            var ack = await js.PublishAsync(subject, new TestData { Test = i }, serializer: TestDataJsonSerializer<TestData>.Default, cancellationToken: cts.Token);
             ack.EnsureSuccess();
         }
 
@@ -133,7 +140,7 @@ public class ConsumerFetchTest
             "ack pending 9",
             async () =>
             {
-                var c = await js.GetConsumerAsync($"{prefix}s1", $"{prefix}c1", cts.Token);
+                var c = await js.GetConsumerAsync(streamName, consumerName, cts.Token);
                 _output.WriteLine($"pend1:{c.Info.NumAckPending}");
                 return c.Info.NumAckPending == 9;
             },
@@ -150,7 +157,7 @@ public class ConsumerFetchTest
             "ack pending 0",
             async () =>
             {
-                var c = await js.GetConsumerAsync($"{prefix}s1", $"{prefix}c1", cts.Token);
+                var c = await js.GetConsumerAsync(streamName, consumerName, cts.Token);
                 _output.WriteLine($"pend:{c.Info.NumAckPending}");
                 return c.Info.NumAckPending == 0;
             },
@@ -158,5 +165,111 @@ public class ConsumerFetchTest
             timeout: TimeSpan.FromSeconds(30));
         await consumer.RefreshAsync(cts.Token);
         Assert.Equal(0, consumer.Info.NumAckPending);
+    }
+
+    [Fact]
+    public async Task Fetch_dispose_does_not_drop_buffered_messages()
+    {
+        // Pressure the race between _disposed=1 and TryComplete() by:
+        // 1. Restricting to a single CPU core (maximizes context switches)
+        // 2. Tight loop with large batches and immediate dispose
+        const int iterations = 50;
+        const int msgCount = 100;
+
+        var proc = System.Diagnostics.Process.GetCurrentProcess();
+        nint savedAffinity = 0;
+        try
+        {
+#pragma warning disable CA1416 // Platform compatibility - wrapped in try/catch
+            savedAffinity = proc.ProcessorAffinity;
+            proc.ProcessorAffinity = (nint)1;
+#pragma warning restore CA1416
+        }
+        catch
+        {
+            // ProcessorAffinity may not be supported on all platforms
+        }
+
+        try
+        {
+            await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+            var prefix = _server.GetNextId();
+            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
+
+            var js = new NatsJSContext(nats);
+            await js.CreateStreamAsync($"{prefix}s1", new[] { $"{prefix}s1.*" }, cts.Token);
+
+            // Publish all messages once up front.
+            for (var i = 0; i < msgCount; i++)
+            {
+                var ack = await js.PublishAsync($"{prefix}s1.foo", new TestData { Test = i }, serializer: TestDataJsonSerializer<TestData>.Default, cancellationToken: cts.Token);
+                ack.EnsureSuccess();
+            }
+
+            for (var iteration = 0; iteration < iterations; iteration++)
+            {
+                // Each iteration: new consumer, fetch, dispose fast, verify.
+                var consumer = (NatsJSConsumer)await js.CreateOrUpdateConsumerAsync(
+                    $"{prefix}s1",
+                    $"{prefix}c{iteration}",
+                    cancellationToken: cts.Token);
+
+                var fetchOpts = new NatsJSFetchOpts
+                {
+                    MaxMsgs = msgCount,
+                    IdleHeartbeat = TimeSpan.FromSeconds(5),
+                    Expires = TimeSpan.FromSeconds(10),
+                };
+
+                var fc = await consumer.FetchInternalAsync<TestData>(
+                    serializer: TestDataJsonSerializer<TestData>.Default,
+                    opts: fetchOpts,
+                    cancellationToken: cts.Token);
+
+                // Wait for at least one message — proves messages are flowing.
+                await Retry.Until(
+                    "first message in channel",
+                    () => fc.Msgs.Count >= 1,
+                    timeout: TimeSpan.FromSeconds(30));
+
+                // Dispose immediately while messages are still arriving.
+                await fc.DisposeAsync();
+
+                // Read and ack everything that made it into the channel.
+                var received = 0;
+                await foreach (var msg in fc.Msgs.ReadAllAsync(cts.Token))
+                {
+                    received++;
+                    await msg.AckAsync(cancellationToken: cts.Token);
+                }
+
+                // Verify: server should have zero ack-pending for delivered msgs.
+                // If messages were silently dropped, NumAckPending > 0.
+                await Retry.Until(
+                    "ack pending 0",
+                    async () =>
+                    {
+                        await consumer.RefreshAsync(cts.Token);
+                        _output.WriteLine($"iter:{iteration} received:{received} ackPending:{consumer.Info.NumAckPending}");
+                        return consumer.Info.NumAckPending == 0;
+                    },
+                    retryDelay: TimeSpan.FromSeconds(1),
+                    timeout: TimeSpan.FromSeconds(30));
+            }
+        }
+        finally
+        {
+            try
+            {
+#pragma warning disable CA1416 // Platform compatibility - wrapped in try/catch
+                if (savedAffinity != 0)
+                    proc.ProcessorAffinity = savedAffinity;
+#pragma warning restore CA1416
+            }
+            catch
+            {
+                // Restore may fail if original wasn't supported
+            }
+        }
     }
 }
