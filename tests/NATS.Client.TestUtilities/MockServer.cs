@@ -17,13 +17,16 @@ public class MockServer : IAsyncDisposable
     private readonly List<Task> _clients = new();
     private readonly Task _accept;
     private readonly CancellationTokenSource _cts;
+    private readonly bool _autoPong;
 
     public MockServer(
         Func<Client, Cmd, Task> handler,
         Action<string>? logger = null,
         string info = "{\"max_payload\":1048576}",
+        bool autoPong = true,
         CancellationToken cancellationToken = default)
     {
+        _autoPong = autoPong;
         _logger = logger ?? (_ => { });
         _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cancellationToken = _cts.Token;
@@ -79,8 +82,13 @@ public class MockServer : IAsyncDisposable
                             {
                                 // B: PING␍␊
                                 // B: PONG␍␊
-                                await sw.WriteAsync("PONG\r\n");
-                                await sw.FlushAsync();
+                                if (_autoPong)
+                                {
+                                    await sw.WriteAsync("PONG\r\n");
+                                    await sw.FlushAsync();
+                                }
+
+                                await handler(client, new Cmd("PING", string.Empty, null, 0, 0, null, string.Empty, client));
                             }
                             else if (line.StartsWith("SUB"))
                             {
