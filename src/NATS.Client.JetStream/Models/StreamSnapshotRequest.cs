@@ -28,12 +28,16 @@ public record StreamSnapshotRequest
     public bool NoConsumers { get; set; }
 
     /// <summary>
-    /// The size of data chunks to send to deliver_subject
+    /// Optional chunk size preference.
+    /// Best to just let server select.
+    /// Defaults on the server to 128KB, automatically clamped to within the range 1KB to 1MB.
+    /// A smaller chunk size means more in-flight messages and more acks needed.
+    /// Links with good throughput but high latency may need to increase this.
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("chunk_size")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    [System.ComponentModel.DataAnnotations.Range(long.MinValue, long.MaxValue)]
-    public long ChunkSize { get; set; }
+    [System.ComponentModel.DataAnnotations.Range(1024, 1024 * 1024)]
+    public int? ChunkSize { get; set; }
 
     /// <summary>
     /// Check all message's checksums prior to snapshot
@@ -41,4 +45,15 @@ public record StreamSnapshotRequest
     [System.Text.Json.Serialization.JsonPropertyName("jsck")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public bool Jsck { get; set; }
+
+    /// <summary>
+    /// Optional window size preference.
+    /// Defaults on the server to 8MB, automatically clamped to within the range 1KB to 32MB.
+    /// Very slow connections may need to reduce this to avoid slow consumer issues.
+    /// Minimum Server Version 2.15.5
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("window_size")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [System.ComponentModel.DataAnnotations.Range(1024, 32 * 1024 * 1024)]
+    public int? WindowSize { get; set; }
 }
