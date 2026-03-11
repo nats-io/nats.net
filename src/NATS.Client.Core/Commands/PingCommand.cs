@@ -10,6 +10,7 @@ internal class PingCommand : IValueTaskSource<TimeSpan>, IObjectPoolNode<PingCom
     private Stopwatch _stopwatch;
     private ManualResetValueTaskSourceCore<TimeSpan> _core;
     private PingCommand? _next;
+    private int _completed;
 
     public PingCommand(ObjectPool? pool)
     {
@@ -25,14 +26,27 @@ internal class PingCommand : IValueTaskSource<TimeSpan>, IObjectPoolNode<PingCom
 
     public void Start() => _stopwatch.Restart();
 
-    public void SetResult() => _core.SetResult(_stopwatch.Elapsed);
+    public void SetResult()
+    {
+        if (Interlocked.CompareExchange(ref _completed, 1, 0) == 0)
+        {
+            _core.SetResult(_stopwatch.Elapsed);
+        }
+    }
 
-    public void SetCanceled() => _core.SetException(new OperationCanceledException());
+    public void SetCanceled()
+    {
+        if (Interlocked.CompareExchange(ref _completed, 1, 0) == 0)
+        {
+            _core.SetException(new OperationCanceledException());
+        }
+    }
 
     public void Reset()
     {
         _stopwatch.Reset();
         _core.Reset();
+        Volatile.Write(ref _completed, 0);
     }
 
     public ValueTask<TimeSpan> RunAsync() => new(this, _core.Version);
