@@ -170,106 +170,117 @@ public class ConsumerFetchTest
     [Fact]
     public async Task Fetch_dispose_does_not_drop_buffered_messages()
     {
-        // Pressure the race between _disposed=1 and TryComplete() by:
-        // 1. Restricting to a single CPU core (maximizes context switches)
-        // 2. Tight loop with large batches and immediate dispose
-        const int iterations = 50;
-        const int msgCount = 100;
+        // Reproduce the race: messages delivered by server but dropped during
+        // dispose because the channel is completed before all writes finish.
+        // Strategy: pump thousands of messages so there are always messages
+        // in-flight during dispose, then check server stats for the gap.
+        // Run iterations in parallel (4x CPU count) to maximize contention.
+        var iterations = Environment.ProcessorCount * 4;
 
-        var proc = System.Diagnostics.Process.GetCurrentProcess();
-        nint savedAffinity = 0;
-        try
-        {
-#pragma warning disable CA1416 // Platform compatibility - wrapped in try/catch
-            savedAffinity = proc.ProcessorAffinity;
-            proc.ProcessorAffinity = (nint)1;
-#pragma warning restore CA1416
-        }
-        catch
-        {
-            // ProcessorAffinity may not be supported on all platforms
-        }
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
 
-        try
-        {
-            await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
-            var prefix = _server.GetNextId();
-            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
+        var js = new NatsJSContext(nats);
+        var streamName = $"{prefix}s1";
+        var subject = $"{prefix}s1.foo";
 
-            var js = new NatsJSContext(nats);
-            await js.CreateStreamAsync($"{prefix}s1", new[] { $"{prefix}s1.*" }, cts.Token);
+        await js.CreateStreamAsync(streamName, new[] { $"{prefix}s1.*" }, cts.Token);
 
-            // Publish all messages once up front.
-            for (var i = 0; i < msgCount; i++)
+        // Keep publishing messages in the background throughout the test
+        // to ensure there are always messages in-flight during dispose.
+        var publishTask = Task.Run(
+            async () =>
             {
-                var ack = await js.PublishAsync($"{prefix}s1.foo", new TestData { Test = i }, serializer: TestDataJsonSerializer<TestData>.Default, cancellationToken: cts.Token);
-                ack.EnsureSuccess();
-            }
-
-            for (var iteration = 0; iteration < iterations; iteration++)
-            {
-                // Each iteration: new consumer, fetch, dispose fast, verify.
-                var consumer = (NatsJSConsumer)await js.CreateOrUpdateConsumerAsync(
-                    $"{prefix}s1",
-                    $"{prefix}c{iteration}",
-                    cancellationToken: cts.Token);
-
-                var fetchOpts = new NatsJSFetchOpts
+                var seq = 0;
+                while (!cts.Token.IsCancellationRequested)
                 {
-                    MaxMsgs = msgCount,
-                    IdleHeartbeat = TimeSpan.FromSeconds(5),
-                    Expires = TimeSpan.FromSeconds(10),
-                };
-
-                var fc = await consumer.FetchInternalAsync<TestData>(
-                    serializer: TestDataJsonSerializer<TestData>.Default,
-                    opts: fetchOpts,
-                    cancellationToken: cts.Token);
-
-                // Wait for at least one message — proves messages are flowing.
-                await Retry.Until(
-                    "first message in channel",
-                    () => fc.Msgs.Count >= 1,
-                    timeout: TimeSpan.FromSeconds(30));
-
-                // Dispose immediately while messages are still arriving.
-                await fc.DisposeAsync();
-
-                // Read and ack everything that made it into the channel.
-                var received = 0;
-                await foreach (var msg in fc.Msgs.ReadAllAsync(cts.Token))
-                {
-                    received++;
-                    await msg.AckAsync(cancellationToken: cts.Token);
-                }
-
-                // Verify: server should have zero ack-pending for delivered msgs.
-                // If messages were silently dropped, NumAckPending > 0.
-                await Retry.Until(
-                    "ack pending 0",
-                    async () =>
+                    for (var i = 0; i < 10_000; i++)
                     {
-                        await consumer.RefreshAsync(cts.Token);
-                        _output.WriteLine($"iter:{iteration} received:{received} ackPending:{consumer.Info.NumAckPending}");
-                        return consumer.Info.NumAckPending == 0;
-                    },
-                    retryDelay: TimeSpan.FromSeconds(1),
-                    timeout: TimeSpan.FromSeconds(30));
-            }
-        }
-        finally
+                        var ack = await js.PublishAsync(
+                            subject,
+                            new TestData { Test = seq++ },
+                            serializer: TestDataJsonSerializer<TestData>.Default,
+                            cancellationToken: cts.Token);
+                        ack.EnsureSuccess();
+                    }
+
+                    await Task.Delay(TimeSpan.FromMilliseconds(10), cts.Token).ConfigureAwait(false);
+                }
+            },
+            cts.Token);
+
+        // Wait for first batch to land before starting consumers.
+        await Retry.Until(
+            "initial messages published",
+            async () =>
+            {
+                var stream = await js.GetStreamAsync(streamName, cancellationToken: cts.Token);
+                return stream.Info.State.Messages >= 10_000;
+            },
+            timeout: TimeSpan.FromSeconds(30));
+
+        var tasks = Enumerable.Range(0, iterations).Select(iteration => Task.Run(async () =>
         {
-            try
+            var consumerName = $"{prefix}c{iteration}";
+            var consumer = (NatsJSConsumer)await js.CreateOrUpdateConsumerAsync(
+                streamName,
+                consumerName,
+                cancellationToken: cts.Token);
+
+            var fetchOpts = new NatsJSFetchOpts
             {
-#pragma warning disable CA1416 // Platform compatibility - wrapped in try/catch
-                if (savedAffinity != 0)
-                    proc.ProcessorAffinity = savedAffinity;
-#pragma warning restore CA1416
-            }
-            catch
+                MaxMsgs = 100_000,
+                IdleHeartbeat = TimeSpan.FromSeconds(5),
+                Expires = TimeSpan.FromSeconds(30),
+            };
+
+            var fc = await consumer.FetchInternalAsync<TestData>(
+                serializer: TestDataJsonSerializer<TestData>.Default,
+                opts: fetchOpts,
+                cancellationToken: cts.Token);
+
+            // Wait until some messages arrive but not all — we want
+            // messages still in-flight when we dispose.
+            await Retry.Until(
+                "some messages in channel",
+                () => fc.Msgs.Count >= 10,
+                timeout: TimeSpan.FromSeconds(30));
+
+            // Dispose while messages are still being delivered.
+            await fc.DisposeAsync();
+
+            // Read and ack everything that made it into the channel.
+            var received = 0;
+            await foreach (var msg in fc.Msgs.ReadAllAsync(cts.Token))
             {
-                // Restore may fail if original wasn't supported
+                received++;
+                await msg.AckAsync(cancellationToken: cts.Token);
             }
+
+            // Check server-side: delivered - acked should be zero.
+            // If messages were delivered but dropped before reaching the
+            // channel, NumAckPending > 0 (server sent them, we never acked).
+            await consumer.RefreshAsync(cts.Token);
+            var delivered = consumer.Info.Delivered.ConsumerSeq;
+            var ackFloor = consumer.Info.AckFloor.ConsumerSeq;
+            var ackPending = consumer.Info.NumAckPending;
+
+            _output.WriteLine($"iter:{iteration} received:{received} delivered:{delivered} ackFloor:{ackFloor} ackPending:{ackPending}");
+
+            Assert.Equal(0, ackPending);
+        })).ToArray();
+
+        await Task.WhenAll(tasks);
+
+        // Stop the background publisher.
+        cts.Cancel();
+        try
+        {
+            await publishTask;
+        }
+        catch (OperationCanceledException)
+        {
         }
     }
 }
