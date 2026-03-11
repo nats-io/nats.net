@@ -3,10 +3,10 @@ using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Models;
-using NATS.Client.Platform.Windows.Tests;
 using NATS.Client.TestUtilities;
 using NATS.Client.TestUtilities2;
 using NATS.Net;
+using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -612,5 +612,481 @@ public class ConsumerConsumeTest
 
         var pullRequestCount = logger.Logs.Count(m => m.EventId == NatsJSLogEvents.PullRequest);
         pullRequestCount.Should().BeLessThanOrEqualTo(4, "should not flood with pull requests after reconnect");
+    }
+
+    [Fact]
+    public async Task Consume_connection_failed_test()
+    {
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts
+        {
+            Url = server.Url,
+            MaxReconnectRetry = 2,
+            ReconnectWaitMin = TimeSpan.FromMilliseconds(100),
+            ReconnectWaitMax = TimeSpan.Zero,
+        });
+        await nats.ConnectAsync();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var js = new NatsJSContext(nats);
+        await js.CreateStreamAsync("s1", ["s1.*"], cts.Token);
+        var consumer = await js.CreateOrUpdateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+
+        var started = new TaskCompletionSource();
+
+        // Start consuming in background
+        var consumeTask = Task.Run(async () =>
+        {
+            var opts = new NatsJSConsumeOpts
+            {
+                MaxMsgs = 10,
+                IdleHeartbeat = TimeSpan.FromSeconds(1),
+                Expires = TimeSpan.FromSeconds(2),
+            };
+            started.SetResult();
+            await foreach (var msg in consumer.ConsumeAsync<string>(opts: opts, cancellationToken: cts.Token))
+            {
+                await msg.AckAsync(cancellationToken: cts.Token);
+            }
+        });
+
+        // Wait for consume to start
+        await started.Task;
+        await Task.Delay(500);
+
+        // Stop server to trigger connection failure
+        await server.StopAsync();
+
+        // Wait for reconnect failure
+        var exception = await Assert.ThrowsAsync<NatsConnectionFailedException>(async () => await consumeTask);
+
+        // Message could be either from connection or from consume internal checks
+        Assert.True(
+            exception.Message.Contains("Connection is in failed state") ||
+            exception.Message.Contains("Maximum connection retry attempts exceeded"),
+            $"Unexpected exception message: {exception.Message}");
+
+        // Verify connection state is Failed
+        Assert.Equal(NatsConnectionState.Failed, nats.ConnectionState);
+    }
+
+    [Fact]
+    public async Task Consume_503_threshold_configuration_test()
+    {
+        await using var nats = _server.CreateNatsConnection();
+        await nats.ConnectRetryAsync();
+        var prefix = _server.GetNextId();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        var js = new NatsJSContext(nats);
+        await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
+
+        // Publish some test messages
+        for (var i = 0; i < 10; i++)
+        {
+            await js.PublishAsync($"{prefix}s1.foo", i, cancellationToken: cts.Token);
+        }
+
+        // Test with custom threshold value
+        {
+            var consumer = await js.CreateOrUpdateConsumerAsync($"{prefix}s1", $"{prefix}c1", cancellationToken: cts.Token);
+            var messagesReceived = 0;
+            var opts = new NatsJSConsumeOpts
+            {
+                MaxMsgs = 10,
+                MaxConsecutive503Errors = 5, // Custom threshold
+            };
+            await foreach (var msg in consumer.ConsumeAsync<int>(opts: opts, cancellationToken: cts.Token))
+            {
+                await msg.AckAsync(cancellationToken: cts.Token);
+                messagesReceived++;
+                if (messagesReceived == 3)
+                    break;
+            }
+
+            Assert.Equal(3, messagesReceived);
+        }
+
+        // Test with disabled threshold
+        {
+            var consumer = await js.CreateOrUpdateConsumerAsync($"{prefix}s1", $"{prefix}c2", cancellationToken: cts.Token);
+            var messagesReceived = 0;
+            var opts = new NatsJSConsumeOpts
+            {
+                MaxMsgs = 10,
+                MaxConsecutive503Errors = -1, // Disabled
+            };
+            await foreach (var msg in consumer.ConsumeAsync<int>(opts: opts, cancellationToken: cts.Token))
+            {
+                await msg.AckAsync(cancellationToken: cts.Token);
+                messagesReceived++;
+                if (messagesReceived == 3)
+                    break;
+            }
+
+            Assert.Equal(3, messagesReceived);
+        }
+
+        // Test with default threshold (10)
+        {
+            var consumer = await js.CreateOrUpdateConsumerAsync($"{prefix}s1", $"{prefix}c3", cancellationToken: cts.Token);
+            var messagesReceived = 0;
+            var opts = new NatsJSConsumeOpts
+            {
+                MaxMsgs = 10,
+
+                // MaxConsecutive503Errors defaults to 10
+            };
+            await foreach (var msg in consumer.ConsumeAsync<int>(opts: opts, cancellationToken: cts.Token))
+            {
+                await msg.AckAsync(cancellationToken: cts.Token);
+                messagesReceived++;
+                if (messagesReceived == 3)
+                    break;
+            }
+
+            Assert.Equal(3, messagesReceived);
+        }
+    }
+
+    [Fact]
+    public async Task Consume_503_counter_resets_on_success_test()
+    {
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectAsync();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var js = new NatsJSContext(nats);
+        await js.CreateStreamAsync("s1", ["s1.*"], cts.Token);
+        var consumer = await js.CreateOrUpdateConsumerAsync("s1", "c1", cancellationToken: cts.Token);
+
+        var messagesReceived = 0;
+        var opts = new NatsJSConsumeOpts
+        {
+            MaxMsgs = 10,
+            MaxConsecutive503Errors = 5,
+        };
+
+        // Start consuming
+        var consumeTask = Task.Run(async () =>
+        {
+            await foreach (var msg in consumer.ConsumeAsync<string>(opts: opts, cancellationToken: cts.Token))
+            {
+                await msg.AckAsync(cancellationToken: cts.Token);
+                messagesReceived++;
+                if (messagesReceived == 2)
+                    break;
+            }
+        });
+
+        // Publish messages to reset the counter
+        await js.PublishAsync("s1.foo", "message1", cancellationToken: cts.Token);
+        await Task.Delay(500); // Wait for message to be consumed
+
+        // At this point, 503 counter should be reset to 0 after successful message
+        await js.PublishAsync("s1.foo", "message2", cancellationToken: cts.Token);
+
+        await consumeTask;
+
+        Assert.Equal(2, messagesReceived);
+    }
+
+    [Fact]
+    public async Task Consume_ephemeral_consumer_deleted_on_server_terminates_with_409()
+    {
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectAsync();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+
+        var js = nats.CreateJetStreamContext();
+        await js.CreateStreamAsync(new StreamConfig("s1", ["s1.*"]), cts.Token);
+        var consumer = await js.CreateOrUpdateConsumerAsync("s1", new ConsumerConfig("c1") { MemStorage = true }, cts.Token);
+
+        // Publish messages
+        for (var i = 0; i < 5; i++)
+        {
+            var ack = await js.PublishAsync("s1.foo", i, cancellationToken: cts.Token);
+            ack.EnsureSuccess();
+        }
+
+        var firstMessageConsumed = new WaitSignal(TimeSpan.FromSeconds(30));
+        var messagesReceived = 0;
+
+        var consumeTask = Task.Run(async () =>
+        {
+            var opts = new NatsJSConsumeOpts
+            {
+                MaxMsgs = 10,
+                MaxConsecutive503Errors = 3,
+            };
+
+            await foreach (var msg in consumer.ConsumeAsync<int>(opts: opts, cancellationToken: cts.Token))
+            {
+                await msg.AckAsync(cancellationToken: cts.Token);
+                Interlocked.Increment(ref messagesReceived);
+                firstMessageConsumed.Pulse();
+            }
+        });
+
+        // Wait until at least one message is consumed, then delete the consumer
+        await firstMessageConsumed;
+        Assert.True(messagesReceived > 0, "Should have received at least one message before deletion");
+
+        await js.DeleteConsumerAsync("s1", "c1", cts.Token);
+
+        // Server sends 409 Consumer Deleted to the active pull, which is a terminal error
+        var exception = await Assert.ThrowsAnyAsync<NatsJSException>(async () => await consumeTask);
+        Assert.IsType<NatsJSProtocolException>(exception);
+        var protocolException = (NatsJSProtocolException)exception;
+        Assert.Equal(409, protocolException.HeaderCode);
+        Assert.Contains("Consumer Deleted", protocolException.Message);
+    }
+
+    [Fact]
+    public async Task Consume_ephemeral_memstorage_consumer_server_restart_terminates_with_503()
+    {
+        var logger = new InMemoryTestLoggerFactory(LogLevel.Debug);
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, LoggerFactory = logger });
+        await nats.ConnectRetryAsync();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+
+        var js = nats.CreateJetStreamContext();
+        await js.CreateStreamAsync(new StreamConfig("s1", ["s1.*"]), cts.Token);
+        var consumer = await js.CreateOrUpdateConsumerAsync("s1", new ConsumerConfig("c1") { MemStorage = true }, cts.Token);
+
+        // Publish messages
+        for (var i = 0; i < 5; i++)
+        {
+            var ack = await js.PublishAsync("s1.foo", i, cancellationToken: cts.Token);
+            ack.EnsureSuccess();
+        }
+
+        var firstMessageConsumed = new WaitSignal(TimeSpan.FromSeconds(30));
+
+        var consumeTask = Task.Run(async () =>
+        {
+            var opts = new NatsJSConsumeOpts
+            {
+                MaxMsgs = 10,
+                MaxConsecutive503Errors = 3,
+                IdleHeartbeat = TimeSpan.FromSeconds(1),
+                Expires = TimeSpan.FromSeconds(2),
+            };
+
+            await foreach (var msg in consumer.ConsumeAsync<int>(opts: opts, cancellationToken: cts.Token))
+            {
+                await msg.AckAsync(cancellationToken: cts.Token);
+                firstMessageConsumed.Pulse();
+            }
+        });
+
+        // Wait until at least one message is consumed, then restart server
+        await firstMessageConsumed;
+
+        await server.RestartAsync();
+
+        // MemStorage consumer vanishes on restart. The server doesn't send 409 because
+        // it doesn't know about the old consumer, so pulls return 503 no responders.
+        var exception = await Assert.ThrowsAnyAsync<NatsJSException>(async () => await consumeTask);
+        Assert.Contains("503", exception.Message);
+
+        // Verify NoResponders log events were accumulated
+        var noResponderLogs = logger.Logs.Count(m => m.EventId == NatsJSLogEvents.NoResponders);
+        Assert.True(noResponderLogs > 0, "Should have logged NoResponders events");
+    }
+
+    [Fact]
+    public async Task Consume_slow_message_processing_does_not_prevent_consumer_deleted_detection()
+    {
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectAsync();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+
+        var js = nats.CreateJetStreamContext();
+        await js.CreateStreamAsync(new StreamConfig("s1", ["s1.*"]), cts.Token);
+        var consumer = await js.CreateOrUpdateConsumerAsync("s1", new ConsumerConfig("c1") { MemStorage = true }, cts.Token);
+
+        // Publish messages
+        for (var i = 0; i < 5; i++)
+        {
+            var ack = await js.PublishAsync("s1.foo", i, cancellationToken: cts.Token);
+            ack.EnsureSuccess();
+        }
+
+        var firstMessageReceived = new WaitSignal(TimeSpan.FromSeconds(30));
+        var messagesProcessed = 0;
+
+        var consumeTask = Task.Run(async () =>
+        {
+            var opts = new NatsJSConsumeOpts
+            {
+                MaxMsgs = 10,
+                MaxConsecutive503Errors = 3,
+            };
+
+            await foreach (var msg in consumer.ConsumeAsync<int>(opts: opts, cancellationToken: cts.Token))
+            {
+                firstMessageReceived.Pulse();
+
+                // Simulate slow processing - consumer will be deleted during this delay
+                await Task.Delay(TimeSpan.FromSeconds(5), cts.Token);
+
+                await msg.AckAsync(cancellationToken: cts.Token);
+                Interlocked.Increment(ref messagesProcessed);
+            }
+        });
+
+        // Wait for first message to arrive, then delete consumer during slow processing
+        await firstMessageReceived;
+
+        await js.DeleteConsumerAsync("s1", "c1", cts.Token);
+
+        // ConsumeAsync should still terminate despite slow message processing.
+        // The server sends 409 Consumer Deleted which terminates the channel writer.
+        var exception = await Assert.ThrowsAnyAsync<NatsJSException>(async () => await consumeTask);
+        Assert.IsType<NatsJSProtocolException>(exception);
+        var protocolException = (NatsJSProtocolException)exception;
+        Assert.Equal(409, protocolException.HeaderCode);
+        Assert.Contains("Consumer Deleted", protocolException.Message);
+    }
+
+    [Fact]
+    public async Task Consume_buffered_messages_with_slow_processing_still_detects_503_after_server_restart()
+    {
+        // When messages are buffered and being slowly processed, the heartbeat timer
+        // is the only mechanism to drive new pull requests after 503 (since ResetPending
+        // sets pending to max, preventing CheckPending from issuing pulls).
+        // We verify that even with slow message processing, the 503 threshold is
+        // eventually hit via timer-driven pulls after the consumer vanishes.
+        var logger = new InMemoryTestLoggerFactory(LogLevel.Debug);
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, LoggerFactory = logger });
+        await nats.ConnectRetryAsync();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+
+        var js = nats.CreateJetStreamContext();
+        await js.CreateStreamAsync(new StreamConfig("s1", ["s1.*"]), cts.Token);
+        var consumer = await js.CreateOrUpdateConsumerAsync("s1", new ConsumerConfig("c1") { MemStorage = true }, cts.Token);
+
+        // Publish many messages so the buffer has data to process slowly
+        for (var i = 0; i < 20; i++)
+        {
+            var ack = await js.PublishAsync("s1.foo", i, cancellationToken: cts.Token);
+            ack.EnsureSuccess();
+        }
+
+        var firstMessageConsumed = new WaitSignal(TimeSpan.FromSeconds(30));
+        var messagesProcessed = 0;
+
+        var consumeTask = Task.Run(async () =>
+        {
+            var opts = new NatsJSConsumeOpts
+            {
+                MaxMsgs = 100,
+                MaxConsecutive503Errors = 3,
+                IdleHeartbeat = TimeSpan.FromSeconds(1),
+                Expires = TimeSpan.FromSeconds(2),
+            };
+
+            await foreach (var msg in consumer.ConsumeAsync<int>(opts: opts, cancellationToken: cts.Token))
+            {
+                await msg.AckAsync(cancellationToken: cts.Token);
+                var count = Interlocked.Increment(ref messagesProcessed);
+                firstMessageConsumed.Pulse();
+
+                // Slow processing on all messages
+                await Task.Delay(TimeSpan.FromMilliseconds(500), cts.Token);
+            }
+        });
+
+        // Wait until messages start flowing, then restart server
+        await firstMessageConsumed;
+
+        await server.RestartAsync();
+
+        // Even though the consumer is slowly processing buffered messages,
+        // the 503 detection should still terminate ConsumeAsync.
+        // After restart, the MemStorage consumer is gone, so timer-driven pulls
+        // return 503 and accumulate until the threshold is hit.
+        var exception = await Assert.ThrowsAnyAsync<NatsJSException>(async () => await consumeTask);
+        Assert.Contains("503", exception.Message);
+
+        // Verify some messages were processed before termination
+        Assert.True(messagesProcessed > 0, "Should have processed at least one message");
+
+        // Verify 503 errors accumulated
+        var noResponderLogs = logger.Logs.Count(m => m.EventId == NatsJSLogEvents.NoResponders);
+        Assert.True(noResponderLogs > 0, "Should have logged NoResponders events");
+    }
+
+    [Fact]
+    public async Task Consume_503_counter_accumulates_across_heartbeat_timer_pulls()
+    {
+        var logger = new InMemoryTestLoggerFactory(LogLevel.Debug);
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, LoggerFactory = logger });
+        await nats.ConnectRetryAsync();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+
+        var js = nats.CreateJetStreamContext();
+        await js.CreateStreamAsync(new StreamConfig("s1", ["s1.*"]), cts.Token);
+        var consumer = await js.CreateOrUpdateConsumerAsync("s1", new ConsumerConfig("c1") { MemStorage = true }, cts.Token);
+
+        // Publish a message so consume loop starts
+        var ack = await js.PublishAsync("s1.foo", 1, cancellationToken: cts.Token);
+        ack.EnsureSuccess();
+
+        var firstMessageConsumed = new WaitSignal(TimeSpan.FromSeconds(30));
+
+        var consumeTask = Task.Run(async () =>
+        {
+            var opts = new NatsJSConsumeOpts
+            {
+                MaxMsgs = 10,
+                MaxConsecutive503Errors = 5,
+                IdleHeartbeat = TimeSpan.FromSeconds(1),
+                Expires = TimeSpan.FromSeconds(2),
+            };
+
+            await foreach (var msg in consumer.ConsumeAsync<int>(opts: opts, cancellationToken: cts.Token))
+            {
+                await msg.AckAsync(cancellationToken: cts.Token);
+                firstMessageConsumed.Pulse();
+            }
+        });
+
+        // Wait for message to be consumed, then restart server so consumer vanishes
+        // without the server sending a 409 notification
+        await firstMessageConsumed;
+
+        await server.RestartAsync();
+
+        // Heartbeat timer fires repeatedly, generating pull requests that return 503
+        // because the MemStorage consumer no longer exists after restart
+        var exception = await Assert.ThrowsAnyAsync<NatsJSException>(async () => await consumeTask);
+        Assert.Contains("503", exception.Message);
+
+        // Verify that idle timeout events were logged (heartbeat timer callbacks)
+        await Retry.Until(
+            "idle timeout logs present",
+            () => logger.Logs.Count(m => m.EventId == NatsJSLogEvents.IdleTimeout) > 0,
+            retryDelay: TimeSpan.FromMilliseconds(500),
+            timeout: TimeSpan.FromSeconds(10));
+
+        // Verify 503 counter accumulated from timer-originated pulls
+        var noResponderLogs = logger.Logs.Count(m => m.EventId == NatsJSLogEvents.NoResponders);
+        Assert.True(noResponderLogs >= 5, $"Should have accumulated at least 5 NoResponders events, got {noResponderLogs}");
     }
 }

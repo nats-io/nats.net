@@ -62,7 +62,7 @@ public class ConsumerPage
 
         {
             #region consumer-next
-            NatsJSMsg<Order>? next = await consumer.NextAsync<Order>();
+            INatsJSMsg<Order>? next = await consumer.NextAsync<Order>();
 
             if (next is { } msg)
             {

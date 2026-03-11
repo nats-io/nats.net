@@ -24,7 +24,10 @@ public static class ClientApp
 
         Console.WriteLine("Client App is starting...");
 
-        await using var nats = new NatsConnection();
+        await using var nats = new NatsConnection(new NatsOpts
+        {
+            RequestReplyMode = NatsRequestReplyMode.Direct,
+        });
 
         using (var activity = activitySource.StartActivity("SayHi"))
         {

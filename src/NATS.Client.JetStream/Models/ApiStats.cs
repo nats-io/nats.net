@@ -15,16 +15,16 @@ public record ApiStats
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("total")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
-    [System.ComponentModel.DataAnnotations.Range(0, int.MaxValue)]
-    public int Total { get; set; }
+    [System.ComponentModel.DataAnnotations.Range(0, ulong.MaxValue)]
+    public ulong Total { get; set; }
 
     /// <summary>
     /// API requests that resulted in an error response
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("errors")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
-    [System.ComponentModel.DataAnnotations.Range(0, int.MaxValue)]
-    public int Errors { get; set; }
+    [System.ComponentModel.DataAnnotations.Range(0, ulong.MaxValue)]
+    public ulong Errors { get; set; }
 
     /// <summary>
     /// Inflight API requests

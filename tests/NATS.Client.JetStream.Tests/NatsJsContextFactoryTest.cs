@@ -2,7 +2,7 @@ using System.Net;
 using System.Text;
 using System.Threading.Channels;
 using NATS.Client.Core.Tests;
-using NATS.Client.Platform.Windows.Tests;
+using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -82,6 +82,8 @@ public class NatsJSContextFactoryTest
         public event AsyncEventHandler<NatsEventArgs>? ReconnectFailed;
 
         public event AsyncEventHandler<NatsMessageDroppedEventArgs>? MessageDropped;
+
+        public event AsyncEventHandler<NatsSlowConsumerEventArgs>? SlowConsumerDetected;
 
         public event AsyncEventHandler<NatsLameDuckModeActivatedEventArgs>? LameDuckModeActivated;
 #pragma warning restore CS0067

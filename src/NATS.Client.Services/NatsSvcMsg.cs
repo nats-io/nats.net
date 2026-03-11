@@ -53,6 +53,11 @@ public readonly struct NatsSvcMsg<T>
     public NatsHeaders? Headers => _msg.Headers;
 
     /// <summary>
+    /// Gets the underlying NatsMsg for internal use (e.g., message drop callbacks).
+    /// </summary>
+    internal NatsMsg<T> Msg => _msg;
+
+    /// <summary>
     /// Send a reply with an empty message body.
     /// </summary>
     /// <param name="headers">Optional message headers.</param>

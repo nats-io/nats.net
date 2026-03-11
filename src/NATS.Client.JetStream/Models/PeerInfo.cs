@@ -45,6 +45,6 @@ public record PeerInfo
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("lag")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    [System.ComponentModel.DataAnnotations.Range(0, int.MaxValue)]
-    public int Lag { get; set; }
+    [System.ComponentModel.DataAnnotations.Range(0, ulong.MaxValue)]
+    public ulong Lag { get; set; }
 }

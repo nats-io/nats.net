@@ -23,7 +23,7 @@ public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
             connection.GetBoundedChannelOpts(opts?.ChannelOpts),
             msg => Connection.OnMessageDropped(this, _msgs?.Reader.Count ?? 0, msg));
 
-        Msgs = new ActivityEndingMsgReader<T>(_msgs.Reader, this);
+        Msgs = new ActivityEndingMsgReader<NatsMsg<T>>(_msgs.Reader, this);
 
         Serializer = serializer;
     }
@@ -45,6 +45,7 @@ public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
 
         await _msgs.Writer.WriteAsync(natsMsg).ConfigureAwait(false);
 
+        ResetSlowConsumer(_msgs.Reader.Count);
         DecrementMaxMsgs();
     }
 

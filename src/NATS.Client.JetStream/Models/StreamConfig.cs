@@ -217,6 +217,8 @@ public record StreamConfig
     /// <summary>
     /// Allow higher performance, direct access to get individual messages
     /// </summary>
+    /// <seealso href="https://www.nuget.org/packages/Synadia.Orbit.JetStream.Extensions">Batch direct message retrieval via GetBatchDirectAsync</seealso>
+    /// <seealso href="https://www.nuget.org/packages/Synadia.Orbit.Counters">Distributed counters require direct-access streams</seealso>
     [System.Text.Json.Serialization.JsonPropertyName("allow_direct")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public bool AllowDirect { get; set; }
@@ -243,6 +245,7 @@ public record StreamConfig
     /// AllowMsgTTL allows header initiated per-message TTLs. If disabled, then the `NATS-TTL` header will be ignored.
     /// </summary>
     /// <remarks>This feature is only available on NATS server v2.11 and later.</remarks>
+    /// <seealso href="https://www.nuget.org/packages/Synadia.Orbit.JetStream.Extensions">Scheduled and delayed message publishing</seealso>
     [System.Text.Json.Serialization.JsonPropertyName("allow_msg_ttl")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public bool AllowMsgTTL { get; set; }
@@ -267,6 +270,7 @@ public record StreamConfig
     /// Allow message counter.
     /// </summary>
     /// <remarks>Supported by server v2.12</remarks>
+    /// <seealso href="https://www.nuget.org/packages/Synadia.Orbit.Counters">Distributed counter operations via NatsJSCounter</seealso>
     [System.Text.Json.Serialization.JsonPropertyName("allow_msg_counter")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public bool AllowMsgCounter { get; set; }
@@ -274,6 +278,7 @@ public record StreamConfig
     /// <summary>
     /// AllowMsgSchedules enables the scheduling of messages.
     /// </summary>
+    /// <seealso href="https://www.nuget.org/packages/Synadia.Orbit.JetStream.Extensions">PublishScheduledAsync for delayed and recurring message scheduling</seealso>
     [System.Text.Json.Serialization.JsonPropertyName("allow_msg_schedules")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public bool AllowMsgSchedules { get; set; }
@@ -281,6 +286,7 @@ public record StreamConfig
     /// <summary>
     /// AllowAtomicPublish allows atomic batch publishing into the stream.
     /// </summary>
+    /// <seealso href="https://www.nuget.org/packages/Synadia.Orbit.JetStream.Publisher">Atomic batch publishing via PublishMsgBatchAsync</seealso>
     [System.Text.Json.Serialization.JsonPropertyName("allow_atomic")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public bool AllowAtomicPublish { get; set; }

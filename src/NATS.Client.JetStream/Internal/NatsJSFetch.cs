@@ -74,12 +74,12 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         _pendingMsgs = _maxMsgs;
         _pendingBytes = _maxBytes;
 
-        // This channel is used to pass messages
-        // to the user from the subscription channel (which should be set to a
-        // sufficiently large value to avoid blocking socket reads in the
-        // NATS connection).
-        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg>>(1000);
-        Msgs = _userMsgs.Reader;
+        // This channel is used to pass messages to the user from the subscription.
+        // Uses connection's channel options (default DropNewest) to avoid blocking socket reads.
+        _userMsgs = Channel.CreateBounded<NatsJSMsg<TMsg>>(
+            Connection.GetBoundedChannelOpts(opts?.ChannelOpts),
+            msg => Connection.OnMessageDropped(this, _userMsgs?.Reader.Count ?? 0, msg.Msg));
+        Msgs = new ActivityEndingMsgReader<NatsJSMsg<TMsg>>(_userMsgs.Reader, this);
 
         if (_debug)
         {
@@ -299,6 +299,8 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
             if (Volatile.Read(ref _disposed) == 0)
             {
                 await _userMsgs.Writer.WriteAsync(msg).ConfigureAwait(false);
+
+                ResetSlowConsumer(_userMsgs.Reader.Count);
             }
         }
 

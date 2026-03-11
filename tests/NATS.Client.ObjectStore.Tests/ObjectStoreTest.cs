@@ -5,9 +5,9 @@ using NATS.Client.Core.Tests;
 using NATS.Client.JetStream.Models;
 using NATS.Client.ObjectStore.Internal;
 using NATS.Client.ObjectStore.Models;
-using NATS.Client.Platform.Windows.Tests;
 using NATS.Client.Serializers.Json;
 using NATS.Client.TestUtilities;
+using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.ObjectStore.Tests;
 
@@ -572,10 +572,10 @@ public class ObjectStoreTest
 
         var s1 = await js.GetStreamAsync("OBJ_b1", cancellationToken: cancellationToken);
 
-        async Task<List<NatsJSMsg<byte[]>>> GetAllMsgs()
+        async Task<List<INatsJSMsg<byte[]>>> GetAllMsgs()
         {
             var c = await s1.CreateOrderedConsumerAsync(cancellationToken: cancellationToken);
-            List<NatsJSMsg<byte[]>> msgs = new();
+            List<INatsJSMsg<byte[]>> msgs = new();
             await foreach (var msg in c.ConsumeAsync<byte[]>(cancellationToken: cancellationToken))
             {
                 msgs.Add(msg);

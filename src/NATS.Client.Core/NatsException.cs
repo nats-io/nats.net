@@ -63,3 +63,12 @@ public sealed class NatsPayloadTooLargeException : NatsException
     {
     }
 }
+
+public sealed class NatsConnectionFailedException(string message) : NatsException(message);
+
+public sealed class NatsTimeoutException() : NatsException("Operation timed out")
+{
+    [DoesNotReturn]
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static void Throw() => throw new NatsTimeoutException();
+}

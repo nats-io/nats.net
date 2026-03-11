@@ -2,7 +2,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using NATS.Client.Core.Tests;
 using NATS.Client.ObjectStore.Models;
-using NATS.Client.Platform.Windows.Tests;
+using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.ObjectStore.Tests;
 

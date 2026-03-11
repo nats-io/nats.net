@@ -26,6 +26,13 @@ public interface INatsConnection : INatsClient
     event AsyncEventHandler<NatsMessageDroppedEventArgs>? MessageDropped;
 
     /// <summary>
+    /// Event that is raised when a slow consumer is detected on a subscription.
+    /// This event fires once per "episode" - when the subscription transitions into a slow consumer state.
+    /// It will fire again if the subscription recovers (channel drains to nearly empty) and then becomes slow again.
+    /// </summary>
+    event AsyncEventHandler<NatsSlowConsumerEventArgs>? SlowConsumerDetected;
+
+    /// <summary>
     /// Event that is raised when server goes into Lame Duck Mode.
     /// </summary>
     public event AsyncEventHandler<NatsLameDuckModeActivatedEventArgs>? LameDuckModeActivated;
@@ -126,6 +133,7 @@ public interface INatsConnection : INatsClient
     /// <remarks>
     /// if reply option's timeout is not defined then it will be set to NatsOpts.RequestTimeout.
     /// </remarks>
+    /// <seealso href="https://www.nuget.org/packages/Synadia.Orbit.Core.Extensions">RequestManyWithSentinelAsync for custom stop conditions</seealso>
     IAsyncEnumerable<NatsMsg<TReply>> RequestManyAsync<TRequest, TReply>(
         string subject,
         TRequest? data,

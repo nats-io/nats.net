@@ -141,7 +141,13 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
         Metadata = metadata;
         _cancellationToken = cancellationToken;
         _serializer = serializer;
-        _channel = Channel.CreateBounded<NatsSvcMsg<T>>(128);
+
+        // Use DropNewest mode with drop callback to avoid blocking the socket reader
+        Channel<NatsSvcMsg<T>>? channel = null;
+        channel = Channel.CreateBounded<NatsSvcMsg<T>>(
+            _nats.GetBoundedChannelOpts(opts?.ChannelOpts),
+            svcMsg => _nats.OnMessageDropped(this, channel?.Reader.Count ?? 0, svcMsg.Msg));
+        _channel = channel;
         _handlerTask = Task.Run(HandlerLoop);
     }
 
@@ -180,7 +186,7 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
     internal ValueTask StartAsync(CancellationToken cancellationToken) =>
         _nats.AddSubAsync(this, cancellationToken);
 
-    protected override ValueTask ReceiveInternalAsync(
+    protected override async ValueTask ReceiveInternalAsync(
         string subject,
         string? replyTo,
         ReadOnlySequence<byte>? headersBuffer,
@@ -208,7 +214,9 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
             _logger.LogWarning(NatsSvcLogEvents.Endpoint, exception, "Endpoint {Name} error receiving message", Name);
         }
 
-        return _channel.Writer.WriteAsync(new NatsSvcMsg<T>(msg, this, exception), _cancellationToken);
+        await _channel.Writer.WriteAsync(new NatsSvcMsg<T>(msg, this, exception), _cancellationToken);
+
+        ResetSlowConsumer(_channel.Reader.Count);
     }
 
     protected override void TryComplete() => _channel.Writer.TryComplete();

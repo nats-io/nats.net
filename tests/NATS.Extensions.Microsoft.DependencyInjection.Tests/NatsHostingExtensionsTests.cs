@@ -3,8 +3,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NATS.Client.Core;
-using NATS.Client.Platform.Windows.Tests;
 using NATS.Net;
+using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Extensions.Microsoft.DependencyInjection.Tests;
 

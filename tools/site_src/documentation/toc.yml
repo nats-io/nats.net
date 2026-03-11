@@ -36,12 +36,18 @@
 - name: Advanced Options
   href: advanced/intro.md
   items:
+    - name: Slow Consumers
+      href: advanced/slow-consumers.md
     - name: Serialization
       href: advanced/serialization.md
     - name: Security
       href: advanced/security.md
     - name: AOT Deployments
       href: advanced/aot.md
+    - name: OpenTelemetry
+      href: advanced/opentelemetry.md
+    - name: Platform Compatibility
+      href: advanced/platform-compatibility.md
 
 - name: Updating Documentation
   href: update-docs.md

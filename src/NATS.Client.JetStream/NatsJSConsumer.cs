@@ -26,9 +26,7 @@ public class NatsJSConsumer : INatsJSConsumer
         _consumer = Info.Name;
     }
 
-    /// <summary>
-    /// Consumer info object as retrieved from NATS JetStream server at the time this object was created, updated or refreshed.
-    /// </summary>
+    /// <inheritdoc />
     public ConsumerInfo Info { get; private set; }
 
     /// <summary>
@@ -56,7 +54,9 @@ public class NatsJSConsumer : INatsJSConsumer
     /// <typeparam name="T">Message type to deserialize.</typeparam>
     /// <returns>Async enumerable of messages which can be used in a <c>await foreach</c> loop.</returns>
     /// <exception cref="NatsJSProtocolException">Consumer is deleted, it's push based or request sent to server is invalid.</exception>
-    public async IAsyncEnumerable<NatsJSMsg<T>> ConsumeAsync<T>(
+    /// <exception cref="NatsConnectionFailedException">Connection has permanently failed and cannot be recovered.</exception>
+    /// <exception cref="NatsJSException">Consumer-related errors, such as the consumer being deleted after too many consecutive 503 errors.</exception>
+    public async IAsyncEnumerable<INatsJSMsg<T>> ConsumeAsync<T>(
         INatsDeserialize<T>? serializer = default,
         NatsJSConsumeOpts? opts = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -76,6 +76,16 @@ public class NatsJSConsumer : INatsJSConsumer
             {
                 ready = false;
             }
+            catch (NatsConnectionFailedException)
+            {
+                // Connection has permanently failed, stop consuming and rethrow
+                throw;
+            }
+            catch (NatsJSException)
+            {
+                // Consumer-related errors (like 503 threshold exceeded), stop consuming and rethrow
+                throw;
+            }
 
             if (!ready)
                 yield break;
@@ -92,6 +102,16 @@ public class NatsJSConsumer : INatsJSConsumer
                 {
                     read = false;
                     jsMsg = default;
+                }
+                catch (NatsConnectionFailedException)
+                {
+                    // Connection has permanently failed, stop consuming and rethrow
+                    throw;
+                }
+                catch (NatsJSException)
+                {
+                    // Consumer-related errors (like 503 threshold exceeded), stop consuming and rethrow
+                    throw;
                 }
 
                 if (!read)
@@ -138,9 +158,10 @@ public class NatsJSConsumer : INatsJSConsumer
     /// }
     /// </code>
     /// </example>
-    public async ValueTask<NatsJSMsg<T>?> NextAsync<T>(INatsDeserialize<T>? serializer = default, NatsJSNextOpts? opts = default, CancellationToken cancellationToken = default)
+    public async ValueTask<INatsJSMsg<T>?> NextAsync<T>(INatsDeserialize<T>? serializer = default, NatsJSNextOpts? opts = default, CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
+        ThrowIfPinned("next");
         opts ??= _context.Opts.DefaultNextOpts;
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
@@ -165,12 +186,13 @@ public class NatsJSConsumer : INatsJSConsumer
     }
 
     /// <inheritdoc />
-    public async IAsyncEnumerable<NatsJSMsg<T>> FetchAsync<T>(
+    public async IAsyncEnumerable<INatsJSMsg<T>> FetchAsync<T>(
         NatsJSFetchOpts opts,
         INatsDeserialize<T>? serializer = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
+        ThrowIfPinned("fetch");
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
         await using var fc = await FetchInternalAsync<T>(opts, serializer, cancellationToken).ConfigureAwait(false);
@@ -262,12 +284,13 @@ public class NatsJSConsumer : INatsJSConsumer
     /// }
     /// </code>
     /// </example>
-    public async IAsyncEnumerable<NatsJSMsg<T>> FetchNoWaitAsync<T>(
+    public async IAsyncEnumerable<INatsJSMsg<T>> FetchNoWaitAsync<T>(
         NatsJSFetchOpts opts,
         INatsDeserialize<T>? serializer = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
+        ThrowIfPinned("fetch");
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
         await using var fc = await FetchInternalAsync<T>(opts with { NoWait = true }, serializer, cancellationToken).ConfigureAwait(false);
@@ -281,12 +304,7 @@ public class NatsJSConsumer : INatsJSConsumer
         }
     }
 
-    /// <summary>
-    /// Retrieve the consumer info from the server and update this consumer.
-    /// </summary>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
-    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <inheritdoc />
     public async ValueTask RefreshAsync(CancellationToken cancellationToken = default) =>
         Info = await _context.JSRequestResponseAsync<object, ConsumerInfo>(
             subject: $"{_context.Opts.Prefix}.CONSUMER.INFO.{_stream}.{_consumer}",
@@ -328,6 +346,7 @@ public class NatsJSConsumer : INatsJSConsumer
     internal async ValueTask<NatsJSConsume<T>> ConsumeInternalAsync<T>(INatsDeserialize<T>? serializer = default, NatsJSConsumeOpts? opts = default, CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
+        cancellationToken.ThrowIfCancellationRequested();
 
         opts ??= new NatsJSConsumeOpts();
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
@@ -354,6 +373,7 @@ public class NatsJSConsumer : INatsJSConsumer
             idle: timeouts.IdleHeartbeat,
             notificationHandler: opts.NotificationHandler,
             priorityGroup: opts.PriorityGroup,
+            maxConsecutive503Errors: opts.MaxConsecutive503Errors,
             jsConsumer: this,
             cancellationToken: cancellationToken);
 
@@ -434,6 +454,7 @@ public class NatsJSConsumer : INatsJSConsumer
         CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
+        cancellationToken.ThrowIfCancellationRequested();
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
         var inbox = _context.NewBaseInbox();
@@ -505,11 +526,12 @@ public class NatsJSConsumer : INatsJSConsumer
             ChannelOpts = new NatsSubChannelOpts
             {
                 // Keep capacity large enough not to block the socket reads.
-                // This might delay message acknowledgements on slow consumers
-                // but it's crucial to keep the reads flowing on the main
-                // NATS TCP connection.
+                // Uses connection's default FullMode (typically DropNewest) to avoid
+                // blocking the main NATS TCP connection on slow consumers.
                 Capacity = maxMsgs > 0 ? maxMsgs * 2 : 1_000,
-                FullMode = BoundedChannelFullMode.Wait,
+
+                // FullMode intentionally not set - uses connection's SubPendingChannelFullMode
+                // (default: DropNewest) to prevent slow consumers from blocking socket reads.
             },
         };
 
@@ -517,5 +539,11 @@ public class NatsJSConsumer : INatsJSConsumer
     {
         if (_deleted)
             throw new NatsJSException($"Consumer '{_stream}:{_consumer}' is deleted");
+    }
+
+    private void ThrowIfPinned(string operation)
+    {
+        if (Info.Config.PriorityPolicy == ConsumerConfigPriorityPolicy.PinnedClient)
+            throw new NatsJSException($"Pinned client priority policy is not allowed with {operation}. Use Consume instead.");
     }
 }

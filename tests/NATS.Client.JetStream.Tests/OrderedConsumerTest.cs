@@ -2,8 +2,8 @@ using System.Diagnostics;
 using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Models;
-using NATS.Client.Platform.Windows.Tests;
 using NATS.Client.TestUtilities2;
+using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -255,6 +255,57 @@ public class OrderedConsumerTest
                 i++;
             }
         }
+    }
+
+    [Fact]
+    public async Task Ordered_consume_connection_failed_test()
+    {
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts
+        {
+            Url = server.Url,
+            MaxReconnectRetry = 2,
+            ReconnectWaitMin = TimeSpan.FromMilliseconds(100),
+            ReconnectWaitMax = TimeSpan.Zero,
+        });
+        await nats.ConnectAsync();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var js = new NatsJSContext(nats);
+        var stream = await js.CreateStreamAsync("s1", ["s1.*"], cts.Token);
+
+        // Publish some messages
+        for (var i = 0; i < 10; i++)
+        {
+            await js.PublishAsync("s1.foo", i, cancellationToken: cts.Token);
+        }
+
+        var consumer = await stream.CreateOrderedConsumerAsync(cancellationToken: cts.Token);
+
+        // Start consuming in background
+        var consumeTask = Task.Run(async () =>
+        {
+            await foreach (var msg in consumer.ConsumeAsync<int>(cancellationToken: cts.Token))
+            {
+                // Let messages flow through
+            }
+        });
+
+        // Stop server to trigger connection failure
+        await server.StopAsync();
+
+        // Wait for reconnect failure
+        var exception = await Assert.ThrowsAsync<NatsConnectionFailedException>(async () => await consumeTask);
+
+        // Message could be either from connection or from consume internal checks
+        Assert.True(
+            exception.Message.Contains("Connection is in failed state") ||
+            exception.Message.Contains("Maximum connection retry attempts exceeded"),
+            $"Unexpected exception message: {exception.Message}");
+
+        // Verify connection state is Failed
+        Assert.Equal(NatsConnectionState.Failed, nats.ConnectionState);
     }
 
     [Fact]

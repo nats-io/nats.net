@@ -4,8 +4,6 @@ internal sealed record NatsUri
 {
     public const string DefaultScheme = "nats";
 
-    private readonly string _redacted;
-
     public NatsUri(string urlString, bool isSeed, string defaultScheme = DefaultScheme)
     {
         IsSeed = isSeed;
@@ -40,21 +38,6 @@ internal sealed record NatsUri
         }
 
         Uri = uriBuilder.Uri;
-
-        // Redact user/password or token from the URI string for logging
-        if (uriBuilder.UserName is { Length: > 0 })
-        {
-            if (uriBuilder.Password is { Length: > 0 })
-            {
-                uriBuilder.Password = "***";
-            }
-            else
-            {
-                uriBuilder.UserName = "***";
-            }
-        }
-
-        _redacted = IsWebSocket && Uri.AbsolutePath != "/" ? uriBuilder.Uri.ToString() : uriBuilder.Uri.ToString().Trim('/');
     }
 
     public Uri Uri { get; init; }
@@ -69,5 +52,23 @@ internal sealed record NatsUri
 
     public int Port => Uri.Port;
 
-    public override string ToString() => _redacted;
+    public override string ToString()
+    {
+        var uriBuilder = new UriBuilder(Uri);
+
+        // Redact user/password or token from the URI string for logging
+        if (uriBuilder.UserName is { Length: > 0 })
+        {
+            if (uriBuilder.Password is { Length: > 0 })
+            {
+                uriBuilder.Password = "***";
+            }
+            else
+            {
+                uriBuilder.UserName = "***";
+            }
+        }
+
+        return IsWebSocket && Uri.AbsolutePath != "/" ? uriBuilder.Uri.ToString() : uriBuilder.Uri.ToString().Trim('/');
+    }
 }

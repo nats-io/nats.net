@@ -51,7 +51,7 @@ namespace NATS.Client.Core.NaCl
         /// Finalizes SHA-512 hashing.
         /// </summary>
         /// <returns>Hash bytes</returns>
-        public byte[] Finalize()
+        public byte[] FinalizeHash()
         {
             _ = _sha512Inner.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
             return _sha512Inner.Hash!;

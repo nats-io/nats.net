@@ -8,7 +8,7 @@ namespace NATS.Client.JetStream;
 
 /// <summary>
 /// This interface provides an optional contract when passing
-/// messages to processing methods which is usually helpful in
+/// messages to processing methods, which is usually helpful in
 /// creating test doubles in unit testing.
 /// </summary>
 /// <remarks>
@@ -27,15 +27,15 @@ namespace NATS.Client.JetStream;
 /// </para>
 /// </remarks>
 /// <typeparam name="T">Data type of the payload</typeparam>
-public interface INatsJSMsg<out T>
+public interface INatsJSMsg<out T> : INatsMsg
 {
     /// <summary>
-    /// Subject of the user message.
+    /// Get subject of the user message.
     /// </summary>
     string Subject { get; }
 
     /// <summary>
-    /// Message size in bytes.
+    /// Get message size in bytes.
     /// </summary>
     /// <remarks>
     /// Message size is calculated using the same method NATS server uses:
@@ -46,17 +46,12 @@ public interface INatsJSMsg<out T>
     int Size { get; }
 
     /// <summary>
-    /// Headers of the user message if set.
-    /// </summary>
-    NatsHeaders? Headers { get; }
-
-    /// <summary>
-    /// Deserialized user data.
+    /// Get deserialized user data.
     /// </summary>
     T? Data { get; }
 
     /// <summary>
-    /// The connection messages was delivered on.
+    /// Get the connection messages were delivered on.
     /// </summary>
     INatsConnection? Connection { get; }
 
@@ -84,7 +79,8 @@ public interface INatsJSMsg<out T>
     /// <param name="opts">A <see cref="NatsPubOpts"/> for publishing options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous send operation.</returns>
-    ValueTask ReplyAsync(NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default);
+    [Obsolete("ReplyAsync is not valid when using JetStream. The reply message will never reach the Requestor as NATS will reply to all JetStream publish by default.")]
+    ValueTask ReplyAsync(NatsHeaders? headers = null, string? replyTo = null, NatsPubOpts? opts = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Acknowledges the message was completely handled.
@@ -92,20 +88,15 @@ public interface INatsJSMsg<out T>
     /// <param name="opts">Ack options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the call.</param>
     /// <returns>A <see cref="ValueTask"/> representing the async call.</returns>
-    ValueTask AckAsync(AckOpts? opts = default, CancellationToken cancellationToken = default);
+    ValueTask AckAsync(AckOpts? opts = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Signals that the message will not be processed now and processing can move onto the next message.
     /// </summary>
-    /// <param name="delay">Delay redelivery of the message.</param>
-    /// <param name="opts">Ack options.</param>
+    /// <param name="opts">Ack options including <see cref="AckOpts.NakDelay"/>.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the call.</param>
     /// <returns>A <see cref="ValueTask"/> representing the async call.</returns>
-    /// <remarks>
-    /// Messages rejected using <c>-NAK</c> will be resent by the NATS JetStream server after the configured timeout
-    /// or the delay parameter if it's specified.
-    /// </remarks>
-    ValueTask NakAsync(AckOpts? opts = default, TimeSpan delay = default, CancellationToken cancellationToken = default);
+    ValueTask NakAsync(AckOpts? opts = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Indicates that work is ongoing and the wait period should be extended.
@@ -116,14 +107,14 @@ public interface INatsJSMsg<out T>
     /// <remarks>
     /// <para>
     /// Time period is defined by the consumer's <c>ack_wait</c> configuration on the server which is
-    /// defined as how long to allow messages to remain un-acknowledged before attempting redelivery.
+    /// defined as how long to allow messages to remain unacknowledged before attempting redelivery.
     /// </para>
     /// <para>
     /// This message must be sent before the <c>ack_wait</c> period elapses. The period should be extended
     /// by another amount of time equal to <c>ack_wait</c> by the NATS JetStream server.
     /// </para>
     /// </remarks>
-    ValueTask AckProgressAsync(AckOpts? opts = default, CancellationToken cancellationToken = default);
+    ValueTask AckProgressAsync(AckOpts? opts = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Instructs the server to stop redelivery of the message without acknowledging it as successfully processed.
@@ -131,7 +122,7 @@ public interface INatsJSMsg<out T>
     /// <param name="opts">Ack options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the call.</param>
     /// <returns>A <see cref="ValueTask"/> representing the async call.</returns>
-    ValueTask AckTerminateAsync(AckOpts? opts = default, CancellationToken cancellationToken = default);
+    ValueTask AckTerminateAsync(AckOpts? opts = null, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -151,45 +142,25 @@ public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
         _replyToDateTimeAndSeq = new Lazy<NatsJSMsgMetadata?>(() => ReplyToDateTimeAndSeq.Parse(msg.ReplyTo));
     }
 
-    /// <summary>
-    /// Subject of the user message.
-    /// </summary>
+    /// <inheritdoc />
     public string Subject => _msg.Subject;
 
-    /// <summary>
-    /// Message size in bytes.
-    /// </summary>
-    /// <remarks>
-    /// Message size is calculated using the same method NATS server uses:
-    /// <code lang="C#">
-    /// int size = subject.Length + replyTo.Length + headers.Length + payload.Length;
-    /// </code>
-    /// </remarks>
+    /// <inheritdoc />
     public int Size => _msg.Size;
 
-    /// <summary>
-    /// Headers of the user message if set.
-    /// </summary>
+    /// <inheritdoc />
     public NatsHeaders? Headers => _msg.Headers;
 
-    /// <summary>
-    /// Deserialized user data.
-    /// </summary>
+    /// <inheritdoc />
     public T? Data => _msg.Data;
 
-    /// <summary>
-    /// The connection messages was delivered on.
-    /// </summary>
+    /// <inheritdoc />
     public INatsConnection? Connection => _msg.Connection;
 
-    /// <summary>
-    /// Additional metadata about the message.
-    /// </summary>
+    /// <inheritdoc />
     public NatsJSMsgMetadata? Metadata => _replyToDateTimeAndSeq.Value;
 
-    /// <summary>
-    /// The reply subject that subscribers can use to send a response back to the publisher/requester.
-    /// </summary>
+    /// <inheritdoc />
     public string? ReplyTo => _msg.ReplyTo;
 
     /// <inheritdoc />
@@ -200,76 +171,60 @@ public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
     /// <inheritdoc />
     public void EnsureSuccess() => _msg.EnsureSuccess();
 
-    /// <summary>
-    /// Reply with an empty message.
-    /// </summary>
-    /// <param name="headers">Optional message headers.</param>
-    /// <param name="replyTo">Optional reply-to subject.</param>
-    /// <param name="opts">A <see cref="NatsPubOpts"/> for publishing options.</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the command.</param>
-    /// <returns>A <see cref="ValueTask"/> that represents the asynchronous send operation.</returns>
-    public ValueTask ReplyAsync(NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default) =>
+    /// <inheritdoc />
+    [Obsolete("ReplyAsync is not valid when using JetStream. The reply message will never reach the Requestor as NATS will reply to all JetStream publish by default.")]
+    public ValueTask ReplyAsync(NatsHeaders? headers = null, string? replyTo = null, NatsPubOpts? opts = null, CancellationToken cancellationToken = default) =>
         _msg.ReplyAsync(headers, replyTo, opts, cancellationToken);
 
-    /// <summary>
-    /// Acknowledges the message was completely handled.
-    /// </summary>
-    /// <param name="opts">Ack options.</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the call.</param>
-    /// <returns>A <see cref="ValueTask"/> representing the async call.</returns>
-    public ValueTask AckAsync(AckOpts? opts = default, CancellationToken cancellationToken = default) => SendAckAsync(NatsJSConstants.Ack, opts, cancellationToken);
+    /// <inheritdoc />
+    public ValueTask AckAsync(AckOpts? opts = null, CancellationToken cancellationToken = default) => SendAckAsync(NatsJSConstants.Ack, opts, cancellationToken);
 
-    /// <summary>
-    /// Signals that the message will not be processed now and processing can move onto the next message.
-    /// </summary>
-    /// <param name="delay">Delay redelivery of the message.</param>
-    /// <param name="opts">Ack options.</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the call.</param>
-    /// <returns>A <see cref="ValueTask"/> representing the async call.</returns>
-    /// <remarks>
-    /// Messages rejected using <c>-NAK</c> will be resent by the NATS JetStream server after the configured timeout
-    /// or the delay parameter if it's specified.
-    /// </remarks>
-    public ValueTask NakAsync(AckOpts? opts = default, TimeSpan delay = default, CancellationToken cancellationToken = default)
+    /// <inheritdoc />
+    public ValueTask NakAsync(AckOpts? opts = null, CancellationToken cancellationToken = default)
     {
-        if (delay == default)
-        {
+        var delay = opts?.NakDelay ?? TimeSpan.Zero;
+
+        if (delay == TimeSpan.Zero)
             return SendAckAsync(NatsJSConstants.Nak, opts, cancellationToken);
-        }
-        else
+
+        var nakDelayed = new ReadOnlySequence<byte>(Encoding.ASCII.GetBytes($"-NAK {{\"delay\": {delay.ToNanos()}}}"));
+        return SendAckAsync(nakDelayed, opts, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public ValueTask AckProgressAsync(AckOpts? opts = null, CancellationToken cancellationToken = default) => SendAckAsync(NatsJSConstants.AckProgress, opts, cancellationToken);
+
+    /// <inheritdoc />
+    public ValueTask AckTerminateAsync(AckOpts? opts = null, CancellationToken cancellationToken = default)
+        => string.IsNullOrEmpty(opts?.TerminateReason)
+            ? SendAckAsync(NatsJSConstants.AckTerminate, opts, cancellationToken)
+            : AckTerminateWithReasonAsync(opts!.Value.TerminateReason!, opts, cancellationToken);
+
+    private async ValueTask AckTerminateWithReasonAsync(string reason, AckOpts? opts, CancellationToken cancellationToken)
+    {
+        var reasonByteCount = Encoding.ASCII.GetByteCount(reason);
+        var totalLength = 6 + reasonByteCount; // `+TERM ` is 6 bytes
+
+        var buffer = ArrayPool<byte>.Shared.Rent(totalLength);
+        try
         {
-            var nakDelayed = new ReadOnlySequence<byte>(Encoding.ASCII.GetBytes($"-NAK {{\"delay\": {delay.ToNanos()}}}"));
-            return SendAckAsync(nakDelayed, opts, cancellationToken);
+#if NETSTANDARD2_0
+            Buffer.BlockCopy(NatsJSMsgConstants.TermPrefix, 0, buffer, 0, 6);
+            Encoding.ASCII.GetBytes(reason, 0, reason.Length, buffer, 6);
+#else
+            "+TERM "u8.CopyTo(buffer.AsSpan());
+            Encoding.ASCII.GetBytes(reason.AsSpan(), buffer.AsSpan(6));
+#endif
+
+            await SendAckAsync(new ReadOnlySequence<byte>(buffer, 0, totalLength), opts, cancellationToken);
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
         }
     }
 
-    /// <summary>
-    /// Indicates that work is ongoing and the wait period should be extended.
-    /// </summary>
-    /// <param name="opts">Ack options.</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the call.</param>
-    /// <returns>A <see cref="ValueTask"/> representing the async call.</returns>
-    /// <remarks>
-    /// <para>
-    /// Time period is defined by the consumer's <c>ack_wait</c> configuration on the server which is
-    /// defined as how long to allow messages to remain un-acknowledged before attempting redelivery.
-    /// </para>
-    /// <para>
-    /// This message must be sent before the <c>ack_wait</c> period elapses. The period should be extended
-    /// by another amount of time equal to <c>ack_wait</c> by the NATS JetStream server.
-    /// </para>
-    /// </remarks>
-    public ValueTask AckProgressAsync(AckOpts? opts = default, CancellationToken cancellationToken = default) => SendAckAsync(NatsJSConstants.AckProgress, opts, cancellationToken);
-
-    /// <summary>
-    /// Instructs the server to stop redelivery of the message without acknowledging it as successfully processed.
-    /// </summary>
-    /// <param name="opts">Ack options.</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the call.</param>
-    /// <returns>A <see cref="ValueTask"/> representing the async call.</returns>
-    public ValueTask AckTerminateAsync(AckOpts? opts = default, CancellationToken cancellationToken = default) => SendAckAsync(NatsJSConstants.AckTerminate, opts, cancellationToken);
-
-    private async ValueTask SendAckAsync(ReadOnlySequence<byte> payload, AckOpts? opts = default, CancellationToken cancellationToken = default)
+    private async ValueTask SendAckAsync(ReadOnlySequence<byte> payload, AckOpts? opts = null, CancellationToken cancellationToken = default)
     {
         CheckPreconditions();
 
@@ -301,7 +256,7 @@ public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
     [MemberNotNull(nameof(ReplyTo))]
     private void CheckPreconditions()
     {
-        if (Connection == default)
+        if (Connection == null)
         {
             throw new NatsException("unable to send acknowledgment; message did not originate from a consumer");
         }
@@ -325,4 +280,22 @@ public readonly record struct AckOpts
     /// Ask server for an acknowledgment
     /// </summary>
     public bool? DoubleAck { get; init; }
+
+    /// <summary>
+    /// Delay for Nak before redelivery
+    /// </summary>
+    public TimeSpan? NakDelay { get; init; }
+
+    /// <summary>
+    /// Reason for AckTerminate
+    /// Requires NATS Server 2.10.4+.
+    /// </summary>
+    public string? TerminateReason { get; init; }
 }
+
+#if NETSTANDARD2_0
+internal static class NatsJSMsgConstants
+{
+    internal static readonly byte[] TermPrefix = "+TERM "u8.ToArray();
+}
+#endif

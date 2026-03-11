@@ -456,6 +456,50 @@ internal class NatsJSJsonNullableNanosecondsConverter : JsonConverter<TimeSpan?>
     }
 }
 
+/// <summary>
+/// Converter for TimeSpan? where -1 from the server indicates "no activity" and should be null.
+/// Used for properties like StreamSourceInfo.Active where NATS server returns -1 when there has been no activity.
+/// </summary>
+internal class NatsJSJsonNullableNanosecondsWithMinusOneConverter : JsonConverter<TimeSpan?>
+{
+    public override bool HandleNull => true;
+
+    public override TimeSpan? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.Null)
+        {
+            return null;
+        }
+
+        if (reader.TokenType != JsonTokenType.Number)
+        {
+            throw new InvalidOperationException("Expected number");
+        }
+
+        var value = reader.GetInt64();
+
+        // -1 indicates no activity, return null to distinguish from genuine zero
+        if (value == -1)
+        {
+            return null;
+        }
+
+        return TimeSpan.FromMilliseconds(value / 1_000_000.0);
+    }
+
+    public override void Write(Utf8JsonWriter writer, TimeSpan? value, JsonSerializerOptions options)
+    {
+        if (value == null)
+        {
+            writer.WriteNumberValue(-1);
+        }
+        else
+        {
+            writer.WriteNumberValue((long)(value.Value.TotalMilliseconds * 1_000_000L));
+        }
+    }
+}
+
 internal class NatsJSJsonNullableCollectionNanosecondsConverter : JsonConverter<ICollection<TimeSpan>?>
 {
     private readonly NatsJSJsonNanosecondsConverter _converter = new();

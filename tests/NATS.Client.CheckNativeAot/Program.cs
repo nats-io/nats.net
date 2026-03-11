@@ -7,10 +7,10 @@ using NATS.Client.JetStream.Models;
 using NATS.Client.KeyValueStore;
 using NATS.Client.ObjectStore;
 using NATS.Client.ObjectStore.Models;
-using NATS.Client.Platform.Windows.Tests;
 using NATS.Client.Services;
 using NATS.Client.Services.Internal;
 using NATS.Client.Services.Models;
+using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 Log("Starting...");
 
@@ -126,7 +126,7 @@ async Task JetStreamTests()
 
         // Consume
         var cts2 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var messages = new List<NatsJSMsg<TestData>>();
+        var messages = new List<INatsJSMsg<TestData>>();
         await foreach (var msg in consumer.ConsumeAsync(serializer: TestDataJsonSerializer<TestData>.Default, new NatsJSConsumeOpts { MaxMsgs = 100 }, cancellationToken: cts2.Token))
         {
             messages.Add(msg);
