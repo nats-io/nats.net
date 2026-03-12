@@ -50,7 +50,7 @@ public record StreamSnapshotRequest
     /// Optional window size preference.
     /// Defaults on the server to 8MB, automatically clamped to within the range 1KB to 32MB.
     /// Very slow connections may need to reduce this to avoid slow consumer issues.
-    /// Minimum Server Version 2.15.5
+    /// Minimum Server Version 2.12.5
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("window_size")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]

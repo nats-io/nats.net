@@ -437,4 +437,128 @@ public class ManageStreamTest
         // Verify messages are retained after promotion
         Assert.Equal(10, promoted.Info.State.Messages);
     }
+
+    [SkipIfNatsServer(versionEarlierThan: "2.12.5")]
+    public async Task Snapshot_request_with_chunk_and_window_size()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
+        await nats.ConnectRetryAsync();
+
+        var js = new NatsJSContext(nats);
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        // Create a stream with some data
+        await js.CreateStreamAsync(new StreamConfig($"{prefix}snap", new[] { $"{prefix}snap.>" }), cts.Token);
+        await js.PublishAsync($"{prefix}snap.1", "hello", cancellationToken: cts.Token);
+
+        // Snapshot with default chunk_size and window_size (omitted)
+        var response = await js.JSRequestResponseAsync<StreamSnapshotRequest, StreamSnapshotResponse>(
+            subject: $"{js.Opts.Prefix}.STREAM.SNAPSHOT.{prefix}snap",
+            new StreamSnapshotRequest { DeliverSubject = nats.NewInbox() },
+            cts.Token);
+        Assert.Equal($"{prefix}snap", response.Config.Name);
+        Assert.True(response.State.Messages > 0);
+
+        // Snapshot with explicit chunk_size and window_size
+        response = await js.JSRequestResponseAsync<StreamSnapshotRequest, StreamSnapshotResponse>(
+            subject: $"{js.Opts.Prefix}.STREAM.SNAPSHOT.{prefix}snap",
+            new StreamSnapshotRequest
+            {
+                DeliverSubject = nats.NewInbox(),
+                ChunkSize = 256 * 1024,
+                WindowSize = 4 * 1024 * 1024,
+            },
+            cts.Token);
+        Assert.Equal($"{prefix}snap", response.Config.Name);
+        Assert.True(response.State.Messages > 0);
+    }
+
+    [SkipIfNatsServer(versionEarlierThan: "2.12.5")]
+    public async Task Snapshot_collect_chunks_and_verify_backup()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
+        await nats.ConnectRetryAsync();
+
+        var js = new NatsJSContext(nats);
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        // Create a stream and publish several messages
+        var streamName = $"{prefix}snapbackup";
+        var messageCount = 50;
+        await js.CreateStreamAsync(new StreamConfig(streamName, new[] { $"{streamName}.>" }), cts.Token);
+        for (var i = 0; i < messageCount; i++)
+        {
+            await js.PublishAsync($"{streamName}.data", $"message-{i}", cancellationToken: cts.Token);
+        }
+
+        // Subscribe to the deliver subject before requesting the snapshot
+        var deliverSubject = nats.NewInbox();
+        var totalBytes = 0L;
+        var chunkCount = 0;
+        var snapshotData = new List<byte[]>();
+
+        // Start subscription to collect chunks
+        var sub = await nats.SubscribeCoreAsync<byte[]>(deliverSubject, cancellationToken: cts.Token);
+        var subTask = Task.Run(
+            async () =>
+            {
+                await foreach (var msg in sub.Msgs.ReadAllAsync(cts.Token))
+                {
+                    // Final message has no reply subject — signals end of snapshot
+                    if (string.IsNullOrEmpty(msg.ReplyTo))
+                    {
+                        break;
+                    }
+
+                    if (msg.Data != null)
+                    {
+                        chunkCount++;
+                        totalBytes += msg.Data.Length;
+                        snapshotData.Add(msg.Data);
+                    }
+
+                    // Ack the chunk so the server sends the next one
+                    await nats.PublishAsync(msg.ReplyTo!, cancellationToken: cts.Token);
+                }
+            },
+            cts.Token);
+
+        // Request snapshot with explicit chunk and window size
+        var response = await js.JSRequestResponseAsync<StreamSnapshotRequest, StreamSnapshotResponse>(
+            subject: $"{js.Opts.Prefix}.STREAM.SNAPSHOT.{streamName}",
+            new StreamSnapshotRequest
+            {
+                DeliverSubject = deliverSubject,
+                ChunkSize = 1024,
+                WindowSize = 8 * 1024,
+            },
+            cts.Token);
+
+        Assert.Equal(streamName, response.Config.Name);
+        Assert.Equal(messageCount, (int)response.State.Messages);
+
+        // Wait for all chunks to be collected
+        await subTask;
+
+        // Verify we received data
+        Assert.True(chunkCount > 0, $"Expected at least one chunk, got {chunkCount}");
+        Assert.True(totalBytes > 0, $"Expected snapshot data, got {totalBytes} bytes");
+
+        _output.WriteLine($"Snapshot stats: {chunkCount} chunks, {totalBytes} bytes total, avg {totalBytes / chunkCount} bytes/chunk");
+
+        // Reassemble snapshot data (S2/Snappy compressed tar archive)
+        var allBytes = snapshotData.SelectMany(b => b).ToArray();
+        _output.WriteLine($"Reassembled snapshot: {allBytes.Length} bytes");
+
+        // Verify S2 stream identifier: 0xFF 0x06 0x00 0x00 "S2sTwO"
+        Assert.True(allBytes.Length >= 10, "Snapshot too small");
+        _output.WriteLine($"First 10 bytes: {string.Join(" ", allBytes.Take(10).Select(b => $"0x{b:X2}"))}");
+        var magic = System.Text.Encoding.ASCII.GetString(allBytes, 4, 6);
+        _output.WriteLine($"S2 magic: {magic}");
+        Assert.Equal(0xFF, allBytes[0]);
+        Assert.Equal(0x06, allBytes[1]);
+        Assert.Equal("S2sTwO", magic);
+    }
 }
