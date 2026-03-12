@@ -448,21 +448,24 @@ public class ManageStreamTest
         var js = new NatsJSContext(nats);
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
-        // Create a stream with some data
-        await js.CreateStreamAsync(new StreamConfig($"{prefix}snap", new[] { $"{prefix}snap.>" }), cts.Token);
-        await js.PublishAsync($"{prefix}snap.1", "hello", cancellationToken: cts.Token);
+        // Use separate streams to avoid "snapshot in progress" error
+        // (the server rejects concurrent snapshots on the same stream)
 
         // Snapshot with default chunk_size and window_size (omitted)
+        await js.CreateStreamAsync(new StreamConfig($"{prefix}snap1", new[] { $"{prefix}snap1.>" }), cts.Token);
+        await js.PublishAsync($"{prefix}snap1.1", "hello", cancellationToken: cts.Token);
         var response = await js.JSRequestResponseAsync<StreamSnapshotRequest, StreamSnapshotResponse>(
-            subject: $"{js.Opts.Prefix}.STREAM.SNAPSHOT.{prefix}snap",
+            subject: $"{js.Opts.Prefix}.STREAM.SNAPSHOT.{prefix}snap1",
             new StreamSnapshotRequest { DeliverSubject = nats.NewInbox() },
             cts.Token);
-        Assert.Equal($"{prefix}snap", response.Config.Name);
+        Assert.Equal($"{prefix}snap1", response.Config.Name);
         Assert.True(response.State.Messages > 0);
 
         // Snapshot with explicit chunk_size and window_size
+        await js.CreateStreamAsync(new StreamConfig($"{prefix}snap2", new[] { $"{prefix}snap2.>" }), cts.Token);
+        await js.PublishAsync($"{prefix}snap2.1", "hello", cancellationToken: cts.Token);
         response = await js.JSRequestResponseAsync<StreamSnapshotRequest, StreamSnapshotResponse>(
-            subject: $"{js.Opts.Prefix}.STREAM.SNAPSHOT.{prefix}snap",
+            subject: $"{js.Opts.Prefix}.STREAM.SNAPSHOT.{prefix}snap2",
             new StreamSnapshotRequest
             {
                 DeliverSubject = nats.NewInbox(),
@@ -470,7 +473,7 @@ public class ManageStreamTest
                 WindowSize = 4 * 1024 * 1024,
             },
             cts.Token);
-        Assert.Equal($"{prefix}snap", response.Config.Name);
+        Assert.Equal($"{prefix}snap2", response.Config.Name);
         Assert.True(response.State.Messages > 0);
     }
 
