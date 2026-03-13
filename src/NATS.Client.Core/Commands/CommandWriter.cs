@@ -333,11 +333,11 @@ internal sealed class CommandWriter : IAsyncDisposable
 
         try
         {
+            if (value != null)
+                serializer.Serialize(payloadBuffer, value, headers);
+
             if (headers != null)
                 _headerWriter.Write(headersBuffer!, headers);
-
-            if (value != null)
-                serializer.Serialize(payloadBuffer, value);
 
             var size = payloadBuffer.WrittenMemory.Length + (headersBuffer?.WrittenMemory.Length ?? 0);
             if (_connection.ServerInfo is { } info && size > info.MaxPayload)
