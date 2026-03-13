@@ -237,13 +237,7 @@ public class MyProtoBufSerializer<T> : INatsSerializer<T>
 {
     public static readonly INatsSerializer<T> Default = new MyProtoBufSerializer<T>();
 
-#pragma warning disable CS0618 // Type or member is obsolete
-    public void Serialize(IBufferWriter<byte> bufferWriter, T value) => Serialize(bufferWriter, value, null);
-
-    public T? Deserialize(in ReadOnlySequence<byte> buffer) => Deserialize(buffer, null);
-#pragma warning restore CS0618
-
-    public void Serialize(IBufferWriter<byte> bufferWriter, T value, INatsHeaders? headers)
+    public void Serialize(IBufferWriter<byte> bufferWriter, T value)
     {
         if (value is IMessage message)
         {
@@ -255,7 +249,7 @@ public class MyProtoBufSerializer<T> : INatsSerializer<T>
         }
     }
 
-    public T? Deserialize(in ReadOnlySequence<byte> buffer, INatsHeaders? headers)
+    public T? Deserialize(in ReadOnlySequence<byte> buffer)
     {
         if (typeof(T) == typeof(Greeting))
         {
@@ -286,7 +280,7 @@ public class MixedSerializerRegistry : INatsSerializerRegistry
 #endregion
 
 #region header-aware-serializer
-public class MyHeaderAwareSerializer<T> : INatsSerializer<T>
+public class MyHeaderAwareSerializer<T> : INatsSerializer<T>, INatsSerializeWithHeaders<T>, INatsDeserializeWithHeaders<T>
 {
     private readonly NatsJsonContextSerializer<T> _jsonSerializer;
 
@@ -295,11 +289,9 @@ public class MyHeaderAwareSerializer<T> : INatsSerializer<T>
         _jsonSerializer = new NatsJsonContextSerializer<T>(context);
     }
 
-#pragma warning disable CS0618 // Type or member is obsolete
-    public void Serialize(IBufferWriter<byte> bufferWriter, T value) => Serialize(bufferWriter, value, null);
+    public void Serialize(IBufferWriter<byte> bufferWriter, T value) => _jsonSerializer.Serialize(bufferWriter, value);
 
-    public T? Deserialize(in ReadOnlySequence<byte> buffer) => Deserialize(buffer, null);
-#pragma warning restore CS0618
+    public T? Deserialize(in ReadOnlySequence<byte> buffer) => _jsonSerializer.Deserialize(buffer);
 
     public void Serialize(IBufferWriter<byte> bufferWriter, T value, INatsHeaders? headers)
     {
@@ -309,7 +301,7 @@ public class MyHeaderAwareSerializer<T> : INatsSerializer<T>
             mutableHeaders["Content-Type"] = "application/json";
         }
 
-        _jsonSerializer.Serialize(bufferWriter, value, headers);
+        _jsonSerializer.Serialize(bufferWriter, value);
     }
 
     public T? Deserialize(in ReadOnlySequence<byte> buffer, INatsHeaders? headers)
@@ -319,13 +311,13 @@ public class MyHeaderAwareSerializer<T> : INatsSerializer<T>
             && headers.TryGetValue("Content-Type", out StringValues contentType)
             && contentType.ToString() == "application/json")
         {
-            return _jsonSerializer.Deserialize(buffer, headers);
+            return _jsonSerializer.Deserialize(buffer);
         }
 
         throw new NatsException($"Unsupported content type for {typeof(T)}");
     }
 
-    public INatsSerializer<T> CombineWith(INatsSerializer<T> next) => throw new NotImplementedException();
+    public INatsSerializer<T> CombineWith(INatsSerializer<T> next) => throw new NotSupportedException();
 }
 #endregion
 

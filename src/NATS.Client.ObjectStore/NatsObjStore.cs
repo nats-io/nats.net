@@ -473,7 +473,7 @@ public class NatsObjStore : INatsObjStore
             }
 
             var buffer = new ReadOnlySequence<byte>(response.Message.Data);
-            var data = NatsObjJsonSerializer<ObjectMetadata>.Default.Deserialize(buffer, null) ?? throw new NatsObjException("Can't deserialize object metadata");
+            var data = NatsObjJsonSerializer<ObjectMetadata>.Default.Deserialize(buffer) ?? throw new NatsObjException("Can't deserialize object metadata");
 
             data.MTime = response.Message.Time;
 

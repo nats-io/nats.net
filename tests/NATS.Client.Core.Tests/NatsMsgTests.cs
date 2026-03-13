@@ -77,7 +77,7 @@ public class NatsMsgTests
         var msg = builder.Msg;
 
         var bufferWriter = new NatsPooledBufferWriter<byte>(256);
-        serializer.Serialize(bufferWriter, data, headers);
+        serializer.Serialize(bufferWriter, data);
         var serializedSize = bufferWriter.WrittenCount;
 
         var expectedSize = subject.Length + (replyTo?.Length ?? 0) + headers.GetBytesLength() + serializedSize;
@@ -109,7 +109,7 @@ public class NatsMsgTests
         var msg = builder.Msg;
 
         var bufferWriter = new NatsPooledBufferWriter<byte>(256);
-        serializer.Serialize(bufferWriter, data, headers);
+        ((INatsSerializeWithHeaders<TestData>)serializer).Serialize(bufferWriter, data, headers);
         var serializedSize = bufferWriter.WrittenCount;
 
         var expectedSize = subject.Length + (replyTo?.Length ?? 0) + headers.GetBytesLength() + serializedSize;
@@ -144,15 +144,13 @@ public class NatsMsgTests
         public string Name { get; set; } = null!;
     }
 
-    private class HeaderAwareSerializer<T> : INatsSerializer<T>
+    private class HeaderAwareSerializer<T> : INatsSerializer<T>, INatsSerializeWithHeaders<T>, INatsDeserializeWithHeaders<T>
     {
         private readonly NatsJsonSerializer<T> _inner = new();
 
-#pragma warning disable CS0618 // Type or member is obsolete
-        public void Serialize(IBufferWriter<byte> bufferWriter, T value) => Serialize(bufferWriter, value, null);
+        public void Serialize(IBufferWriter<byte> bufferWriter, T value) => _inner.Serialize(bufferWriter, value);
 
-        public T? Deserialize(in ReadOnlySequence<byte> buffer) => Deserialize(buffer, null);
-#pragma warning restore CS0618
+        public T? Deserialize(in ReadOnlySequence<byte> buffer) => _inner.Deserialize(buffer);
 
         public void Serialize(IBufferWriter<byte> bufferWriter, T value, INatsHeaders? headers)
         {
@@ -165,11 +163,11 @@ public class NatsMsgTests
                 bufferWriter.Advance(prefix.Length);
             }
 
-            _inner.Serialize(bufferWriter, value, headers);
+            _inner.Serialize(bufferWriter, value);
         }
 
         public T? Deserialize(in ReadOnlySequence<byte> buffer, INatsHeaders? headers) =>
-            _inner.Deserialize(buffer, headers);
+            _inner.Deserialize(buffer);
 
         public INatsSerializer<T> CombineWith(INatsSerializer<T> next) => this;
     }

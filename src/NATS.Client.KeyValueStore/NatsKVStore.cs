@@ -400,7 +400,7 @@ public class NatsKVStore : INatsKVStore
 
                 try
                 {
-                    data = serializer.Deserialize(buffer, null);
+                    data = serializer.Deserialize(buffer);
                 }
                 catch (Exception e)
                 {
