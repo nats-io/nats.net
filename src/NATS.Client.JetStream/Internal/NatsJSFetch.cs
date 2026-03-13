@@ -165,6 +165,9 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         Interlocked.Exchange(ref _disposed, 1);
         try
         {
+            // Drain: UNSUB → PING/PONG → TryComplete, so all in-flight
+            // messages are written to the channel before it's completed.
+            await DrainAsync().ConfigureAwait(false);
             await base.DisposeAsync().ConfigureAwait(false);
         }
         finally
@@ -294,14 +297,9 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
             _pendingMsgs--;
             _pendingBytes -= msg.Size;
 
-            // Stop feeding the user if we are disposed.
-            // We need to exit as soon as possible.
-            if (Volatile.Read(ref _disposed) == 0)
-            {
-                await _userMsgs.Writer.WriteAsync(msg).ConfigureAwait(false);
+            await _userMsgs.Writer.WriteAsync(msg).ConfigureAwait(false);
 
-                ResetSlowConsumer(_userMsgs.Reader.Count);
-            }
+            ResetSlowConsumer(_userMsgs.Reader.Count);
         }
 
         if (_maxBytes > 0 && _pendingBytes <= 0)
