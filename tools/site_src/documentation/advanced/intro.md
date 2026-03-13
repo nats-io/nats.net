@@ -92,6 +92,7 @@ essentially sent back to back after they're picked up from internal queues and b
 
 ## What's Next
 
+- [Dependency Injection](dependency-injection.md) explains the two DI packages (`NATS.Client.Hosting` and `NATS.Extensions.Microsoft.DependencyInjection`) and when to use each one.
 - [Slow Consumers](slow-consumers.md) explains how to detect and handle subscribers that can't keep up with the message rate, including the `MessageDropped` and `SlowConsumerDetected` events.
 - [Serialization](serialization.md) is the process of converting an object into a format that can be stored or transmitted.
 - [Security](security.md) is an important aspect of any distributed system. NATS provides a number of security features to help you secure your applications.

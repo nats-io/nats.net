@@ -189,10 +189,10 @@ public struct NatsMemoryOwner<T> : IMemoryOwner<T>
 
             ref var r0 = ref array!.DangerousGetReferenceAt(_start);
 
-            // On .NET 6+ runtimes, we can manually create a span from the starting reference to
+            // On .NET 8+ runtimes, we can manually create a span from the starting reference to
             // skip the argument validations, which include an explicit null check, covariance check
             // for the array and the actual validation for the starting offset and target length. We
-            // only do this on .NET 6+ as we can leverage the runtime-specific array layout to get
+            // only do this on .NET 8+ as we can leverage the runtime-specific array layout to get
             // a fast access to the initial element, which makes this trick worth it. Otherwise, on
             // runtimes where we would need to at least access a static field to retrieve the base
             // byte offset within an SZ array object, we can get better performance by just using the

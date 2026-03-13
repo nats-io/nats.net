@@ -149,7 +149,7 @@ public partial class NatsConnection
         var totalLength = prefix.Length + (int)Nuid.NuidLength + separatorLength;
         var totalPrefixLength = prefix.Length + separatorLength;
 
-#if NET6_0_OR_GREATER || NETSTANDARD2_1
+#if !NETSTANDARD2_0
         return string.Create(totalLength, (prefix, totalPrefixLength), (buf, state) => WriteBuffer(buf, state));
 #else
         Span<char> buffer = new char[totalLength];
