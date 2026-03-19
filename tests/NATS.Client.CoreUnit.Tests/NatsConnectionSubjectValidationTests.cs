@@ -142,15 +142,15 @@ public class NatsConnectionSubjectValidationTests
         await action.Should().ThrowAsync<NatsException>().WithMessage("Queue group is invalid.");
     }
 
-    // SkipSubjectValidation option tests (default is true, so validation is skipped by default)
+    // SkipSubjectValidation option tests (default is false, so validation is enabled by default)
     [Theory]
     [InlineData("foo bar")]
     [InlineData("foo\tbar")]
     public async Task PublishAsync_WithSkipValidation_DoesNotThrowOnInvalidSubject(string subject)
     {
-        // Default SkipSubjectValidation=true, validation is bypassed at the API level.
+        // SkipSubjectValidation=true bypasses validation at the API level.
         // The call will fail later (e.g., connection timeout) but not due to validation.
-        await using var nats = new NatsConnection();
+        await using var nats = new NatsConnection(new NatsOpts { SkipSubjectValidation = true });
 
         // This should not throw NatsException for invalid subject
         // It will throw something else (timeout, connection error) since we're not connected
@@ -170,8 +170,8 @@ public class NatsConnectionSubjectValidationTests
     [InlineData("foo\tbar")]
     public async Task SubscribeAsync_WithSkipValidation_DoesNotThrowOnInvalidSubject(string subject)
     {
-        // Default SkipSubjectValidation=true
-        await using var nats = new NatsConnection();
+        // SkipSubjectValidation=true bypasses validation at the API level.
+        await using var nats = new NatsConnection(new NatsOpts { SkipSubjectValidation = true });
 
         // This should not throw NatsException for invalid subject
         Func<Task> action = async () =>
