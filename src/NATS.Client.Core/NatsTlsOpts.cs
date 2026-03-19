@@ -14,14 +14,32 @@ namespace NATS.Client.Core;
 public enum TlsMode
 {
     /// <summary>
-    /// For connections that use the "nats://" scheme and don't supply Client or CA Certificates - same as <c>Prefer</c>
-    /// For connections that use the "tls://" scheme or supply Client or CA Certificates - same as <c>Require</c>
+    /// For connections that use the "nats://" scheme and don't supply Client or CA Certificates - same as <see cref="Prefer"/>.
+    /// For connections that use the "tls://" scheme or supply Client or CA Certificates - same as <see cref="Require"/>.
     /// </summary>
+    /// <remarks>
+    /// When this resolves to <see cref="Prefer"/>, TLS is opportunistic and subject to the same
+    /// limitations described in the <see cref="Prefer"/> remarks.
+    /// Use the <c>tls://</c> scheme or set <see cref="Require"/> explicitly when TLS is required for security.
+    /// </remarks>
     Auto,
 
     /// <summary>
-    /// if the Server supports TLS, then use it, otherwise use plain-text.
+    /// If the server supports TLS, then use it; otherwise, use plain-text.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is an opportunistic TLS mode. Whether the server "supports TLS" is determined
+    /// from the server's INFO message, which is received over plaintext TCP before any TLS
+    /// upgrade occurs. A man-in-the-middle attacker on the network could forge the INFO
+    /// message to strip the TLS flags, causing the client to skip TLS and send credentials
+    /// in plaintext. This is inherent to the NATS protocol's connection flow and applies to
+    /// all NATS client implementations.
+    /// </para>
+    /// <para>
+    /// If TLS is required for security, use the <c>tls://</c> scheme or set <see cref="TlsMode.Require"/> explicitly.
+    /// </para>
+    /// </remarks>
     Prefer,
 
     /// <summary>
@@ -99,7 +117,14 @@ public sealed record NatsTlsOpts
     /// <summary>When true, skip remote certificate verification and accept any server certificate</summary>
     public bool InsecureSkipVerify { get; init; }
 
-    /// <summary>TLS mode to use during connection</summary>
+    /// <summary>
+    /// TLS mode to use during connection.
+    /// </summary>
+    /// <remarks>
+    /// Defaults to <see cref="TlsMode.Auto"/>. When the effective mode is <see cref="TlsMode.Prefer"/>,
+    /// TLS is opportunistic and a network attacker can downgrade the connection to plaintext.
+    /// Use the <c>tls://</c> scheme or <see cref="TlsMode.Require"/> when TLS must be guaranteed.
+    /// </remarks>
     public TlsMode Mode { get; init; }
 
     internal bool HasTlsCerts
