@@ -9,6 +9,7 @@ namespace NATS.Client.Core.Internal;
 internal sealed class SocketReader
 {
     private readonly int _minimumBufferSize;
+    private readonly int _maxControlLineSize;
     private readonly ConnectionStatsCounter _counter;
     private readonly SeqeunceBuilder _seqeunceBuilder = new SeqeunceBuilder();
     private readonly Stopwatch _stopwatch = new Stopwatch();
@@ -18,10 +19,11 @@ internal sealed class SocketReader
 
     private Memory<byte> _availableMemory;
 
-    public SocketReader(SocketConnectionWrapper socketConnection, int minimumBufferSize, ConnectionStatsCounter counter, ILoggerFactory loggerFactory)
+    public SocketReader(SocketConnectionWrapper socketConnection, int minimumBufferSize, ConnectionStatsCounter counter, ILoggerFactory loggerFactory, int maxControlLineSize = 4 * 1024 * 1024)
     {
         _socketConnection = socketConnection;
         _minimumBufferSize = minimumBufferSize;
+        _maxControlLineSize = maxControlLineSize;
         _counter = counter;
         _logger = loggerFactory.CreateLogger<SocketReader>();
         _isTraceLogging = _logger.IsEnabled(LogLevel.Trace);
@@ -80,6 +82,7 @@ internal sealed class SocketReader
 #endif
     public async ValueTask<ReadOnlySequence<byte>> ReadUntilReceiveNewLineAsync()
     {
+        var totalRead = 0;
         while (true)
         {
             if (_availableMemory.Length == 0)
@@ -112,6 +115,7 @@ internal sealed class SocketReader
                 throw ex;
             }
 
+            totalRead += read;
             Interlocked.Add(ref _counter.ReceivedBytes, read);
             var appendMemory = _availableMemory.Slice(0, read);
             _seqeunceBuilder.Append(appendMemory);
@@ -120,6 +124,11 @@ internal sealed class SocketReader
             if (appendMemory.Span.Contains((byte)'\n'))
             {
                 break;
+            }
+
+            if (totalRead > _maxControlLineSize)
+            {
+                throw new NatsException($"Protocol error: control line exceeded maximum size of {_maxControlLineSize} bytes without newline");
             }
         }
 

@@ -1,7 +1,6 @@
 using System.Buffers;
 using System.Buffers.Text;
 using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -80,22 +79,10 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
     {
         if (!Utf8Parser.TryParse(span, out int value, out var consumed))
         {
-            throw new Exception(); // throw...
+            throw new NatsException("Protocol error: invalid integer in message header");
         }
 
         return value;
-    }
-
-    private static int GetInt32(in ReadOnlySequence<byte> sequence)
-    {
-        if (sequence.IsSingleSegment || sequence.GetFirstSpan().Length <= 10)
-        {
-            return GetInt32(sequence.GetFirstSpan());
-        }
-
-        Span<byte> buf = stackalloc byte[Math.Min((int)sequence.Length, 10)];
-        sequence.Slice(buf.Length).CopyTo(buf);
-        return GetInt32(buf);
     }
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#info
@@ -182,6 +169,17 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                         var msgHeader = buffer.Slice(0, positionBeforePayload.Value);
                         var (subject, sid, payloadLength, replyTo) = ParseMessageHeader(msgHeader);
 
+                        if (payloadLength < 0)
+                        {
+                            throw new NatsException($"Protocol error: negative MSG payload length {payloadLength}");
+                        }
+
+                        var serverInfo = _connection.WritableServerInfo;
+                        if (serverInfo != null && payloadLength > serverInfo.MaxPayload)
+                        {
+                            throw new NatsException($"Protocol error: MSG payload length {payloadLength} exceeds server's max payload {serverInfo.MaxPayload}");
+                        }
+
                         if (payloadLength == 0)
                         {
                             // payload is empty.
@@ -254,8 +252,23 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                             _logger.LogTrace(NatsLogEvents.Protocol, "HMSG trace parsed: {Subject} {Sid} {ReplyTo} {HeadersLength} {TotalLength}", subject, sid, replyTo, headersLength, totalLength);
                         }
 
+                        if (headersLength < 0 || totalLength < 0)
+                        {
+                            throw new NatsException($"Protocol error: negative HMSG lengths (headers={headersLength}, total={totalLength})");
+                        }
+
+                        if (totalLength < headersLength)
+                        {
+                            throw new NatsException($"Protocol error: HMSG total length {totalLength} is less than headers length {headersLength}");
+                        }
+
+                        var serverInfo2 = _connection.WritableServerInfo;
+                        if (serverInfo2 != null && totalLength > serverInfo2.MaxPayload)
+                        {
+                            throw new NatsException($"Protocol error: HMSG total length {totalLength} exceeds server's max payload {serverInfo2.MaxPayload}");
+                        }
+
                         var payloadLength = totalLength - headersLength;
-                        Debug.Assert(payloadLength >= 0, "Protocol error: illogical header and total lengths");
 
                         var headerBegin = buffer.GetPosition(1, positionBeforeNatsHeader.Value);
                         var totalSlice = buffer.Slice(headerBegin);
