@@ -669,6 +669,12 @@ public partial class NatsConnection : INatsConnection
                 // wait for the current socket to complete or throw
                 await _socketConnection!.WaitForClosed.ConfigureAwait(false);
             }
+            catch (NatsProtocolViolationException e)
+            {
+                // Protocol violations indicate a malicious or broken server — do not reconnect
+                _logger.LogError(NatsLogEvents.Connection, e, "Protocol violation, will not reconnect");
+                return;
+            }
             catch (Exception)
             {
                 // If the NatsConnection is disposed, WaitForClosed throws so stop reconnect-loop correctly

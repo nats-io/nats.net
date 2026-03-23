@@ -128,7 +128,9 @@ internal sealed class SocketReader
 
             if (totalRead > _maxControlLineSize)
             {
-                throw new NatsException($"Protocol error: control line exceeded maximum size of {_maxControlLineSize} bytes without newline");
+                var msg = $"Control line exceeded maximum size of {_maxControlLineSize} bytes without newline";
+                _socketConnection.SignalDisconnected(new NatsProtocolViolationException(msg));
+                NatsProtocolViolationException.Throw(msg);
             }
         }
 

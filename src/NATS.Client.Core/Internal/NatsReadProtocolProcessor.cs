@@ -13,6 +13,7 @@ namespace NATS.Client.Core.Internal;
 internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
 {
     private readonly NatsConnection _connection;
+    private readonly SocketConnectionWrapper _socketConnection;
     private readonly SocketReader _socketReader;
     private readonly Task _readLoop;
     private readonly TaskCompletionSource _waitForInfoSignal;
@@ -22,11 +23,14 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
     private readonly ILogger<NatsReadProtocolProcessor> _logger;
     private readonly Encoding _subjectEncoding;
     private readonly bool _trace;
+    private readonly int _maxPayloadHardCap;
     private int _disposed;
 
     public NatsReadProtocolProcessor(SocketConnectionWrapper socketConnection, NatsConnection connection, TaskCompletionSource waitForInfoSignal, TaskCompletionSource waitForPongOrErrorSignal, Task infoParsed)
     {
         _connection = connection;
+        _socketConnection = socketConnection;
+        _maxPayloadHardCap = connection.Opts.MaxPayloadHardCap;
         _subjectEncoding = connection.Opts.SubjectEncoding;
         _logger = connection.Opts.LoggerFactory.CreateLogger<NatsReadProtocolProcessor>();
         _trace = _logger.IsEnabled(LogLevel.Trace);
@@ -171,13 +175,13 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
 
                         if (payloadLength < 0)
                         {
-                            throw new NatsException($"Protocol error: negative MSG payload length {payloadLength}");
+                            NatsProtocolViolationException.Throw($"Negative MSG payload length {payloadLength}");
                         }
 
-                        var serverInfo = _connection.WritableServerInfo;
-                        if (serverInfo != null && payloadLength > serverInfo.MaxPayload)
+                        var maxPayload = Math.Min(_connection.WritableServerInfo?.MaxPayload ?? _maxPayloadHardCap, _maxPayloadHardCap);
+                        if (payloadLength > maxPayload)
                         {
-                            throw new NatsException($"Protocol error: MSG payload length {payloadLength} exceeds server's max payload {serverInfo.MaxPayload}");
+                            NatsProtocolViolationException.Throw($"MSG payload length {payloadLength} exceeds max payload {maxPayload}");
                         }
 
                         if (payloadLength == 0)
@@ -254,18 +258,18 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
 
                         if (headersLength < 0 || totalLength < 0)
                         {
-                            throw new NatsException($"Protocol error: negative HMSG lengths (headers={headersLength}, total={totalLength})");
+                            NatsProtocolViolationException.Throw($"Negative HMSG lengths (headers={headersLength}, total={totalLength})");
                         }
 
                         if (totalLength < headersLength)
                         {
-                            throw new NatsException($"Protocol error: HMSG total length {totalLength} is less than headers length {headersLength}");
+                            NatsProtocolViolationException.Throw($"HMSG total length {totalLength} is less than headers length {headersLength}");
                         }
 
-                        var serverInfo2 = _connection.WritableServerInfo;
-                        if (serverInfo2 != null && totalLength > serverInfo2.MaxPayload)
+                        var maxPayload = Math.Min(_connection.WritableServerInfo?.MaxPayload ?? _maxPayloadHardCap, _maxPayloadHardCap);
+                        if (totalLength > maxPayload)
                         {
-                            throw new NatsException($"Protocol error: HMSG total length {totalLength} exceeds server's max payload {serverInfo2.MaxPayload}");
+                            NatsProtocolViolationException.Throw($"HMSG total length {totalLength} exceeds max payload {maxPayload}");
                         }
 
                         var payloadLength = totalLength - headersLength;
@@ -313,6 +317,14 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
             catch (SocketClosedException e)
             {
                 _logger.LogDebug(NatsLogEvents.Protocol, e, "Socket closed during read loop");
+                _waitForInfoSignal.TrySetObservedException(e);
+                _waitForPongOrErrorSignal.TrySetObservedException(e);
+                return;
+            }
+            catch (NatsProtocolViolationException e)
+            {
+                _logger.LogError(NatsLogEvents.Protocol, e, "Protocol violation, dropping connection");
+                _socketConnection.SignalDisconnected(e);
                 _waitForInfoSignal.TrySetObservedException(e);
                 _waitForPongOrErrorSignal.TrySetObservedException(e);
                 return;

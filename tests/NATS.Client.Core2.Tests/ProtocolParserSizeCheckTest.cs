@@ -35,7 +35,7 @@ public class ProtocolParserSizeCheckTest(ITestOutputHelper output)
         await new Func<IReadOnlyList<InMemoryTestLoggerFactory.LogMessage>>(() => logFactory.Logs)
             .ShouldWithRetryAsync(
                 m => m.LogLevel == LogLevel.Error
-                     && m.Exception is NatsException
+                     && m.Exception is NatsProtocolViolationException
                      && m.Exception.Message.Contains("max payload"),
                 "MSG with oversized payload should be rejected");
     }
@@ -61,8 +61,8 @@ public class ProtocolParserSizeCheckTest(ITestOutputHelper output)
         await new Func<IReadOnlyList<InMemoryTestLoggerFactory.LogMessage>>(() => logFactory.Logs)
             .ShouldWithRetryAsync(
                 m => m.LogLevel == LogLevel.Error
-                     && m.Exception is NatsException
-                     && m.Exception.Message.Contains("negative"),
+                     && m.Exception is NatsProtocolViolationException
+                     && m.Exception.Message.Contains("Negative"),
                 "MSG with negative payload length should be rejected");
     }
 
@@ -89,7 +89,7 @@ public class ProtocolParserSizeCheckTest(ITestOutputHelper output)
         await new Func<IReadOnlyList<InMemoryTestLoggerFactory.LogMessage>>(() => logFactory.Logs)
             .ShouldWithRetryAsync(
                 m => m.LogLevel == LogLevel.Error
-                     && m.Exception is NatsException
+                     && m.Exception is NatsProtocolViolationException
                      && m.Exception.Message.Contains("less than headers"),
                 "HMSG with total < headers should be rejected");
     }
@@ -116,7 +116,7 @@ public class ProtocolParserSizeCheckTest(ITestOutputHelper output)
         await new Func<IReadOnlyList<InMemoryTestLoggerFactory.LogMessage>>(() => logFactory.Logs)
             .ShouldWithRetryAsync(
                 m => m.LogLevel == LogLevel.Error
-                     && m.Exception is NatsException
+                     && m.Exception is NatsProtocolViolationException
                      && m.Exception.Message.Contains("max payload"),
                 "HMSG exceeding max_payload should be rejected");
     }
@@ -137,31 +137,78 @@ public class ProtocolParserSizeCheckTest(ITestOutputHelper output)
 
         // Send -ERR prefix so the parser enters a path that calls ReadUntilReceiveNewLineAsync,
         // then flood with data that has no newline.
+        // Default _maxControlLineSize is 4MB, so we need to exceed that.
         var junk = new string('X', 64 * 1024);
-        await server.SendRawAsync("-ERR ");
-
-        var totalSent = 5;
-        try
+        using var sendCts = new CancellationTokenSource();
+        var sendTask = Task.Run(async () =>
         {
-            while (totalSent < 5 * 1024 * 1024)
+            try
             {
-                await server.SendRawAsync(junk);
-                totalSent += junk.Length;
+                await server.SendRawAsync("-ERR ");
+                var totalSent = 5;
+                while (totalSent < 5 * 1024 * 1024 && !sendCts.Token.IsCancellationRequested)
+                {
+                    await server.SendRawAsync(junk);
+                    totalSent += junk.Length;
+                }
             }
-
-            output.WriteLine($"Sent {totalSent} bytes without newline");
-        }
-        catch (IOException)
-        {
-            output.WriteLine("Client disconnected before all data sent (expected)");
-        }
+            catch
+            {
+                // Client may close socket mid-write — expected
+            }
+        });
 
         await new Func<IReadOnlyList<InMemoryTestLoggerFactory.LogMessage>>(() => logFactory.Logs)
             .ShouldWithRetryAsync(
                 m => m.LogLevel == LogLevel.Error
-                     && m.Exception is NatsException
-                     && m.Exception.Message.Contains("control line"),
+                     && m.Exception is NatsProtocolViolationException
+                     && m.Exception.Message.Contains("Control line"),
                 "control line exceeding max size should be rejected");
+
+        sendCts.Cancel();
+        try
+        {
+            await sendTask.WaitAsync(TimeSpan.FromSeconds(3));
+        }
+        catch
+        {
+            // Send task may not complete cleanly
+        }
+    }
+
+    /// <summary>
+    /// A protocol violation drops the connection (read loop exits) rather than
+    /// spinning in an infinite error loop on the same bad buffer.
+    /// </summary>
+    [Fact]
+    public async Task Protocol_violation_drops_connection()
+    {
+        var logFactory = new InMemoryTestLoggerFactory(LogLevel.Error, m => output.WriteLine($"[LOG] {m.Message}"));
+        await using var server = new FakeServer(output);
+
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, LoggerFactory = logFactory });
+        await nats.ConnectAsync();
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await nats.SubscribeCoreAsync<int>("foo", cancellationToken: cts.Token);
+        await server.WaitForSubAsync("foo");
+
+        // Send a malicious MSG with negative payload
+        await server.SendRawAsync("MSG foo 1 -1\r\n");
+
+        // The violation should be logged exactly once (not in a loop), then connection drops
+        await new Func<IReadOnlyList<InMemoryTestLoggerFactory.LogMessage>>(() => logFactory.Logs)
+            .ShouldWithRetryAsync(
+                m => m.LogLevel == LogLevel.Error
+                     && m.Exception is NatsProtocolViolationException
+                     && m.Exception.Message.Contains("Negative"),
+                "protocol violation should be logged");
+
+        // Give a moment for any spin to manifest, then verify no error flood.
+        // Expect a small number (read loop + reconnect loop each log once) but not hundreds.
+        await Task.Delay(TimeSpan.FromMilliseconds(500));
+        var violationCount = logFactory.Logs.Count(m => m.Exception is NatsProtocolViolationException);
+        violationCount.Should().BeLessThanOrEqualTo(3, "the error should be logged a few times, not in a spin loop");
     }
 
     /// <summary>
@@ -242,6 +289,7 @@ public class ProtocolParserSizeCheckTest(ITestOutputHelper output)
         private TcpClient? _tcpClient;
         private StreamWriter? _writer;
         private Task? _readLoop;
+        private bool _protocolDump;
 
         public FakeServer(ITestOutputHelper output, string info = "{\"max_payload\":1048576}")
         {
@@ -258,9 +306,25 @@ public class ProtocolParserSizeCheckTest(ITestOutputHelper output)
 
         public string Url => $"127.0.0.1:{Port}";
 
+        /// <summary>
+        /// Enable protocol dump — all sent and received data is logged to test output.
+        /// Call before ConnectAsync.
+        /// </summary>
+        public FakeServer EnableProtocolDump()
+        {
+            _protocolDump = true;
+            return this;
+        }
+
         public async Task SendRawAsync(string data)
         {
             await _accepted.Task.ConfigureAwait(false);
+            if (_protocolDump)
+            {
+                var preview = data.Length > 200 ? data.Substring(0, 200) + $"...({data.Length} chars)" : data;
+                _output.WriteLine($"[S] SND: {preview.Replace("\r", "\\r").Replace("\n", "\\n")}");
+            }
+
             await _writer!.WriteAsync(data);
             await _writer.FlushAsync();
         }
@@ -306,7 +370,10 @@ public class ProtocolParserSizeCheckTest(ITestOutputHelper output)
             var reader = new StreamReader(stream, encoding);
 
             // Send INFO
-            await _writer.WriteAsync($"INFO {info}\r\n");
+            var infoLine = $"INFO {info}\r\n";
+            if (_protocolDump)
+                _output.WriteLine($"[S] SND: {infoLine.Replace("\r", "\\r").Replace("\n", "\\n")}");
+            await _writer.WriteAsync(infoLine);
             await _writer.FlushAsync();
 
             // Read lines: respond to PING, track SUB
@@ -317,6 +384,8 @@ public class ProtocolParserSizeCheckTest(ITestOutputHelper output)
                     break;
 
                 _output.WriteLine($"[S] RCV: {line}");
+                if (_protocolDump)
+                    _output.WriteLine($"[S] RCV (dump): {line}");
 
                 if (line.StartsWith("PING"))
                 {
