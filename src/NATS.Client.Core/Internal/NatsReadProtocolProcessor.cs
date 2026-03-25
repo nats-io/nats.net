@@ -83,7 +83,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
     {
         if (!Utf8Parser.TryParse(span, out int value, out var consumed))
         {
-            throw new NatsException("Protocol error: invalid integer in message header");
+            NatsProtocolViolationException.Throw("Invalid integer in message header");
         }
 
         return value;
@@ -321,7 +321,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
             }
             catch (NatsProtocolViolationException e)
             {
-                _logger.LogError(NatsLogEvents.Protocol, e, "Protocol violation, dropping connection");
+                _logger.LogError(NatsLogEvents.Protocol, e, "Protocol violation");
                 _socketConnection.SignalDisconnected(e);
                 _waitForInfoSignal.TrySetObservedException(e);
                 _waitForPongOrErrorSignal.TrySetObservedException(e);
