@@ -178,10 +178,9 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                             NatsProtocolViolationException.Throw($"Negative MSG payload length {payloadLength}");
                         }
 
-                        var maxPayload = Math.Min(_connection.WritableServerInfo?.MaxPayload ?? _maxPayloadHardCap, _maxPayloadHardCap);
-                        if (payloadLength > maxPayload)
+                        if (payloadLength > _maxPayloadHardCap)
                         {
-                            NatsProtocolViolationException.Throw($"MSG payload length {payloadLength} exceeds max payload {maxPayload}");
+                            NatsProtocolViolationException.Throw($"Payload length {payloadLength} exceeds max allowed size {_maxPayloadHardCap}");
                         }
 
                         if (payloadLength == 0)
@@ -266,10 +265,9 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                             NatsProtocolViolationException.Throw($"HMSG total length {totalLength} is less than headers length {headersLength}");
                         }
 
-                        var maxPayload = Math.Min(_connection.WritableServerInfo?.MaxPayload ?? _maxPayloadHardCap, _maxPayloadHardCap);
-                        if (totalLength > maxPayload)
+                        if (totalLength > _maxPayloadHardCap)
                         {
-                            NatsProtocolViolationException.Throw($"HMSG total length {totalLength} exceeds max payload {maxPayload}");
+                            NatsProtocolViolationException.Throw($"HMSG total length {totalLength} exceeds max allowed size {_maxPayloadHardCap}");
                         }
 
                         var payloadLength = totalLength - headersLength;

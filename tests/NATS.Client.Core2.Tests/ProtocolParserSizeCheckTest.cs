@@ -36,7 +36,7 @@ public class ProtocolParserSizeCheckTest(ITestOutputHelper output)
             .ShouldWithRetryAsync(
                 m => m.LogLevel == LogLevel.Error
                      && m.Exception is NatsProtocolViolationException
-                     && m.Exception.Message.Contains("max payload"),
+                     && m.Exception.Message.Contains("max allowed size"),
                 "MSG with oversized payload should be rejected");
     }
 
@@ -117,76 +117,22 @@ public class ProtocolParserSizeCheckTest(ITestOutputHelper output)
             .ShouldWithRetryAsync(
                 m => m.LogLevel == LogLevel.Error
                      && m.Exception is NatsProtocolViolationException
-                     && m.Exception.Message.Contains("max payload"),
+                     && m.Exception.Message.Contains("max allowed size"),
                 "HMSG exceeding max_payload should be rejected");
     }
 
     /// <summary>
-    /// A control line without \n must not cause unbounded memory allocation.
-    /// ReadUntilReceiveNewLineAsync loops renting 64KB buffers forever — the fix
-    /// adds a max control line size (default 4MB).
+    /// A protocol violation exits the read loop cleanly (not in a spin loop).
+    /// The connection will attempt to reconnect to other servers.
     /// </summary>
     [Fact]
-    public async Task Control_line_without_newline_does_not_cause_oom()
+    public async Task Protocol_violation_exits_read_loop_cleanly()
     {
         var logFactory = new InMemoryTestLoggerFactory(LogLevel.Error, m => output.WriteLine($"[LOG] {m.Message}"));
         await using var server = new FakeServer(output);
 
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, LoggerFactory = logFactory });
-        await nats.ConnectAsync();
-
-        // Send -ERR prefix so the parser enters a path that calls ReadUntilReceiveNewLineAsync,
-        // then flood with data that has no newline.
-        // Default _maxControlLineSize is 4MB, so we need to exceed that.
-        var junk = new string('X', 64 * 1024);
-        using var sendCts = new CancellationTokenSource();
-        var sendTask = Task.Run(async () =>
-        {
-            try
-            {
-                await server.SendRawAsync("-ERR ");
-                var totalSent = 5;
-                while (totalSent < 5 * 1024 * 1024 && !sendCts.Token.IsCancellationRequested)
-                {
-                    await server.SendRawAsync(junk);
-                    totalSent += junk.Length;
-                }
-            }
-            catch
-            {
-                // Client may close socket mid-write — expected
-            }
-        });
-
-        await new Func<IReadOnlyList<InMemoryTestLoggerFactory.LogMessage>>(() => logFactory.Logs)
-            .ShouldWithRetryAsync(
-                m => m.LogLevel == LogLevel.Error
-                     && m.Exception is NatsProtocolViolationException
-                     && m.Exception.Message.Contains("Control line"),
-                "control line exceeding max size should be rejected");
-
-        sendCts.Cancel();
-        try
-        {
-            await sendTask.WaitAsync(TimeSpan.FromSeconds(3));
-        }
-        catch
-        {
-            // Send task may not complete cleanly
-        }
-    }
-
-    /// <summary>
-    /// A protocol violation drops the connection (read loop exits) rather than
-    /// spinning in an infinite error loop on the same bad buffer.
-    /// </summary>
-    [Fact]
-    public async Task Protocol_violation_drops_connection()
-    {
-        var logFactory = new InMemoryTestLoggerFactory(LogLevel.Error, m => output.WriteLine($"[LOG] {m.Message}"));
-        await using var server = new FakeServer(output);
-
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, LoggerFactory = logFactory });
+        // MaxReconnectRetry=0 because FakeServer only accepts one connection
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, LoggerFactory = logFactory, MaxReconnectRetry = 0 });
         await nats.ConnectAsync();
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));

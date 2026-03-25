@@ -85,8 +85,8 @@ public sealed record NatsOpts
     public int ReaderBufferSize { get; init; } = 65536;
 
     /// <summary>
-    /// Absolute maximum allowed payload size, applied as a ceiling regardless of the server's advertised max_payload.
-    /// Provides a client-side safeguard against unexpectedly large messages causing out-of-memory conditions.
+    /// Maximum allowed incoming message size. Provides a client-side safeguard against
+    /// unexpectedly large messages causing out-of-memory conditions.
     /// Default is 64 MB.
     /// </summary>
     public int MaxPayloadHardCap { get; init; } = 64 * 1024 * 1024;
