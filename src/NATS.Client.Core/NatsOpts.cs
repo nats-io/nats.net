@@ -84,6 +84,13 @@ public sealed record NatsOpts
 
     public int ReaderBufferSize { get; init; } = 65536;
 
+    /// <summary>
+    /// Maximum allowed incoming message size. Provides a client-side safeguard against
+    /// unexpectedly large messages causing out-of-memory conditions.
+    /// Default is 64 MB.
+    /// </summary>
+    public int MaxPayloadHardCap { get; init; } = 64 * 1024 * 1024;
+
     public bool UseThreadPoolCallback { get; init; } = false;
 
     public string InboxPrefix { get; init; } = "_INBOX";
