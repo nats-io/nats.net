@@ -8,6 +8,13 @@ public class NatsConnectionSubjectValidationTests
 {
     private static readonly NatsOpts OptsWithValidation = new() { SkipSubjectValidation = false };
 
+    // Guard against regression: default opts must have validation enabled
+    [Fact]
+    public void DefaultOpts_HasValidationEnabled()
+    {
+        NatsOpts.Default.SkipSubjectValidation.Should().BeFalse();
+    }
+
     // PublishAsync tests
     [Theory]
     [InlineData("foo bar")]
@@ -150,7 +157,7 @@ public class NatsConnectionSubjectValidationTests
     {
         // SkipSubjectValidation=true bypasses validation at the API level.
         // The call will fail later (e.g., connection timeout) but not due to validation.
-        await using var nats = new NatsConnection(new NatsOpts { SkipSubjectValidation = true });
+        await using var nats = new NatsConnection(NatsOpts.Default with { SkipSubjectValidation = true });
 
         // This should not throw NatsException for invalid subject
         // It will throw something else (timeout, connection error) since we're not connected
@@ -171,7 +178,7 @@ public class NatsConnectionSubjectValidationTests
     public async Task SubscribeAsync_WithSkipValidation_DoesNotThrowOnInvalidSubject(string subject)
     {
         // SkipSubjectValidation=true bypasses validation at the API level.
-        await using var nats = new NatsConnection(new NatsOpts { SkipSubjectValidation = true });
+        await using var nats = new NatsConnection(NatsOpts.Default with { SkipSubjectValidation = true });
 
         // This should not throw NatsException for invalid subject
         Func<Task> action = async () =>
