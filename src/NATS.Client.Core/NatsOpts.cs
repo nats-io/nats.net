@@ -245,19 +245,21 @@ public sealed record NatsOpts
 
     /// <summary>
     /// Gets or sets a value indicating whether to skip subject validation.
-    /// The default is <c>true</c>, meaning subject validation is disabled.
+    /// The default is <c>false</c>, meaning subject validation is enabled.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// When set to <c>true</c> (default), all subject validation is bypassed.
+    /// When set to <c>false</c> (default), subjects are validated to ensure they are not empty
+    /// and don't contain whitespace characters (space, tab, CR, LF). This prevents CRLF
+    /// protocol injection where a subject containing \r\n could inject arbitrary NATS commands.
     /// </para>
     /// <para>
-    /// When set to <c>false</c>, subjects are validated to ensure they are not empty
-    /// and don't contain whitespace characters (space, tab, CR, LF). This can help
-    /// catch invalid subjects early but adds minor overhead.
+    /// When set to <c>true</c>, all subject validation is bypassed for maximum throughput.
+    /// Only use this if you fully control all subject strings and can guarantee they never
+    /// contain whitespace or CRLF sequences.
     /// </para>
     /// </remarks>
-    public bool SkipSubjectValidation { get; init; } = true;
+    public bool SkipSubjectValidation { get; init; } = false;
 
     /// <summary>
     /// Gets or sets a value indicating whether to suppress warning logs when a slow consumer is detected.
