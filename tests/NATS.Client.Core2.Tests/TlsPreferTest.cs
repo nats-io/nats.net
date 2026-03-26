@@ -5,20 +5,16 @@ using System.Text;
 namespace NATS.Client.Core.Tests;
 
 /// <summary>
-/// Demonstrates that TlsMode.Prefer (and TlsMode.Auto over nats://) is
-/// susceptible to a MITM downgrade: if an attacker forges the server's
-/// INFO message to strip TLS flags, the client will skip TLS and send
-/// CONNECT (including credentials) in plaintext.
-///
-/// This is by design -- the NATS protocol sends INFO before TLS upgrade,
-/// so every NATS client behaves this way. The mitigation is to use
-/// tls:// or TlsMode.Require when TLS must be guaranteed.
+/// Verifies TlsMode.Prefer (and TlsMode.Auto over nats://) behavior:
+/// TLS is opportunistic, so when the server's INFO does not advertise TLS
+/// the connection stays plaintext. This is expected -- use tls:// or
+/// TlsMode.Require when TLS is required.
 /// </summary>
-public class TlsPreferMitmTest(ITestOutputHelper output)
+public class TlsPreferTest(ITestOutputHelper output)
 {
     /// <summary>
-    /// Simulates a MITM that strips tls_available/tls_required from INFO.
-    /// Verifies the client sends CONNECT with credentials over plaintext.
+    /// When INFO has no TLS flags the client proceeds in plaintext,
+    /// including any configured credentials in the CONNECT message.
     /// </summary>
     [Fact]
     public async Task Prefer_mode_sends_credentials_in_plaintext_when_info_has_no_tls_flags()
@@ -47,8 +43,8 @@ public class TlsPreferMitmTest(ITestOutputHelper output)
                 var sw = new StreamWriter(stream, encoding);
                 var sr = new StreamReader(stream, encoding);
 
-                // MITM-forged INFO: no tls_required, no tls_available
-                await sw.WriteAsync("INFO {\"server_id\":\"mitm\",\"max_payload\":1048576,\"tls_required\":false,\"tls_available\":false}\r\n");
+                // INFO with no TLS flags (server does not offer TLS)
+                await sw.WriteAsync("INFO {\"server_id\":\"fake\",\"max_payload\":1048576,\"tls_required\":false,\"tls_available\":false}\r\n");
                 await sw.FlushAsync();
 
                 // Read lines until we see CONNECT
@@ -58,7 +54,7 @@ public class TlsPreferMitmTest(ITestOutputHelper output)
                     if (line == null)
                         break;
 
-                    output.WriteLine($"[MITM] RCV: {line}");
+                    output.WriteLine($"[SERVER] RCV: {line}");
 
                     if (line.StartsWith("CONNECT"))
                     {
@@ -74,7 +70,7 @@ public class TlsPreferMitmTest(ITestOutputHelper output)
             },
             cts.Token);
 
-        // Client with credentials using Prefer mode (same as Auto with nats://)
+        // Client with credentials using Prefer mode
         await using var nats = new NatsConnection(new NatsOpts
         {
             Url = $"nats://127.0.0.1:{port}",
@@ -90,7 +86,7 @@ public class TlsPreferMitmTest(ITestOutputHelper output)
         await serverTask;
         listener.Stop();
 
-        // The CONNECT line was sent over plaintext and contains credentials
+        // CONNECT was sent over plaintext and includes credentials
         connectLine.Should().NotBeEmpty("client should have sent CONNECT");
         connectLine.Should().Contain("secret_user", "credentials were sent over plaintext");
         connectLine.Should().Contain("secret_pass", "credentials were sent over plaintext");
@@ -99,8 +95,7 @@ public class TlsPreferMitmTest(ITestOutputHelper output)
     }
 
     /// <summary>
-    /// Verifies that TlsMode.Auto resolves to Prefer for nats:// without certs,
-    /// making it equally susceptible to the same MITM downgrade.
+    /// Verifies that TlsMode.Auto resolves to Prefer for nats:// without certs.
     /// </summary>
     [Fact]
     public void Auto_mode_resolves_to_prefer_for_nats_scheme_without_certs()
