@@ -72,6 +72,16 @@ public sealed record NatsOpts
 
     public NatsAuthOpts AuthOpts { get; init; } = new();
 
+    /// <summary>
+    /// TLS options for the connection.
+    /// </summary>
+    /// <remarks>
+    /// By default the client attempts a TLS upgrade when the server advertises TLS support.
+    /// If you don't want TLS (e.g. behind a TLS-terminating proxy), set
+    /// <see cref="NatsTlsOpts.Mode"/> to <see cref="TlsMode.Disable"/>.
+    /// </remarks>
+    /// <seealso cref="NatsTlsOpts.Mode"/>
+    /// <seealso cref="TlsMode"/>
     public NatsTlsOpts TlsOpts { get; init; } = new();
 
     public NatsWebSocketOpts WebSocketOpts { get; init; } = new();

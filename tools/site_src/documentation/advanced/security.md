@@ -34,3 +34,37 @@ You can set the TLS options to use your client certificates when connecting to a
 > only solution is to add the certificates to the certificate store manually.
 >
 > See also .NET documentation on [Troubleshooting SslStream authentication issues](https://learn.microsoft.com/en-us/dotnet/core/extensions/sslstream-troubleshooting#intermediate-certificates-are-not-sent)
+
+## TLS Modes
+
+The .NET client supports several TLS modes via `NatsTlsOpts.Mode`:
+
+| Mode | Behavior |
+|------|----------|
+| `Auto` (default) | Resolves to `Prefer` for `nats://` without certificates, `Require` for `tls://` or when certificates are provided |
+| `Prefer` | Upgrades to TLS if the server advertises TLS support, otherwise connects in plaintext |
+| `Require` | Always requires TLS, fails if the server does not support it |
+| `Implicit` | Connects with TLS immediately, before any protocol exchange |
+| `Disable` | Never attempts TLS, always connects in plaintext |
+
+### TLS Behind a Proxy
+
+When the nats-server is behind a TLS-terminating proxy, the server may advertise TLS support
+(`tls_available`) even though TLS is handled by the proxy. In this configuration the default
+`Auto`/`Prefer` mode will attempt a TLS upgrade that the nats-server cannot complete, causing
+the connection to fail.
+
+Set `TlsMode.Disable` to skip the TLS upgrade:
+
+```csharp
+var opts = new NatsOpts
+{
+    Url = "nats://my-nats-behind-proxy:4222",
+    TlsOpts = new NatsTlsOpts { Mode = TlsMode.Disable },
+};
+await using var nats = new NatsConnection(opts);
+```
+
+> [!NOTE]
+> This behavior differs from most other NATS clients, which do not attempt a TLS upgrade
+> when the server only advertises `tls_available` without `tls_required`.
