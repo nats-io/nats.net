@@ -123,7 +123,7 @@ internal sealed class NatsPooledBufferWriter<T> : IBufferWriter<T>, IObjectPoolN
     public void Reset()
     {
         if (_array != null)
-            _pool.Return(_array);
+            _pool.Return(_array, clearArray: true);
         _array = _pool.Rent(_size);
         _index = 0;
     }

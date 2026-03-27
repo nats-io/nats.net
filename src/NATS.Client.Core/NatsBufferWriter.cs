@@ -275,7 +275,7 @@ public sealed class NatsBufferWriter<T> : IBufferWriter<T>, IMemoryOwner<T>
 
         _array = null;
 
-        _pool.Return(array);
+        _pool.Return(array, clearArray: true);
     }
 
     /// <inheritdoc/>
@@ -391,7 +391,7 @@ internal static class NatsBufferWriterExtensions
     /// <param name="clearArray">Indicates whether the contents of the array should be cleared before reuse.</param>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="newSize"/> is less than 0.</exception>
     /// <remarks>When this method returns, the caller must not use any references to the old array anymore.</remarks>
-    public static void Resize<T>(this ArrayPool<T> pool, [NotNull] ref T[]? array, int newSize, bool clearArray = false)
+    public static void Resize<T>(this ArrayPool<T> pool, [NotNull] ref T[]? array, int newSize, bool clearArray = true)
     {
         // If the old array is null, just create a new one with the requested size
         if (array is null)
