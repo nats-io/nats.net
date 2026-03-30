@@ -8,35 +8,47 @@ namespace NATS.Client.Core.Internal;
 /// </summary>
 internal sealed class ClearingMemoryPool : MemoryPool<byte>
 {
-    private readonly MemoryPool<byte> _inner = MemoryPool<byte>.Shared;
+    private readonly ObjectPool<ClearingMemoryOwner> _wrappers = new(256);
 
-    public override int MaxBufferSize => _inner.MaxBufferSize;
+    public override int MaxBufferSize => int.MaxValue;
 
     public override IMemoryOwner<byte> Rent(int minBufferSize = -1)
     {
-        return new ClearingMemoryOwner(_inner.Rent(minBufferSize));
+        if (!_wrappers.TryPop(out var wrapper))
+        {
+            wrapper = new ClearingMemoryOwner(this);
+        }
+
+        wrapper.SetArray(ArrayPool<byte>.Shared.Rent(minBufferSize == -1 ? 4096 : minBufferSize));
+        return wrapper;
     }
 
     protected override void Dispose(bool disposing)
     {
     }
 
-    private sealed class ClearingMemoryOwner : IMemoryOwner<byte>
+    private sealed class ClearingMemoryOwner : IMemoryOwner<byte>, IObjectPoolNode<ClearingMemoryOwner>
     {
-        private IMemoryOwner<byte>? _inner;
+        private readonly ClearingMemoryPool _pool;
+        private ClearingMemoryOwner? _nextNode;
+        private byte[]? _array;
 
-        public ClearingMemoryOwner(IMemoryOwner<byte> inner) => _inner = inner;
+        public ClearingMemoryOwner(ClearingMemoryPool pool) => _pool = pool;
 
-        public Memory<byte> Memory => _inner?.Memory ?? Memory<byte>.Empty;
+        public ref ClearingMemoryOwner? NextNode => ref _nextNode;
+
+        public Memory<byte> Memory => _array;
+
+        public void SetArray(byte[] array) => _array = array;
 
         public void Dispose()
         {
-            var inner = Interlocked.Exchange(ref _inner, null);
-            if (inner == null)
+            var array = Interlocked.Exchange(ref _array, null);
+            if (array == null)
                 return;
 
-            inner.Memory.Span.Clear();
-            inner.Dispose();
+            ArrayPool<byte>.Shared.Return(array, clearArray: true);
+            _pool._wrappers.TryPush(this);
         }
     }
 }
