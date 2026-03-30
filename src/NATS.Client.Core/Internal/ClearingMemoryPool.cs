@@ -31,11 +31,10 @@ internal sealed class ClearingMemoryPool : MemoryPool<byte>
 
         public void Dispose()
         {
-            var inner = _inner;
+            var inner = Interlocked.Exchange(ref _inner, null);
             if (inner == null)
                 return;
 
-            _inner = null;
             inner.Memory.Span.Clear();
             inner.Dispose();
         }
