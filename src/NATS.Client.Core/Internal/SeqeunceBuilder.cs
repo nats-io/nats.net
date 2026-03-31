@@ -138,7 +138,7 @@ internal class SequenceSegment : ReadOnlySequenceSegment<byte>
         // guranteed does not add another segment in same memory so can return buffer in this.
         if (MemoryMarshal.TryGetArray(Memory, out var array) && array.Array != null)
         {
-            ArrayPool<byte>.Shared.Return(array.Array);
+            ArrayPool<byte>.Shared.Return(array.Array, clearArray: true);
         }
 
         Memory = default;
