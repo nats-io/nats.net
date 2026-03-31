@@ -85,7 +85,7 @@ public record StreamConfig
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("max_bytes")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
-    [System.ComponentModel.DataAnnotations.Range(long.MinValue, long.MinValue)]
+    [System.ComponentModel.DataAnnotations.Range(long.MinValue, long.MaxValue)]
     public long MaxBytes { get; set; }
 
     /// <summary>
