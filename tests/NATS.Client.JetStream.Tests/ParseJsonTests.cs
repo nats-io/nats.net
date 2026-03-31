@@ -1,12 +1,21 @@
 using System.Buffers;
 using System.Text;
+using NATS.Client.Core.Tests;
+using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
+using NATS.Client.TestUtilities;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.JetStream.Tests;
 
+[Collection("nats-server")]
 public class ParseJsonTests
 {
+    private readonly NatsServerFixture _server;
+
+    public ParseJsonTests(NatsServerFixture server) => _server = server;
+
     [Fact]
     public void Placement_properties_should_be_optional()
     {
@@ -36,5 +45,37 @@ public class ParseJsonTests
 
         var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         Assert.Matches("\"ack_policy\":\"explicit\"", json);
+    }
+
+    [Fact]
+    public void StreamSnapshotRequest_chunk_size_and_window_size_serialization()
+    {
+        var serializer = NatsJSJsonSerializer<StreamSnapshotRequest>.Default;
+
+        // When not set, chunk_size and window_size should be omitted from JSON
+        var bw = new NatsBufferWriter<byte>();
+        serializer.Serialize(bw, new StreamSnapshotRequest { DeliverSubject = "snap" });
+        var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
+        Assert.DoesNotContain("chunk_size", json);
+        Assert.DoesNotContain("window_size", json);
+        Assert.Contains("\"deliver_subject\":\"snap\"", json);
+
+        // When set, both should appear with correct values
+        bw = new NatsBufferWriter<byte>();
+        serializer.Serialize(bw, new StreamSnapshotRequest
+        {
+            DeliverSubject = "snap",
+            ChunkSize = 256 * 1024,
+            WindowSize = 16 * 1024 * 1024,
+        });
+        json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
+        Assert.Contains("\"chunk_size\":262144", json);
+        Assert.Contains("\"window_size\":16777216", json);
+
+        // Round-trip deserialization
+        var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory));
+        Assert.NotNull(result);
+        Assert.Equal(256 * 1024, result.ChunkSize);
+        Assert.Equal(16 * 1024 * 1024, result.WindowSize);
     }
 }

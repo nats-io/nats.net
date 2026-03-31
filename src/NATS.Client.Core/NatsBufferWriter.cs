@@ -275,7 +275,7 @@ public sealed class NatsBufferWriter<T> : IBufferWriter<T>, IMemoryOwner<T>
 
         _array = null;
 
-        _pool.Return(array);
+        _pool.Return(array, clearArray: true);
     }
 
     /// <inheritdoc/>
