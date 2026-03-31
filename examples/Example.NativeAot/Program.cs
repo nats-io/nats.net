@@ -201,11 +201,9 @@ public class MyProtoBufSerializer<T> : INatsSerializer<T>
 {
     public static readonly INatsSerializer<T> Default = new MyProtoBufSerializer<T>();
 
-#pragma warning disable CS0618 // Type or member is obsolete
     public void Serialize(IBufferWriter<byte> bufferWriter, T value) => Serialize(bufferWriter, value, null);
 
     public T? Deserialize(in ReadOnlySequence<byte> buffer) => Deserialize(buffer, null);
-#pragma warning restore CS0618
 
     public void Serialize(IBufferWriter<byte> bufferWriter, T value, INatsHeaders? headers)
     {
