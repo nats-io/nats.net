@@ -386,7 +386,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                     {
                         _logger.LogDebug(NatsJSLogEvents.PinIdMismatch, "Pin ID Mismatch");
                         NatsJSExtensionsInternal.HandlePinIdMismatch(_jsConsumer, _notificationChannel);
-                        ResetPending();
+                        ClearPending();
                     }
                     else if (headers.Code == 503)
                     {
@@ -475,6 +475,15 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         {
             _pendingMsgs = _maxMsgs;
             _pendingBytes = _maxBytes;
+        }
+    }
+
+    private void ClearPending()
+    {
+        lock (_pendingGate)
+        {
+            _pendingMsgs = 0;
+            _pendingBytes = 0;
         }
     }
 
