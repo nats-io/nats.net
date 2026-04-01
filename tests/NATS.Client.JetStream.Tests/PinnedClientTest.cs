@@ -517,3 +517,51 @@ public class PinnedClientTest
         _output.WriteLine($"Pinned client ID in state: {workerGroup.PinnedClientId}");
     }
 }
+
+public class PinnedClientMockServerTest
+{
+    [Fact]
+    public async Task Queued_consume_pull_request_should_use_latest_pin_id_when_sent()
+    {
+        var pullRequestCount = 0;
+        var secondPullRequest = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        await using var ms = new MockServer((_, cmd) =>
+        {
+            if (cmd.Name == "PUB" && cmd.Subject.Contains("CONSUMER.INFO", StringComparison.Ordinal))
+            {
+                cmd.Reply(payload: """{"stream_name":"x","name":"x"}""");
+                return Task.CompletedTask;
+            }
+
+            if (cmd.Name == "PUB" && cmd.Subject.Contains("CONSUMER.MSG.NEXT", StringComparison.Ordinal))
+            {
+                var request = cmd.Buffer is null ? string.Empty : new string(cmd.Buffer);
+                if (Interlocked.Increment(ref pullRequestCount) == 2)
+                {
+                    secondPullRequest.TrySetResult(request);
+                }
+            }
+
+            return Task.CompletedTask;
+        });
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await using var nats = new NatsConnection(new NatsOpts { Url = ms.Url });
+        var js = nats.CreateJetStreamContext();
+        var consumer = (NatsJSConsumer)await js.GetConsumerAsync("x", "x", cts.Token);
+
+        consumer.SetPinId("pin-old");
+
+        await using var cc = await consumer.ConsumeInternalAsync<int>(
+            opts: new NatsJSConsumeOpts { MaxMsgs = 1, ThresholdMsgs = 0 },
+            cancellationToken: cts.Token);
+
+        cc.Delivered(1);
+        consumer.SetPinId("pin-new");
+
+        var request = await secondPullRequest.Task.WaitAsync(cts.Token);
+        Assert.Contains(@"""id"":""pin-new""", request);
+        Assert.DoesNotContain(@"""id"":""pin-old""", request);
+    }
+}

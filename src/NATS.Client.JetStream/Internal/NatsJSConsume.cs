@@ -540,7 +540,6 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
             MinPending = _priorityGroup?.MinPending ?? 0,
             MinAckPending = _priorityGroup?.MinAckPending ?? 0,
             Priority = _priorityGroup?.Priority ?? 0,
-            Id = _jsConsumer?.GetPinId(),
         },
         Origin = origin,
     });
@@ -559,6 +558,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
             var origin = $"pull-loop({pr.Origin})";
             try
             {
+                pr.Request.Id = _jsConsumer?.GetPinId();
                 await CallMsgNextAsync(origin, pr.Request).ConfigureAwait(false);
             }
             catch (NatsConnectionFailedException)
