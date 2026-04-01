@@ -109,7 +109,7 @@ public class NatsMsgTests
         var msg = builder.Msg;
 
         var bufferWriter = new NatsPooledBufferWriter<byte>(256);
-        ((INatsSerializeWithHeaders<TestData>)serializer).Serialize(bufferWriter, data, headers);
+        ((INatsSerializeWithContext<TestData>)serializer).Serialize(bufferWriter, data, new NatsMsgContext { Subject = subject, ReplyTo = replyTo, Headers = headers });
         var serializedSize = bufferWriter.WrittenCount;
 
         var expectedSize = subject.Length + (replyTo?.Length ?? 0) + headers.GetBytesLength() + serializedSize;
@@ -144,7 +144,7 @@ public class NatsMsgTests
         public string Name { get; set; } = null!;
     }
 
-    private class HeaderAwareSerializer<T> : INatsSerializer<T>, INatsSerializeWithHeaders<T>, INatsDeserializeWithHeaders<T>
+    private class HeaderAwareSerializer<T> : INatsSerializer<T>, INatsSerializeWithContext<T>, INatsDeserializeWithContext<T>
     {
         private readonly NatsJsonSerializer<T> _inner = new();
 
@@ -152,10 +152,10 @@ public class NatsMsgTests
 
         public T? Deserialize(in ReadOnlySequence<byte> buffer) => _inner.Deserialize(buffer);
 
-        public void Serialize(IBufferWriter<byte> bufferWriter, T value, INatsHeaders? headers)
+        public void Serialize(IBufferWriter<byte> bufferWriter, T value, in NatsMsgContext context)
         {
             // Write a header-based prefix before the JSON payload
-            if (headers != null && headers.TryGetValue("X-Type", out var values))
+            if (context.Headers != null && context.Headers.TryGetValue("X-Type", out var values))
             {
                 var prefix = Encoding.UTF8.GetBytes(values.ToString() + ":");
                 var span = bufferWriter.GetSpan(prefix.Length);
@@ -166,7 +166,7 @@ public class NatsMsgTests
             _inner.Serialize(bufferWriter, value);
         }
 
-        public T? Deserialize(in ReadOnlySequence<byte> buffer, INatsHeaders? headers) =>
+        public T? Deserialize(in ReadOnlySequence<byte> buffer, in NatsMsgContext context) =>
             _inner.Deserialize(buffer);
 
         public INatsSerializer<T> CombineWith(INatsSerializer<T> next) => this;

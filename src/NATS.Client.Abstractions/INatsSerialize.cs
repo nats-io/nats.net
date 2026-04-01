@@ -44,33 +44,33 @@ public interface INatsDeserialize<out T>
 }
 
 /// <summary>
-/// Extended serializer interface that supports sending headers during serialization.
+/// Extended serializer interface with access to message context during serialization.
 /// </summary>
 /// <typeparam name="T">Serialized object type</typeparam>
-public interface INatsSerializeWithHeaders<in T> : INatsSerialize<T>
+public interface INatsSerializeWithContext<in T> : INatsSerialize<T>
 {
     /// <summary>
-    /// Serialize value to buffer with headers.
+    /// Serialize value to buffer with message context.
     /// </summary>
     /// <param name="bufferWriter">Buffer to write the serialized data.</param>
     /// <param name="value">Object to be serialized.</param>
-    /// <param name="headers">Optional NATS headers associated with the message.</param>
-    void Serialize(IBufferWriter<byte> bufferWriter, T value, INatsHeaders? headers);
+    /// <param name="context">Message envelope metadata.</param>
+    void Serialize(IBufferWriter<byte> bufferWriter, T value, in NatsMsgContext context);
 }
 
 /// <summary>
-/// Extended deserializer interface that supports receiving headers during deserialization.
+/// Extended deserializer interface with access to message context during deserialization.
 /// </summary>
 /// <typeparam name="T">Deserialized object type</typeparam>
-public interface INatsDeserializeWithHeaders<out T> : INatsDeserialize<T>
+public interface INatsDeserializeWithContext<out T> : INatsDeserialize<T>
 {
     /// <summary>
-    /// Deserialize value from buffer with headers.
+    /// Deserialize value from buffer with message context.
     /// </summary>
     /// <param name="buffer">Buffer with the serialized data.</param>
-    /// <param name="headers">Optional NATS headers associated with the message.</param>
+    /// <param name="context">Message envelope metadata.</param>
     /// <returns>Deserialized object</returns>
-    T? Deserialize(in ReadOnlySequence<byte> buffer, INatsHeaders? headers);
+    T? Deserialize(in ReadOnlySequence<byte> buffer, in NatsMsgContext context);
 }
 
 /// <summary>
@@ -84,18 +84,18 @@ public interface INatsSerializerRegistry
 }
 
 /// <summary>
-/// Extension methods to support header-aware serialization with fallback to standard serialization.
+/// Extension methods to support context-aware serialization with fallback to standard serialization.
 /// </summary>
 public static class NatsSerializationExtensions
 {
     /// <summary>
-    /// Serializes the value with header support, falling back to standard serialization if headers are not supported.
+    /// Serializes the value with message context, falling back to standard serialization if not supported.
     /// </summary>
-    public static void Serialize<T>(this INatsSerialize<T> serializer, IBufferWriter<byte> bufferWriter, T value, INatsHeaders? headers)
+    public static void Serialize<T>(this INatsSerialize<T> serializer, IBufferWriter<byte> bufferWriter, T value, in NatsMsgContext context)
     {
-        if (headers != null && serializer is INatsSerializeWithHeaders<T> withHeaders)
+        if (serializer is INatsSerializeWithContext<T> withContext)
         {
-            withHeaders.Serialize(bufferWriter, value, headers);
+            withContext.Serialize(bufferWriter, value, in context);
             return;
         }
 
@@ -103,12 +103,12 @@ public static class NatsSerializationExtensions
     }
 
     /// <summary>
-    /// Deserializes the value with header support, falling back to standard deserialization if headers are not supported.
+    /// Deserializes the value with message context, falling back to standard deserialization if not supported.
     /// </summary>
-    public static T? Deserialize<T>(this INatsDeserialize<T> deserializer, in ReadOnlySequence<byte> buffer, INatsHeaders? headers)
+    public static T? Deserialize<T>(this INatsDeserialize<T> deserializer, in ReadOnlySequence<byte> buffer, in NatsMsgContext context)
     {
-        if (deserializer is INatsDeserializeWithHeaders<T> withHeaders)
-            return withHeaders.Deserialize(buffer, headers);
+        if (deserializer is INatsDeserializeWithContext<T> withContext)
+            return withContext.Deserialize(buffer, in context);
 
         return deserializer.Deserialize(buffer);
     }

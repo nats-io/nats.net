@@ -401,7 +401,7 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
         {
             try
             {
-                data = serializer.Deserialize(payloadBuffer, headers);
+                data = serializer.Deserialize(payloadBuffer, new NatsMsgContext { Subject = subject, ReplyTo = replyTo, Headers = headers });
             }
             catch (Exception e)
             {
@@ -519,7 +519,7 @@ public class NatsMsgBuilder<T>
                 if (Serializer != null && Data != null)
                 {
                     var bufferWriter = new NatsPooledBufferWriter<byte>(SerializationBufferSize);
-                    Serializer.Serialize(bufferWriter, Data, Headers);
+                    Serializer.Serialize(bufferWriter, Data, new NatsMsgContext { Subject = Subject, ReplyTo = ReplyTo, Headers = Headers });
                     size = bufferWriter.WrittenMemory.Length;
                 }
 

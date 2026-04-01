@@ -20,12 +20,12 @@ public class EnumJsonTests
         var serializer = NatsJSJsonSerializer<ConsumerConfig>.Default;
 
         var bw = new NatsBufferWriter<byte>();
-        serializer.Serialize(bw, new ConsumerConfig { AckPolicy = value }, null);
+        serializer.Serialize(bw, new ConsumerConfig { AckPolicy = value }, default);
 
         var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         Assert.Contains(expected, json);
 
-        var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory), null);
+        var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory), default);
         Assert.NotNull(result);
         Assert.Equal(value, result.AckPolicy);
     }
@@ -42,12 +42,12 @@ public class EnumJsonTests
         var serializer = NatsJSJsonSerializer<ConsumerConfig>.Default;
 
         var bw = new NatsBufferWriter<byte>();
-        serializer.Serialize(bw, new ConsumerConfig { DeliverPolicy = value }, null);
+        serializer.Serialize(bw, new ConsumerConfig { DeliverPolicy = value }, default);
 
         var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         Assert.Contains(expected, json);
 
-        var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory), null);
+        var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory), default);
         Assert.NotNull(result);
         Assert.Equal(value, result.DeliverPolicy);
     }
@@ -60,12 +60,12 @@ public class EnumJsonTests
         var serializer = NatsJSJsonSerializer<ConsumerConfig>.Default;
 
         var bw = new NatsBufferWriter<byte>();
-        serializer.Serialize(bw, new ConsumerConfig { ReplayPolicy = value }, null);
+        serializer.Serialize(bw, new ConsumerConfig { ReplayPolicy = value }, default);
 
         var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         Assert.Contains(expected, json);
 
-        var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory), null);
+        var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory), default);
         Assert.NotNull(result);
         Assert.Equal(value, result.ReplayPolicy);
     }
@@ -78,7 +78,7 @@ public class EnumJsonTests
         var serializer = NatsJSJsonSerializer<StreamConfig>.Default;
 
         var bw = new NatsBufferWriter<byte>();
-        serializer.Serialize(bw, new StreamConfig { Compression = value }, null);
+        serializer.Serialize(bw, new StreamConfig { Compression = value }, default);
 
         var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         if (value == default)
@@ -86,7 +86,7 @@ public class EnumJsonTests
         else
             Assert.Contains(expected, json);
 
-        var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory), null);
+        var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory), default);
         Assert.NotNull(result);
         Assert.Equal(value, result.Compression);
     }
@@ -99,7 +99,7 @@ public class EnumJsonTests
         var serializer = NatsJSJsonSerializer<StreamConfig>.Default;
 
         var bw = new NatsBufferWriter<byte>();
-        serializer.Serialize(bw, new StreamConfig { Discard = value }, null);
+        serializer.Serialize(bw, new StreamConfig { Discard = value }, default);
 
         var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         if (value == default)
@@ -107,7 +107,7 @@ public class EnumJsonTests
         else
             Assert.Contains(expected, json);
 
-        var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory), null);
+        var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory), default);
         Assert.NotNull(result);
         Assert.Equal(value, result.Discard);
     }
@@ -121,12 +121,12 @@ public class EnumJsonTests
         var serializer = NatsJSJsonSerializer<StreamConfig>.Default;
 
         var bw = new NatsBufferWriter<byte>();
-        serializer.Serialize(bw, new StreamConfig { Retention = value }, null);
+        serializer.Serialize(bw, new StreamConfig { Retention = value }, default);
 
         var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         Assert.Contains(expected, json);
 
-        var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory), null);
+        var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory), default);
         Assert.NotNull(result);
         Assert.Equal(value, result.Retention);
     }
@@ -139,12 +139,12 @@ public class EnumJsonTests
         var serializer = NatsJSJsonSerializer<StreamConfig>.Default;
 
         var bw = new NatsBufferWriter<byte>();
-        serializer.Serialize(bw, new StreamConfig { Storage = value }, null);
+        serializer.Serialize(bw, new StreamConfig { Storage = value }, default);
 
         var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         Assert.Contains(expected, json);
 
-        var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory), null);
+        var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory), default);
         Assert.NotNull(result);
         Assert.Equal(value, result.Storage);
     }
@@ -158,12 +158,12 @@ public class EnumJsonTests
         var serializer = NatsJSJsonSerializer<ConsumerCreateRequest>.Default;
 
         var bw = new NatsBufferWriter<byte>();
-        serializer.Serialize(bw, new ConsumerCreateRequest { Action = value, StreamName = string.Empty }, null);
+        serializer.Serialize(bw, new ConsumerCreateRequest { Action = value, StreamName = string.Empty }, default);
 
         var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         Assert.Contains(expected, json);
 
-        var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory), null);
+        var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory), default);
         Assert.NotNull(result);
         Assert.Equal(value, result.Action);
     }
@@ -176,13 +176,13 @@ public class EnumJsonTests
         // When PersistMode is null (not explicitly set), it should not be included in JSON
         var bw = new NatsBufferWriter<byte>();
         var config = new StreamConfig { PersistMode = null };
-        serializer.Serialize(bw, config, null);
+        serializer.Serialize(bw, config, default);
 
         var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         Assert.DoesNotContain("persist_mode", json);
 
         // Deserialize and verify it remains null
-        var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory), null);
+        var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory), default);
         Assert.NotNull(result);
         Assert.Null(result.PersistMode);
     }
@@ -197,13 +197,13 @@ public class EnumJsonTests
         // When PersistMode is explicitly set (even to Default), it should be included in JSON
         var bw = new NatsBufferWriter<byte>();
         var config = new StreamConfig { PersistMode = value };
-        serializer.Serialize(bw, config, null);
+        serializer.Serialize(bw, config, default);
 
         var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         Assert.Contains(expected, json);
 
         // Deserialize and verify the value is preserved
-        var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory), null);
+        var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory), default);
         Assert.NotNull(result);
         Assert.Equal(value, result.PersistMode);
     }
@@ -216,39 +216,39 @@ public class EnumJsonTests
         // Test case 1: Server returns "default" - should preserve it
         var jsonWithDefault = "{\"persist_mode\":\"default\",\"retention\":\"limits\",\"storage\":\"file\"}";
         var bytes = Encoding.UTF8.GetBytes(jsonWithDefault);
-        var configFromServer = serializer.Deserialize(new ReadOnlySequence<byte>(bytes), null);
+        var configFromServer = serializer.Deserialize(new ReadOnlySequence<byte>(bytes), default);
         Assert.NotNull(configFromServer);
         Assert.Equal(StreamConfigPersistMode.Default, configFromServer.PersistMode);
 
         // When we serialize it again, it should include persist_mode
         var bw1 = new NatsBufferWriter<byte>();
-        serializer.Serialize(bw1, configFromServer, null);
+        serializer.Serialize(bw1, configFromServer, default);
         var jsonOut1 = Encoding.UTF8.GetString(bw1.WrittenSpan.ToArray());
         Assert.Contains("\"persist_mode\":\"default\"", jsonOut1);
 
         // Test case 2: Server returns "async" - should preserve it
         var jsonWithAsync = "{\"persist_mode\":\"async\",\"retention\":\"limits\",\"storage\":\"file\"}";
         bytes = Encoding.UTF8.GetBytes(jsonWithAsync);
-        configFromServer = serializer.Deserialize(new ReadOnlySequence<byte>(bytes), null);
+        configFromServer = serializer.Deserialize(new ReadOnlySequence<byte>(bytes), default);
         Assert.NotNull(configFromServer);
         Assert.Equal(StreamConfigPersistMode.Async, configFromServer.PersistMode);
 
         // When we serialize it again, it should include persist_mode
         var bw2 = new NatsBufferWriter<byte>();
-        serializer.Serialize(bw2, configFromServer, null);
+        serializer.Serialize(bw2, configFromServer, default);
         var jsonOut2 = Encoding.UTF8.GetString(bw2.WrittenSpan.ToArray());
         Assert.Contains("\"persist_mode\":\"async\"", jsonOut2);
 
         // Test case 3: Server doesn't return persist_mode - should remain null
         var jsonWithoutPersistMode = "{\"retention\":\"limits\",\"storage\":\"file\"}";
         bytes = Encoding.UTF8.GetBytes(jsonWithoutPersistMode);
-        configFromServer = serializer.Deserialize(new ReadOnlySequence<byte>(bytes), null);
+        configFromServer = serializer.Deserialize(new ReadOnlySequence<byte>(bytes), default);
         Assert.NotNull(configFromServer);
         Assert.Null(configFromServer.PersistMode);
 
         // When we serialize it again, it should NOT include persist_mode
         var bw3 = new NatsBufferWriter<byte>();
-        serializer.Serialize(bw3, configFromServer, null);
+        serializer.Serialize(bw3, configFromServer, default);
         var jsonOut3 = Encoding.UTF8.GetString(bw3.WrittenSpan.ToArray());
         Assert.DoesNotContain("persist_mode", jsonOut3);
     }
@@ -262,12 +262,12 @@ public class EnumJsonTests
         var serializer = NatsJSJsonSerializer<ConsumerConfig>.Default;
 
         var bw = new NatsBufferWriter<byte>();
-        serializer.Serialize(bw, new ConsumerConfig { PriorityPolicy = value }, null);
+        serializer.Serialize(bw, new ConsumerConfig { PriorityPolicy = value }, default);
 
         var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         Assert.Contains(expected, json);
 
-        var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory), null);
+        var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory), default);
         Assert.NotNull(result);
         Assert.Equal(value, result.PriorityPolicy);
     }
@@ -278,12 +278,12 @@ public class EnumJsonTests
         var serializer = NatsJSJsonSerializer<ConsumerConfig>.Default;
 
         var bw = new NatsBufferWriter<byte>();
-        serializer.Serialize(bw, new ConsumerConfig { PriorityPolicy = null }, null);
+        serializer.Serialize(bw, new ConsumerConfig { PriorityPolicy = null }, default);
 
         var json = Encoding.UTF8.GetString(bw.WrittenSpan.ToArray());
         Assert.DoesNotContain("priority_policy", json);
 
-        var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory), null);
+        var result = serializer.Deserialize(new ReadOnlySequence<byte>(bw.WrittenMemory), default);
         Assert.NotNull(result);
         Assert.Null(result.PriorityPolicy);
     }

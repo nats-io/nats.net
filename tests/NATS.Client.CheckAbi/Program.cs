@@ -20,8 +20,9 @@ Check("INatsSerialize<>", "NATS.Client.Abstractions", typeof(INatsSerialize<>).A
 Check("INatsDeserialize<>", "NATS.Client.Abstractions", typeof(INatsDeserialize<>).Assembly.GetName().Name!);
 Check("INatsSerializer<>", "NATS.Client.Abstractions", typeof(INatsSerializer<>).Assembly.GetName().Name!);
 Check("INatsSerializerRegistry", "NATS.Client.Abstractions", typeof(INatsSerializerRegistry).Assembly.GetName().Name!);
-Check("INatsSerializeWithHeaders<>", "NATS.Client.Abstractions", typeof(INatsSerializeWithHeaders<>).Assembly.GetName().Name!);
-Check("INatsDeserializeWithHeaders<>", "NATS.Client.Abstractions", typeof(INatsDeserializeWithHeaders<>).Assembly.GetName().Name!);
+Check("INatsSerializeWithContext<>", "NATS.Client.Abstractions", typeof(INatsSerializeWithContext<>).Assembly.GetName().Name!);
+Check("INatsDeserializeWithContext<>", "NATS.Client.Abstractions", typeof(INatsDeserializeWithContext<>).Assembly.GetName().Name!);
+Check("NatsMsgContext", "NATS.Client.Abstractions", typeof(NatsMsgContext).Assembly.GetName().Name!);
 Console.WriteLine();
 
 Console.WriteLine("Types as seen by TransientLib (compiled against 2.6.0):");

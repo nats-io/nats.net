@@ -280,7 +280,7 @@ public class MixedSerializerRegistry : INatsSerializerRegistry
 #endregion
 
 #region header-aware-serializer
-public class MyHeaderAwareSerializer<T> : INatsSerializer<T>, INatsSerializeWithHeaders<T>, INatsDeserializeWithHeaders<T>
+public class MyHeaderAwareSerializer<T> : INatsSerializer<T>, INatsSerializeWithContext<T>, INatsDeserializeWithContext<T>
 {
     private readonly NatsJsonContextSerializer<T> _jsonSerializer;
 
@@ -293,22 +293,22 @@ public class MyHeaderAwareSerializer<T> : INatsSerializer<T>, INatsSerializeWith
 
     public T? Deserialize(in ReadOnlySequence<byte> buffer) => _jsonSerializer.Deserialize(buffer);
 
-    public void Serialize(IBufferWriter<byte> bufferWriter, T value, INatsHeaders? headers)
+    public void Serialize(IBufferWriter<byte> bufferWriter, T value, in NatsMsgContext context)
     {
         // Set a content-type header so the deserializer knows the format
-        if (headers is NatsHeaders mutableHeaders)
+        if (context.Headers != null)
         {
-            mutableHeaders["Content-Type"] = "application/json";
+            context.Headers["Content-Type"] = "application/json";
         }
 
         _jsonSerializer.Serialize(bufferWriter, value);
     }
 
-    public T? Deserialize(in ReadOnlySequence<byte> buffer, INatsHeaders? headers)
+    public T? Deserialize(in ReadOnlySequence<byte> buffer, in NatsMsgContext context)
     {
         // Read the content-type header to determine how to deserialize
-        if (headers != null
-            && headers.TryGetValue("Content-Type", out StringValues contentType)
+        if (context.Headers != null
+            && context.Headers.TryGetValue("Content-Type", out StringValues contentType)
             && contentType.ToString() == "application/json")
         {
             return _jsonSerializer.Deserialize(buffer);
