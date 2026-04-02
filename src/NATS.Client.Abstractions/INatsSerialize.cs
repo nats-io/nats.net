@@ -40,6 +40,7 @@ public interface INatsDeserialize<out T>
     /// Deserialize value from buffer.
     /// </summary>
     /// <param name="buffer">Buffer with the serialized data.</param>
+    /// <returns>Deserialized object</returns>
     T? Deserialize(in ReadOnlySequence<byte> buffer);
 }
 
