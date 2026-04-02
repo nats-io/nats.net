@@ -137,7 +137,7 @@ public class NuidTests
         });
 
         executionThread.Start();
-        executionThread.Join(10_000);
+        executionThread.Join(1_000);
 
         // Assert
         Assert.Equal(2, Interlocked.CompareExchange(ref _result, 0, 0));
@@ -175,7 +175,7 @@ public class NuidTests
             Volatile.Write(ref completedSuccessfully, didWrite && isMatch);
         });
         t.Start();
-        t.Join(10_000);
+        t.Join(1_000);
 
         Assert.True(completedSuccessfully);
     }
@@ -202,7 +202,7 @@ public class NuidTests
             threads.Add(t);
         }
 
-        threads.ForEach(t => t.Join(10_000));
+        threads.ForEach(t => t.Join(1_000));
 
         // Assert
         var uniquePrefixes = new HashSet<string>();
