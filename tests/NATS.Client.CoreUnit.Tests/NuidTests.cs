@@ -137,7 +137,7 @@ public class NuidTests
         });
 
         executionThread.Start();
-        Assert.True(executionThread.Join(10_000), $"Thread {executionThread.ManagedThreadId} did not complete within the timeout.");
+        executionThread.Join(10_000);
 
         // Assert
         Assert.Equal(2, Interlocked.CompareExchange(ref _result, 0, 0));
@@ -175,7 +175,7 @@ public class NuidTests
             Volatile.Write(ref completedSuccessfully, didWrite && isMatch);
         });
         t.Start();
-        Assert.True(t.Join(10_000), $"Thread {t.ManagedThreadId} did not complete within the timeout.");
+        t.Join(10_000);
 
         Assert.True(completedSuccessfully);
     }
@@ -202,10 +202,7 @@ public class NuidTests
             threads.Add(t);
         }
 
-        foreach (var thread in threads)
-        {
-            Assert.True(thread.Join(10_000), $"Thread {thread.ManagedThreadId} did not complete within the timeout.");
-        }
+        threads.ForEach(t => t.Join(10_000));
 
         // Assert
         var uniquePrefixes = new HashSet<string>();
