@@ -560,7 +560,8 @@ public class PinnedClientMockServerTest
         cc.Delivered(1);
         consumer.SetPinId("pin-new");
 
-        var request = await secondPullRequest.Task.WaitAsync(cts.Token);
+        await secondPullRequest.Task.WaitAsync(cts.Token);
+        var request = await secondPullRequest.Task;
         Assert.Contains(@"""id"":""pin-new""", request);
         Assert.DoesNotContain(@"""id"":""pin-old""", request);
     }
