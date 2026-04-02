@@ -307,7 +307,7 @@ public struct NatsMemoryOwner<T> : IMemoryOwner<T>
 
         _array = null;
 
-        _pool.Return(array);
+        _pool.Return(array, clearArray: true);
     }
 
     /// <inheritdoc/>

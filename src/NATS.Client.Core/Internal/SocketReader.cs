@@ -78,6 +78,9 @@ internal sealed class SocketReader
 #if !NETSTANDARD
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
 #endif
+
+    // No incoming control line size check — we trust the server after TLS handshake.
+    // Outgoing control line size is the server's responsibility to enforce.
     public async ValueTask<ReadOnlySequence<byte>> ReadUntilReceiveNewLineAsync()
     {
         while (true)

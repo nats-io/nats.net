@@ -24,6 +24,12 @@ public partial class NatsConnection
 
         pingCommand.Start();
 
+#if NETSTANDARD
+        using var registration = cancellationToken.Register(static state => ((PingCommand)state!).SetCanceled(), pingCommand);
+#else
+        await using var registration = cancellationToken.UnsafeRegister(static state => ((PingCommand)state!).SetCanceled(), pingCommand);
+#endif
+
         await CommandWriter.PingAsync(pingCommand, cancellationToken).ConfigureAwait(false);
 
         return await pingCommand.RunAsync().ConfigureAwait(false);
