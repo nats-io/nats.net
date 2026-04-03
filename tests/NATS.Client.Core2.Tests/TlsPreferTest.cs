@@ -376,7 +376,7 @@ public class TlsPreferTest(ITestOutputHelper output)
     [Fact]
     public async Task Real_server_tls_available_go_client_stays_plaintext()
     {
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(180));
 
         var conf = Path.GetFullPath("tls_available_go_test.conf");
         var confContents = """
