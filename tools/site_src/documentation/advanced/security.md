@@ -47,6 +47,10 @@ The .NET client supports several TLS modes via `NatsTlsOpts.Mode`:
 | `Implicit` | Connects with TLS immediately, before any protocol exchange |
 | `Disable` | Never attempts TLS, always connects in plaintext |
 
+> [!NOTE]
+> Only `Require` and `Implicit` provide the full protection that TLS can offer.
+> Other modes may fall back to plaintext depending on server configuration.
+
 ### TLS Behind a Proxy
 
 When the nats-server is behind a TLS-terminating proxy, the server may advertise TLS support

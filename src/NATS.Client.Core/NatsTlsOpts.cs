@@ -11,6 +11,10 @@ namespace NATS.Client.Core;
 /// <summary>
 /// TLS mode to use during connection.
 /// </summary>
+/// <remarks>
+/// Only <see cref="Require"/> and <see cref="Implicit"/> provide the full protection that TLS can offer.
+/// Other modes may fall back to plaintext depending on server configuration.
+/// </remarks>
 public enum TlsMode
 {
     /// <summary>
@@ -133,6 +137,10 @@ public sealed record NatsTlsOpts
     /// Behind a TLS-terminating proxy, use <see cref="TlsMode.Disable"/> to prevent the
     /// client from attempting a TLS upgrade that the nats-server cannot complete.
     /// Use the <c>tls://</c> scheme or <see cref="TlsMode.Require"/> when TLS is required.
+    /// </para>
+    /// <para>
+    /// Only <see cref="TlsMode.Require"/> and <see cref="TlsMode.Implicit"/> provide the full
+    /// protection that TLS can offer. Other modes may fall back to plaintext depending on server configuration.
     /// </para>
     /// </remarks>
     public TlsMode Mode { get; init; }
