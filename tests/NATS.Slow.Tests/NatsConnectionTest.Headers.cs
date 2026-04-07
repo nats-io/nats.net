@@ -37,16 +37,9 @@ public abstract partial class NatsConnectionTest
             ["Test-Header-Key"] = "test-header-value",
             ["Multi"] = new[] { "multi-value-0", "multi-value-1" },
         };
-        Assert.False(headers.IsReadOnly);
 
         // Send with headers
         await nats.PublishAsync("foo", 100, headers: headers);
-
-        Assert.True(headers.IsReadOnly);
-        Assert.Throws<InvalidOperationException>(() =>
-        {
-            headers["should-not-set"] = "value";
-        });
 
         var msg1 = await signal1;
         Assert.Equal(100, msg1.Data);

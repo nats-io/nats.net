@@ -364,8 +364,6 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
             }
         }
 
-        headers?.SetReadOnly();
-
         var size = subject.Length
                    + (replyTo?.Length ?? 0)
                    + (headersBuffer?.Length ?? 0)

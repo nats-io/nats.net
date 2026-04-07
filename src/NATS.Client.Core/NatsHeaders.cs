@@ -70,8 +70,6 @@ public class NatsHeaders : INatsHeaders
     private static readonly IEnumerator<KeyValuePair<string, StringValues>> EmptyIEnumeratorType = default(Enumerator);
     private static readonly IEnumerator EmptyIEnumerator = default(Enumerator);
 
-    private int _readonly = 0;
-
     public int Version => 1;
 
     public int Code { get; internal set; }
@@ -144,7 +142,6 @@ public class NatsHeaders : INatsHeaders
             {
                 throw new ArgumentNullException(nameof(key));
             }
-            ThrowIfReadOnly();
 
             if (value.Count == 0)
             {
@@ -161,11 +158,7 @@ public class NatsHeaders : INatsHeaders
     StringValues IDictionary<string, StringValues>.this[string key]
     {
         get { return this[key]; }
-        set
-        {
-            ThrowIfReadOnly();
-            this[key] = value;
-        }
+        set { this[key] = value; }
     }
 
     /// <summary>
@@ -175,10 +168,9 @@ public class NatsHeaders : INatsHeaders
     public int Count => Store?.Count ?? 0;
 
     /// <summary>
-    /// Gets a value that indicates whether the <see cref="NatsHeaders" /> is in read-only mode.
+    /// Gets a value that indicates whether the <see cref="NatsHeaders" /> is read-only. Always false.
     /// </summary>
-    /// <returns>true if the <see cref="NatsHeaders" /> is in read-only mode; otherwise, false.</returns>
-    public bool IsReadOnly => Volatile.Read(ref _readonly) == 1;
+    public bool IsReadOnly => false;
 
     /// <summary>
     /// Gets the collection of HTTP header names in this instance.
@@ -222,7 +214,6 @@ public class NatsHeaders : INatsHeaders
         {
             throw new ArgumentException("The key is null");
         }
-        ThrowIfReadOnly();
         EnsureStore(1);
         Store.Add(item.Key, item.Value);
     }
@@ -238,7 +229,6 @@ public class NatsHeaders : INatsHeaders
         {
             throw new ArgumentNullException(nameof(key));
         }
-        ThrowIfReadOnly();
         EnsureStore(1);
         Store.Add(key, value);
     }
@@ -248,7 +238,6 @@ public class NatsHeaders : INatsHeaders
     /// </summary>
     public void Clear()
     {
-        ThrowIfReadOnly();
         Store?.Clear();
     }
 
@@ -322,7 +311,6 @@ public class NatsHeaders : INatsHeaders
     /// <returns>true if the specified object was removed from the collection; otherwise, false.</returns>
     public bool Remove(KeyValuePair<string, StringValues> item)
     {
-        ThrowIfReadOnly();
         if (Store == null)
         {
             return false;
@@ -342,7 +330,6 @@ public class NatsHeaders : INatsHeaders
     /// <returns>true if the specified object was removed from the collection; otherwise, false.</returns>
     public bool Remove(string key)
     {
-        ThrowIfReadOnly();
         if (Store == null)
         {
             return false;
@@ -424,34 +411,6 @@ public class NatsHeaders : INatsHeaders
             return EmptyIEnumerator;
         }
         return Store.GetEnumerator();
-    }
-
-    internal void SetReadOnly() => Interlocked.Exchange(ref _readonly, 1);
-
-    internal void SetOverrideReadOnly(string key, StringValues value)
-    {
-        if (key == null)
-        {
-            throw new ArgumentNullException(nameof(key));
-        }
-
-        if (value.Count == 0)
-        {
-            Store?.Remove(key);
-        }
-        else
-        {
-            EnsureStore(1);
-            Store[key] = value;
-        }
-    }
-
-    private void ThrowIfReadOnly()
-    {
-        if (IsReadOnly)
-        {
-            throw new InvalidOperationException("The response headers cannot be modified because the response has already started.");
-        }
     }
 
     /// <summary>
