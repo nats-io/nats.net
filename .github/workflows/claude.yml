@@ -1,6 +1,11 @@
 name: Claude Code
 
-permissions: {}
+# GITHUB_TOKEN needs contents:read and actions:read — required by
+# claude-code-action for restoring trusted config files from the base branch.
+# All other GitHub API access uses the App token.
+permissions:
+  contents: read
+  actions: read
 
 on:
   issue_comment:
