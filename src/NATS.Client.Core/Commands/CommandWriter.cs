@@ -78,6 +78,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         _cts = new CancellationTokenSource();
 
         var pipe = new Pipe(new PipeOptions(
+            pool: new ClearingMemoryPool(),
             pauseWriterThreshold: opts.WriterBufferSize, // flush will block after hitting
             resumeWriterThreshold: opts.WriterBufferSize / 2,
             minimumSegmentSize: MinSegmentSize,

@@ -431,50 +431,53 @@ public class NatsKVStore : INatsKVStore
     /// <inheritdoc />
     public async IAsyncEnumerable<NatsKVEntry<T>> WatchAsync<T>(IEnumerable<string> keys, INatsDeserialize<T>? serializer = default, NatsKVWatchOpts? opts = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        await using var watcher = await WatchInternalAsync<T>(keys, serializer, opts, cancellationToken);
-
-        if (watcher.InitialConsumer.Info.NumPending == 0 && opts?.OnNoData != null)
+        NatsKVWatcher<T> watcher;
+        try
         {
-            if (await opts.OnNoData(cancellationToken))
-            {
-                yield break;
-            }
+            watcher = await WatchInternalAsync<T>(keys, serializer, opts, cancellationToken);
+        }
+        catch (OperationCanceledException) when (!_opts.WatcherThrowOnCancellation)
+        {
+            yield break;
         }
 
-        while (true)
+        await using (watcher)
         {
-            bool waitToReadAsync;
-
-            if (_opts.WatcherThrowOnCancellation)
+            if (watcher.InitialConsumer.Info.NumPending == 0 && opts?.OnNoData != null)
             {
-                waitToReadAsync = await watcher.Entries.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
+                if (await opts.OnNoData(cancellationToken))
+                {
+                    yield break;
+                }
             }
-            else
+
+            while (true)
             {
-                try
+                bool waitToReadAsync;
+
+                if (_opts.WatcherThrowOnCancellation)
                 {
                     waitToReadAsync = await watcher.Entries.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
                 }
-                catch (ChannelClosedException)
+                else
                 {
-                    break;
+                    try
+                    {
+                        waitToReadAsync = await watcher.Entries.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (Exception ex) when (ex is ChannelClosedException or OperationCanceledException)
+                    {
+                        break;
+                    }
                 }
-                catch (TaskCanceledException)
-                {
-                    break;
-                }
-                catch (OperationCanceledException)
-                {
-                    break;
-                }
-            }
 
-            if (!waitToReadAsync)
-                break;
+                if (!waitToReadAsync)
+                    break;
 
-            while (watcher.Entries.TryRead(out var msg))
-            {
-                yield return msg;
+                while (watcher.Entries.TryRead(out var msg))
+                {
+                    yield return msg;
+                }
             }
         }
     }
@@ -513,15 +516,7 @@ public class NatsKVStore : INatsKVStore
                 {
                     waitToReadAsync = await watcher.Entries.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
                 }
-                catch (ChannelClosedException)
-                {
-                    break;
-                }
-                catch (TaskCanceledException)
-                {
-                    break;
-                }
-                catch (OperationCanceledException)
+                catch (Exception ex) when (ex is ChannelClosedException or OperationCanceledException)
                 {
                     break;
                 }
@@ -584,15 +579,7 @@ public class NatsKVStore : INatsKVStore
                     {
                         waitToReadAsync = await watcher.Entries.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
                     }
-                    catch (ChannelClosedException)
-                    {
-                        break;
-                    }
-                    catch (TaskCanceledException)
-                    {
-                        break;
-                    }
-                    catch (OperationCanceledException)
+                    catch (Exception ex) when (ex is ChannelClosedException or OperationCanceledException)
                     {
                         break;
                     }
@@ -661,15 +648,7 @@ public class NatsKVStore : INatsKVStore
                 {
                     waitToReadAsync = await watcher.Entries.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
                 }
-                catch (ChannelClosedException)
-                {
-                    break;
-                }
-                catch (TaskCanceledException)
-                {
-                    break;
-                }
-                catch (OperationCanceledException)
+                catch (Exception ex) when (ex is ChannelClosedException or OperationCanceledException)
                 {
                     break;
                 }

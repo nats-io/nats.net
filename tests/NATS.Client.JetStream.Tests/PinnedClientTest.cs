@@ -1,6 +1,10 @@
+using System.Collections.Concurrent;
+using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Models;
 using NATS.Client.TestUtilities;
+using NATS.Client.TestUtilities2;
+using NATS.Net;
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -164,6 +168,126 @@ public class PinnedClientTest
         Assert.NotNull(secondPinId);
         Assert.NotEqual(firstPinId, secondPinId);
         _output.WriteLine($"Second consumer got {count2} messages with new pin ID: {secondPinId}");
+    }
+
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Pin_id_mismatch_should_trigger_immediate_repull(NatsRequestReplyMode mode)
+    {
+        const string pinId = "pin-1";
+        var pullRequests = new ConcurrentQueue<string>();
+        var mismatchInjected = 0;
+        string? subscriptionSubject = null;
+        string? subscriptionSid = null;
+
+        static async Task SendHMsgAsync(MockServer.Client client, string subject, string sid, string? replyTo, string headers, string? payload)
+        {
+            if (!headers.EndsWith("\r\n", StringComparison.Ordinal))
+            {
+                headers += "\r\n";
+            }
+
+            headers += "\r\n";
+            payload ??= string.Empty;
+
+            var replyToPart = string.IsNullOrWhiteSpace(replyTo) ? string.Empty : $" {replyTo}";
+            var hsize = headers.Length;
+            var size = hsize + payload.Length;
+
+            await client.Writer.WriteAsync($"HMSG {subject} {sid}{replyToPart} {hsize} {size}\r\n{headers}{payload}\r\n");
+            await client.Writer.FlushAsync();
+        }
+
+        await using var ms = new MockServer(async (_, cmd) =>
+        {
+            if (cmd.Name == "SUB")
+            {
+                subscriptionSubject = cmd.Subject;
+                subscriptionSid = cmd.Sid;
+                return;
+            }
+
+            if (cmd.Name == "PUB" && cmd.Subject.Contains("CONSUMER.INFO", StringComparison.Ordinal))
+            {
+                cmd.Reply(payload: """{"stream_name":"x","name":"x"}""");
+                return;
+            }
+
+            if (cmd.Name != "PUB" || !cmd.Subject.Contains("CONSUMER.MSG.NEXT", StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            var request = cmd.Buffer is null ? string.Empty : new string(cmd.Buffer);
+            pullRequests.Enqueue(request);
+
+            if (pullRequests.Count == 1)
+            {
+                Assert.NotNull(subscriptionSid);
+                await SendHMsgAsync(
+                    cmd.Client,
+                    subject: "x.1",
+                    sid: subscriptionSid!,
+                    replyTo: null,
+                    headers: $"NATS/1.0\r\nNats-Pending-Messages: 1\r\nNats-Pin-Id: {pinId}",
+                    payload: "1");
+                return;
+            }
+
+            if (pullRequests.Count == 2)
+            {
+                Assert.NotNull(subscriptionSubject);
+                Assert.NotNull(subscriptionSid);
+                Assert.Contains(pinId, request);
+
+                await SendHMsgAsync(
+                    cmd.Client,
+                    subject: subscriptionSubject!,
+                    sid: subscriptionSid!,
+                    replyTo: null,
+                    headers: "NATS/1.0 423 Pin ID Mismatch",
+                    payload: null);
+                Interlocked.Exchange(ref mismatchInjected, 1);
+            }
+        });
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await using var nats = new NatsConnection(new NatsOpts { Url = ms.Url, RequestReplyMode = mode });
+        var js = nats.CreateJetStreamContext();
+        var consumer = (NatsJSConsumer)await js.GetConsumerAsync("x", "x", cts.Token);
+
+        var consumeOpts = new NatsJSConsumeOpts
+        {
+            MaxMsgs = 1,
+            ThresholdMsgs = 0,
+            Expires = TimeSpan.FromSeconds(5),
+            IdleHeartbeat = TimeSpan.FromSeconds(1),
+        };
+
+        await using var cc = await consumer.ConsumeInternalAsync<int>(opts: consumeOpts, cancellationToken: cts.Token);
+
+        var first = await cc.Msgs.ReadAsync(cts.Token);
+        Assert.NotNull(first.Headers);
+        Assert.True(first.Headers.TryGetValue("Nats-Pin-Id", out var pinIdValues));
+        Assert.Equal(pinId, pinIdValues.ToString());
+
+        cc.Delivered(first.Size);
+
+        await Retry.Until(
+            "pin mismatch injected",
+            () => Volatile.Read(ref mismatchInjected) == 1,
+            timeout: TimeSpan.FromSeconds(5),
+            retryDelay: TimeSpan.FromMilliseconds(25));
+
+        await Retry.Until(
+            "immediate repull after pin mismatch",
+            () => pullRequests.Count >= 3,
+            timeout: TimeSpan.FromMilliseconds(500),
+            retryDelay: TimeSpan.FromMilliseconds(25));
+
+        var requests = pullRequests.ToArray();
+        Assert.DoesNotContain(pinId, requests[2]);
     }
 
     [Fact]
@@ -391,5 +515,54 @@ public class PinnedClientTest
         Assert.NotNull(workerGroup);
         Assert.NotNull(workerGroup.PinnedClientId);
         _output.WriteLine($"Pinned client ID in state: {workerGroup.PinnedClientId}");
+    }
+}
+
+public class PinnedClientMockServerTest
+{
+    [Fact]
+    public async Task Queued_consume_pull_request_should_use_latest_pin_id_when_sent()
+    {
+        var pullRequestCount = 0;
+        var secondPullRequest = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        await using var ms = new MockServer((_, cmd) =>
+        {
+            if (cmd.Name == "PUB" && cmd.Subject.Contains("CONSUMER.INFO", StringComparison.Ordinal))
+            {
+                cmd.Reply(payload: """{"stream_name":"x","name":"x"}""");
+                return Task.CompletedTask;
+            }
+
+            if (cmd.Name == "PUB" && cmd.Subject.Contains("CONSUMER.MSG.NEXT", StringComparison.Ordinal))
+            {
+                var request = cmd.Buffer is null ? string.Empty : new string(cmd.Buffer);
+                if (Interlocked.Increment(ref pullRequestCount) == 2)
+                {
+                    secondPullRequest.TrySetResult(request);
+                }
+            }
+
+            return Task.CompletedTask;
+        });
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await using var nats = new NatsConnection(new NatsOpts { Url = ms.Url });
+        var js = nats.CreateJetStreamContext();
+        var consumer = (NatsJSConsumer)await js.GetConsumerAsync("x", "x", cts.Token);
+
+        consumer.SetPinId("pin-old");
+
+        await using var cc = await consumer.ConsumeInternalAsync<int>(
+            opts: new NatsJSConsumeOpts { MaxMsgs = 1, ThresholdMsgs = 0 },
+            cancellationToken: cts.Token);
+
+        cc.Delivered(1);
+        consumer.SetPinId("pin-new");
+
+        await secondPullRequest.Task.WaitAsync(cts.Token);
+        var request = await secondPullRequest.Task;
+        Assert.Contains(@"""id"":""pin-new""", request);
+        Assert.DoesNotContain(@"""id"":""pin-old""", request);
     }
 }

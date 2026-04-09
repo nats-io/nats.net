@@ -386,7 +386,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                     {
                         _logger.LogDebug(NatsJSLogEvents.PinIdMismatch, "Pin ID Mismatch");
                         NatsJSExtensionsInternal.HandlePinIdMismatch(_jsConsumer, _notificationChannel);
-                        ResetPending();
+                        ClearPending();
                     }
                     else if (headers.Code == 503)
                     {
@@ -478,6 +478,15 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         }
     }
 
+    private void ClearPending()
+    {
+        lock (_pendingGate)
+        {
+            _pendingMsgs = 0;
+            _pendingBytes = 0;
+        }
+    }
+
     private void CheckPending()
     {
         lock (_pendingGate)
@@ -531,7 +540,6 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
             MinPending = _priorityGroup?.MinPending ?? 0,
             MinAckPending = _priorityGroup?.MinAckPending ?? 0,
             Priority = _priorityGroup?.Priority ?? 0,
-            Id = _jsConsumer?.GetPinId(),
         },
         Origin = origin,
     });
@@ -550,6 +558,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
             var origin = $"pull-loop({pr.Origin})";
             try
             {
+                pr.Request.Id = _jsConsumer?.GetPinId();
                 await CallMsgNextAsync(origin, pr.Request).ConfigureAwait(false);
             }
             catch (NatsConnectionFailedException)
