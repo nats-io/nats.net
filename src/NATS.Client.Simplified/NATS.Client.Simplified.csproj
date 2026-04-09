@@ -3,7 +3,7 @@
     <PropertyGroup>
         <!-- NuGet Packaging -->
         <PackageTags>pubsub;messaging;cloud-native;distributed;async;nats</PackageTags>
-        <Description>Simplified high-level API for NATS .NET. Wraps common pub/sub, request-reply, and JetStream patterns with sensible defaults for quick adoption.</Description>
+        <Description>Simplified high-level API for NATS .NET. Wraps common pub/sub and request-reply patterns with sensible defaults for quick adoption.</Description>
 
         <RootNamespace>NATS.Net</RootNamespace>
     </PropertyGroup>

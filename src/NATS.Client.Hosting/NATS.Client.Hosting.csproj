@@ -3,7 +3,7 @@
   <PropertyGroup>
     <!-- NuGet Packaging -->
     <PackageTags>pubsub;messaging;cloud-native;aspnetcore;hosting;nats</PackageTags>
-    <Description>ASP.NET Core and Generic Host integration for the NATS .NET core client. Registers NatsConnection as a hosted service with dependency injection support.</Description>
+    <Description>ASP.NET Core and Generic Host integration for the NATS .NET core client. Registers NatsConnection in the .NET Generic Host service collection.</Description>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' != 'net8.0'">

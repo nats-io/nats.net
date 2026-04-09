@@ -68,6 +68,7 @@ await foreach (var msg in nc.SubscribeAsync<Order>("orders.>"))
     Console.WriteLine($"Received order: {msg.Data}");
 
 // Request-reply
+var order = new Order(Id: 2, Item: "gadget");
 var reply = await nc.RequestAsync<Order, Confirmation>("orders.create", order);
 
 // JetStream (persistent messaging)
