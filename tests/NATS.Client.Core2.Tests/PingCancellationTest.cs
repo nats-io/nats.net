@@ -123,7 +123,7 @@ public class PingCancellationTest
         await using var server = await NatsServerProcess.StartAsync();
 
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         var rtt = await nats.PingAsync();
         rtt.Should().BeGreaterThan(TimeSpan.Zero);
@@ -135,7 +135,7 @@ public class PingCancellationTest
         await using var server = await NatsServerProcess.StartAsync();
 
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         // Verify ping works while server is up
         var rtt = await nats.PingAsync();
