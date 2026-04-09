@@ -2,8 +2,8 @@
 
   <PropertyGroup>
     <!-- NuGet Packaging -->
-    <PackageTags>pubsub;messaging;microservices;services</PackageTags>
-    <Description>Service API support for NATS.Client.</Description>
+    <PackageTags>pubsub;messaging;microservices;services;cloud-native;distributed;CNCF;nats</PackageTags>
+    <Description>Services framework for NATS .NET. Build discoverable microservices with automatic health monitoring, stats, and endpoint management.</Description>
   </PropertyGroup>
 
   <ItemGroup>

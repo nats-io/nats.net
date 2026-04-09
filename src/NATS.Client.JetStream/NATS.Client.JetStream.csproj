@@ -2,8 +2,8 @@
 
   <PropertyGroup>
     <!-- NuGet Packaging -->
-    <PackageTags>pubsub;messaging;persistance</PackageTags>
-    <Description>JetStream support for NATS.Client.</Description>
+    <PackageTags>pubsub;messaging;persistence;streaming;cloud-native;distributed;CNCF;nats</PackageTags>
+    <Description>JetStream persistent messaging for NATS .NET. Provides at-least-once delivery, stream management, and pull/push consumers for durable message processing.</Description>
   </PropertyGroup>
 
   <!--  Dependencies for prior to net5.0-->

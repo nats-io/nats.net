@@ -2,8 +2,8 @@
 
   <PropertyGroup>
     <!-- NuGet Packaging -->
-    <PackageTags>pubsub;messaging</PackageTags>
-    <Description>NATS client for modern .NET</Description>
+    <PackageTags>pubsub;messaging;cloud-native;distributed;async;real-time;CNCF;nats</PackageTags>
+    <Description>NATS .NET client for the NATS cloud-native messaging system. Includes Core NATS pub/sub, JetStream persistent messaging, Key/Value Store, Object Store, and Services. Built on async/await with support for .NET 8, .NET 6, and .NET Standard 2.0.</Description>
   </PropertyGroup>
 
   <ItemGroup>

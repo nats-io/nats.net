@@ -2,8 +2,8 @@
 
     <PropertyGroup>
         <!-- NuGet Packaging -->
-        <PackageTags>pubsub;messaging</PackageTags>
-        <Description>ASP.NET Core and Generic Host support for NATS.Net.</Description>
+        <PackageTags>pubsub;messaging;cloud-native;aspnetcore;hosting;dependency-injection;nats</PackageTags>
+        <Description>Microsoft dependency injection extension for NATS .NET. Configures NatsClient with the Generic Host and ASP.NET Core service collection.</Description>
     </PropertyGroup>
 
     <ItemGroup Condition="'$(TargetFramework)' != 'net8.0'">

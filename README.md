@@ -16,6 +16,73 @@ async enumerables and channels, and leverages advanced .NET memory, buffer and I
 
 **Additionally check out [NATS by example](https://natsbyexample.com) - An evolving collection of runnable, cross-client reference examples for NATS.**
 
+### Quick Start
+
+Start a NATS server:
+
+```shell
+docker run -p 4222:4222 nats
+```
+
+Create a subscriber app:
+
+```shell
+dotnet new console -n Sub && cd Sub && dotnet add package NATS.Net
+```
+
+```csharp
+using NATS.Net;
+
+await using var nc = new NatsClient();
+
+await foreach (var msg in nc.SubscribeAsync<string>("greet"))
+    Console.WriteLine($"Received: {msg.Data}");
+```
+
+In another terminal, create a publisher app:
+
+```shell
+dotnet new console -n Pub && cd Pub && dotnet add package NATS.Net
+```
+
+```csharp
+using NATS.Net;
+
+await using var nc = new NatsClient();
+
+await nc.PublishAsync("greet", "Hello, NATS!");
+```
+
+### API at a Glance
+
+```csharp
+using NATS.Net;
+
+await using var nc = new NatsClient();
+
+// Publish a message
+await nc.PublishAsync("orders.new", new Order(Id: 1, Item: "widget"));
+
+// Subscribe with async enumerable
+await foreach (var msg in nc.SubscribeAsync<Order>("orders.>"))
+    Console.WriteLine($"Received order: {msg.Data}");
+
+// Request-reply
+var reply = await nc.RequestAsync<Order, Confirmation>("orders.create", order);
+
+// JetStream (persistent messaging)
+var js = nc.CreateJetStreamContext();
+
+// Key/Value Store
+var kv = nc.CreateKeyValueStoreContext();
+
+// Object Store
+var obj = nc.CreateObjectStoreContext();
+
+// Services
+var svc = nc.CreateServicesContext();
+```
+
 > [!NOTE]
 > **We are not testing with .NET 6.0 target anymore** even though it is still targeted by the library.
 > This is to reduce the number of test runs and speed up the CI process as well as to prepare for
