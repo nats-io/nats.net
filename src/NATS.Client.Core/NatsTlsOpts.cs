@@ -11,17 +11,41 @@ namespace NATS.Client.Core;
 /// <summary>
 /// TLS mode to use during connection.
 /// </summary>
+/// <remarks>
+/// Only <see cref="Require"/> and <see cref="Implicit"/> provide the full protection that TLS can offer.
+/// Other modes may fall back to plaintext depending on server configuration.
+/// </remarks>
 public enum TlsMode
 {
     /// <summary>
-    /// For connections that use the "nats://" scheme and don't supply Client or CA Certificates - same as <c>Prefer</c>
-    /// For connections that use the "tls://" scheme or supply Client or CA Certificates - same as <c>Require</c>
+    /// For connections that use the "nats://" scheme and don't supply Client or CA Certificates - same as <see cref="Prefer"/>.
+    /// For connections that use the "tls://" scheme or supply Client or CA Certificates - same as <see cref="Require"/>.
     /// </summary>
+    /// <remarks>
+    /// When this resolves to <see cref="Prefer"/>, TLS is opportunistic: the connection
+    /// may remain plaintext depending on the server's INFO response.
+    /// Use the <c>tls://</c> scheme or set <see cref="Require"/> explicitly when TLS is required.
+    /// </remarks>
     Auto,
 
     /// <summary>
-    /// if the Server supports TLS, then use it, otherwise use plain-text.
+    /// If the server supports TLS, then use it; otherwise, use plain-text.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is an opportunistic TLS mode. The TLS decision is based on the server's
+    /// INFO message, which arrives over plaintext before any encryption is established.
+    /// On an untrusted network the connection may remain plaintext.
+    /// </para>
+    /// <para>
+    /// When connecting directly, this mode upgrades to TLS if the server supports it.
+    /// Behind a TLS-terminating proxy, use <see cref="TlsMode.Disable"/> instead,
+    /// as the client may attempt a TLS upgrade that the nats-server cannot complete.
+    /// </para>
+    /// <para>
+    /// If TLS is required, use the <c>tls://</c> scheme or set <see cref="TlsMode.Require"/> explicitly.
+    /// </para>
+    /// </remarks>
     Prefer,
 
     /// <summary>
@@ -99,7 +123,26 @@ public sealed record NatsTlsOpts
     /// <summary>When true, skip remote certificate verification and accept any server certificate</summary>
     public bool InsecureSkipVerify { get; init; }
 
-    /// <summary>TLS mode to use during connection</summary>
+    /// <summary>
+    /// TLS mode to use during connection.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Defaults to <see cref="TlsMode.Auto"/>, which resolves to <see cref="TlsMode.Prefer"/>
+    /// for <c>nats://</c> connections without certificates. In this mode the client will
+    /// attempt a TLS upgrade when the server advertises TLS support. This differs from most
+    /// other NATS clients, which do not upgrade unless explicitly configured.
+    /// </para>
+    /// <para>
+    /// Behind a TLS-terminating proxy, use <see cref="TlsMode.Disable"/> to prevent the
+    /// client from attempting a TLS upgrade that the nats-server cannot complete.
+    /// Use the <c>tls://</c> scheme or <see cref="TlsMode.Require"/> when TLS is required.
+    /// </para>
+    /// <para>
+    /// Only <see cref="TlsMode.Require"/> and <see cref="TlsMode.Implicit"/> provide the full
+    /// protection that TLS can offer. Other modes may fall back to plaintext depending on server configuration.
+    /// </para>
+    /// </remarks>
     public TlsMode Mode { get; init; }
 
     internal bool HasTlsCerts

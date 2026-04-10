@@ -1,6 +1,7 @@
 using System.Text;
 using NATS.Client.Core2.Tests;
 using NATS.Client.TestUtilities;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.Core.Tests;
 
@@ -37,8 +38,9 @@ public class Utf8SubjectMockServerTest
             },
             cancellationToken: cts.Token);
 
+        await server.Ready;
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         await foreach (var msg in nats.SubscribeAsync<string>(">", cancellationToken: cts.Token))
         {
@@ -77,8 +79,9 @@ public class Utf8SubjectMockServerTest
             },
             cancellationToken: cts.Token);
 
+        await server.Ready;
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         await foreach (var msg in nats.SubscribeAsync<string>(">", cancellationToken: cts.Token))
         {
@@ -123,8 +126,9 @@ public class Utf8SubjectMockServerTest
             },
             cancellationToken: cts.Token);
 
+        await server.Ready;
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         await foreach (var msg in nats.SubscribeAsync<string>(">", cancellationToken: cts.Token))
         {

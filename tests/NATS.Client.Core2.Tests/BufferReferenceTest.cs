@@ -22,6 +22,7 @@ public class BufferReferenceTest
         {
             Url = _server.Url,
             RequestReplyMode = NatsRequestReplyMode.Direct,
+            CommandTimeout = TimeSpan.FromSeconds(30),
         });
 
         await nats.ConnectRetryAsync();
