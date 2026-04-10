@@ -29,6 +29,18 @@ Console.WriteLine("Types as seen by TransientLib (compiled against 2.6.0):");
 Check("INatsSerialize<> (transient)", "NATS.Client.Abstractions", MySerializer.GetSerializerInterfaceAssembly());
 Console.WriteLine();
 
+Console.WriteLine("Assembly versions at runtime:");
+Console.WriteLine($"  INatsSerialize<> assembly version (from this project): {typeof(INatsSerialize<>).Assembly.GetName().Version}");
+Console.WriteLine($"  INatsSerialize<> assembly version (from TransientLib): {MySerializer.GetSerializerInterfaceAssemblyVersion()}");
+foreach (var asm in AppDomain.CurrentDomain.GetAssemblies()
+    .Where(a => a.GetName().Name?.Contains("NATS") == true)
+    .OrderBy(a => a.GetName().Name))
+{
+    Console.WriteLine($"  {asm.GetName().Name} v{asm.GetName().Version} [{asm.Location}]");
+}
+
+Console.WriteLine();
+
 Console.WriteLine("Testing TransientLib.MySerializer (compiled against 2.6.0):");
 var serializer = new MySerializer();
 var buffer = new ArrayBufferWriter<byte>();
