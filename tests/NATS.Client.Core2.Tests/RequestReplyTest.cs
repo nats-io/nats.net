@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using NATS.Client.Core2.Tests;
 using NATS.Client.Core2.Tests.ExtraUtils.FrameworkPolyfillExtensions;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.Core.Tests;
 
@@ -233,6 +234,7 @@ public class RequestReplyTest
     public async Task Request_reply_many_test_max_count()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
 
         var sub = await nats.SubscribeCoreAsync<int>("foo");
         var reg = sub.Register(async msg =>

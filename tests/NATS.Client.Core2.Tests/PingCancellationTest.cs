@@ -1,4 +1,5 @@
 using NATS.Client.TestUtilities;
+using NATS.Client.TestUtilities2;
 using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.Core.Tests;
@@ -19,8 +20,9 @@ public class PingCancellationTest
             logger: m => _output.WriteLine(m),
             cancellationToken: cts.Token);
 
+        await server.Ready;
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         var rtt = await nats.PingAsync(cts.Token);
         rtt.Should().BeGreaterThan(TimeSpan.Zero);
@@ -36,8 +38,9 @@ public class PingCancellationTest
             logger: m => _output.WriteLine(m),
             cancellationToken: cts.Token);
 
+        await server.Ready;
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         for (var i = 0; i < 5; i++)
         {
@@ -75,8 +78,9 @@ public class PingCancellationTest
             autoPong: false,
             cancellationToken: cts.Token);
 
+        await server.Ready;
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         // This ping should time out because the server won't reply PONG
         using var pingCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
@@ -95,8 +99,9 @@ public class PingCancellationTest
             logger: m => _output.WriteLine(m),
             cancellationToken: cts.Token);
 
+        await server.Ready;
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         // Fire multiple pings concurrently — exercises the pool and concurrent SetResult paths
         var tasks = new Task<TimeSpan>[10];
@@ -118,7 +123,7 @@ public class PingCancellationTest
         await using var server = await NatsServerProcess.StartAsync();
 
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         var rtt = await nats.PingAsync();
         rtt.Should().BeGreaterThan(TimeSpan.Zero);
@@ -130,7 +135,7 @@ public class PingCancellationTest
         await using var server = await NatsServerProcess.StartAsync();
 
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         // Verify ping works while server is up
         var rtt = await nats.PingAsync();

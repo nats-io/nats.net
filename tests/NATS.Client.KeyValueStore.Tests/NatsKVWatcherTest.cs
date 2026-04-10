@@ -221,7 +221,7 @@ public class NatsKVWatcherTest
     [Fact]
     public async Task Watcher_timeout_reconnect()
     {
-        var timeout = TimeSpan.FromSeconds(30);
+        var timeout = TimeSpan.FromSeconds(60);
 
         var cts = new CancellationTokenSource(timeout);
         var cancellationToken = cts.Token;

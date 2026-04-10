@@ -276,7 +276,10 @@ public class SlowConsumerTest
             {
                 var rtt = await pingTask;
                 pingCount++;
-                if (rtt.TotalMilliseconds > maxPingRttMs)
+
+                // Skip the first ping for max RTT calculation since it
+                // legitimately catches the tail of the 100-message publish burst.
+                if (i > 0 && rtt.TotalMilliseconds > maxPingRttMs)
                     maxPingRttMs = rtt.TotalMilliseconds;
                 _output.WriteLine($"Ping {i + 1}: RTT {rtt.TotalMilliseconds}ms");
             }
