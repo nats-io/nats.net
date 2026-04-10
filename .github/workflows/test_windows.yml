@@ -40,7 +40,9 @@ jobs:
 
       - name: Set up Go
         uses: actions/setup-go@v5
-        with: { cache: true }
+        with:
+          go-version: 'stable'
+          cache: true
 
       - name: Install nats-server
         run: go install github.com/nats-io/nats-server/v2@${{ matrix.config.branch }}
