@@ -159,7 +159,7 @@ internal class UserCredentials
             using var reader = new StreamReader(path);
             return ParseCreds(reader);
         }
-        catch (NatsException e)
+        catch (Exception e)
         {
             throw new NatsException($"Error loading creds file '{path}': {e.Message}", e);
         }
