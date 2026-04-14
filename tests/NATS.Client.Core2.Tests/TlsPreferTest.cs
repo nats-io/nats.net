@@ -213,21 +213,45 @@ public class TlsPreferTest(ITestOutputHelper output)
                 var stream = tcp.GetStream();
                 var encoding = Encoding.GetEncoding(28591);
                 var sw = new StreamWriter(stream, encoding);
-                var sr = new StreamReader(stream, encoding);
 
                 // Server behind TLS proxy: tls_required=false, tls_available=true
                 await sw.WriteAsync("INFO {\"server_id\":\"proxy-backend\",\"max_payload\":1048576,\"tls_required\":false,\"tls_available\":true}\r\n");
                 await sw.FlushAsync();
 
-                // Read whatever the client sends next
-                var line = await sr.ReadLineAsync();
-                output.WriteLine($"[SERVER] RCV: {line}");
-
-                // If the client sent CONNECT, it stayed plaintext (didn't try TLS).
-                // If we get something else or the connection drops, client tried TLS upgrade.
-                if (line == null || !line.StartsWith("CONNECT"))
+                // Identify the client's next action from its first byte:
+                //   0x16 -> TLS Handshake record (ContentType=Handshake), client tried TLS upgrade
+                //   0x43 -> 'C' of plaintext "CONNECT ...", client stayed plaintext
+                var firstByte = new byte[1];
+                int read;
+                try
                 {
+                    read = await stream.ReadAsync(firstByte, 0, 1, cts.Token);
+                }
+                catch (IOException ex)
+                {
+                    output.WriteLine($"[SERVER] RCV failed: {ex.Message}");
+                    read = 0;
+                }
+
+                if (read == 1 && firstByte[0] == 0x16)
+                {
+                    output.WriteLine("[SERVER] RCV: TLS Handshake record (0x16)");
                     clientAttemptedTls = true;
+                }
+                else if (read == 1 && firstByte[0] == (byte)'C')
+                {
+                    using var sr = new StreamReader(stream, encoding);
+                    var rest = await sr.ReadLineAsync();
+                    var line = "C" + rest;
+                    output.WriteLine($"[SERVER] RCV: {line}");
+                    if (!line.StartsWith("CONNECT"))
+                    {
+                        output.WriteLine("[SERVER] RCV: expected CONNECT but got malformed line");
+                    }
+                }
+                else
+                {
+                    output.WriteLine($"[SERVER] RCV: unexpected (read={read}, byte=0x{(read == 1 ? firstByte[0] : 0):X2})");
                 }
             },
             cts.Token);
