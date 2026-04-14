@@ -82,6 +82,7 @@ public class TlsPreferTest(ITestOutputHelper output)
                 Password = "secret_pass",
             },
             TlsOpts = new NatsTlsOpts { Mode = TlsMode.Prefer },
+            ConnectTimeout = TimeSpan.FromSeconds(10),
         });
 
         await nats.ConnectAsync();
@@ -337,6 +338,7 @@ public class TlsPreferTest(ITestOutputHelper output)
         {
             Url = $"nats://127.0.0.1:{port}",
             TlsOpts = new NatsTlsOpts { Mode = TlsMode.Disable },
+            ConnectTimeout = TimeSpan.FromSeconds(10),
         });
 
         await nats.ConnectAsync();
