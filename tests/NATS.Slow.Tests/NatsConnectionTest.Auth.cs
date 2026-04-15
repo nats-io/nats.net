@@ -307,6 +307,36 @@ public abstract partial class NatsConnectionTest
         await register;
     }
 
+    [Fact]
+    public async Task NKeyAuthWithNoAuthUserTest()
+    {
+        // Server with no_auth_user defined omits auth_required from INFO but still sends a nonce.
+        // An NKey-configured client must still respond with a signature.
+        var serverOpts = new NatsServerOptsBuilder()
+            .UseTransport(_transportType)
+            .AddServerConfig("resources/configs/auth/nkey-no-auth-user.conf")
+            .Build();
+
+        var clientOpts = NatsOpts.Default with
+        {
+            AuthOpts = NatsAuthOpts.Default with
+            {
+                NKey = "UALQSMXRSAA7ZXIGDDJBJ2JOYJVQIWM3LQVDM5KYIPG4EP3FAGJ47BOJ",
+                Seed = "SUAAVWRZG6M5FA5VRRGWSCIHKTOJC7EWNIT4JV3FTOIPO4OBFR5WA7X5TE",
+            },
+        };
+
+        await using var server = await NatsServer.StartAsync(_output, serverOpts, clientOpts);
+
+        // Anonymous connection should succeed (mapped to no_auth_user).
+        await using var anonConnection = await server.CreateClientConnectionAsync();
+        await anonConnection.PingAsync();
+
+        // NKey-authenticated connection should also succeed.
+        await using var authConnection = await server.CreateClientConnectionAsync(clientOpts);
+        await authConnection.PingAsync();
+    }
+
     public class Auth
     {
         public Auth(string name, string serverConfig, NatsOpts clientOpts, string? urlAuth = null)
