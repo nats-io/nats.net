@@ -2,8 +2,8 @@
 
     <PropertyGroup>
         <!-- NuGet Packaging -->
-        <PackageTags>pubsub;messaging</PackageTags>
-        <Description>NATS core client for .NET</Description>
+        <PackageTags>pubsub;messaging;cloud-native;distributed;async;real-time;CNCF;nats</PackageTags>
+        <Description>Core client for NATS, the high-performance cloud-native messaging system. Provides async pub/sub, request-reply, and queue groups for .NET applications.</Description>
     </PropertyGroup>
 
     <!--  Dependencies for all -->

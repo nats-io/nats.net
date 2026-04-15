@@ -2,8 +2,8 @@
 
   <PropertyGroup>
     <!-- NuGet Packaging -->
-    <PackageTags>pubsub;messaging;persistance;key-value;storage</PackageTags>
-    <Description>JetStream Key/Value Store support for NATS.Client.</Description>
+    <PackageTags>pubsub;messaging;persistence;key-value;storage;cloud-native;distributed;CNCF;nats</PackageTags>
+    <Description>Key/Value Store for NATS .NET, built on JetStream. Provides distributed key-value storage with watch, history, and TTL support.</Description>
   </PropertyGroup>
 
   <ItemGroup>

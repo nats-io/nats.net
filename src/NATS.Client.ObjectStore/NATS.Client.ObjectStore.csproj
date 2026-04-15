@@ -2,8 +2,8 @@
 
   <PropertyGroup>
     <!-- NuGet Packaging -->
-    <PackageTags>pubsub;messaging;persistance;storage</PackageTags>
-    <Description>JetStream Object Store support for NATS.Client.</Description>
+    <PackageTags>pubsub;messaging;persistence;storage;cloud-native;distributed;CNCF;nats</PackageTags>
+    <Description>Object Store for NATS .NET, built on JetStream. Stores and retrieves large objects as chunked streams with metadata and integrity checks.</Description>
   </PropertyGroup>
 
   <ItemGroup>
