@@ -2,8 +2,8 @@
 
   <PropertyGroup>
     <!-- NuGet Packaging -->
-    <PackageTags>pubsub;messaging</PackageTags>
-    <Description>NATS client generic JSON serializer. Not suitable for native AOT deployments.</Description>
+    <PackageTags>pubsub;messaging;json;serialization;nats</PackageTags>
+    <Description>JSON serializer for NATS .NET using System.Text.Json. Supports ad-hoc types for quick prototyping. Not suitable for native AOT deployments.</Description>
 
     <IsTrimmable>false</IsTrimmable>
     <IsAotCompatible>false</IsAotCompatible>

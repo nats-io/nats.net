@@ -394,9 +394,26 @@ public partial class NatsConnection : INatsConnection
                 throw new NatsException($"URI {uri} requires TLS but TlsMode is set to Disable");
         }
 
-        if (!Opts.AuthOpts.IsAnonymous)
+        try
         {
-            _userCredentials = new UserCredentials(Opts.AuthOpts);
+            if (!Opts.AuthOpts.IsAnonymous)
+            {
+                _userCredentials = new UserCredentials(Opts.AuthOpts);
+            }
+        }
+        catch (Exception ex)
+        {
+            var exception = ex as NatsException ?? new NatsException($"Failed to load credentials: {ex.Message}", ex);
+            lock (_gate)
+            {
+                ConnectionState = NatsConnectionState.Closed; // allow retry connect
+
+                // throw for the waiter
+                _waitForOpenConnection.TrySetObservedException(exception);
+                _waitForOpenConnection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            }
+
+            throw exception;
         }
 
         var attemptedUris = new List<NatsUri>();
