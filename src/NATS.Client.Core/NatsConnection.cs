@@ -900,7 +900,7 @@ public partial class NatsConnection : INatsConnection
         }
         catch (Exception ex)
         {
-            _logger.LogError(NatsLogEvents.Connection, ex, "Error occured when publishing events");
+            _logger.LogError(NatsLogEvents.Connection, ex, "Error occurred when publishing events");
             if (!_disposedCts.IsCancellationRequested)
                 _publishEventsTask = Task.Run(PublishEventsAsync, _disposedCts.Token);
         }
@@ -1089,7 +1089,7 @@ public partial class NatsConnection : INatsConnection
         {
             try
             {
-                _logger.LogError(NatsLogEvents.Connection, ex, $"Error occured when disposing {description}");
+                _logger.LogError(NatsLogEvents.Connection, ex, $"Error occurred when disposing {description}");
             }
             catch
             {
