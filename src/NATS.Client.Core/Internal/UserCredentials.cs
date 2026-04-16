@@ -1,7 +1,6 @@
-using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
-using NATS.Client.Core.NaCl;
+using NATS.NKeys;
 
 namespace NATS.Client.Core.Internal;
 
@@ -54,11 +53,11 @@ internal class UserCredentials
         if (seed == null || nonce == null)
             return null;
 
-        using var kp = NKeys.FromSeed(seed);
-        var bytes = kp.Sign(Encoding.ASCII.GetBytes(nonce));
-        var sig = CryptoBytes.ToBase64String(bytes);
+        using var kp = KeyPair.FromSeed(seed.AsSpan());
+        var signature = new byte[64];
+        kp.Sign(Encoding.ASCII.GetBytes(nonce), signature);
 
-        return sig;
+        return Convert.ToBase64String(signature);
     }
 
     internal async Task AuthenticateAsync(ClientOpts opts, ServerInfo? info, NatsUri uri, TimeSpan timeout, CancellationToken cancellationToken)
@@ -99,7 +98,10 @@ internal class UserCredentials
                 if (!string.IsNullOrEmpty(authCred.Secret))
                 {
                     seed = authCred.Secret;
-                    opts.NKey = NKeys.PublicKeyFromSeed(seed);
+                    using (var kp = KeyPair.FromSeed(seed.AsSpan()))
+                    {
+                        opts.NKey = kp.GetPublicKey();
+                    }
                 }
 
                 break;
@@ -136,7 +138,9 @@ internal class UserCredentials
             opts.AuthToken = Token;
         }
 
-        opts.Sig = info is { AuthRequired: true, Nonce: { } } ? Sign(info.Nonce, seed) : null;
+        // Sign whenever the server sends a nonce: servers with no_auth_user defined
+        // omit auth_required from INFO but still expect a signature from NKey clients.
+        opts.Sig = info is { Nonce: { } } ? Sign(info.Nonce, seed) : null;
     }
 
     private (string, string) LoadCredsContent(string creds)
@@ -159,7 +163,7 @@ internal class UserCredentials
             using var reader = new StreamReader(path);
             return ParseCreds(reader);
         }
-        catch (NatsException e)
+        catch (Exception e)
         {
             throw new NatsException($"Error loading creds file '{path}': {e.Message}", e);
         }

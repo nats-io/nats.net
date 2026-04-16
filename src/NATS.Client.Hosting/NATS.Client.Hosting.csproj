@@ -2,8 +2,8 @@
 
   <PropertyGroup>
     <!-- NuGet Packaging -->
-    <PackageTags>pubsub;messaging</PackageTags>
-    <Description>ASP.NET Core and Generic Host support for NATS.Client.</Description>
+    <PackageTags>pubsub;messaging;cloud-native;aspnetcore;hosting;nats</PackageTags>
+    <Description>ASP.NET Core and Generic Host integration for the NATS .NET core client. Registers NatsConnection in the .NET Generic Host service collection.</Description>
   </PropertyGroup>
 
   <ItemGroup Condition="!$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net8.0'))">
