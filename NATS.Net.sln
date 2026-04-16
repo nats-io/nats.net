@@ -158,6 +158,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.CheckAbiTransie
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.CheckAbi", "tests\NATS.Client.CheckAbi\NATS.Client.CheckAbi.csproj", "{DA8E9EC2-990C-4DA2-A3F3-7E7796C71DD8}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NATS.Client.CheckAbiOld", "tests\NATS.Client.CheckAbiOld\NATS.Client.CheckAbiOld.csproj", "{93E92151-28BF-4176-92F4-65E1227C3269}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -372,6 +374,10 @@ Global
 		{DA8E9EC2-990C-4DA2-A3F3-7E7796C71DD8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DA8E9EC2-990C-4DA2-A3F3-7E7796C71DD8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DA8E9EC2-990C-4DA2-A3F3-7E7796C71DD8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{93E92151-28BF-4176-92F4-65E1227C3269}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{93E92151-28BF-4176-92F4-65E1227C3269}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{93E92151-28BF-4176-92F4-65E1227C3269}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{93E92151-28BF-4176-92F4-65E1227C3269}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -432,6 +438,7 @@ Global
 		{71C2BC96-C104-4748-B6CF-E74BAC4E709D} = {4827B3EC-73D8-436D-AE2A-5E29AC95FD0C}
 		{21649885-B40A-4F6B-9286-A7E378276C3E} = {C526E8AB-739A-48D7-8FC4-048978C9B650}
 		{DA8E9EC2-990C-4DA2-A3F3-7E7796C71DD8} = {C526E8AB-739A-48D7-8FC4-048978C9B650}
+		{93E92151-28BF-4176-92F4-65E1227C3269} = {C526E8AB-739A-48D7-8FC4-048978C9B650}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {8CBB7278-D093-448E-B3DE-B5991209A1AA}
