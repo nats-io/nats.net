@@ -335,7 +335,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         try
         {
             if (value != null)
-                serializer.Serialize(payloadBuffer, value, new NatsMsgContext { Subject = subject, ReplyTo = replyTo, Headers = headers });
+                serializer.Serialize(payloadBuffer, value, new NatsMsgContext(subject, replyTo, headers));
 
             if (headers != null)
                 _headerWriter.Write(headersBuffer!, headers);

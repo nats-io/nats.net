@@ -109,7 +109,7 @@ public class NatsMsgTests
         var msg = builder.Msg;
 
         var bufferWriter = new NatsPooledBufferWriter<byte>(256);
-        ((INatsSerializeWithContext<TestData>)serializer).Serialize(bufferWriter, data, new NatsMsgContext { Subject = subject, ReplyTo = replyTo, Headers = headers });
+        ((INatsSerializeWithContext<TestData>)serializer).Serialize(bufferWriter, data, new NatsMsgContext(subject, replyTo, headers));
         var serializedSize = bufferWriter.WrittenCount;
 
         var expectedSize = subject.Length + (replyTo?.Length ?? 0) + headers.GetBytesLength() + serializedSize;
@@ -144,7 +144,7 @@ public class NatsMsgTests
         public string Name { get; set; } = null!;
     }
 
-    private class HeaderAwareSerializer<T> : INatsSerializer<T>, INatsSerializeWithContext<T>, INatsDeserializeWithContext<T>
+    private class HeaderAwareSerializer<T> : INatsSerializer<T>, INatsSerializerWithContext<T>
     {
         private readonly NatsJsonSerializer<T> _inner = new();
 

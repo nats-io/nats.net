@@ -10,6 +10,12 @@ namespace NATS.Client.Core;
 /// <summary>
 /// Represents a wrapper for RequestHeaders and ResponseHeaders.
 /// </summary>
+/// <remarks>
+/// Not thread-safe. Do not share a single <see cref="NatsHeaders"/> instance across concurrent
+/// publishes: the writer may read and context-aware serializers may mutate the dictionary while
+/// it is being written to the wire. Construct a fresh instance per publish, or wait for one
+/// publish to complete before reusing the same instance.
+/// </remarks>
 [SuppressMessage("StyleCop.CSharp.OrderingRules", "SA1201:Elements should appear in the correct order", Justification = "Keep class format as is for reference")]
 [SuppressMessage("StyleCop.CSharp.LayoutRules", "SA1504:All accessors should be single-line or multi-line", Justification = "Keep class format as is for reference")]
 [SuppressMessage("StyleCop.CSharp.LayoutRules", "SA1516:Elements should be separated by blank line", Justification = "Keep class format as is for reference")]

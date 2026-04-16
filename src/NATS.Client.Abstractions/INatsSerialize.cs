@@ -75,6 +75,15 @@ public interface INatsDeserializeWithContext<out T> : INatsDeserialize<T>
 }
 
 /// <summary>
+/// Combined context-aware serializer interface that supports both serialization and deserialization
+/// with access to message context.
+/// </summary>
+/// <typeparam name="T">Object type</typeparam>
+public interface INatsSerializerWithContext<T> : INatsSerializeWithContext<T>, INatsDeserializeWithContext<T>
+{
+}
+
+/// <summary>
 /// Registry for serializers and deserializers.
 /// </summary>
 public interface INatsSerializerRegistry
@@ -87,6 +96,13 @@ public interface INatsSerializerRegistry
 /// <summary>
 /// Extension methods to support context-aware serialization with fallback to standard serialization.
 /// </summary>
+/// <remarks>
+/// Context-aware serializers that want to mutate <see cref="NatsMsgContext.Headers"/> must check
+/// for null before doing so: the library passes whatever headers the caller supplied to
+/// <c>PublishAsync</c>, and does not allocate a new <see cref="INatsHeaders"/> for serializers that
+/// opt in to context. Callers who want header-mutating behavior must pass a non-null
+/// headers instance to <c>PublishAsync</c>.
+/// </remarks>
 public static class NatsSerializationExtensions
 {
     /// <summary>

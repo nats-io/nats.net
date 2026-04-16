@@ -9,7 +9,7 @@ public class NatsSerializationExtensionsTests
     {
         var serializer = new TrackingSerializerWithContext();
         var buffer = new NatsPooledBufferWriter<byte>(256);
-        var context = new NatsMsgContext { Subject = "test", Headers = new NatsHeaders { { "X-Test", "value" } } };
+        var context = new NatsMsgContext("test", headers: new NatsHeaders { { "X-Test", "value" } });
 
         ((INatsSerialize<string>)serializer).Serialize(buffer, "test", in context);
 
@@ -22,7 +22,7 @@ public class NatsSerializationExtensionsTests
     {
         var serializer = new TrackingSerializer();
         var buffer = new NatsPooledBufferWriter<byte>(256);
-        var context = new NatsMsgContext { Subject = "test", Headers = new NatsHeaders { { "X-Test", "value" } } };
+        var context = new NatsMsgContext("test", headers: new NatsHeaders { { "X-Test", "value" } });
 
         ((INatsSerialize<string>)serializer).Serialize(buffer, "test", in context);
 
@@ -34,7 +34,7 @@ public class NatsSerializationExtensionsTests
     {
         var serializer = new TrackingSerializerWithContext();
         var buffer = new NatsPooledBufferWriter<byte>(256);
-        var context = new NatsMsgContext { Subject = "test" };
+        var context = new NatsMsgContext("test");
 
         ((INatsSerialize<string>)serializer).Serialize(buffer, "test", in context);
 
@@ -47,7 +47,7 @@ public class NatsSerializationExtensionsTests
     {
         var deserializer = new TrackingDeserializerWithContext();
         var buffer = new ReadOnlySequence<byte>(new byte[] { 1 });
-        var context = new NatsMsgContext { Subject = "test", Headers = new NatsHeaders { { "X-Test", "value" } } };
+        var context = new NatsMsgContext("test", headers: new NatsHeaders { { "X-Test", "value" } });
 
         ((INatsDeserialize<string>)deserializer).Deserialize(buffer, in context);
 
@@ -60,7 +60,7 @@ public class NatsSerializationExtensionsTests
     {
         var deserializer = new TrackingDeserializer();
         var buffer = new ReadOnlySequence<byte>(new byte[] { 1 });
-        var context = new NatsMsgContext { Subject = "test", Headers = new NatsHeaders { { "X-Test", "value" } } };
+        var context = new NatsMsgContext("test", headers: new NatsHeaders { { "X-Test", "value" } });
 
         ((INatsDeserialize<string>)deserializer).Deserialize(buffer, in context);
 
@@ -72,12 +72,42 @@ public class NatsSerializationExtensionsTests
     {
         var deserializer = new TrackingDeserializerWithContext();
         var buffer = new ReadOnlySequence<byte>(new byte[] { 1 });
-        var context = new NatsMsgContext { Subject = "test" };
+        var context = new NatsMsgContext("test");
 
         ((INatsDeserialize<string>)deserializer).Deserialize(buffer, in context);
 
         deserializer.ContextDeserializeCalled.Should().BeTrue();
         deserializer.StandardDeserializeCalled.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Serialize_built_in_chain_propagates_context_to_leaf()
+    {
+        // A non-context built-in (NatsRawSerializer) chained with a context-aware leaf.
+        // For a type it can't handle, the built-in delegates to _next; the context must arrive at the leaf.
+        var leaf = new TrackingContextSerializer();
+        var chained = NatsRawSerializer<string>.Default.CombineWith(leaf);
+        var buffer = new NatsPooledBufferWriter<byte>(256);
+        var context = new NatsMsgContext("test", headers: new NatsHeaders { { "X-Test", "value" } });
+
+        chained.Serialize(buffer, "hello", in context);
+
+        leaf.ContextSerializeCalled.Should().BeTrue();
+        leaf.StandardSerializeCalled.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Deserialize_built_in_chain_propagates_context_to_leaf()
+    {
+        var leaf = new TrackingContextSerializer();
+        var chained = NatsRawSerializer<string>.Default.CombineWith(leaf);
+        var buffer = new ReadOnlySequence<byte>(new byte[] { 1 });
+        var context = new NatsMsgContext("test", headers: new NatsHeaders { { "X-Test", "value" } });
+
+        chained.Deserialize(buffer, in context);
+
+        leaf.ContextDeserializeCalled.Should().BeTrue();
+        leaf.StandardDeserializeCalled.Should().BeFalse();
     }
 
     private class TrackingSerializer : INatsSerialize<string>
@@ -129,5 +159,36 @@ public class NatsSerializationExtensionsTests
             ContextDeserializeCalled = true;
             return null;
         }
+    }
+
+    private class TrackingContextSerializer : INatsSerializer<string>, INatsSerializerWithContext<string>
+    {
+        public bool StandardSerializeCalled { get; private set; }
+
+        public bool ContextSerializeCalled { get; private set; }
+
+        public bool StandardDeserializeCalled { get; private set; }
+
+        public bool ContextDeserializeCalled { get; private set; }
+
+        public void Serialize(IBufferWriter<byte> bufferWriter, string value) =>
+            StandardSerializeCalled = true;
+
+        public void Serialize(IBufferWriter<byte> bufferWriter, string value, in NatsMsgContext context) =>
+            ContextSerializeCalled = true;
+
+        public string? Deserialize(in ReadOnlySequence<byte> buffer)
+        {
+            StandardDeserializeCalled = true;
+            return null;
+        }
+
+        public string? Deserialize(in ReadOnlySequence<byte> buffer, in NatsMsgContext context)
+        {
+            ContextDeserializeCalled = true;
+            return null;
+        }
+
+        public INatsSerializer<string> CombineWith(INatsSerializer<string> next) => throw new NotSupportedException();
     }
 }

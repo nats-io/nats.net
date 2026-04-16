@@ -280,7 +280,7 @@ public class MixedSerializerRegistry : INatsSerializerRegistry
 #endregion
 
 #region header-aware-serializer
-public class MyHeaderAwareSerializer<T> : INatsSerializer<T>, INatsSerializeWithContext<T>, INatsDeserializeWithContext<T>
+public class MyHeaderAwareSerializer<T> : INatsSerializer<T>, INatsSerializerWithContext<T>
 {
     private readonly NatsJsonContextSerializer<T> _jsonSerializer;
 
