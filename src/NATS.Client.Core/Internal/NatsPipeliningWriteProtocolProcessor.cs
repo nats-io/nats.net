@@ -300,7 +300,7 @@
 //         }
 //         catch (Exception ex)
 //         {
-//             logger.LogError(ex, "Unexpected error occured in write loop");
+//             logger.LogError(ex, "Unexpected error occurred in write loop");
 //             throw;
 //         }
 //

@@ -329,7 +329,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
             }
             catch (Exception ex)
             {
-                _logger.LogError(NatsLogEvents.Protocol, ex, "Error occured during read loop");
+                _logger.LogError(NatsLogEvents.Protocol, ex, "Error occurred during read loop");
                 continue;
             }
         }
