@@ -138,7 +138,9 @@ internal class UserCredentials
             opts.AuthToken = Token;
         }
 
-        opts.Sig = info is { AuthRequired: true, Nonce: { } } ? Sign(info.Nonce, seed) : null;
+        // Sign whenever the server sends a nonce: servers with no_auth_user defined
+        // omit auth_required from INFO but still expect a signature from NKey clients.
+        opts.Sig = info is { Nonce: { } } ? Sign(info.Nonce, seed) : null;
     }
 
     private (string, string) LoadCredsContent(string creds)
