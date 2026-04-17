@@ -24,11 +24,11 @@ public class NatsJsonSerializerTests
         var bufferWriter = new ArrayBufferWriter<byte>();
 
         // Act - Serialize
-        serializer.Serialize(bufferWriter, obj);
+        serializer.Serialize(bufferWriter, obj, default);
 
         // Deserialize back
         var buffer = new ReadOnlySequence<byte>(bufferWriter.WrittenMemory);
-        var result = serializer.Deserialize(buffer);
+        var result = serializer.Deserialize(buffer, default);
 
         // Assert - Round trip should succeed
         Assert.NotNull(result);
@@ -44,7 +44,7 @@ public class NatsJsonSerializerTests
         var buffer = new ReadOnlySequence<byte>(json);
 
         // Act
-        var result = serializer.Deserialize(buffer);
+        var result = serializer.Deserialize(buffer, default);
 
         // Assert - This should work fine
         Assert.NotNull(result);
@@ -60,7 +60,7 @@ public class NatsJsonSerializerTests
         var bufferWriter = new ArrayBufferWriter<byte>();
 
         // Act - Serialize
-        serializer.Serialize(bufferWriter, obj);
+        serializer.Serialize(bufferWriter, obj, default);
         var json = Encoding.UTF8.GetString(bufferWriter.WrittenSpan);
 
         // With default options, null is included in JSON
@@ -68,7 +68,7 @@ public class NatsJsonSerializerTests
 
         // Deserialize back
         var buffer = new ReadOnlySequence<byte>(bufferWriter.WrittenMemory);
-        var result = serializer.Deserialize(buffer);
+        var result = serializer.Deserialize(buffer, default);
 
         // Assert - Round trip succeeds
         Assert.NotNull(result);

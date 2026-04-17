@@ -364,8 +364,6 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
             }
         }
 
-        headers?.SetReadOnly();
-
         var size = subject.Length
                    + (replyTo?.Length ?? 0)
                    + (headersBuffer?.Length ?? 0)
@@ -401,7 +399,7 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
         {
             try
             {
-                data = serializer.Deserialize(payloadBuffer);
+                data = serializer.Deserialize(payloadBuffer, new NatsMsgContext(subject, replyTo, headers));
             }
             catch (Exception e)
             {
@@ -519,7 +517,7 @@ public class NatsMsgBuilder<T>
                 if (Serializer != null && Data != null)
                 {
                     var bufferWriter = new NatsPooledBufferWriter<byte>(SerializationBufferSize);
-                    Serializer.Serialize(bufferWriter, Data);
+                    Serializer.Serialize(bufferWriter, Data, new NatsMsgContext(Subject, ReplyTo, Headers));
                     size = bufferWriter.WrittenMemory.Length;
                 }
 

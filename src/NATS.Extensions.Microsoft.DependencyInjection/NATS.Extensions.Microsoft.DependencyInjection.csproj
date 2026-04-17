@@ -6,18 +6,18 @@
         <Description>Microsoft dependency injection extension for NATS .NET. Configures NatsClient with the Generic Host and ASP.NET Core service collection.</Description>
     </PropertyGroup>
 
-    <ItemGroup Condition="'$(TargetFramework)' != 'net8.0'">
+    <ItemGroup Condition="!$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net8.0'))">
         <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="6.0.0"/>
         <PackageReference Include="Microsoft.Extensions.Options" Version="6.0.1" />
     </ItemGroup>
 
-    <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <ItemGroup Condition="$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net8.0'))">
         <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.0"/>
         <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.2" />
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\NATS.Net\NATS.Net.csproj" />
+      <ProjectReference Include="..\NATS.Client.Simplified\NATS.Client.Simplified.csproj" />
     </ItemGroup>
 
 </Project>

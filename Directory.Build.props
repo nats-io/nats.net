@@ -9,6 +9,9 @@
 
         <!-- Do not package by default to avoid accidental publishing -->
         <IsPackable>false</IsPackable>
+
+        <!-- NuGet version used by ABI compatibility checks -->
+        <NatsAbiCheckVersion>2.6.0</NatsAbiCheckVersion>
     </PropertyGroup>
 
     <ItemGroup>

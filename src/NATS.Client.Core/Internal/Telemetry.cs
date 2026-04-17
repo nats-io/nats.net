@@ -104,11 +104,7 @@ internal static class Telemetry
                     return;
                 }
 
-                // There are cases where headers reused publicly (e.g. JetStream publish retry)
-                // there may also be cases where application can reuse the same header
-                // in which case we should still be able to overwrite headers with telemetry fields
-                // even though headers would be set to readonly before being passed down in publish methods.
-                headers.SetOverrideReadOnly(fieldName, fieldValue);
+                headers[fieldName] = fieldValue;
             });
     }
 
@@ -286,11 +282,7 @@ internal static class Telemetry
             },
             out var traceParent,
             out var traceState);
-#if NETSTANDARD2_0_OR_GREATER || NET7_0_OR_GREATER
         return ActivityContext.TryParse(traceParent, traceState, isRemote: true, out context);
-#else
-        return ActivityContext.TryParse(traceParent, traceState, out context);
-#endif
     }
 
     public class Constants

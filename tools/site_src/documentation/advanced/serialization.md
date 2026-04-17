@@ -83,6 +83,22 @@ You can then use the custom serializer as the default for the connection:
 
 [!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/SerializationPage.cs#custom)]
 
+## Using Message Context in Serializers
+
+Serializers can opt into receiving message context (subject, reply-to, headers) by implementing
+[`INatsSerializeWithContext<T>`](xref:NATS.Client.Core.INatsSerializeWithContext`1) and/or
+[`INatsDeserializeWithContext<T>`](xref:NATS.Client.Core.INatsDeserializeWithContext`1).
+These interfaces extend the base serialization interfaces, so existing serializers continue to work without changes.
+When a context-aware serializer is detected, the library automatically dispatches to the context overload;
+otherwise it falls back to the standard method.
+
+This can be used for scenarios like content-type negotiation, subject-based dispatch, encoding metadata,
+or any other context-driven serialization logic.
+
+Here is an example of a serializer that writes a content-type header during serialization and uses it during deserialization:
+
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/SerializationPage.cs#header-aware-serializer)]
+
 ## Using Multiple Serializers (chaining)
 
 You can also chain multiple serializers together to support multiple serialization formats. The first serializer in the

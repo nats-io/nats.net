@@ -10,12 +10,18 @@ namespace NATS.Client.Core;
 /// <summary>
 /// Represents a wrapper for RequestHeaders and ResponseHeaders.
 /// </summary>
+/// <remarks>
+/// Not thread-safe. Do not share a single <see cref="NatsHeaders"/> instance across concurrent
+/// publishes: the writer may read and context-aware serializers may mutate the dictionary while
+/// it is being written to the wire. Construct a fresh instance per publish, or wait for one
+/// publish to complete before reusing the same instance.
+/// </remarks>
 [SuppressMessage("StyleCop.CSharp.OrderingRules", "SA1201:Elements should appear in the correct order", Justification = "Keep class format as is for reference")]
 [SuppressMessage("StyleCop.CSharp.LayoutRules", "SA1504:All accessors should be single-line or multi-line", Justification = "Keep class format as is for reference")]
 [SuppressMessage("StyleCop.CSharp.LayoutRules", "SA1516:Elements should be separated by blank line", Justification = "Keep class format as is for reference")]
 [SuppressMessage("StyleCop.CSharp.LayoutRules", "SA1513:Closing brace should be followed by blank line", Justification = "Keep class format as is for reference")]
 [SuppressMessage("StyleCop.CSharp.OrderingRules", "SA1214:Readonly fields should appear before non-readonly fields", Justification = "Keep class format as is for reference")]
-public class NatsHeaders : IDictionary<string, StringValues>
+public class NatsHeaders : INatsHeaders
 {
     public enum Messages
     {
@@ -69,8 +75,6 @@ public class NatsHeaders : IDictionary<string, StringValues>
     // Pre-box
     private static readonly IEnumerator<KeyValuePair<string, StringValues>> EmptyIEnumeratorType = default(Enumerator);
     private static readonly IEnumerator EmptyIEnumerator = default(Enumerator);
-
-    private int _readonly = 0;
 
     public int Version => 1;
 
@@ -144,7 +148,6 @@ public class NatsHeaders : IDictionary<string, StringValues>
             {
                 throw new ArgumentNullException(nameof(key));
             }
-            ThrowIfReadOnly();
 
             if (value.Count == 0)
             {
@@ -161,11 +164,7 @@ public class NatsHeaders : IDictionary<string, StringValues>
     StringValues IDictionary<string, StringValues>.this[string key]
     {
         get { return this[key]; }
-        set
-        {
-            ThrowIfReadOnly();
-            this[key] = value;
-        }
+        set { this[key] = value; }
     }
 
     /// <summary>
@@ -175,10 +174,9 @@ public class NatsHeaders : IDictionary<string, StringValues>
     public int Count => Store?.Count ?? 0;
 
     /// <summary>
-    /// Gets a value that indicates whether the <see cref="NatsHeaders" /> is in read-only mode.
+    /// Gets a value that indicates whether the <see cref="NatsHeaders" /> is read-only. Always false.
     /// </summary>
-    /// <returns>true if the <see cref="NatsHeaders" /> is in read-only mode; otherwise, false.</returns>
-    public bool IsReadOnly => Volatile.Read(ref _readonly) == 1;
+    public bool IsReadOnly => false;
 
     /// <summary>
     /// Gets the collection of HTTP header names in this instance.
@@ -222,7 +220,6 @@ public class NatsHeaders : IDictionary<string, StringValues>
         {
             throw new ArgumentException("The key is null");
         }
-        ThrowIfReadOnly();
         EnsureStore(1);
         Store.Add(item.Key, item.Value);
     }
@@ -238,7 +235,6 @@ public class NatsHeaders : IDictionary<string, StringValues>
         {
             throw new ArgumentNullException(nameof(key));
         }
-        ThrowIfReadOnly();
         EnsureStore(1);
         Store.Add(key, value);
     }
@@ -248,7 +244,6 @@ public class NatsHeaders : IDictionary<string, StringValues>
     /// </summary>
     public void Clear()
     {
-        ThrowIfReadOnly();
         Store?.Clear();
     }
 
@@ -322,7 +317,6 @@ public class NatsHeaders : IDictionary<string, StringValues>
     /// <returns>true if the specified object was removed from the collection; otherwise, false.</returns>
     public bool Remove(KeyValuePair<string, StringValues> item)
     {
-        ThrowIfReadOnly();
         if (Store == null)
         {
             return false;
@@ -342,7 +336,6 @@ public class NatsHeaders : IDictionary<string, StringValues>
     /// <returns>true if the specified object was removed from the collection; otherwise, false.</returns>
     public bool Remove(string key)
     {
-        ThrowIfReadOnly();
         if (Store == null)
         {
             return false;
@@ -424,34 +417,6 @@ public class NatsHeaders : IDictionary<string, StringValues>
             return EmptyIEnumerator;
         }
         return Store.GetEnumerator();
-    }
-
-    internal void SetReadOnly() => Interlocked.Exchange(ref _readonly, 1);
-
-    internal void SetOverrideReadOnly(string key, StringValues value)
-    {
-        if (key == null)
-        {
-            throw new ArgumentNullException(nameof(key));
-        }
-
-        if (value.Count == 0)
-        {
-            Store?.Remove(key);
-        }
-        else
-        {
-            EnsureStore(1);
-            Store[key] = value;
-        }
-    }
-
-    private void ThrowIfReadOnly()
-    {
-        if (IsReadOnly)
-        {
-            throw new InvalidOperationException("The response headers cannot be modified because the response has already started.");
-        }
     }
 
     /// <summary>
