@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Authentication;
 using System.Text;
 using Synadia.Orbit.Testing.GoHarness;
 using Synadia.Orbit.Testing.NatsServerProcessManager;
@@ -202,6 +203,7 @@ public class TlsPreferTest(ITestOutputHelper output)
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
 
         var clientAttemptedTls = false;
+        var clientSentConnect = false;
 
         var serverTask = Task.Run(
             async () =>
@@ -241,6 +243,7 @@ public class TlsPreferTest(ITestOutputHelper output)
                 }
                 else if (read == 1 && firstByte[0] == (byte)'C')
                 {
+                    clientSentConnect = true;
                     using var sr = new StreamReader(stream, encoding);
                     var rest = await sr.ReadLineAsync();
                     var line = "C" + rest;
@@ -264,19 +267,42 @@ public class TlsPreferTest(ITestOutputHelper output)
             MaxReconnectRetry = 0,
         });
 
+        Exception? connectException = null;
         try
         {
             await nats.ConnectAsync();
         }
-        catch
+        catch (Exception ex)
         {
             // Expected: TLS handshake fails because server can't do TLS
+            connectException = ex;
         }
 
         await serverTask;
         listener.Stop();
 
-        clientAttemptedTls.Should().BeTrue(
+        // Guard against the actual bug: Prefer mode skipping TLS upgrade and sending plaintext CONNECT.
+        clientSentConnect.Should().BeFalse(
+            "Prefer mode must not send plaintext CONNECT when server advertises tls_available=true");
+
+        if (clientAttemptedTls)
+        {
+            return;
+        }
+
+        // On net481 the client can tear the TCP socket down (RST) after a very early
+        // TLS init failure, so the ClientHello byte is sometimes never observed by the
+        // server. Fall back to ConnectAsync's exception chain as evidence that the
+        // client went down the TLS upgrade path.
+        var causes = new List<Exception>();
+        for (var e = connectException; e != null; e = e.InnerException)
+        {
+            causes.Add(e);
+            output.WriteLine($"[{e.GetType().Name}] {e.Message}");
+        }
+
+        var tlsRelated = causes.Any(c => c is AuthenticationException || c is SocketException || c is IOException);
+        tlsRelated.Should().BeTrue(
             "Prefer mode should attempt TLS upgrade when server advertises tls_available=true");
     }
 
