@@ -17,6 +17,7 @@ public class MockServer : IAsyncDisposable
     private readonly List<Task> _clients = new();
     private readonly Task _accept;
     private readonly CancellationTokenSource _cts;
+    private readonly TaskCompletionSource _ready = new();
     private readonly bool _autoPong;
 
     public MockServer(
@@ -37,6 +38,7 @@ public class MockServer : IAsyncDisposable
         _accept = Task.Run(
             async () =>
             {
+                _ready.SetResult();
                 var n = 0;
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -150,6 +152,8 @@ public class MockServer : IAsyncDisposable
     }
 
     public int Port { get; }
+
+    public Task Ready => _ready.Task;
 
     public string Url => $"127.0.0.1:{Port}";
 

@@ -173,7 +173,16 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
 
         if (_debug)
         {
-            _logger.LogDebug(NatsJSLogEvents.PullRequest, "Sending pull request for {Origin} {Msgs}, {Bytes}", origin, request.Batch, request.MaxBytes);
+            _logger.LogDebug(
+                NatsJSLogEvents.PullRequest,
+                "Sending pull request for {Origin} {Msgs}, {Bytes}, pinId={PinId}, expires={Expires}, idleHeartbeat={IdleHeartbeat}, group={Group}",
+                origin,
+                request.Batch,
+                request.MaxBytes,
+                request.Id,
+                request.Expires,
+                request.IdleHeartbeat,
+                request.Group);
         }
 
         return Connection.PublishAsync(
@@ -389,7 +398,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                     {
                         _logger.LogDebug(NatsJSLogEvents.PinIdMismatch, "Pin ID Mismatch");
                         NatsJSExtensionsInternal.HandlePinIdMismatch(_jsConsumer, _notificationChannel);
-                        ResetPending();
+                        ClearPending();
                     }
                     else if (headers.Code == 503)
                     {
@@ -476,6 +485,15 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         }
     }
 
+    private void ClearPending()
+    {
+        lock (_pendingGate)
+        {
+            _pendingMsgs = 0;
+            _pendingBytes = 0;
+        }
+    }
+
     private void CheckPending()
     {
         lock (_pendingGate)
@@ -529,7 +547,6 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
             MinPending = _priorityGroup?.MinPending ?? 0,
             MinAckPending = _priorityGroup?.MinAckPending ?? 0,
             Priority = _priorityGroup?.Priority ?? 0,
-            Id = _jsConsumer?.GetPinId(),
         },
         Origin = origin,
     });
@@ -548,6 +565,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
             var origin = $"pull-loop({pr.Origin})";
             try
             {
+                pr.Request.Id = _jsConsumer?.GetPinId();
                 await CallMsgNextAsync(origin, pr.Request).ConfigureAwait(false);
             }
             catch (NatsConnectionFailedException)

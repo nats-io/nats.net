@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net.Sockets;
 using Microsoft.Extensions.Logging;
 using NATS.Client.TestUtilities;
+using NATS.Client.TestUtilities2;
 #if !NET6_0_OR_GREATER
 using NATS.Client.Core.Internal.NetStandardExtensions;
 #endif
@@ -40,8 +41,9 @@ public class SendBufferTest
 
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
 
+        await server.Ready;
         Log($"[C] connect {server.Url}");
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         Log($"[C] ping");
         var rtt = await nats.PingAsync(cts.Token);
@@ -128,10 +130,12 @@ public class SendBufferTest
         {
             Url = server.Url,
             LoggerFactory = testLogger,
+            CommandTimeout = TimeSpan.FromSeconds(30),
         });
 
+        await server.Ready;
         Log($"[C] connect {server.Url}");
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         Log($"[C] ping");
         var rtt = await nats.PingAsync(cts.Token);

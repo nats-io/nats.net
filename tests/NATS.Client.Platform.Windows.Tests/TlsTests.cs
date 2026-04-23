@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Net.Sockets;
 using System.Security.Authentication;
 using NATS.Client.Core;
@@ -23,8 +22,16 @@ public class TlsTests : IClassFixture<TlsTestsNatsServerFixture>
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
 
         var exception = await Assert.ThrowsAsync<NatsException>(async () => await nats.ConnectAsync());
-        Assert.Matches("TLS authentication failed|Unable to read data from the transport", exception.InnerException?.Message);
-        Assert.True(exception.InnerException?.InnerException is SocketException or AuthenticationException);
+
+        // The TLS handshake failure surfaces differently across runtimes and races
+        // (AuthenticationException, SocketException, or IOException on net481 when
+        // the server resets the connection). Walk the exception chain and accept
+        // any of these as evidence that the TLS upgrade was rejected.
+        var causes = Unwrap(exception).ToList();
+        foreach (var cause in causes)
+            _output.WriteLine($"[{cause.GetType().Name}] {cause.Message}");
+
+        Assert.Contains(causes, c => c is AuthenticationException or SocketException or IOException);
     }
 
     [Fact]
@@ -48,6 +55,15 @@ public class TlsTests : IClassFixture<TlsTestsNatsServerFixture>
         {
             await nats.PublishAsync($"{prefix}.foo", i);
             Assert.Equal(i, (await sub.Msgs.ReadAsync()).Data);
+        }
+    }
+
+    private static IEnumerable<Exception> Unwrap(Exception? ex)
+    {
+        while (ex != null)
+        {
+            yield return ex;
+            ex = ex.InnerException;
         }
     }
 }

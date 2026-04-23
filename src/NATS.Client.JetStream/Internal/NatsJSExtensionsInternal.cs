@@ -26,9 +26,8 @@ internal static class NatsJSExtensionsInternal
     /// <param name="jsConsumer">The consumer to set the pin ID on.</param>
     public static void TrySetPinIdFromHeaders(NatsHeaders? headers, NatsJSConsumer? jsConsumer)
     {
-        if (jsConsumer != null && headers != null && headers.TryGetValue(NatsPinIdHeader, out var pinIdValues))
+        if (jsConsumer != null && headers != null && headers.TryGetLastValue(NatsPinIdHeader, out var pinId))
         {
-            var pinId = pinIdValues.ToString();
             if (!string.IsNullOrEmpty(pinId))
             {
                 jsConsumer.SetPinId(pinId);
