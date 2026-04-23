@@ -139,6 +139,9 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
         _context.Connection.ConnectionDisconnected -= ConnectionOnConnectionDisconnected;
         try
         {
+            // Drain: UNSUB -> PING/PONG -> TryComplete, so all in-flight
+            // messages are written to the channel before it's completed.
+            await DrainAsync().ConfigureAwait(false);
             await base.DisposeAsync().ConfigureAwait(false);
         }
         finally
@@ -306,17 +309,12 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
                 }
             }
 
-            // Stop feeding the user if we are disposed.
-            // We need to exit as soon as possible.
-            if (Volatile.Read(ref _disposed) == 0)
-            {
-                // We can't pass cancellation token here because we need to hand
-                // the message to the user to be processed. Writer will be completed
-                // when the user calls Stop() or when the subscription is closed.
-                await _userMsgs.Writer.WriteAsync(msg).ConfigureAwait(false);
+            // We can't pass cancellation token here because we need to hand
+            // the message to the user to be processed. Writer will be completed
+            // when the user calls Stop() or when the subscription is closed.
+            await _userMsgs.Writer.WriteAsync(msg).ConfigureAwait(false);
 
-                ResetSlowConsumer(_userMsgs.Reader.Count);
-            }
+            ResetSlowConsumer(_userMsgs.Reader.Count);
         }
 
         CheckPending();

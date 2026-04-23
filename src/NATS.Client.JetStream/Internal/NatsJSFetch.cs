@@ -165,7 +165,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         Interlocked.Exchange(ref _disposed, 1);
         try
         {
-            // Drain: UNSUB → PING/PONG → TryComplete, so all in-flight
+            // Drain: UNSUB -> PING/PONG -> TryComplete, so all in-flight
             // messages are written to the channel before it's completed.
             await DrainAsync().ConfigureAwait(false);
             await base.DisposeAsync().ConfigureAwait(false);

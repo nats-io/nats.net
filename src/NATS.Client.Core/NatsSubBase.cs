@@ -395,7 +395,7 @@ public abstract class NatsSubBase
             _logger.LogWarning(NatsLogEvents.Subscription, e, "Error during drain ping");
         }
 
-        // Now it's safe to complete the channel — no more messages will arrive.
+        // Now it's safe to complete the channel, no more messages will arrive.
         try
         {
             TryComplete();
