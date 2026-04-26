@@ -81,8 +81,7 @@ public class ConsumerFetchTest
     // messages in-flight when DisposeAsync is called must all reach the
     // channel before it completes. If this test starts flapping, check the
     // DrainAsync pattern in NatsSubBase and the DisposeAsync overrides in
-    // NatsJSFetch, NatsJSConsume, NatsJSOrderedConsume. A manual stress
-    // repro lives under sandbox/SubCleanDispose.
+    // NatsJSFetch, NatsJSConsume, NatsJSOrderedConsume.
     [Theory]
 
     // TODO: Fix this test

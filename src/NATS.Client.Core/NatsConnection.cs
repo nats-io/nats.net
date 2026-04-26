@@ -280,7 +280,6 @@ public partial class NatsConnection : INatsConnection
             IsDisposed = true;
             _logger.Log(LogLevel.Information, NatsLogEvents.Connection, "Disposing connection {Name}", _name);
 
-            await DisposeSocketAsync(false).ConfigureAwait(false);
             if (_pingTimerCancellationTokenSource != null)
             {
 #if NET8_0_OR_GREATER
@@ -290,8 +289,11 @@ public partial class NatsConnection : INatsConnection
 #endif
             }
 
+            // Drain subscriptions and flush the writer before tearing down
+            // the socket so UNSUB/PING/PONG and pending acks can land.
             await _subscriptionManager.DisposeAsync().ConfigureAwait(false);
             await CommandWriter.DisposeAsync().ConfigureAwait(false);
+            await DisposeSocketAsync(false).ConfigureAwait(false);
             _waitForOpenConnection.TrySetCanceled();
 #if NET8_0_OR_GREATER
             await _disposedCts.CancelAsync().ConfigureAwait(false);

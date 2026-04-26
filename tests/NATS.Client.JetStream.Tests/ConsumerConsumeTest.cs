@@ -358,6 +358,79 @@ public class ConsumerConsumeTest
     }
 
     [Fact]
+    public async Task Consume_connection_dispose_drains_buffered_messages()
+    {
+        // Disposing the connection while a consume loop is mid-flight must
+        // drain the buffered messages and let the loop ack them, not race
+        // CommandWriter teardown and throw ObjectDisposedException.
+        const int totalMsgs = 100;
+        const int pullBatch = 20;
+        const int bailAt = 10;
+
+        var prefix = _server.GetNextId();
+        var streamName = $"{prefix}s1";
+        var subject = $"{prefix}s1.x";
+        var consumerName = $"{prefix}c1";
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+
+        await using (var setup = new NatsConnection(new NatsOpts { Url = _server.Url }))
+        {
+            var setupJs = new NatsJSContext(setup);
+            var stream = await setupJs.CreateStreamAsync(new StreamConfig(streamName, [subject]), cts.Token);
+
+            for (var i = 0; i < totalMsgs; i++)
+                (await setupJs.PublishAsync(subject, $"msg-{i}", cancellationToken: cts.Token)).EnsureSuccess();
+
+            await stream.CreateOrUpdateConsumerAsync(new ConsumerConfig(consumerName), cts.Token);
+        }
+
+        var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var js = new NatsJSContext(nats);
+        var consumer = await js.GetConsumerAsync(streamName, consumerName, cts.Token);
+
+        var consumeTask = Task.Run(
+            async () =>
+            {
+                var count = 0;
+                await foreach (var msg in consumer.ConsumeAsync<string>(opts: new NatsJSConsumeOpts { MaxMsgs = pullBatch }, cancellationToken: cts.Token))
+                {
+                    count++;
+                    await msg.AckAsync(cancellationToken: cts.Token);
+                    await Task.Delay(50, cts.Token);
+                }
+
+                return count;
+            },
+            cts.Token);
+
+        await Retry.Until(
+            $"AckFloor >= {bailAt}",
+            async () =>
+            {
+                var c = await js.GetConsumerAsync(streamName, consumerName, cts.Token);
+                return c.Info.AckFloor.ConsumerSeq >= bailAt;
+            },
+            retryDelay: TimeSpan.FromMilliseconds(50),
+            timeout: TimeSpan.FromSeconds(30));
+
+        await nats.DisposeAsync();
+
+        var consumed = await consumeTask;
+
+        // Reader should have drained the entire pulled batch and acked each.
+        Assert.Equal(pullBatch, consumed);
+
+        await using var check = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var checkJs = new NatsJSContext(check);
+        var info = (await checkJs.GetConsumerAsync(streamName, consumerName, cts.Token)).Info;
+
+        Assert.Equal(0, info.NumAckPending);
+        Assert.Equal((ulong)pullBatch, (ulong)info.AckFloor.ConsumerSeq);
+        Assert.Equal((ulong)(totalMsgs - pullBatch), info.NumPending);
+    }
+
+    [Fact]
     public async Task Consume_stop_test()
     {
         await using var nats = _server.CreateNatsConnection();

@@ -404,6 +404,11 @@ public abstract class NatsSubBase
         {
             _logger.LogWarning(NatsLogEvents.Subscription, e, "Error while completing subscription");
         }
+
+        // Hook for subclasses to wait for an active user reader (e.g. an
+        // await-foreach loop) to drain the channel before the connection
+        // tears down the writer/socket.
+        await WaitForReaderDrainAsync().ConfigureAwait(false);
     }
 
     /// <summary>
@@ -437,6 +442,12 @@ public abstract class NatsSubBase
     /// <param name="payloadBuffer">Raw payload bytes.</param>
     /// <returns></returns>
     protected abstract ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer);
+
+    /// <summary>
+    /// Subclasses override to wait for the user-side reader to finish
+    /// draining buffered messages. Default is no-op.
+    /// </summary>
+    protected virtual ValueTask WaitForReaderDrainAsync() => default;
 
     /// <summary>
     /// Resets the slow consumer state if the channel has drained, allowing another
