@@ -367,47 +367,53 @@ public abstract class NatsSubBase
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous drain operation.</returns>
     internal async ValueTask DrainAsync()
     {
+        var needsUnsub = false;
         lock (_gate)
         {
-            if (_unsubscribed)
-                return;
-            _unsubscribed = true;
+            if (!_unsubscribed)
+            {
+                _unsubscribed = true;
+                needsUnsub = true;
+            }
         }
 
-        _timeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-        _idleTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-        _startUpTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-
-        // Send UNSUB to the server and remove from subscription manager.
-        // This stops the server from sending new messages for this subscription.
-        await _manager.RemoveAsync(this).ConfigureAwait(false);
-
-        // PING/PONG round-trip: after we get the PONG back, we know the server
-        // has processed our UNSUB and the socket reader has processed all messages
-        // that were in-flight before the UNSUB was received by the server.
-        try
+        if (needsUnsub)
         {
-            using var pingCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            await Connection.PingAsync(pingCts.Token).ConfigureAwait(false);
-        }
-        catch (Exception e)
-        {
-            _logger.LogWarning(NatsLogEvents.Subscription, e, "Error during drain ping");
+            _timeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+            _idleTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+            _startUpTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+
+            // Send UNSUB to the server and remove from subscription manager.
+            // This stops the server from sending new messages for this subscription.
+            await _manager.RemoveAsync(this).ConfigureAwait(false);
+
+            // PING/PONG round-trip: after we get the PONG back, we know the server
+            // has processed our UNSUB and the socket reader has processed all messages
+            // that were in-flight before the UNSUB was received by the server.
+            try
+            {
+                using var pingCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                await Connection.PingAsync(pingCts.Token).ConfigureAwait(false);
+            }
+            catch (Exception e)
+            {
+                _logger.LogWarning(NatsLogEvents.Subscription, e, "Error during drain ping");
+            }
+
+            // Now it's safe to complete the channel, no more messages will arrive.
+            try
+            {
+                TryComplete();
+            }
+            catch (Exception e)
+            {
+                _logger.LogWarning(NatsLogEvents.Subscription, e, "Error while completing subscription");
+            }
         }
 
-        // Now it's safe to complete the channel, no more messages will arrive.
-        try
-        {
-            TryComplete();
-        }
-        catch (Exception e)
-        {
-            _logger.LogWarning(NatsLogEvents.Subscription, e, "Error while completing subscription");
-        }
-
-        // Hook for subclasses to wait for an active user reader (e.g. an
-        // await-foreach loop) to drain the channel before the connection
-        // tears down the writer/socket.
+        // Always wait for an active user reader to drain the channel before
+        // returning, even if the subscription was already ended (e.g. via
+        // EndSubscription / UnsubscribeAsync) before drain was called.
         await WaitForReaderDrainAsync().ConfigureAwait(false);
     }
 

@@ -48,6 +48,8 @@ public partial class NatsConnection : INatsConnection
     private readonly ClientOpts _clientOpts;
     private readonly SubscriptionManager _subscriptionManager;
     private readonly ReplyTaskFactory _replyTaskFactory;
+    private readonly object _drainParticipantsGate = new();
+    private readonly HashSet<NatsSubBase> _drainParticipants = new();
 
     private ServerInfo? _writableServerInfo;
     private int _pongCount;
@@ -294,6 +296,7 @@ public partial class NatsConnection : INatsConnection
                 // Drain subs and flush the writer first so UNSUB/PING/PONG
                 // and any pending acks can land before the socket closes.
                 await _subscriptionManager.DisposeAsync().ConfigureAwait(false);
+                await DrainRemainingParticipantsAsync().ConfigureAwait(false);
                 await CommandWriter.DisposeAsync().ConfigureAwait(false);
                 await DisposeSocketAsync(false).ConfigureAwait(false);
             }
@@ -372,6 +375,18 @@ public partial class NatsConnection : INatsConnection
 
     // called only internally
     internal ValueTask SubscribeCoreAsync(int sid, string subject, string? queueGroup, int? maxMsgs, CancellationToken cancellationToken) => CommandWriter.SubscribeAsync(sid, subject, queueGroup, maxMsgs, cancellationToken);
+
+    internal void RegisterDrainParticipant(NatsSubBase sub)
+    {
+        lock (_drainParticipantsGate)
+            _drainParticipants.Add(sub);
+    }
+
+    internal void UnregisterDrainParticipant(NatsSubBase sub)
+    {
+        lock (_drainParticipantsGate)
+            _drainParticipants.Remove(sub);
+    }
 
     internal ValueTask UnsubscribeAsync(int sid)
     {
@@ -1151,5 +1166,23 @@ public partial class NatsConnection : INatsConnection
     {
         if (IsDisposed)
             throw new ObjectDisposedException(null);
+    }
+
+    // Drain subs that already removed themselves from the SubscriptionManager
+    // (e.g. JetStream Fetch on natural completion) but still have a user
+    // iterator reading the channel. Their own DrainAsync waits on the
+    // reader-exited signal.
+    private async ValueTask DrainRemainingParticipantsAsync()
+    {
+        NatsSubBase[] remaining;
+        lock (_drainParticipantsGate)
+        {
+            if (_drainParticipants.Count == 0)
+                return;
+            remaining = _drainParticipants.ToArray();
+        }
+
+        foreach (var sub in remaining)
+            await sub.DrainAsync().ConfigureAwait(false);
     }
 }

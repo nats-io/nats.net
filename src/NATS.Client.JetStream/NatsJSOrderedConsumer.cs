@@ -76,6 +76,9 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
             ulong seq = 0;
             while (!cancellationToken.IsCancellationRequested)
             {
+                if (_context.Connection is NatsConnection { IsDisposed: true })
+                    yield break;
+
                 var consumer = await RecreateConsumer(consumerName, seq, cancellationToken);
                 consumerName = consumer.Info.Name;
                 _logger.LogInformation(NatsJSLogEvents.NewConsumer, "Created {ConsumerName} with sequence {Seq}", consumerName, seq);

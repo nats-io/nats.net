@@ -162,11 +162,18 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         _hbTimer.Change(_hbTimeout, Timeout.Infinite);
     }
 
-    public void MarkReaderActive() => Interlocked.Exchange(ref _readerActive, 1);
+    public void MarkReaderActive()
+    {
+        Interlocked.Exchange(ref _readerActive, 1);
+        if (Connection is NatsConnection nc)
+            nc.RegisterDrainParticipant(this);
+    }
 
     public void MarkReaderInactive()
     {
         Interlocked.Exchange(ref _readerActive, 0);
+        if (Connection is NatsConnection nc)
+            nc.UnregisterDrainParticipant(this);
         _readerExited.TrySetResult();
     }
 

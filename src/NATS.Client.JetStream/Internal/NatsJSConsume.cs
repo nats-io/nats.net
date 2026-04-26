@@ -199,11 +199,18 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
 
     public void ResetHeartbeatTimer() => _timer.Change(_hbTimeout, _hbTimeout);
 
-    public void MarkReaderActive() => Interlocked.Exchange(ref _readerActive, 1);
+    public void MarkReaderActive()
+    {
+        Interlocked.Exchange(ref _readerActive, 1);
+        if (Connection is NatsConnection nc)
+            nc.RegisterDrainParticipant(this);
+    }
 
     public void MarkReaderInactive()
     {
         Interlocked.Exchange(ref _readerActive, 0);
+        if (Connection is NatsConnection nc)
+            nc.UnregisterDrainParticipant(this);
         _readerExited.TrySetResult();
     }
 
