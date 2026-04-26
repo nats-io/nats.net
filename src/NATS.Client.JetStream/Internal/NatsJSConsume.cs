@@ -314,9 +314,12 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         if (Volatile.Read(ref _readerActive) == 0)
             return;
 
+        if (Connection.Opts.ConsumerDrainOnDisposeTimeout is not { } timeout)
+            return;
+
         try
         {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var cts = new CancellationTokenSource(timeout);
             await _readerExited.Task.WaitAsync(cts.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException)

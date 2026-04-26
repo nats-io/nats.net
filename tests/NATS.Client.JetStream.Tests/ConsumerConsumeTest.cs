@@ -385,7 +385,12 @@ public class ConsumerConsumeTest
             await stream.CreateOrUpdateConsumerAsync(new ConsumerConfig(consumerName), cts.Token);
         }
 
-        var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var nats = new NatsConnection(new NatsOpts
+        {
+            Url = _server.Url,
+            DrainSubscriptionsOnDispose = true,
+            ConsumerDrainOnDisposeTimeout = TimeSpan.FromSeconds(30),
+        });
         var js = new NatsJSContext(nats);
         var consumer = await js.GetConsumerAsync(streamName, consumerName, cts.Token);
 

@@ -289,11 +289,21 @@ public partial class NatsConnection : INatsConnection
 #endif
             }
 
-            // Drain subscriptions and flush the writer before tearing down
-            // the socket so UNSUB/PING/PONG and pending acks can land.
-            await _subscriptionManager.DisposeAsync().ConfigureAwait(false);
-            await CommandWriter.DisposeAsync().ConfigureAwait(false);
-            await DisposeSocketAsync(false).ConfigureAwait(false);
+            if (Opts.DrainSubscriptionsOnDispose)
+            {
+                // Drain subs and flush the writer first so UNSUB/PING/PONG
+                // and any pending acks can land before the socket closes.
+                await _subscriptionManager.DisposeAsync().ConfigureAwait(false);
+                await CommandWriter.DisposeAsync().ConfigureAwait(false);
+                await DisposeSocketAsync(false).ConfigureAwait(false);
+            }
+            else
+            {
+                await DisposeSocketAsync(false).ConfigureAwait(false);
+                await _subscriptionManager.DisposeAsync().ConfigureAwait(false);
+                await CommandWriter.DisposeAsync().ConfigureAwait(false);
+            }
+
             _waitForOpenConnection.TrySetCanceled();
 #if NET8_0_OR_GREATER
             await _disposedCts.CancelAsync().ConfigureAwait(false);

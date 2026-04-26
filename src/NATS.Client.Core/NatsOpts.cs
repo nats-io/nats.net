@@ -154,6 +154,31 @@ public sealed record NatsOpts
     public bool WaitUntilSent { get; init; } = false;
 
     /// <summary>
+    /// When true, <see cref="NatsConnection.DisposeAsync"/> drains subscriptions
+    /// and flushes the command writer before closing the socket. (default: false)
+    /// </summary>
+    /// <remarks>
+    /// With the default (false), the socket is closed first, which means UNSUB
+    /// and any pending writes (e.g. JetStream acks queued by a consume loop)
+    /// are dropped. Enable to let subscriptions drain cleanly on dispose.
+    /// Required for <see cref="ConsumerDrainOnDisposeTimeout"/> to be effective.
+    /// </remarks>
+    public bool DrainSubscriptionsOnDispose { get; init; } = false;
+
+    /// <summary>
+    /// When set, JetStream consumer/fetch dispose waits up to this timeout for
+    /// the user's consume loop to finish acking buffered messages before
+    /// returning. (default: null, no wait)
+    /// </summary>
+    /// <remarks>
+    /// Only effective when <see cref="DrainSubscriptionsOnDispose"/> is also
+    /// true. Without this wait, messages already delivered into the consumer
+    /// channel but not yet yielded by the user loop are dropped on dispose
+    /// and remain NumAckPending until AckWait expires.
+    /// </remarks>
+    public TimeSpan? ConsumerDrainOnDisposeTimeout { get; init; } = null;
+
+    /// <summary>
     /// Maximum number of reconnect attempts. (default: -1, unlimited)
     /// </summary>
     /// <remarks>
