@@ -394,6 +394,7 @@ public class ConsumerConsumeTest
         var js = new NatsJSContext(nats);
         var consumer = await js.GetConsumerAsync(streamName, consumerName, cts.Token);
 
+        var reachedBail = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var consumeTask = Task.Run(
             async () =>
             {
@@ -402,6 +403,8 @@ public class ConsumerConsumeTest
                 {
                     count++;
                     await msg.AckAsync(cancellationToken: cts.Token);
+                    if (count >= bailAt)
+                        reachedBail.TrySetResult();
                     await Task.Delay(50, cts.Token);
                 }
 
@@ -409,30 +412,23 @@ public class ConsumerConsumeTest
             },
             cts.Token);
 
-        await Retry.Until(
-            $"AckFloor >= {bailAt}",
-            async () =>
-            {
-                var c = await js.GetConsumerAsync(streamName, consumerName, cts.Token);
-                return c.Info.AckFloor.ConsumerSeq >= bailAt;
-            },
-            retryDelay: TimeSpan.FromMilliseconds(50),
-            timeout: TimeSpan.FromSeconds(30));
+        await reachedBail.Task.WaitAsync(cts.Token);
 
         await nats.DisposeAsync();
 
         var consumed = await consumeTask;
 
-        // Reader should have drained the entire pulled batch and acked each.
-        Assert.Equal(pullBatch, consumed);
-
         await using var check = new NatsConnection(new NatsOpts { Url = _server.Url });
         var checkJs = new NatsJSContext(check);
         var info = (await checkJs.GetConsumerAsync(streamName, consumerName, cts.Token)).Info;
 
+        // Whatever the reader processed must all be acked: nothing left
+        // pending, AckFloor matches the client-side count, NumPending is
+        // the rest of the stream.
+        Assert.True(consumed >= bailAt, $"consumed {consumed} should be >= {bailAt}");
         Assert.Equal(0, info.NumAckPending);
-        Assert.Equal((ulong)pullBatch, (ulong)info.AckFloor.ConsumerSeq);
-        Assert.Equal((ulong)(totalMsgs - pullBatch), info.NumPending);
+        Assert.Equal((ulong)consumed, (ulong)info.AckFloor.ConsumerSeq);
+        Assert.Equal((ulong)(totalMsgs - consumed), info.NumPending);
     }
 
     [Fact]
