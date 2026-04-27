@@ -36,5 +36,14 @@ await using var nats = new NatsConnection(opts);
 Both default to off, so existing apps see no behavior change. Turn them
 on if you want a clean shutdown without redeliveries.
 
+## A note on resilience
+
+You do not lose messages either way. JetStream redelivers anything that
+wasn't acked once `AckWait` expires, which is the whole point of
+at-least-once delivery. The old default is still correct, just noisier:
+a graceful shutdown can cause redeliveries you didn't actually need.
+For most apps that's fine. These options are for when you want shutdown
+to be precise rather than just safe.
+
 Applies to `Consume`, `Fetch`, and ordered consumer loops in
 `NATS.Client.JetStream`. Lands in `2.8.0`.
