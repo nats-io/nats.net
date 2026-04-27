@@ -328,7 +328,7 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
     public static NatsMsg<T> Build(
         string subject,
         string? replyTo,
-        in ReadOnlySequence<byte>? headersBuffer,
+        in ReadOnlySequence<byte> headersBuffer,
         in ReadOnlySequence<byte> payloadBuffer,
         INatsConnection? connection,
         NatsHeaderParser headerParser,
@@ -346,21 +346,21 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
             }
         }
 
-        if (headersBuffer != null)
+        if (headersBuffer.Length > 0)
         {
             headers = new NatsHeaders();
 
             try
             {
                 // Parsing can also throw an exception.
-                if (!headerParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), headers))
+                if (!headerParser.ParseHeaders(new SequenceReader<byte>(headersBuffer), headers))
                 {
                     throw new NatsException("Error parsing headers");
                 }
             }
             catch (Exception e)
             {
-                headers.Error ??= new NatsHeaderParseException(headersBuffer.Value.ToArray(), e);
+                headers.Error ??= new NatsHeaderParseException(headersBuffer.ToArray(), e);
             }
         }
 
@@ -368,7 +368,7 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
 
         var size = subject.Length
                    + (replyTo?.Length ?? 0)
-                   + (headersBuffer?.Length ?? 0)
+                   + headersBuffer.Length
                    + payloadBuffer.Length;
 
         if (Telemetry.HasListeners())
