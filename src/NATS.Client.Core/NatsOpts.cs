@@ -158,10 +158,21 @@ public sealed record NatsOpts
     /// and flushes the command writer before closing the socket. (default: false)
     /// </summary>
     /// <remarks>
+    /// <para>
     /// With the default (false), the socket is closed first, which means UNSUB
     /// and any pending writes (e.g. JetStream acks queued by a consume loop)
     /// are dropped. Enable to let subscriptions drain cleanly on dispose.
     /// Required for <see cref="ConsumerDrainOnDisposeTimeout"/> to be effective.
+    /// </para>
+    /// <para>
+    /// Drain mechanism: each subscription sends UNSUB, then a PING and waits
+    /// for the PONG (up to 5 seconds). Once the PONG arrives the server has
+    /// processed UNSUB and the socket reader has delivered any messages the
+    /// server sent before that, so completing the user channel afterwards
+    /// won't drop in-flight messages. Dispose therefore blocks for at most
+    /// one round-trip per drained subscription, plus the
+    /// <see cref="ConsumerDrainOnDisposeTimeout"/> wait if set.
+    /// </para>
     /// </remarks>
     public bool DrainSubscriptionsOnDispose { get; init; } = false;
 
