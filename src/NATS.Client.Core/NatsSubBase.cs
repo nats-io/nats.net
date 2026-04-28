@@ -395,20 +395,13 @@ public abstract class NatsSubBase
                 using var pingCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
                 await Connection.PingAsync(pingCts.Token).ConfigureAwait(false);
             }
-            catch (Exception e)
+            catch (OperationCanceledException)
             {
-                _logger.LogWarning(NatsLogEvents.Subscription, e, "Error during drain ping");
+                // 5s timeout reached or connection cancelled mid-dispose. Expected on dispose path.
             }
 
             // Now it's safe to complete the channel, no more messages will arrive.
-            try
-            {
-                TryComplete();
-            }
-            catch (Exception e)
-            {
-                _logger.LogWarning(NatsLogEvents.Subscription, e, "Error while completing subscription");
-            }
+            TryComplete();
         }
 
         // Always wait for an active user reader to drain the channel before
