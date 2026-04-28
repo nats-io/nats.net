@@ -32,11 +32,9 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
     private readonly long _thresholdBytes;
 
     private readonly object _pendingGate = new();
-    private readonly TaskCompletionSource _readerExited = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private long _pendingMsgs;
     private long _pendingBytes;
     private int _disposed;
-    private int _readerActive;
 
     public NatsJSOrderedConsume(
         long maxMsgs,
@@ -134,21 +132,6 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
 
     public void ResetHeartbeatTimer() => _timer.Change(_hbTimeout, Timeout.Infinite);
 
-    public void MarkReaderActive()
-    {
-        Interlocked.Exchange(ref _readerActive, 1);
-        if (Connection is NatsConnection nc)
-            nc.RegisterDrainParticipant(this);
-    }
-
-    public void MarkReaderInactive()
-    {
-        Interlocked.Exchange(ref _readerActive, 0);
-        if (Connection is NatsConnection nc)
-            nc.UnregisterDrainParticipant(this);
-        _readerExited.TrySetResult();
-    }
-
     public override async ValueTask DisposeAsync()
     {
         Interlocked.Exchange(ref _disposed, 1);
@@ -156,8 +139,6 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
         _context.Connection.ConnectionDisconnected -= ConnectionOnConnectionDisconnected;
         try
         {
-            // Drain (UNSUB -> PING/PONG -> TryComplete) is no-op unless
-            // DrainSubscriptionsOnDispose is enabled.
             await DrainAsync().ConfigureAwait(false);
             await base.DisposeAsync().ConfigureAwait(false);
         }
@@ -176,25 +157,6 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
     {
         // Override normal subscription behavior to resubscribe on reconnect
         return default;
-    }
-
-    protected override async ValueTask WaitForReaderDrainAsync()
-    {
-        if (Volatile.Read(ref _readerActive) == 0)
-            return;
-
-        if (Connection.Opts.ConsumerDrainOnDisposeTimeout is not { } timeout)
-            return;
-
-        try
-        {
-            using var cts = new CancellationTokenSource(timeout);
-            await _readerExited.Task.WaitAsync(cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogWarning(NatsJSLogEvents.Internal, "Timeout waiting for ordered-consume reader to exit on dispose");
-        }
     }
 
     protected override async ValueTask ReceiveInternalAsync(

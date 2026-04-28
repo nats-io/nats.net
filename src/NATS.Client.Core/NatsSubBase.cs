@@ -50,6 +50,7 @@ public abstract class NatsSubBase
     private int _pendingMsgs;
     private Exception? _exception;
     private int _isSlowConsumer;
+    private TaskCompletionSource? _readerExited;
 
     /// <summary>
     /// Creates a new instance of <see cref="NatsSubBase"/>.
@@ -439,6 +440,33 @@ public abstract class NatsSubBase
     internal virtual ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter, int sid) => commandWriter.SubscribeAsync(sid, Subject, QueueGroup, PendingMsgs, CancellationToken.None);
 
     /// <summary>
+    /// Marks the user-side reader as active so dispose can wait for it to
+    /// drain buffered messages before completing. Pairs with
+    /// <see cref="MarkReaderInactive"/>.
+    /// </summary>
+    internal void MarkReaderActive()
+    {
+        if (_readerExited is null)
+        {
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            Interlocked.CompareExchange(ref _readerExited, tcs, null);
+        }
+
+        if (Connection is NatsConnection nc)
+            nc.RegisterDrainParticipant(this);
+    }
+
+    /// <summary>
+    /// Signals the user-side reader has exited. Pairs with <see cref="MarkReaderActive"/>.
+    /// </summary>
+    internal void MarkReaderInactive()
+    {
+        if (Connection is NatsConnection nc)
+            nc.UnregisterDrainParticipant(this);
+        _readerExited?.TrySetResult();
+    }
+
+    /// <summary>
     /// Invoked when a MSG or HMSG arrives for the subscription.
     /// <remarks>
     /// This method is invoked while reading from the socket. Buffers belong to the socket reader and you should process them as quickly as possible or create a copy before you return from this method.
@@ -452,10 +480,19 @@ public abstract class NatsSubBase
     protected abstract ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer);
 
     /// <summary>
-    /// Subclasses override to wait for the user-side reader to finish
-    /// draining buffered messages. Default is no-op.
+    /// Waits for the user-side reader to exit so buffered messages can be
+    /// drained on dispose. No-op when the reader was never marked active or
+    /// when <see cref="NatsOpts.ConsumerDrainOnDisposeTimeout"/> is unset.
     /// </summary>
-    protected virtual ValueTask WaitForReaderDrainAsync() => default;
+    protected virtual ValueTask WaitForReaderDrainAsync()
+    {
+        var tcs = _readerExited;
+        if (tcs is null || tcs.Task.IsCompleted)
+            return default;
+        if (Connection.Opts.ConsumerDrainOnDisposeTimeout is not { } timeout)
+            return default;
+        return WaitForReaderDrainCoreAsync(tcs.Task, timeout);
+    }
 
     /// <summary>
     /// Resets the slow consumer state if the channel has drained, allowing another
@@ -547,5 +584,18 @@ public abstract class NatsSubBase
         UnsubscribeAsync();
 #pragma warning restore VSTHRD110
 #pragma warning restore CA2012
+    }
+
+    private async ValueTask WaitForReaderDrainCoreAsync(Task task, TimeSpan timeout)
+    {
+        try
+        {
+            using var cts = new CancellationTokenSource(timeout);
+            await task.WaitAsync(cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogWarning(NatsLogEvents.Subscription, "Timeout waiting for subscription reader to exit on dispose");
+        }
     }
 }

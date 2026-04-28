@@ -30,11 +30,9 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
     private readonly TimeSpan _idle;
     private readonly long _hbTimeout;
 
-    private readonly TaskCompletionSource _readerExited = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private long _pendingMsgs;
     private long _pendingBytes;
     private int _disposed;
-    private int _readerActive;
 
     public NatsJSFetch(
         long maxMsgs,
@@ -162,28 +160,11 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         _hbTimer.Change(_hbTimeout, Timeout.Infinite);
     }
 
-    public void MarkReaderActive()
-    {
-        Interlocked.Exchange(ref _readerActive, 1);
-        if (Connection is NatsConnection nc)
-            nc.RegisterDrainParticipant(this);
-    }
-
-    public void MarkReaderInactive()
-    {
-        Interlocked.Exchange(ref _readerActive, 0);
-        if (Connection is NatsConnection nc)
-            nc.UnregisterDrainParticipant(this);
-        _readerExited.TrySetResult();
-    }
-
     public override async ValueTask DisposeAsync()
     {
         Interlocked.Exchange(ref _disposed, 1);
         try
         {
-            // Drain (UNSUB -> PING/PONG -> TryComplete) is no-op unless
-            // DrainSubscriptionsOnDispose is enabled.
             await DrainAsync().ConfigureAwait(false);
             await base.DisposeAsync().ConfigureAwait(false);
         }
@@ -225,25 +206,6 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
             replyTo: Subject,
             serializer: NatsJSJsonSerializer<ConsumerGetnextRequest>.Default,
             cancellationToken: CancellationToken.None);
-    }
-
-    protected override async ValueTask WaitForReaderDrainAsync()
-    {
-        if (Volatile.Read(ref _readerActive) == 0)
-            return;
-
-        if (Connection.Opts.ConsumerDrainOnDisposeTimeout is not { } timeout)
-            return;
-
-        try
-        {
-            using var cts = new CancellationTokenSource(timeout);
-            await _readerExited.Task.WaitAsync(cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogWarning(NatsJSLogEvents.Internal, "Timeout waiting for fetch reader to exit on dispose");
-        }
     }
 
     protected override async ValueTask ReceiveInternalAsync(

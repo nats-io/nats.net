@@ -78,11 +78,8 @@ public class ConsumerFetchTest
         Assert.Equal(10, count);
     }
 
-    // Canary for the dispose race in JetStream fetch/consume/ordered-consume:
-    // messages in-flight when DisposeAsync is called must all reach the
-    // channel before it completes. If this test starts flapping, check the
-    // DrainAsync pattern in NatsSubBase and the DisposeAsync overrides in
-    // NatsJSFetch, NatsJSConsume, NatsJSOrderedConsume.
+    // Canary for the dispose race: messages in-flight when DisposeAsync is
+    // called must all reach the channel before it completes.
     [Theory]
 
     // TODO: Fix this test
