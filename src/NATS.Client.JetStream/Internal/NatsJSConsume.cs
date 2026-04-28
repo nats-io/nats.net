@@ -237,8 +237,8 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         Interlocked.Exchange(ref _disposed, 1);
         try
         {
-            // Drain: UNSUB -> PING/PONG -> TryComplete, so all in-flight
-            // messages are written to the channel before it's completed.
+            // Drain (UNSUB -> PING/PONG -> TryComplete) is no-op unless
+            // DrainSubscriptionsOnDispose is enabled.
             await DrainAsync().ConfigureAwait(false);
             await base.DisposeAsync().ConfigureAwait(false);
         }

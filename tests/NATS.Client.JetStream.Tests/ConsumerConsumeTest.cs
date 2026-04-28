@@ -277,7 +277,11 @@ public class ConsumerConsumeTest
     [Fact]
     public async Task Consume_dispose_test()
     {
-        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await using var nats = new NatsConnection(new NatsOpts
+        {
+            Url = _server.Url,
+            DrainSubscriptionsOnDispose = true,
+        });
         var prefix = _server.GetNextId();
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));

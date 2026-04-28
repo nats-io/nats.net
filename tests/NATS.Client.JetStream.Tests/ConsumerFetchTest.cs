@@ -90,7 +90,12 @@ public class ConsumerFetchTest
     [InlineData(NatsRequestReplyMode.SharedInbox)]
     public async Task Fetch_dispose_test(NatsRequestReplyMode mode)
     {
-        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
+        await using var nats = new NatsConnection(new NatsOpts
+        {
+            Url = _server.Url,
+            RequestReplyMode = mode,
+            DrainSubscriptionsOnDispose = true,
+        });
         var prefix = _server.GetNextId();
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));

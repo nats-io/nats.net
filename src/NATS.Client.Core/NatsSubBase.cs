@@ -364,9 +364,18 @@ public abstract class NatsSubBase
     /// This avoids the race where TryComplete() closes the channel while
     /// the socket reader is still delivering messages.
     /// </summary>
+    /// <remarks>
+    /// No-op unless <see cref="NatsOpts.DrainSubscriptionsOnDispose"/> is
+    /// enabled. The connection-level dispose path also gates entry into
+    /// this method on the same flag (see ordering in
+    /// <see cref="NatsConnection.DisposeAsync"/>).
+    /// </remarks>
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous drain operation.</returns>
     internal async ValueTask DrainAsync()
     {
+        if (!Connection.Opts.DrainSubscriptionsOnDispose)
+            return;
+
         var needsUnsub = false;
         lock (_gate)
         {
