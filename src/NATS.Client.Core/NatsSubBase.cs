@@ -402,12 +402,12 @@ public abstract class NatsSubBase
             // that were in-flight before the UNSUB was received by the server.
             try
             {
-                using var pingCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                using var pingCts = new CancellationTokenSource(Connection.Opts.DrainPingTimeout);
                 await Connection.PingAsync(pingCts.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
-                // 5s timeout reached or connection cancelled mid-dispose. Expected on dispose path.
+                // Timeout reached or connection cancelled mid-dispose. Expected on dispose path.
             }
 
             // Now it's safe to complete the channel, no more messages will arrive.

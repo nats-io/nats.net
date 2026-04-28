@@ -1171,18 +1171,22 @@ public partial class NatsConnection : INatsConnection
     // Drain subs that already removed themselves from the SubscriptionManager
     // (e.g. JetStream Fetch on natural completion) but still have a user
     // iterator reading the channel. Their own DrainAsync waits on the
-    // reader-exited signal.
-    private async ValueTask DrainRemainingParticipantsAsync()
+    // reader-exited signal. Run in parallel so a slow/dead server doesn't
+    // multiply the dispose wait by the number of subs.
+    private ValueTask DrainRemainingParticipantsAsync()
     {
         NatsSubBase[] remaining;
         lock (_drainParticipantsGate)
         {
             if (_drainParticipants.Count == 0)
-                return;
+                return default;
             remaining = _drainParticipants.ToArray();
         }
 
-        foreach (var sub in remaining)
-            await sub.DrainAsync().ConfigureAwait(false);
+        var tasks = new Task[remaining.Length];
+        for (var i = 0; i < remaining.Length; i++)
+            tasks[i] = remaining[i].DrainAsync().AsTask();
+
+        return new ValueTask(Task.WhenAll(tasks));
     }
 }

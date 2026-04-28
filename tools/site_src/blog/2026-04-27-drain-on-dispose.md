@@ -22,6 +22,9 @@ There are now two opt-in options on `NatsOpts` to control this:
   consumer and fetch dispose waits up to this timeout for the user's
   consume loop to finish acking the buffered messages before returning.
   Only effective when `DrainSubscriptionsOnDispose` is also `true`.
+- `DrainPingTimeout` (default `5s`). Per-subscription PING/PONG timeout
+  used during drain. Increase for high-latency networks where a single
+  round-trip can exceed the default.
 
 ```csharp
 var opts = NatsOpts.Default with
