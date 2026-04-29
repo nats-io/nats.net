@@ -36,7 +36,11 @@ internal sealed class CommandWriter : IAsyncDisposable
     private readonly NatsConnection _connection;
     private readonly ObjectPool _pool;
     private readonly int _arrayPoolInitialSize;
+#if NET9_0_OR_GREATER
+    private readonly System.Threading.Lock _lock = new();
+#else
     private readonly object _lock = new();
+#endif
     private readonly CancellationTokenSource _cts;
     private readonly ConnectionStatsCounter _counter;
     private readonly Memory<byte> _consolidateMem = new byte[SendMemSize].AsMemory();
@@ -957,7 +961,11 @@ internal sealed class CommandWriter : IAsyncDisposable
     private class PartialSendFailureCounter
     {
         private const int MaxRetry = 1;
+#if NET9_0_OR_GREATER
+        private readonly System.Threading.Lock _gate = new();
+#else
         private readonly object _gate = new();
+#endif
         private int _count;
 
         public bool Failed()

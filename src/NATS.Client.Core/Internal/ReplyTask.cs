@@ -7,7 +7,11 @@ namespace NATS.Client.Core.Internal;
 
 internal sealed class ReplyTask<T> : ReplyTaskBase, IDisposable
 {
+#if NET9_0_OR_GREATER
+    private readonly System.Threading.Lock _gate;
+#else
     private readonly object _gate;
+#endif
     private readonly ReplyTaskFactory _factory;
     private readonly long _id;
     private readonly NatsConnection _connection;
@@ -25,7 +29,11 @@ internal sealed class ReplyTask<T> : ReplyTaskBase, IDisposable
         _deserializer = deserializer;
         _requestTimeout = requestTimeout;
         _tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+#if NET9_0_OR_GREATER
+        _gate = new System.Threading.Lock();
+#else
         _gate = new object();
+#endif
     }
 
     public string Subject { get; }
