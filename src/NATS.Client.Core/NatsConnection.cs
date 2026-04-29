@@ -295,10 +295,16 @@ public partial class NatsConnection : INatsConnection
             {
                 // Drain subs and flush the writer first so UNSUB/PING/PONG
                 // and any pending acks can land before the socket closes.
-                await _subscriptionManager.DisposeAsync().ConfigureAwait(false);
-                await DrainRemainingParticipantsAsync().ConfigureAwait(false);
-                await CommandWriter.DisposeAsync().ConfigureAwait(false);
-                await DisposeSocketAsync(false).ConfigureAwait(false);
+                try
+                {
+                    await _subscriptionManager.DisposeAsync().ConfigureAwait(false);
+                }
+                finally
+                {
+                    await DrainRemainingParticipantsAsync().ConfigureAwait(false);
+                    await CommandWriter.DisposeAsync().ConfigureAwait(false);
+                    await DisposeSocketAsync(false).ConfigureAwait(false);
+                }
             }
             else
             {

@@ -422,7 +422,8 @@ public abstract class NatsSubBase
             }
 
             // Remove from routing now that no more messages can arrive for this SID.
-            mgr?.RemoveFromRouting(sid);
+            if (sid != -1)
+                mgr?.RemoveFromRouting(sid);
 
             // Now it's safe to complete the channel, no more messages will arrive.
             TryComplete();
