@@ -34,7 +34,6 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
     private readonly object _pendingGate = new();
     private long _pendingMsgs;
     private long _pendingBytes;
-    private int _disposed;
 
     public NatsJSOrderedConsume(
         long maxMsgs,
@@ -134,8 +133,6 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
 
     public override async ValueTask DisposeAsync()
     {
-        Interlocked.Exchange(ref _disposed, 1);
-
         _context.Connection.ConnectionDisconnected -= ConnectionOnConnectionDisconnected;
         try
         {

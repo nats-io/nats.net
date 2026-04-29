@@ -32,7 +32,6 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
 
     private long _pendingMsgs;
     private long _pendingBytes;
-    private int _disposed;
 
     public NatsJSFetch(
         long maxMsgs,
@@ -162,7 +161,6 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
 
     public override async ValueTask DisposeAsync()
     {
-        Interlocked.Exchange(ref _disposed, 1);
         try
         {
             await DrainAsync().ConfigureAwait(false);

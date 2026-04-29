@@ -45,7 +45,6 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
     private readonly object _pendingGate = new();
     private long _pendingMsgs;
     private long _pendingBytes;
-    private int _disposed;
     private int _consecutive503Errors;
 
     public NatsJSConsume(
@@ -217,7 +216,6 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
 
     public override async ValueTask DisposeAsync()
     {
-        Interlocked.Exchange(ref _disposed, 1);
         try
         {
             await DrainAsync().ConfigureAwait(false);
