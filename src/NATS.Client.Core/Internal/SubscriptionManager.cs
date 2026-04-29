@@ -100,18 +100,17 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
         }
 
         int? orphanSid = null;
+        NatsSubBase? targetSub = null;
         lock (_gate)
         {
             if (_bySid.TryGetValue(sid, out var sidMetadata))
             {
-                if (sidMetadata.WeakReference.TryGetTarget(out var sub))
+                if (sidMetadata.WeakReference.TryGetTarget(out targetSub))
                 {
                     if (_trace)
                     {
                         _logger.LogTrace(NatsLogEvents.Subscription, "Found subscription handler for {Subject}/{Sid}", subject, sid);
                     }
-
-                    return sub.ReceiveAsync(subject, replyTo, headersBuffer, payloadBuffer);
                 }
                 else
                 {
@@ -128,6 +127,11 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
                 // Note this log level was set to warning before, however, it is not an error condition and can happen in normal operation, so debug is more appropriate.
                 _logger.LogDebug(NatsLogEvents.Subscription, "Can\'t find subscription for {Subject}/{Sid}", subject, sid);
             }
+        }
+
+        if (targetSub != null)
+        {
+            return targetSub.ReceiveAsync(subject, replyTo, headersBuffer, payloadBuffer);
         }
 
         if (orphanSid != null)
