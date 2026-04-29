@@ -14,7 +14,11 @@ public class NatsJSConsumer : INatsJSConsumer
     private readonly NatsJSContext _context;
     private readonly string _stream;
     private readonly string _consumer;
+#if NET9_0_OR_GREATER
+    private readonly System.Threading.Lock _pinIdLock = new();
+#else
     private readonly object _pinIdLock = new();
+#endif
     private volatile bool _deleted;
     private string? _pinId;
 

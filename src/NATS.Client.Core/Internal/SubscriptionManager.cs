@@ -15,7 +15,11 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
     private readonly ILogger<SubscriptionManager> _logger;
     private readonly bool _trace;
     private readonly bool _debug;
+#if NET9_0_OR_GREATER
+    private readonly System.Threading.Lock _gate = new();
+#else
     private readonly object _gate = new();
+#endif
     private readonly NatsConnection _connection;
     private readonly string _inboxPrefix;
     private readonly ConcurrentDictionary<int, SidMetadata> _bySid = new();

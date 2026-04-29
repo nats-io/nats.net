@@ -36,7 +36,11 @@ public partial class NatsConnection : INatsConnection
 #pragma warning disable SA1401
     internal readonly ConnectionStatsCounter Counter; // allow to call from external sources
 #pragma warning restore SA1401
+#if NET9_0_OR_GREATER
+    private readonly System.Threading.Lock _gate = new();
+#else
     private readonly object _gate = new object();
+#endif
     private readonly ILogger<NatsConnection> _logger;
     private readonly ObjectPool _pool;
     private readonly CancellationTokenSource _disposedCts;
