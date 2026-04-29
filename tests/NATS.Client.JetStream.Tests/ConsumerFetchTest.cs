@@ -1,5 +1,6 @@
 using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
+using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -77,6 +78,8 @@ public class ConsumerFetchTest
         Assert.Equal(10, count);
     }
 
+    // Canary for the dispose race: messages in-flight when DisposeAsync is
+    // called must all reach the channel before it completes.
     [Theory]
 
     // TODO: Fix this test
@@ -84,14 +87,25 @@ public class ConsumerFetchTest
     [InlineData(NatsRequestReplyMode.SharedInbox)]
     public async Task Fetch_dispose_test(NatsRequestReplyMode mode)
     {
-        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
+        await using var nats = new NatsConnection(new NatsOpts
+        {
+            Url = _server.Url,
+            RequestReplyMode = mode,
+            DrainSubscriptionsOnDispose = true,
+        });
         var prefix = _server.GetNextId();
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 
         var js = new NatsJSContext(nats);
-        var stream = await js.CreateStreamAsync($"{prefix}s1", new[] { $"{prefix}s1.*" }, cts.Token);
-        var consumer = (NatsJSConsumer)await js.CreateOrUpdateConsumerAsync($"{prefix}s1", $"{prefix}c1", cancellationToken: cts.Token);
+
+        var streamName = $"{prefix}s1";
+        var subjectSub = $"{prefix}s1.*";
+        var consumerName = $"{prefix}c1";
+        var subject = $"{prefix}s1.foo";
+
+        await js.CreateStreamAsync(streamName, [subjectSub], cts.Token);
+        var consumer = (NatsJSConsumer)await js.CreateOrUpdateConsumerAsync(streamName, consumerName, cancellationToken: cts.Token);
 
         var fetchOpts = new NatsJSFetchOpts
         {
@@ -102,7 +116,7 @@ public class ConsumerFetchTest
 
         for (var i = 0; i < 100; i++)
         {
-            var ack = await js.PublishAsync($"{prefix}s1.foo", new TestData { Test = i }, serializer: TestDataJsonSerializer<TestData>.Default, cancellationToken: cts.Token);
+            var ack = await js.PublishAsync(subject, new TestData { Test = i }, serializer: TestDataJsonSerializer<TestData>.Default, cancellationToken: cts.Token);
             ack.EnsureSuccess();
         }
 
@@ -133,7 +147,7 @@ public class ConsumerFetchTest
             "ack pending 9",
             async () =>
             {
-                var c = await js.GetConsumerAsync($"{prefix}s1", $"{prefix}c1", cts.Token);
+                var c = await js.GetConsumerAsync(streamName, consumerName, cts.Token);
                 _output.WriteLine($"pend1:{c.Info.NumAckPending}");
                 return c.Info.NumAckPending == 9;
             },
@@ -150,7 +164,7 @@ public class ConsumerFetchTest
             "ack pending 0",
             async () =>
             {
-                var c = await js.GetConsumerAsync($"{prefix}s1", $"{prefix}c1", cts.Token);
+                var c = await js.GetConsumerAsync(streamName, consumerName, cts.Token);
                 _output.WriteLine($"pend:{c.Info.NumAckPending}");
                 return c.Info.NumAckPending == 0;
             },
@@ -158,5 +172,74 @@ public class ConsumerFetchTest
             timeout: TimeSpan.FromSeconds(30));
         await consumer.RefreshAsync(cts.Token);
         Assert.Equal(0, consumer.Info.NumAckPending);
+    }
+
+    [Fact]
+    public async Task Fetch_connection_dispose_drains_buffered_messages()
+    {
+        const int totalMsgs = 100;
+        const int pullBatch = 20;
+        const int bailAt = 10;
+
+        var prefix = _server.GetNextId();
+        var streamName = $"{prefix}s1";
+        var subject = $"{prefix}s1.x";
+        var consumerName = $"{prefix}c1";
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+
+        await using (var setup = new NatsConnection(new NatsOpts { Url = _server.Url }))
+        {
+            var setupJs = new NatsJSContext(setup);
+            var stream = await setupJs.CreateStreamAsync(new StreamConfig(streamName, [subject]), cts.Token);
+
+            for (var i = 0; i < totalMsgs; i++)
+                (await setupJs.PublishAsync(subject, $"msg-{i}", cancellationToken: cts.Token)).EnsureSuccess();
+
+            await stream.CreateOrUpdateConsumerAsync(new ConsumerConfig(consumerName), cts.Token);
+        }
+
+        var nats = new NatsConnection(new NatsOpts
+        {
+            Url = _server.Url,
+            DrainSubscriptionsOnDispose = true,
+            ConsumerDrainOnDisposeTimeout = TimeSpan.FromSeconds(30),
+        });
+        var js = new NatsJSContext(nats);
+        var consumer = await js.GetConsumerAsync(streamName, consumerName, cts.Token);
+
+        var reachedBail = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var fetchTask = Task.Run(
+            async () =>
+            {
+                var count = 0;
+                var fetchOpts = new NatsJSFetchOpts { MaxMsgs = pullBatch, Expires = TimeSpan.FromSeconds(30) };
+                await foreach (var msg in consumer.FetchAsync<string>(fetchOpts, cancellationToken: cts.Token))
+                {
+                    count++;
+                    await msg.AckAsync(cancellationToken: cts.Token);
+                    if (count >= bailAt)
+                        reachedBail.TrySetResult();
+                    await Task.Delay(50, cts.Token);
+                }
+
+                return count;
+            },
+            cts.Token);
+
+        await reachedBail.Task.WaitAsync(cts.Token);
+
+        await nats.DisposeAsync();
+
+        var consumed = await fetchTask;
+
+        await using var check = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var checkJs = new NatsJSContext(check);
+        var info = (await checkJs.GetConsumerAsync(streamName, consumerName, cts.Token)).Info;
+
+        Assert.True(consumed >= bailAt, $"consumed {consumed} should be >= {bailAt}");
+        Assert.Equal(0, info.NumAckPending);
+        Assert.Equal((ulong)consumed, (ulong)info.AckFloor.ConsumerSeq);
+        Assert.Equal((ulong)(totalMsgs - consumed), info.NumPending);
     }
 }
