@@ -393,9 +393,16 @@ public abstract class NatsSubBase
             _idleTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
             _startUpTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
 
-            // Send UNSUB to the server and remove from subscription manager.
-            // This stops the server from sending new messages for this subscription.
-            await _manager.RemoveAsync(this).ConfigureAwait(false);
+            // For the built-in SubscriptionManager: send UNSUB but keep the SID in the routing
+            // table until after the PING/PONG round-trip, so messages already in the socket
+            // buffer are delivered before the channel is completed.
+            // For external managers: fall back to RemoveAsync (routing removed before PING).
+            var mgr = _manager as SubscriptionManager;
+            var sid = mgr != null
+                ? await mgr.UnsubscribeForDrainAsync(this).ConfigureAwait(false)
+                : -1;
+            if (mgr == null)
+                await _manager.RemoveAsync(this).ConfigureAwait(false);
 
             // PING/PONG round-trip: after we get the PONG back, we know the server
             // has processed our UNSUB and the socket reader has processed all messages
@@ -407,8 +414,15 @@ public abstract class NatsSubBase
             }
             catch (OperationCanceledException)
             {
-                // Timeout reached or connection cancelled mid-dispose. Expected on dispose path.
+                // Timeout via DrainPingTimeout. Expected on dispose path.
             }
+            catch (NatsException)
+            {
+                // Connection failed or disconnected during drain. Drain is best-effort.
+            }
+
+            // Remove from routing now that no more messages can arrive for this SID.
+            mgr?.RemoveFromRouting(sid);
 
             // Now it's safe to complete the channel, no more messages will arrive.
             TryComplete();
@@ -446,6 +460,9 @@ public abstract class NatsSubBase
     /// </summary>
     internal void MarkReaderActive()
     {
+        if (!Connection.Opts.DrainSubscriptionsOnDispose)
+            return;
+
         if (_readerExited is null)
         {
             var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
