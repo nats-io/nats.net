@@ -297,6 +297,36 @@ public class ManageStreamTest
         Assert.False(reRetrievedStream.Info.Config.AllowAtomicPublish);
     }
 
+    [SkipIfNatsServer(versionEarlierThan: "2.14")]
+    public async Task AllowBatchPublish_property_should_be_set_on_stream()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
+        await nats.ConnectRetryAsync();
+
+        var js = new NatsJSContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        var streamConfig = new StreamConfig($"{prefix}batched", [$"{prefix}batched.*"])
+        {
+            AllowBatchPublish = true,
+        };
+
+        var stream = await js.CreateStreamAsync(streamConfig, cts.Token);
+        Assert.True(stream.Info.Config.AllowBatchPublish);
+
+        var retrievedStream = await js.GetStreamAsync($"{prefix}batched", cancellationToken: cts.Token);
+        Assert.True(retrievedStream.Info.Config.AllowBatchPublish);
+
+        var updatedConfig = streamConfig with { AllowBatchPublish = false };
+        var updatedStream = await js.UpdateStreamAsync(updatedConfig, cts.Token);
+        Assert.False(updatedStream.Info.Config.AllowBatchPublish);
+
+        var reRetrievedStream = await js.GetStreamAsync($"{prefix}batched", cancellationToken: cts.Token);
+        Assert.False(reRetrievedStream.Info.Config.AllowBatchPublish);
+    }
+
     [SkipIfNatsServer(versionEarlierThan: "2.12")]
     public async Task PersistMode_property_should_be_set_on_stream()
     {
