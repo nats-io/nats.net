@@ -8,7 +8,6 @@ on:
 
 jobs:
   test:
-    if: github.head_ref != 'example/nats-io-docs'
     name: test
     strategy:
       fail-fast: false

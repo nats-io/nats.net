@@ -9,7 +9,6 @@ permissions:
 jobs:
 
   signoffs:
-    if: github.head_ref != 'example/nats-io-docs'
     runs-on: ubuntu-latest
     steps:
       - { name: Checkout, uses: actions/checkout@v4, with: { fetch-depth: 0 } }

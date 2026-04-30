@@ -9,7 +9,6 @@ on:
 jobs:
 
   windows_test:
-    if: github.head_ref != 'example/nats-io-docs'
     name: Windows
     strategy:
       fail-fast: false

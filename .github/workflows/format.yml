@@ -5,7 +5,6 @@ on:
 
 jobs:
   check:
-    if: github.head_ref != 'example/nats-io-docs'
     name: check
     runs-on: ubuntu-latest
     steps:

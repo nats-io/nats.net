@@ -11,7 +11,6 @@ permissions:
 
 jobs:
   apicompat:
-    if: github.head_ref != 'example/nats-io-docs'
     name: Check TFM API Compatibility
     runs-on: ubuntu-latest
     env:
