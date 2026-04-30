@@ -8,6 +8,7 @@ on:
 
 jobs:
   docs-preview:
+    if: github.head_ref != 'example/nats-io-docs'
     name: docs-preview
     runs-on: ubuntu-latest
     permissions:

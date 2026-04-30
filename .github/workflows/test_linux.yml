@@ -8,6 +8,7 @@ on:
 
 jobs:
   linux_test:
+    if: github.head_ref != 'example/nats-io-docs'
     name: Linux
     strategy:
       fail-fast: false
