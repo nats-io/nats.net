@@ -43,7 +43,10 @@ jobs:
         run: nats-server -v
 
       - name: Build
-        run: dotnet build examples/Example.NatsIODocs/Example.NatsIODocs.csproj -c Release
+        run: |
+          dotnet build examples/Example.NatsIODocs/Example.NatsIODocs.csproj -c Release
+          dotnet build examples/Example.NatsIODocs.GettingStartedPublish/Example.NatsIODocs.GettingStartedPublish.csproj -c Release
+          dotnet build examples/Example.NatsIODocs.GettingStartedSubscribe/Example.NatsIODocs.GettingStartedSubscribe.csproj -c Release
 
       - name: Run examples
         shell: bash
@@ -51,12 +54,11 @@ jobs:
           nats-server &
           sleep 2
           set -e
+
           PROJ=examples/Example.NatsIODocs/Example.NatsIODocs.csproj
           for ex in \
             basics-publish \
             basics-subscribe \
-            getting-started-publish \
-            getting-started-subscribe \
             subjects-single-wildcard \
             subjects-multi-wildcard \
             subjects-monitoring \
@@ -75,3 +77,16 @@ jobs:
             dotnet run --project $PROJ -c Release --no-build -- $ex
             echo "::endgroup::"
           done
+
+          # macOS coreutils ships timeout as gtimeout
+          TIMEOUT_CMD=$(command -v timeout || command -v gtimeout)
+
+          echo "::group::getting-started-publish"
+          dotnet run --project examples/Example.NatsIODocs.GettingStartedPublish/Example.NatsIODocs.GettingStartedPublish.csproj -c Release --no-build
+          echo "::endgroup::"
+
+          echo "::group::getting-started-subscribe"
+          ec=0
+          $TIMEOUT_CMD 8 dotnet run --project examples/Example.NatsIODocs.GettingStartedSubscribe/Example.NatsIODocs.GettingStartedSubscribe.csproj -c Release --no-build || ec=$?
+          [ $ec -eq 0 ] || [ $ec -eq 124 ] || exit $ec
+          echo "::endgroup::"

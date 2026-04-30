@@ -1,10 +1,8 @@
-var example = args.FirstOrDefault() ?? "getting-started-publish";
+var example = args.FirstOrDefault() ?? "basics-publish";
 var timeout = TimeSpan.FromSeconds(10);
 
 var task = example switch
 {
-    "getting-started-publish" => GettingStartedPublish.RunAsync(),
-    "getting-started-subscribe" => GettingStartedSubscribe.RunAsync(),
     "basics-publish" => BasicsPublish.RunAsync(),
     "basics-subscribe" => BasicsSubscribe.RunAsync(),
     "subjects-single-wildcard" => SubjectsSingleWildcard.RunAsync(),
