@@ -1,0 +1,50 @@
+name: Test Examples NatsIODocs
+
+on:
+  pull_request: {}
+  push:
+    branches:
+    - main
+
+jobs:
+  build:
+    name: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+      NUGET_XMLDOC_MODE: skip
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup dotnet
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.x
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+          cache: true
+
+      - name: Install nats-server
+        run: go install github.com/nats-io/nats-server/v2@latest
+
+      - name: Check nats-server
+        run: nats-server -v
+
+      - name: Build
+        run: dotnet build examples/Example.NatsIODocs/Example.NatsIODocs.csproj -c Release
+
+      - name: Run basics-publish
+        shell: bash
+        run: |
+          nats-server &
+          sleep 2
+          dotnet run --project examples/Example.NatsIODocs/Example.NatsIODocs.csproj -c Release --no-build -- basics-publish
