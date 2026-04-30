@@ -45,9 +45,14 @@ jobs:
       - name: Build
         run: dotnet build examples/Example.NatsIODocs/Example.NatsIODocs.csproj -c Release
 
-      - name: Run basics-publish
+      - name: Run examples
         shell: bash
         run: |
           nats-server &
           sleep 2
-          dotnet run --project examples/Example.NatsIODocs/Example.NatsIODocs.csproj -c Release --no-build -- basics-publish
+          set -e
+          PROJ=examples/Example.NatsIODocs/Example.NatsIODocs.csproj
+          dotnet run --project $PROJ -c Release --no-build -- basics-publish
+          dotnet run --project $PROJ -c Release --no-build -- basics-subscribe
+          dotnet run --project $PROJ -c Release --no-build -- getting-started-publish
+          dotnet run --project $PROJ -c Release --no-build -- getting-started-subscribe
