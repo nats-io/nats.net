@@ -78,15 +78,5 @@ jobs:
             echo "::endgroup::"
           done
 
-          # macOS coreutils ships timeout as gtimeout
-          TIMEOUT_CMD=$(command -v timeout || command -v gtimeout)
-
-          echo "::group::getting-started-publish"
-          dotnet run --project examples/Example.NatsIODocs.GettingStartedPublish/Example.NatsIODocs.GettingStartedPublish.csproj -c Release --no-build
-          echo "::endgroup::"
-
-          echo "::group::getting-started-subscribe"
-          ec=0
-          $TIMEOUT_CMD 8 dotnet run --project examples/Example.NatsIODocs.GettingStartedSubscribe/Example.NatsIODocs.GettingStartedSubscribe.csproj -c Release --no-build || ec=$?
-          [ $ec -eq 0 ] || [ $ec -eq 124 ] || exit $ec
-          echo "::endgroup::"
+          # The standalone getting-started projects target demo.nats.io and are not
+          # exercised at runtime here (their build is verified in the Build step).

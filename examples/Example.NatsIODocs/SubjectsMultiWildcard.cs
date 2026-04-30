@@ -1,10 +1,10 @@
 using NATS.Net;
 
-// NATS-DOC-START
 internal static class SubjectsMultiWildcard
 {
     public static async Task RunAsync()
     {
+        // NATS-DOC-START
         await using var client = new NatsClient();
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
@@ -38,7 +38,7 @@ internal static class SubjectsMultiWildcard
 
         Console.WriteLine("Waiting for messages...");
         await subscribe;
+
+        // NATS-DOC-END
     }
 }
-
-// NATS-DOC-END

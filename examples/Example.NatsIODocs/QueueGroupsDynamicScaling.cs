@@ -1,10 +1,10 @@
 using NATS.Net;
 
-// NATS-DOC-START
 internal static class QueueGroupsDynamicScaling
 {
     public static async Task RunAsync()
     {
+        // NATS-DOC-START
         await using var client = new NatsClient();
 
         const string subject = "tasks";
@@ -42,7 +42,7 @@ internal static class QueueGroupsDynamicScaling
             });
             return (id, cts, task);
         }
+
+        // NATS-DOC-END
     }
 }
-
-// NATS-DOC-END
