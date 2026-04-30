@@ -1,3 +1,4 @@
+using NATS.Client.Core;
 using NATS.Net;
 
 internal static class RequestReplyTimeout
@@ -27,14 +28,15 @@ internal static class RequestReplyTimeout
         await client.PingAsync();
 
         // NATS-DOC-START
-        // Cancellation token sets the timeout for the request
+        // Set the per-request timeout via reply options
+        var replyOpts = new NatsSubOpts { Timeout = TimeSpan.FromSeconds(1) };
+
         try
         {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
-            var reply = await client.RequestAsync<string>("service", cancellationToken: cts.Token);
+            var reply = await client.RequestAsync<string>("service", replyOpts: replyOpts);
             Console.WriteLine($"Response: {reply.Data}");
         }
-        catch (OperationCanceledException)
+        catch (NatsNoReplyException)
         {
             Console.WriteLine("No Response: timed out");
         }

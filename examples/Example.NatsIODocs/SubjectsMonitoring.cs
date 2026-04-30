@@ -6,31 +6,23 @@ internal static class SubjectsMonitoring
     {
         await using var client = new NatsClient();
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-
         // NATS-DOC-START
-        // Subscribe to everything
+        // Subscribe to everything; run in the background so we can publish below
         var subscribe = Task.Run(async () =>
         {
             var received = 0;
-            try
+            await foreach (var msg in client.SubscribeAsync<string>(">"))
             {
-                await foreach (var msg in client.SubscribeAsync<string>(">", cancellationToken: cts.Token))
+                Console.WriteLine($"[MONITOR] {msg.Subject} --> {msg.Data}");
+                if (++received == 3)
                 {
-                    Console.WriteLine($"[MONITOR] {msg.Subject} --> {msg.Data}");
-                    if (++received == 3)
-                    {
-                        break;
-                    }
+                    break;
                 }
-            }
-            catch (OperationCanceledException)
-            {
             }
         });
 
         // NATS-DOC-END
-        await client.PingAsync(cts.Token);
+        await client.PingAsync();
 
         await client.PublishAsync("hello", "Hello NATS!");
         await client.PublishAsync("event.new", "click");
