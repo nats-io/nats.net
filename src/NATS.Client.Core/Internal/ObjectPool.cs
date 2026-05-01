@@ -12,7 +12,11 @@ internal sealed class ObjectPool
 {
     private static int typeId = -1; // Increment by IdentityGenerator<T>
 
+#if NET9_0_OR_GREATER
+    private readonly System.Threading.Lock _gate = new();
+#else
     private readonly object _gate = new object();
+#endif
     private readonly int _poolLimit;
     private object[] _poolNodes = new object[4]; // ObjectPool<T>[]
 
