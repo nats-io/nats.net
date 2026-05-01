@@ -177,7 +177,16 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
 
         if (_debug)
         {
-            _logger.LogDebug(NatsJSLogEvents.PullRequest, "Sending pull request for {Origin} {Msgs}, {Bytes}", origin, request.Batch, request.MaxBytes);
+            _logger.LogDebug(
+                NatsJSLogEvents.PullRequest,
+                "Sending pull request for {Origin} {Msgs}, {Bytes}, pinId={PinId}, expires={Expires}, idleHeartbeat={IdleHeartbeat}, group={Group}",
+                origin,
+                request.Batch,
+                request.MaxBytes,
+                request.Id,
+                request.Expires,
+                request.IdleHeartbeat,
+                request.Group);
         }
 
         return Connection.PublishAsync(

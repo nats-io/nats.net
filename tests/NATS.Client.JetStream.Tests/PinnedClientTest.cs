@@ -1,6 +1,9 @@
 using System.Collections.Concurrent;
+using Microsoft.Extensions.Primitives;
+using NATS.Client.Core;
 using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
+using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
 using NATS.Client.TestUtilities;
 using NATS.Client.TestUtilities2;
@@ -520,6 +523,33 @@ public class PinnedClientTest
 
 public class PinnedClientMockServerTest
 {
+    [Fact]
+    public async Task Pin_id_from_headers_should_use_last_value_when_multiple_headers_present()
+    {
+        await using var ms = new MockServer((_, cmd) =>
+        {
+            if (cmd.Name == "PUB" && cmd.Subject.Contains("CONSUMER.INFO", StringComparison.Ordinal))
+            {
+                cmd.Reply(payload: """{"stream_name":"x","name":"x"}""");
+            }
+
+            return Task.CompletedTask;
+        });
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await using var nats = new NatsConnection(new NatsOpts { Url = ms.Url });
+        var js = nats.CreateJetStreamContext();
+        var consumer = (NatsJSConsumer)await js.GetConsumerAsync("x", "x", cts.Token);
+        var headers = new NatsHeaders
+        {
+            { "Nats-Pin-Id", new StringValues(["pin-stale", "pin-current"]) },
+        };
+
+        NatsJSExtensionsInternal.TrySetPinIdFromHeaders(headers, consumer);
+
+        Assert.Equal("pin-current", consumer.GetPinId());
+    }
+
     [Fact]
     public async Task Queued_consume_pull_request_should_use_latest_pin_id_when_sent()
     {

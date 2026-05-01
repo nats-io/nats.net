@@ -301,4 +301,12 @@ public record StreamConfig
     [System.Text.Json.Serialization.JsonConverter(typeof(NatsJSJsonStringEnumConverter<StreamConfigPersistMode>))]
 #endif
     public StreamConfigPersistMode? PersistMode { get; set; }
+
+    /// <summary>
+    /// AllowBatchPublish allows fast batch publishing into the stream.
+    /// </summary>
+    /// <remarks>Requires nats-server v2.14.0 or later.</remarks>
+    [System.Text.Json.Serialization.JsonPropertyName("allow_batched")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool AllowBatchPublish { get; set; }
 }

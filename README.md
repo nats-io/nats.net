@@ -11,10 +11,9 @@
 > **NATS .NET v3 is in development on the [`release/3.0`](https://github.com/nats-io/nats.net/tree/release/3.0) branch!**
 > v3 adds .NET 10 support and drops .NET 6.0. Target frameworks: `netstandard2.0`, `netstandard2.1`, `net8.0`, `net10.0`.
 
-NATS .NET is a client library designed to connect to the NATS messaging server,
-fully supporting all NATS features.
-It integrates seamlessly with modern .NET asynchronous interfaces such as
-async enumerables and channels, and leverages advanced .NET memory, buffer and IO features. (supports server v2.11)
+NATS .NET is the .NET client for NATS, a distributed messaging system.
+It provides pub/sub and request/reply (Core NATS), streaming and persistence (JetStream),
+Key-Value Store, Object Store, and Services.
 
 ### Check out [DOCS](https://nats-io.github.io/nats.net/) for guides and examples.
 
