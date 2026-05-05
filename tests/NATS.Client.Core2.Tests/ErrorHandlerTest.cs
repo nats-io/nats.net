@@ -44,59 +44,35 @@ public class ErrorHandlerTest
 
         var prefix = _server.GetNextId();
 
-        await nats.PublishAsync("x", $"_{prefix}_published_1_");
-
-        await nats.PingAsync();
-
-        await Retry.Until(
-            "published and pinged 1",
-            () =>
-            {
-                var published = false;
-                foreach (var frame in proxy.AllFrames)
+        async Task PublishAndWaitForPong(string subject, string marker)
+        {
+            await nats.PublishAsync(subject, $"_{prefix}_{marker}_");
+            await nats.PingAsync();
+            await Retry.Until(
+                $"published {marker} and pinged",
+                () =>
                 {
-                    if (frame.Origin == "C" && frame.Message.Contains($"_{prefix}_published_1_"))
+                    var published = false;
+                    foreach (var frame in proxy.AllFrames)
                     {
-                        published = true;
-                        continue;
+                        if (frame.Origin == "C" && frame.Message.Contains($"_{prefix}_{marker}_"))
+                        {
+                            published = true;
+                            continue;
+                        }
+
+                        if (published && frame.Origin == "S" && frame.Message == "PONG")
+                        {
+                            return true;
+                        }
                     }
 
-                    if (published && frame.Origin == "S" && frame.Message == "PONG")
-                    {
-                        return true;
-                    }
-                }
+                    return false;
+                });
+        }
 
-                return false;
-            });
-
-        await nats.PublishAsync("y", $"_{prefix}_published_2_");
-
-        await nats.PingAsync();
-
-        await Retry.Until(
-            "published and pinged 2",
-            () =>
-            {
-                var published = false;
-                foreach (var frame in proxy.AllFrames)
-                {
-                    if (frame.Origin == "C" && frame.Message.Contains($"_{prefix}_published_2_"))
-                    {
-                        published = true;
-                        continue;
-                    }
-
-                    if (published && frame.Origin == "S" && frame.Message == "PONG")
-                    {
-                        return true;
-                    }
-                }
-
-                return false;
-            });
-
-        await Task.Delay(TimeSpan.FromSeconds(2));
+        await PublishAndWaitForPong("x", "published_1");
+        await PublishAndWaitForPong("y", "published_2");
 
         Assert.Contains(proxy.AllFrames, f => f.Origin == "S" && f.Message == "-ERR 'Permissions Violation for Publish to \"y\"'");
 
