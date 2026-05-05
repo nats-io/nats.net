@@ -25,6 +25,7 @@ public class ErrorHandlerTest
         await using var nats = new NatsConnection(new NatsOpts
         {
             Url = $"nats://127.0.0.1:{proxy.Port}",
+            ConnectTimeout = TimeSpan.FromSeconds(10),
             LoggerFactory = logger,
             AuthOpts = new NatsAuthOpts { Username = "u" },
         });
