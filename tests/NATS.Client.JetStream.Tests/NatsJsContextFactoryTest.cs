@@ -86,6 +86,8 @@ public class NatsJSContextFactoryTest
         public event AsyncEventHandler<NatsSlowConsumerEventArgs>? SlowConsumerDetected;
 
         public event AsyncEventHandler<NatsLameDuckModeActivatedEventArgs>? LameDuckModeActivated;
+
+        public event AsyncEventHandler<NatsServerErrorEventArgs>? ServerError;
 #pragma warning restore CS0067
 
         public INatsServerInfo? ServerInfo { get; } = null;
