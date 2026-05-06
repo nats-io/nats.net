@@ -11,10 +11,17 @@ public record StreamConsumerSource
     /// Name of the durable consumer to use.
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("name")]
-    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
     [System.ComponentModel.DataAnnotations.StringLength(int.MaxValue, MinimumLength = 1)]
     [System.ComponentModel.DataAnnotations.RegularExpression(@"^[^.*>]+$")]
-    public string? Name { get; set; }
+#if NET6_0
+    public string Name { get; set; } = default!;
+#else
+#pragma warning disable SA1206
+    public required string Name { get; set; }
+#pragma warning restore SA1206
+#endif
 
     /// <summary>
     /// The subject the server delivers messages to.
