@@ -74,6 +74,7 @@ public static class NatsJSJsonSerializer<T>
 [JsonSerializable(typeof(StreamRestoreResponse))]
 [JsonSerializable(typeof(StreamSnapshotRequest))]
 [JsonSerializable(typeof(StreamSnapshotResponse))]
+[JsonSerializable(typeof(StreamConsumerSource))]
 [JsonSerializable(typeof(StreamSource))]
 [JsonSerializable(typeof(StreamSourceInfo))]
 [JsonSerializable(typeof(StreamState))]
@@ -154,6 +155,8 @@ internal class NatsJSJsonStringEnumConverter<TEnum> : JsonConverter<TEnum>
                 return (TEnum)(object)ConsumerConfigAckPolicy.All;
             case "explicit":
                 return (TEnum)(object)ConsumerConfigAckPolicy.Explicit;
+            case "flow_control":
+                return (TEnum)(object)ConsumerConfigAckPolicy.FlowControl;
             }
         }
 
@@ -294,6 +297,9 @@ internal class NatsJSJsonStringEnumConverter<TEnum> : JsonConverter<TEnum>
                 return;
             case ConsumerConfigAckPolicy.Explicit:
                 writer.WriteStringValue("explicit");
+                return;
+            case ConsumerConfigAckPolicy.FlowControl:
+                writer.WriteStringValue("flow_control");
                 return;
             }
         }
