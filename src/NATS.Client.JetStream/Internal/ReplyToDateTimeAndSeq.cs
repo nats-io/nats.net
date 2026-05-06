@@ -33,7 +33,7 @@ internal static class ReplyToDateTimeAndSeq
             return null;
         }
 
-        if (originalTokens[0] != "$JS" || originalTokens[1] != "ACK")
+        if (originalTokens[0] != "$JS" || (originalTokens[1] != "ACK" && originalTokens[1] != "FC"))
         {
             return null;
         }
