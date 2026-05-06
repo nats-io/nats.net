@@ -32,7 +32,6 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
 
     private long _pendingMsgs;
     private long _pendingBytes;
-    private int _disposed;
 
     public NatsJSFetch(
         long maxMsgs,
@@ -162,9 +161,9 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
 
     public override async ValueTask DisposeAsync()
     {
-        Interlocked.Exchange(ref _disposed, 1);
         try
         {
+            await DrainAsync().ConfigureAwait(false);
             await base.DisposeAsync().ConfigureAwait(false);
         }
         finally
@@ -294,14 +293,9 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
             _pendingMsgs--;
             _pendingBytes -= msg.Size;
 
-            // Stop feeding the user if we are disposed.
-            // We need to exit as soon as possible.
-            if (Volatile.Read(ref _disposed) == 0)
-            {
-                await _userMsgs.Writer.WriteAsync(msg).ConfigureAwait(false);
+            await _userMsgs.Writer.WriteAsync(msg).ConfigureAwait(false);
 
-                ResetSlowConsumer(_userMsgs.Reader.Count);
-            }
+            ResetSlowConsumer(_userMsgs.Reader.Count);
         }
 
         if (_maxBytes > 0 && _pendingBytes <= 0)
