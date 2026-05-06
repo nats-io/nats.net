@@ -155,10 +155,11 @@ public class ManageConsumerTest
 
         var consumer = (NatsJSConsumer)await js.CreateOrUpdateConsumerAsync($"{prefix}s1", new ConsumerConfig($"{prefix}c1"), cts.Token);
 
+        // DoubleAck so the server's ack floor is observably updated before we issue the reset.
         var fetchOpts = new NatsJSFetchOpts { MaxMsgs = 2, Expires = TimeSpan.FromSeconds(5) };
         await foreach (var msg in consumer.FetchAsync<int>(opts: fetchOpts, cancellationToken: cts.Token))
         {
-            await msg.AckAsync(cancellationToken: cts.Token);
+            await msg.AckAsync(new AckOpts { DoubleAck = true }, cancellationToken: cts.Token);
         }
 
         // Reset to a specific stream sequence: next delivery should be that sequence.
@@ -171,7 +172,7 @@ public class ManageConsumerTest
             Assert.NotNull(next);
             Assert.Equal(4ul, next!.Metadata!.Value.Sequence.Stream);
             Assert.Equal(4, next.Data);
-            await next.AckAsync(cancellationToken: cts.Token);
+            await next.AckAsync(new AckOpts { DoubleAck = true }, cancellationToken: cts.Token);
         }
 
         // Reset with seq=0 (empty body): rewinds to the ack floor. ResetSeq is the next deliverable sequence.
