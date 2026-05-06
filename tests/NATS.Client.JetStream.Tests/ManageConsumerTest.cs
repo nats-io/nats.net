@@ -168,13 +168,10 @@ public class ManageConsumerTest
             Assert.Equal($"{prefix}c1", resetResponse.Name);
 
             var next = await consumer.NextAsync<int>(cancellationToken: cts.Token);
-            Assert.True(next is { });
-            if (next is { } msg)
-            {
-                Assert.Equal(4ul, msg.Metadata!.Value.Sequence.Stream);
-                Assert.Equal(4, msg.Data);
-                await msg.AckAsync(cancellationToken: cts.Token);
-            }
+            Assert.NotNull(next);
+            Assert.Equal(4ul, next!.Metadata!.Value.Sequence.Stream);
+            Assert.Equal(4, next.Data);
+            await next.AckAsync(cancellationToken: cts.Token);
         }
 
         // Reset with seq=0 (empty body): rewinds to the ack floor. ResetSeq is the next deliverable sequence.
@@ -183,11 +180,8 @@ public class ManageConsumerTest
             Assert.Equal(5ul, resetResponse.ResetSeq);
 
             var next = await consumer.NextAsync<int>(cancellationToken: cts.Token);
-            Assert.True(next is { });
-            if (next is { } msg)
-            {
-                Assert.Equal(5ul, msg.Metadata!.Value.Sequence.Stream);
-            }
+            Assert.NotNull(next);
+            Assert.Equal(5ul, next!.Metadata!.Value.Sequence.Stream);
         }
     }
 

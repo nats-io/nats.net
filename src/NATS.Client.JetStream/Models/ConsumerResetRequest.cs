@@ -3,6 +3,7 @@ namespace NATS.Client.JetStream.Models;
 /// <summary>
 /// A request to the JetStream $JS.API.CONSUMER.RESET API
 /// </summary>
+/// <remarks>This feature is only available on NATS server v2.14 and later.</remarks>
 internal record ConsumerResetRequest
 {
     /// <summary>
