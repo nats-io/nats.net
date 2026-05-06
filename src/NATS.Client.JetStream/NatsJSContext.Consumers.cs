@@ -194,7 +194,7 @@ public partial class NatsJSContext : INatsJSContext
         ThrowIfInvalidStreamName(stream);
         return await JSRequestResponseAsync<ConsumerResetRequest, ConsumerResetResponse>(
             subject: $"{Opts.Prefix}.CONSUMER.RESET.{stream}.{consumer}",
-            request: new ConsumerResetRequest { Seq = seq },
+            request: seq == 0 ? null : new ConsumerResetRequest { Seq = seq },
             cancellationToken);
     }
 
