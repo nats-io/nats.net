@@ -5,4 +5,5 @@ public enum ConsumerConfigAckPolicy
     Explicit = 0,
     All = 1,
     None = 2,
+    FlowControl = 3,
 }
