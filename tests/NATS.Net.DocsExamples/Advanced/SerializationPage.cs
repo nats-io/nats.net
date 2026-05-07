@@ -15,6 +15,7 @@ using System.Text;
 using System.Text.Json.Serialization;
 using Google.Protobuf;
 using Google.Protobuf.Reflection;
+using Microsoft.Extensions.Primitives;
 using NATS.Client.Core;
 
 namespace NATS.Net.DocsExamples.Advanced;
@@ -275,6 +276,48 @@ public class MixedSerializerRegistry : INatsSerializerRegistry
     public INatsSerialize<T> GetSerializer<T>() => new NatsJsonContextSerializer<T>(MyJsonContext.Default, next: MyProtoBufSerializer<T>.Default);
 
     public INatsDeserialize<T> GetDeserializer<T>() => new NatsJsonContextSerializer<T>(MyJsonContext.Default, next: MyProtoBufSerializer<T>.Default);
+}
+#endregion
+
+#region header-aware-serializer
+public class MyHeaderAwareSerializer<T> : INatsSerializer<T>, INatsSerializerWithContext<T>
+{
+    private readonly NatsJsonContextSerializer<T> _jsonSerializer;
+
+    public MyHeaderAwareSerializer(JsonSerializerContext context)
+    {
+        _jsonSerializer = new NatsJsonContextSerializer<T>(context);
+    }
+
+    public void Serialize(IBufferWriter<byte> bufferWriter, T value) => _jsonSerializer.Serialize(bufferWriter, value);
+
+    public T? Deserialize(in ReadOnlySequence<byte> buffer) => _jsonSerializer.Deserialize(buffer);
+
+    public void Serialize(IBufferWriter<byte> bufferWriter, T value, in NatsMsgContext context)
+    {
+        // Set a content-type header so the deserializer knows the format
+        if (context.Headers != null)
+        {
+            context.Headers["Content-Type"] = "application/json";
+        }
+
+        _jsonSerializer.Serialize(bufferWriter, value);
+    }
+
+    public T? Deserialize(in ReadOnlySequence<byte> buffer, in NatsMsgContext context)
+    {
+        // Read the content-type header to determine how to deserialize
+        if (context.Headers != null
+            && context.Headers.TryGetValue("Content-Type", out StringValues contentType)
+            && contentType.ToString() == "application/json")
+        {
+            return _jsonSerializer.Deserialize(buffer);
+        }
+
+        throw new NatsException($"Unsupported content type for {typeof(T)}");
+    }
+
+    public INatsSerializer<T> CombineWith(INatsSerializer<T> next) => throw new NotSupportedException();
 }
 #endregion
 

@@ -32,7 +32,11 @@ public abstract class NatsSubBase
 {
     private static readonly byte[] NoRespondersHeaderSequence = { (byte)' ', (byte)'5', (byte)'0', (byte)'3' };
     private readonly ILogger _logger;
+#if NET9_0_OR_GREATER
+    private readonly System.Threading.Lock _gate = new();
+#else
     private readonly object _gate = new();
+#endif
     private readonly bool _debug;
     private readonly INatsSubscriptionManager _manager;
     private readonly Timer? _timeoutTimer;

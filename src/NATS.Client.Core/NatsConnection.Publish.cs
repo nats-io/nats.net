@@ -19,7 +19,6 @@ public partial class NatsConnection
             Telemetry.AddTraceContextHeaders(activity, ref headers);
             try
             {
-                headers?.SetReadOnly();
                 return ConnectionState != NatsConnectionState.Open
                     ? ConnectAndPublishAsync(subject, default, headers, replyTo, NatsRawSerializer<byte[]>.Default, cancellationToken)
                     : CommandWriter.PublishAsync(subject, default, headers, replyTo, NatsRawSerializer<byte[]>.Default, cancellationToken);
@@ -31,7 +30,6 @@ public partial class NatsConnection
             }
         }
 
-        headers?.SetReadOnly();
         return ConnectionState != NatsConnectionState.Open
             ? ConnectAndPublishAsync(subject, default, headers, replyTo, NatsRawSerializer<byte[]>.Default, cancellationToken)
             : CommandWriter.PublishAsync(subject, default, headers, replyTo, NatsRawSerializer<byte[]>.Default, cancellationToken);
@@ -53,7 +51,6 @@ public partial class NatsConnection
             try
             {
                 serializer ??= Opts.SerializerRegistry.GetSerializer<T>();
-                headers?.SetReadOnly();
                 return ConnectionState != NatsConnectionState.Open
                     ? ConnectAndPublishAsync(subject, data, headers, replyTo, serializer, cancellationToken)
                     : CommandWriter.PublishAsync(subject, data, headers, replyTo, serializer, cancellationToken);
@@ -66,7 +63,6 @@ public partial class NatsConnection
         }
 
         serializer ??= Opts.SerializerRegistry.GetSerializer<T>();
-        headers?.SetReadOnly();
         return ConnectionState != NatsConnectionState.Open
             ? ConnectAndPublishAsync(subject, data, headers, replyTo, serializer, cancellationToken)
             : CommandWriter.PublishAsync(subject, data, headers, replyTo, serializer, cancellationToken);
