@@ -10,6 +10,7 @@
     <Project Path="examples/Example.JetStream.PullConsumer/Example.JetStream.PullConsumer.csproj" />
     <Project Path="examples/Example.KeyValueStore.Watcher/Example.KeyValueStore.Watcher.csproj" />
     <Project Path="examples/Example.NativeAot/Example.NativeAot.csproj" />
+    <Project Path="examples/Example.NatsIODocs/Example.NatsIODocs.csproj" />
     <Project Path="examples/Example.ObjectStore/Example.ObjectStore.csproj" />
     <Project Path="examples/Example.OpenTelemetry/Example.OpenTelemetry.csproj" />
     <Project Path="examples/Example.ProtoBufMessages/Example.ProtoBufMessages.csproj" />
