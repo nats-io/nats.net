@@ -9,29 +9,9 @@ internal static class QueueGroupsBasic
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
 
-        var count1 = 0;
-        var count2 = 0;
-        var count3 = 0;
-
-        var worker1 = Worker("Subscriber 1", () => Interlocked.Increment(ref count1));
-        var worker2 = Worker("Subscriber 2", () => Interlocked.Increment(ref count2));
-        var worker3 = Worker("Subscriber 3", () => Interlocked.Increment(ref count3));
-
-        // Ensure subscriptions are at the server before publishing
-        await client.PingAsync(cts.Token);
-
-        for (var i = 1; i <= 10; i++)
-        {
-            await client.PublishAsync("orders.new", $"Order Number: {i}");
-        }
-
-        Console.WriteLine("Messages published to orders.new");
-
-        await Task.WhenAll(worker1, worker2, worker3);
-
-        Console.WriteLine($"Subscriber 1 received {count1} messages.");
-        Console.WriteLine($"Subscriber 2 received {count2} messages.");
-        Console.WriteLine($"Subscriber 3 received {count3} messages.");
+        var countA = 0;
+        var countB = 0;
+        var countC = 0;
 
         async Task Worker(string name, Action onMessage)
         {
@@ -47,6 +27,28 @@ internal static class QueueGroupsBasic
             {
             }
         }
+
+        // Set up the subscribers
+        var workerA = Worker("Subscriber A", () => Interlocked.Increment(ref countA));
+        var workerB = Worker("Subscriber B", () => Interlocked.Increment(ref countB));
+        var workerC = Worker("Subscriber C", () => Interlocked.Increment(ref countC));
+
+        // Ensure subscriptions are at the server before publishing
+        await client.PingAsync(cts.Token);
+
+        // Publish messages once all subscriptions are set up
+        for (var i = 1; i <= 10; i++)
+        {
+            await client.PublishAsync("orders.new", $"Order Number: {i}");
+        }
+
+        Console.WriteLine("Messages published to orders.new");
+
+        await Task.WhenAll(workerA, workerB, workerC);
+
+        Console.WriteLine($"Subscriber A received {countA} messages.");
+        Console.WriteLine($"Subscriber B received {countB} messages.");
+        Console.WriteLine($"Subscriber C received {countC} messages.");
 
         // NATS-DOC-END
     }

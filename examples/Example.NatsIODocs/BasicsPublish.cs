@@ -9,8 +9,8 @@ internal static class BasicsPublish
         // NATS-DOC-START
         // Publish a message to the subject "weather.updates"
         await client.PublishAsync("weather.updates", "Temperature: 72F");
-        Console.WriteLine("Message published to weather.updates");
 
         // NATS-DOC-END
+        Console.WriteLine("Message published to weather.updates");
     }
 }

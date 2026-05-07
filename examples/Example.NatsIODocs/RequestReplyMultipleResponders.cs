@@ -10,8 +10,8 @@ internal static class RequestReplyMultipleResponders
 
         // NATS-DOC-START
         // Set up 2 instances of the service (no queue group, so both reply to each request)
-        var service1 = Service(1);
-        var service2 = Service(2);
+        var serviceA = Service("A");
+        var serviceB = Service("B");
 
         await client.PingAsync(cts.Token);
 
@@ -19,8 +19,8 @@ internal static class RequestReplyMultipleResponders
         try
         {
             using var reqCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
-            var reply = await client.RequestAsync<string>("service", cancellationToken: reqCts.Token);
-            Console.WriteLine(reply.Data);
+            var reply = await client.RequestAsync<string>("calc.add", cancellationToken: reqCts.Token);
+            Console.WriteLine($"Got response: {reply.Data}");
         }
         catch (OperationCanceledException)
         {
@@ -29,15 +29,15 @@ internal static class RequestReplyMultipleResponders
 
         // NATS-DOC-END
         await cts.CancelAsync();
-        await Task.WhenAll(service1, service2);
+        await Task.WhenAll(serviceA, serviceB);
 
-        async Task Service(int id)
+        async Task Service(string id)
         {
             try
             {
-                await foreach (var msg in client.SubscribeAsync<string>("service", cancellationToken: cts.Token))
+                await foreach (var msg in client.SubscribeAsync<string>("calc.add", cancellationToken: cts.Token))
                 {
-                    await msg.ReplyAsync($"Result from service instance {id}", cancellationToken: cts.Token);
+                    await msg.ReplyAsync($"calculated result from {id}", cancellationToken: cts.Token);
                 }
             }
             catch (OperationCanceledException)

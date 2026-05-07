@@ -43,10 +43,7 @@ jobs:
         run: nats-server -v
 
       - name: Build
-        run: |
-          dotnet build examples/Example.NatsIODocs/Example.NatsIODocs.csproj -c Release
-          dotnet build examples/Example.NatsIODocs.GettingStartedPublish/Example.NatsIODocs.GettingStartedPublish.csproj -c Release
-          dotnet build examples/Example.NatsIODocs.GettingStartedSubscribe/Example.NatsIODocs.GettingStartedSubscribe.csproj -c Release
+        run: dotnet build examples/Example.NatsIODocs/Example.NatsIODocs.csproj -c Release
 
       - name: Run examples
         shell: bash
@@ -56,6 +53,9 @@ jobs:
           set -e
 
           PROJ=examples/Example.NatsIODocs/Example.NatsIODocs.csproj
+          # getting-started-{publish,subscribe} target demo.nats.io and the
+          # subscribe variant blocks waiting for messages, so they are not
+          # exercised at runtime here. Their build is covered above.
           for ex in \
             basics-publish \
             basics-subscribe \
@@ -77,6 +77,3 @@ jobs:
             dotnet run --project $PROJ -c Release --no-build -- $ex
             echo "::endgroup::"
           done
-
-          # The standalone getting-started projects target demo.nats.io and are not
-          # exercised at runtime here (their build is verified in the Build step).

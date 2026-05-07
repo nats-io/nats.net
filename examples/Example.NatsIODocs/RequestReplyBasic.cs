@@ -16,7 +16,7 @@ internal static class RequestReplyBasic
             {
                 await foreach (var msg in client.SubscribeAsync<string>("time", cancellationToken: cts.Token))
                 {
-                    await msg.ReplyAsync(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString(), cancellationToken: cts.Token);
+                    await msg.ReplyAsync(DateTimeOffset.UtcNow.ToString("O"), cancellationToken: cts.Token);
                 }
             }
             catch (OperationCanceledException)
@@ -31,8 +31,7 @@ internal static class RequestReplyBasic
         {
             using var reqCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
             var reply = await client.RequestAsync<string>("time", cancellationToken: reqCts.Token);
-            var time = DateTimeOffset.FromUnixTimeMilliseconds(long.Parse(reply.Data!));
-            Console.WriteLine($"Time is {time:O}");
+            Console.WriteLine($"Time is {reply.Data}");
         }
         catch (OperationCanceledException)
         {
