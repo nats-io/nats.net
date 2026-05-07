@@ -1,8 +1,9 @@
 using NATS.Net;
 
-internal static class QueueGroupsBasic
+public class QueueGroupsBasic
 {
-    public static async Task RunAsync()
+    [Fact(Skip = "Shows client initialization with the default port; not run in CI.")]
+    public async Task RunAsync()
     {
         // NATS-DOC-START
         await using var client = new NatsClient();

@@ -42,38 +42,5 @@ jobs:
       - name: Check nats-server
         run: nats-server -v
 
-      - name: Build
-        run: dotnet build examples/Example.NatsIODocs/Example.NatsIODocs.csproj -c Release
-
-      - name: Run examples
-        shell: bash
-        run: |
-          nats-server &
-          sleep 2
-          set -e
-
-          PROJ=examples/Example.NatsIODocs/Example.NatsIODocs.csproj
-          # getting-started-{publish,subscribe} target demo.nats.io and the
-          # subscribe variant blocks waiting for messages, so they are not
-          # exercised at runtime here. Their build is covered above.
-          for ex in \
-            basics-publish \
-            basics-subscribe \
-            subjects-single-wildcard \
-            subjects-multi-wildcard \
-            subjects-monitoring \
-            queue-groups-basic \
-            queue-groups-dynamic-scaling \
-            queue-groups-request-reply \
-            queue-groups-mixed-subscribers \
-            request-reply-basic \
-            request-reply-timeout \
-            request-reply-multiple-responders \
-            request-reply-no-responders \
-            request-reply-headers \
-            request-reply-calculator
-          do
-            echo "::group::$ex"
-            dotnet run --project $PROJ -c Release --no-build -- $ex
-            echo "::endgroup::"
-          done
+      - name: Test
+        run: dotnet test examples/Example.NatsIODocs/Example.NatsIODocs.csproj -c Release

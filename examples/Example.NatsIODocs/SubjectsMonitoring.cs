@@ -1,10 +1,12 @@
 using NATS.Net;
 
-internal static class SubjectsMonitoring
+[Collection("nats-server")]
+public class SubjectsMonitoring(NatsServerFixture fixture)
 {
-    public static async Task RunAsync()
+    [Fact]
+    public async Task RunAsync()
     {
-        await using var client = new NatsClient();
+        await using var client = new NatsClient(fixture.Server.Url);
 
         // NATS-DOC-START
         // Subscribe to everything; run in the background so we can publish below

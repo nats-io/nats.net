@@ -1,16 +1,26 @@
 using NATS.Net;
 
-internal static class BasicsSubscribe
+[Collection("nats-server")]
+public class BasicsSubscribe(NatsServerFixture fixture)
 {
-    public static async Task RunAsync()
+    [Fact]
+    public async Task RunAsync()
     {
-        await using var client = new NatsClient();
+        await using var client = new NatsClient(fixture.Server.Url);
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
 
         // NATS-DOC-START
         // Subscribe to 'weather.updates' and process messages
-        await foreach (var msg in client.SubscribeAsync<string>("weather.updates"))
+        try
         {
-            Console.WriteLine($"Received: {msg.Data}");
+            await foreach (var msg in client.SubscribeAsync<string>("weather.updates", cancellationToken: cts.Token))
+            {
+                Console.WriteLine($"Received: {msg.Data}");
+            }
+        }
+        catch (OperationCanceledException)
+        {
         }
 
         // NATS-DOC-END

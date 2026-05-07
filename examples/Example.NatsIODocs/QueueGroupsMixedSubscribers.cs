@@ -1,10 +1,12 @@
 using NATS.Net;
 
-internal static class QueueGroupsMixedSubscribers
+[Collection("nats-server")]
+public class QueueGroupsMixedSubscribers(NatsServerFixture fixture)
 {
-    public static async Task RunAsync()
+    [Fact]
+    public async Task RunAsync()
     {
-        await using var client = new NatsClient();
+        await using var client = new NatsClient(fixture.Server.Url);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
 

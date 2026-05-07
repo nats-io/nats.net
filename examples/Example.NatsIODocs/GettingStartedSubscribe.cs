@@ -1,8 +1,9 @@
 using NATS.Net;
 
-internal static class GettingStartedSubscribe
+public class GettingStartedSubscribe
 {
-    public static async Task RunAsync()
+    [Fact(Skip = "Targets demo.nats.io and blocks waiting for messages; not run in CI.")]
+    public async Task RunAsync()
     {
         // NATS-DOC-START
         await using var client = new NatsClient("demo.nats.io");

@@ -1,48 +1,45 @@
+using NATS.Client.Core;
 using NATS.Net;
 
-internal static class RequestReplyMultipleResponders
+[Collection("nats-server")]
+public class RequestReplyMultipleResponders(NatsServerFixture fixture)
 {
-    public static async Task RunAsync()
+    [Fact]
+    public async Task RunAsync()
     {
-        await using var client = new NatsClient();
-
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        await using var client = new NatsClient(fixture.Server.Url);
 
         // NATS-DOC-START
-        // Set up 2 instances of the service (no queue group, so both reply to each request)
-        var serviceA = Service("A");
-        var serviceB = Service("B");
+        string ProcessCalculation(string? data)
+        {
+            return "calculated result";
+        }
 
-        await client.PingAsync(cts.Token);
+        // Set up 2 instances of the service (no queue group, so both reply to each request)
+        var serviceA = await client.Connection.SubscribeCoreAsync<string>("calc.add");
+        _ = Task.Run(async () =>
+        {
+            await foreach (var msg in serviceA.Msgs.ReadAllAsync())
+            {
+                var result = ProcessCalculation(msg.Data) + $" from A";
+                await msg.ReplyAsync(result);
+            }
+        });
+
+        var serviceB = await client.Connection.SubscribeCoreAsync<string>("calc.add");
+        _ = Task.Run(async () =>
+        {
+            await foreach (var msg in serviceB.Msgs.ReadAllAsync())
+            {
+                var result = ProcessCalculation(msg.Data) + $" from B";
+                await msg.ReplyAsync(result);
+            }
+        });
 
         // The first reply wins; later replies are dropped
-        try
-        {
-            using var reqCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
-            var reply = await client.RequestAsync<string>("calc.add", cancellationToken: reqCts.Token);
-            Console.WriteLine($"Got response: {reply.Data}");
-        }
-        catch (OperationCanceledException)
-        {
-            Console.WriteLine("No Response");
-        }
+        var reply = await client.RequestAsync<string>("calc.add");
+        Console.WriteLine($"Got response: {reply.Data}");
 
         // NATS-DOC-END
-        await cts.CancelAsync();
-        await Task.WhenAll(serviceA, serviceB);
-
-        async Task Service(string id)
-        {
-            try
-            {
-                await foreach (var msg in client.SubscribeAsync<string>("calc.add", cancellationToken: cts.Token))
-                {
-                    await msg.ReplyAsync($"calculated result from {id}", cancellationToken: cts.Token);
-                }
-            }
-            catch (OperationCanceledException)
-            {
-            }
-        }
     }
 }

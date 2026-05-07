@@ -1,11 +1,13 @@
 using NATS.Client.Core;
 using NATS.Net;
 
-internal static class RequestReplyNoResponders
+[Collection("nats-server")]
+public class RequestReplyNoResponders(NatsServerFixture fixture)
 {
-    public static async Task RunAsync()
+    [Fact]
+    public async Task RunAsync()
     {
-        await using var client = new NatsClient();
+        await using var client = new NatsClient(fixture.Server.Url);
 
         // NATS-DOC-START
         // RequestAsync throws NatsNoRespondersException by default when nobody is listening
