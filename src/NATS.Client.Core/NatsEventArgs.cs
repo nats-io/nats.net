@@ -52,3 +52,11 @@ public class NatsSlowConsumerEventArgs : NatsEventArgs
 
     public NatsSubBase Subscription { get; }
 }
+
+public class NatsServerErrorEventArgs : NatsEventArgs
+{
+    public NatsServerErrorEventArgs(string error)
+        : base($"Server error {error}") => Error = error;
+
+    public string Error { get; }
+}
