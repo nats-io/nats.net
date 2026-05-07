@@ -5,6 +5,10 @@
   href: api/
   homepage: api/index.md
 
+- name: Blog
+  href: blog/
+  homepage: blog/index.md
+
 - name: GitHub
   href: https://github.com/nats-io/nats.net
 

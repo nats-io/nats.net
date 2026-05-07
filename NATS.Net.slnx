@@ -1,0 +1,97 @@
+<Solution>
+  <Folder Name="/examples/">
+    <Project Path="examples/Example.Client/Example.Client.csproj" />
+    <Project Path="examples/Example.Core.PublishHeaders/Example.Core.PublishHeaders.csproj" />
+    <Project Path="examples/Example.Core.PublishModel/Example.Core.PublishModel.csproj" />
+    <Project Path="examples/Example.Core.SubscribeHeaders/Example.Core.SubscribeHeaders.csproj" />
+    <Project Path="examples/Example.Core.SubscribeModel/Example.Core.SubscribeModel.csproj" />
+    <Project Path="examples/Example.Core.SubscribeQueueGroup/Example.Core.SubscribeQueueGroup.csproj" />
+    <Project Path="examples/Example.Core.SubscribeRaw/Example.Core.SubscribeRaw.csproj" />
+    <Project Path="examples/Example.JetStream.PullConsumer/Example.JetStream.PullConsumer.csproj" />
+    <Project Path="examples/Example.KeyValueStore.Watcher/Example.KeyValueStore.Watcher.csproj" />
+    <Project Path="examples/Example.NativeAot/Example.NativeAot.csproj" />
+    <Project Path="examples/Example.NatsIODocs/Example.NatsIODocs.csproj" />
+    <Project Path="examples/Example.ObjectStore/Example.ObjectStore.csproj" />
+    <Project Path="examples/Example.OpenTelemetry/Example.OpenTelemetry.csproj" />
+    <Project Path="examples/Example.ProtoBufMessages/Example.ProtoBufMessages.csproj" />
+    <Project Path="examples/Example.Services/Example.Services.csproj" />
+    <Project Path="examples/Example.TlsFirst/Example.TlsFirst.csproj" />
+  </Folder>
+  <Folder Name="/examples/BlazorWasm/">
+    <File Path="examples/BlazorWasm/nats-server.conf" />
+    <File Path="examples/BlazorWasm/README.md" />
+    <Project Path="examples/BlazorWasm/Client/BlazorWasm.Client.csproj" />
+    <Project Path="examples/BlazorWasm/Server/BlazorWasm.Server.csproj" />
+    <Project Path="examples/BlazorWasm/Shared/BlazorWasm.Shared.csproj" />
+  </Folder>
+  <Folder Name="/sandbox/">
+    <Project Path="sandbox/ConsoleApp/ConsoleApp.csproj" />
+    <Project Path="sandbox/MicroBenchmark/MicroBenchmark.csproj" />
+    <Project Path="sandbox/MinimumWebApp/MinimumWebApp.csproj" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path=".gitattributes" />
+    <File Path=".gitignore" />
+    <File Path="CODE-OF-CONDUCT.md" />
+    <File Path="CONTRIBUTING.md" />
+    <File Path="dependencies.md" />
+    <File Path="Directory.Build.props" />
+    <File Path="global.json" />
+    <File Path="Icon.png" />
+    <File Path="LICENSE" />
+    <File Path="README.md" />
+    <File Path="REPO_RENAME.md" />
+    <File Path="version.txt" />
+  </Folder>
+  <Folder Name="/Solution Items/.github/" />
+  <Folder Name="/Solution Items/.github/workflows/">
+    <File Path=".github/workflows/apicompat.yml" />
+    <File Path=".github/workflows/docs.yml" />
+    <File Path=".github/workflows/format.yml" />
+    <File Path=".github/workflows/perf.yml" />
+    <File Path=".github/workflows/release.yml" />
+    <File Path=".github/workflows/signoffs.yml" />
+    <File Path=".github/workflows/test_linux.yml" />
+    <File Path=".github/workflows/test_linux_core.yml" />
+    <File Path=".github/workflows/test_windows.yml" />
+  </Folder>
+  <Folder Name="/src/">
+    <File Path="src/Directory.Build.props" />
+    <Project Path="src/NATS.Client.Abstractions/NATS.Client.Abstractions.csproj" />
+    <Project Path="src/NATS.Client.Core/NATS.Client.Core.csproj" />
+    <Project Path="src/NATS.Client.Hosting/NATS.Client.Hosting.csproj" />
+    <Project Path="src/NATS.Client.JetStream/NATS.Client.JetStream.csproj" />
+    <Project Path="src/NATS.Client.KeyValueStore/NATS.Client.KeyValueStore.csproj" />
+    <Project Path="src/NATS.Client.ObjectStore/NATS.Client.ObjectStore.csproj" />
+    <Project Path="src/NATS.Client.Serializers.Json/NATS.Client.Serializers.Json.csproj" />
+    <Project Path="src/NATS.Client.Services/NATS.Client.Services.csproj" />
+    <Project Path="src/NATS.Client.Simplified/NATS.Client.Simplified.csproj" />
+    <Project Path="src/NATS.Extensions.Microsoft.DependencyInjection/NATS.Extensions.Microsoft.DependencyInjection.csproj" />
+    <Project Path="src/NATS.Net/NATS.Net.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/NATS.Client.CheckAbi/NATS.Client.CheckAbi.csproj" />
+    <Project Path="tests/NATS.Client.CheckAbiTransientLib/NATS.Client.CheckAbiTransientLib.csproj" />
+    <Project Path="tests/NATS.Client.CheckNativeAot/NATS.Client.CheckNativeAot.csproj" />
+    <Project Path="tests/Nats.Client.Compat/Nats.Client.Compat.csproj" />
+    <Project Path="tests/NATS.Client.Core.Tests/NATS.Client.Core.Tests.csproj" />
+    <Project Path="tests/NATS.Client.Core2.Tests/NATS.Client.Core2.Tests.csproj" />
+    <Project Path="tests/NATS.Client.CoreUnit.Tests/NATS.Client.CoreUnit.Tests.csproj" />
+    <Project Path="tests/NATS.Client.JetStream.Tests/NATS.Client.JetStream.Tests.csproj" />
+    <Project Path="tests/NATS.Client.KeyValueStore.Tests/NATS.Client.KeyValueStore.Tests.csproj" />
+    <Project Path="tests/NATS.Client.ObjectStore.Tests/NATS.Client.ObjectStore.Tests.csproj" />
+    <Project Path="tests/NATS.Client.Perf/NATS.Client.Perf.csproj" />
+    <Project Path="tests/NATS.Client.Platform.Windows.Tests/NATS.Client.Platform.Windows.Tests.csproj" />
+    <Project Path="tests/NATS.Client.Services.Tests/NATS.Client.Services.Tests.csproj" />
+    <Project Path="tests/NATS.Client.Simplified.Tests/NATS.Client.Simplified.Tests.csproj" />
+    <Project Path="tests/NATS.Client.TestUtilities/NATS.Client.TestUtilities.csproj" />
+    <Project Path="tests/NATS.Extensions.Microsoft.DependencyInjection.Tests/NATS.Extensions.Microsoft.DependencyInjection.Tests.csproj" />
+    <Project Path="tests/NATS.Net.DocsExamples/NATS.Net.DocsExamples.csproj" />
+    <Project Path="tests/NATS.Net.OpenTelemetry.Tests/NATS.Net.OpenTelemetry.Tests.csproj" />
+    <Project Path="tests/NATS.Slow.Tests/NATS.Slow.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/Schema.Generation/Schema.Generation.csproj" />
+  </Folder>
+</Solution>
