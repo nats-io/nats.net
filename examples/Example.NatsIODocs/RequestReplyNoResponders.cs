@@ -1,8 +1,10 @@
 using NATS.Client.Core;
 using NATS.Net;
 
+namespace Example.NatsIODocs;
+
 [Collection("nats-server")]
-public class RequestReplyNoResponders(NatsServerFixture fixture)
+public class RequestReplyNoResponders(NatsServerFixture fixture, ITestOutputHelper output)
 {
     [Fact]
     public async Task RunAsync()
@@ -13,13 +15,12 @@ public class RequestReplyNoResponders(NatsServerFixture fixture)
         // RequestAsync throws NatsNoRespondersException by default when nobody is listening
         try
         {
-            using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
-            var reply = await client.RequestAsync<string>("no.such.service", cancellationToken: cts.Token);
-            Console.WriteLine($"Response: {reply.Data}");
+            var reply = await client.RequestAsync<string>("no.such.service");
+            output.WriteLine($"Response: {reply.Data}");
         }
         catch (NatsNoRespondersException)
         {
-            Console.WriteLine("No Response: no responders");
+            output.WriteLine("No responders");
         }
 
         // NATS-DOC-END

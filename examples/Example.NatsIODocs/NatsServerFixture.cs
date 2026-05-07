@@ -1,5 +1,7 @@
 using Synadia.Orbit.Testing.NatsServerProcessManager;
 
+namespace Example.NatsIODocs;
+
 public sealed class NatsServerFixture : IDisposable
 {
     public NatsServerFixture()

@@ -1,5 +1,7 @@
 using NATS.Net;
 
+namespace Example.NatsIODocs;
+
 [Collection("nats-server")]
 public class BasicsPublish(NatsServerFixture fixture)
 {
@@ -13,6 +15,5 @@ public class BasicsPublish(NatsServerFixture fixture)
         await client.PublishAsync("weather.updates", "Temperature: 72F");
 
         // NATS-DOC-END
-        Console.WriteLine("Message published to weather.updates");
     }
 }

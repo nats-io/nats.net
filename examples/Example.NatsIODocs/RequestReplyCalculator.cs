@@ -1,60 +1,37 @@
 using NATS.Net;
 
+namespace Example.NatsIODocs;
+
 [Collection("nats-server")]
-public class RequestReplyCalculator(NatsServerFixture fixture)
+public class RequestReplyCalculator(NatsServerFixture fixture, ITestOutputHelper output)
 {
     [Fact]
     public async Task RunAsync()
     {
         await using var client = new NatsClient(fixture.Server.Url);
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-
         // NATS-DOC-START
-        // Set up the calculator service
-        var service = Task.Run(async () =>
+        // Calculator service: parses "x y" and replies with x+y
+        _ = Task.Run(async () =>
         {
-            try
+            await foreach (var msg in client.SubscribeAsync<string>("calc.add"))
             {
-                await foreach (var msg in client.SubscribeAsync<string>("calc.add", cancellationToken: cts.Token))
-                {
-                    var parts = msg.Data!.Split(' ');
-                    var x = int.Parse(parts[0]);
-                    var y = int.Parse(parts[1]);
-                    await msg.ReplyAsync((x + y).ToString(), cancellationToken: cts.Token);
-                }
-            }
-            catch (OperationCanceledException)
-            {
+                var parts = msg.Data!.Split(' ');
+                var x = int.Parse(parts[0]);
+                var y = int.Parse(parts[1]);
+                await msg.ReplyAsync((x + y).ToString());
             }
         });
 
-        await client.PingAsync(cts.Token);
+        // Let the subscription register
+        await Task.Delay(1000);
 
-        try
-        {
-            using var reqCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
-            var reply = await client.RequestAsync<string, string>("calc.add", "5 3", cancellationToken: reqCts.Token);
-            Console.WriteLine($"5 + 3 = {reply.Data}");
-        }
-        catch (OperationCanceledException)
-        {
-            Console.WriteLine("No Response");
-        }
+        var reply1 = await client.RequestAsync<string, string>("calc.add", "5 3");
+        output.WriteLine($"5 + 3 = {reply1.Data}");
 
-        try
-        {
-            using var reqCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
-            var reply = await client.RequestAsync<string, string>("calc.add", "10 7", cancellationToken: reqCts.Token);
-            Console.WriteLine($"10 + 7 = {reply.Data}");
-        }
-        catch (OperationCanceledException)
-        {
-            Console.WriteLine("No Response");
-        }
+        var reply2 = await client.RequestAsync<string, string>("calc.add", "10 7");
+        output.WriteLine($"10 + 7 = {reply2.Data}");
 
         // NATS-DOC-END
-        await cts.CancelAsync();
-        await service;
     }
 }

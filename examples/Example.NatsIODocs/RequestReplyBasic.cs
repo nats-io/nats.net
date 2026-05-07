@@ -1,47 +1,32 @@
 using NATS.Net;
 
+namespace Example.NatsIODocs;
+
 [Collection("nats-server")]
-public class RequestReplyBasic(NatsServerFixture fixture)
+public class RequestReplyBasic(NatsServerFixture fixture, ITestOutputHelper output)
 {
     [Fact]
     public async Task RunAsync()
     {
         await using var client = new NatsClient(fixture.Server.Url);
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-
         // NATS-DOC-START
-        // Set up the time service
-        var service = Task.Run(async () =>
+        // Set up a service that replies with the current time
+        _ = Task.Run(async () =>
         {
-            try
+            await foreach (var msg in client.SubscribeAsync<string>("time"))
             {
-                await foreach (var msg in client.SubscribeAsync<string>("time", cancellationToken: cts.Token))
-                {
-                    await msg.ReplyAsync(DateTimeOffset.UtcNow.ToString("O"), cancellationToken: cts.Token);
-                }
-            }
-            catch (OperationCanceledException)
-            {
+                await msg.ReplyAsync(DateTimeOffset.UtcNow.ToString("O"));
             }
         });
 
-        await client.PingAsync(cts.Token);
+        // Let the subscription register
+        await Task.Delay(1000);
 
-        // Make a request with a per-call timeout
-        try
-        {
-            using var reqCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
-            var reply = await client.RequestAsync<string>("time", cancellationToken: reqCts.Token);
-            Console.WriteLine($"Time is {reply.Data}");
-        }
-        catch (OperationCanceledException)
-        {
-            Console.WriteLine("No Response");
-        }
+        // Make a request
+        var reply = await client.RequestAsync<string>("time");
+        output.WriteLine($"Time is {reply.Data}");
 
         // NATS-DOC-END
-        await cts.CancelAsync();
-        await service;
     }
 }

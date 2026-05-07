@@ -1,41 +1,43 @@
 using NATS.Net;
 
-public class QueueGroupsBasic
+namespace Example.NatsIODocs;
+
+[Collection("nats-server")]
+public class QueueGroupsBasic(NatsServerFixture fixture, ITestOutputHelper output)
 {
-    [Fact(Skip = "Shows client initialization with the default port; not run in CI.")]
+    [Fact]
     public async Task RunAsync()
     {
+        await using var client = new NatsClient(fixture.Server.Url);
+
         // NATS-DOC-START
-        await using var client = new NatsClient();
-
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-
-        var countA = 0;
-        var countB = 0;
-        var countC = 0;
-
-        async Task Worker(string name, Action onMessage)
+        // Create three workers in the same queue group
+        _ = Task.Run(async () =>
         {
-            try
+            await foreach (var msg in client.SubscribeAsync<string>("orders.new", queueGroup: "new-orders-queue"))
             {
-                await foreach (var msg in client.SubscribeAsync<string>("orders.new", queueGroup: "new-orders-queue", cancellationToken: cts.Token))
-                {
-                    onMessage();
-                    Console.WriteLine($"{name} Received: {msg.Data}");
-                }
+                output.WriteLine($"Worker A processed: {msg.Data}");
             }
-            catch (OperationCanceledException)
+        });
+
+        _ = Task.Run(async () =>
+        {
+            await foreach (var msg in client.SubscribeAsync<string>("orders.new", queueGroup: "new-orders-queue"))
             {
+                output.WriteLine($"Worker B processed: {msg.Data}");
             }
-        }
+        });
 
-        // Set up the subscribers
-        var workerA = Worker("Subscriber A", () => Interlocked.Increment(ref countA));
-        var workerB = Worker("Subscriber B", () => Interlocked.Increment(ref countB));
-        var workerC = Worker("Subscriber C", () => Interlocked.Increment(ref countC));
+        _ = Task.Run(async () =>
+        {
+            await foreach (var msg in client.SubscribeAsync<string>("orders.new", queueGroup: "new-orders-queue"))
+            {
+                output.WriteLine($"Worker C processed: {msg.Data}");
+            }
+        });
 
-        // Ensure subscriptions are at the server before publishing
-        await client.PingAsync(cts.Token);
+        // Let subscription tasks to start
+        await Task.Delay(1000);
 
         // Publish messages once all subscriptions are set up
         for (var i = 1; i <= 10; i++)
@@ -43,14 +45,7 @@ public class QueueGroupsBasic
             await client.PublishAsync("orders.new", $"Order Number: {i}");
         }
 
-        Console.WriteLine("Messages published to orders.new");
-
-        await Task.WhenAll(workerA, workerB, workerC);
-
-        Console.WriteLine($"Subscriber A received {countA} messages.");
-        Console.WriteLine($"Subscriber B received {countB} messages.");
-        Console.WriteLine($"Subscriber C received {countC} messages.");
-
         // NATS-DOC-END
+        await Task.Delay(1000);
     }
 }

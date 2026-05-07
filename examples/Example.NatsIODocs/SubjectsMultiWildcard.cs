@@ -1,27 +1,45 @@
 using NATS.Net;
 
+namespace Example.NatsIODocs;
+
 [Collection("nats-server")]
-public class SubjectsMultiWildcard(NatsServerFixture fixture)
+public class SubjectsMultiWildcard(NatsServerFixture fixture, ITestOutputHelper output)
 {
     [Fact]
     public async Task RunAsync()
     {
         await using var client = new NatsClient(fixture.Server.Url);
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-
         // NATS-DOC-START
         // Subscribe to all non-critical alarms
-        var alarm = SubscribeAsync(client, "sensor.alarm.*", cts.Token);
+        _ = Task.Run(async () =>
+        {
+            await foreach (var msg in client.SubscribeAsync<string>("sensor.alarm.*"))
+            {
+                output.WriteLine($"[sensor.alarm.*]      {msg.Data,-15} ({msg.Subject})");
+            }
+        });
 
         // Subscribe to all critical
-        var critical = SubscribeAsync(client, "sensor.*.*.critical", cts.Token);
+        _ = Task.Run(async () =>
+        {
+            await foreach (var msg in client.SubscribeAsync<string>("sensor.*.*.critical"))
+            {
+                output.WriteLine($"[sensor.*.*.critical] {msg.Data,-15} ({msg.Subject})");
+            }
+        });
 
         // Subscribe to everything
-        var all = SubscribeAsync(client, "sensor.>", cts.Token);
+        _ = Task.Run(async () =>
+        {
+            await foreach (var msg in client.SubscribeAsync<string>("sensor.>"))
+            {
+                output.WriteLine($"[sensor.>]            {msg.Data,-15} ({msg.Subject})");
+            }
+        });
 
-        // Allow subscriptions to register before publishing
-        await client.PingAsync(cts.Token);
+        // Let subscription tasks start
+        await Task.Delay(1000);
 
         // Publish to specific subjects
         await client.PublishAsync("sensor.alarm.smoke", "kitchen,14:22");
@@ -29,22 +47,7 @@ public class SubjectsMultiWildcard(NatsServerFixture fixture)
         await client.PublishAsync("sensor.alarm.water", "basement,16:42");
         await client.PublishAsync("sensor.alarm.water.critical", "basement,16:43");
 
-        await Task.WhenAll(alarm, critical, all);
-
         // NATS-DOC-END
-    }
-
-    private static async Task SubscribeAsync(NatsClient client, string filter, CancellationToken cancellationToken)
-    {
-        try
-        {
-            await foreach (var msg in client.SubscribeAsync<string>(filter, cancellationToken: cancellationToken))
-            {
-                Console.WriteLine($"[{filter,-20}] {msg.Data,-15} ({msg.Subject})");
-            }
-        }
-        catch (OperationCanceledException)
-        {
-        }
+        await Task.Delay(1000);
     }
 }

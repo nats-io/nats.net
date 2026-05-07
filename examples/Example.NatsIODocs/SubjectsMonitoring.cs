@@ -1,36 +1,33 @@
 using NATS.Net;
 
+namespace Example.NatsIODocs;
+
 [Collection("nats-server")]
-public class SubjectsMonitoring(NatsServerFixture fixture)
+public class SubjectsMonitoring(NatsServerFixture fixture, ITestOutputHelper output)
 {
     [Fact]
     public async Task RunAsync()
     {
         await using var client = new NatsClient(fixture.Server.Url);
 
-        // NATS-DOC-START
-        // Subscribe to everything; run in the background so we can publish below
-        var subscribe = Task.Run(async () =>
+        _ = Task.Run(async () =>
         {
-            var received = 0;
+            // NATS-DOC-START
+            // Wire tap: subscribe to everything for monitoring
             await foreach (var msg in client.SubscribeAsync<string>(">"))
             {
-                Console.WriteLine($"[MONITOR] {msg.Subject} --> {msg.Data}");
-                if (++received == 3)
-                {
-                    break;
-                }
+                output.WriteLine($"[MONITOR] {msg.Subject}: {msg.Data}");
             }
+
+            // NATS-DOC-END
         });
 
-        // NATS-DOC-END
-        await client.PingAsync();
+        await Task.Delay(1000);
 
         await client.PublishAsync("hello", "Hello NATS!");
         await client.PublishAsync("event.new", "click");
         await client.PublishAsync("weather.north.fr", "Temperature: 11C");
 
-        Console.WriteLine("Waiting for messages...");
-        await subscribe;
+        await Task.Delay(1000);
     }
 }

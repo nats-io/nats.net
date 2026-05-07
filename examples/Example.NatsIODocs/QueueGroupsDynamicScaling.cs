@@ -1,48 +1,37 @@
+using NATS.Client.Core;
 using NATS.Net;
 
-public class QueueGroupsDynamicScaling
+namespace Example.NatsIODocs;
+
+[Collection("nats-server")]
+public class QueueGroupsDynamicScaling(NatsServerFixture fixture, ITestOutputHelper output)
 {
-    [Fact(Skip = "Shows client initialization with the default port; not run in CI.")]
+    [Fact(Skip = "Subscriber lifecycle (unsubscribe) plumbing isn't a clean doc snippet; not run in CI.")]
     public async Task RunAsync()
     {
+        await using var client = new NatsClient(fixture.Server.Url);
+
         // NATS-DOC-START
-        await using var client = new NatsClient();
+        // Start workers in the same queue group; track them so we can scale down later
+        var workers = new List<INatsSub<string>>();
 
-        const string subject = "tasks";
-        const string queueName = "workers";
-
-        var workers = new List<(int Id, CancellationTokenSource Cts, Task Task)>();
-
-        // Scale up
         for (var i = 1; i <= 5; i++)
-            workers.Add(StartWorker(i));
-
-        // ... do some work, then scale down
-
-        // Scale down
-        foreach (var (_, cts, _) in workers)
-            await cts.CancelAsync();
-
-        await Task.WhenAll(workers.Select(w => w.Task));
-
-        (int, CancellationTokenSource, Task) StartWorker(int id)
         {
-            var cts = new CancellationTokenSource();
-            var task = Task.Run(async () =>
+            var id = i;
+            var sub = await client.Connection.SubscribeCoreAsync<string>("tasks", queueGroup: "workers");
+            _ = Task.Run(async () =>
             {
-                try
+                await foreach (var msg in sub.Msgs.ReadAllAsync())
                 {
-                    await foreach (var msg in client.SubscribeAsync<string>(subject, queueGroup: queueName, cancellationToken: cts.Token))
-                    {
-                        Console.WriteLine($"Worker {id} processing: {msg.Data}");
-                    }
-                }
-                catch (OperationCanceledException)
-                {
+                    output.WriteLine($"Worker {id} processing: {msg.Data}");
                 }
             });
-            return (id, cts, task);
+            workers.Add(sub);
         }
+
+        // Scale down: drop the first worker
+        await workers[0].UnsubscribeAsync();
+        workers.RemoveAt(0);
 
         // NATS-DOC-END
     }

@@ -1,8 +1,9 @@
-using NATS.Client.Core;
 using NATS.Net;
 
+namespace Example.NatsIODocs;
+
 [Collection("nats-server")]
-public class RequestReplyMultipleResponders(NatsServerFixture fixture)
+public class RequestReplyMultipleResponders(NatsServerFixture fixture, ITestOutputHelper output)
 {
     [Fact]
     public async Task RunAsync()
@@ -10,35 +11,28 @@ public class RequestReplyMultipleResponders(NatsServerFixture fixture)
         await using var client = new NatsClient(fixture.Server.Url);
 
         // NATS-DOC-START
-        string ProcessCalculation(string? data)
-        {
-            return "calculated result";
-        }
-
-        // Set up 2 instances of the service (no queue group, so both reply to each request)
-        var serviceA = await client.Connection.SubscribeCoreAsync<string>("calc.add");
+        // Two service instances reply on the same subject; the first reply wins
         _ = Task.Run(async () =>
         {
-            await foreach (var msg in serviceA.Msgs.ReadAllAsync())
+            await foreach (var msg in client.SubscribeAsync<string>("calc.add"))
             {
-                var result = ProcessCalculation(msg.Data) + $" from A";
-                await msg.ReplyAsync(result);
+                await msg.ReplyAsync("calculated result from A");
             }
         });
 
-        var serviceB = await client.Connection.SubscribeCoreAsync<string>("calc.add");
         _ = Task.Run(async () =>
         {
-            await foreach (var msg in serviceB.Msgs.ReadAllAsync())
+            await foreach (var msg in client.SubscribeAsync<string>("calc.add"))
             {
-                var result = ProcessCalculation(msg.Data) + $" from B";
-                await msg.ReplyAsync(result);
+                await msg.ReplyAsync("calculated result from B");
             }
         });
 
-        // The first reply wins; later replies are dropped
+        // Let the subscriptions register
+        await Task.Delay(1000);
+
         var reply = await client.RequestAsync<string>("calc.add");
-        Console.WriteLine($"Got response: {reply.Data}");
+        output.WriteLine($"Got response: {reply.Data}");
 
         // NATS-DOC-END
     }
