@@ -54,6 +54,7 @@ public abstract class NatsSubBase
     private int _pendingMsgs;
     private Exception? _exception;
     private int _isSlowConsumer;
+    private TaskCompletionSource? _readerExited;
 
     /// <summary>
     /// Creates a new instance of <see cref="NatsSubBase"/>.
@@ -363,6 +364,82 @@ public abstract class NatsSubBase
     internal void ClearException() => Interlocked.Exchange(ref _exception, null);
 
     /// <summary>
+    /// Sends UNSUB to the server, waits for PING/PONG round-trip to ensure
+    /// all in-flight messages are processed, then completes the channel.
+    /// This avoids the race where TryComplete() closes the channel while
+    /// the socket reader is still delivering messages.
+    /// </summary>
+    /// <remarks>
+    /// No-op unless <see cref="NatsOpts.DrainSubscriptionsOnDispose"/> is
+    /// enabled. The connection-level dispose path also gates entry into
+    /// this method on the same flag (see ordering in
+    /// <see cref="NatsConnection.DisposeAsync"/>).
+    /// </remarks>
+    /// <returns>A <see cref="ValueTask"/> that represents the asynchronous drain operation.</returns>
+    internal async ValueTask DrainAsync()
+    {
+        if (!Connection.Opts.DrainSubscriptionsOnDispose)
+            return;
+
+        var needsUnsub = false;
+        lock (_gate)
+        {
+            if (!_unsubscribed)
+            {
+                _unsubscribed = true;
+                needsUnsub = true;
+            }
+        }
+
+        if (needsUnsub)
+        {
+            _timeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+            _idleTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+            _startUpTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+
+            // For the built-in SubscriptionManager: send UNSUB but keep the SID in the routing
+            // table until after the PING/PONG round-trip, so messages already in the socket
+            // buffer are delivered before the channel is completed.
+            // For external managers: fall back to RemoveAsync (routing removed before PING).
+            var mgr = _manager as SubscriptionManager;
+            var sid = mgr != null
+                ? await mgr.UnsubscribeForDrainAsync(this).ConfigureAwait(false)
+                : -1;
+            if (mgr == null)
+                await _manager.RemoveAsync(this).ConfigureAwait(false);
+
+            // PING/PONG round-trip: after we get the PONG back, we know the server
+            // has processed our UNSUB and the socket reader has processed all messages
+            // that were in-flight before the UNSUB was received by the server.
+            try
+            {
+                using var pingCts = new CancellationTokenSource(Connection.Opts.DrainPingTimeout);
+                await Connection.PingAsync(pingCts.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                // Timeout via DrainPingTimeout. Expected on dispose path.
+            }
+            catch (NatsException)
+            {
+                // Connection failed or disconnected during drain. Drain is best-effort.
+            }
+
+            // Remove from routing now that no more messages can arrive for this SID.
+            if (sid != -1)
+                mgr?.RemoveFromRouting(sid);
+
+            // Now it's safe to complete the channel, no more messages will arrive.
+            TryComplete();
+        }
+
+        // Always wait for an active user reader to drain the channel before
+        // returning, even if the subscription was already ended (e.g. via
+        // EndSubscription / UnsubscribeAsync) before drain was called.
+        await WaitForReaderDrainAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Marks this subscription as a slow consumer. Returns true if this was a state transition
     /// (i.e., the subscription was not previously marked as a slow consumer).
     /// </summary>
@@ -382,6 +459,36 @@ public abstract class NatsSubBase
     internal virtual ValueTask WriteReconnectCommandsAsync(CommandWriter commandWriter, int sid) => commandWriter.SubscribeAsync(sid, Subject, QueueGroup, PendingMsgs, CancellationToken.None);
 
     /// <summary>
+    /// Marks the user-side reader as active so dispose can wait for it to
+    /// drain buffered messages before completing. Pairs with
+    /// <see cref="MarkReaderInactive"/>.
+    /// </summary>
+    internal void MarkReaderActive()
+    {
+        if (!Connection.Opts.DrainSubscriptionsOnDispose)
+            return;
+
+        if (_readerExited is null)
+        {
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            Interlocked.CompareExchange(ref _readerExited, tcs, null);
+        }
+
+        if (Connection is NatsConnection nc)
+            nc.RegisterDrainParticipant(this);
+    }
+
+    /// <summary>
+    /// Signals the user-side reader has exited. Pairs with <see cref="MarkReaderActive"/>.
+    /// </summary>
+    internal void MarkReaderInactive()
+    {
+        if (Connection is NatsConnection nc)
+            nc.UnregisterDrainParticipant(this);
+        _readerExited?.TrySetResult();
+    }
+
+    /// <summary>
     /// Invoked when a MSG or HMSG arrives for the subscription.
     /// <remarks>
     /// This method is invoked while reading from the socket. Buffers belong to the socket reader and you should process them as quickly as possible or create a copy before you return from this method.
@@ -393,6 +500,21 @@ public abstract class NatsSubBase
     /// <param name="payloadBuffer">Raw payload bytes.</param>
     /// <returns></returns>
     protected abstract ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer);
+
+    /// <summary>
+    /// Waits for the user-side reader to exit so buffered messages can be
+    /// drained on dispose. No-op when the reader was never marked active or
+    /// when <see cref="NatsOpts.ConsumerDrainOnDisposeTimeout"/> is unset.
+    /// </summary>
+    protected virtual ValueTask WaitForReaderDrainAsync()
+    {
+        var tcs = _readerExited;
+        if (tcs is null || tcs.Task.IsCompleted)
+            return default;
+        if (Connection.Opts.ConsumerDrainOnDisposeTimeout is not { } timeout)
+            return default;
+        return WaitForReaderDrainCoreAsync(tcs.Task, timeout);
+    }
 
     /// <summary>
     /// Resets the slow consumer state if the channel has drained, allowing another
@@ -484,5 +606,18 @@ public abstract class NatsSubBase
         UnsubscribeAsync();
 #pragma warning restore VSTHRD110
 #pragma warning restore CA2012
+    }
+
+    private async ValueTask WaitForReaderDrainCoreAsync(Task task, TimeSpan timeout)
+    {
+        try
+        {
+            using var cts = new CancellationTokenSource(timeout);
+            await task.WaitAsync(cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogWarning(NatsLogEvents.Subscription, "Timeout waiting for subscription reader to exit on dispose");
+        }
     }
 }

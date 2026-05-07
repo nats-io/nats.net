@@ -38,7 +38,6 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
 #endif
     private long _pendingMsgs;
     private long _pendingBytes;
-    private int _disposed;
 
     public NatsJSOrderedConsume(
         long maxMsgs,
@@ -138,11 +137,10 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
 
     public override async ValueTask DisposeAsync()
     {
-        Interlocked.Exchange(ref _disposed, 1);
-
         _context.Connection.ConnectionDisconnected -= ConnectionOnConnectionDisconnected;
         try
         {
+            await DrainAsync().ConfigureAwait(false);
             await base.DisposeAsync().ConfigureAwait(false);
         }
         finally
@@ -310,17 +308,12 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
                 }
             }
 
-            // Stop feeding the user if we are disposed.
-            // We need to exit as soon as possible.
-            if (Volatile.Read(ref _disposed) == 0)
-            {
-                // We can't pass cancellation token here because we need to hand
-                // the message to the user to be processed. Writer will be completed
-                // when the user calls Stop() or when the subscription is closed.
-                await _userMsgs.Writer.WriteAsync(msg).ConfigureAwait(false);
+            // We can't pass cancellation token here because we need to hand
+            // the message to the user to be processed. Writer will be completed
+            // when the user calls Stop() or when the subscription is closed.
+            await _userMsgs.Writer.WriteAsync(msg).ConfigureAwait(false);
 
-                ResetSlowConsumer(_userMsgs.Reader.Count);
-            }
+            ResetSlowConsumer(_userMsgs.Reader.Count);
         }
 
         CheckPending();

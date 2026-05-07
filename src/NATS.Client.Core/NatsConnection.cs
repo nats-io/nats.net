@@ -52,6 +52,8 @@ public partial class NatsConnection : INatsConnection
     private readonly ClientOpts _clientOpts;
     private readonly SubscriptionManager _subscriptionManager;
     private readonly ReplyTaskFactory _replyTaskFactory;
+    private readonly object _drainParticipantsGate = new();
+    private readonly HashSet<NatsSubBase> _drainParticipants = new();
 
     private ServerInfo? _writableServerInfo;
     private int _pongCount;
@@ -284,7 +286,6 @@ public partial class NatsConnection : INatsConnection
             IsDisposed = true;
             _logger.Log(LogLevel.Information, NatsLogEvents.Connection, "Disposing connection {Name}", _name);
 
-            await DisposeSocketAsync(false).ConfigureAwait(false);
             if (_pingTimerCancellationTokenSource != null)
             {
 #if NET8_0_OR_GREATER
@@ -294,8 +295,28 @@ public partial class NatsConnection : INatsConnection
 #endif
             }
 
-            await _subscriptionManager.DisposeAsync().ConfigureAwait(false);
-            await CommandWriter.DisposeAsync().ConfigureAwait(false);
+            if (Opts.DrainSubscriptionsOnDispose)
+            {
+                // Drain subs and flush the writer first so UNSUB/PING/PONG
+                // and any pending acks can land before the socket closes.
+                try
+                {
+                    await _subscriptionManager.DisposeAsync().ConfigureAwait(false);
+                }
+                finally
+                {
+                    await DrainRemainingParticipantsAsync().ConfigureAwait(false);
+                    await CommandWriter.DisposeAsync().ConfigureAwait(false);
+                    await DisposeSocketAsync(false).ConfigureAwait(false);
+                }
+            }
+            else
+            {
+                await DisposeSocketAsync(false).ConfigureAwait(false);
+                await _subscriptionManager.DisposeAsync().ConfigureAwait(false);
+                await CommandWriter.DisposeAsync().ConfigureAwait(false);
+            }
+
             _waitForOpenConnection.TrySetCanceled();
 #if NET8_0_OR_GREATER
             await _disposedCts.CancelAsync().ConfigureAwait(false);
@@ -364,6 +385,18 @@ public partial class NatsConnection : INatsConnection
 
     // called only internally
     internal ValueTask SubscribeCoreAsync(int sid, string subject, string? queueGroup, int? maxMsgs, CancellationToken cancellationToken) => CommandWriter.SubscribeAsync(sid, subject, queueGroup, maxMsgs, cancellationToken);
+
+    internal void RegisterDrainParticipant(NatsSubBase sub)
+    {
+        lock (_drainParticipantsGate)
+            _drainParticipants.Add(sub);
+    }
+
+    internal void UnregisterDrainParticipant(NatsSubBase sub)
+    {
+        lock (_drainParticipantsGate)
+            _drainParticipants.Remove(sub);
+    }
 
     internal ValueTask UnsubscribeAsync(int sid)
     {
@@ -1143,5 +1176,27 @@ public partial class NatsConnection : INatsConnection
     {
         if (IsDisposed)
             throw new ObjectDisposedException(null);
+    }
+
+    // Drain subs that already removed themselves from the SubscriptionManager
+    // (e.g. JetStream Fetch on natural completion) but still have a user
+    // iterator reading the channel. Their own DrainAsync waits on the
+    // reader-exited signal. Run in parallel so a slow/dead server doesn't
+    // multiply the dispose wait by the number of subs.
+    private ValueTask DrainRemainingParticipantsAsync()
+    {
+        NatsSubBase[] remaining;
+        lock (_drainParticipantsGate)
+        {
+            if (_drainParticipants.Count == 0)
+                return default;
+            remaining = _drainParticipants.ToArray();
+        }
+
+        var tasks = new Task[remaining.Length];
+        for (var i = 0; i < remaining.Length; i++)
+            tasks[i] = remaining[i].DrainAsync().AsTask();
+
+        return new ValueTask(Task.WhenAll(tasks));
     }
 }

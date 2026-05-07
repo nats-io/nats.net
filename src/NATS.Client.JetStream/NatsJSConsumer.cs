@@ -67,45 +67,20 @@ public class NatsJSConsumer : INatsJSConsumer
     {
         opts ??= _context.Opts.DefaultConsumeOpts;
         await using var cc = await ConsumeInternalAsync<T>(serializer, opts, cancellationToken).ConfigureAwait(false);
-
-        while (!cancellationToken.IsCancellationRequested)
+        cc.MarkReaderActive();
+        try
         {
-            // We have to check calls individually since we can't use yield return in try-catch blocks.
-            bool ready;
-            try
-            {
-                ready = await cc.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                ready = false;
-            }
-            catch (NatsConnectionFailedException)
-            {
-                // Connection has permanently failed, stop consuming and rethrow
-                throw;
-            }
-            catch (NatsJSException)
-            {
-                // Consumer-related errors (like 503 threshold exceeded), stop consuming and rethrow
-                throw;
-            }
-
-            if (!ready)
-                yield break;
-
             while (!cancellationToken.IsCancellationRequested)
             {
-                bool read;
-                NatsJSMsg<T> jsMsg;
+                // We have to check calls individually since we can't use yield return in try-catch blocks.
+                bool ready;
                 try
                 {
-                    read = cc.Msgs.TryRead(out jsMsg);
+                    ready = await cc.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
                 {
-                    read = false;
-                    jsMsg = default;
+                    ready = false;
                 }
                 catch (NatsConnectionFailedException)
                 {
@@ -118,16 +93,48 @@ public class NatsJSConsumer : INatsJSConsumer
                     throw;
                 }
 
-                if (!read)
-                    break;
+                if (!ready)
+                    yield break;
 
-                // if yield is blocked by the application code, we don't want
-                // heartbeat timer kicking in and issuing unnecessary pull requests.
-                cc.StopHeartbeatTimer();
-                yield return jsMsg;
-                cc.ResetHeartbeatTimer();
-                cc.Delivered(jsMsg.Size);
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    bool read;
+                    NatsJSMsg<T> jsMsg;
+                    try
+                    {
+                        read = cc.Msgs.TryRead(out jsMsg);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        read = false;
+                        jsMsg = default;
+                    }
+                    catch (NatsConnectionFailedException)
+                    {
+                        // Connection has permanently failed, stop consuming and rethrow
+                        throw;
+                    }
+                    catch (NatsJSException)
+                    {
+                        // Consumer-related errors (like 503 threshold exceeded), stop consuming and rethrow
+                        throw;
+                    }
+
+                    if (!read)
+                        break;
+
+                    // if yield is blocked by the application code, we don't want
+                    // heartbeat timer kicking in and issuing unnecessary pull requests.
+                    cc.StopHeartbeatTimer();
+                    yield return jsMsg;
+                    cc.ResetHeartbeatTimer();
+                    cc.Delivered(jsMsg.Size);
+                }
             }
+        }
+        finally
+        {
+            cc.MarkReaderInactive();
         }
     }
 
@@ -181,9 +188,17 @@ public class NatsJSConsumer : INatsJSConsumer
             serializer,
             cancellationToken: cancellationToken).ConfigureAwait(false);
 
-        await foreach (var natsJSMsg in f.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        f.MarkReaderActive();
+        try
         {
-            return natsJSMsg;
+            await foreach (var natsJSMsg in f.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+            {
+                return natsJSMsg;
+            }
+        }
+        finally
+        {
+            f.MarkReaderInactive();
         }
 
         return null;
@@ -200,46 +215,53 @@ public class NatsJSConsumer : INatsJSConsumer
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
         await using var fc = await FetchInternalAsync<T>(opts, serializer, cancellationToken).ConfigureAwait(false);
-
-        while (!cancellationToken.IsCancellationRequested)
+        fc.MarkReaderActive();
+        try
         {
-            // We have to check calls individually since we can't use yield return in try-catch blocks.
-            bool ready;
-            try
-            {
-                ready = await fc.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                ready = false;
-            }
-
-            if (!ready)
-                yield break;
-
             while (!cancellationToken.IsCancellationRequested)
             {
-                bool read;
-                NatsJSMsg<T> jsMsg;
+                // We have to check calls individually since we can't use yield return in try-catch blocks.
+                bool ready;
                 try
                 {
-                    read = fc.Msgs.TryRead(out jsMsg);
+                    ready = await fc.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
                 {
-                    read = false;
-                    jsMsg = default;
+                    ready = false;
                 }
 
-                if (!read)
-                    break;
+                if (!ready)
+                    yield break;
 
-                // if yield is blocked by the application code, we don't want
-                // heartbeat timer kicking in and issuing unnecessary pull requests.
-                fc.StopHeartbeatTimer();
-                yield return jsMsg;
-                fc.ResetHeartbeatTimer();
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    bool read;
+                    NatsJSMsg<T> jsMsg;
+                    try
+                    {
+                        read = fc.Msgs.TryRead(out jsMsg);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        read = false;
+                        jsMsg = default;
+                    }
+
+                    if (!read)
+                        break;
+
+                    // if yield is blocked by the application code, we don't want
+                    // heartbeat timer kicking in and issuing unnecessary pull requests.
+                    fc.StopHeartbeatTimer();
+                    yield return jsMsg;
+                    fc.ResetHeartbeatTimer();
+                }
             }
+        }
+        finally
+        {
+            fc.MarkReaderInactive();
         }
     }
 
@@ -298,13 +320,21 @@ public class NatsJSConsumer : INatsJSConsumer
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
         await using var fc = await FetchInternalAsync<T>(opts with { NoWait = true }, serializer, cancellationToken).ConfigureAwait(false);
-        await foreach (var jsMsg in fc.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        fc.MarkReaderActive();
+        try
         {
-            // if yield is blocked by the application code, we don't want
-            // heartbeat timer kicking in and issuing unnecessary pull requests.
-            fc.StopHeartbeatTimer();
-            yield return jsMsg;
-            fc.ResetHeartbeatTimer();
+            await foreach (var jsMsg in fc.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+            {
+                // if yield is blocked by the application code, we don't want
+                // heartbeat timer kicking in and issuing unnecessary pull requests.
+                fc.StopHeartbeatTimer();
+                yield return jsMsg;
+                fc.ResetHeartbeatTimer();
+            }
+        }
+        finally
+        {
+            fc.MarkReaderInactive();
         }
     }
 
