@@ -188,6 +188,16 @@ public partial class NatsJSContext : INatsJSContext
             cancellationToken);
     }
 
+    /// <inheritdoc />
+    public async ValueTask<ConsumerResetResponse> ResetConsumerAsync(string stream, string consumer, ulong seq = 0, CancellationToken cancellationToken = default)
+    {
+        ThrowIfInvalidStreamName(stream);
+        return await JSRequestResponseAsync<ConsumerResetRequest, ConsumerResetResponse>(
+            subject: $"{Opts.Prefix}.CONSUMER.RESET.{stream}.{consumer}",
+            request: seq == 0 ? null : new ConsumerResetRequest { Seq = seq },
+            cancellationToken);
+    }
+
     internal ValueTask<ConsumerInfo> CreateOrderedConsumerInternalAsync(
         string stream,
         NatsJSOrderedConsumerOpts opts,

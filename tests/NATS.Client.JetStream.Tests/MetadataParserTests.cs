@@ -31,6 +31,8 @@ public class MetadataParserTests
             [new TestData(Name: "parse v2 ignore two", Subject: "$JS.ACK.domain.hash-123.stream.cons.100.200.150.513553500000000000.400.token.1.2", Metadata: expected)],
             [new TestData(Name: "parse v2 underscore", Subject: "$JS.ACK._.hash-123.stream.cons.100.200.150.513553500000000000.400.token", Metadata: expectedNoDomain)],
             [new TestData(Name: "parse v1 successful", Subject: "$JS.ACK.stream.cons.100.200.150.513553500000000000.400", Metadata: expectedNoDomain)],
+            [new TestData(Name: "parse v2 fc successful", Subject: "$JS.FC.domain.hash-123.stream.cons.100.200.150.513553500000000000.400.token", Metadata: expected)],
+            [new TestData(Name: "parse v2 fc underscore", Subject: "$JS.FC._.hash-123.stream.cons.100.200.150.513553500000000000.400.token", Metadata: expectedNoDomain)],
             [new TestData(Name: "invalid no subject1", Subject: string.Empty, Metadata: null)],
             [new TestData(Name: "invalid no subject2", Subject: null, Metadata: null)],
             [new TestData(Name: "invalid less than 9", Subject: "$JS.ACK.2.3.4.5.6.7", Metadata: null)],

@@ -196,6 +196,21 @@ public interface INatsJSContext
     ValueTask UnpinConsumerAsync(string stream, string consumer, string group, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Reset a consumer's delivery state.
+    /// </summary>
+    /// <param name="stream">Stream name where consumer is associated to.</param>
+    /// <param name="consumer">Consumer name to be reset.</param>
+    /// <param name="seq">Stream sequence to reset to. Zero (the default) resets the consumer to its current ack floor.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>The reset response, including the consumer info and the sequence the consumer was reset to.</returns>
+    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
+    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
+    /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
+    /// <remarks>This feature is only available on NATS server v2.14 and later.</remarks>
+    ValueTask<ConsumerResetResponse> ResetConsumerAsync(string stream, string consumer, ulong seq = 0, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Calls JetStream Account Info API.
     /// </summary>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>

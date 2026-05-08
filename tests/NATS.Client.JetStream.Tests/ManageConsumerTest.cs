@@ -135,6 +135,57 @@ public class ManageConsumerTest
         }
     }
 
+    [SkipIfNatsServer(versionEarlierThan: "2.14")]
+    public async Task Reset_consumer()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
+        var prefix = _server.GetNextId();
+        var js = new NatsJSContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        await js.CreateStreamAsync(new StreamConfig($"{prefix}s1", [$"{prefix}s1.*"]), cts.Token);
+
+        for (var i = 1; i <= 5; i++)
+        {
+            var ack = await js.PublishAsync($"{prefix}s1.x", i, cancellationToken: cts.Token);
+            ack.EnsureSuccess();
+        }
+
+        var consumer = (NatsJSConsumer)await js.CreateOrUpdateConsumerAsync($"{prefix}s1", new ConsumerConfig($"{prefix}c1"), cts.Token);
+
+        // DoubleAck so the server's ack floor is observably updated before we issue the reset.
+        var fetchOpts = new NatsJSFetchOpts { MaxMsgs = 2, Expires = TimeSpan.FromSeconds(5) };
+        await foreach (var msg in consumer.FetchAsync<int>(opts: fetchOpts, cancellationToken: cts.Token))
+        {
+            await msg.AckAsync(new AckOpts { DoubleAck = true }, cancellationToken: cts.Token);
+        }
+
+        // Reset to a specific stream sequence: next delivery should be that sequence.
+        {
+            var resetResponse = await js.ResetConsumerAsync($"{prefix}s1", $"{prefix}c1", seq: 4, cts.Token);
+            Assert.Equal(4ul, resetResponse.ResetSeq);
+            Assert.Equal($"{prefix}c1", resetResponse.Name);
+
+            var next = await consumer.NextAsync<int>(cancellationToken: cts.Token);
+            Assert.NotNull(next);
+            Assert.Equal(4ul, next!.Metadata!.Value.Sequence.Stream);
+            Assert.Equal(4, next.Data);
+            await next.AckAsync(new AckOpts { DoubleAck = true }, cancellationToken: cts.Token);
+        }
+
+        // Reset with seq=0 (empty body): rewinds to the ack floor. ResetSeq is the next deliverable sequence.
+        {
+            var resetResponse = await js.ResetConsumerAsync($"{prefix}s1", $"{prefix}c1", cancellationToken: cts.Token);
+            Assert.Equal(5ul, resetResponse.ResetSeq);
+
+            var next = await consumer.NextAsync<int>(cancellationToken: cts.Token);
+            Assert.NotNull(next);
+            Assert.Equal(5ul, next!.Metadata!.Value.Sequence.Stream);
+        }
+    }
+
     [SkipIfNatsServer(versionEarlierThan: "2.10")]
     public async Task Consumer_create_update_action()
     {

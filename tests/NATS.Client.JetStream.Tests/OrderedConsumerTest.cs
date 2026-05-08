@@ -494,4 +494,75 @@ public class OrderedConsumerTest
         _output.WriteLine($"Received {count} messages with MaxBytes mode");
         Assert.True(count > 5, "Should have received messages after consumer deletion");
     }
+
+    [Fact]
+    public async Task OrderedConsume_connection_dispose_drains_buffered_messages()
+    {
+        const int totalMsgs = 100;
+        const int pullBatch = 20;
+        const int bailAt = 10;
+
+        var prefix = _server.GetNextId();
+        var streamName = $"{prefix}s1";
+        var subject = $"{prefix}s1.x";
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+
+        await using (var setup = new NatsConnection(new NatsOpts { Url = _server.Url }))
+        {
+            var setupJs = new NatsJSContext(setup);
+            await setupJs.CreateStreamAsync(new StreamConfig(streamName, [subject]), cts.Token);
+
+            for (var i = 0; i < totalMsgs; i++)
+                (await setupJs.PublishAsync(subject, i, cancellationToken: cts.Token)).EnsureSuccess();
+        }
+
+        var nats = new NatsConnection(new NatsOpts
+        {
+            Url = _server.Url,
+            DrainSubscriptionsOnDispose = true,
+            ConsumerDrainOnDisposeTimeout = TimeSpan.FromSeconds(30),
+        });
+        var js = new NatsJSContext(nats);
+        var stream = await js.GetStreamAsync(streamName, cancellationToken: cts.Token);
+        var consumer = await stream.CreateOrderedConsumerAsync(cancellationToken: cts.Token);
+
+        var reachedBail = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var lastSeq = -1;
+        Exception? readerError = null;
+        var consumeTask = Task.Run(
+            async () =>
+            {
+                var count = 0;
+                try
+                {
+                    var consumeOpts = new NatsJSConsumeOpts { MaxMsgs = pullBatch, Expires = TimeSpan.FromSeconds(30) };
+                    await foreach (var msg in consumer.ConsumeAsync<int>(opts: consumeOpts, cancellationToken: cts.Token))
+                    {
+                        Volatile.Write(ref lastSeq, msg.Data);
+                        count++;
+                        if (count >= bailAt)
+                            reachedBail.TrySetResult();
+                        await Task.Delay(50, cts.Token);
+                    }
+                }
+                catch (Exception e) when (e is not OperationCanceledException)
+                {
+                    readerError = e;
+                }
+
+                return count;
+            },
+            cts.Token);
+
+        await reachedBail.Task.WaitAsync(cts.Token);
+
+        await nats.DisposeAsync();
+
+        var consumed = await consumeTask;
+
+        Assert.Null(readerError);
+        Assert.True(consumed >= bailAt, $"consumed {consumed} should be >= {bailAt}");
+        Assert.Equal(consumed - 1, Volatile.Read(ref lastSeq));
+    }
 }

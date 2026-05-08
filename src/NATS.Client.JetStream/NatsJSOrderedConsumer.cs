@@ -76,6 +76,9 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
             ulong seq = 0;
             while (!cancellationToken.IsCancellationRequested)
             {
+                if (_context.Connection is NatsConnection { IsDisposed: true })
+                    yield break;
+
                 var consumer = await RecreateConsumer(consumerName, seq, cancellationToken);
                 consumerName = consumer.Info.Name;
                 _logger.LogInformation(NatsJSLogEvents.NewConsumer, "Created {ConsumerName} with sequence {Seq}", consumerName, seq);
@@ -85,71 +88,79 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
 
                 await using (var cc = await consumer.OrderedConsumeInternalAsync(serializer, opts, cancellationToken))
                 {
-                    while (true)
+                    cc.MarkReaderActive();
+                    try
                     {
-                        // We have to check every call to WaitToReadAsync and TryRead for
-                        // protocol exceptions individually because we can't yield return
-                        // within try-catch.
-                        try
-                        {
-                            var read = await cc.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
-                            if (!read)
-                                break;
-                        }
-                        catch (OperationCanceledException)
-                        {
-                            break;
-                        }
-                        catch (NatsJSProtocolException pe)
-                        {
-                            protocolException = pe;
-                            goto CONSUME_LOOP;
-                        }
-                        catch (NatsConnectionFailedException)
-                        {
-                            // Connection has permanently failed, stop consuming and rethrow
-                            throw;
-                        }
-                        catch (NatsJSException e) when (e is not NatsJSProtocolException and not NatsJSConnectionException and not NatsJSTimeoutException)
-                        {
-                            // Consumer-related errors (like 503 threshold exceeded), stop consuming and rethrow
-                            throw;
-                        }
-                        catch (NatsJSConnectionException e)
-                        {
-                            _logger.LogWarning(NatsJSLogEvents.Retry, "{Error}. Retrying...", e.Message);
-                            goto CONSUME_LOOP;
-                        }
-                        catch (NatsJSTimeoutException e)
-                        {
-                            notificationHandler?.Invoke(NatsJSTimeoutNotification.Default, cancellationToken);
-                            _logger.LogWarning(NatsJSLogEvents.Retry, "{Error}. Retrying...", e.Message);
-                            goto CONSUME_LOOP;
-                        }
-
                         while (true)
                         {
-                            NatsJSMsg<T> msg;
-
-                            var canRead = cc.Msgs.TryRead(out msg);
-                            if (!canRead)
-                                break;
-
-                            if (msg.Metadata is not { } metadata)
-                                continue;
-
-                            var expected = cseq + 1;
-                            if (metadata.Sequence.Consumer != expected)
+                            // We have to check every call to WaitToReadAsync and TryRead for
+                            // protocol exceptions individually because we can't yield return
+                            // within try-catch.
+                            try
                             {
-                                _logger.LogWarning(NatsJSLogEvents.Retry, "Consumer sequence mismatch. Expected {Expected}, was {SequenceConsumer}. Retrying...", expected, metadata.Sequence.Consumer);
+                                var read = await cc.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
+                                if (!read)
+                                    break;
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                break;
+                            }
+                            catch (NatsJSProtocolException pe)
+                            {
+                                protocolException = pe;
+                                goto CONSUME_LOOP;
+                            }
+                            catch (NatsConnectionFailedException)
+                            {
+                                // Connection has permanently failed, stop consuming and rethrow
+                                throw;
+                            }
+                            catch (NatsJSException e) when (e is not NatsJSProtocolException and not NatsJSConnectionException and not NatsJSTimeoutException)
+                            {
+                                // Consumer-related errors (like 503 threshold exceeded), stop consuming and rethrow
+                                throw;
+                            }
+                            catch (NatsJSConnectionException e)
+                            {
+                                _logger.LogWarning(NatsJSLogEvents.Retry, "{Error}. Retrying...", e.Message);
+                                goto CONSUME_LOOP;
+                            }
+                            catch (NatsJSTimeoutException e)
+                            {
+                                notificationHandler?.Invoke(NatsJSTimeoutNotification.Default, cancellationToken);
+                                _logger.LogWarning(NatsJSLogEvents.Retry, "{Error}. Retrying...", e.Message);
                                 goto CONSUME_LOOP;
                             }
 
-                            seq = metadata.Sequence.Stream;
-                            cseq = metadata.Sequence.Consumer;
+                            while (true)
+                            {
+                                NatsJSMsg<T> msg;
 
-                            yield return msg;
+                                var canRead = cc.Msgs.TryRead(out msg);
+                                if (!canRead)
+                                    break;
+
+                                if (msg.Metadata is not { } metadata)
+                                    continue;
+
+                                var expected = cseq + 1;
+                                if (metadata.Sequence.Consumer != expected)
+                                {
+                                    _logger.LogWarning(NatsJSLogEvents.Retry, "Consumer sequence mismatch. Expected {Expected}, was {SequenceConsumer}. Retrying...", expected, metadata.Sequence.Consumer);
+                                    goto CONSUME_LOOP;
+                                }
+
+                                seq = metadata.Sequence.Stream;
+                                cseq = metadata.Sequence.Consumer;
+
+                                yield return msg;
+                            }
                         }
+                    }
+                    finally
+                    {
+                        cc.MarkReaderInactive();
                     }
                 }
 

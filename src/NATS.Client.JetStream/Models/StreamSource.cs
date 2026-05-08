@@ -57,6 +57,13 @@ public record StreamSource
     public ExternalStreamSource? External { get; set; }
 
     /// <summary>
+    /// Configures durable sourcing using a pre-created consumer.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("consumer")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public StreamConsumerSource? Consumer { get; set; }
+
+    /// <summary>
     /// This field is a convenience for setting up an ExternalStream.
     /// If set, the value here is used to calculate the JetStreamAPI prefix.
     /// This field is never serialized to the server. This value cannot be set

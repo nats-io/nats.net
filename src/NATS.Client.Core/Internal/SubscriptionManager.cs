@@ -149,18 +149,23 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
         _cts.Cancel();
 #endif
 
-        WeakReference<NatsSubBase>[] subRefs;
+        var subs = new List<NatsSubBase>();
         lock (_gate)
         {
-            subRefs = _bySid.Values.Select(m => m.WeakReference).ToArray();
-            _bySid.Clear();
+            foreach (var sidMetadata in _bySid.Values)
+            {
+                if (sidMetadata.WeakReference.TryGetTarget(out var sub))
+                    subs.Add(sub);
+            }
         }
 
-        foreach (var subRef in subRefs)
-        {
-            if (subRef.TryGetTarget(out var sub))
-                await sub.DisposeAsync().ConfigureAwait(false);
-        }
+        if (subs.Count == 0)
+            return;
+
+        var tasks = new Task[subs.Count];
+        for (var i = 0; i < subs.Count; i++)
+            tasks[i] = subs[i].DisposeAsync().AsTask();
+        await Task.WhenAll(tasks).ConfigureAwait(false);
     }
 
     public ValueTask RemoveAsync(NatsSubBase sub)
@@ -186,6 +191,34 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
         }
 
         return _connection.UnsubscribeAsync(subMetadata.Sid);
+    }
+
+    // Send UNSUB and remove from _bySub, but keep in _bySid until after PING/PONG.
+    // Returns the SID so the caller can call RemoveFromRouting after the round-trip.
+    internal async ValueTask<int> UnsubscribeForDrainAsync(NatsSubBase sub)
+    {
+        SubscriptionMetadata? subMetadata;
+        lock (_gate)
+        {
+            if (!_bySub.TryGetValue(sub, out subMetadata))
+                return -1;
+            _bySub.Remove(sub);
+        }
+
+        if (_debug)
+            _logger.LogDebug(NatsLogEvents.Subscription, "Drain-unsubscribing {Subject}/{Sid}", sub.Subject, subMetadata.Sid);
+
+        await _connection.UnsubscribeAsync(subMetadata.Sid).ConfigureAwait(false);
+        return subMetadata.Sid;
+    }
+
+    // Remove from _bySid after the PING/PONG round-trip completes.
+    internal void RemoveFromRouting(int sid)
+    {
+        lock (_gate)
+        {
+            _bySid.TryRemove(sid, out _);
+        }
     }
 
     /// <summary>

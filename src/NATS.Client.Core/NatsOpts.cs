@@ -154,6 +154,55 @@ public sealed record NatsOpts
     public bool WaitUntilSent { get; init; } = false;
 
     /// <summary>
+    /// When true, <see cref="NatsConnection.DisposeAsync"/> drains subscriptions
+    /// and flushes the command writer before closing the socket. (default: false)
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// With the default (false), the socket is closed first, which means UNSUB
+    /// and any pending writes (e.g. JetStream acks queued by a consume loop)
+    /// are dropped. Enable to let subscriptions drain cleanly on dispose.
+    /// Required for <see cref="ConsumerDrainOnDisposeTimeout"/> to be effective.
+    /// </para>
+    /// <para>
+    /// Drain mechanism: each subscription sends UNSUB, then a PING and waits
+    /// for the PONG (bounded by <see cref="DrainPingTimeout"/>). Once the
+    /// PONG arrives the server has processed UNSUB and the socket reader has
+    /// delivered any messages the server sent before that, so completing the
+    /// user channel afterwards won't drop in-flight messages. Subscriptions
+    /// drain in parallel on connection dispose, so total dispose time is
+    /// bounded by one round-trip plus the <see cref="ConsumerDrainOnDisposeTimeout"/>
+    /// wait if set, not multiplied by the number of subscriptions.
+    /// </para>
+    /// </remarks>
+    public bool DrainSubscriptionsOnDispose { get; init; } = false;
+
+    /// <summary>
+    /// When set, JetStream consumer/fetch dispose waits up to this timeout for
+    /// the user's consume loop to finish acking buffered messages before
+    /// returning. (default: null, no wait)
+    /// </summary>
+    /// <remarks>
+    /// Only effective when <see cref="DrainSubscriptionsOnDispose"/> is also
+    /// true. Without this wait, messages already delivered into the consumer
+    /// channel but not yet yielded by the user loop are dropped on dispose
+    /// and remain NumAckPending until AckWait expires.
+    /// </remarks>
+    public TimeSpan? ConsumerDrainOnDisposeTimeout { get; init; } = null;
+
+    /// <summary>
+    /// Per-subscription PING/PONG timeout used during drain on dispose.
+    /// (default: 5 seconds)
+    /// </summary>
+    /// <remarks>
+    /// Bounds how long drain will wait for the server to ack the UNSUB before
+    /// completing the user channel anyway. Increase for high-latency networks
+    /// where a single round-trip can exceed the default. Only effective when
+    /// <see cref="DrainSubscriptionsOnDispose"/> is true.
+    /// </remarks>
+    public TimeSpan DrainPingTimeout { get; init; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>
     /// Maximum number of reconnect attempts. (default: -1, unlimited)
     /// </summary>
     /// <remarks>

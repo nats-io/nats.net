@@ -69,6 +69,8 @@ public class NatsObjContextFactoryTest
 
         public ValueTask UnpinConsumerAsync(string stream, string consumer, string group, CancellationToken cancellationToken = default) => throw new NotImplementedException();
 
+        public ValueTask<ConsumerResetResponse> ResetConsumerAsync(string stream, string consumer, ulong seq = 0, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+
         public ValueTask<AccountInfoResponse> GetAccountInfoAsync(CancellationToken cancellationToken = default) => throw new NotImplementedException();
 
         public ValueTask<PubAckResponse> PublishAsync<T>(string subject, T? data, INatsSerialize<T>? serializer = default, NatsJSPubOpts? opts = default, NatsHeaders? headers = default, CancellationToken cancellationToken = default) => throw new NotImplementedException();

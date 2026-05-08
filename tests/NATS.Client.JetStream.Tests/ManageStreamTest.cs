@@ -468,6 +468,100 @@ public class ManageStreamTest
         Assert.Equal(10, promoted.Info.State.Messages);
     }
 
+    [SkipIfNatsServer(versionEarlierThan: "2.14")]
+    public async Task Mirror_and_source_with_durable_consumer()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var prefix = _server.GetNextId();
+        await nats.ConnectRetryAsync();
+
+        var js = new NatsJSContext(nats);
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var sourceName = $"{prefix}SOURCE";
+        await js.CreateStreamAsync(new StreamConfig(sourceName, [$"{prefix}foo"]), cts.Token);
+
+        await js.CreateOrUpdateConsumerAsync(
+            sourceName,
+            new ConsumerConfig("C")
+            {
+                AckPolicy = ConsumerConfigAckPolicy.FlowControl,
+                IdleHeartbeat = TimeSpan.FromSeconds(1),
+                DeliverSubject = $"{prefix}deliver.mirror",
+            },
+            cts.Token);
+        await js.CreateOrUpdateConsumerAsync(
+            sourceName,
+            new ConsumerConfig("C2")
+            {
+                AckPolicy = ConsumerConfigAckPolicy.FlowControl,
+                IdleHeartbeat = TimeSpan.FromSeconds(1),
+                DeliverSubject = $"{prefix}deliver.source",
+            },
+            cts.Token);
+
+        var mirror = await js.CreateStreamAsync(
+            new StreamConfig
+            {
+                Name = $"{prefix}MIRROR",
+                Mirror = new StreamSource
+                {
+                    Name = sourceName,
+                    Consumer = new StreamConsumerSource { Name = "C", DeliverSubject = $"{prefix}deliver.mirror" },
+                },
+            },
+            cts.Token);
+
+        Assert.NotNull(mirror.Info.Config.Mirror);
+        Assert.NotNull(mirror.Info.Config.Mirror!.Consumer);
+        Assert.Equal("C", mirror.Info.Config.Mirror.Consumer!.Name);
+        Assert.Equal($"{prefix}deliver.mirror", mirror.Info.Config.Mirror.Consumer.DeliverSubject);
+
+        var sourced = await js.CreateStreamAsync(
+            new StreamConfig
+            {
+                Name = $"{prefix}SOURCED",
+                Sources = new[]
+                {
+                    new StreamSource
+                    {
+                        Name = sourceName,
+                        Consumer = new StreamConsumerSource { Name = "C2", DeliverSubject = $"{prefix}deliver.source" },
+                    },
+                },
+            },
+            cts.Token);
+
+        Assert.NotNull(sourced.Info.Config.Sources);
+        var sourceEntry = sourced.Info.Config.Sources!.Single();
+        Assert.NotNull(sourceEntry.Consumer);
+        Assert.Equal("C2", sourceEntry.Consumer!.Name);
+        Assert.Equal($"{prefix}deliver.source", sourceEntry.Consumer.DeliverSubject);
+
+        for (var i = 0; i < 3; i++)
+        {
+            await js.PublishAsync($"{prefix}foo", new byte[] { (byte)i }, cancellationToken: cts.Token);
+        }
+
+        await Retry.Until(
+            "mirror caught up",
+            async () =>
+            {
+                await mirror.RefreshAsync(cts.Token);
+                return mirror.Info.State.Messages == 3;
+            },
+            timeout: TimeSpan.FromSeconds(10));
+
+        await Retry.Until(
+            "sourced caught up",
+            async () =>
+            {
+                await sourced.RefreshAsync(cts.Token);
+                return sourced.Info.State.Messages == 3;
+            },
+            timeout: TimeSpan.FromSeconds(10));
+    }
+
     [SkipIfNatsServer(versionEarlierThan: "2.12.5")]
     public async Task Snapshot_request_with_chunk_and_window_size()
     {
