@@ -321,6 +321,21 @@ public partial class NatsConnection : INatsConnection
             _disposedCts.Cancel();
             _initialConnectCts.Cancel();
 #endif
+
+            // Drain the reconnect loop so any exception it raises is observed here
+            // rather than leaking onto the finalizer thread.
+            var reconnectLoopTask = _reconnectLoopTask;
+            if (reconnectLoopTask is not null)
+            {
+                try
+                {
+                    await reconnectLoopTask.ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(NatsLogEvents.Connection, ex, "Reconnect loop completed with exception during dispose");
+                }
+            }
         }
     }
 
@@ -513,7 +528,7 @@ public partial class NatsConnection : INatsConnection
 #pragma warning disable VSTHRD103
             _initialConnectCts.Cancel();
 #pragma warning restore VSTHRD103
-            _reconnectLoopTask = Task.Run(ReconnectLoop);
+            _reconnectLoopTask = Task.Run(ReconnectLoopAsync);
             _eventChannel.Writer.TryWrite((NatsEvent.ConnectionOpened, new NatsEventArgs(url?.ToString() ?? string.Empty)));
         }
     }
@@ -644,23 +659,45 @@ public partial class NatsConnection : INatsConnection
                     reconnectTask = _subscriptionManager.WriteReconnectCommandsAsync(priorityCommandWriter.CommandWriter).AsTask();
                 }
 
-                // receive COMMAND response (PONG or ERROR)
                 try
                 {
-                    await waitForPongOrErrorSignal.Task
-                        .WaitAsync(Opts.ConnectTimeout)
-                        .ConfigureAwait(false);
-                }
-                catch (TimeoutException)
-                {
-                    _logger.LogDebug(NatsLogEvents.Connection, "Timeout waiting for initial pong");
-                    throw;
-                }
+                    // receive COMMAND response (PONG or ERROR)
+                    try
+                    {
+                        await waitForPongOrErrorSignal.Task
+                            .WaitAsync(Opts.ConnectTimeout)
+                            .ConfigureAwait(false);
+                    }
+                    catch (TimeoutException)
+                    {
+                        _logger.LogDebug(NatsLogEvents.Connection, "Timeout waiting for initial pong");
+                        throw;
+                    }
 
-                if (reconnectTask != null)
+                    if (reconnectTask != null)
+                    {
+                        // wait for reconnect commands to complete
+                        await reconnectTask.ConfigureAwait(false);
+                    }
+                }
+                catch
                 {
-                    // wait for reconnect commands to complete
-                    await reconnectTask.ConfigureAwait(false);
+                    // The priority writer is about to be torn down on the way out;
+                    // observe the reconnect task so its fault can't surface later
+                    // as an UnobservedTaskException on the finalizer thread.
+                    if (reconnectTask != null)
+                    {
+                        try
+                        {
+                            await reconnectTask.ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogDebug(NatsLogEvents.Connection, ex, "Reconnect commands faulted during teardown");
+                        }
+                    }
+
+                    throw;
                 }
             }
 
@@ -705,7 +742,7 @@ public partial class NatsConnection : INatsConnection
         _logger.LogDebug(NatsLogEvents.Connection, "Setup reader and writer completed successfully");
     }
 
-    private async void ReconnectLoop()
+    private async Task ReconnectLoopAsync()
     {
         var reconnectCount = Interlocked.Increment(ref _reconnectCount);
         _logger.LogDebug(NatsLogEvents.Connection, "Reconnect loop started [{ReconnectCount}]", reconnectCount);
@@ -741,7 +778,9 @@ public partial class NatsConnection : INatsConnection
                 ConnectionState = NatsConnectionState.Reconnecting;
                 _waitForOpenConnection.TrySetCanceled();
                 _waitForOpenConnection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+#pragma warning disable VSTHRD103
                 _pingTimerCancellationTokenSource?.Cancel();
+#pragma warning restore VSTHRD103
             }
 
             // Invoke event after state changed
@@ -838,7 +877,7 @@ public partial class NatsConnection : INatsConnection
                 _pingTimerCancellationTokenSource = new CancellationTokenSource();
                 StartPingTimer(_pingTimerCancellationTokenSource.Token);
                 _waitForOpenConnection.TrySetResult();
-                _reconnectLoopTask = Task.Run(ReconnectLoop);
+                _reconnectLoopTask = Task.Run(ReconnectLoopAsync);
                 _eventChannel.Writer.TryWrite((NatsEvent.ConnectionOpened, new NatsEventArgs(url.ToString())));
             }
         }
