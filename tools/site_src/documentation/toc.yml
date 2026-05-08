@@ -38,6 +38,8 @@
   items:
     - name: Slow Consumers
       href: advanced/slow-consumers.md
+    - name: Server Errors
+      href: advanced/server-errors.md
     - name: Serialization
       href: advanced/serialization.md
     - name: Security
