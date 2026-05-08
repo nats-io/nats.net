@@ -89,7 +89,9 @@ public class ErrorHandlerTest
             {
                 lock (errors)
                 {
-                    return errors.Any(e => e.Error == "Permissions Violation for Publish to \"y\"");
+                    return errors.Any(e =>
+                        e.Error == "Permissions Violation for Publish to \"y\""
+                        && e.Kind == NatsServerErrorKind.PermissionsViolation);
                 }
             });
     }
