@@ -25,6 +25,7 @@ public class NatsServerErrorEventArgsTest
     }
 
     [Theory]
+    [InlineData(null)]
     [InlineData("")]
     [InlineData("Authentication Timeout")]
     [InlineData("Maximum Payload Violation")]
@@ -33,9 +34,9 @@ public class NatsServerErrorEventArgsTest
     [InlineData("Invalid Client Protocol")]
     [InlineData("permissions violation")]
     [InlineData("Some Future Server Error")]
-    public void Unknown_kinds(string error)
+    public void Unknown_kinds(string? error)
     {
-        var args = new NatsServerErrorEventArgs(error);
+        var args = new NatsServerErrorEventArgs(error!);
         Assert.Equal(NatsServerErrorKind.Unknown, args.Kind);
         Assert.Equal(error, args.Error);
     }
