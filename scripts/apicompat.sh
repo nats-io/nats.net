@@ -22,7 +22,7 @@ fi
 # Build if requested
 if [ "$1" = "--build" ]; then
     echo "Building solution..."
-    dotnet build -c Release "$ROOT_DIR/NATS.Net.sln"
+    dotnet build -c Release "$ROOT_DIR/NATS.Net.slnx"
 fi
 
 check_compat() {

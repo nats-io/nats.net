@@ -19,7 +19,7 @@ var generatorSettings = new CSharpGeneratorSettings
 };
 
 var slnDirInfo = new DirectoryInfo(Directory.GetCurrentDirectory());
-while (!File.Exists(Path.Combine(slnDirInfo.FullName, "NATS.Client.sln")))
+while (!File.Exists(Path.Combine(slnDirInfo.FullName, "NATS.Net.slnx")))
 {
     if (slnDirInfo.Parent == default)
         throw new Exception("could not locate solution root");

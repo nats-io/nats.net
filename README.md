@@ -149,7 +149,7 @@ You can join the community asking questions, sharing ideas, and helping others:
 
 - Read the [Contributor Guide](CONTRIBUTING.md)
 - Fork the repository and create a branch
-- Open `NATS.Net.sln` solution in Visual Studio, Rider or VS Code (or any other editor of your choice)
+- Open `NATS.Net.slnx` solution in Visual Studio, Rider or VS Code (or any other editor of your choice)
 - Make changes and write tests
 - Run tests against a locally installed NATS server in your PATH
 - Note that some tests are still not reliable locally, so CI will run all tests
