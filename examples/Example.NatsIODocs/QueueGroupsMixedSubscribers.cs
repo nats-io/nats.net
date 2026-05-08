@@ -51,7 +51,6 @@ public class QueueGroupsMixedSubscribers(NatsServerFixture fixture, ITestOutputH
 
         // Audit and metrics see every message; one worker processes each
         await client.PublishAsync("orders.new", "Order 123");
-        await client.PublishAsync("orders.new", "Order 124");
 
         // NATS-DOC-END
         await Task.Delay(1000);

@@ -9,7 +9,6 @@ public class BasicsSubscribe(NatsServerFixture fixture, ITestOutputHelper output
     public async Task RunAsync()
     {
         await using var client = new NatsClient(fixture.Server.Url);
-
         _ = Task.Run(async () =>
         {
             // NATS-DOC-START
@@ -21,5 +20,8 @@ public class BasicsSubscribe(NatsServerFixture fixture, ITestOutputHelper output
 
             // NATS-DOC-END
         });
+
+        await Task.Delay(1000);
+        await client.PublishAsync("weather.updates", "sunny");
     }
 }

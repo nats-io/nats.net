@@ -35,7 +35,7 @@ public class RequestReplyHeaders(NatsServerFixture fixture, ITestOutputHelper ou
             ["X-Priority"] = "high",
         };
 
-        var reply = await client.RequestAsync<string, string>("service", "data", headers: requestHeaders);
+        var reply = await client.RequestAsync<string, string>(subject: "service", data: "data", headers: requestHeaders);
         output.WriteLine($"Response: {reply.Data}");
         output.WriteLine($"Response ID: {reply.Headers?["X-Response-ID"]}");
 

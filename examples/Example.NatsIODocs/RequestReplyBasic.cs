@@ -12,20 +12,21 @@ public class RequestReplyBasic(NatsServerFixture fixture, ITestOutputHelper outp
 
         // NATS-DOC-START
         // Set up a service that replies with the current time
+        // DateTime would be serialized as an ISO-formatted string, just like all primitive types.
         _ = Task.Run(async () =>
         {
-            await foreach (var msg in client.SubscribeAsync<string>("time"))
+            await foreach (var msg in client.SubscribeAsync<DateTime>("time"))
             {
-                await msg.ReplyAsync(DateTimeOffset.UtcNow.ToString("O"));
+                await msg.ReplyAsync(DateTime.Now);
             }
         });
 
-        // Let the subscription register
+        // Let the subscription task start
         await Task.Delay(1000);
 
         // Make a request
-        var reply = await client.RequestAsync<string>("time");
-        output.WriteLine($"Time is {reply.Data}");
+        var reply = await client.RequestAsync<DateTime>("time");
+        output.WriteLine($"Time is {reply.Data:O}");
 
         // NATS-DOC-END
     }

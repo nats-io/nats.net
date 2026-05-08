@@ -30,7 +30,7 @@ public class QueueGroupsDynamicScaling(NatsServerFixture fixture, ITestOutputHel
         }
 
         // Scale down: drop the first worker
-        await workers[0].UnsubscribeAsync();
+        await workers[0].DisposeAsync();
         workers.RemoveAt(0);
 
         // NATS-DOC-END

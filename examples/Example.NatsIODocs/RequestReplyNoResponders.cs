@@ -15,12 +15,12 @@ public class RequestReplyNoResponders(NatsServerFixture fixture, ITestOutputHelp
         // RequestAsync throws NatsNoRespondersException by default when nobody is listening
         try
         {
-            var reply = await client.RequestAsync<string>("no.such.service");
+            var reply = await client.RequestAsync<string, string>(subject: "no.such.service", data: "test");
             output.WriteLine($"Response: {reply.Data}");
         }
         catch (NatsNoRespondersException)
         {
-            output.WriteLine("No responders");
+            output.WriteLine("No services available to handle the request");
         }
 
         // NATS-DOC-END
