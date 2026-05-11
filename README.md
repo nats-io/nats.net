@@ -125,6 +125,74 @@ Head over to [NATS documentation](https://docs.nats.io/nats-concepts/overview) f
 - **NATS.Client.Serializers.Json**: JSON serializer for ad-hoc types
 - **NATS.Extensions.Microsoft.DependencyInjection**: extension to configure DI container
 
+## Client and Orbit
+
+NATS client functionality is split across two layers: the **core client**
+(`NATS.Net`, this repo) and **[Orbit](https://github.com/synadia-io/orbit.net)**,
+a separate set of packages with higher-level utilities.
+
+The split exists so the core can stay small, stable, and consistent across
+NATS clients in every language, while Orbit can iterate quickly on
+opinionated abstractions without dragging the core API along for the ride.
+
+### Core client (`NATS.Net`)
+
+- Direct API over Core NATS and JetStream as exposed by `nats-server`.
+- Lightweight, unopinionated, performance-oriented.
+- API surface kept in **parity** with other official NATS clients
+  (Rust, Go, Java, JS, Python, C). A feature shipped here should look
+  the same shape everywhere.
+- Stable, conservative versioning. Breaking changes are rare and deliberate.
+
+### Orbit (`orbit.net`)
+
+- Higher-level, opinionated abstractions built **on top of** the core client.
+- Per-package versioning, so an experimental utility can iterate
+  without bumping every other piece.
+- Free to be language-specific: a .NET-idiomatic API does not need to match
+  the equivalent in other languages.
+- May lag, omit, or extend cross-client parity items.
+
+### What goes where?
+
+| Concern                                            | Core (`NATS.Net`)   | Orbit |
+|----------------------------------------------------|:-------------------:|:-----:|
+| Connect, publish, subscribe, request/reply         | ✅                  |       |
+| JetStream publish, consumers, streams, KV, OS      | ✅                  |       |
+| Service API (request/reply micro-services)         | ✅                  |       |
+| Wire-protocol coverage, auth, TLS, reconnection    | ✅                  |       |
+| Cross-client parity, conservative semver           | ✅                  |       |
+| Opinionated helpers / sugar over core APIs         |                     | ✅    |
+| New experimental patterns (e.g. partitioned groups)|                     | ✅    |
+| KV codecs, distributed counters, NATS contexts     |                     | ✅    |
+| .NET-idiomatic abstractions with no parity mandate |                     | ✅    |
+| Per-utility versioning, faster API churn allowed   |                     | ✅    |
+
+> **Rule of thumb:** if it is a thin mapping of something `nats-server`
+> already speaks and every official client must expose it, it belongs in
+> core. If it is a pattern, helper, or abstraction layered on top, it
+> belongs in Orbit.
+
+### Layering
+
+```text
+   ┌──────────────────────────────────────────────────────┐
+   │  Application code                                    │
+   └──────────────┬───────────────────────────┬───────────┘
+                  │                           │
+                  ▼                           ▼
+        ┌───────────────────┐       ┌───────────────────┐
+        │ Orbit packages    │  uses │ NATS.Net (core)   │
+        │ (opinionated,     │──────▶│ (parity, stable,  │
+        │  per-pkg semver)  │       │  protocol-level)  │
+        └───────────────────┘       └─────────┬─────────┘
+                                              │
+                                              ▼
+                                       ┌─────────────┐
+                                       │ nats-server │
+                                       └─────────────┘
+```
+
 ## Contributing
 
 You are welcome to contribute to this project. Here are some steps to get you started:
