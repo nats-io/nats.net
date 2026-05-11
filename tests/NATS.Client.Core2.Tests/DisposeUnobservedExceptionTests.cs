@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using NATS.Client.TestUtilities;
 using NATS.Client.TestUtilities2;
 using Synadia.Orbit.Testing.NatsServerProcessManager;
@@ -9,7 +10,7 @@ public class DisposeUnobservedExceptionTests(ITestOutputHelper output)
     [Fact]
     public async Task Dispose_after_connect_does_not_cause_UnobservedTaskException()
     {
-        var unobserved = new List<Exception>();
+        var unobserved = new ConcurrentBag<Exception>();
 
         void Handler(object? sender, UnobservedTaskExceptionEventArgs args)
         {
@@ -90,7 +91,7 @@ public class DisposeUnobservedExceptionTests(ITestOutputHelper output)
             ReconnectWaitMax = TimeSpan.FromMilliseconds(50),
         });
 
-        var unobserved = new List<Exception>();
+        var unobserved = new ConcurrentBag<Exception>();
 
         void Handler(object? sender, UnobservedTaskExceptionEventArgs args)
         {
