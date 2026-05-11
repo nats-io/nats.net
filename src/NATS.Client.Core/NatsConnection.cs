@@ -79,7 +79,7 @@ public partial class NatsConnection : INatsConnection
     private string _lastAuthError = string.Empty;
     private bool _stopRetries;
     private Task? _publishEventsTask;
-    private Task? _reconnectLoopTask;
+    private volatile Task? _reconnectLoopTask;
 
     public NatsConnection()
         : this(NatsOpts.Default)
