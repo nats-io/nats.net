@@ -452,4 +452,29 @@ public class RequestReplyTest
         var type = json["type"]!.GetValue<string>();
         Assert.Equal("io.nats.jetstream.api.v1.account_info_response", type);
     }
+
+    [Theory]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    public async Task Request_reply_max_timespan_timeout_does_not_throw(NatsRequestReplyMode mode)
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
+
+        var subject = $"foo.{Guid.NewGuid():N}";
+        await using var sub = await nats.SubscribeCoreAsync<int>(subject);
+        var reg = sub.Register(async msg =>
+        {
+            await msg.ReplyAsync(msg.Data * 2);
+        });
+        await nats.PingAsync();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var replyOpts = new NatsSubOpts { Timeout = TimeSpan.MaxValue };
+        var reply = await nats.RequestAsync<int, int>(subject, 21, replyOpts: replyOpts, cancellationToken: cts.Token);
+
+        Assert.Equal(42, reply.Data);
+
+        await sub.DisposeAsync();
+        await reg;
+    }
 }

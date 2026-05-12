@@ -204,6 +204,28 @@ public class SubscriptionTest
     }
 
     [Fact]
+    public async Task Subscribe_with_max_timespan_timeouts_does_not_throw()
+    {
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        const string subject = "foo-max";
+        var opts = new NatsSubOpts
+        {
+            Timeout = TimeSpan.MaxValue,
+            IdleTimeout = TimeSpan.MaxValue,
+            StartUpTimeout = TimeSpan.MaxValue,
+        };
+
+        await using var sub = await nats.SubscribeCoreAsync<int>(subject, opts: opts);
+
+        await nats.PublishAsync(subject, 42);
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var msg = await sub.Msgs.ReadAsync(cts.Token);
+        Assert.Equal(42, msg.Data);
+    }
+
+    [Fact]
     public async Task Manual_unsubscribe_test()
     {
         await using var server = await NatsServerProcess.StartAsync();

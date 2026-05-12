@@ -23,7 +23,9 @@ internal sealed class ReplyTask<T> : ReplyTaskBase, IDisposable
         Subject = subject;
         _connection = connection;
         _deserializer = deserializer;
-        _requestTimeout = requestTimeout;
+        _requestTimeout = requestTimeout > NatsSubBase.MaxSupportedTimeout
+            ? Timeout.InfiniteTimeSpan
+            : requestTimeout;
         _tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         _gate = new object();
     }

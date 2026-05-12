@@ -18,7 +18,9 @@ public record NatsSubOpts
     /// </summary>
     /// <remarks>
     /// If not set, all published messages will be received until explicitly
-    /// unsubscribed or disposed.
+    /// unsubscribed or disposed. Values greater than ~49.7 days (the maximum
+    /// supported by <see cref="System.Threading.Timer"/>) are treated as
+    /// "no timeout".
     /// </remarks>
     public TimeSpan? Timeout { get; init; }
 
@@ -28,7 +30,9 @@ public record NatsSubOpts
     /// </summary>
     /// <remarks>
     /// If not set, all published messages will be received until explicitly
-    /// unsubscribed or disposed.
+    /// unsubscribed or disposed. Values greater than ~49.7 days (the maximum
+    /// supported by <see cref="System.Threading.Timer"/>) are treated as
+    /// "no timeout".
     /// </remarks>
     public TimeSpan? StartUpTimeout { get; init; }
 
@@ -38,7 +42,9 @@ public record NatsSubOpts
     /// </summary>
     /// <remarks>
     /// If not set, all published messages will be received until explicitly
-    /// unsubscribed or disposed.
+    /// unsubscribed or disposed. Values greater than ~49.7 days (the maximum
+    /// supported by <see cref="System.Threading.Timer"/>) are treated as
+    /// "no timeout".
     /// </remarks>
     public TimeSpan? IdleTimeout { get; init; }
 
