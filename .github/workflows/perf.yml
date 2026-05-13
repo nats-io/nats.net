@@ -13,7 +13,7 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - branch: 'v2.10'
+          - branch: 'v2.12'
           - branch: 'latest'
           - branch: 'main'
     runs-on: ubuntu-latest
