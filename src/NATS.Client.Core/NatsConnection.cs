@@ -159,7 +159,7 @@ public partial class NatsConnection : INatsConnection
         {
             if (value?.LameDuckMode == true)
             {
-                PushEvent(NatsEvent.LameDuckModeActivated, new NatsLameDuckModeActivatedEventArgs(_currentConnectUri!.Uri));
+                _eventChannel.Writer.TryWrite((NatsEvent.LameDuckModeActivated, new NatsLameDuckModeActivatedEventArgs(_currentConnectUri!.Uri)));
             }
 
             Interlocked.Exchange(ref _writableServerInfo, value);
@@ -247,11 +247,11 @@ public partial class NatsConnection : INatsConnection
     public void OnMessageDropped<T>(NatsSubBase natsSub, int pending, NatsMsg<T> msg)
     {
         var subject = msg.Subject;
-        PushEvent(NatsEvent.MessageDropped, new NatsMessageDroppedEventArgs(natsSub, pending, subject, msg.ReplyTo, msg.Headers, msg.Data));
+        _eventChannel.Writer.TryWrite((NatsEvent.MessageDropped, new NatsMessageDroppedEventArgs(natsSub, pending, subject, msg.ReplyTo, msg.Headers, msg.Data)));
 
         if (natsSub.TryMarkSlowConsumer())
         {
-            PushEvent(NatsEvent.SlowConsumerDetected, new NatsSlowConsumerEventArgs(natsSub));
+            _eventChannel.Writer.TryWrite((NatsEvent.SlowConsumerDetected, new NatsSlowConsumerEventArgs(natsSub)));
 
             if (!Opts.SuppressSlowConsumerWarnings)
             {
@@ -524,7 +524,7 @@ public partial class NatsConnection : INatsConnection
             _initialConnectCts.Cancel();
 #pragma warning restore VSTHRD103
             _reconnectLoopTask = Task.Run(ReconnectLoop);
-            PushEvent(NatsEvent.ConnectionOpened, new NatsEventArgs(url?.ToString() ?? string.Empty));
+            _eventChannel.Writer.TryWrite((NatsEvent.ConnectionOpened, new NatsEventArgs(url?.ToString() ?? string.Empty)));
         }
     }
 
@@ -755,7 +755,7 @@ public partial class NatsConnection : INatsConnection
             }
 
             // Invoke event after state changed
-            PushEvent(NatsEvent.ConnectionDisconnected, new NatsEventArgs(_currentConnectUri?.ToString() ?? string.Empty));
+            _eventChannel.Writer.TryWrite((NatsEvent.ConnectionDisconnected, new NatsEventArgs(_currentConnectUri?.ToString() ?? string.Empty)));
 
             // Cleanup current socket
             await DisposeSocketAsync(true).ConfigureAwait(false);
@@ -820,7 +820,7 @@ public partial class NatsConnection : INatsConnection
                 var attempted = _currentConnectUri ?? url;
                 _logger.LogWarning(NatsLogEvents.Connection, ex, "Failed to connect NATS {Url} [{ReconnectCount}]", attempted, reconnectCount);
 
-                PushEvent(NatsEvent.ReconnectFailed, new NatsEventArgs(attempted?.ToString() ?? string.Empty));
+                _eventChannel.Writer.TryWrite((NatsEvent.ReconnectFailed, new NatsEventArgs(attempted?.ToString() ?? string.Empty)));
 
                 if (debug)
                 {
@@ -849,7 +849,7 @@ public partial class NatsConnection : INatsConnection
                 StartPingTimer(_pingTimerCancellationTokenSource.Token);
                 _waitForOpenConnection.TrySetResult();
                 _reconnectLoopTask = Task.Run(ReconnectLoop);
-                PushEvent(NatsEvent.ConnectionOpened, new NatsEventArgs(url.ToString()));
+                _eventChannel.Writer.TryWrite((NatsEvent.ConnectionOpened, new NatsEventArgs(url.ToString())));
             }
         }
         catch (Exception ex)
