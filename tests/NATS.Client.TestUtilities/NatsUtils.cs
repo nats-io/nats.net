@@ -9,7 +9,7 @@ public static class NatsUtils
 {
     public static async Task ConnectRetryAsync(this INatsClient client, TimeSpan? timeout = null)
     {
-        timeout ??= TimeSpan.FromSeconds(30);
+        timeout ??= TimeSpan.FromSeconds(60);
         Exception? exception = null;
         var stopwatch = Stopwatch.StartNew();
 

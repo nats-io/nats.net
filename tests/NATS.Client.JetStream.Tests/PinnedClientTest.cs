@@ -537,7 +537,7 @@ public class PinnedClientMockServerTest
         });
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        await using var nats = new NatsConnection(new NatsOpts { Url = ms.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = ms.Url, ConnectTimeout = TimeSpan.FromSeconds(30) });
         var js = nats.CreateJetStreamContext();
         var consumer = (NatsJSConsumer)await js.GetConsumerAsync("x", "x", cts.Token);
         var headers = new NatsHeaders

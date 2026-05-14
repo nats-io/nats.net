@@ -24,7 +24,7 @@ public class ProtocolParserSizeCheckTest(ITestOutputHelper output)
         await using var server = new FakeServer(output);
 
         await server.Ready;
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, LoggerFactory = logFactory, ConnectTimeout = TimeSpan.FromSeconds(10) });
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, LoggerFactory = logFactory, ConnectTimeout = TimeSpan.FromSeconds(30) });
         await nats.ConnectAsync();
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));

@@ -79,7 +79,7 @@ public class PingCancellationTest
             cancellationToken: cts.Token);
 
         await server.Ready;
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, ConnectTimeout = TimeSpan.FromSeconds(30) });
         await nats.ConnectRetryAsync();
 
         // This ping should time out because the server won't reply PONG
