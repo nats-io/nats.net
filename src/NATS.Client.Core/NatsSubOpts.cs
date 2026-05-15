@@ -18,9 +18,12 @@ public record NatsSubOpts
     /// </summary>
     /// <remarks>
     /// If not set, all published messages will be received until explicitly
-    /// unsubscribed or disposed. Values greater than ~49.7 days (the maximum
-    /// supported by <see cref="System.Threading.Timer"/>) are treated as
-    /// "no timeout".
+    /// unsubscribed or disposed. Use <see cref="TimeSpan.MaxValue"/> or
+    /// <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> to explicitly
+    /// disable the timeout. Other values must be between zero and
+    /// ~49.7 days (the maximum supported by <see cref="System.Threading.Timer"/>);
+    /// out-of-range values throw <see cref="ArgumentOutOfRangeException"/>
+    /// when the subscription starts.
     /// </remarks>
     public TimeSpan? Timeout { get; init; }
 
@@ -30,9 +33,12 @@ public record NatsSubOpts
     /// </summary>
     /// <remarks>
     /// If not set, all published messages will be received until explicitly
-    /// unsubscribed or disposed. Values greater than ~49.7 days (the maximum
-    /// supported by <see cref="System.Threading.Timer"/>) are treated as
-    /// "no timeout".
+    /// unsubscribed or disposed. Use <see cref="TimeSpan.MaxValue"/> or
+    /// <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> to explicitly
+    /// disable the timeout. Other values must be between zero and
+    /// ~49.7 days (the maximum supported by <see cref="System.Threading.Timer"/>);
+    /// out-of-range values throw <see cref="ArgumentOutOfRangeException"/>
+    /// when the subscription starts.
     /// </remarks>
     public TimeSpan? StartUpTimeout { get; init; }
 
@@ -42,9 +48,12 @@ public record NatsSubOpts
     /// </summary>
     /// <remarks>
     /// If not set, all published messages will be received until explicitly
-    /// unsubscribed or disposed. Values greater than ~49.7 days (the maximum
-    /// supported by <see cref="System.Threading.Timer"/>) are treated as
-    /// "no timeout".
+    /// unsubscribed or disposed. Use <see cref="TimeSpan.MaxValue"/> or
+    /// <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> to explicitly
+    /// disable the timeout. Other values must be between zero and
+    /// ~49.7 days (the maximum supported by <see cref="System.Threading.Timer"/>);
+    /// out-of-range values throw <see cref="ArgumentOutOfRangeException"/>
+    /// when the subscription starts.
     /// </remarks>
     public TimeSpan? IdleTimeout { get; init; }
 

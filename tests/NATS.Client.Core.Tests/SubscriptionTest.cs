@@ -9,6 +9,23 @@ public class SubscriptionTest
 
     public SubscriptionTest(ITestOutputHelper output) => _output = output;
 
+    public static IEnumerable<object[]> OutOfRangeTimeoutCases()
+    {
+        var setters = new (string ParamName, Func<TimeSpan, NatsSubOpts> Setter)[]
+        {
+            (nameof(NatsSubOpts.Timeout), t => new NatsSubOpts { Timeout = t }),
+            (nameof(NatsSubOpts.IdleTimeout), t => new NatsSubOpts { IdleTimeout = t }),
+            (nameof(NatsSubOpts.StartUpTimeout), t => new NatsSubOpts { StartUpTimeout = t }),
+        };
+        var badValues = new[] { TimeSpan.FromDays(50), TimeSpan.FromMilliseconds(-2) };
+
+        foreach (var (paramName, setter) in setters)
+        {
+            foreach (var bad in badValues)
+                yield return new object[] { paramName, setter, bad };
+        }
+    }
+
     [Fact]
     public async Task Subscription_periodic_cleanup_test()
     {
@@ -204,7 +221,7 @@ public class SubscriptionTest
     }
 
     [Fact]
-    public async Task Subscribe_with_max_timespan_timeouts_does_not_throw()
+    public async Task Subscribe_with_no_timeout_sentinels_does_not_throw()
     {
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
@@ -213,7 +230,7 @@ public class SubscriptionTest
         var opts = new NatsSubOpts
         {
             Timeout = TimeSpan.MaxValue,
-            IdleTimeout = TimeSpan.MaxValue,
+            IdleTimeout = Timeout.InfiniteTimeSpan,
             StartUpTimeout = TimeSpan.MaxValue,
         };
 
@@ -223,6 +240,19 @@ public class SubscriptionTest
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var msg = await sub.Msgs.ReadAsync(cts.Token);
         Assert.Equal(42, msg.Data);
+    }
+
+    [Theory]
+    [MemberData(nameof(OutOfRangeTimeoutCases))]
+    public async Task Subscribe_with_out_of_range_timeout_throws(string paramName, Func<TimeSpan, NatsSubOpts> withTimeout, TimeSpan badValue)
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = "nats://127.0.0.1:1" });
+
+        var ex = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () =>
+        {
+            await using var sub = await nats.SubscribeCoreAsync<int>("foo-bad", opts: withTimeout(badValue));
+        });
+        Assert.Equal(paramName, ex.ParamName);
     }
 
     [Fact]

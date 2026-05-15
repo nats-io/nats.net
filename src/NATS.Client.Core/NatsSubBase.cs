@@ -30,10 +30,6 @@ public enum NatsSubEndReason
 /// </summary>
 public abstract class NatsSubBase
 {
-    // Timer.Change and Task.WaitAsync throw for dueTime > (uint.MaxValue - 1) ms (~49.7 days);
-    // values beyond this are treated as "no timeout".
-    internal static readonly TimeSpan MaxSupportedTimeout = TimeSpan.FromMilliseconds(uint.MaxValue - 1);
-
     private static readonly byte[] NoRespondersHeaderSequence = { (byte)' ', (byte)'5', (byte)'0', (byte)'3' };
     private readonly ILogger _logger;
     private readonly object _gate = new();
@@ -84,9 +80,9 @@ public abstract class NatsSubBase
         _manager = manager;
         _pendingMsgs = opts is { MaxMsgs: > 0 } ? opts.MaxMsgs ?? -1 : -1;
         _countPendingMsgs = _pendingMsgs > 0;
-        _idleTimeout = NormalizeTimeout(opts?.IdleTimeout);
-        _startUpTimeout = NormalizeTimeout(opts?.StartUpTimeout);
-        _timeout = NormalizeTimeout(opts?.Timeout);
+        _idleTimeout = NormalizeTimeout(opts?.IdleTimeout, nameof(NatsSubOpts.IdleTimeout));
+        _startUpTimeout = NormalizeTimeout(opts?.StartUpTimeout, nameof(NatsSubOpts.StartUpTimeout));
+        _timeout = NormalizeTimeout(opts?.Timeout, nameof(NatsSubOpts.Timeout));
 
         Connection = connection;
         Subject = subject;
@@ -608,12 +604,8 @@ public abstract class NatsSubBase
 #pragma warning restore CA2012
     }
 
-    private static TimeSpan NormalizeTimeout(TimeSpan? value)
-    {
-        if (value is not { } v || v <= TimeSpan.Zero || v > MaxSupportedTimeout)
-            return TimeSpan.Zero;
-        return v;
-    }
+    private static TimeSpan NormalizeTimeout(TimeSpan? value, string paramName)
+        => value is { } v ? TimeoutValidation.Validate(v, paramName, TimeSpan.Zero) : TimeSpan.Zero;
 
     private async ValueTask WaitForReaderDrainCoreAsync(Task task, TimeSpan timeout)
     {
