@@ -4,6 +4,6 @@
         <TestSessionTimeout>600000</TestSessionTimeout>
     </RunConfiguration>
     <xUnit>
-        <MaxParallelThreads>4.0x</MaxParallelThreads>
+        <MaxParallelThreads>1.0x</MaxParallelThreads>
     </xUnit>
 </RunSettings>
