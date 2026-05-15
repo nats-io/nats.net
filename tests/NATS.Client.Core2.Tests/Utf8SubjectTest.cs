@@ -80,7 +80,7 @@ public class Utf8SubjectMockServerTest
             cancellationToken: cts.Token);
 
         await server.Ready;
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, ConnectTimeout = TimeSpan.FromSeconds(30) });
         await nats.ConnectRetryAsync();
 
         await foreach (var msg in nats.SubscribeAsync<string>(">", cancellationToken: cts.Token))

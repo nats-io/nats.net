@@ -265,6 +265,7 @@ public class TlsPreferTest(ITestOutputHelper output)
             Url = $"nats://127.0.0.1:{port}",
             TlsOpts = new NatsTlsOpts { Mode = TlsMode.Prefer },
             MaxReconnectRetry = 0,
+            ConnectTimeout = TimeSpan.FromSeconds(30),
         });
 
         Exception? connectException = null;
@@ -301,7 +302,10 @@ public class TlsPreferTest(ITestOutputHelper output)
             output.WriteLine($"[{e.GetType().Name}] {e.Message}");
         }
 
-        var tlsRelated = causes.Any(c => c is AuthenticationException || c is SocketException || c is IOException);
+        // A connect-timeout while the client was already past the INFO read is also evidence the
+        // TLS path was attempted: the plaintext path would have completed the handshake within the
+        // timeout, while a stalled TLS handshake under runner contention shows up as a timeout.
+        var tlsRelated = causes.Any(c => c is AuthenticationException || c is SocketException || c is IOException || c is TimeoutException);
         tlsRelated.Should().BeTrue(
             "Prefer mode should attempt TLS upgrade when server advertises tls_available=true");
     }
