@@ -10,6 +10,96 @@ public class AuthErrorTest
 
     public AuthErrorTest(ITestOutputHelper output) => _output = output;
 
+    // Regression for an established connection receiving -ERR mid-session
+    // (e.g. JWT expiry, auth callout token rotation). The client should
+    // reconnect without producing UnobservedTaskException from the
+    // server exception constructed inside the read loop, and recoverable
+    // server-initiated graceful disconnects should log at Debug rather
+    // than Error.
+    [Theory]
+    [InlineData("User Authentication Expired", LogLevel.Debug)]
+    [InlineData("Account Authentication Expired", LogLevel.Debug)]
+    [InlineData("User Authentication Revoked", LogLevel.Debug)]
+    [InlineData("Stale Connection", LogLevel.Debug)]
+    [InlineData("Permissions Violation for Publish to foo", LogLevel.Error)]
+    public async Task Mid_session_server_error_reconnects_cleanly(string serverError, LogLevel expectedLevel)
+    {
+        var unobservedThrown = 0;
+        Exception? unobservedException = null;
+        EventHandler<UnobservedTaskExceptionEventArgs> handler = (_, e) =>
+        {
+            unobservedException = e.Exception;
+            Interlocked.Increment(ref unobservedThrown);
+        };
+
+        var logs = new InMemoryTestLoggerFactory(LogLevel.Trace, m => _output.WriteLine($"[LOG {m.LogLevel}] {m.Message}"));
+
+        TaskScheduler.UnobservedTaskException += handler;
+        try
+        {
+            var pingCount = 0;
+            var reconnected = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            await using var server = new MockServer(
+                handler: async (client, cmd) =>
+                {
+                    if (cmd.Name != "PING")
+                        return;
+
+                    var n = Interlocked.Increment(ref pingCount);
+                    if (n == 1)
+                    {
+                        // First PING after CONNECT: auto-PONG already sent.
+                        // Now push a mid-session -ERR and close the socket so
+                        // the client must reconnect.
+                        await client.Writer.WriteAsync($"-ERR '{serverError}'\r\n");
+                        await client.Writer.FlushAsync();
+                        client.Close();
+                    }
+                    else if (n == 2)
+                    {
+                        // Second connection's initial PING: client is back up.
+                        reconnected.TrySetResult();
+                    }
+                },
+                logger: m => _output.WriteLine(m));
+
+            await server.Ready;
+
+            await using (var nats = new NatsConnection(new NatsOpts
+            {
+                Url = server.Url,
+                LoggerFactory = logs,
+                ReconnectWaitMin = TimeSpan.FromMilliseconds(50),
+                ReconnectWaitMax = TimeSpan.FromMilliseconds(100),
+            }))
+            {
+                await nats.ConnectAsync();
+                await reconnected.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            }
+
+            // Give any orphaned exceptions a chance to surface.
+            await Task.Delay(100);
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+        }
+        finally
+        {
+            TaskScheduler.UnobservedTaskException -= handler;
+        }
+
+        Assert.True(
+            unobservedThrown == 0,
+            $"Expected no unobserved exceptions, got {unobservedThrown}: {unobservedException}");
+
+        var serverErrorLogs = logs.Logs
+            .Where(m => m.Message.StartsWith("Server error "))
+            .ToList();
+        Assert.NotEmpty(serverErrorLogs);
+        Assert.All(serverErrorLogs, m => Assert.Equal(expectedLevel, m.LogLevel));
+    }
+
     // [SkipOnPlatform("WINDOWS", "doesn't support HUP signal")]
     [Fact]
     public async Task Auth_err_twice_will_stop_retries()
