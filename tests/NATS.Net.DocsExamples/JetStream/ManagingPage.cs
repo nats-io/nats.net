@@ -67,7 +67,6 @@ public class ManagingPage
             // Same as above
             durableConfig = new ConsumerConfig
             {
-                Name = "durable_processor",
                 DurableName = "durable_processor",
             };
 
