@@ -52,6 +52,34 @@ public class ManageConsumerTest
     [Theory]
     [InlineData(NatsRequestReplyMode.Direct)]
     [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Create_consumer_with_durable_only(NatsRequestReplyMode mode)
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestTimeout = TimeSpan.FromSeconds(10), RequestReplyMode = mode });
+        await nats.ConnectRetryAsync();
+        var prefix = _server.GetNextId();
+        var js = new NatsJSContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+
+        await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
+
+        var consumer = await js.CreateOrUpdateConsumerAsync(
+            $"{prefix}s1",
+            new ConsumerConfig
+            {
+                DurableName = $"{prefix}c1",
+                AckPolicy = ConsumerConfigAckPolicy.Explicit,
+            },
+            cts.Token);
+
+        Assert.Equal($"{prefix}s1", consumer.Info.StreamName);
+        Assert.Equal($"{prefix}c1", consumer.Info.Config.Name);
+        Assert.Equal($"{prefix}c1", consumer.Info.Config.DurableName);
+    }
+
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
     public async Task List_delete_consumer(NatsRequestReplyMode mode)
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
