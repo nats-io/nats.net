@@ -424,13 +424,15 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                 _socketReader.AdvanceTo(buffer.Start);
                 var newBuffer = await _socketReader.ReadUntilReceiveNewLineAsync().ConfigureAwait(false);
                 var newPosition = newBuffer.PositionOf((byte)'\n');
-                var error = ParseError(newBuffer.Slice(0, newBuffer.GetOffset(newPosition!.Value) - 1));
+                var lineWithCR = newBuffer.Slice(0, newPosition!.Value);
+                var error = ParseError(lineWithCR.Slice(0, lineWithCR.Length - 1));
                 HandleServerError(error);
                 return newBuffer.Slice(newBuffer.GetPosition(1, newPosition!.Value));
             }
             else
             {
-                var error = ParseError(buffer.Slice(0, buffer.GetOffset(position.Value) - 1));
+                var lineWithCR = buffer.Slice(0, position.Value);
+                var error = ParseError(lineWithCR.Slice(0, lineWithCR.Length - 1));
                 HandleServerError(error);
                 return buffer.Slice(buffer.GetPosition(1, position.Value));
             }
