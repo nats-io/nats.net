@@ -98,8 +98,8 @@ public readonly struct NatsSvcMsg<T>
     public ValueTask ReplyErrorAsync<TReply>(int code, string message, TReply data, NatsHeaders? headers = default, string? replyTo = default, INatsSerialize<TReply>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         headers ??= new NatsHeaders();
-        headers.Add("Nats-Service-Error-Code", $"{code}");
-        headers.Add("Nats-Service-Error", $"{message}");
+        headers.Add(NatsSvcConstants.ServiceErrorCodeHeader, $"{code}");
+        headers.Add(NatsSvcConstants.ServiceErrorHeader, $"{message}");
 
         _endPoint?.IncrementErrors();
         _endPoint?.SetLastError($"{message} ({code})");
@@ -120,8 +120,8 @@ public readonly struct NatsSvcMsg<T>
     public ValueTask ReplyErrorAsync(int code, string message, NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         headers ??= new NatsHeaders();
-        headers.Add("Nats-Service-Error", $"{message}");
-        headers.Add("Nats-Service-Error-Code", $"{code}");
+        headers.Add(NatsSvcConstants.ServiceErrorHeader, $"{message}");
+        headers.Add(NatsSvcConstants.ServiceErrorCodeHeader, $"{code}");
 
         _endPoint?.IncrementErrors();
         _endPoint?.SetLastError($"{code}:{message}");
