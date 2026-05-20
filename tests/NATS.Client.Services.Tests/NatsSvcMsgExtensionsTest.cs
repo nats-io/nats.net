@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Primitives;
 using NATS.Net;
 
 namespace NATS.Client.Services.Tests;
@@ -23,40 +24,28 @@ public class NatsSvcMsgExtensionsTest
     {
         var headers = new NatsHeaders
         {
-            { "Nats-Service-Error", "boom" },
-            { "Nats-Service-Error-Code", "500" },
+            { NatsSvcConstants.ServiceErrorHeader, "boom" },
+            { NatsSvcConstants.ServiceErrorCodeHeader, "500" },
         };
 
         Msg(headers).IsServiceSuccess().Should().BeFalse();
     }
 
     [Fact]
-    public void IsServiceSuccess_ignores_no_responders_by_default()
-    {
-        Msg(flags: NatsMsgFlags.NoResponders).IsServiceSuccess().Should().BeTrue();
-    }
-
-    [Fact]
-    public void IsServiceSuccess_throws_on_no_responders_when_opted_in()
+    public void IsServiceSuccess_throws_on_no_responders_by_default()
     {
         var msg = Msg(flags: NatsMsgFlags.NoResponders);
 
-        msg.Invoking(m => m.IsServiceSuccess(throwOnNoResponders: true))
+        msg.Invoking(m => m.IsServiceSuccess())
             .Should().Throw<NatsNoRespondersException>();
     }
 
     [Fact]
-    public void IsServiceSuccess_with_opt_in_returns_true_when_no_responders_false_and_no_error()
+    public void IsServiceSuccess_ignores_no_responders_when_opted_out()
     {
-        Msg().IsServiceSuccess(throwOnNoResponders: true).Should().BeTrue();
-    }
-
-    [Fact]
-    public void IsServiceSuccess_with_opt_in_returns_false_when_error_header_present_without_no_responders()
-    {
-        var headers = new NatsHeaders { { "Nats-Service-Error", "boom" } };
-
-        Msg(headers).IsServiceSuccess(throwOnNoResponders: true).Should().BeFalse();
+        Msg(flags: NatsMsgFlags.NoResponders)
+            .IsServiceSuccess(throwOnNoResponders: false)
+            .Should().BeTrue();
     }
 
     [Fact]
@@ -75,8 +64,8 @@ public class NatsSvcMsgExtensionsTest
     {
         var headers = new NatsHeaders
         {
-            { "Nats-Service-Error", "Division by zero" },
-            { "Nats-Service-Error-Code", "400" },
+            { NatsSvcConstants.ServiceErrorHeader, "Division by zero" },
+            { NatsSvcConstants.ServiceErrorCodeHeader, "400" },
         };
 
         var status = Msg(headers).GetServiceStatus();
@@ -90,7 +79,7 @@ public class NatsSvcMsgExtensionsTest
     [Fact]
     public void GetServiceStatus_defaults_code_to_zero_when_code_header_missing()
     {
-        var headers = new NatsHeaders { { "Nats-Service-Error", "no code" } };
+        var headers = new NatsHeaders { { NatsSvcConstants.ServiceErrorHeader, "no code" } };
 
         var status = Msg(headers).GetServiceStatus();
 
@@ -104,8 +93,8 @@ public class NatsSvcMsgExtensionsTest
     {
         var headers = new NatsHeaders
         {
-            { "Nats-Service-Error", "bad code" },
-            { "Nats-Service-Error-Code", "not-a-number" },
+            { NatsSvcConstants.ServiceErrorHeader, "bad code" },
+            { NatsSvcConstants.ServiceErrorCodeHeader, "not-a-number" },
         };
 
         var status = Msg(headers).GetServiceStatus();
@@ -116,24 +105,37 @@ public class NatsSvcMsgExtensionsTest
     }
 
     [Fact]
-    public void GetServiceStatus_returns_no_responders_when_sentinel_flag_set()
+    public void GetServiceStatus_takes_last_value_when_header_appears_multiple_times()
     {
-        var status = Msg(flags: NatsMsgFlags.NoResponders).GetServiceStatus();
+        var headers = new NatsHeaders
+        {
+            [NatsSvcConstants.ServiceErrorHeader] = new StringValues(new[] { "first", "last" }),
+            [NatsSvcConstants.ServiceErrorCodeHeader] = new StringValues(new[] { "111", "222" }),
+        };
+
+        var status = Msg(headers).GetServiceStatus();
+
+        status.Code.Should().Be(222);
+        status.Message.Should().Be("last");
+    }
+
+    [Fact]
+    public void GetServiceStatus_throws_on_no_responders_by_default()
+    {
+        var msg = Msg(flags: NatsMsgFlags.NoResponders);
+
+        msg.Invoking(m => m.GetServiceStatus())
+            .Should().Throw<NatsNoRespondersException>();
+    }
+
+    [Fact]
+    public void GetServiceStatus_returns_no_responders_status_when_opted_out()
+    {
+        var status = Msg(flags: NatsMsgFlags.NoResponders).GetServiceStatus(throwOnNoResponders: false);
 
         status.IsSuccess.Should().BeFalse();
         status.HasNoResponders.Should().BeTrue();
         status.Code.Should().Be(0);
-        status.Message.Should().BeNull();
-    }
-
-    [Fact]
-    public void GetServiceStatus_prefers_no_responders_over_service_error()
-    {
-        var headers = new NatsHeaders { { "Nats-Service-Error", "boom" } };
-
-        var status = Msg(headers, flags: NatsMsgFlags.NoResponders).GetServiceStatus();
-
-        status.HasNoResponders.Should().BeTrue();
         status.Message.Should().BeNull();
     }
 
@@ -150,8 +152,8 @@ public class NatsSvcMsgExtensionsTest
     {
         var headers = new NatsHeaders
         {
-            { "Nats-Service-Error", "Division by zero" },
-            { "Nats-Service-Error-Code", "400" },
+            { NatsSvcConstants.ServiceErrorHeader, "Division by zero" },
+            { NatsSvcConstants.ServiceErrorCodeHeader, "400" },
         };
         var msg = Msg(headers);
 
@@ -161,30 +163,29 @@ public class NatsSvcMsgExtensionsTest
     }
 
     [Fact]
-    public void EnsureServiceSuccess_ignores_no_responders_by_default()
+    public void EnsureServiceSuccess_throws_on_no_responders_by_default()
     {
         var msg = Msg(flags: NatsMsgFlags.NoResponders);
 
-        msg.HasNoResponders.Should().BeTrue();
-        msg.EnsureServiceSuccess().HasNoResponders.Should().BeTrue();
+        msg.Invoking(m => m.EnsureServiceSuccess())
+            .Should().Throw<NatsNoRespondersException>();
     }
 
     [Fact]
-    public void EnsureServiceSuccess_throws_on_no_responders_when_opted_in()
+    public void EnsureServiceSuccess_ignores_no_responders_when_opted_out()
     {
         var msg = Msg(flags: NatsMsgFlags.NoResponders);
 
-        msg.Invoking(m => m.EnsureServiceSuccess(throwOnNoResponders: true))
-            .Should().Throw<NatsNoRespondersException>();
+        msg.EnsureServiceSuccess(throwOnNoResponders: false).HasNoResponders.Should().BeTrue();
     }
 
     [Fact]
     public void EnsureServiceSuccess_prefers_no_responders_over_service_error()
     {
-        var headers = new NatsHeaders { { "Nats-Service-Error", "boom" } };
+        var headers = new NatsHeaders { { NatsSvcConstants.ServiceErrorHeader, "boom" } };
         var msg = Msg(headers, flags: NatsMsgFlags.NoResponders);
 
-        msg.Invoking(m => m.EnsureServiceSuccess(throwOnNoResponders: true))
+        msg.Invoking(m => m.EnsureServiceSuccess())
             .Should().Throw<NatsNoRespondersException>();
     }
 
