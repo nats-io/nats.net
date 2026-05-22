@@ -15,6 +15,7 @@
     
     <ItemGroup>
       <ProjectReference Include="..\..\src\NATS.Client.Core\NATS.Client.Core.csproj" />
+      <ProjectReference Include="..\..\src\NATS.Client.OpenTelemetry\NATS.Client.OpenTelemetry.csproj" />
     </ItemGroup>
 
 </Project>

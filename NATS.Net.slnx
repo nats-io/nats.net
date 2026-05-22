@@ -64,6 +64,7 @@
     <Project Path="src/NATS.Client.JetStream/NATS.Client.JetStream.csproj" />
     <Project Path="src/NATS.Client.KeyValueStore/NATS.Client.KeyValueStore.csproj" />
     <Project Path="src/NATS.Client.ObjectStore/NATS.Client.ObjectStore.csproj" />
+    <Project Path="src/NATS.Client.OpenTelemetry/NATS.Client.OpenTelemetry.csproj" />
     <Project Path="src/NATS.Client.Serializers.Json/NATS.Client.Serializers.Json.csproj" />
     <Project Path="src/NATS.Client.Services/NATS.Client.Services.csproj" />
     <Project Path="src/NATS.Client.Simplified/NATS.Client.Simplified.csproj" />

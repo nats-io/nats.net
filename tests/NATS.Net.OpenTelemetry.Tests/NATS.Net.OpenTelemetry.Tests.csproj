@@ -11,6 +11,7 @@
 
     <ItemGroup>
         <PackageReference Include="FluentAssertions" Version="[7,8)" />
+        <PackageReference Include="OpenTelemetry" Version="1.15.3" />
         <PackageReference Include="ProcessX" Version="1.5.6" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
         <PackageReference Include="xunit.v3" Version="1.0.1" />
@@ -34,6 +35,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\NATS.Client.JetStream\NATS.Client.JetStream.csproj" />
+        <ProjectReference Include="..\..\src\NATS.Client.OpenTelemetry\NATS.Client.OpenTelemetry.csproj" />
         <ProjectReference Include="..\..\src\NATS.Client.Serializers.Json\NATS.Client.Serializers.Json.csproj" />
         <ProjectReference Include="..\NATS.Client.TestUtilities\NATS.Client.TestUtilities.csproj" />
         <ProjectReference Include="..\..\src\NATS.Client.Core\NATS.Client.Core.csproj" />

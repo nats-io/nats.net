@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <!-- NuGet Packaging -->
+        <PackageTags>opentelemetry;tracing;metrics;observability;nats</PackageTags>
+        <Description>OpenTelemetry instrumentation for NATS .NET. Adds the ActivitySource and Meter for the client to a TracerProviderBuilder or MeterProviderBuilder.</Description>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="OpenTelemetry.Api" Version="1.15.3" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\NATS.Client.Core\NATS.Client.Core.csproj" />
+    </ItemGroup>
+
+</Project>

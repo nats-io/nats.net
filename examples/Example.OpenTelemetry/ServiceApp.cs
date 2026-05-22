@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using NATS.Client.Core;
+using NATS.Client.OpenTelemetry;
 using OpenTelemetry;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -16,7 +17,7 @@ public static class ServiceApp
         using var tracerProvider = Sdk.CreateTracerProviderBuilder()
             .AddOtlpExporter()
             .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(serviceName: serviceName, serviceVersion: serviceVersion))
-            .AddSource("NATS.Net")
+            .AddNatsClientInstrumentation()
             .AddSource("MyServiceSource")
             .Build();
 

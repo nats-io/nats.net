@@ -8,7 +8,7 @@ namespace NATS.Client.Core.Internal;
 // https://opentelemetry.io/docs/specs/semconv/messaging/messaging-metrics/
 internal static class Telemetry
 {
-    public const string NatsActivitySource = "NATS.Net";
+    public const string NatsActivitySource = NatsTelemetry.SourceName;
     public static readonly ActivitySource NatsActivities = new(name: NatsActivitySource);
 
     public static readonly Meter NatsMeter = new(name: NatsActivitySource);
