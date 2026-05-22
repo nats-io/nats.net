@@ -1,13 +1,33 @@
 using System.Diagnostics;
+using System.Diagnostics.Metrics;
 
 namespace NATS.Client.Core.Internal;
 
 // https://opentelemetry.io/docs/specs/semconv/attributes-registry/messaging/
 // https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/#messaging-attributes
+// https://opentelemetry.io/docs/specs/semconv/messaging/messaging-metrics/
 internal static class Telemetry
 {
     public const string NatsActivitySource = "NATS.Net";
     public static readonly ActivitySource NatsActivities = new(name: NatsActivitySource);
+
+    public static readonly Meter NatsMeter = new(name: NatsActivitySource);
+
+    public static readonly Counter<long> PublishedMessages =
+        NatsMeter.CreateCounter<long>("messaging.client.published.messages", unit: "{message}");
+
+    public static readonly Counter<long> ConsumedMessages =
+        NatsMeter.CreateCounter<long>("messaging.client.consumed.messages", unit: "{message}");
+
+    public static readonly Histogram<double> OperationDuration =
+        NatsMeter.CreateHistogram<double>("messaging.client.operation.duration", unit: "s");
+
+    public static readonly UpDownCounter<long> ActiveSubscriptions =
+        NatsMeter.CreateUpDownCounter<long>("nats.client.active_subscriptions", unit: "{subscription}");
+
+    public static readonly Counter<long> Reconnects =
+        NatsMeter.CreateCounter<long>("nats.client.reconnects", unit: "{event}");
+
     private static readonly object BoxedTrue = true;
 
     public static bool HasListeners() => NatsActivities.HasListeners();
