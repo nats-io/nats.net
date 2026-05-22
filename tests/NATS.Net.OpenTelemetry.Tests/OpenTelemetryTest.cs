@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Models;
 using Synadia.Orbit.Testing.NatsServerProcessManager;
@@ -72,6 +73,37 @@ public class OpenTelemetryTest
         Assert.Equal(publishActivity.TraceId, consumeActivity.TraceId);
 
         tracker.AssertAllStopped();
+    }
+
+    [Fact]
+    public async Task Publish_counter()
+    {
+        using var meter = new MeterTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        await nats.ConnectAsync();
+
+        for (var i = 0; i < 5; i++)
+        {
+            await nats.PublishAsync("foo", i, cancellationToken: cts.Token);
+        }
+
+        var published = meter.LongMeasurements
+            .Where(m => m.Name == "messaging.client.published.messages")
+            .ToList();
+
+        published.Sum(m => m.Value).Should().Be(5);
+
+        var tags = published[0].Tags.ToDictionary(t => t.Key, t => t.Value);
+        tags.Should().ContainKey("messaging.system").WhoseValue.Should().Be("nats");
+        tags.Should().ContainKey("messaging.operation").WhoseValue.Should().Be("publish");
+        tags.Should().ContainKey("server.address");
+        tags.Should().ContainKey("server.port");
+        tags.Should().NotContainKey("messaging.destination.name");
+        tags.Should().NotContainKey("messaging.nats.message.subject");
     }
 
     [Fact]
@@ -182,6 +214,36 @@ public class OpenTelemetryTest
                 Assert.Fail($"Activity leak detected. {leaked.Count} activity(s) started but never stopped:\n{details}");
             }
         }
+
+        public void Dispose() => _listener.Dispose();
+    }
+
+    private sealed class MeterTracker : IDisposable
+    {
+        private readonly MeterListener _listener;
+
+        public MeterTracker()
+        {
+            _listener = new MeterListener
+            {
+                InstrumentPublished = (instrument, listener) =>
+                {
+                    if (instrument.Meter.Name == "NATS.Net")
+                        listener.EnableMeasurementEvents(instrument);
+                },
+            };
+
+            _listener.SetMeasurementEventCallback<long>((inst, val, tags, _) =>
+                LongMeasurements.Add((inst.Name, val, tags.ToArray())));
+            _listener.SetMeasurementEventCallback<double>((inst, val, tags, _) =>
+                DoubleMeasurements.Add((inst.Name, val, tags.ToArray())));
+
+            _listener.Start();
+        }
+
+        public List<(string Name, long Value, KeyValuePair<string, object?>[] Tags)> LongMeasurements { get; } = new();
+
+        public List<(string Name, double Value, KeyValuePair<string, object?>[] Tags)> DoubleMeasurements { get; } = new();
 
         public void Dispose() => _listener.Dispose();
     }

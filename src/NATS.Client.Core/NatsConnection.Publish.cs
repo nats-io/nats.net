@@ -13,6 +13,9 @@ public partial class NatsConnection
             SubjectValidator.ValidateReplyTo(replyTo);
         }
 
+        if (Telemetry.PublishedMessages.Enabled)
+            Telemetry.PublishedMessages.Add(1, Telemetry.BuildMetricTags(this, Telemetry.Constants.OpPub));
+
         if (Telemetry.HasListeners())
         {
             using var activity = Telemetry.StartSendActivity($"{SpanDestinationName(subject)} {Telemetry.Constants.PublishActivityName}", this, subject, replyTo);
@@ -43,6 +46,9 @@ public partial class NatsConnection
             SubjectValidator.ValidateSubject(subject);
             SubjectValidator.ValidateReplyTo(replyTo);
         }
+
+        if (Telemetry.PublishedMessages.Enabled)
+            Telemetry.PublishedMessages.Add(1, Telemetry.BuildMetricTags(this, Telemetry.Constants.OpPub));
 
         if (Telemetry.HasListeners())
         {

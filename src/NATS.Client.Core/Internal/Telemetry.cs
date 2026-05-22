@@ -32,6 +32,25 @@ internal static class Telemetry
 
     public static bool HasListeners() => NatsActivities.HasListeners();
 
+    public static TagList BuildMetricTags(INatsConnection? connection, string operation)
+    {
+        var tags = new TagList
+        {
+            { Constants.SystemKey, Constants.SystemVal },
+            { Constants.OpKey, operation },
+        };
+
+        if (connection is NatsConnection { ServerInfo: { } info })
+        {
+            tags.Add(Constants.ServerAddress, info.Host);
+            tags.Add(Constants.ServerPort, info.Port);
+            tags.Add(Constants.NetworkProtoName, "nats");
+            tags.Add(Constants.NetworkTransport, "tcp");
+        }
+
+        return tags;
+    }
+
     public static Activity? StartSendActivity(
         string name,
         INatsConnection? connection,
