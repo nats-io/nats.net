@@ -64,6 +64,9 @@ internal sealed class ReplyTask<T> : ReplyTaskBase, IDisposable
             _msg = NatsMsg<T>.Build(Subject, replyTo, headersBuffer, payload, _connection, _connection.HeaderParser, _deserializer);
         }
 
+        if (Telemetry.ConsumedMessages.Enabled)
+            Telemetry.ConsumedMessages.Add(1, Telemetry.BuildMetricTags(_connection, Telemetry.Constants.OpRec));
+
         _tcs.TrySetResult();
     }
 

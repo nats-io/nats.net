@@ -107,6 +107,71 @@ public class OpenTelemetryTest
     }
 
     [Fact]
+    public async Task Consume_counter()
+    {
+        using var meter = new MeterTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        await using var sub = await nats.SubscribeCoreAsync<int>("foo.consume", cancellationToken: cts.Token);
+
+        for (var i = 0; i < 5; i++)
+        {
+            await nats.PublishAsync("foo.consume", i, cancellationToken: cts.Token);
+        }
+
+        for (var i = 0; i < 5; i++)
+        {
+            await sub.Msgs.ReadAsync(cts.Token);
+        }
+
+        var consumed = meter.LongMeasurements
+            .Where(m => m.Name == "messaging.client.consumed.messages")
+            .ToList();
+
+        consumed.Sum(m => m.Value).Should().Be(5);
+
+        var tags = consumed[0].Tags.ToDictionary(t => t.Key, t => t.Value);
+        tags.Should().ContainKey("messaging.system").WhoseValue.Should().Be("nats");
+        tags.Should().ContainKey("messaging.operation").WhoseValue.Should().Be("receive");
+        tags.Should().ContainKey("server.address");
+        tags.Should().ContainKey("server.port");
+        tags.Should().NotContainKey("messaging.destination.name");
+        tags.Should().NotContainKey("messaging.nats.message.subject");
+    }
+
+    [Fact]
+    public async Task Consume_counter_direct_request_reply()
+    {
+        using var meter = new MeterTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts
+        {
+            Url = server.Url,
+            RequestReplyMode = NatsRequestReplyMode.Direct,
+        });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var sub = await nats.SubscribeCoreAsync<int>("foo.direct.consume", cancellationToken: cts.Token);
+        var reg = sub.Register(async msg => await msg.ReplyAsync(msg.Data * 2, cancellationToken: cts.Token));
+
+        var reply = await nats.RequestAsync<int, int>("foo.direct.consume", 21, cancellationToken: cts.Token);
+        reply.Data.Should().Be(42);
+
+        var consumed = meter.LongMeasurements
+            .Where(m => m.Name == "messaging.client.consumed.messages")
+            .Sum(m => m.Value);
+
+        consumed.Should().Be(2);
+
+        await sub.DisposeAsync();
+        await reg;
+    }
+
+    [Fact]
     public async Task Direct_request_reply_receive_activity_is_disposed()
     {
         using var tracker = new ActivityTracker();
