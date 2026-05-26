@@ -267,6 +267,32 @@ public class OpenTelemetryTest
     }
 
     [Fact]
+    public async Task Subscribe_operation_duration_histogram()
+    {
+        using var meter = new MeterTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        await using var sub = await nats.SubscribeCoreAsync<int>("foo.sub.duration", cancellationToken: cts.Token);
+
+        var subscribe = meter.DoubleMeasurements
+            .Where(m => m.Name == "messaging.client.operation.duration")
+            .Where(m => m.Tags.Any(t => t.Key == "messaging.operation" && (string?)t.Value == "subscribe"))
+            .ToList();
+
+        subscribe.Should().HaveCount(1);
+        subscribe[0].Value.Should().BeGreaterThan(0);
+
+        var tags = subscribe[0].Tags.ToDictionary(t => t.Key, t => t.Value);
+        tags.Should().ContainKey("messaging.system").WhoseValue.Should().Be("nats");
+        tags.Should().ContainKey("server.address");
+        tags.Should().ContainKey("server.port");
+        tags.Should().NotContainKey("error.type");
+    }
+
+    [Fact]
     public async Task Request_operation_duration_records_error_type_on_failure()
     {
         using var meter = new MeterTracker();
