@@ -168,11 +168,16 @@ public partial class NatsConnection : INatsConnection
             KeyValuePair<string, object?>[]? prefix = null;
             if (value is not null)
             {
+                // ServerInfo.Host/Port is the server's bind address (often 0.0.0.0); use the
+                // address the client actually dialled for OTel server.address/server.port.
+                var connectUri = _currentConnectUri;
+                var host = connectUri?.Host ?? value.Host;
+                var port = connectUri?.Port ?? value.Port;
                 prefix = new[]
                 {
                     new KeyValuePair<string, object?>(Telemetry.Constants.SystemKey, Telemetry.Constants.SystemVal),
-                    new KeyValuePair<string, object?>(Telemetry.Constants.ServerAddress, value.Host),
-                    new KeyValuePair<string, object?>(Telemetry.Constants.ServerPort, (object)value.Port),
+                    new KeyValuePair<string, object?>(Telemetry.Constants.ServerAddress, host),
+                    new KeyValuePair<string, object?>(Telemetry.Constants.ServerPort, (object)port),
                     new KeyValuePair<string, object?>(Telemetry.Constants.NetworkProtoName, "nats"),
                     new KeyValuePair<string, object?>(Telemetry.Constants.NetworkTransport, "tcp"),
                 };
