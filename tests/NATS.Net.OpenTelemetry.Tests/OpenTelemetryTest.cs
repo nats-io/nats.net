@@ -172,6 +172,43 @@ public class OpenTelemetryTest
     }
 
     [Fact]
+    public async Task Active_subscriptions_updown_counter()
+    {
+        using var meter = new MeterTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var sub1 = await nats.SubscribeCoreAsync<int>("foo.active.1", cancellationToken: cts.Token);
+        var sub2 = await nats.SubscribeCoreAsync<int>("foo.active.2", cancellationToken: cts.Token);
+
+        var active = meter.LongMeasurements
+            .Where(m => m.Name == "nats.client.active_subscriptions")
+            .ToList();
+
+        active.Sum(m => m.Value).Should().Be(2);
+
+        var tags = active[0].Tags.ToDictionary(t => t.Key, t => t.Value);
+        tags.Should().ContainKey("messaging.system").WhoseValue.Should().Be("nats");
+        tags.Should().ContainKey("messaging.operation").WhoseValue.Should().Be("subscribe");
+        tags.Should().ContainKey("server.address");
+        tags.Should().ContainKey("server.port");
+
+        await sub1.DisposeAsync();
+
+        meter.LongMeasurements
+            .Where(m => m.Name == "nats.client.active_subscriptions")
+            .Sum(m => m.Value).Should().Be(1);
+
+        await sub2.DisposeAsync();
+
+        meter.LongMeasurements
+            .Where(m => m.Name == "nats.client.active_subscriptions")
+            .Sum(m => m.Value).Should().Be(0);
+    }
+
+    [Fact]
     public async Task Direct_request_reply_receive_activity_is_disposed()
     {
         using var tracker = new ActivityTracker();

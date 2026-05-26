@@ -26,7 +26,7 @@ internal static class Telemetry
         NatsMeter.CreateUpDownCounter<long>("nats.client.active_subscriptions", unit: "{subscription}");
 
     public static readonly Counter<long> Reconnects =
-        NatsMeter.CreateCounter<long>("nats.client.reconnects", unit: "{event}");
+        NatsMeter.CreateCounter<long>("nats.client.reconnects", unit: "{reconnect}");
 
     private static readonly object BoxedTrue = true;
 
@@ -339,6 +339,7 @@ internal static class Telemetry
         public const string OpKey = "messaging.operation";
         public const string OpPub = "publish";
         public const string OpRec = "receive";
+        public const string OpSub = "subscribe";
         public const string MsgBodySize = "messaging.message.body.size";
         public const string MsgTotalSize = "messaging.message.envelope.size";
 

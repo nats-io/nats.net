@@ -54,6 +54,7 @@ public abstract class NatsSubBase
     private int _pendingMsgs;
     private Exception? _exception;
     private int _isSlowConsumer;
+    private int _telemetryActive;
     private TaskCompletionSource? _readerExited;
 
     /// <summary>
@@ -208,6 +209,9 @@ public abstract class NatsSubBase
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous operation.</returns>
     public virtual ValueTask ReadyAsync()
     {
+        if (Interlocked.Exchange(ref _telemetryActive, 1) == 0 && Telemetry.ActiveSubscriptions.Enabled)
+            Telemetry.ActiveSubscriptions.Add(1, Telemetry.BuildMetricTags(Connection, Telemetry.Constants.OpSub));
+
         // Let idle timer start with the first message, in case
         // we're allowed to wait longer for the first message.
         if (_startUpTimeoutTimer == null)
@@ -232,6 +236,8 @@ public abstract class NatsSubBase
                 return default;
             _unsubscribed = true;
         }
+
+        DecrementActiveSubscription();
 
         _timeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
         _idleTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
@@ -396,6 +402,8 @@ public abstract class NatsSubBase
 
         if (needsUnsub)
         {
+            DecrementActiveSubscription();
+
             _timeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
             _idleTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
             _startUpTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
@@ -609,6 +617,12 @@ public abstract class NatsSubBase
         UnsubscribeAsync();
 #pragma warning restore VSTHRD110
 #pragma warning restore CA2012
+    }
+
+    private void DecrementActiveSubscription()
+    {
+        if (Interlocked.Exchange(ref _telemetryActive, 0) == 1)
+            Telemetry.ActiveSubscriptions.Add(-1, Telemetry.BuildMetricTags(Connection, Telemetry.Constants.OpSub));
     }
 
     private async ValueTask WaitForReaderDrainCoreAsync(Task task, TimeSpan timeout)
