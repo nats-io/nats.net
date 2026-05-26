@@ -349,6 +349,9 @@ internal sealed class CommandWriter : IAsyncDisposable
             {
                 throw new NatsPayloadTooLargeException($"Payload size {size} exceeds server's maximum payload size {info.MaxPayload}");
             }
+
+            if (Telemetry.SentBytes.Enabled)
+                Telemetry.SentBytes.Add(size, Telemetry.BuildMetricTags(_connection, Telemetry.Constants.OpPub));
         }
         catch
         {

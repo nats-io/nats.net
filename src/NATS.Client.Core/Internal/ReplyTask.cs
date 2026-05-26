@@ -67,6 +67,12 @@ internal sealed class ReplyTask<T> : ReplyTaskBase, IDisposable
         if (Telemetry.ConsumedMessages.Enabled)
             Telemetry.ConsumedMessages.Add(1, Telemetry.BuildMetricTags(_connection, Telemetry.Constants.OpRec));
 
+        if (Telemetry.ReceivedBytes.Enabled)
+        {
+            var bytes = payload.Length + (headersBuffer?.Length ?? 0);
+            Telemetry.ReceivedBytes.Add(bytes, Telemetry.BuildMetricTags(_connection, Telemetry.Constants.OpRec));
+        }
+
         _tcs.TrySetResult();
     }
 

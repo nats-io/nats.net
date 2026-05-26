@@ -293,6 +293,41 @@ public class OpenTelemetryTest
     }
 
     [Fact]
+    public async Task Sent_and_received_bytes_counters()
+    {
+        using var meter = new MeterTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        await using var sub = await nats.SubscribeCoreAsync<byte[]>("foo.bytes", cancellationToken: cts.Token);
+
+        var payload = new byte[1024];
+        await nats.PublishAsync("foo.bytes", payload, cancellationToken: cts.Token);
+
+        var msg = await sub.Msgs.ReadAsync(cts.Token);
+        msg.Data!.Length.Should().Be(1024);
+
+        var sent = meter.LongMeasurements
+            .Where(m => m.Name == "nats.client.sent.bytes")
+            .Sum(m => m.Value);
+        var received = meter.LongMeasurements
+            .Where(m => m.Name == "nats.client.received.bytes")
+            .Sum(m => m.Value);
+
+        sent.Should().Be(1024);
+        received.Should().Be(1024);
+
+        var sentTags = meter.LongMeasurements.First(m => m.Name == "nats.client.sent.bytes").Tags.ToDictionary(t => t.Key, t => t.Value);
+        sentTags.Should().ContainKey("messaging.system").WhoseValue.Should().Be("nats");
+        sentTags.Should().ContainKey("messaging.operation").WhoseValue.Should().Be("publish");
+
+        var recvTags = meter.LongMeasurements.First(m => m.Name == "nats.client.received.bytes").Tags.ToDictionary(t => t.Key, t => t.Value);
+        recvTags.Should().ContainKey("messaging.operation").WhoseValue.Should().Be("receive");
+    }
+
+    [Fact]
     public async Task Subscribe_operation_duration_histogram()
     {
         using var meter = new MeterTracker();

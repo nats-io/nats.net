@@ -28,6 +28,12 @@ internal static class Telemetry
     public static readonly Counter<long> Reconnects =
         NatsMeter.CreateCounter<long>("nats.client.reconnects", unit: "{reconnect}");
 
+    public static readonly Counter<long> SentBytes =
+        NatsMeter.CreateCounter<long>("nats.client.sent.bytes", unit: "By");
+
+    public static readonly Counter<long> ReceivedBytes =
+        NatsMeter.CreateCounter<long>("nats.client.received.bytes", unit: "By");
+
     private static readonly object BoxedTrue = true;
 
     /// <summary>

@@ -326,6 +326,12 @@ public abstract class NatsSubBase
         if (Telemetry.ConsumedMessages.Enabled)
             Telemetry.ConsumedMessages.Add(1, Telemetry.BuildMetricTags(Connection, Telemetry.Constants.OpRec));
 
+        if (Telemetry.ReceivedBytes.Enabled)
+        {
+            var bytes = payloadBuffer.Length + (headersBuffer?.Length ?? 0);
+            Telemetry.ReceivedBytes.Add(bytes, Telemetry.BuildMetricTags(Connection, Telemetry.Constants.OpRec));
+        }
+
         try
         {
             // Need to await to handle any exceptions
