@@ -278,11 +278,20 @@ public class OpenTelemetryTest
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
 
-        await nats.ConnectAsync();
+        // Attach before ConnectAsync so we observe both opens and can wait for the second
+        // (the reconnect) without racing the async event-channel delivery of the first.
+        var opened = 0;
+        var openedTwice = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        nats.ConnectionOpened += (_, _) =>
+        {
+            if (Interlocked.Increment(ref opened) == 2)
+                openedTwice.TrySetResult();
+            return default;
+        };
 
-        var openedAgain = nats.ConnectionOpenedAsAwaitable();
+        await nats.ConnectAsync();
         await nats.ReconnectAsync();
-        await openedAgain;
+        await openedTwice.Task.WaitAsync(TimeSpan.FromSeconds(30));
 
         var reconnects = meter.LongMeasurements
             .Where(m => m.Name == "nats.client.reconnects")
