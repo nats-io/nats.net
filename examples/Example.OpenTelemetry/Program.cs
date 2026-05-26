@@ -2,11 +2,12 @@
 
                          OpenTelemetry Example
 
-(1) Run Jaeger locally and then run the client and server apps.
+Both apps export traces and metrics via OTLP. Point them at any backend that
+accepts OTLP (Jaeger for traces, an OTel collector, Grafana stack, etc.).
+
+(1) Quickest local setup: Jaeger all-in-one accepts OTLP for traces.
 
 https://www.jaegertracing.io/download/
-
-https://medium.com/jaegertracing/introducing-native-support-for-opentelemetry-in-jaeger-eb661be8183c
 
 ```powershell
 > $env:COLLECTOR_OTLP_ENABLED=true
@@ -19,9 +20,12 @@ or
 $ COLLECTOR_OTLP_ENABLED=true jaeger-all-in-one
 ```
 
-(2) Jaeger UI default URL http://localhost:16686/search
+Jaeger UI: http://localhost:16686/search (traces only).
 
-(3) In different terminals run:
+For metrics, route the OTLP stream through an OpenTelemetry Collector to
+Prometheus/Grafana or any OTLP-capable backend.
+
+(2) In different terminals run:
 
 ```
 nats-server

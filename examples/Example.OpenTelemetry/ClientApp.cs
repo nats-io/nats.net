@@ -2,6 +2,7 @@ using System.Diagnostics;
 using NATS.Client.Core;
 using NATS.Client.OpenTelemetry;
 using OpenTelemetry;
+using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
@@ -14,11 +15,19 @@ public static class ClientApp
         var serviceName = "ClientApp";
         var serviceVersion = "1.0.0";
 
+        var resourceBuilder = ResourceBuilder.CreateDefault().AddService(serviceName: serviceName, serviceVersion: serviceVersion);
+
         using var tracerProvider = Sdk.CreateTracerProviderBuilder()
             .AddOtlpExporter()
-            .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(serviceName: serviceName, serviceVersion: serviceVersion))
+            .SetResourceBuilder(resourceBuilder)
             .AddNatsClientInstrumentation()
             .AddSource("MyClientSource")
+            .Build();
+
+        using var meterProvider = Sdk.CreateMeterProviderBuilder()
+            .AddOtlpExporter()
+            .SetResourceBuilder(resourceBuilder)
+            .AddNatsClientInstrumentation()
             .Build();
 
         ActivitySource activitySource = new("MyClientSource");
