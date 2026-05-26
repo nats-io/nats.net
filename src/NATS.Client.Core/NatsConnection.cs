@@ -845,6 +845,8 @@ public partial class NatsConnection : INatsConnection
                 _backoff = TimeSpan.Zero;
                 _logger.LogInformation(NatsLogEvents.Connection, "Connection succeeded {Name}, NATS {Url} [{ReconnectCount}]", _name, url, reconnectCount);
                 ConnectionState = NatsConnectionState.Open;
+                if (Telemetry.Reconnects.Enabled)
+                    Telemetry.Reconnects.Add(1, Telemetry.BuildMetricTags(this, Telemetry.Constants.OpReconnect));
                 _pingTimerCancellationTokenSource = new CancellationTokenSource();
                 StartPingTimer(_pingTimerCancellationTokenSource.Token);
                 _waitForOpenConnection.TrySetResult();

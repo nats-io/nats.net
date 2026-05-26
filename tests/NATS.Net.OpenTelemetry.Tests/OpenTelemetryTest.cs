@@ -267,6 +267,32 @@ public class OpenTelemetryTest
     }
 
     [Fact]
+    public async Task Reconnect_counter()
+    {
+        using var meter = new MeterTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        await nats.ConnectAsync();
+
+        var openedAgain = nats.ConnectionOpenedAsAwaitable();
+        await nats.ReconnectAsync();
+        await openedAgain;
+
+        var reconnects = meter.LongMeasurements
+            .Where(m => m.Name == "nats.client.reconnects")
+            .ToList();
+
+        reconnects.Sum(m => m.Value).Should().Be(1);
+
+        var tags = reconnects[0].Tags.ToDictionary(t => t.Key, t => t.Value);
+        tags.Should().ContainKey("messaging.system").WhoseValue.Should().Be("nats");
+        tags.Should().ContainKey("messaging.operation").WhoseValue.Should().Be("reconnect");
+        tags.Should().ContainKey("server.address");
+        tags.Should().ContainKey("server.port");
+    }
+
+    [Fact]
     public async Task Subscribe_operation_duration_histogram()
     {
         using var meter = new MeterTracker();
