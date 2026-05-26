@@ -64,20 +64,19 @@ internal static class Telemetry
 
     public static TagList BuildMetricTags(INatsConnection? connection, string operation)
     {
-        var tags = new TagList
-        {
-            { Constants.SystemKey, Constants.SystemVal },
-            { Constants.OpKey, operation },
-        };
+        var tags = default(TagList);
 
-        if (connection is NatsConnection { ServerInfo: { } info })
+        if (connection is NatsConnection { MetricTagsPrefix: { } prefix })
         {
-            tags.Add(Constants.ServerAddress, info.Host);
-            tags.Add(Constants.ServerPort, info.Port);
-            tags.Add(Constants.NetworkProtoName, "nats");
-            tags.Add(Constants.NetworkTransport, "tcp");
+            for (var i = 0; i < prefix.Length; i++)
+                tags.Add(prefix[i]);
+        }
+        else
+        {
+            tags.Add(Constants.SystemKey, Constants.SystemVal);
         }
 
+        tags.Add(Constants.OpKey, operation);
         return tags;
     }
 

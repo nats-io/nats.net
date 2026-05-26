@@ -57,6 +57,7 @@ public partial class NatsConnection : INatsConnection
     private readonly HashSet<NatsSubBase> _drainParticipants = new();
 
     private ServerInfo? _writableServerInfo;
+    private KeyValuePair<string, object?>[]? _metricTagsPrefix;
     private int _pongCount;
     private int _connectionState;
     private int _isDisposed;
@@ -163,8 +164,25 @@ public partial class NatsConnection : INatsConnection
             }
 
             Interlocked.Exchange(ref _writableServerInfo, value);
+
+            KeyValuePair<string, object?>[]? prefix = null;
+            if (value is not null)
+            {
+                prefix = new[]
+                {
+                    new KeyValuePair<string, object?>(Telemetry.Constants.SystemKey, Telemetry.Constants.SystemVal),
+                    new KeyValuePair<string, object?>(Telemetry.Constants.ServerAddress, value.Host),
+                    new KeyValuePair<string, object?>(Telemetry.Constants.ServerPort, (object)value.Port),
+                    new KeyValuePair<string, object?>(Telemetry.Constants.NetworkProtoName, "nats"),
+                    new KeyValuePair<string, object?>(Telemetry.Constants.NetworkTransport, "tcp"),
+                };
+            }
+
+            Volatile.Write(ref _metricTagsPrefix, prefix);
         }
     }
+
+    internal KeyValuePair<string, object?>[]? MetricTagsPrefix => Volatile.Read(ref _metricTagsPrefix);
 
     internal bool IsDisposed
     {
