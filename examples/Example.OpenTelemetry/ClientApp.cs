@@ -1,7 +1,9 @@
 using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.OpenTelemetry;
 using OpenTelemetry;
+using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -30,12 +32,26 @@ public static class ClientApp
             .AddNatsClientInstrumentation()
             .Build();
 
+        using var loggerFactory = LoggerFactory.Create(builder =>
+        {
+            builder.AddOpenTelemetry(options =>
+            {
+                options.SetResourceBuilder(resourceBuilder);
+                options.IncludeFormattedMessage = true;
+                options.IncludeScopes = true;
+                options.ParseStateValues = true;
+                options.AddOtlpExporter();
+            });
+        });
+        var logger = loggerFactory.CreateLogger(serviceName);
+
         ActivitySource activitySource = new("MyClientSource");
 
-        Console.WriteLine("Client App is starting...");
+        logger.LogInformation("Client App is starting...");
 
         await using var nats = new NatsConnection(new NatsOpts
         {
+            LoggerFactory = loggerFactory,
             RequestReplyMode = NatsRequestReplyMode.Direct,
         });
 
@@ -44,7 +60,7 @@ public static class ClientApp
             await nats.PublishAsync("greet.presence.client.app", "ClientApp is here!");
 
             var response = await nats.RequestAsync<string, string>("greet.hi", "Hi, telemetry!");
-            Console.WriteLine($"Response: {response}");
+            logger.LogInformation("Response: {Response}", response);
         }
     }
 }

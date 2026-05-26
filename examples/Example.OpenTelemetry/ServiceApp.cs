@@ -1,7 +1,9 @@
 using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.OpenTelemetry;
 using OpenTelemetry;
+using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -30,12 +32,26 @@ public static class ServiceApp
             .AddNatsClientInstrumentation()
             .Build();
 
+        using var loggerFactory = LoggerFactory.Create(builder =>
+        {
+            builder.AddOpenTelemetry(options =>
+            {
+                options.SetResourceBuilder(resourceBuilder);
+                options.IncludeFormattedMessage = true;
+                options.IncludeScopes = true;
+                options.ParseStateValues = true;
+                options.AddOtlpExporter();
+            });
+        });
+        var logger = loggerFactory.CreateLogger(serviceName);
+
         ActivitySource activitySource = new("MyServiceSource");
 
-        Console.WriteLine("Service App is starting...");
+        logger.LogInformation("Service App is starting...");
 
         await using var nats = new NatsConnection(new NatsOpts
         {
+            LoggerFactory = loggerFactory,
             RequestReplyMode = NatsRequestReplyMode.Direct,
         });
 
@@ -45,7 +61,7 @@ public static class ServiceApp
 
             if (msg.Subject.StartsWith("greet.presence"))
             {
-                Console.WriteLine($"{msg.Data} is here!");
+                logger.LogInformation("{Data} is here!", msg.Data);
 
                 activity?.AddEvent(new ActivityEvent("Presence", tags: new()
                 {
