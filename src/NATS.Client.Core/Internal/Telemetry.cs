@@ -30,7 +30,37 @@ internal static class Telemetry
 
     private static readonly object BoxedTrue = true;
 
+    /// <summary>
+    /// Don't use this for metrics.
+    /// </summary>
     public static bool HasListeners() => NatsActivities.HasListeners();
+
+    public static void RecordOperationDuration(long startTimestamp, INatsConnection? connection, string operation, Exception? error)
+    {
+        if (!OperationDuration.Enabled)
+            return;
+
+        var elapsed = (Stopwatch.GetTimestamp() - startTimestamp) / (double)Stopwatch.Frequency;
+        var tags = BuildMetricTags(connection, operation);
+        if (error is not null)
+            tags.Add(Constants.ErrorTypeKey, error.GetType().FullName ?? "unknown");
+
+        OperationDuration.Record(elapsed, tags);
+    }
+
+    public static async ValueTask MeasureOperationAsync(ValueTask task, long startTimestamp, INatsConnection? connection, string operation)
+    {
+        try
+        {
+            await task.ConfigureAwait(false);
+            RecordOperationDuration(startTimestamp, connection, operation, null);
+        }
+        catch (Exception ex)
+        {
+            RecordOperationDuration(startTimestamp, connection, operation, ex);
+            throw;
+        }
+    }
 
     public static TagList BuildMetricTags(INatsConnection? connection, string operation)
     {
@@ -340,6 +370,8 @@ internal static class Telemetry
         public const string OpPub = "publish";
         public const string OpRec = "receive";
         public const string OpSub = "subscribe";
+        public const string OpReq = "request";
+        public const string ErrorTypeKey = "error.type";
         public const string MsgBodySize = "messaging.message.body.size";
         public const string MsgTotalSize = "messaging.message.envelope.size";
 

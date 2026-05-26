@@ -209,6 +209,92 @@ public class OpenTelemetryTest
     }
 
     [Fact]
+    public async Task Publish_operation_duration_histogram()
+    {
+        using var meter = new MeterTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await nats.ConnectAsync();
+
+        await nats.PublishAsync("foo.duration", 42, cancellationToken: cts.Token);
+
+        var durations = meter.DoubleMeasurements
+            .Where(m => m.Name == "messaging.client.operation.duration")
+            .ToList();
+
+        var publish = durations.Where(m => m.Tags.Any(t => t.Key == "messaging.operation" && (string?)t.Value == "publish")).ToList();
+        publish.Should().NotBeEmpty();
+        publish[0].Value.Should().BeGreaterThan(0);
+
+        var tags = publish[0].Tags.ToDictionary(t => t.Key, t => t.Value);
+        tags.Should().ContainKey("messaging.system").WhoseValue.Should().Be("nats");
+        tags.Should().ContainKey("server.address");
+        tags.Should().ContainKey("server.port");
+        tags.Should().NotContainKey("error.type");
+    }
+
+    [Fact]
+    public async Task Request_operation_duration_histogram()
+    {
+        using var meter = new MeterTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var sub = await nats.SubscribeCoreAsync<int>("foo.req", cancellationToken: cts.Token);
+        var reg = sub.Register(async msg => await msg.ReplyAsync(msg.Data * 2, cancellationToken: cts.Token));
+
+        var reply = await nats.RequestAsync<int, int>("foo.req", 21, cancellationToken: cts.Token);
+        reply.Data.Should().Be(42);
+
+        var request = meter.DoubleMeasurements
+            .Where(m => m.Name == "messaging.client.operation.duration")
+            .Where(m => m.Tags.Any(t => t.Key == "messaging.operation" && (string?)t.Value == "request"))
+            .ToList();
+
+        request.Should().HaveCount(1);
+        request[0].Value.Should().BeGreaterThan(0);
+
+        var tags = request[0].Tags.ToDictionary(t => t.Key, t => t.Value);
+        tags.Should().ContainKey("messaging.system").WhoseValue.Should().Be("nats");
+        tags.Should().NotContainKey("error.type");
+
+        await sub.DisposeAsync();
+        await reg;
+    }
+
+    [Fact]
+    public async Task Request_operation_duration_records_error_type_on_failure()
+    {
+        using var meter = new MeterTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var act = async () => await nats.RequestAsync<int, int>(
+            "foo.no.responders",
+            1,
+            replyOpts: new NatsSubOpts { Timeout = TimeSpan.FromSeconds(1) },
+            cancellationToken: cts.Token);
+
+        await act.Should().ThrowAsync<NatsNoRespondersException>();
+
+        var request = meter.DoubleMeasurements
+            .Where(m => m.Name == "messaging.client.operation.duration")
+            .Where(m => m.Tags.Any(t => t.Key == "messaging.operation" && (string?)t.Value == "request"))
+            .ToList();
+
+        request.Should().HaveCount(1);
+        var tags = request[0].Tags.ToDictionary(t => t.Key, t => t.Value);
+        tags.Should().ContainKey("error.type");
+        ((string?)tags["error.type"]).Should().Contain("NatsNoRespondersException");
+    }
+
+    [Fact]
     public async Task Direct_request_reply_receive_activity_is_disposed()
     {
         using var tracker = new ActivityTracker();
