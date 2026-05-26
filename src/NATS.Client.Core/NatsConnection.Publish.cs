@@ -14,9 +14,6 @@ public partial class NatsConnection
             SubjectValidator.ValidateReplyTo(replyTo);
         }
 
-        if (Telemetry.PublishedMessages.Enabled)
-            Telemetry.PublishedMessages.Add(1, Telemetry.BuildMetricTags(this, Telemetry.Constants.OpPub));
-
         var measure = Telemetry.OperationDuration.Enabled;
         var start = measure ? Stopwatch.GetTimestamp() : 0L;
 
@@ -57,9 +54,6 @@ public partial class NatsConnection
             SubjectValidator.ValidateSubject(subject);
             SubjectValidator.ValidateReplyTo(replyTo);
         }
-
-        if (Telemetry.PublishedMessages.Enabled)
-            Telemetry.PublishedMessages.Add(1, Telemetry.BuildMetricTags(this, Telemetry.Constants.OpPub));
 
         var measure = Telemetry.OperationDuration.Enabled;
         var start = measure ? Stopwatch.GetTimestamp() : 0L;

@@ -84,8 +84,8 @@ public class OpenTelemetryTest
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
-        await nats.ConnectAsync();
-
+        // Intentionally not calling ConnectAsync first; the first publish triggers connect.
+        // Counter must not record measurements with (Unset) server tags.
         for (var i = 0; i < 5; i++)
         {
             await nats.PublishAsync("foo", i, cancellationToken: cts.Token);
@@ -97,13 +97,18 @@ public class OpenTelemetryTest
 
         published.Sum(m => m.Value).Should().Be(5);
 
-        var tags = published[0].Tags.ToDictionary(t => t.Key, t => t.Value);
-        tags.Should().ContainKey("messaging.system").WhoseValue.Should().Be("nats");
-        tags.Should().ContainKey("messaging.operation").WhoseValue.Should().Be("publish");
-        tags.Should().ContainKey("server.address");
-        tags.Should().ContainKey("server.port");
-        tags.Should().NotContainKey("messaging.destination.name");
-        tags.Should().NotContainKey("messaging.nats.message.subject");
+        // Every measurement must carry the full server tag set, including the first publish
+        // that triggered the connect.
+        foreach (var m in published)
+        {
+            var tags = m.Tags.ToDictionary(t => t.Key, t => t.Value);
+            tags.Should().ContainKey("messaging.system").WhoseValue.Should().Be("nats");
+            tags.Should().ContainKey("messaging.operation").WhoseValue.Should().Be("publish");
+            tags.Should().ContainKey("server.address");
+            tags.Should().ContainKey("server.port");
+            tags.Should().NotContainKey("messaging.destination.name");
+            tags.Should().NotContainKey("messaging.nats.message.subject");
+        }
     }
 
     [Fact]
