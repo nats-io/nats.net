@@ -81,7 +81,6 @@ public class ManageConsumerTest
     [InlineData("foo.bar")]
     [InlineData("foo*")]
     [InlineData("foo>")]
-    [InlineData("foo bar")]
     public async Task Create_consumer_with_invalid_name_throws(string badName)
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestTimeout = TimeSpan.FromSeconds(10) });

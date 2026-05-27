@@ -11,7 +11,7 @@ namespace NATS.Client.JetStream;
 /// <summary>Provides management and access to NATS JetStream streams and consumers.</summary>
 public partial class NatsJSContext
 {
-    private static readonly char[] InvalidConsumerNameChars = { ' ', '.', '*', '>', '/', '\\', '\t', '\n', '\r' };
+    private static readonly char[] InvalidConsumerNameChars = { '.', '*', '>' };
 
     private readonly ILogger _logger;
 
@@ -387,10 +387,11 @@ public partial class NatsJSContext
     internal static void ThrowIfInvalidConsumerName(string name, [CallerArgumentExpression("name")] string? paramName = null)
     {
         // The resolved name (Name, else DurableName) is appended to the CONSUMER.CREATE
-        // subject as a single token. Reject characters that are legal in a subject but
-        // would split or wildcard that token ('.', '*', '>', path separators) or break
-        // the protocol line (whitespace), so the server gets the name we intended rather
-        // than a structurally different request. Mirrors the server's name rules.
+        // subject as a single token. Reject only the characters that are legal in a
+        // subject but restructure that token ('.' adds tokens, '*'/'>' are wildcards),
+        // so the server gets the name we intended rather than a structurally different
+        // request it cannot diagnose. Other invalid characters (whitespace, path
+        // separators) are caught by subject validation or the server's own name checks.
         if (name.IndexOfAny(InvalidConsumerNameChars) >= 0)
         {
             ThrowInvalidConsumerNameException(paramName);
@@ -541,7 +542,7 @@ public partial class NatsJSContext
 
     [DoesNotReturn]
     private static void ThrowInvalidConsumerNameException(string? paramName) =>
-        throw new ArgumentException("Consumer name cannot contain ' ', '.', '*', '>', '/', '\\' or whitespace", paramName);
+        throw new ArgumentException("Consumer name cannot contain '.', '*', '>'", paramName);
 
     [DoesNotReturn]
     private static void ThrowEmptyException(string? paramName) =>
