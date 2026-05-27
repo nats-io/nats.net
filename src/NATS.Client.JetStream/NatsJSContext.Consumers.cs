@@ -263,6 +263,7 @@ public partial class NatsJSContext : INatsJSContext
 
         if (!string.IsNullOrWhiteSpace(name))
         {
+            ThrowIfInvalidConsumerName(name!);
             subject += $".{name}";
         }
 
