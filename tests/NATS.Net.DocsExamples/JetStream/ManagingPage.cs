@@ -64,10 +64,9 @@ public class ManagingPage
             // Create a durable consumer
             ConsumerConfig durableConfig = new ConsumerConfig("durable_processor");
 
-            // Same as above
+            // Same as above (on NATS .NET 2.8.0 and earlier, Name must also be set to the same value)
             durableConfig = new ConsumerConfig
             {
-                Name = "durable_processor",
                 DurableName = "durable_processor",
             };
 

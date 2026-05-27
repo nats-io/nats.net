@@ -95,6 +95,49 @@ public class KeyValueContextTest
         updatedStatus.Info.Config.Description.Should().Be(natsKVConfig.Description);
     }
 
+    [Theory]
+    [InlineData(0, 120)] // MaxAge unset -> duplicate_window = 2 min
+    [InlineData(30, 30)] // MaxAge <= 2 min -> duplicate_window = MaxAge
+    [InlineData(600, 120)] // MaxAge > 2 min -> duplicate_window capped at 2 min
+    public async Task Duplicate_window_capped_by_max_age_on_create(int maxAgeSeconds, int expectedDuplicateWindowSeconds)
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var config = new NatsKVConfig("kv1") { MaxAge = TimeSpan.FromSeconds(maxAgeSeconds) };
+        var store = await kv.CreateStoreAsync(config, cancellationToken);
+        var status = await store.GetStatusAsync(cancellationToken);
+
+        status.Info.Config.DuplicateWindow.Should().Be(TimeSpan.FromSeconds(expectedDuplicateWindowSeconds));
+    }
+
+    [Fact]
+    public async Task Duplicate_window_recapped_on_update()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var store = await kv.CreateStoreAsync(new NatsKVConfig("kv1") { MaxAge = TimeSpan.FromSeconds(30) }, cancellationToken);
+        var status = await store.GetStatusAsync(cancellationToken);
+        status.Info.Config.DuplicateWindow.Should().Be(TimeSpan.FromSeconds(30));
+
+        await kv.UpdateStoreAsync(new NatsKVConfig("kv1") { MaxAge = TimeSpan.FromMinutes(10) }, cancellationToken);
+        var updated = await store.GetStatusAsync(cancellationToken);
+        updated.Info.Config.DuplicateWindow.Should().Be(TimeSpan.FromMinutes(2));
+    }
+
     [Fact]
     public async Task Delete_store_test()
     {

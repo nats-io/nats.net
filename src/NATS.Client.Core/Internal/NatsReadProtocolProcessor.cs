@@ -116,6 +116,28 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         return Encoding.UTF8.GetString(errorSlice.Slice(6, errorSlice.Length - 7));
     }
 
+    private void HandleServerError(string error)
+    {
+        var args = new NatsServerErrorEventArgs(error);
+
+        // Server-initiated graceful disconnects (expiry/revoke/stale) are
+        // expected and recovered by reconnect; log at Debug so they don't
+        // show up as errors. Callers that need visibility can subscribe to
+        // the ServerError event. Matches nats.go which doesn't log at all
+        // for these and surfaces them via AsyncErrorCB.
+        var level = args.Kind switch
+        {
+            NatsServerErrorKind.AuthenticationExpired => LogLevel.Debug,
+            NatsServerErrorKind.AccountAuthenticationExpired => LogLevel.Debug,
+            NatsServerErrorKind.AuthenticationRevoked => LogLevel.Debug,
+            NatsServerErrorKind.StaleConnection => LogLevel.Debug,
+            _ => LogLevel.Error,
+        };
+        _logger.Log(level, NatsLogEvents.Protocol, "Server error {Error}", error);
+        _connection.PushEvent(NatsEvent.ServerError, args);
+        _waitForPongOrErrorSignal.TrySetObservedException(new NatsServerException(error));
+    }
+
     private async Task ReadLoopAsync()
     {
         while (true)
@@ -402,18 +424,16 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                 _socketReader.AdvanceTo(buffer.Start);
                 var newBuffer = await _socketReader.ReadUntilReceiveNewLineAsync().ConfigureAwait(false);
                 var newPosition = newBuffer.PositionOf((byte)'\n');
-                var error = ParseError(newBuffer.Slice(0, newBuffer.GetOffset(newPosition!.Value) - 1));
-                _logger.LogError(NatsLogEvents.Protocol, "Server error {Error}", error);
-                _connection.PushEvent(NatsEvent.ServerError, new NatsServerErrorEventArgs(error));
-                _waitForPongOrErrorSignal.TrySetObservedException(new NatsServerException(error));
+                var lineWithCR = newBuffer.Slice(0, newPosition!.Value);
+                var error = ParseError(lineWithCR.Slice(0, lineWithCR.Length - 1));
+                HandleServerError(error);
                 return newBuffer.Slice(newBuffer.GetPosition(1, newPosition!.Value));
             }
             else
             {
-                var error = ParseError(buffer.Slice(0, buffer.GetOffset(position.Value) - 1));
-                _logger.LogError(NatsLogEvents.Protocol, "Server error {Error}", error);
-                _connection.PushEvent(NatsEvent.ServerError, new NatsServerErrorEventArgs(error));
-                _waitForPongOrErrorSignal.TrySetObservedException(new NatsServerException(error));
+                var lineWithCR = buffer.Slice(0, position.Value);
+                var error = ParseError(lineWithCR.Slice(0, lineWithCR.Length - 1));
+                HandleServerError(error);
                 return buffer.Slice(buffer.GetPosition(1, position.Value));
             }
         }

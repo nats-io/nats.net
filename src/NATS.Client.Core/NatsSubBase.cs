@@ -84,9 +84,9 @@ public abstract class NatsSubBase
         _manager = manager;
         _pendingMsgs = opts is { MaxMsgs: > 0 } ? opts.MaxMsgs ?? -1 : -1;
         _countPendingMsgs = _pendingMsgs > 0;
-        _idleTimeout = opts?.IdleTimeout ?? TimeSpan.Zero;
-        _startUpTimeout = opts?.StartUpTimeout ?? TimeSpan.Zero;
-        _timeout = opts?.Timeout ?? TimeSpan.Zero;
+        _idleTimeout = TimeoutValidation.Validate(opts?.IdleTimeout, nameof(NatsSubOpts.IdleTimeout), TimeSpan.Zero);
+        _startUpTimeout = TimeoutValidation.Validate(opts?.StartUpTimeout, nameof(NatsSubOpts.StartUpTimeout), TimeSpan.Zero);
+        _timeout = TimeoutValidation.Validate(opts?.Timeout, nameof(NatsSubOpts.Timeout), TimeSpan.Zero);
 
         Connection = connection;
         Subject = subject;
