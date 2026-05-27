@@ -6,18 +6,18 @@ internal static class TimeoutValidation
     // TimeSpan.MaxValue and Timeout.InfiniteTimeSpan are accepted as explicit "no timeout" sentinels.
     public static readonly TimeSpan MaxSupportedTimeout = TimeSpan.FromMilliseconds(uint.MaxValue - 1);
 
-    public static TimeSpan Validate(TimeSpan value, string paramName, TimeSpan noTimeoutResult)
+    public static TimeSpan Validate(TimeSpan? value, string paramName, TimeSpan noTimeoutResult)
     {
-        if (value == TimeSpan.MaxValue || value == Timeout.InfiniteTimeSpan)
+        if (value is not { } v || v == TimeSpan.MaxValue || v == Timeout.InfiniteTimeSpan)
             return noTimeoutResult;
-        if (value < TimeSpan.Zero || value > MaxSupportedTimeout)
+        if (v < TimeSpan.Zero || v > MaxSupportedTimeout)
         {
             throw new ArgumentOutOfRangeException(
                 paramName,
-                value,
+                v,
                 $"{paramName} must be between TimeSpan.Zero and {MaxSupportedTimeout}, or TimeSpan.MaxValue / Timeout.InfiniteTimeSpan for no timeout.");
         }
 
-        return value;
+        return v;
     }
 }

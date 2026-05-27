@@ -80,9 +80,9 @@ public abstract class NatsSubBase
         _manager = manager;
         _pendingMsgs = opts is { MaxMsgs: > 0 } ? opts.MaxMsgs ?? -1 : -1;
         _countPendingMsgs = _pendingMsgs > 0;
-        _idleTimeout = NormalizeTimeout(opts?.IdleTimeout, nameof(NatsSubOpts.IdleTimeout));
-        _startUpTimeout = NormalizeTimeout(opts?.StartUpTimeout, nameof(NatsSubOpts.StartUpTimeout));
-        _timeout = NormalizeTimeout(opts?.Timeout, nameof(NatsSubOpts.Timeout));
+        _idleTimeout = TimeoutValidation.Validate(opts?.IdleTimeout, nameof(NatsSubOpts.IdleTimeout), TimeSpan.Zero);
+        _startUpTimeout = TimeoutValidation.Validate(opts?.StartUpTimeout, nameof(NatsSubOpts.StartUpTimeout), TimeSpan.Zero);
+        _timeout = TimeoutValidation.Validate(opts?.Timeout, nameof(NatsSubOpts.Timeout), TimeSpan.Zero);
 
         Connection = connection;
         Subject = subject;
@@ -603,9 +603,6 @@ public abstract class NatsSubBase
 #pragma warning restore VSTHRD110
 #pragma warning restore CA2012
     }
-
-    private static TimeSpan NormalizeTimeout(TimeSpan? value, string paramName)
-        => value is { } v ? TimeoutValidation.Validate(v, paramName, TimeSpan.Zero) : TimeSpan.Zero;
 
     private async ValueTask WaitForReaderDrainCoreAsync(Task task, TimeSpan timeout)
     {
