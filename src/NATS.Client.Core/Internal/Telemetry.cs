@@ -19,8 +19,16 @@ internal static class Telemetry
     public static readonly Counter<long> ConsumedMessages =
         NatsMeter.CreateCounter<long>("messaging.client.consumed.messages", unit: "{message}");
 
+    // OTel messaging semconv recommends these advisory buckets for messaging.client.operation.duration.
+    // https://opentelemetry.io/docs/specs/semconv/messaging/messaging-metrics/#metric-messagingclientoperationduration
     public static readonly Histogram<double> OperationDuration =
-        NatsMeter.CreateHistogram<double>("messaging.client.operation.duration", unit: "s");
+        NatsMeter.CreateHistogram<double>(
+            "messaging.client.operation.duration",
+            unit: "s",
+            advice: new InstrumentAdvice<double>
+            {
+                HistogramBucketBoundaries = new[] { 0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10 },
+            });
 
     public static readonly UpDownCounter<long> ActiveSubscriptions =
         NatsMeter.CreateUpDownCounter<long>("nats.client.active_subscriptions", unit: "{subscription}");

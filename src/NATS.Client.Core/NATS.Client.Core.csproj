@@ -20,11 +20,16 @@
     <!--  Dependencies for prior to net5.0-->
     <ItemGroup Condition="!$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net5.0'))">
         <PackageReference Include="System.Threading.Channels" Version="8.0.0"/>
-        <PackageReference Include="System.Diagnostics.DiagnosticSource" Version="8.0.1"/>
         <PackageReference Include="Nullable" Version="1.3.1">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
         </PackageReference>
+    </ItemGroup>
+
+    <!--  Dependencies for prior to net10.0 (InstrumentAdvice<T> requires DiagnosticSource 9.0+) -->
+    <!--  9.0.1 is the minimum floor; 9.0.0 trims ActivitySource ctor under NativeAOT (dotnet/runtime#109872). -->
+    <ItemGroup Condition="!$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net10.0'))">
+        <PackageReference Include="System.Diagnostics.DiagnosticSource" Version="9.0.1"/>
     </ItemGroup>
 
     <!--  Dependencies for netstandard2.0 only -->
