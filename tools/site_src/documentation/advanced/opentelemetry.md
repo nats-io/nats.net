@@ -91,7 +91,7 @@ The following instruments are exposed on the `NATS.Net` meter:
 | `messaging.client.published.messages` | Counter | `{message}` | Messages published by the client |
 | `messaging.client.consumed.messages` | Counter | `{message}` | Messages received by the client |
 | `messaging.client.operation.duration` | Histogram | `s` | Duration of publish, request, and subscribe operations |
-| `nats.client.active_subscriptions` | UpDownCounter | `{subscription}` | Currently active subscriptions |
+| `nats.client.active_subscriptions` | UpDownCounter | `{subscription}` | Active `NatsSubBase` instances. Under `SharedInbox` request/reply mode each in-flight `RequestAsync` registers a transient reply subscription with the shared inbox muxer and is included here; `Direct` mode uses a reply task and is not counted |
 | `nats.client.reconnects` | Counter | `{reconnect}` | Successful reconnects since process start |
 | `nats.client.sent.bytes` | Counter | `By` | Bytes sent in published messages (body + headers) |
 | `nats.client.received.bytes` | Counter | `By` | Bytes received in consumed messages (body + headers) |

@@ -163,8 +163,6 @@ public partial class NatsConnection : INatsConnection
                 PushEvent(NatsEvent.LameDuckModeActivated, new NatsLameDuckModeActivatedEventArgs(_currentConnectUri!.Uri));
             }
 
-            Interlocked.Exchange(ref _writableServerInfo, value);
-
             KeyValuePair<string, object?>[]? prefix = null;
             if (value is not null)
             {
@@ -183,7 +181,12 @@ public partial class NatsConnection : INatsConnection
                 };
             }
 
+            // Publish prefix before ServerInfo so any reader observing the new ServerInfo
+            // is guaranteed to also observe the matching prefix. Today no single reader
+            // reads both, but #1156 will unify the trace and metric tag sources and start
+            // relying on this ordering.
             Volatile.Write(ref _metricTagsPrefix, prefix);
+            Interlocked.Exchange(ref _writableServerInfo, value);
         }
     }
 
@@ -862,20 +865,23 @@ public partial class NatsConnection : INatsConnection
                 goto CONNECT_AGAIN;
             }
 
+            bool emitReconnect;
             lock (_gate)
             {
                 _connectRetry = 0;
                 _backoff = TimeSpan.Zero;
                 _logger.LogInformation(NatsLogEvents.Connection, "Connection succeeded {Name}, NATS {Url} [{ReconnectCount}]", _name, url, reconnectCount);
                 ConnectionState = NatsConnectionState.Open;
-                if (Telemetry.Reconnects.Enabled)
-                    Telemetry.Reconnects.Add(1, Telemetry.BuildMetricTags(this, Telemetry.Constants.OpReconnect));
+                emitReconnect = Telemetry.Reconnects.Enabled;
                 _pingTimerCancellationTokenSource = new CancellationTokenSource();
                 StartPingTimer(_pingTimerCancellationTokenSource.Token);
                 _waitForOpenConnection.TrySetResult();
                 _reconnectLoopTask = Task.Run(ReconnectLoop);
                 PushEvent(NatsEvent.ConnectionOpened, new NatsEventArgs(url.ToString()));
             }
+
+            if (emitReconnect)
+                Telemetry.Reconnects.Add(1, Telemetry.BuildMetricTags(this, Telemetry.Constants.OpReconnect));
         }
         catch (Exception ex)
         {

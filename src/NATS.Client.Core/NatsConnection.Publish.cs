@@ -38,9 +38,18 @@ public partial class NatsConnection
         }
         else
         {
-            task = ConnectionState != NatsConnectionState.Open
-                ? ConnectAndPublishAsync(subject, default, headers, replyTo, NatsRawSerializer<byte[]>.Default, cancellationToken)
-                : CommandWriter.PublishAsync(subject, default, headers, replyTo, NatsRawSerializer<byte[]>.Default, cancellationToken);
+            try
+            {
+                task = ConnectionState != NatsConnectionState.Open
+                    ? ConnectAndPublishAsync(subject, default, headers, replyTo, NatsRawSerializer<byte[]>.Default, cancellationToken)
+                    : CommandWriter.PublishAsync(subject, default, headers, replyTo, NatsRawSerializer<byte[]>.Default, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                if (measure)
+                    Telemetry.RecordOperationDuration(start, this, Telemetry.Constants.OpPub, ex);
+                throw;
+            }
         }
 
         return measure ? Telemetry.MeasureOperationAsync(task, start, this, Telemetry.Constants.OpPub) : task;
@@ -80,10 +89,19 @@ public partial class NatsConnection
         }
         else
         {
-            serializer ??= Opts.SerializerRegistry.GetSerializer<T>();
-            task = ConnectionState != NatsConnectionState.Open
-                ? ConnectAndPublishAsync(subject, data, headers, replyTo, serializer, cancellationToken)
-                : CommandWriter.PublishAsync(subject, data, headers, replyTo, serializer, cancellationToken);
+            try
+            {
+                serializer ??= Opts.SerializerRegistry.GetSerializer<T>();
+                task = ConnectionState != NatsConnectionState.Open
+                    ? ConnectAndPublishAsync(subject, data, headers, replyTo, serializer, cancellationToken)
+                    : CommandWriter.PublishAsync(subject, data, headers, replyTo, serializer, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                if (measure)
+                    Telemetry.RecordOperationDuration(start, this, Telemetry.Constants.OpPub, ex);
+                throw;
+            }
         }
 
         return measure ? Telemetry.MeasureOperationAsync(task, start, this, Telemetry.Constants.OpPub) : task;

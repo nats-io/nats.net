@@ -54,12 +54,21 @@ internal static class Telemetry
         if (!OperationDuration.Enabled)
             return;
 
-        var elapsed = (Stopwatch.GetTimestamp() - startTimestamp) / (double)Stopwatch.Frequency;
-        var tags = BuildMetricTags(connection, operation);
-        if (error is not null)
-            tags.Add(Constants.ErrorTypeKey, error.GetType().FullName ?? "unknown");
+        try
+        {
+            var elapsed = (Stopwatch.GetTimestamp() - startTimestamp) / (double)Stopwatch.Frequency;
+            var tags = BuildMetricTags(connection, operation);
+            if (error is not null)
+                tags.Add(Constants.ErrorTypeKey, error.GetType().FullName ?? "unknown");
 
-        OperationDuration.Record(elapsed, tags);
+            OperationDuration.Record(elapsed, tags);
+        }
+        catch
+        {
+            // Instrumentation must never break the calling operation. A buggy MeterListener
+            // or tag construction failure here would otherwise replace the in-flight messaging
+            // exception (catch/finally semantics), hiding the real failure from the caller.
+        }
     }
 
     public static async ValueTask MeasureOperationAsync(ValueTask task, long startTimestamp, INatsConnection? connection, string operation)
@@ -80,6 +89,12 @@ internal static class Telemetry
     {
         var tags = default(TagList);
 
+        // MetricTagsPrefix is read off the concrete NatsConnection by design: exposing it on
+        // INatsConnection would be a breaking change for external implementers, and default
+        // interface members aren't available on netstandard2.0. Custom INatsConnection wrappers
+        // therefore fall through to the minimal tag set below. Normal usage (including via
+        // NatsJSContext) hits this branch because the runtime type is NatsConnection regardless
+        // of the static type the caller holds.
         if (connection is NatsConnection { MetricTagsPrefix: { } prefix })
         {
             for (var i = 0; i < prefix.Length; i++)
