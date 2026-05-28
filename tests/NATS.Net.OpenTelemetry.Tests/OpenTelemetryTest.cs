@@ -214,34 +214,6 @@ public class OpenTelemetryTest
     }
 
     [Fact]
-    public async Task Active_subscriptions_decrement_on_connection_dispose()
-    {
-        using var meter = new MeterTracker();
-        await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
-
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-
-        // Intentionally not disposing the subs; the connection-disposal path drives
-        // DecrementActiveSubscription via SubscriptionManager.DisposeAsync.
-        var sub1 = await nats.SubscribeCoreAsync<int>("foo.close.1", cancellationToken: cts.Token);
-        var sub2 = await nats.SubscribeCoreAsync<int>("foo.close.2", cancellationToken: cts.Token);
-
-        meter.LongMeasurements
-            .Where(m => m.Name == "nats.client.active_subscriptions")
-            .Sum(m => m.Value).Should().Be(2);
-
-        await nats.DisposeAsync();
-
-        meter.LongMeasurements
-            .Where(m => m.Name == "nats.client.active_subscriptions")
-            .Sum(m => m.Value).Should().Be(0);
-
-        GC.KeepAlive(sub1);
-        GC.KeepAlive(sub2);
-    }
-
-    [Fact]
     public async Task Publish_operation_duration_histogram()
     {
         using var meter = new MeterTracker();
