@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
-using NATS.Client.OpenTelemetry;
 using OpenTelemetry;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
@@ -22,14 +21,14 @@ public static class ClientApp
         using var tracerProvider = Sdk.CreateTracerProviderBuilder()
             .AddOtlpExporter()
             .SetResourceBuilder(resourceBuilder)
-            .AddNatsClientInstrumentation()
+            .AddSource(NatsTelemetry.SourceName)
             .AddSource("MyClientSource")
             .Build();
 
         using var meterProvider = Sdk.CreateMeterProviderBuilder()
             .AddOtlpExporter()
             .SetResourceBuilder(resourceBuilder)
-            .AddNatsClientInstrumentation()
+            .AddMeter(NatsTelemetry.SourceName)
             .Build();
 
         using var loggerFactory = LoggerFactory.Create(builder =>
