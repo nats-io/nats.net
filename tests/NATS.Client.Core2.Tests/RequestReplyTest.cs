@@ -452,4 +452,48 @@ public class RequestReplyTest
         var type = json["type"]!.GetValue<string>();
         Assert.Equal("io.nats.jetstream.api.v1.account_info_response", type);
     }
+
+    [Theory]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    public async Task Request_reply_no_timeout_sentinels_do_not_throw(NatsRequestReplyMode mode)
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
+
+        var subject = $"foo.{Guid.NewGuid():N}";
+        await using var sub = await nats.SubscribeCoreAsync<int>(subject);
+        var reg = sub.Register(async msg =>
+        {
+            await msg.ReplyAsync(msg.Data * 2);
+        });
+        await nats.PingAsync();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        var replyOptsMax = new NatsSubOpts { Timeout = TimeSpan.MaxValue };
+        var replyMax = await nats.RequestAsync<int, int>(subject, 21, replyOpts: replyOptsMax, cancellationToken: cts.Token);
+        Assert.Equal(42, replyMax.Data);
+
+        var replyOptsInf = new NatsSubOpts { Timeout = Timeout.InfiniteTimeSpan };
+        var replyInf = await nats.RequestAsync<int, int>(subject, 21, replyOpts: replyOptsInf, cancellationToken: cts.Token);
+        Assert.Equal(42, replyInf.Data);
+
+        await sub.DisposeAsync();
+        await reg;
+    }
+
+    [Theory]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    public async Task Request_reply_out_of_range_timeout_throws(NatsRequestReplyMode mode)
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
+
+        var replyOpts = new NatsSubOpts { Timeout = TimeSpan.FromDays(50) };
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () =>
+        {
+            await nats.RequestAsync<int, int>($"foo.{Guid.NewGuid():N}", 1, replyOpts: replyOpts);
+        });
+    }
 }

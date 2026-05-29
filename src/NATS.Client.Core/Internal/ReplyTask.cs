@@ -29,7 +29,7 @@ internal sealed class ReplyTask<T> : ReplyTaskBase, IDisposable
         Subject = subject;
         _connection = connection;
         _deserializer = deserializer;
-        _requestTimeout = requestTimeout;
+        _requestTimeout = TimeoutValidation.Validate(requestTimeout, nameof(requestTimeout), Timeout.InfiniteTimeSpan);
         _tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 #if NET9_0_OR_GREATER
         _gate = new System.Threading.Lock();

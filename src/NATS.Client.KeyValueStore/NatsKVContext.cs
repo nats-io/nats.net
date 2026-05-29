@@ -195,6 +195,13 @@ public class NatsKVContext : INatsKVContext
 
         var replicas = config.NumberOfReplicas > 0 ? config.NumberOfReplicas : 1;
 
+        // ADR-8: cap duplicate_window at max_age when a Key TTL is set.
+        var duplicateWindow = TimeSpan.FromMinutes(2);
+        if (config.MaxAge > TimeSpan.Zero && config.MaxAge < duplicateWindow)
+        {
+            duplicateWindow = config.MaxAge;
+        }
+
         string[]? subjects;
         StreamSource? mirror;
         ICollection<StreamSource>? sources;
@@ -263,6 +270,7 @@ public class NatsKVContext : INatsKVContext
             MaxMsgsPerSubject = history,
             MaxBytes = config.MaxBytes,
             MaxAge = config.MaxAge,
+            DuplicateWindow = duplicateWindow,
             MaxMsgSize = config.MaxValueSize,
             Compression = config.Compression ? StreamConfigCompression.S2 : StreamConfigCompression.None,
             Storage = storage,

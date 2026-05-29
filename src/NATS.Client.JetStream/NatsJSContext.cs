@@ -11,6 +11,8 @@ namespace NATS.Client.JetStream;
 /// <summary>Provides management and access to NATS JetStream streams and consumers.</summary>
 public partial class NatsJSContext
 {
+    private static readonly char[] InvalidConsumerNameChars = { '.', '*', '>' };
+
     private readonly ILogger _logger;
 
     /// <inheritdoc cref="NatsJSContext(NATS.Client.Core.INatsConnection,NATS.Client.JetStream.NatsJSOpts)"/>>
@@ -382,6 +384,20 @@ public partial class NatsJSContext
         }
     }
 
+    internal static void ThrowIfInvalidConsumerName(string name, [CallerArgumentExpression("name")] string? paramName = null)
+    {
+        // The resolved name (Name, else DurableName) is appended to the CONSUMER.CREATE
+        // subject as a single token. Reject only the characters that are legal in a
+        // subject but restructure that token ('.' adds tokens, '*'/'>' are wildcards),
+        // so the server gets the name we intended rather than a structurally different
+        // request it cannot diagnose. Other invalid characters (whitespace, path
+        // separators) are caught by subject validation or the server's own name checks.
+        if (name.IndexOfAny(InvalidConsumerNameChars) >= 0)
+        {
+            ThrowInvalidConsumerNameException(paramName);
+        }
+    }
+
     internal async ValueTask<NatsJSResponse<TResponse>> JSRequestAsync<TRequest, TResponse>(
         string subject,
         TRequest? request,
@@ -523,6 +539,10 @@ public partial class NatsJSContext
     [DoesNotReturn]
     private static void ThrowInvalidStreamNameException(string? paramName) =>
         throw new ArgumentException("Stream name cannot contain ' ', '.'", paramName);
+
+    [DoesNotReturn]
+    private static void ThrowInvalidConsumerNameException(string? paramName) =>
+        throw new ArgumentException("Consumer name cannot contain '.', '*', '>'", paramName);
 
     [DoesNotReturn]
     private static void ThrowEmptyException(string? paramName) =>

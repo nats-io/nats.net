@@ -255,9 +255,16 @@ public partial class NatsJSContext : INatsJSContext
     {
         var subject = $"{Opts.Prefix}.CONSUMER.CREATE.{stream}";
 
-        if (!string.IsNullOrWhiteSpace(config.Name))
+        var name = config.Name;
+        if (string.IsNullOrWhiteSpace(name))
         {
-            subject += $".{config.Name}";
+            name = config.DurableName;
+        }
+
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            ThrowIfInvalidConsumerName(name!);
+            subject += $".{name}";
         }
 
         if (!string.IsNullOrWhiteSpace(config.FilterSubject))
