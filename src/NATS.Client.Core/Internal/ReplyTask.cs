@@ -19,6 +19,8 @@ internal sealed class ReplyTask<T> : ReplyTaskBase, IDisposable
     private readonly TimeSpan _requestTimeout;
     private readonly TaskCompletionSource _tcs;
     private NatsMsg<T> _msg;
+    private long _replyBytes;
+    private bool _isNoResponders;
 
     public ReplyTask(ReplyTaskFactory factory, long id, string subject, NatsConnection connection, INatsDeserialize<T> deserializer, TimeSpan requestTimeout)
     {
@@ -51,10 +53,30 @@ internal sealed class ReplyTask<T> : ReplyTaskBase, IDisposable
             NatsNoReplyException.Throw();
         }
 
+        NatsMsg<T> msg;
+        long bytes;
+        bool isNoResponders;
         lock (_gate)
         {
-            return _msg;
+            msg = _msg;
+            bytes = _replyBytes;
+            isNoResponders = _isNoResponders;
         }
+
+        // Count only messages actually delivered to the caller. Late replies that arrive
+        // after a timeout still hit SetResult, but the user never sees them, so the
+        // counters belong here on the success path, not in SetResult. 503 NoResponders
+        // sentinels are also excluded for parity with the SharedInbox path.
+        if (!isNoResponders && (Telemetry.ConsumedMessages.Enabled || Telemetry.ReceivedBytes.Enabled))
+        {
+            var tags = Telemetry.BuildMetricTags(_connection, Telemetry.Constants.OpRec);
+            if (Telemetry.ConsumedMessages.Enabled)
+                Telemetry.ConsumedMessages.Add(1, tags);
+            if (Telemetry.ReceivedBytes.Enabled)
+                Telemetry.ReceivedBytes.Add(bytes, tags);
+        }
+
+        return msg;
     }
 
     public override void SetResult(string? replyTo, ReadOnlySequence<byte> payload, ReadOnlySequence<byte>? headersBuffer)
@@ -62,6 +84,8 @@ internal sealed class ReplyTask<T> : ReplyTaskBase, IDisposable
         lock (_gate)
         {
             _msg = NatsMsg<T>.Build(Subject, replyTo, headersBuffer, payload, _connection, _connection.HeaderParser, _deserializer);
+            _isNoResponders = payload.Length == 0 && NatsSubBase.IsHeader503(headersBuffer);
+            _replyBytes = payload.Length + (headersBuffer?.Length ?? 0);
         }
 
         _tcs.TrySetResult();

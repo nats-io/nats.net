@@ -54,6 +54,7 @@ public abstract class NatsSubBase
     private int _pendingMsgs;
     private Exception? _exception;
     private int _isSlowConsumer;
+    private int _telemetryActive;
     private TaskCompletionSource? _readerExited;
 
     /// <summary>
@@ -208,6 +209,25 @@ public abstract class NatsSubBase
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous operation.</returns>
     public virtual ValueTask ReadyAsync()
     {
+        // nats.client.active_subscriptions counts every NatsSubBase that reaches Ready,
+        // regardless of whether it corresponds to a wire-level SUB. Under SharedInbox
+        // request/reply mode each in-flight RequestAsync registers a transient reply
+        // NatsSub with the shared inbox muxer (no extra wire SUB) and that registration
+        // still bumps the gauge. Operator dashboards should expect oscillation under
+        // request load. Direct mode uses ReplyTask and does not increment.
+        if (Telemetry.ActiveSubscriptions.Enabled)
+        {
+            var emit = false;
+            lock (_gate)
+            {
+                if (!_unsubscribed && Interlocked.Exchange(ref _telemetryActive, 1) == 0)
+                    emit = true;
+            }
+
+            if (emit)
+                Telemetry.ActiveSubscriptions.Add(1, Telemetry.BuildMetricTags(Connection, Telemetry.Constants.OpSub));
+        }
+
         // Let idle timer start with the first message, in case
         // we're allowed to wait longer for the first message.
         if (_startUpTimeoutTimer == null)
@@ -232,6 +252,8 @@ public abstract class NatsSubBase
                 return default;
             _unsubscribed = true;
         }
+
+        DecrementActiveSubscription();
 
         _timeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
         _idleTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
@@ -321,6 +343,23 @@ public abstract class NatsSubBase
         {
             // Need to await to handle any exceptions
             await ReceiveInternalAsync(subject, replyTo, headersBuffer, payloadBuffer).ConfigureAwait(false);
+
+            // Per OTel messaging semconv, consumed.messages counts messages "delivered to
+            // the application", so we only record after ReceiveInternalAsync has completed
+            // the hand-off to the subscription channel. received.bytes follows the same
+            // convention. Messages dropped by cancellation, channel closure, or serializer
+            // exceptions are not counted.
+            if (Telemetry.ConsumedMessages.Enabled || Telemetry.ReceivedBytes.Enabled)
+            {
+                var tags = Telemetry.BuildMetricTags(Connection, Telemetry.Constants.OpRec);
+                if (Telemetry.ConsumedMessages.Enabled)
+                    Telemetry.ConsumedMessages.Add(1, tags);
+                if (Telemetry.ReceivedBytes.Enabled)
+                {
+                    var bytes = payloadBuffer.Length + (headersBuffer?.Length ?? 0);
+                    Telemetry.ReceivedBytes.Add(bytes, tags);
+                }
+            }
         }
         catch (TaskCanceledException)
         {
@@ -393,6 +432,8 @@ public abstract class NatsSubBase
 
         if (needsUnsub)
         {
+            DecrementActiveSubscription();
+
             _timeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
             _idleTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
             _startUpTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
@@ -606,6 +647,12 @@ public abstract class NatsSubBase
         UnsubscribeAsync();
 #pragma warning restore VSTHRD110
 #pragma warning restore CA2012
+    }
+
+    private void DecrementActiveSubscription()
+    {
+        if (Interlocked.Exchange(ref _telemetryActive, 0) == 1)
+            Telemetry.ActiveSubscriptions.Add(-1, Telemetry.BuildMetricTags(Connection, Telemetry.Constants.OpSub));
     }
 
     private async ValueTask WaitForReaderDrainCoreAsync(Task task, TimeSpan timeout)

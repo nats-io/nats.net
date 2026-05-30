@@ -49,5 +49,4 @@
     <ItemGroup>
         <Compile Include="..\NATS.Client.Core2.Tests\NatsServerFixture.cs" />
     </ItemGroup>
-    
 </Project>

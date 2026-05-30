@@ -2,26 +2,28 @@
 
                          OpenTelemetry Example
 
-(1) Run Jaeger locally and then run the client and server apps.
+Both apps export traces and metrics via OTLP. Point them at any backend that
+accepts OTLP (Aspire dashboard, Jaeger for traces, Grafana stack, etc.).
 
-https://www.jaegertracing.io/download/
-
-https://medium.com/jaegertracing/introducing-native-support-for-opentelemetry-in-jaeger-eb661be8183c
+(1) Start Aspire dashboard:
 
 ```powershell
-> $env:COLLECTOR_OTLP_ENABLED=true
-> jaeger-all-in-one.exe
+> docker run --rm -it `
+  -p 18888:18888 -p 4317:18889 `
+  -e DASHBOARD__OTLP__AUTHMODE=Unsecured `
+  mcr.microsoft.com/dotnet/aspire-dashboard:latest
 ```
 
 or
 
 ```bash
-$ COLLECTOR_OTLP_ENABLED=true jaeger-all-in-one
+$ docker run --rm -it \
+  -p 18888:18888 -p 4317:18889 \
+  -e DASHBOARD__OTLP__AUTHMODE=Unsecured \
+  mcr.microsoft.com/dotnet/aspire-dashboard:latest
 ```
 
-(2) Jaeger UI default URL http://localhost:16686/search
-
-(3) In different terminals run:
+(2) In different terminals run:
 
 ```
 nats-server

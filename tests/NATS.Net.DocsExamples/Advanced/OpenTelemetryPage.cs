@@ -49,6 +49,36 @@ public class OpenTelemetryPage
         }
 
         {
+            #region metrics-setup
+            // The NATS.Net client emits metrics through System.Diagnostics.Metrics.Meter
+            // under the same "NATS.Net" name used for activities. Metrics are opt-in:
+            // nothing is recorded until something subscribes to the meter.
+
+            // Using the OpenTelemetry SDK and the NATS.Client.OpenTelemetry package:
+            //
+            //   using var meterProvider = Sdk.CreateMeterProviderBuilder()
+            //       .AddNatsClientInstrumentation()  // or .AddMeter("NATS.Net")
+            //       .AddOtlpExporter()
+            //       .Build();
+
+            // Or using a plain MeterListener (no extra packages):
+            using System.Diagnostics.Metrics.MeterListener meterListener = new()
+            {
+                InstrumentPublished = (instrument, listener) =>
+                {
+                    if (instrument.Meter.Name == "NATS.Net")
+                        listener.EnableMeasurementEvents(instrument);
+                },
+            };
+            meterListener.SetMeasurementEventCallback<long>((inst, value, tags, _) =>
+                Console.WriteLine($"{inst.Name}: {value}"));
+            meterListener.SetMeasurementEventCallback<double>((inst, value, tags, _) =>
+                Console.WriteLine($"{inst.Name}: {value}"));
+            meterListener.Start();
+            #endregion
+        }
+
+        {
             #region publish-subscribe
             await using NatsConnection nats = new NatsConnection();
 

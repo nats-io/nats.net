@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
@@ -13,26 +14,45 @@ public partial class NatsConnection
             SubjectValidator.ValidateReplyTo(replyTo);
         }
 
+        var measure = Telemetry.OperationDuration.Enabled;
+        var start = measure ? Stopwatch.GetTimestamp() : 0L;
+
+        ValueTask task;
         if (Telemetry.HasListeners())
         {
             using var activity = Telemetry.StartSendActivity($"{SpanDestinationName(subject)} {Telemetry.Constants.PublishActivityName}", this, subject, replyTo);
             Telemetry.AddTraceContextHeaders(activity, ref headers);
             try
             {
-                return ConnectionState != NatsConnectionState.Open
+                task = ConnectionState != NatsConnectionState.Open
                     ? ConnectAndPublishAsync(subject, default, headers, replyTo, NatsRawSerializer<byte[]>.Default, cancellationToken)
                     : CommandWriter.PublishAsync(subject, default, headers, replyTo, NatsRawSerializer<byte[]>.Default, cancellationToken);
             }
             catch (Exception ex)
             {
                 Telemetry.SetException(activity, ex);
+                if (measure)
+                    Telemetry.RecordOperationDuration(start, this, Telemetry.Constants.OpPub, ex);
+                throw;
+            }
+        }
+        else
+        {
+            try
+            {
+                task = ConnectionState != NatsConnectionState.Open
+                    ? ConnectAndPublishAsync(subject, default, headers, replyTo, NatsRawSerializer<byte[]>.Default, cancellationToken)
+                    : CommandWriter.PublishAsync(subject, default, headers, replyTo, NatsRawSerializer<byte[]>.Default, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                if (measure)
+                    Telemetry.RecordOperationDuration(start, this, Telemetry.Constants.OpPub, ex);
                 throw;
             }
         }
 
-        return ConnectionState != NatsConnectionState.Open
-            ? ConnectAndPublishAsync(subject, default, headers, replyTo, NatsRawSerializer<byte[]>.Default, cancellationToken)
-            : CommandWriter.PublishAsync(subject, default, headers, replyTo, NatsRawSerializer<byte[]>.Default, cancellationToken);
+        return measure ? Telemetry.MeasureOperationAsync(task, start, this, Telemetry.Constants.OpPub) : task;
     }
 
     /// <inheritdoc />
@@ -44,6 +64,10 @@ public partial class NatsConnection
             SubjectValidator.ValidateReplyTo(replyTo);
         }
 
+        var measure = Telemetry.OperationDuration.Enabled;
+        var start = measure ? Stopwatch.GetTimestamp() : 0L;
+
+        ValueTask task;
         if (Telemetry.HasListeners())
         {
             using var activity = Telemetry.StartSendActivity($"{SpanDestinationName(subject)} {Telemetry.Constants.PublishActivityName}", this, subject, replyTo);
@@ -51,21 +75,36 @@ public partial class NatsConnection
             try
             {
                 serializer ??= Opts.SerializerRegistry.GetSerializer<T>();
-                return ConnectionState != NatsConnectionState.Open
+                task = ConnectionState != NatsConnectionState.Open
                     ? ConnectAndPublishAsync(subject, data, headers, replyTo, serializer, cancellationToken)
                     : CommandWriter.PublishAsync(subject, data, headers, replyTo, serializer, cancellationToken);
             }
             catch (Exception ex)
             {
                 Telemetry.SetException(activity, ex);
+                if (measure)
+                    Telemetry.RecordOperationDuration(start, this, Telemetry.Constants.OpPub, ex);
+                throw;
+            }
+        }
+        else
+        {
+            try
+            {
+                serializer ??= Opts.SerializerRegistry.GetSerializer<T>();
+                task = ConnectionState != NatsConnectionState.Open
+                    ? ConnectAndPublishAsync(subject, data, headers, replyTo, serializer, cancellationToken)
+                    : CommandWriter.PublishAsync(subject, data, headers, replyTo, serializer, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                if (measure)
+                    Telemetry.RecordOperationDuration(start, this, Telemetry.Constants.OpPub, ex);
                 throw;
             }
         }
 
-        serializer ??= Opts.SerializerRegistry.GetSerializer<T>();
-        return ConnectionState != NatsConnectionState.Open
-            ? ConnectAndPublishAsync(subject, data, headers, replyTo, serializer, cancellationToken)
-            : CommandWriter.PublishAsync(subject, data, headers, replyTo, serializer, cancellationToken);
+        return measure ? Telemetry.MeasureOperationAsync(task, start, this, Telemetry.Constants.OpPub) : task;
     }
 
     /// <inheritdoc />

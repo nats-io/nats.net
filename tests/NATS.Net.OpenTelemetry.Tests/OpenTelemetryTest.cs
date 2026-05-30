@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Models;
 using Synadia.Orbit.Testing.NatsServerProcessManager;
@@ -72,6 +73,326 @@ public class OpenTelemetryTest
         Assert.Equal(publishActivity.TraceId, consumeActivity.TraceId);
 
         tracker.AssertAllStopped();
+    }
+
+    [Fact]
+    public async Task Publish_counter()
+    {
+        using var meter = new MeterTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        // Intentionally not calling ConnectAsync first; the first publish triggers connect.
+        // Counter must not record measurements with (Unset) server tags.
+        for (var i = 0; i < 5; i++)
+        {
+            await nats.PublishAsync("foo", i, cancellationToken: cts.Token);
+        }
+
+        var published = meter.LongMeasurements
+            .Where(m => m.Name == "messaging.client.published.messages")
+            .ToList();
+
+        published.Sum(m => m.Value).Should().Be(5);
+
+        // Every measurement must carry the full server tag set, including the first publish
+        // that triggered the connect.
+        foreach (var m in published)
+        {
+            var tags = m.Tags.ToDictionary(t => t.Key, t => t.Value);
+            tags.Should().ContainKey("messaging.system").WhoseValue.Should().Be("nats");
+            tags.Should().ContainKey("messaging.operation").WhoseValue.Should().Be("publish");
+            tags.Should().ContainKey("server.address");
+            tags.Should().ContainKey("server.port");
+            tags.Should().NotContainKey("messaging.destination.name");
+            tags.Should().NotContainKey("messaging.nats.message.subject");
+        }
+    }
+
+    [Fact]
+    public async Task Consume_counter()
+    {
+        using var meter = new MeterTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        await using var sub = await nats.SubscribeCoreAsync<int>("foo.consume", cancellationToken: cts.Token);
+
+        for (var i = 0; i < 5; i++)
+        {
+            await nats.PublishAsync("foo.consume", i, cancellationToken: cts.Token);
+        }
+
+        for (var i = 0; i < 5; i++)
+        {
+            await sub.Msgs.ReadAsync(cts.Token);
+        }
+
+        var consumed = meter.LongMeasurements
+            .Where(m => m.Name == "messaging.client.consumed.messages")
+            .ToList();
+
+        consumed.Sum(m => m.Value).Should().Be(5);
+
+        var tags = consumed[0].Tags.ToDictionary(t => t.Key, t => t.Value);
+        tags.Should().ContainKey("messaging.system").WhoseValue.Should().Be("nats");
+        tags.Should().ContainKey("messaging.operation").WhoseValue.Should().Be("receive");
+        tags.Should().ContainKey("server.address");
+        tags.Should().ContainKey("server.port");
+        tags.Should().NotContainKey("messaging.destination.name");
+        tags.Should().NotContainKey("messaging.nats.message.subject");
+    }
+
+    [Fact]
+    public async Task Consume_counter_direct_request_reply()
+    {
+        using var meter = new MeterTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts
+        {
+            Url = server.Url,
+            RequestReplyMode = NatsRequestReplyMode.Direct,
+        });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var sub = await nats.SubscribeCoreAsync<int>("foo.direct.consume", cancellationToken: cts.Token);
+        var reg = sub.Register(async msg => await msg.ReplyAsync(msg.Data * 2, cancellationToken: cts.Token));
+
+        var reply = await nats.RequestAsync<int, int>("foo.direct.consume", 21, cancellationToken: cts.Token);
+        reply.Data.Should().Be(42);
+
+        var consumed = meter.LongMeasurements
+            .Where(m => m.Name == "messaging.client.consumed.messages")
+            .Sum(m => m.Value);
+
+        consumed.Should().Be(2);
+
+        await sub.DisposeAsync();
+        await reg;
+    }
+
+    [Fact]
+    public async Task Active_subscriptions_updown_counter()
+    {
+        using var meter = new MeterTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var sub1 = await nats.SubscribeCoreAsync<int>("foo.active.1", cancellationToken: cts.Token);
+        var sub2 = await nats.SubscribeCoreAsync<int>("foo.active.2", cancellationToken: cts.Token);
+
+        var active = meter.LongMeasurements
+            .Where(m => m.Name == "nats.client.active_subscriptions")
+            .ToList();
+
+        active.Sum(m => m.Value).Should().Be(2);
+
+        var tags = active[0].Tags.ToDictionary(t => t.Key, t => t.Value);
+        tags.Should().ContainKey("messaging.system").WhoseValue.Should().Be("nats");
+        tags.Should().ContainKey("messaging.operation").WhoseValue.Should().Be("subscribe");
+        tags.Should().ContainKey("server.address");
+        tags.Should().ContainKey("server.port");
+
+        await sub1.DisposeAsync();
+
+        meter.LongMeasurements
+            .Where(m => m.Name == "nats.client.active_subscriptions")
+            .Sum(m => m.Value).Should().Be(1);
+
+        await sub2.DisposeAsync();
+
+        meter.LongMeasurements
+            .Where(m => m.Name == "nats.client.active_subscriptions")
+            .Sum(m => m.Value).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Publish_operation_duration_histogram()
+    {
+        using var meter = new MeterTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await nats.ConnectAsync();
+
+        await nats.PublishAsync("foo.duration", 42, cancellationToken: cts.Token);
+
+        var durations = meter.DoubleMeasurements
+            .Where(m => m.Name == "messaging.client.operation.duration")
+            .ToList();
+
+        var publish = durations.Where(m => m.Tags.Any(t => t.Key == "messaging.operation" && (string?)t.Value == "publish")).ToList();
+        publish.Should().NotBeEmpty();
+        publish[0].Value.Should().BeGreaterThan(0);
+
+        var tags = publish[0].Tags.ToDictionary(t => t.Key, t => t.Value);
+        tags.Should().ContainKey("messaging.system").WhoseValue.Should().Be("nats");
+        tags.Should().ContainKey("server.address");
+        tags.Should().ContainKey("server.port");
+        tags.Should().NotContainKey("error.type");
+    }
+
+    [Fact]
+    public async Task Request_operation_duration_histogram()
+    {
+        using var meter = new MeterTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var sub = await nats.SubscribeCoreAsync<int>("foo.req", cancellationToken: cts.Token);
+        var reg = sub.Register(async msg => await msg.ReplyAsync(msg.Data * 2, cancellationToken: cts.Token));
+
+        var reply = await nats.RequestAsync<int, int>("foo.req", 21, cancellationToken: cts.Token);
+        reply.Data.Should().Be(42);
+
+        var request = meter.DoubleMeasurements
+            .Where(m => m.Name == "messaging.client.operation.duration")
+            .Where(m => m.Tags.Any(t => t.Key == "messaging.operation" && (string?)t.Value == "request"))
+            .ToList();
+
+        request.Should().HaveCount(1);
+        request[0].Value.Should().BeGreaterThan(0);
+
+        var tags = request[0].Tags.ToDictionary(t => t.Key, t => t.Value);
+        tags.Should().ContainKey("messaging.system").WhoseValue.Should().Be("nats");
+        tags.Should().NotContainKey("error.type");
+
+        await sub.DisposeAsync();
+        await reg;
+    }
+
+    [Fact]
+    public async Task Reconnect_counter()
+    {
+        using var meter = new MeterTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        // Attach before ConnectAsync so we observe both opens and can wait for the second
+        // (the reconnect) without racing the async event-channel delivery of the first.
+        var opened = 0;
+        var openedTwice = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        nats.ConnectionOpened += (_, _) =>
+        {
+            if (Interlocked.Increment(ref opened) == 2)
+                openedTwice.TrySetResult();
+            return default;
+        };
+
+        await nats.ConnectAsync();
+        await nats.ReconnectAsync();
+        await openedTwice.Task.WaitAsync(TimeSpan.FromSeconds(30));
+
+        var reconnects = meter.LongMeasurements
+            .Where(m => m.Name == "nats.client.reconnects")
+            .ToList();
+
+        reconnects.Sum(m => m.Value).Should().Be(1);
+
+        var tags = reconnects[0].Tags.ToDictionary(t => t.Key, t => t.Value);
+        tags.Should().ContainKey("messaging.system").WhoseValue.Should().Be("nats");
+        tags.Should().ContainKey("messaging.operation").WhoseValue.Should().Be("reconnect");
+        tags.Should().ContainKey("server.address");
+        tags.Should().ContainKey("server.port");
+    }
+
+    [Fact]
+    public async Task Sent_and_received_bytes_counters()
+    {
+        using var meter = new MeterTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        await using var sub = await nats.SubscribeCoreAsync<byte[]>("foo.bytes", cancellationToken: cts.Token);
+
+        var payload = new byte[1024];
+        await nats.PublishAsync("foo.bytes", payload, cancellationToken: cts.Token);
+
+        var msg = await sub.Msgs.ReadAsync(cts.Token);
+        msg.Data!.Length.Should().Be(1024);
+
+        var sent = meter.LongMeasurements
+            .Where(m => m.Name == "nats.client.sent.bytes")
+            .Sum(m => m.Value);
+        var received = meter.LongMeasurements
+            .Where(m => m.Name == "nats.client.received.bytes")
+            .Sum(m => m.Value);
+
+        sent.Should().Be(1024);
+        received.Should().Be(1024);
+
+        var sentTags = meter.LongMeasurements.First(m => m.Name == "nats.client.sent.bytes").Tags.ToDictionary(t => t.Key, t => t.Value);
+        sentTags.Should().ContainKey("messaging.system").WhoseValue.Should().Be("nats");
+        sentTags.Should().ContainKey("messaging.operation").WhoseValue.Should().Be("publish");
+
+        var recvTags = meter.LongMeasurements.First(m => m.Name == "nats.client.received.bytes").Tags.ToDictionary(t => t.Key, t => t.Value);
+        recvTags.Should().ContainKey("messaging.operation").WhoseValue.Should().Be("receive");
+    }
+
+    [Fact]
+    public async Task Subscribe_operation_duration_histogram()
+    {
+        using var meter = new MeterTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        await using var sub = await nats.SubscribeCoreAsync<int>("foo.sub.duration", cancellationToken: cts.Token);
+
+        var subscribe = meter.DoubleMeasurements
+            .Where(m => m.Name == "messaging.client.operation.duration")
+            .Where(m => m.Tags.Any(t => t.Key == "messaging.operation" && (string?)t.Value == "subscribe"))
+            .ToList();
+
+        subscribe.Should().HaveCount(1);
+        subscribe[0].Value.Should().BeGreaterThan(0);
+
+        var tags = subscribe[0].Tags.ToDictionary(t => t.Key, t => t.Value);
+        tags.Should().ContainKey("messaging.system").WhoseValue.Should().Be("nats");
+        tags.Should().ContainKey("server.address");
+        tags.Should().ContainKey("server.port");
+        tags.Should().NotContainKey("error.type");
+    }
+
+    [Fact]
+    public async Task Request_operation_duration_records_error_type_on_failure()
+    {
+        using var meter = new MeterTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var act = async () => await nats.RequestAsync<int, int>(
+            "foo.no.responders",
+            1,
+            replyOpts: new NatsSubOpts { Timeout = TimeSpan.FromSeconds(1) },
+            cancellationToken: cts.Token);
+
+        await act.Should().ThrowAsync<NatsNoRespondersException>();
+
+        var request = meter.DoubleMeasurements
+            .Where(m => m.Name == "messaging.client.operation.duration")
+            .Where(m => m.Tags.Any(t => t.Key == "messaging.operation" && (string?)t.Value == "request"))
+            .ToList();
+
+        request.Should().HaveCount(1);
+        var tags = request[0].Tags.ToDictionary(t => t.Key, t => t.Value);
+        tags.Should().ContainKey("error.type");
+        ((string?)tags["error.type"]).Should().Contain("NatsNoRespondersException");
     }
 
     [Fact]
@@ -182,6 +503,36 @@ public class OpenTelemetryTest
                 Assert.Fail($"Activity leak detected. {leaked.Count} activity(s) started but never stopped:\n{details}");
             }
         }
+
+        public void Dispose() => _listener.Dispose();
+    }
+
+    private sealed class MeterTracker : IDisposable
+    {
+        private readonly MeterListener _listener;
+
+        public MeterTracker()
+        {
+            _listener = new MeterListener
+            {
+                InstrumentPublished = (instrument, listener) =>
+                {
+                    if (instrument.Meter.Name == "NATS.Net")
+                        listener.EnableMeasurementEvents(instrument);
+                },
+            };
+
+            _listener.SetMeasurementEventCallback<long>((inst, val, tags, _) =>
+                LongMeasurements.Add((inst.Name, val, tags.ToArray())));
+            _listener.SetMeasurementEventCallback<double>((inst, val, tags, _) =>
+                DoubleMeasurements.Add((inst.Name, val, tags.ToArray())));
+
+            _listener.Start();
+        }
+
+        public List<(string Name, long Value, KeyValuePair<string, object?>[] Tags)> LongMeasurements { get; } = new();
+
+        public List<(string Name, double Value, KeyValuePair<string, object?>[] Tags)> DoubleMeasurements { get; } = new();
 
         public void Dispose() => _listener.Dispose();
     }
