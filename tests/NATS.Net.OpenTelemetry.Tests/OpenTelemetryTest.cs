@@ -457,6 +457,12 @@ public class OpenTelemetryTest
         // Verify network.protocol.version is no longer present
         Assert.Null(sendActivity.GetTagItem("network.protocol.version"));
         Assert.Null(receiveActivity.GetTagItem("network.protocol.version"));
+
+        // server.port and network.peer.port are integers per OTel semconv, not strings
+        AssertIntTag(sendActivity, "server.port");
+        AssertIntTag(sendActivity, "network.peer.port");
+        AssertIntTag(receiveActivity, "server.port");
+        AssertIntTag(receiveActivity, "network.peer.port");
     }
 
     private void AssertStringTagNotNullOrEmpty(Activity activity, string name)
@@ -464,6 +470,13 @@ public class OpenTelemetryTest
         var tag = activity.GetTagItem(name) as string;
         Assert.NotNull(tag);
         Assert.False(string.IsNullOrEmpty(tag));
+    }
+
+    private void AssertIntTag(Activity activity, string name)
+    {
+        var tag = activity.GetTagItem(name);
+        Assert.NotNull(tag);
+        Assert.IsType<int>(tag);
     }
 
     private sealed class ActivityTracker : IDisposable

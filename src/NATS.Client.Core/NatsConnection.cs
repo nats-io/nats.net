@@ -58,6 +58,9 @@ public partial class NatsConnection : INatsConnection
 
     private ServerInfo? _writableServerInfo;
     private KeyValuePair<string, object?>[]? _metricTagsPrefix;
+    private object? _boxedServerPort;
+    private string? _serverHost;
+    private string? _clientId;
     private int _pongCount;
     private int _connectionState;
     private int _isDisposed;
@@ -164,33 +167,49 @@ public partial class NatsConnection : INatsConnection
             }
 
             KeyValuePair<string, object?>[]? prefix = null;
+            object? port = null;
+            string? host = null;
+            string? clientId = null;
             if (value is not null)
             {
                 // ServerInfo.Host/Port is the server's bind address (often 0.0.0.0); use the
                 // address the client actually dialled for OTel server.address/server.port.
                 var connectUri = _currentConnectUri;
-                var host = connectUri?.Host ?? value.Host;
-                var port = connectUri?.Port ?? value.Port;
+                host = connectUri?.Host ?? value.Host;
+                port = connectUri?.Port ?? value.Port;
+                clientId = value.ClientId.ToString();
                 prefix = new[]
                 {
                     new KeyValuePair<string, object?>(Telemetry.Constants.SystemKey, Telemetry.Constants.SystemVal),
                     new KeyValuePair<string, object?>(Telemetry.Constants.ServerAddress, host),
-                    new KeyValuePair<string, object?>(Telemetry.Constants.ServerPort, (object)port),
+                    new KeyValuePair<string, object?>(Telemetry.Constants.ServerPort, port),
                     new KeyValuePair<string, object?>(Telemetry.Constants.NetworkProtoName, "nats"),
                     new KeyValuePair<string, object?>(Telemetry.Constants.NetworkTransport, "tcp"),
                 };
             }
 
-            // Publish prefix before ServerInfo so any reader observing the new ServerInfo
-            // is guaranteed to also observe the matching prefix. Today no single reader
-            // reads both, but #1156 will unify the trace and metric tag sources and start
-            // relying on this ordering.
+            // Cache the trace-tag host, boxed port and client id once per ServerInfo change so the
+            // per-message trace path can reuse them instead of re-boxing the port and re-allocating
+            // the client id string on every message. Host and port come from the connect URI, so the
+            // trace and metric tags now share the same source.
+            Volatile.Write(ref _boxedServerPort, port);
+            Volatile.Write(ref _serverHost, host);
+            Volatile.Write(ref _clientId, clientId);
+
+            // Publish the cached fields before ServerInfo so any reader observing the new ServerInfo
+            // is guaranteed to also observe the matching tags.
             Volatile.Write(ref _metricTagsPrefix, prefix);
             Interlocked.Exchange(ref _writableServerInfo, value);
         }
     }
 
     internal KeyValuePair<string, object?>[]? MetricTagsPrefix => Volatile.Read(ref _metricTagsPrefix);
+
+    internal object? BoxedServerPort => Volatile.Read(ref _boxedServerPort);
+
+    internal string? ServerHost => Volatile.Read(ref _serverHost);
+
+    internal string? ClientId => Volatile.Read(ref _clientId);
 
     internal bool IsDisposed
     {
