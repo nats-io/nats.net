@@ -27,7 +27,9 @@ public class OpenTelemetryTest
 
         await sub.Msgs.ReadAsync(cts.Token);
 
-        AssertActivityData("foo", tracker.Started);
+        var expectedHost = new Uri(server.Url).Host;
+        var expectedClientId = nats.ServerInfo!.ClientId.ToString();
+        AssertActivityData("foo", tracker.Started, expectedHost, expectedClientId);
         tracker.AssertAllStopped();
     }
 
@@ -424,7 +426,7 @@ public class OpenTelemetryTest
         await reg;
     }
 
-    private void AssertActivityData(string subject, IReadOnlyList<Activity> activityList)
+    private void AssertActivityData(string subject, IReadOnlyList<Activity> activityList, string expectedHost, string expectedClientId)
     {
         var activities = activityList.ToArray();
         Assert.NotEmpty(activities);
@@ -463,6 +465,17 @@ public class OpenTelemetryTest
         AssertIntTag(sendActivity, "network.peer.port");
         AssertIntTag(receiveActivity, "server.port");
         AssertIntTag(receiveActivity, "network.peer.port");
+
+        // server.address/network.peer.address come from the connect URI, not ServerInfo.Host
+        // (the server bind address, often 0.0.0.0)
+        Assert.Equal(expectedHost, sendActivity.GetTagItem("server.address"));
+        Assert.Equal(expectedHost, sendActivity.GetTagItem("network.peer.address"));
+        Assert.Equal(expectedHost, receiveActivity.GetTagItem("server.address"));
+        Assert.Equal(expectedHost, receiveActivity.GetTagItem("network.peer.address"));
+
+        // messaging.client_id is the server-assigned client id, cached per ServerInfo change
+        Assert.Equal(expectedClientId, sendActivity.GetTagItem("messaging.client_id"));
+        Assert.Equal(expectedClientId, receiveActivity.GetTagItem("messaging.client_id"));
     }
 
     private void AssertStringTagNotNullOrEmpty(Activity activity, string name)
