@@ -140,7 +140,7 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
         _context.Connection.ConnectionDisconnected -= ConnectionOnConnectionDisconnected;
         try
         {
-            await DrainAsync().ConfigureAwait(false);
+            await DrainOnDisposeAsync().ConfigureAwait(false);
             await base.DisposeAsync().ConfigureAwait(false);
         }
         finally

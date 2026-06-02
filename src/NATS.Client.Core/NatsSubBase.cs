@@ -277,6 +277,23 @@ public abstract class NatsSubBase
     }
 
     /// <summary>
+    /// Drains the subscription: sends UNSUB so the server stops delivering new
+    /// messages, waits for a PING/PONG round-trip so messages already in flight
+    /// are received, then completes the message channel. Buffered messages stay
+    /// available to read and the connection remains usable.
+    /// </summary>
+    /// <remarks>
+    /// Unlike <see cref="UnsubscribeAsync"/>, which completes the channel right
+    /// away and can drop messages still in the socket buffer, drain fences inbound
+    /// delivery with a PING/PONG so buffered messages are preserved. The fence is
+    /// best-effort and bounded by <paramref name="cancellationToken"/> and
+    /// <see cref="NatsOpts.DrainPingTimeout"/>.
+    /// </remarks>
+    /// <param name="cancellationToken">Bounds the best-effort PING/PONG fence wait.</param>
+    /// <returns>A <see cref="ValueTask"/> that represents the asynchronous drain operation.</returns>
+    public virtual ValueTask DrainAsync(CancellationToken cancellationToken = default) => DrainCoreAsync(cancellationToken);
+
+    /// <summary>
     /// Disposes the instance asynchronously.
     /// </summary>
     /// <returns>A <see cref="ValueTask"/> representing the asynchronous disposal operation.</returns>
@@ -403,10 +420,9 @@ public abstract class NatsSubBase
     internal void ClearException() => Interlocked.Exchange(ref _exception, null);
 
     /// <summary>
-    /// Sends UNSUB to the server, waits for PING/PONG round-trip to ensure
-    /// all in-flight messages are processed, then completes the channel.
-    /// This avoids the race where TryComplete() closes the channel while
-    /// the socket reader is still delivering messages.
+    /// Dispose-path drain. Runs the same UNSUB plus PING/PONG fence as
+    /// <see cref="DrainAsync"/>, then waits for an active user reader to drain
+    /// the channel before returning.
     /// </summary>
     /// <remarks>
     /// No-op unless <see cref="NatsOpts.DrainSubscriptionsOnDispose"/> is
@@ -415,64 +431,12 @@ public abstract class NatsSubBase
     /// <see cref="NatsConnection.DisposeAsync"/>).
     /// </remarks>
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous drain operation.</returns>
-    internal async ValueTask DrainAsync()
+    internal async ValueTask DrainOnDisposeAsync()
     {
         if (!Connection.Opts.DrainSubscriptionsOnDispose)
             return;
 
-        var needsUnsub = false;
-        lock (_gate)
-        {
-            if (!_unsubscribed)
-            {
-                _unsubscribed = true;
-                needsUnsub = true;
-            }
-        }
-
-        if (needsUnsub)
-        {
-            DecrementActiveSubscription();
-
-            _timeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-            _idleTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-            _startUpTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-
-            // For the built-in SubscriptionManager: send UNSUB but keep the SID in the routing
-            // table until after the PING/PONG round-trip, so messages already in the socket
-            // buffer are delivered before the channel is completed.
-            // For external managers: fall back to RemoveAsync (routing removed before PING).
-            var mgr = _manager as SubscriptionManager;
-            var sid = mgr != null
-                ? await mgr.UnsubscribeForDrainAsync(this).ConfigureAwait(false)
-                : -1;
-            if (mgr == null)
-                await _manager.RemoveAsync(this).ConfigureAwait(false);
-
-            // PING/PONG round-trip: after we get the PONG back, we know the server
-            // has processed our UNSUB and the socket reader has processed all messages
-            // that were in-flight before the UNSUB was received by the server.
-            try
-            {
-                using var pingCts = new CancellationTokenSource(Connection.Opts.DrainPingTimeout);
-                await Connection.PingAsync(pingCts.Token).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                // Timeout via DrainPingTimeout. Expected on dispose path.
-            }
-            catch (NatsException)
-            {
-                // Connection failed or disconnected during drain. Drain is best-effort.
-            }
-
-            // Remove from routing now that no more messages can arrive for this SID.
-            if (sid != -1)
-                mgr?.RemoveFromRouting(sid);
-
-            // Now it's safe to complete the channel, no more messages will arrive.
-            TryComplete();
-        }
+        await DrainCoreAsync(CancellationToken.None).ConfigureAwait(false);
 
         // Always wait for an active user reader to drain the channel before
         // returning, even if the subscription was already ended (e.g. via
@@ -653,6 +617,71 @@ public abstract class NatsSubBase
     {
         if (Interlocked.Exchange(ref _telemetryActive, 0) == 1)
             Telemetry.ActiveSubscriptions.Add(-1, Telemetry.BuildMetricTags(Connection, Telemetry.Constants.OpSub));
+    }
+
+    /// <summary>
+    /// Sends UNSUB to the server, waits for a PING/PONG round-trip to ensure all
+    /// in-flight messages are processed, then completes the channel. This avoids
+    /// the race where TryComplete() closes the channel while the socket reader is
+    /// still delivering messages. Idempotent: a no-op once the subscription has
+    /// already been unsubscribed.
+    /// </summary>
+    private async ValueTask DrainCoreAsync(CancellationToken cancellationToken)
+    {
+        var needsUnsub = false;
+        lock (_gate)
+        {
+            if (!_unsubscribed)
+            {
+                _unsubscribed = true;
+                needsUnsub = true;
+            }
+        }
+
+        if (!needsUnsub)
+            return;
+
+        DecrementActiveSubscription();
+
+        _timeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+        _idleTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+        _startUpTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+
+        // For the built-in SubscriptionManager: send UNSUB but keep the SID in the routing
+        // table until after the PING/PONG round-trip, so messages already in the socket
+        // buffer are delivered before the channel is completed.
+        // For external managers: fall back to RemoveAsync (routing removed before PING).
+        var mgr = _manager as SubscriptionManager;
+        var sid = mgr != null
+            ? await mgr.UnsubscribeForDrainAsync(this).ConfigureAwait(false)
+            : -1;
+        if (mgr == null)
+            await _manager.RemoveAsync(this).ConfigureAwait(false);
+
+        // PING/PONG round-trip: after we get the PONG back, we know the server
+        // has processed our UNSUB and the socket reader has processed all messages
+        // that were in-flight before the UNSUB was received by the server.
+        try
+        {
+            using var pingCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            pingCts.CancelAfter(Connection.Opts.DrainPingTimeout);
+            await Connection.PingAsync(pingCts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Drain ping timed out (DrainPingTimeout) or was cancelled. Drain is best-effort.
+        }
+        catch (NatsException)
+        {
+            // Connection failed or disconnected during drain. Drain is best-effort.
+        }
+
+        // Remove from routing now that no more messages can arrive for this SID.
+        if (sid != -1)
+            mgr?.RemoveFromRouting(sid);
+
+        // Now it's safe to complete the channel, no more messages will arrive.
+        TryComplete();
     }
 
     private async ValueTask WaitForReaderDrainCoreAsync(Task task, TimeSpan timeout)
