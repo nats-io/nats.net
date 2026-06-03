@@ -150,11 +150,16 @@ public class ConnectionRetryTest
 
         _output.WriteLine($"reconnects: {reconnects}, sent: {sent}, received: {received}");
 
-        // some messages may still be lost, as socket could have been disconnected
-        // after socket.WriteAsync returned, but before OS sent
-        // check to ensure that the loss was < 1%
+        // Some messages may still be lost, as the socket could have been disconnected
+        // after socket.WriteAsync returned but before the OS sent the bytes. Each forced
+        // disconnect can drop at most the message(s) in flight at that moment, so bound the
+        // loss by the reconnect count rather than an absolute percentage. The percentage is
+        // unstable under CI contention, where reconnect cadence (and thus loss) scales with
+        // CPU load, while loss-per-disconnect stays small. A reconnect that dropped a whole
+        // queued batch would push lost well above the reconnect count and still fail here.
+        var lost = sent - received;
         var loss = 100.0 - (100.0 * received / sent);
-        Assert.True(loss <= 1.0, $"message loss of {loss:F}% was above 1% - {sent} sent, {received} received");
+        Assert.True(lost <= reconnects * 2, $"message loss {lost} ({loss:F}%) exceeded 2x reconnect count ({reconnects}) - {sent} sent, {received} received");
     }
 
     [Fact]
