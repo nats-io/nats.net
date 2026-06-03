@@ -288,8 +288,14 @@ public abstract class NatsSubBase
     /// delivery with a PING/PONG so buffered messages are preserved. The fence is
     /// best-effort and bounded by <paramref name="cancellationToken"/> and
     /// <see cref="NatsOpts.DrainPingTimeout"/>.
+    /// <para>
+    /// Cancellation only shortens the PING/PONG fence wait; it cannot abort the
+    /// drain. Once <see cref="DrainAsync"/> is entered the subscription is always
+    /// committed to the drained state, and cancelling the token does not throw or
+    /// keep the subscription alive.
+    /// </para>
     /// </remarks>
-    /// <param name="cancellationToken">Bounds the best-effort PING/PONG fence wait.</param>
+    /// <param name="cancellationToken">Bounds the best-effort PING/PONG fence wait. Cancellation does not abort the drain.</param>
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous drain operation.</returns>
     public virtual ValueTask DrainAsync(CancellationToken cancellationToken = default) => DrainCoreAsync(cancellationToken);
 

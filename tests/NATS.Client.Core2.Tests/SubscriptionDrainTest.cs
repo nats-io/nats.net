@@ -5,12 +5,10 @@ namespace NATS.Client.Core.Tests;
 [Collection("nats-server")]
 public class SubscriptionDrainTest
 {
-    private readonly ITestOutputHelper _output;
     private readonly NatsServerFixture _server;
 
-    public SubscriptionDrainTest(ITestOutputHelper output, NatsServerFixture server)
+    public SubscriptionDrainTest(NatsServerFixture server)
     {
-        _output = output;
         _server = server;
     }
 
