@@ -123,6 +123,13 @@ public class ConnectionRetryTest
             {
                 await pubConn.PublishAsync("test", data, cancellationToken: timeoutCts.Token);
                 Interlocked.Increment(ref sent);
+
+                // Throttle the publisher so it does not race far ahead of the writer. Without
+                // this, many publishes get coalesced into the unflushed write buffer and a single
+                // forced disconnect drops the whole batch, so loss scales with publish rate under
+                // CI contention. Keeping in-flight to ~1 bounds loss to the in-flight message per
+                // disconnect.
+                await Task.Delay(10, timeoutCts.Token);
             }
 
             await pubConn.PublishAsync("test", new byte[2], cancellationToken: timeoutCts.Token);
@@ -151,12 +158,11 @@ public class ConnectionRetryTest
         _output.WriteLine($"reconnects: {reconnects}, sent: {sent}, received: {received}");
 
         // Some messages may still be lost, as the socket could have been disconnected
-        // after socket.WriteAsync returned but before the OS sent the bytes. Each forced
-        // disconnect can drop at most the message(s) in flight at that moment, so bound the
-        // loss by the reconnect count rather than an absolute percentage. The percentage is
-        // unstable under CI contention, where reconnect cadence (and thus loss) scales with
-        // CPU load, while loss-per-disconnect stays small. A reconnect that dropped a whole
-        // queued batch would push lost well above the reconnect count and still fail here.
+        // after socket.WriteAsync returned but before the OS sent the bytes. With the
+        // publisher throttled to keep in-flight to ~1, each forced disconnect can drop at
+        // most that in-flight message, so bound the loss by the reconnect count. A reconnect
+        // that dropped a whole queued batch would push lost well above the reconnect count
+        // and still fail here.
         var lost = sent - received;
         var loss = 100.0 - (100.0 * received / sent);
         Assert.True(lost <= reconnects * 2, $"message loss {lost} ({loss:F}%) exceeded 2x reconnect count ({reconnects}) - {sent} sent, {received} received");
