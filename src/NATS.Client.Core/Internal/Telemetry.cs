@@ -139,18 +139,19 @@ internal static class Telemetry
             if (replyTo is not null)
                 len++;
 
-            var serverPort = conn.ServerInfo.Port.ToString();
+            var serverPort = conn.BoxedServerPort; // boxed once per ServerInfo change, reused for server.port and network.peer.port
+            var serverHost = conn.ServerHost; // grabbed once per ServerInfo change
             tags = new KeyValuePair<string, object?>[len];
             tags[0] = new KeyValuePair<string, object?>(Constants.SystemKey, Constants.SystemVal);
             tags[1] = new KeyValuePair<string, object?>(Constants.OpKey, Constants.OpPub);
             tags[2] = new KeyValuePair<string, object?>(Constants.DestName, subject);
 
-            tags[3] = new KeyValuePair<string, object?>(Constants.ClientId, conn.ServerInfo.ClientId.ToString());
-            tags[4] = new KeyValuePair<string, object?>(Constants.ServerAddress, conn.ServerInfo.Host);
+            tags[3] = new KeyValuePair<string, object?>(Constants.ClientId, conn.ClientId);
+            tags[4] = new KeyValuePair<string, object?>(Constants.ServerAddress, serverHost);
             tags[5] = new KeyValuePair<string, object?>(Constants.ServerPort, serverPort);
             tags[6] = new KeyValuePair<string, object?>(Constants.NetworkProtoName, "nats");
             tags[7] = new KeyValuePair<string, object?>(Constants.NetworkTransport, "tcp");
-            tags[8] = new KeyValuePair<string, object?>(Constants.NetworkPeerAddress, conn.ServerInfo.Host);
+            tags[8] = new KeyValuePair<string, object?>(Constants.NetworkPeerAddress, serverHost);
             tags[9] = new KeyValuePair<string, object?>(Constants.NetworkPeerPort, serverPort);
             tags[10] = new KeyValuePair<string, object?>(Constants.NetworkLocalAddress, conn.ServerInfo.ClientIp);
 
@@ -238,7 +239,8 @@ internal static class Telemetry
         KeyValuePair<string, object?>[] tags;
         if (connection is NatsConnection { ServerInfo: not null } conn)
         {
-            var serverPort = conn.ServerInfo.Port.ToString();
+            var serverPort = conn.BoxedServerPort; // boxed once per ServerInfo change, reused for server.port and network.peer.port
+            var serverHost = conn.ServerHost; // grabbed once per ServerInfo change
 
             var len = 17;
             if (replyTo is not null)
@@ -256,12 +258,12 @@ internal static class Telemetry
             tags[6] = new KeyValuePair<string, object?>(Constants.DestPubName, subject);
             tags[7] = new KeyValuePair<string, object?>(Constants.MsgBodySize, bodySize.ToString());
             tags[8] = new KeyValuePair<string, object?>(Constants.MsgTotalSize, size.ToString());
-            tags[9] = new KeyValuePair<string, object?>(Constants.ClientId, conn.ServerInfo.ClientId.ToString());
-            tags[10] = new KeyValuePair<string, object?>(Constants.ServerAddress, conn.ServerInfo.Host);
+            tags[9] = new KeyValuePair<string, object?>(Constants.ClientId, conn.ClientId);
+            tags[10] = new KeyValuePair<string, object?>(Constants.ServerAddress, serverHost);
             tags[11] = new KeyValuePair<string, object?>(Constants.ServerPort, serverPort);
             tags[12] = new KeyValuePair<string, object?>(Constants.NetworkProtoName, "nats");
             tags[13] = new KeyValuePair<string, object?>(Constants.NetworkTransport, "tcp");
-            tags[14] = new KeyValuePair<string, object?>(Constants.NetworkPeerAddress, conn.ServerInfo.Host);
+            tags[14] = new KeyValuePair<string, object?>(Constants.NetworkPeerAddress, serverHost);
             tags[15] = new KeyValuePair<string, object?>(Constants.NetworkPeerPort, serverPort);
             tags[16] = new KeyValuePair<string, object?>(Constants.NetworkLocalAddress, conn.ServerInfo.ClientIp);
 
