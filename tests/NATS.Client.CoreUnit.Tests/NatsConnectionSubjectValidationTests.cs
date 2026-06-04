@@ -6,15 +6,6 @@ namespace NATS.Client.CoreUnit.Tests;
 
 public class NatsConnectionSubjectValidationTests
 {
-    private static readonly NatsOpts OptsWithValidation = new() { SkipSubjectValidation = false };
-
-    // Guard against regression: default opts must have validation enabled
-    [Fact]
-    public void DefaultOpts_HasValidationEnabled()
-    {
-        NatsOpts.Default.SkipSubjectValidation.Should().BeFalse();
-    }
-
     // PublishAsync tests
     [Theory]
     [InlineData("foo bar")]
@@ -23,7 +14,7 @@ public class NatsConnectionSubjectValidationTests
     [InlineData("foo\nbar")]
     public async Task PublishAsync_SubjectWithWhitespace_ThrowsImmediately(string subject)
     {
-        await using var nats = new NatsConnection(OptsWithValidation);
+        await using var nats = new NatsConnection(NatsOpts.Default);
         var action = async () => await nats.PublishAsync(subject);
         await action.Should().ThrowAsync<NatsException>().WithMessage("Subject is invalid.");
     }
@@ -31,7 +22,7 @@ public class NatsConnectionSubjectValidationTests
     [Fact]
     public async Task PublishAsync_EmptySubject_ThrowsImmediately()
     {
-        await using var nats = new NatsConnection(OptsWithValidation);
+        await using var nats = new NatsConnection(NatsOpts.Default);
         var action = async () => await nats.PublishAsync(string.Empty);
         await action.Should().ThrowAsync<NatsException>().WithMessage("Subject is invalid.");
     }
@@ -41,7 +32,7 @@ public class NatsConnectionSubjectValidationTests
     [InlineData("reply\tto")]
     public async Task PublishAsync_ReplyToWithWhitespace_ThrowsImmediately(string replyTo)
     {
-        await using var nats = new NatsConnection(OptsWithValidation);
+        await using var nats = new NatsConnection(NatsOpts.Default);
         var action = async () => await nats.PublishAsync("foo.bar", replyTo: replyTo);
         await action.Should().ThrowAsync<NatsException>().WithMessage("Subject is invalid.");
     }
@@ -49,7 +40,7 @@ public class NatsConnectionSubjectValidationTests
     [Fact]
     public async Task PublishAsync_EmptyReplyTo_ThrowsImmediately()
     {
-        await using var nats = new NatsConnection(OptsWithValidation);
+        await using var nats = new NatsConnection(NatsOpts.Default);
         var action = async () => await nats.PublishAsync("foo.bar", replyTo: string.Empty);
         await action.Should().ThrowAsync<NatsException>().WithMessage("Subject is invalid.");
     }
@@ -60,7 +51,7 @@ public class NatsConnectionSubjectValidationTests
     [InlineData("foo\tbar")]
     public async Task PublishAsyncT_SubjectWithWhitespace_ThrowsImmediately(string subject)
     {
-        await using var nats = new NatsConnection(OptsWithValidation);
+        await using var nats = new NatsConnection(NatsOpts.Default);
         var action = async () => await nats.PublishAsync(subject, "data");
         await action.Should().ThrowAsync<NatsException>().WithMessage("Subject is invalid.");
     }
@@ -73,7 +64,7 @@ public class NatsConnectionSubjectValidationTests
     [InlineData("foo\nbar")]
     public async Task SubscribeAsync_SubjectWithWhitespace_ThrowsImmediately(string subject)
     {
-        await using var nats = new NatsConnection(OptsWithValidation);
+        await using var nats = new NatsConnection(NatsOpts.Default);
         var action = async () =>
         {
             await foreach (var unused in nats.SubscribeAsync<string>(subject))
@@ -87,7 +78,7 @@ public class NatsConnectionSubjectValidationTests
     [Fact]
     public async Task SubscribeAsync_EmptySubject_ThrowsImmediately()
     {
-        await using var nats = new NatsConnection(OptsWithValidation);
+        await using var nats = new NatsConnection(NatsOpts.Default);
         var action = async () =>
         {
             await foreach (var unused in nats.SubscribeAsync<string>(string.Empty))
@@ -103,7 +94,7 @@ public class NatsConnectionSubjectValidationTests
     [InlineData("queue\tgroup")]
     public async Task SubscribeAsync_QueueGroupWithWhitespace_ThrowsImmediately(string queueGroup)
     {
-        await using var nats = new NatsConnection(OptsWithValidation);
+        await using var nats = new NatsConnection(NatsOpts.Default);
         var action = async () =>
         {
             await foreach (var unused in nats.SubscribeAsync<string>("foo.bar", queueGroup: queueGroup))
@@ -117,7 +108,7 @@ public class NatsConnectionSubjectValidationTests
     [Fact]
     public async Task SubscribeAsync_EmptyQueueGroup_ThrowsImmediately()
     {
-        await using var nats = new NatsConnection(OptsWithValidation);
+        await using var nats = new NatsConnection(NatsOpts.Default);
         var action = async () =>
         {
             await foreach (var unused in nats.SubscribeAsync<string>("foo.bar", queueGroup: string.Empty))
@@ -134,7 +125,7 @@ public class NatsConnectionSubjectValidationTests
     [InlineData("foo\tbar")]
     public async Task SubscribeCoreAsync_SubjectWithWhitespace_ThrowsImmediately(string subject)
     {
-        await using var nats = new NatsConnection(OptsWithValidation);
+        await using var nats = new NatsConnection(NatsOpts.Default);
         var action = async () => await nats.SubscribeCoreAsync<string>(subject);
         await action.Should().ThrowAsync<NatsException>().WithMessage("Subject is invalid.");
     }
@@ -144,55 +135,22 @@ public class NatsConnectionSubjectValidationTests
     [InlineData("queue\tgroup")]
     public async Task SubscribeCoreAsync_QueueGroupWithWhitespace_ThrowsImmediately(string queueGroup)
     {
-        await using var nats = new NatsConnection(OptsWithValidation);
+        await using var nats = new NatsConnection(NatsOpts.Default);
         var action = async () => await nats.SubscribeCoreAsync<string>("foo.bar", queueGroup: queueGroup);
         await action.Should().ThrowAsync<NatsException>().WithMessage("Queue group is invalid.");
     }
 
-    // SkipSubjectValidation option tests (default is false, so validation is enabled by default)
+    // Obsolete SkipSubjectValidation must no longer disable validation
     [Theory]
     [InlineData("foo bar")]
     [InlineData("foo\tbar")]
-    public async Task PublishAsync_WithSkipValidation_DoesNotThrowOnInvalidSubject(string subject)
+    public async Task PublishAsync_WithObsoleteSkipValidation_StillThrows(string subject)
     {
-        // SkipSubjectValidation=true bypasses validation at the API level.
-        // The call will fail later (e.g., connection timeout) but not due to validation.
+#pragma warning disable CS0618 // SkipSubjectValidation is obsolete and ignored
         await using var nats = new NatsConnection(NatsOpts.Default with { SkipSubjectValidation = true });
-
-        // This should not throw NatsException for invalid subject
-        // It will throw something else (timeout, connection error) since we're not connected
-        Func<Task> action = async () =>
-        {
-            using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
-            await nats.PublishAsync(subject, cancellationToken: cts.Token);
-        };
-
-        // Should NOT throw "Subject is invalid."
-        var ex = await action.Should().ThrowAsync<Exception>();
-        ex.Which.Message.Should().NotBe("Subject is invalid.");
-    }
-
-    [Theory]
-    [InlineData("foo bar")]
-    [InlineData("foo\tbar")]
-    public async Task SubscribeAsync_WithSkipValidation_DoesNotThrowOnInvalidSubject(string subject)
-    {
-        // SkipSubjectValidation=true bypasses validation at the API level.
-        await using var nats = new NatsConnection(NatsOpts.Default with { SkipSubjectValidation = true });
-
-        // This should not throw NatsException for invalid subject
-        Func<Task> action = async () =>
-        {
-            using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
-            await foreach (var unused in nats.SubscribeAsync<string>(subject, cancellationToken: cts.Token))
-            {
-                // Should not reach here
-            }
-        };
-
-        // Should NOT throw "Subject is invalid." - will throw timeout or connection error instead
-        var ex = await action.Should().ThrowAsync<Exception>();
-        ex.Which.Message.Should().NotBe("Subject is invalid.");
+#pragma warning restore CS0618
+        var action = async () => await nats.PublishAsync(subject);
+        await action.Should().ThrowAsync<NatsException>().WithMessage("Subject is invalid.");
     }
 
     // RequestAsync tests
@@ -203,7 +161,7 @@ public class NatsConnectionSubjectValidationTests
     [InlineData("foo\nbar")]
     public async Task RequestAsync_SubjectWithWhitespace_ThrowsImmediately(string subject)
     {
-        await using var nats = new NatsConnection(OptsWithValidation);
+        await using var nats = new NatsConnection(NatsOpts.Default);
         var action = async () => await nats.RequestAsync<string, string>(subject, "data");
         await action.Should().ThrowAsync<NatsException>().WithMessage("Subject is invalid.");
     }
@@ -211,7 +169,7 @@ public class NatsConnectionSubjectValidationTests
     [Fact]
     public async Task RequestAsync_EmptySubject_ThrowsImmediately()
     {
-        await using var nats = new NatsConnection(OptsWithValidation);
+        await using var nats = new NatsConnection(NatsOpts.Default);
         var action = async () => await nats.RequestAsync<string, string>(string.Empty, "data");
         await action.Should().ThrowAsync<NatsException>().WithMessage("Subject is invalid.");
     }
@@ -222,7 +180,7 @@ public class NatsConnectionSubjectValidationTests
     [InlineData("foo\tbar")]
     public async Task RequestManyAsync_SubjectWithWhitespace_ThrowsImmediately(string subject)
     {
-        await using var nats = new NatsConnection(OptsWithValidation);
+        await using var nats = new NatsConnection(NatsOpts.Default);
         var action = async () =>
         {
             await foreach (var msg in nats.RequestManyAsync<string, string>(subject, "data"))
@@ -239,7 +197,7 @@ public class NatsConnectionSubjectValidationTests
     [InlineData("foo\tbar")]
     public async Task CreateRequestSubAsync_SubjectWithWhitespace_ThrowsImmediately(string subject)
     {
-        await using var nats = new NatsConnection(OptsWithValidation);
+        await using var nats = new NatsConnection(NatsOpts.Default);
         var action = async () => await nats.CreateRequestSubAsync<string, string>(subject, "data");
         await action.Should().ThrowAsync<NatsException>().WithMessage("Subject is invalid.");
     }
@@ -249,7 +207,7 @@ public class NatsConnectionSubjectValidationTests
     [Fact]
     public void SubscribeAsync_ThrowsSynchronously_BeforeIteration()
     {
-        var nats = new NatsConnection(OptsWithValidation);
+        var nats = new NatsConnection(NatsOpts.Default);
 
         // Exception should be thrown HERE, when calling SubscribeAsync,
         // NOT when iterating the result
@@ -264,7 +222,7 @@ public class NatsConnectionSubjectValidationTests
     [Fact]
     public void SubscribeAsync_QueueGroup_ThrowsSynchronously_BeforeIteration()
     {
-        var nats = new NatsConnection(OptsWithValidation);
+        var nats = new NatsConnection(NatsOpts.Default);
 
         var exception = Assert.Throws<NatsException>(() =>
         {
@@ -277,7 +235,7 @@ public class NatsConnectionSubjectValidationTests
     [Fact]
     public void SubscribeCoreAsync_ThrowsSynchronously_BeforeAwait()
     {
-        var nats = new NatsConnection(OptsWithValidation);
+        var nats = new NatsConnection(NatsOpts.Default);
 
         // Exception should be thrown HERE, when calling SubscribeCoreAsync,
         // NOT when awaiting the result
@@ -292,7 +250,7 @@ public class NatsConnectionSubjectValidationTests
     [Fact]
     public void RequestManyAsync_ThrowsSynchronously_BeforeIteration()
     {
-        var nats = new NatsConnection(OptsWithValidation);
+        var nats = new NatsConnection(NatsOpts.Default);
 
         // Exception should be thrown HERE, when calling RequestManyAsync,
         // NOT when iterating the result

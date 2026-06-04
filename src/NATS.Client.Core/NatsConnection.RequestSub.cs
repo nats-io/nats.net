@@ -15,10 +15,7 @@ public partial class NatsConnection
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default)
     {
-        if (!Opts.SkipSubjectValidation)
-        {
-            SubjectValidator.ValidateSubject(subject);
-        }
+        SubjectValidator.ValidateSubject(subject);
 
         var replyTo = NewInbox();
 

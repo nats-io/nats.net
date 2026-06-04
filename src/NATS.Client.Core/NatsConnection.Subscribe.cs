@@ -11,11 +11,8 @@ public partial class NatsConnection
     {
         // Validate synchronously before returning the async enumerable
         // so that invalid subjects throw immediately when SubscribeAsync is called
-        if (!Opts.SkipSubjectValidation)
-        {
-            SubjectValidator.ValidateSubject(subject);
-            SubjectValidator.ValidateQueueGroup(queueGroup);
-        }
+        SubjectValidator.ValidateSubject(subject);
+        SubjectValidator.ValidateQueueGroup(queueGroup);
 
         return SubscribeInternalAsync<T>(subject, queueGroup, serializer, opts, cancellationToken);
     }
@@ -24,11 +21,8 @@ public partial class NatsConnection
     public ValueTask<INatsSub<T>> SubscribeCoreAsync<T>(string subject, string? queueGroup = default, INatsDeserialize<T>? serializer = default, NatsSubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         // Validate synchronously so invalid subjects throw immediately
-        if (!Opts.SkipSubjectValidation)
-        {
-            SubjectValidator.ValidateSubject(subject);
-            SubjectValidator.ValidateQueueGroup(queueGroup);
-        }
+        SubjectValidator.ValidateSubject(subject);
+        SubjectValidator.ValidateQueueGroup(queueGroup);
 
         return SubscribeCoreInternalAsync<T>(subject, queueGroup, serializer, opts, cancellationToken);
     }

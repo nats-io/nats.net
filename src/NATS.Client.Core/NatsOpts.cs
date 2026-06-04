@@ -303,21 +303,14 @@ public sealed record NatsOpts
     public bool PublishTimeoutOnDisconnected { get; init; } = false;
 
     /// <summary>
-    /// Gets or sets a value indicating whether to skip subject validation.
-    /// The default is <c>false</c>, meaning subject validation is enabled.
+    /// No longer has any effect. Subjects are always validated.
     /// </summary>
     /// <remarks>
-    /// <para>
-    /// When set to <c>false</c> (default), subjects are validated to ensure they are not empty
-    /// and don't contain whitespace characters (space, tab, CR, LF). This prevents CRLF
-    /// protocol injection where a subject containing \r\n could inject arbitrary NATS commands.
-    /// </para>
-    /// <para>
-    /// When set to <c>true</c>, all subject validation is bypassed for maximum throughput.
-    /// Only use this if you fully control all subject strings and can guarantee they never
-    /// contain whitespace or CRLF sequences.
-    /// </para>
+    /// Subject validation rejects empty subjects and subjects containing whitespace (space, tab,
+    /// CR, LF), which prevents CRLF protocol injection. It is now always enabled and cannot be
+    /// turned off; setting this property is ignored.
     /// </remarks>
+    [Obsolete("Subjects are always validated. This option is ignored and will be removed in a future release.")]
     public bool SkipSubjectValidation { get; init; } = false;
 
     /// <summary>

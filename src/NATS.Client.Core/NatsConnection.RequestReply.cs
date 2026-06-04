@@ -33,10 +33,7 @@ public partial class NatsConnection
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default)
     {
-        if (!Opts.SkipSubjectValidation)
-        {
-            SubjectValidator.ValidateSubject(subject);
-        }
+        SubjectValidator.ValidateSubject(subject);
 
         var measure = Telemetry.OperationDuration.Enabled;
         var start = measure ? Stopwatch.GetTimestamp() : 0L;
@@ -142,10 +139,7 @@ public partial class NatsConnection
     {
         // Validate synchronously before returning the async enumerable
         // so that invalid subjects throw immediately when RequestManyAsync is called
-        if (!Opts.SkipSubjectValidation)
-        {
-            SubjectValidator.ValidateSubject(subject);
-        }
+        SubjectValidator.ValidateSubject(subject);
 
         return RequestManyInternalAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken);
     }

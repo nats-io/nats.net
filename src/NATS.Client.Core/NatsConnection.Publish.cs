@@ -8,11 +8,8 @@ public partial class NatsConnection
     /// <inheritdoc />
     public ValueTask PublishAsync(string subject, NatsHeaders? headers = default, string? replyTo = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
-        if (!Opts.SkipSubjectValidation)
-        {
-            SubjectValidator.ValidateSubject(subject);
-            SubjectValidator.ValidateReplyTo(replyTo);
-        }
+        SubjectValidator.ValidateSubject(subject);
+        SubjectValidator.ValidateReplyTo(replyTo);
 
         var measure = Telemetry.OperationDuration.Enabled;
         var start = measure ? Stopwatch.GetTimestamp() : 0L;
@@ -58,11 +55,8 @@ public partial class NatsConnection
     /// <inheritdoc />
     public ValueTask PublishAsync<T>(string subject, T? data, NatsHeaders? headers = default, string? replyTo = default, INatsSerialize<T>? serializer = default, NatsPubOpts? opts = default, CancellationToken cancellationToken = default)
     {
-        if (!Opts.SkipSubjectValidation)
-        {
-            SubjectValidator.ValidateSubject(subject);
-            SubjectValidator.ValidateReplyTo(replyTo);
-        }
+        SubjectValidator.ValidateSubject(subject);
+        SubjectValidator.ValidateReplyTo(replyTo);
 
         var measure = Telemetry.OperationDuration.Enabled;
         var start = measure ? Stopwatch.GetTimestamp() : 0L;
