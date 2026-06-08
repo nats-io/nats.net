@@ -172,12 +172,10 @@ a serializer.
 
 ### Channel Full Mode
 
-`NATS.Extensions.Microsoft.DependencyInjection` sets `SubPendingChannelFullMode` to
-`BoundedChannelFullMode.Wait` by default (matching `NatsClient` behavior). This means
-a slow subscriber will apply backpressure instead of dropping messages.
-
-`NATS.Client.Hosting` uses the `NatsOpts` default of `BoundedChannelFullMode.DropNewest`,
-which drops the newest messages when the subscriber's channel is full.
+Both `NATS.Extensions.Microsoft.DependencyInjection` and `NATS.Client.Hosting` use the
+`NatsOpts` default of `BoundedChannelFullMode.DropNewest`, which drops the newest messages
+when the subscriber's channel is full. Use `WithSubPendingChannelFullMode(...)` on the
+builder to change it.
 
 ### Options Pattern
 

@@ -18,7 +18,7 @@ It resets after the subscription catches up (channel drains), so it will fire ag
 
 ## Tuning Channel Capacity
 
-Each subscription has an internal bounded channel with a default capacity of 1024 messages.
+Each subscription has an internal bounded channel with a default capacity of 16384 messages.
 You can tune this globally or per subscription:
 
 [!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/SlowConsumerPage.cs#tuning)]
@@ -27,8 +27,8 @@ You can tune this globally or per subscription:
 
 The `SubPendingChannelFullMode` option controls what happens when the channel is full:
 
-- `BoundedChannelFullMode.DropNewest` (default for `NatsConnection`) - newest messages are dropped
-- `BoundedChannelFullMode.Wait` (default for `NatsClient`) - backpressure is applied, but the server may disconnect you as a slow consumer
+- `BoundedChannelFullMode.DropNewest` (the default) - newest messages are dropped
+- `BoundedChannelFullMode.Wait` - backpressure is applied, but the server may disconnect you as a slow consumer
 
 > [!WARNING]
 > Using `BoundedChannelFullMode.Wait` prevents message loss at the client level, but if the subscriber
