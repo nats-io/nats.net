@@ -85,7 +85,9 @@ public class RequestReplyTest
             });
             await nats.PingAsync();
 
-            await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+            // Direct mode surfaces cancellation as TaskCanceledException (a subclass of
+            // OperationCanceledException), SharedInbox as OperationCanceledException; accept either.
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
             {
                 await nats.RequestAsync<int, int>("foo", 0, cancellationToken: cts.Token);
             });
@@ -95,14 +97,28 @@ public class RequestReplyTest
         }
     }
 
-    [Fact]
-    public async Task Request_reply_no_responders_test()
+    [Theory]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    public async Task Request_reply_no_responders_test(NatsRequestReplyMode mode)
     {
-        // Enable no responders, and do not set a timeout. We should get a response with a 503-header code.
-        {
-            await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
-            await Assert.ThrowsAsync<NatsNoRespondersException>(async () => await nats.RequestAsync<int, int>(Guid.NewGuid().ToString(), 0));
-        }
+        // Enable no responders, and do not set a timeout. The 503 sentinel should
+        // surface as NatsNoRespondersException in both modes.
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
+        await Assert.ThrowsAsync<NatsNoRespondersException>(async () => await nats.RequestAsync<int, int>(Guid.NewGuid().ToString(), 0));
+    }
+
+    [Theory]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    public async Task Request_reply_no_responders_suppressed_test(NatsRequestReplyMode mode)
+    {
+        // With ThrowIfNoResponders disabled, the 503 sentinel is delivered as a message
+        // carrying the no-responders flag instead of throwing, in both modes.
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
+        var replyOpts = new NatsSubOpts { ThrowIfNoResponders = false };
+        var reply = await nats.RequestAsync<int, int>(Guid.NewGuid().ToString(), 0, replyOpts: replyOpts);
+        Assert.True(reply.HasNoResponders);
     }
 
     [Fact]
@@ -438,9 +454,27 @@ public class RequestReplyTest
     }
 
     [Fact]
-    public async Task Default_SharedInbox_request_reply_test()
+    public async Task Default_mode_is_direct_test()
     {
+        // Default RequestReplyMode is Direct, so the reply-to inbox carries a numeric id
+        // e.g. _INBOX.Hu5HPpWesrJhvQq2NG3YJ6.1
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var reply = await nats.RequestAsync<string>("$JS.API.INFO", cancellationToken: default);
+
+        reply.Subject.Length.Should().BeLessThan("_INBOX..".Length + (2 * 22));
+        Assert.True(long.TryParse(reply.Subject.Split('.')[2], out var id));
+        Assert.True(id > 0);
+
+        // simple response check
+        var json = JsonNode.Parse(reply.Data!)!;
+        var type = json["type"]!.GetValue<string>();
+        Assert.Equal("io.nats.jetstream.api.v1.account_info_response", type);
+    }
+
+    [Fact]
+    public async Task SharedInbox_request_reply_test()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = NatsRequestReplyMode.SharedInbox });
         var reply = await nats.RequestAsync<string>("$JS.API.INFO", cancellationToken: default);
 
         // reply-to should be inbox

@@ -53,7 +53,7 @@ public partial class NatsConnection
 
                     if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
                     {
-                        using var rt = _replyTaskFactory.CreateReplyTask(replySerializer, replyOpts.Timeout);
+                        using var rt = _replyTaskFactory.CreateReplyTask(replySerializer, replyOpts.Timeout, replyOpts.ThrowIfNoResponders ?? true);
                         requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
                         await PublishAsync(subject, data, headers, rt.Subject, requestSerializer, requestOpts, cancellationToken).ConfigureAwait(false);
                         var msg = await rt.GetResultAsync(cancellationToken).ConfigureAwait(false);
@@ -85,7 +85,7 @@ public partial class NatsConnection
 
             if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
             {
-                using var rt = _replyTaskFactory.CreateReplyTask(replySerializer, replyOpts.Timeout);
+                using var rt = _replyTaskFactory.CreateReplyTask(replySerializer, replyOpts.Timeout, replyOpts.ThrowIfNoResponders ?? true);
                 requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
                 await PublishAsync(subject, data, headers, rt.Subject, requestSerializer, requestOpts, cancellationToken).ConfigureAwait(false);
                 return await rt.GetResultAsync(cancellationToken).ConfigureAwait(false);

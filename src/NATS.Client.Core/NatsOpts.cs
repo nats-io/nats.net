@@ -260,8 +260,10 @@ public sealed record NatsOpts
     /// </para>
     /// The <see cref="RequestReplyMode"/> setting determines which mode is used during message exchanges
     /// initiated by <see cref="NatsConnection.RequestAsync{TRequest, TReply}"/> or other related methods.
+    /// Defaults to <see cref="NatsRequestReplyMode.Direct"/>. <see cref="NatsConnection.RequestManyAsync{TRequest, TReply}"/>
+    /// always uses the shared inbox path regardless of this setting.
     /// </remarks>
-    public NatsRequestReplyMode RequestReplyMode { get; init; } = NatsRequestReplyMode.SharedInbox;
+    public NatsRequestReplyMode RequestReplyMode { get; init; } = NatsRequestReplyMode.Direct;
 
     /// <summary>
     /// Factory for creating socket connections to the NATS server.
