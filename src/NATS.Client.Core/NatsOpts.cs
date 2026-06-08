@@ -38,6 +38,12 @@ public sealed record NatsOpts
         AuthOpts = NatsAuthOpts.Default,
     };
 
+    // Backing fields for RequestReplyMode. _directSetIntentionally records whether Direct was set
+    // explicitly (vs inherited as the default) so no-responders behavior can be preserved across
+    // the 3.x default flip; see the RequestReplyMode init accessor.
+    private readonly NatsRequestReplyMode _requestReplyMode = NatsRequestReplyMode.Direct;
+    private readonly bool _directSetIntentionally;
+
     /// <summary>
     /// NATS server URL to connect to. (default: nats://localhost:4222)
     /// </summary>
@@ -262,8 +268,28 @@ public sealed record NatsOpts
     /// initiated by <see cref="NatsConnection.RequestAsync{TRequest, TReply}"/> or other related methods.
     /// Defaults to <see cref="NatsRequestReplyMode.Direct"/>. <see cref="NatsConnection.RequestManyAsync{TRequest, TReply}"/>
     /// always uses the shared inbox path regardless of this setting.
+    /// <para>
+    /// No-responders handling depends on whether this is set explicitly. Left at its default, request-reply
+    /// throws <see cref="NatsNoRespondersException"/> on a 503 no-responders sentinel. Setting it explicitly to
+    /// <see cref="NatsRequestReplyMode.Direct"/> instead returns the sentinel as a message with
+    /// <see cref="NatsMsg{T}.HasNoResponders"/> set, preserving the behavior of Direct mode before 3.x. Use the
+    /// per-call <see cref="NatsSubOpts.ThrowIfNoResponders"/> to override either way.
+    /// </para>
     /// </remarks>
-    public NatsRequestReplyMode RequestReplyMode { get; init; } = NatsRequestReplyMode.Direct;
+    public NatsRequestReplyMode RequestReplyMode
+    {
+        get => _requestReplyMode;
+        init
+        {
+            _requestReplyMode = value;
+
+            // Explicitly selecting Direct (as opposed to inheriting it as the default) opts out of
+            // throwing on no-responders, matching Direct's pre-3.x behavior. The _requestReplyMode
+            // field initializer bypasses this accessor, so an unset RequestReplyMode keeps the
+            // throwing default.
+            _directSetIntentionally = value == NatsRequestReplyMode.Direct;
+        }
+    }
 
     /// <summary>
     /// Factory for creating socket connections to the NATS server.
@@ -338,6 +364,12 @@ public sealed record NatsOpts
     /// </para>
     /// </remarks>
     public bool SuppressSlowConsumerWarnings { get; init; } = false;
+
+    // True when RequestReplyMode was set to Direct explicitly (vs inherited as the default).
+    // NatsConnection.SetBaseReplyOptsDefaults derives the default no-responders behavior from this:
+    // explicit Direct returns the 503 sentinel as a message, everything else throws. A per-call
+    // NatsSubOpts.ThrowIfNoResponders still takes precedence.
+    internal bool DirectSetIntentionally => _directSetIntentionally;
 
     internal NatsUri[] GetSeedUris(bool suppressRandomization = false)
     {

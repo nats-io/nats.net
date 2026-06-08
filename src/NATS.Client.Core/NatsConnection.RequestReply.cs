@@ -7,16 +7,16 @@ namespace NATS.Client.Core;
 
 public partial class NatsConnection
 {
+    // ThrowIfNoResponders is intentionally left unset here so it falls through to the
+    // default derived in SetBaseReplyOptsDefaults (throw unless Direct was set explicitly).
     private static readonly NatsSubOpts ReplyOptsDefault = new NatsSubOpts
     {
         MaxMsgs = 1,
-        ThrowIfNoResponders = true,
     };
 
     private static readonly NatsSubOpts ReplyManyOptsDefault = new NatsSubOpts
     {
         StopOnEmptyMsg = true,
-        ThrowIfNoResponders = true,
     };
 
     /// <inheritdoc />
@@ -214,6 +214,13 @@ public partial class NatsConnection
             opts = opts with { StopOnEmptyMsg = true };
         }
 
+        // RequestManyAsync always uses the shared inbox path, so it is unaffected by the
+        // Direct intentional-selection opt-out and keeps throwing on no-responders by default.
+        if (!opts.ThrowIfNoResponders.HasValue)
+        {
+            opts = opts with { ThrowIfNoResponders = true };
+        }
+
         return SetBaseReplyOptsDefaults(opts);
     }
 
@@ -226,7 +233,9 @@ public partial class NatsConnection
 
         if (!opts.ThrowIfNoResponders.HasValue)
         {
-            opts = opts with { ThrowIfNoResponders = true };
+            // Throw on no-responders by default, except when Direct was selected explicitly, which
+            // preserves Direct's pre-3.x behavior of returning the sentinel as a message.
+            opts = opts with { ThrowIfNoResponders = !Opts.DirectSetIntentionally };
         }
 
         return opts;

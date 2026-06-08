@@ -97,28 +97,50 @@ public class RequestReplyTest
         }
     }
 
-    [Theory]
-    [InlineData(NatsRequestReplyMode.SharedInbox)]
-    [InlineData(NatsRequestReplyMode.Direct)]
-    public async Task Request_reply_no_responders_test(NatsRequestReplyMode mode)
+    [Fact]
+    public async Task Request_reply_no_responders_default_throws_test()
     {
-        // Enable no responders, and do not set a timeout. The 503 sentinel should
-        // surface as NatsNoRespondersException in both modes.
-        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
+        // Default mode (Direct transport, not set explicitly) throws on no-responders,
+        // preserving the pre-3.x default behavior.
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
         await Assert.ThrowsAsync<NatsNoRespondersException>(async () => await nats.RequestAsync<int, int>(Guid.NewGuid().ToString(), 0));
+    }
+
+    [Fact]
+    public async Task Request_reply_no_responders_shared_inbox_throws_test()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = NatsRequestReplyMode.SharedInbox });
+        await Assert.ThrowsAsync<NatsNoRespondersException>(async () => await nats.RequestAsync<int, int>(Guid.NewGuid().ToString(), 0));
+    }
+
+    [Fact]
+    public async Task Request_reply_no_responders_explicit_direct_returns_message_test()
+    {
+        // Explicitly selecting Direct preserves the pre-3.x Direct behavior: the 503 sentinel
+        // comes back as a message with HasNoResponders set instead of throwing.
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = NatsRequestReplyMode.Direct });
+        var reply = await nats.RequestAsync<int, int>(Guid.NewGuid().ToString(), 0);
+        Assert.True(reply.HasNoResponders);
     }
 
     [Theory]
     [InlineData(NatsRequestReplyMode.SharedInbox)]
     [InlineData(NatsRequestReplyMode.Direct)]
-    public async Task Request_reply_no_responders_suppressed_test(NatsRequestReplyMode mode)
+    public async Task Request_reply_no_responders_per_call_suppressed_test(NatsRequestReplyMode mode)
     {
-        // With ThrowIfNoResponders disabled, the 503 sentinel is delivered as a message
-        // carrying the no-responders flag instead of throwing, in both modes.
+        // Per-call ThrowIfNoResponders=false returns the sentinel as a message in either mode.
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
-        var replyOpts = new NatsSubOpts { ThrowIfNoResponders = false };
-        var reply = await nats.RequestAsync<int, int>(Guid.NewGuid().ToString(), 0, replyOpts: replyOpts);
+        var reply = await nats.RequestAsync<int, int>(Guid.NewGuid().ToString(), 0, replyOpts: new NatsSubOpts { ThrowIfNoResponders = false });
         Assert.True(reply.HasNoResponders);
+    }
+
+    [Fact]
+    public async Task Request_reply_no_responders_per_call_throw_overrides_explicit_direct_test()
+    {
+        // Per-call ThrowIfNoResponders=true forces a throw even when Direct was selected explicitly.
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = NatsRequestReplyMode.Direct });
+        await Assert.ThrowsAsync<NatsNoRespondersException>(async () =>
+            await nats.RequestAsync<int, int>(Guid.NewGuid().ToString(), 0, replyOpts: new NatsSubOpts { ThrowIfNoResponders = true }));
     }
 
     [Fact]
