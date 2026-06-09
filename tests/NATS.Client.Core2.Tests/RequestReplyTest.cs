@@ -481,6 +481,8 @@ public class RequestReplyTest
         // Default RequestReplyMode is Direct, so the reply-to inbox carries a numeric id
         // e.g. _INBOX.Hu5HPpWesrJhvQq2NG3YJ6.1
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        Assert.Equal(NatsRequestReplyMode.Direct, nats.Opts.RequestReplyMode);
+
         var reply = await nats.RequestAsync<string>("$JS.API.INFO", cancellationToken: default);
 
         reply.Subject.Length.Should().BeLessThan("_INBOX..".Length + (2 * 22));
