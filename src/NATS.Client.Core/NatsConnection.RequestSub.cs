@@ -15,7 +15,12 @@ public partial class NatsConnection
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default)
     {
-        SubjectValidator.ValidateSubject(subject);
+#pragma warning disable CS0618 // SkipSubjectValidation is obsolete but still honored
+        if (!Opts.SkipSubjectValidation)
+#pragma warning restore CS0618
+        {
+            SubjectValidator.ValidateSubject(subject);
+        }
 
         var replyTo = NewInbox();
 

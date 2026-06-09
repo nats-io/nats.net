@@ -74,8 +74,13 @@ public abstract class NatsSubBase
         NatsSubOpts? opts,
         CancellationToken cancellationToken = default)
     {
-        SubjectValidator.ValidateSubject(subject);
-        SubjectValidator.ValidateQueueGroup(queueGroup);
+#pragma warning disable CS0618 // SkipSubjectValidation is obsolete but still honored
+        if (!connection.Opts.SkipSubjectValidation)
+#pragma warning restore CS0618
+        {
+            SubjectValidator.ValidateSubject(subject);
+            SubjectValidator.ValidateQueueGroup(queueGroup);
+        }
 
         _logger = connection.Opts.LoggerFactory.CreateLogger<NatsSubBase>();
         _debug = _logger.IsEnabled(LogLevel.Debug);

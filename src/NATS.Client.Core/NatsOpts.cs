@@ -303,14 +303,31 @@ public sealed record NatsOpts
     public bool PublishTimeoutOnDisconnected { get; init; } = false;
 
     /// <summary>
-    /// No longer has any effect. Subjects are always validated.
+    /// Gets or sets a value indicating whether to skip subject validation.
+    /// The default is <c>false</c>, meaning subject validation is enabled.
     /// </summary>
     /// <remarks>
-    /// Subject validation rejects empty subjects and subjects containing whitespace (space, tab,
-    /// CR, LF), which prevents CRLF protocol injection. It is now always enabled and cannot be
-    /// turned off; setting this property is ignored.
+    /// <para>
+    /// When set to <c>false</c> (default), subjects are validated to ensure they are not empty
+    /// and don't contain whitespace characters (space, tab, CR, LF). This prevents CRLF
+    /// protocol injection where a subject containing \r\n could inject arbitrary NATS commands.
+    /// </para>
+    /// <para>
+    /// When set to <c>true</c>, all subject validation is bypassed for maximum throughput.
+    /// Only use this if you fully control all subject strings and can guarantee they never
+    /// contain whitespace or CRLF sequences.
+    /// </para>
+    /// <para>
+    /// This option is obsolete and discouraged. With validation off, a subject that merely
+    /// contains a space or tab is split into tokens on the wire: <c>PUB foo bar 5</c> is read
+    /// by the server as subject <c>foo</c> with reply-to <c>bar</c>, and <c>SUB foo bar 1</c>
+    /// as subject <c>foo</c> joined to queue group <c>bar</c>. Either way the call is silently
+    /// misrouted with no error. Disabling validation also removes the guard against CRLF
+    /// protocol injection. The saving is negligible next to the network round trip, so this
+    /// is kept only for compatibility and may be removed in a future release.
+    /// </para>
     /// </remarks>
-    [Obsolete("Subjects are always validated. This option is ignored and will be removed in a future release.")]
+    [Obsolete("Skipping subject validation is discouraged and may be removed in a future release. Leave subject validation enabled.")]
     public bool SkipSubjectValidation { get; init; } = false;
 
     /// <summary>
