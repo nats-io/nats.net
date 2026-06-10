@@ -196,6 +196,12 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
             cancellationToken: cancellationToken);
     }
 
+    public override ValueTask DrainAsync(CancellationToken cancellationToken = default)
+    {
+        StopHeartbeatTimer();
+        return base.DrainAsync(cancellationToken);
+    }
+
     public void StopHeartbeatTimer() => _timer.Change(Timeout.Infinite, Timeout.Infinite);
 
     public void ResetHeartbeatTimer() => _timer.Change(_hbTimeout, _hbTimeout);

@@ -160,6 +160,14 @@ public record NatsJSConsumeOpts
     /// Set to -1 to disable this check. (default: 10)
     /// </summary>
     public int MaxConsecutive503Errors { get; init; } = 10;
+
+    /// <summary>
+    /// When true, cancelling the token passed to ConsumeAsync drains the consumer
+    /// gracefully (stop pulling, deliver buffered messages so handlers can ACK,
+    /// then complete) and leaves the connection usable, instead of stopping
+    /// immediately. (default: false)
+    /// </summary>
+    public bool DrainOnCancel { get; init; }
 }
 
 /// <summary>
