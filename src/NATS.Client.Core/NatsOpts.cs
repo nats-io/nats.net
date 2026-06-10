@@ -318,7 +318,17 @@ public sealed record NatsOpts
     /// Only use this if you fully control all subject strings and can guarantee they never
     /// contain whitespace or CRLF sequences.
     /// </para>
+    /// <para>
+    /// This option is obsolete and discouraged. With validation off, a subject that merely
+    /// contains a space or tab is split into tokens on the wire: <c>PUB foo bar 5</c> is read
+    /// by the server as subject <c>foo</c> with reply-to <c>bar</c>, and <c>SUB foo bar 1</c>
+    /// as subject <c>foo</c> joined to queue group <c>bar</c>. Either way the call is silently
+    /// misrouted with no error. Disabling validation also removes the guard against CRLF
+    /// protocol injection. The saving is negligible next to the network round trip, so this
+    /// is kept only for compatibility and may be removed in a future release.
+    /// </para>
     /// </remarks>
+    [Obsolete("Skipping subject validation is discouraged and may be removed in a future release. Leave subject validation enabled.")]
     public bool SkipSubjectValidation { get; init; } = false;
 
     /// <summary>
