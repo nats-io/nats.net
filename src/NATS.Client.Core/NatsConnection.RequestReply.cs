@@ -33,7 +33,9 @@ public partial class NatsConnection
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default)
     {
+#pragma warning disable CS0618 // SkipSubjectValidation is obsolete but still honored
         if (!Opts.SkipSubjectValidation)
+#pragma warning restore CS0618
         {
             SubjectValidator.ValidateSubject(subject);
         }
@@ -142,7 +144,9 @@ public partial class NatsConnection
     {
         // Validate synchronously before returning the async enumerable
         // so that invalid subjects throw immediately when RequestManyAsync is called
+#pragma warning disable CS0618 // SkipSubjectValidation is obsolete but still honored
         if (!Opts.SkipSubjectValidation)
+#pragma warning restore CS0618
         {
             SubjectValidator.ValidateSubject(subject);
         }

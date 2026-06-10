@@ -74,7 +74,9 @@ public abstract class NatsSubBase
         NatsSubOpts? opts,
         CancellationToken cancellationToken = default)
     {
+#pragma warning disable CS0618 // SkipSubjectValidation is obsolete but still honored
         if (!connection.Opts.SkipSubjectValidation)
+#pragma warning restore CS0618
         {
             SubjectValidator.ValidateSubject(subject);
             SubjectValidator.ValidateQueueGroup(queueGroup);
