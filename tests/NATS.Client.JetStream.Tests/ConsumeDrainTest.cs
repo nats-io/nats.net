@@ -6,14 +6,9 @@ namespace NATS.Client.JetStream.Tests;
 [Collection("nats-server")]
 public class ConsumeDrainTest
 {
-    private readonly ITestOutputHelper _output;
     private readonly NatsServerFixture _server;
 
-    public ConsumeDrainTest(ITestOutputHelper output, NatsServerFixture server)
-    {
-        _output = output;
-        _server = server;
-    }
+    public ConsumeDrainTest(NatsServerFixture server) => _server = server;
 
     [Fact]
     public async Task Consume_drain_on_cancel_delivers_buffered_and_keeps_connection()
@@ -109,7 +104,8 @@ public class ConsumeDrainTest
 #endif
         }
 
-        // Without drain the buffered messages are abandoned when the token is cancelled.
-        Assert.True(received < total, $"expected fewer than {total} messages, got {received}");
+        // Without drain the loop stops promptly on cancel (fired after the first
+        // message) and abandons the buffered messages rather than delivering them.
+        Assert.True(received <= 5, $"expected a prompt stop (<= 5 messages), got {received} of {total}");
     }
 }
