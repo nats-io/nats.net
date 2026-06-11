@@ -204,13 +204,6 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
             cancellationToken: cancellationToken);
     }
 
-    public override ValueTask DrainAsync(CancellationToken cancellationToken = default)
-    {
-        _draining = true;
-        StopHeartbeatTimer();
-        return base.DrainAsync(cancellationToken);
-    }
-
     public void StopHeartbeatTimer() => _timer.Change(Timeout.Infinite, Timeout.Infinite);
 
     public void ResetHeartbeatTimer()
@@ -320,6 +313,15 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
 
             ResetPending();
         }
+    }
+
+    protected override void StopDelivery()
+    {
+        // Mark draining first so the heartbeat callback, its re-arm, and CompleteStop
+        // defer to the drain fence, then stop the timer so it can't pull or complete the
+        // channel during the drain.
+        _draining = true;
+        StopHeartbeatTimer();
     }
 
     protected override async ValueTask ReceiveInternalAsync(

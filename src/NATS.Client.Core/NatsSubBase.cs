@@ -515,6 +515,18 @@ public abstract class NatsSubBase
     protected abstract ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer);
 
     /// <summary>
+    /// Stops any subclass-owned delivery machinery (e.g. a JetStream pull loop or
+    /// idle-heartbeat timer) as the first step of a drain, before the UNSUB and the
+    /// PING/PONG fence. The base implementation is a no-op; subclasses that keep
+    /// pulling or run a timer that can complete the message channel must override this
+    /// so drain does not leave that machinery running or let it skip the fence.
+    /// Called on both the explicit drain and the dispose-drain path; must be idempotent.
+    /// </summary>
+    protected virtual void StopDelivery()
+    {
+    }
+
+    /// <summary>
     /// Waits for the user-side reader to exit so buffered messages can be
     /// drained on dispose. No-op when the reader was never marked active or
     /// when <see cref="NatsOpts.ConsumerDrainOnDisposeTimeout"/> is unset.
@@ -636,6 +648,11 @@ public abstract class NatsSubBase
     /// </summary>
     private async ValueTask DrainCoreAsync(CancellationToken cancellationToken)
     {
+        // Stop any subclass-owned delivery engine (e.g. a JetStream pull/heartbeat loop)
+        // first so it can't keep pulling or complete the channel ahead of the fence below.
+        // Runs on both the explicit drain and the dispose-drain path.
+        StopDelivery();
+
         // Disarm the lifecycle timers before taking the unsubscribe gate so a
         // Timeout/IdleTimeout/StartUp callback that is about to fire is less likely to win
         // the gate and complete the channel without the drain fence. The gate below still
