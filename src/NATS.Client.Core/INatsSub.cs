@@ -39,7 +39,7 @@ public interface INatsSub<T> : IAsyncDisposable
     /// <see cref="UnsubscribeAsync"/>, drain does not drop messages still in the socket
     /// buffer. The connection stays open.
     /// </remarks>
-    /// <param name="cancellationToken">Bounds the best-effort PING/PONG fence wait.</param>
+    /// <param name="cancellationToken">Bounds the best-effort PING/PONG fence wait, which lasts at most <see cref="NatsOpts.DrainPingTimeout"/>; the token can only shorten it, not extend it past that timeout.</param>
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous drain operation.</returns>
     public ValueTask DrainAsync(CancellationToken cancellationToken = default);
 }

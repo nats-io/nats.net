@@ -297,7 +297,7 @@ public abstract class NatsSubBase
     /// keep the subscription alive.
     /// </para>
     /// </remarks>
-    /// <param name="cancellationToken">Bounds the best-effort PING/PONG fence wait. Cancellation does not abort the drain.</param>
+    /// <param name="cancellationToken">Bounds the best-effort PING/PONG fence wait, which lasts at most <see cref="NatsOpts.DrainPingTimeout"/>; the token can only shorten it, not extend it past that timeout. Cancellation does not abort the drain.</param>
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous drain operation.</returns>
     public virtual ValueTask DrainAsync(CancellationToken cancellationToken = default) => DrainCoreAsync(cancellationToken);
 
