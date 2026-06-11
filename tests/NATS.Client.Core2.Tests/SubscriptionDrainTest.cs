@@ -66,6 +66,9 @@ public class SubscriptionDrainTest
         await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken))
             received.Add(msg.Data);
 
+        // Check the count first so a dropped message surfaces as a count mismatch rather
+        // than a confusing order-equality failure.
+        Assert.Equal(count, received.Count);
         Assert.Equal(Enumerable.Range(0, count), received);
     }
 
