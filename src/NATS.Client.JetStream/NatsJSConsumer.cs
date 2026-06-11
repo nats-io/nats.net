@@ -80,16 +80,10 @@ public class NatsJSConsumer : INatsJSConsumer
         {
             while (true)
             {
-                if (cancellationToken.IsCancellationRequested && !draining)
-                {
-                    if (!drainOnCancel)
-                        yield break;
-
-                    draining = true;
-                    drainTask = cc.DrainAsync();
-                }
-
                 // We have to check calls individually since we can't use yield return in try-catch blocks.
+                // WaitToReadAsync throws if the token is already canceled (even with buffered
+                // messages), so the catch below is the single place that reacts to cancellation:
+                // start the drain when DrainOnCancel is set, otherwise stop.
                 bool ready;
                 try
                 {
