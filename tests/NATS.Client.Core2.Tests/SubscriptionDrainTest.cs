@@ -41,6 +41,35 @@ public class SubscriptionDrainTest
     }
 
     [Fact]
+    public async Task Drain_delivers_messages_still_in_flight_after_unsub()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cancellationToken = cts.Token;
+
+        var subject = $"foo.{Guid.NewGuid():N}";
+        var sub = await nats.SubscribeCoreAsync<int>(subject, cancellationToken: cancellationToken);
+
+        // Kept below the default SubPendingChannelCapacity so nothing is dropped for being
+        // over capacity; what is under test is the drain fence, not back-pressure.
+        const int count = 1000;
+        for (var i = 0; i < count; i++)
+            await nats.PublishAsync(subject, i, cancellationToken: cancellationToken);
+
+        // Unlike the test above there is no PING/PONG before draining, so messages the
+        // server sent before it processed our UNSUB are still in flight (not yet in the
+        // channel). The drain fences inbound delivery with its own PING/PONG so they all
+        // land before the channel completes; without that fence the tail would be dropped.
+        await sub.DrainAsync(cancellationToken);
+
+        var received = new List<int>();
+        await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken))
+            received.Add(msg.Data);
+
+        Assert.Equal(Enumerable.Range(0, count), received);
+    }
+
+    [Fact]
     public async Task Drain_stops_new_messages_but_connection_stays_usable()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
