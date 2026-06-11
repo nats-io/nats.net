@@ -167,6 +167,11 @@ public record NatsJSConsumeOpts
     /// then complete) and leaves the connection usable, instead of stopping
     /// immediately. (default: false)
     /// </summary>
+    /// <remarks>
+    /// Only the standard pull consumer's ConsumeAsync honors this. Ordered consumers
+    /// (see <see cref="NatsJSOrderedConsumer"/>) do not ACK and always stop promptly
+    /// on cancel, so the option has no effect there.
+    /// </remarks>
     public bool DrainOnCancel { get; init; }
 }
 
