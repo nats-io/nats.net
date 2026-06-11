@@ -648,20 +648,6 @@ public abstract class NatsSubBase
     /// </summary>
     private async ValueTask DrainCoreAsync(CancellationToken cancellationToken)
     {
-        // Stop any subclass-owned delivery engine (e.g. a JetStream pull/heartbeat loop)
-        // first so it can't keep pulling or complete the channel ahead of the fence below.
-        // Runs on both the explicit drain and the dispose-drain path.
-        StopDelivery();
-
-        // Disarm the lifecycle timers before taking the unsubscribe gate so a
-        // Timeout/IdleTimeout/StartUp callback that is about to fire is less likely to win
-        // the gate and complete the channel without the drain fence. The gate below still
-        // guarantees correctness if a callback was already in flight; this just narrows the
-        // window where an explicit drain races those timers.
-        _timeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-        _idleTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-        _startUpTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-
         var needsUnsub = false;
         lock (_gate)
         {
@@ -675,12 +661,22 @@ public abstract class NatsSubBase
         if (!needsUnsub)
             return;
 
-        DecrementActiveSubscription();
-
         var mgr = _manager as SubscriptionManager;
         var sid = -1;
         try
         {
+            DecrementActiveSubscription();
+
+            // Stop the subclass-owned delivery engine (e.g. a JetStream pull/heartbeat loop)
+            // and disarm the lifecycle timers before the fence so they can't keep pulling or
+            // complete the channel ahead of it. These run inside the try so that if any of
+            // them throw (e.g. a timer disposed by a racing DisposeAsync) the finally below
+            // still completes the channel and no reader is left waiting forever.
+            StopDelivery();
+            _timeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+            _idleTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+            _startUpTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+
             // For the built-in SubscriptionManager: send UNSUB but keep the SID in the routing
             // table until after the PING/PONG round-trip, so messages already in the socket
             // buffer are delivered before the channel is completed.
@@ -714,7 +710,7 @@ public abstract class NatsSubBase
         finally
         {
             // Remove from routing now that no more messages can arrive for this SID, then
-            // complete the channel. This runs even if UNSUB or PING threw, so a reader
+            // complete the channel. This runs even if anything in the try threw, so a reader
             // blocked on the channel (e.g. the drain-on-cancel consume loop reading with
             // CancellationToken.None) is never left waiting forever.
             if (sid != -1)
