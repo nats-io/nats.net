@@ -636,6 +636,15 @@ public abstract class NatsSubBase
     /// </summary>
     private async ValueTask DrainCoreAsync(CancellationToken cancellationToken)
     {
+        // Disarm the lifecycle timers before taking the unsubscribe gate so a
+        // Timeout/IdleTimeout/StartUp callback that is about to fire is less likely to win
+        // the gate and complete the channel without the drain fence. The gate below still
+        // guarantees correctness if a callback was already in flight; this just narrows the
+        // window where an explicit drain races those timers.
+        _timeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+        _idleTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+        _startUpTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+
         var needsUnsub = false;
         lock (_gate)
         {
@@ -651,26 +660,22 @@ public abstract class NatsSubBase
 
         DecrementActiveSubscription();
 
-        _timeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-        _idleTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-        _startUpTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-
-        // For the built-in SubscriptionManager: send UNSUB but keep the SID in the routing
-        // table until after the PING/PONG round-trip, so messages already in the socket
-        // buffer are delivered before the channel is completed.
-        // For external managers: fall back to RemoveAsync (routing removed before PING).
         var mgr = _manager as SubscriptionManager;
-        var sid = mgr != null
-            ? await mgr.UnsubscribeForDrainAsync(this).ConfigureAwait(false)
-            : -1;
-        if (mgr == null)
-            await _manager.RemoveAsync(this).ConfigureAwait(false);
-
-        // PING/PONG round-trip: after we get the PONG back, we know the server
-        // has processed our UNSUB and the socket reader has processed all messages
-        // that were in-flight before the UNSUB was received by the server.
+        var sid = -1;
         try
         {
+            // For the built-in SubscriptionManager: send UNSUB but keep the SID in the routing
+            // table until after the PING/PONG round-trip, so messages already in the socket
+            // buffer are delivered before the channel is completed.
+            // For external managers: fall back to RemoveAsync (routing removed before PING).
+            if (mgr != null)
+                sid = await mgr.UnsubscribeForDrainAsync(this).ConfigureAwait(false);
+            else
+                await _manager.RemoveAsync(this).ConfigureAwait(false);
+
+            // PING/PONG round-trip: after we get the PONG back, we know the server
+            // has processed our UNSUB and the socket reader has processed all messages
+            // that were in-flight before the UNSUB was received by the server.
             using var pingCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             pingCts.CancelAfter(Connection.Opts.DrainPingTimeout);
             await Connection.PingAsync(pingCts.Token).ConfigureAwait(false);
@@ -683,13 +688,23 @@ public abstract class NatsSubBase
         {
             // Connection failed or disconnected during drain. Drain is best-effort.
         }
+        catch (ObjectDisposedException)
+        {
+            // The connection or its command writer was disposed mid-drain (e.g. a connection
+            // dispose racing an explicit drain). Drain is best-effort; fall through and still
+            // complete the channel below.
+        }
+        finally
+        {
+            // Remove from routing now that no more messages can arrive for this SID, then
+            // complete the channel. This runs even if UNSUB or PING threw, so a reader
+            // blocked on the channel (e.g. the drain-on-cancel consume loop reading with
+            // CancellationToken.None) is never left waiting forever.
+            if (sid != -1)
+                mgr?.RemoveFromRouting(sid);
 
-        // Remove from routing now that no more messages can arrive for this SID.
-        if (sid != -1)
-            mgr?.RemoveFromRouting(sid);
-
-        // Now it's safe to complete the channel, no more messages will arrive.
-        TryComplete();
+            TryComplete();
+        }
     }
 
     private async ValueTask WaitForReaderDrainCoreAsync(Task task, TimeSpan timeout)
