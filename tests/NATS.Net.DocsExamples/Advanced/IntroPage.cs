@@ -79,9 +79,9 @@ public class IntroPage
 
             NatsOpts opts = new NatsOpts
             {
-                // You need to set pending in the constructor and not use
-                // the option here, as it will be ignored.
-                SubPendingChannelFullMode = BoundedChannelFullMode.DropOldest,
+                // Set the subscriber channel overflow behavior here; it is
+                // respected by both NatsClient and NatsConnection.
+                SubPendingChannelFullMode = BoundedChannelFullMode.DropNewest,
 
                 // Your custom options
                 SerializerRegistry = new MyProtoBufSerializerRegistry(),
@@ -89,7 +89,7 @@ public class IntroPage
                 // ...
             };
 
-            await using NatsClient nc = new NatsClient(opts, pending: BoundedChannelFullMode.DropNewest);
+            await using NatsClient nc = new NatsClient(opts);
             #endregion
         }
 
