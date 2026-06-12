@@ -349,6 +349,21 @@ internal sealed class CommandWriter : IAsyncDisposable
             {
                 throw new NatsPayloadTooLargeException($"Payload size {size} exceeds server's maximum payload size {info.MaxPayload}");
             }
+
+            // Per OTel messaging semconv, messaging.client.published.messages counts publish
+            // attempts, not successful wire writes -- so we increment here, before the
+            // _semLock / _disposed / state-machine paths that might fail to enqueue.
+            // sent.bytes follows the same "attempted" convention for consistency. Operators
+            // wanting a "successfully published" view subtract operation.duration samples
+            // that carry an error.type tag.
+            if (Telemetry.PublishedMessages.Enabled || Telemetry.SentBytes.Enabled)
+            {
+                var tags = Telemetry.BuildMetricTags(_connection, Telemetry.Constants.OpPub);
+                if (Telemetry.PublishedMessages.Enabled)
+                    Telemetry.PublishedMessages.Add(1, tags);
+                if (Telemetry.SentBytes.Enabled)
+                    Telemetry.SentBytes.Add(size, tags);
+            }
         }
         catch
         {

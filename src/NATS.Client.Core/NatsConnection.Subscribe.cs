@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using NATS.Client.Core.Internal;
 
@@ -10,7 +11,9 @@ public partial class NatsConnection
     {
         // Validate synchronously before returning the async enumerable
         // so that invalid subjects throw immediately when SubscribeAsync is called
+#pragma warning disable CS0618 // SkipSubjectValidation is obsolete but still honored
         if (!Opts.SkipSubjectValidation)
+#pragma warning restore CS0618
         {
             SubjectValidator.ValidateSubject(subject);
             SubjectValidator.ValidateQueueGroup(queueGroup);
@@ -23,7 +26,9 @@ public partial class NatsConnection
     public ValueTask<INatsSub<T>> SubscribeCoreAsync<T>(string subject, string? queueGroup = default, INatsDeserialize<T>? serializer = default, NatsSubOpts? opts = default, CancellationToken cancellationToken = default)
     {
         // Validate synchronously so invalid subjects throw immediately
+#pragma warning disable CS0618 // SkipSubjectValidation is obsolete but still honored
         if (!Opts.SkipSubjectValidation)
+#pragma warning restore CS0618
         {
             SubjectValidator.ValidateSubject(subject);
             SubjectValidator.ValidateQueueGroup(queueGroup);
@@ -37,7 +42,24 @@ public partial class NatsConnection
         serializer ??= Opts.SerializerRegistry.GetDeserializer<T>();
 
         await using var sub = new NatsSub<T>(this, _subscriptionManager.GetManagerFor(subject), subject, queueGroup, opts, serializer, cancellationToken);
-        await AddSubAsync(sub, cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        var measure = Telemetry.OperationDuration.Enabled;
+        var start = measure ? Stopwatch.GetTimestamp() : 0L;
+        Exception? error = null;
+        try
+        {
+            await AddSubAsync(sub, cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            error = ex;
+            throw;
+        }
+        finally
+        {
+            if (measure)
+                Telemetry.RecordOperationDuration(start, this, Telemetry.Constants.OpSub, error);
+        }
 
         // We don't cancel the channel reader here because we want to keep reading until the subscription
         // channel writer completes so that messages left in the channel can be consumed before exit the loop.
@@ -51,7 +73,25 @@ public partial class NatsConnection
     {
         serializer ??= Opts.SerializerRegistry.GetDeserializer<T>();
         var sub = new NatsSub<T>(this, _subscriptionManager.GetManagerFor(subject), subject, queueGroup, opts, serializer, cancellationToken);
-        await AddSubAsync(sub, cancellationToken).ConfigureAwait(false);
+
+        var measure = Telemetry.OperationDuration.Enabled;
+        var start = measure ? Stopwatch.GetTimestamp() : 0L;
+        Exception? error = null;
+        try
+        {
+            await AddSubAsync(sub, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            error = ex;
+            throw;
+        }
+        finally
+        {
+            if (measure)
+                Telemetry.RecordOperationDuration(start, this, Telemetry.Constants.OpSub, error);
+        }
+
         return sub;
     }
 }

@@ -531,7 +531,7 @@ public class ServicesTests
         var cancellationToken = cts.Token;
 
         await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, SkipSubjectValidation = false });
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
         var svc = new NatsSvcContext(nats);
 
         await using var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
@@ -556,7 +556,7 @@ public class ServicesTests
         var cancellationToken = cts.Token;
 
         await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, SkipSubjectValidation = false });
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
         var svc = new NatsSvcContext(nats);
 
         await using var s1 = await svc.AddServiceAsync(

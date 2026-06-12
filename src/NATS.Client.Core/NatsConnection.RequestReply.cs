@@ -33,67 +33,86 @@ public partial class NatsConnection
         NatsSubOpts? replyOpts = default,
         CancellationToken cancellationToken = default)
     {
+#pragma warning disable CS0618 // SkipSubjectValidation is obsolete but still honored
         if (!Opts.SkipSubjectValidation)
+#pragma warning restore CS0618
         {
             SubjectValidator.ValidateSubject(subject);
         }
 
-        if (Telemetry.HasListeners())
+        var measure = Telemetry.OperationDuration.Enabled;
+        var start = measure ? Stopwatch.GetTimestamp() : 0L;
+        Exception? error = null;
+
+        try
         {
-            using var activity = Telemetry.StartSendActivity($"{SpanDestinationName(subject)} {Telemetry.Constants.RequestReplyActivityName}", this, subject, null);
-            try
+            if (Telemetry.HasListeners())
             {
-                replyOpts = SetReplyOptsDefaults(replyOpts);
-
-                if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
+                using var activity = Telemetry.StartSendActivity($"{SpanDestinationName(subject)} {Telemetry.Constants.RequestReplyActivityName}", this, subject, null);
+                try
                 {
-                    using var rt = _replyTaskFactory.CreateReplyTask(replySerializer, replyOpts.Timeout);
-                    requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
-                    await PublishAsync(subject, data, headers, rt.Subject, requestSerializer, requestOpts, cancellationToken).ConfigureAwait(false);
-                    var msg = await rt.GetResultAsync(cancellationToken).ConfigureAwait(false);
+                    replyOpts = SetReplyOptsDefaults(replyOpts);
 
-                    // Dispose activity from headers to avoid leaking it
-                    msg.Headers?.Activity?.Dispose();
+                    if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
+                    {
+                        using var rt = _replyTaskFactory.CreateReplyTask(replySerializer, replyOpts.Timeout);
+                        requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
+                        await PublishAsync(subject, data, headers, rt.Subject, requestSerializer, requestOpts, cancellationToken).ConfigureAwait(false);
+                        var msg = await rt.GetResultAsync(cancellationToken).ConfigureAwait(false);
 
-                    return msg;
+                        // Dispose activity from headers to avoid leaking it
+                        msg.Headers?.Activity?.Dispose();
+
+                        return msg;
+                    }
+
+                    await using var sub1 = await CreateRequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
+                        .ConfigureAwait(false);
+
+                    await foreach (var msg in sub1.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+                    {
+                        return msg;
+                    }
+
+                    throw new NatsNoReplyException();
                 }
-
-                await using var sub1 = await CreateRequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
-                    .ConfigureAwait(false);
-
-                await foreach (var msg in sub1.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+                catch (Exception e)
                 {
-                    return msg;
+                    Telemetry.SetException(activity, e);
+                    throw;
                 }
-
-                throw new NatsNoReplyException();
             }
-            catch (Exception e)
+
+            replyOpts = SetReplyOptsDefaults(replyOpts);
+
+            if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
             {
-                Telemetry.SetException(activity, e);
-                throw;
+                using var rt = _replyTaskFactory.CreateReplyTask(replySerializer, replyOpts.Timeout);
+                requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
+                await PublishAsync(subject, data, headers, rt.Subject, requestSerializer, requestOpts, cancellationToken).ConfigureAwait(false);
+                return await rt.GetResultAsync(cancellationToken).ConfigureAwait(false);
             }
+
+            await using var sub = await CreateRequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
+                .ConfigureAwait(false);
+
+            await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+            {
+                return msg;
+            }
+
+            throw new NatsNoReplyException();
         }
-
-        replyOpts = SetReplyOptsDefaults(replyOpts);
-
-        if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
+        catch (Exception ex)
         {
-            using var rt = _replyTaskFactory.CreateReplyTask(replySerializer, replyOpts.Timeout);
-            requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
-            await PublishAsync(subject, data, headers, rt.Subject, requestSerializer, requestOpts, cancellationToken).ConfigureAwait(false);
-            return await rt.GetResultAsync(cancellationToken).ConfigureAwait(false);
+            error = ex;
+            throw;
         }
-
-        await using var sub = await CreateRequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
-            .ConfigureAwait(false);
-
-        await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        finally
         {
-            return msg;
+            if (measure)
+                Telemetry.RecordOperationDuration(start, this, Telemetry.Constants.OpReq, error);
         }
-
-        throw new NatsNoReplyException();
     }
 
     /// <inheritdoc />
@@ -125,7 +144,9 @@ public partial class NatsConnection
     {
         // Validate synchronously before returning the async enumerable
         // so that invalid subjects throw immediately when RequestManyAsync is called
+#pragma warning disable CS0618 // SkipSubjectValidation is obsolete but still honored
         if (!Opts.SkipSubjectValidation)
+#pragma warning restore CS0618
         {
             SubjectValidator.ValidateSubject(subject);
         }

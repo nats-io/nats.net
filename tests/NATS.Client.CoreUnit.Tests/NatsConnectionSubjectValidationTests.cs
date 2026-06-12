@@ -1,6 +1,9 @@
 using System.Text;
 using NATS.Client.Core.Internal;
 
+// SkipSubjectValidation is obsolete but still honored; these tests exercise it on purpose.
+#pragma warning disable CS0618
+
 // ReSharper disable AccessToDisposedClosure
 namespace NATS.Client.CoreUnit.Tests;
 

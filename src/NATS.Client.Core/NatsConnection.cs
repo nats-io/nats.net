@@ -57,6 +57,10 @@ public partial class NatsConnection : INatsConnection
     private readonly HashSet<NatsSubBase> _drainParticipants = new();
 
     private ServerInfo? _writableServerInfo;
+    private KeyValuePair<string, object?>[]? _metricTagsPrefix;
+    private object? _boxedServerPort;
+    private string? _serverHost;
+    private string? _clientId;
     private int _pongCount;
     private int _connectionState;
     private int _isDisposed;
@@ -162,9 +166,50 @@ public partial class NatsConnection : INatsConnection
                 PushEvent(NatsEvent.LameDuckModeActivated, new NatsLameDuckModeActivatedEventArgs(_currentConnectUri!.Uri));
             }
 
+            KeyValuePair<string, object?>[]? prefix = null;
+            object? port = null;
+            string? host = null;
+            string? clientId = null;
+            if (value is not null)
+            {
+                // ServerInfo.Host/Port is the server's bind address (often 0.0.0.0); use the
+                // address the client actually dialled for OTel server.address/server.port.
+                var connectUri = _currentConnectUri;
+                host = connectUri?.Host ?? value.Host;
+                port = connectUri?.Port ?? value.Port;
+                clientId = value.ClientId.ToString();
+                prefix = new[]
+                {
+                    new KeyValuePair<string, object?>(Telemetry.Constants.SystemKey, Telemetry.Constants.SystemVal),
+                    new KeyValuePair<string, object?>(Telemetry.Constants.ServerAddress, host),
+                    new KeyValuePair<string, object?>(Telemetry.Constants.ServerPort, port),
+                    new KeyValuePair<string, object?>(Telemetry.Constants.NetworkProtoName, "nats"),
+                    new KeyValuePair<string, object?>(Telemetry.Constants.NetworkTransport, "tcp"),
+                };
+            }
+
+            // Cache the trace-tag host, boxed port and client id once per ServerInfo change so the
+            // per-message trace path can reuse them instead of re-boxing the port and re-allocating
+            // the client id string on every message. Host and port come from the connect URI, so the
+            // trace and metric tags now share the same source.
+            Volatile.Write(ref _boxedServerPort, port);
+            Volatile.Write(ref _serverHost, host);
+            Volatile.Write(ref _clientId, clientId);
+
+            // Publish the cached fields before ServerInfo so any reader observing the new ServerInfo
+            // is guaranteed to also observe the matching tags.
+            Volatile.Write(ref _metricTagsPrefix, prefix);
             Interlocked.Exchange(ref _writableServerInfo, value);
         }
     }
+
+    internal KeyValuePair<string, object?>[]? MetricTagsPrefix => Volatile.Read(ref _metricTagsPrefix);
+
+    internal object? BoxedServerPort => Volatile.Read(ref _boxedServerPort);
+
+    internal string? ServerHost => Volatile.Read(ref _serverHost);
+
+    internal string? ClientId => Volatile.Read(ref _clientId);
 
     internal bool IsDisposed
     {
@@ -839,18 +884,23 @@ public partial class NatsConnection : INatsConnection
                 goto CONNECT_AGAIN;
             }
 
+            bool emitReconnect;
             lock (_gate)
             {
                 _connectRetry = 0;
                 _backoff = TimeSpan.Zero;
                 _logger.LogInformation(NatsLogEvents.Connection, "Connection succeeded {Name}, NATS {Url} [{ReconnectCount}]", _name, url, reconnectCount);
                 ConnectionState = NatsConnectionState.Open;
+                emitReconnect = Telemetry.Reconnects.Enabled;
                 _pingTimerCancellationTokenSource = new CancellationTokenSource();
                 StartPingTimer(_pingTimerCancellationTokenSource.Token);
                 _waitForOpenConnection.TrySetResult();
                 _reconnectLoopTask = Task.Run(ReconnectLoop);
                 PushEvent(NatsEvent.ConnectionOpened, new NatsEventArgs(url.ToString()));
             }
+
+            if (emitReconnect)
+                Telemetry.Reconnects.Add(1, Telemetry.BuildMetricTags(this, Telemetry.Constants.OpReconnect));
         }
         catch (Exception ex)
         {
