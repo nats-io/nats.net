@@ -183,7 +183,10 @@ public class OpenTelemetryTest
     {
         using var meter = new MeterTracker();
         await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        // SharedInbox so the connection doesn't open an inbox subscription at connect,
+        // which would itself count as an active subscription and offset the sums below.
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestReplyMode = NatsRequestReplyMode.SharedInbox });
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 

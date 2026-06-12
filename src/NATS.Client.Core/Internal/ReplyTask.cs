@@ -17,12 +17,13 @@ internal sealed class ReplyTask<T> : ReplyTaskBase, IDisposable
     private readonly NatsConnection _connection;
     private readonly INatsDeserialize<T> _deserializer;
     private readonly TimeSpan _requestTimeout;
+    private readonly bool _throwIfNoResponders;
     private readonly TaskCompletionSource _tcs;
     private NatsMsg<T> _msg;
     private long _replyBytes;
     private bool _isNoResponders;
 
-    public ReplyTask(ReplyTaskFactory factory, long id, string subject, NatsConnection connection, INatsDeserialize<T> deserializer, TimeSpan requestTimeout)
+    public ReplyTask(ReplyTaskFactory factory, long id, string subject, NatsConnection connection, INatsDeserialize<T> deserializer, TimeSpan requestTimeout, bool throwIfNoResponders)
     {
         _factory = factory;
         _id = id;
@@ -30,6 +31,7 @@ internal sealed class ReplyTask<T> : ReplyTaskBase, IDisposable
         _connection = connection;
         _deserializer = deserializer;
         _requestTimeout = TimeoutValidation.Validate(requestTimeout, nameof(requestTimeout), Timeout.InfiniteTimeSpan);
+        _throwIfNoResponders = throwIfNoResponders;
         _tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 #if NET9_0_OR_GREATER
         _gate = new System.Threading.Lock();
@@ -61,6 +63,13 @@ internal sealed class ReplyTask<T> : ReplyTaskBase, IDisposable
             msg = _msg;
             bytes = _replyBytes;
             isNoResponders = _isNoResponders;
+        }
+
+        // Match the SharedInbox path: when ThrowIfNoResponders is set, a 503 sentinel
+        // surfaces as NatsNoRespondersException rather than an empty message.
+        if (isNoResponders && _throwIfNoResponders)
+        {
+            throw new NatsNoRespondersException();
         }
 
         // Count only messages actually delivered to the caller. Late replies that arrive
@@ -123,7 +132,7 @@ internal sealed class ReplyTaskFactory
         _replies = new ConcurrentDictionary<long, ReplyTaskBase>();
     }
 
-    public ReplyTask<TReply> CreateReplyTask<TReply>(INatsDeserialize<TReply>? deserializer, TimeSpan? requestTimeout)
+    public ReplyTask<TReply> CreateReplyTask<TReply>(INatsDeserialize<TReply>? deserializer, TimeSpan? requestTimeout, bool throwIfNoResponders)
     {
         deserializer ??= _serializerRegistry.GetDeserializer<TReply>();
         var id = Interlocked.Increment(ref _nextId);
@@ -149,7 +158,7 @@ internal sealed class ReplyTaskFactory
             subject = _inboxPrefixString + id;
         }
 
-        var rt = new ReplyTask<TReply>(this, id, subject, _connection, deserializer, requestTimeout ?? _requestTimeout);
+        var rt = new ReplyTask<TReply>(this, id, subject, _connection, deserializer, requestTimeout ?? _requestTimeout, throwIfNoResponders);
         _replies.TryAdd(id, rt);
         return rt;
     }

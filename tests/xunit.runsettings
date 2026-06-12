@@ -4,6 +4,9 @@
         <TestSessionTimeout>600000</TestSessionTimeout>
     </RunConfiguration>
     <xUnit>
-        <MaxParallelThreads>1.0x</MaxParallelThreads>
+        <!-- Run test collections serially. Some suites assert on process-global state
+             (e.g. telemetry ActivityListener/MeterListener), where parallel collections
+             cross-contaminate and produce false positives. -->
+        <ParallelizeTestCollections>false</ParallelizeTestCollections>
     </xUnit>
 </RunSettings>

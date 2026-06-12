@@ -31,7 +31,10 @@ public class SubscriptionTest
     {
         await using var server = await NatsServerProcess.StartAsync();
         var proxy = new NatsProxy(server.Port);
-        var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}", SubscriptionCleanUpInterval = TimeSpan.FromSeconds(1) });
+
+        // SharedInbox so the connection doesn't open an inbox subscription at connect,
+        // which would make the SUB frame count below never settle at 1.
+        var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}", SubscriptionCleanUpInterval = TimeSpan.FromSeconds(1), RequestReplyMode = NatsRequestReplyMode.SharedInbox });
 
         async Task Isolator()
         {
@@ -68,7 +71,10 @@ public class SubscriptionTest
     {
         await using var server = await NatsServerProcess.StartAsync();
         var proxy = new NatsProxy(server.Port);
-        var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}", SubscriptionCleanUpInterval = TimeSpan.MaxValue });
+
+        // SharedInbox so the connection doesn't open an inbox subscription at connect,
+        // which would make the SUB frame count below never settle at 1.
+        var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}", SubscriptionCleanUpInterval = TimeSpan.MaxValue, RequestReplyMode = NatsRequestReplyMode.SharedInbox });
 
         async Task Isolator()
         {
