@@ -1254,7 +1254,7 @@ public partial class NatsConnection : INatsConnection
 
         var tasks = new Task[remaining.Length];
         for (var i = 0; i < remaining.Length; i++)
-            tasks[i] = remaining[i].DrainAsync().AsTask();
+            tasks[i] = remaining[i].DrainOnDisposeAsync().AsTask();
 
         return new ValueTask(Task.WhenAll(tasks));
     }

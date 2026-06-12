@@ -197,14 +197,15 @@ public sealed record NatsOpts
     public TimeSpan? ConsumerDrainOnDisposeTimeout { get; init; } = null;
 
     /// <summary>
-    /// Per-subscription PING/PONG timeout used during drain on dispose.
+    /// Per-subscription PING/PONG timeout used during drain.
     /// (default: 5 seconds)
     /// </summary>
     /// <remarks>
     /// Bounds how long drain will wait for the server to ack the UNSUB before
     /// completing the user channel anyway. Increase for high-latency networks
-    /// where a single round-trip can exceed the default. Only effective when
-    /// <see cref="DrainSubscriptionsOnDispose"/> is true.
+    /// where a single round-trip can exceed the default. Applies both to drain on
+    /// dispose (when <see cref="DrainSubscriptionsOnDispose"/> is true) and to the
+    /// explicit per-subscription drain API.
     /// </remarks>
     public TimeSpan DrainPingTimeout { get; init; } = TimeSpan.FromSeconds(5);
 

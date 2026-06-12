@@ -50,6 +50,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
     private long _pendingMsgs;
     private long _pendingBytes;
     private int _consecutive503Errors;
+    private volatile bool _draining;
 
     public NatsJSConsume(
         long maxMsgs,
@@ -114,6 +115,13 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
             static state =>
             {
                 var self = (NatsJSConsume<TMsg>)state!;
+
+                // A drain is completing the subscription behind a PING/PONG fence. Don't let
+                // the heartbeat callback complete the channel (CompleteStop) and skip the
+                // fence, which would drop in-flight messages the drain is meant to preserve.
+                if (self._draining)
+                    return;
+
                 self._notificationChannel?.Notify(NatsJSTimeoutNotification.Default);
 
                 if (self._cancellationToken.IsCancellationRequested)
@@ -198,7 +206,15 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
 
     public void StopHeartbeatTimer() => _timer.Change(Timeout.Infinite, Timeout.Infinite);
 
-    public void ResetHeartbeatTimer() => _timer.Change(_hbTimeout, _hbTimeout);
+    public void ResetHeartbeatTimer()
+    {
+        // Once draining, the heartbeat timer stays stopped so it can't re-arm and complete
+        // the channel ahead of the drain fence.
+        if (_draining)
+            return;
+
+        _timer.Change(_hbTimeout, _hbTimeout);
+    }
 
     public void Delivered(int msgSize)
     {
@@ -222,7 +238,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
     {
         try
         {
-            await DrainAsync().ConfigureAwait(false);
+            await DrainOnDisposeAsync().ConfigureAwait(false);
             await base.DisposeAsync().ConfigureAwait(false);
         }
         finally
@@ -297,6 +313,15 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
 
             ResetPending();
         }
+    }
+
+    protected override void StopDelivery()
+    {
+        // Mark draining first so the heartbeat callback, its re-arm, and CompleteStop
+        // defer to the drain fence, then stop the timer so it can't pull or complete the
+        // channel during the drain.
+        _draining = true;
+        StopHeartbeatTimer();
     }
 
     protected override async ValueTask ReceiveInternalAsync(
@@ -529,6 +554,12 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
             state =>
             {
                 var self = (NatsJSConsume<TMsg>)state!;
+
+                // If a drain started after this stop was queued, leave completion to the
+                // drain fence rather than dropping in-flight messages here.
+                if (self._draining)
+                    return;
+
                 self._userMsgs.Writer.TryComplete();
                 self.EndSubscription(NatsSubEndReason.None);
             },

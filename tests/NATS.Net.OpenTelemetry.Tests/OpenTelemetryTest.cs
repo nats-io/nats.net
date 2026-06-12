@@ -298,9 +298,22 @@ public class OpenTelemetryTest
         await nats.ReconnectAsync();
         await openedTwice.Task.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var reconnects = meter.LongMeasurements
-            .Where(m => m.Name == "nats.client.reconnects")
-            .ToList();
+        // The reconnects counter is incremented just after the ConnectionOpened event is
+        // queued, so the measurement can land slightly after the event we awaited. Poll
+        // for it rather than reading once and racing the increment.
+        List<(string Name, long Value, KeyValuePair<string, object?>[] Tags)> reconnects = new();
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        while (DateTime.UtcNow < deadline)
+        {
+            reconnects = meter.LongMeasurements
+                .Where(m => m.Name == "nats.client.reconnects")
+                .ToList();
+
+            if (reconnects.Count > 0)
+                break;
+
+            await Task.Delay(25);
+        }
 
         reconnects.Sum(m => m.Value).Should().Be(1);
 
@@ -539,6 +552,9 @@ public class OpenTelemetryTest
     private sealed class MeterTracker : IDisposable
     {
         private readonly MeterListener _listener;
+        private readonly object _sync = new();
+        private readonly List<(string Name, long Value, KeyValuePair<string, object?>[] Tags)> _longMeasurements = new();
+        private readonly List<(string Name, double Value, KeyValuePair<string, object?>[] Tags)> _doubleMeasurements = new();
 
         public MeterTracker()
         {
@@ -551,17 +567,39 @@ public class OpenTelemetryTest
                 },
             };
 
+            // Measurement callbacks fire on background threads (e.g. the reconnect loop),
+            // so guard the lists and hand out snapshots to readers.
             _listener.SetMeasurementEventCallback<long>((inst, val, tags, _) =>
-                LongMeasurements.Add((inst.Name, val, tags.ToArray())));
+            {
+                lock (_sync)
+                    _longMeasurements.Add((inst.Name, val, tags.ToArray()));
+            });
             _listener.SetMeasurementEventCallback<double>((inst, val, tags, _) =>
-                DoubleMeasurements.Add((inst.Name, val, tags.ToArray())));
+            {
+                lock (_sync)
+                    _doubleMeasurements.Add((inst.Name, val, tags.ToArray()));
+            });
 
             _listener.Start();
         }
 
-        public List<(string Name, long Value, KeyValuePair<string, object?>[] Tags)> LongMeasurements { get; } = new();
+        public IReadOnlyList<(string Name, long Value, KeyValuePair<string, object?>[] Tags)> LongMeasurements
+        {
+            get
+            {
+                lock (_sync)
+                    return _longMeasurements.ToArray();
+            }
+        }
 
-        public List<(string Name, double Value, KeyValuePair<string, object?>[] Tags)> DoubleMeasurements { get; } = new();
+        public IReadOnlyList<(string Name, double Value, KeyValuePair<string, object?>[] Tags)> DoubleMeasurements
+        {
+            get
+            {
+                lock (_sync)
+                    return _doubleMeasurements.ToArray();
+            }
+        }
 
         public void Dispose() => _listener.Dispose();
     }
