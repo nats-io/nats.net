@@ -77,10 +77,10 @@ public class NatsHostingExtensionsTests
 
         Assert.Same(NullLoggerFactory.Instance, nats.Opts.LoggerFactory);
 
-        // These defaults are different from NatsOptions defaults but same as NatsClient defaults
-        // for ease of use for new users
+        // The serializer registry default matches NatsClient (JSON) for ease of use for new users.
+        // The overflow mode inherits the NatsOpts default (DropNewest), same as NatsClient and NatsConnection.
         Assert.Same(NatsClientDefaultSerializerRegistry.Default, nats.Opts.SerializerRegistry);
-        Assert.Equal(BoundedChannelFullMode.Wait, nats.Opts.SubPendingChannelFullMode);
+        Assert.Equal(BoundedChannelFullMode.DropNewest, nats.Opts.SubPendingChannelFullMode);
 
         return Task.CompletedTask;
     }
@@ -123,8 +123,8 @@ public class NatsHostingExtensionsTests
 
         Assert.Same(mySerializerRegistry, nats.Opts.SerializerRegistry);
 
-        // You can only override this using .WithSubPendingChannelFullMode() on builder above
-        Assert.Equal(BoundedChannelFullMode.Wait, nats.Opts.SubPendingChannelFullMode);
+        // Inherits the NatsOpts default; override with .WithSubPendingChannelFullMode() on builder above
+        Assert.Equal(BoundedChannelFullMode.DropNewest, nats.Opts.SubPendingChannelFullMode);
 
         return Task.CompletedTask;
     }
@@ -146,8 +146,8 @@ public class NatsHostingExtensionsTests
 
         Assert.Same(mySerializerRegistry, nats.Opts.SerializerRegistry);
 
-        // You can only override this using .WithSubPendingChannelFullMode() on builder above
-        Assert.Equal(BoundedChannelFullMode.Wait, nats.Opts.SubPendingChannelFullMode);
+        // Inherits the NatsOpts default; override with .WithSubPendingChannelFullMode() on builder above
+        Assert.Equal(BoundedChannelFullMode.DropNewest, nats.Opts.SubPendingChannelFullMode);
 
         return Task.CompletedTask;
     }

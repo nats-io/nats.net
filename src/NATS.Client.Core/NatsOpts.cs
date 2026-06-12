@@ -234,9 +234,9 @@ public sealed record NatsOpts
 
     /// <summary>
     /// This value will be used for subscriptions internal bounded message channel capacity.
-    /// The default subscriber pending message limit is 1024.
+    /// The default subscriber pending message limit is 16384.
     /// </summary>
-    public int SubPendingChannelCapacity { get; init; } = 1024;
+    public int SubPendingChannelCapacity { get; init; } = 16384;
 
     /// <summary>
     /// This value will be used for subscriptions internal bounded message channel <c>FullMode</c>.

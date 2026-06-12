@@ -1,4 +1,3 @@
-using System.Threading.Channels;
 using NATS.Client.Core;
 
 namespace NATS.Net;
@@ -40,7 +39,6 @@ public class NatsClient : INatsClient
             Name = name,
             Url = url,
             SerializerRegistry = NatsClientDefaultSerializerRegistry.Default,
-            SubPendingChannelFullMode = BoundedChannelFullMode.Wait,
             AuthOpts = new NatsAuthOpts { CredsFile = credsFile },
         };
 
@@ -51,13 +49,11 @@ public class NatsClient : INatsClient
     /// Initializes a new instance of the <see cref="NatsClient"/> class.
     /// </summary>
     /// <param name="opts">NATS client options.</param>
-    /// <param name="pending">Sets `SubPendingChannelFullMode` option. (default: wait)</param>
     /// <remarks>
     /// By default, the <paramref name="opts"/> will be merged with the default options
-    /// overriding SerializationRegistry with <see cref="NatsClientDefaultSerializerRegistry.Default"/>
-    /// and SubPendingChannelFullMode with <see cref="BoundedChannelFullMode.Wait"/>.
+    /// overriding SerializationRegistry with <see cref="NatsClientDefaultSerializerRegistry.Default"/>.
     /// </remarks>
-    public NatsClient(NatsOpts opts, BoundedChannelFullMode pending = BoundedChannelFullMode.Wait)
+    public NatsClient(NatsOpts opts)
     {
         if (ReferenceEquals(opts.SerializerRegistry, NatsOpts.Default.SerializerRegistry))
         {
@@ -66,8 +62,6 @@ public class NatsClient : INatsClient
                 SerializerRegistry = NatsClientDefaultSerializerRegistry.Default,
             };
         }
-
-        opts = opts with { SubPendingChannelFullMode = pending };
 
         Connection = new NatsConnection(opts);
     }
