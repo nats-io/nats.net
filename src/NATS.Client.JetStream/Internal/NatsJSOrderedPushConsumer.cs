@@ -182,11 +182,11 @@ internal class NatsJSOrderedPushConsumer<T>
         // by now, so no new subscription can be created. Without this the sub's
         // ConnectionOpened handler stays attached to the connection, rooting the
         // sub for the connection's lifetime (memory leak).
+        // DisposeAsync unsubscribes internally, so a single call covers both.
         var sub = _sub;
         if (sub != null)
         {
-            await sub.UnsubscribeAsync();
-            await sub.DisposeAsync();
+            await sub.DisposeAsync().ConfigureAwait(false);
         }
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(_cancellationToken);
