@@ -1,6 +1,8 @@
 using System.Diagnostics;
+using System.Reflection;
 using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
+using NATS.Client.JetStream.Internal;
 using NATS.Client.Platform.Windows.Tests;
 using NATS.Client.TestUtilities2;
 
@@ -50,6 +52,67 @@ public class OrderedConsumerTest
             if (++count == 10)
                 break;
         }
+    }
+
+    [Fact]
+    public async Task Push_consumer_dispose_unhooks_connection_opened_handler()
+    {
+        // Regression test: NatsJSOrderedPushConsumerSub hooks NatsConnection.ConnectionOpened
+        // in its constructor. The last subscription created by an ordered push consumer was never
+        // disposed on the consumer's own DisposeAsync, leaking that handler (and everything it
+        // captured) for the lifetime of the connection. Verify the handler count returns to its
+        // baseline after each consumer is disposed.
+        await using var nats = _server.CreateNatsConnection();
+        await nats.ConnectRetryAsync();
+        var prefix = _server.GetNextId();
+
+        var js = new NatsJSContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
+
+        var eventField = typeof(NatsConnection).GetField(
+            nameof(NatsConnection.ConnectionOpened),
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        Assert.NotNull(eventField);
+
+        int HandlerCount()
+        {
+            var del = (Delegate?)eventField!.GetValue(nats);
+            return del?.GetInvocationList().Length ?? 0;
+        }
+
+        var baseline = HandlerCount();
+
+        for (var i = 0; i < 5; i++)
+        {
+            await using (var pushConsumer = new NatsJSOrderedPushConsumer<int>(
+                             context: js,
+                             stream: $"{prefix}s1",
+                             filter: $"{prefix}s1.*",
+                             serializer: NatsDefaultSerializer<int>.Default,
+                             opts: new NatsJSOrderedPushConsumerOpts(),
+                             subOpts: new NatsSubOpts(),
+                             cancellationToken: cts.Token))
+            {
+                pushConsumer.Init();
+
+                // Wait until the subscription is actually created and its handler is hooked.
+                await Retry.Until(
+                    "connection opened handler hooked",
+                    () => HandlerCount() > baseline,
+                    timeout: TimeSpan.FromSeconds(10));
+            }
+
+            // After dispose the handler must be unhooked again.
+            await Retry.Until(
+                "connection opened handler unhooked",
+                () => HandlerCount() == baseline,
+                timeout: TimeSpan.FromSeconds(10));
+        }
+
+        Assert.Equal(baseline, HandlerCount());
     }
 
     [Fact]
