@@ -158,6 +158,12 @@ internal class NatsJSOrderedPushConsumer<T>
 
         _msgChannel.Writer.TryComplete();
 
+        if (_sub is { } sub)
+        {
+            await sub.UnsubscribeAsync();
+            await sub.DisposeAsync();
+        }
+
         await _context.DeleteConsumerAsync(_stream, Consumer, _cancellationToken);
     }
 
