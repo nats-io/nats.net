@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using NATS.Client.Core.Tests;
@@ -662,5 +663,41 @@ public class ObjectStoreTest
         uint chunks = info.Chunks; // Should compile without error
 #pragma warning restore IDE0007
         Assert.Equal(1U, chunks);
+    }
+
+    [Fact]
+    public async Task Get_does_not_leak_connection_opened_handlers()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        var js = new NatsJSContext(nats);
+        var ob = new NatsObjContext(js);
+
+        var store = await ob.CreateObjectStoreAsync(new NatsObjConfig("b1"), cancellationToken);
+        await store.PutAsync("k1", new byte[] { 1, 2, 3 }, cancellationToken: cancellationToken);
+
+        // The ordered push consumer created per GetAsync registers a ConnectionOpened
+        // handler that must be removed when the consumer is disposed. If it is not, the
+        // handler (and the subscription it roots) leaks for the connection's lifetime.
+        var baseline = ConnectionOpenedHandlerCount(nats);
+
+        for (var i = 0; i < 10; i++)
+        {
+            var bytes = await store.GetBytesAsync("k1", cancellationToken);
+            Assert.Equal(new byte[] { 1, 2, 3 }, bytes);
+        }
+
+        Assert.Equal(baseline, ConnectionOpenedHandlerCount(nats));
+    }
+
+    private static int ConnectionOpenedHandlerCount(NatsConnection nats)
+    {
+        var field = typeof(NatsConnection).GetField("ConnectionOpened", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        var handler = (Delegate?)field.GetValue(nats);
+        return handler?.GetInvocationList().Length ?? 0;
     }
 }
