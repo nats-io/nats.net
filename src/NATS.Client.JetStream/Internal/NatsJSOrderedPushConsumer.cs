@@ -178,6 +178,17 @@ internal class NatsJSOrderedPushConsumer<T>
 
         _msgChannel.Writer.TryComplete();
 
+        // Dispose the current subscription. Both background loops have completed
+        // by now, so no new subscription can be created. Without this the sub's
+        // ConnectionOpened handler stays attached to the connection, rooting the
+        // sub for the connection's lifetime (memory leak).
+        var sub = _sub;
+        if (sub != null)
+        {
+            await sub.UnsubscribeAsync();
+            await sub.DisposeAsync();
+        }
+
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(_cancellationToken);
         cts.CancelAfter(_opts.CleanupTimeout);
         try
