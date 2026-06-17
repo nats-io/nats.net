@@ -46,6 +46,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
     private long _pendingMsgs;
     private long _pendingBytes;
     private int _consecutive503Errors;
+    private int _timeoutNotified;
 
     public NatsJSConsume(
         long maxMsgs,
@@ -110,7 +111,10 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
             static state =>
             {
                 var self = (NatsJSConsume<TMsg>)state!;
-                self._notificationChannel?.Notify(NatsJSTimeoutNotification.Default);
+                if (Interlocked.Exchange(ref self._timeoutNotified, 1) == 0)
+                {
+                    self._notificationChannel?.Notify(NatsJSTimeoutNotification.Default);
+                }
 
                 if (self._cancellationToken.IsCancellationRequested)
                 {
@@ -194,7 +198,11 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
 
     public void StopHeartbeatTimer() => _timer.Change(Timeout.Infinite, Timeout.Infinite);
 
-    public void ResetHeartbeatTimer() => _timer.Change(_hbTimeout, _hbTimeout);
+    public void ResetHeartbeatTimer()
+    {
+        Interlocked.Exchange(ref _timeoutNotified, 0);
+        _timer.Change(_hbTimeout, _hbTimeout);
+    }
 
     public void Delivered(int msgSize)
     {
