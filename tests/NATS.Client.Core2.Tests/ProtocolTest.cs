@@ -486,7 +486,7 @@ public class ProtocolTest
             }
         }
 
-        protected override ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
+        protected override ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte> headersBuffer, ReadOnlySequence<byte> payloadBuffer)
         {
             _callback(int.Parse(Encoding.UTF8.GetString(payloadBuffer.ToArray())));
             DecrementMaxMsgs();

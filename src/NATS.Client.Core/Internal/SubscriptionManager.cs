@@ -88,7 +88,7 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
         return SubscribeInternalAsync(sub.Subject, sub.QueueGroup, sub.Opts, sub, cancellationToken);
     }
 
-    public ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte>? headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
+    public ValueTask PublishToClientHandlersAsync(string subject, string? replyTo, int sid, in ReadOnlySequence<byte> headersBuffer, in ReadOnlySequence<byte> payloadBuffer)
     {
         if (_trace)
         {
