@@ -23,10 +23,14 @@ Check("INatsSerializerRegistry", "NATS.Client.Abstractions", typeof(INatsSeriali
 Check("INatsSerializeWithContext<>", "NATS.Client.Abstractions", typeof(INatsSerializeWithContext<>).Assembly.GetName().Name!);
 Check("INatsDeserializeWithContext<>", "NATS.Client.Abstractions", typeof(INatsDeserializeWithContext<>).Assembly.GetName().Name!);
 Check("NatsMsgContext", "NATS.Client.Abstractions", typeof(NatsMsgContext).Assembly.GetName().Name!);
+Check("INatsSocketConnection", "NATS.Client.Abstractions", typeof(INatsSocketConnection).Assembly.GetName().Name!);
+Check("INatsTlsUpgradeableSocketConnection", "NATS.Client.Abstractions", typeof(INatsTlsUpgradeableSocketConnection).Assembly.GetName().Name!);
 Console.WriteLine();
 
 Console.WriteLine("Types as seen by TransientLib (compiled against 2.6.0):");
 Check("INatsSerialize<> (transient)", "NATS.Client.Abstractions", MySerializer.GetSerializerInterfaceAssembly());
+Check("INatsSocketConnection (transient)", "NATS.Client.Abstractions", MySocketConnection.GetSocketConnectionInterfaceAssembly());
+Check("INatsTlsUpgradeableSocketConnection (transient)", "NATS.Client.Abstractions", MySocketConnection.GetTlsUpgradeableInterfaceAssembly());
 Console.WriteLine();
 
 Console.WriteLine("Assembly versions at runtime:");
@@ -51,6 +55,16 @@ var deserialized = serializer.Deserialize(new ReadOnlySequence<byte>(buffer.Writ
 Console.WriteLine($"  Deserialized: '{deserialized}'");
 if (deserialized != "hello from transient dependency")
     errors.Add($"Round-trip failed: got '{deserialized}'");
+
+Console.WriteLine();
+
+Console.WriteLine("Testing TransientLib.MySocketConnection (compiled against 2.6.0):");
+INatsSocketConnection connection = new MySocketConnection();
+var sent = await connection.SendAsync(new ReadOnlyMemory<byte>(new byte[7]));
+Console.WriteLine($"  SendAsync reported {sent} bytes");
+if (sent != 7)
+    errors.Add($"SendAsync failed: got {sent}");
+await connection.DisposeAsync();
 
 Console.WriteLine();
 
