@@ -479,6 +479,81 @@ public class OpenTelemetryTest
         tags.Should().NotContainKey("error.type");
     }
 
+    [Fact]
+    public async Task Dropped_messages_counter()
+    {
+        using var meter = new MeterTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts
+        {
+            Url = server.Url,
+            SubPendingChannelCapacity = 3,
+        });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cancellationToken = cts.Token;
+
+        var dropped = 0;
+        nats.MessageDropped += (_, _) =>
+        {
+            Interlocked.Increment(ref dropped);
+            return default;
+        };
+
+        var sync = 0;
+        var signal = new WaitSignal();
+
+        // Block the consumer after the sync message so the bounded channel overflows.
+        var subscription = Task.Run(
+            async () =>
+            {
+                await foreach (var msg in nats.SubscribeAsync<string>("drop.>", cancellationToken: cancellationToken))
+                {
+                    if (msg.Subject == "drop.sync")
+                    {
+                        Interlocked.Increment(ref sync);
+                        await signal;
+                        continue;
+                    }
+
+                    if (msg.Subject == "drop.end")
+                    {
+                        break;
+                    }
+                }
+            },
+            cancellationToken);
+
+        await Retry.Until(
+            "subscription is ready",
+            () => Volatile.Read(ref sync) > 0,
+            async () => await nats.PublishAsync("drop.sync", cancellationToken: cancellationToken));
+
+        for (var i = 0; i < 20; i++)
+        {
+            await nats.PublishAsync("drop.data", $"msg{i}", cancellationToken: cancellationToken);
+        }
+
+        await Retry.Until("messages are dropped", () => Volatile.Read(ref dropped) > 0);
+
+        signal.Pulse();
+        await Retry.Until(
+            "subscription ended",
+            () => subscription.IsCompleted,
+            async () => await nats.PublishAsync("drop.end", cancellationToken: cancellationToken));
+        await subscription;
+
+        var droppedMeasurements = meter.LongMeasurements
+            .Where(m => m.Name == "nats.client.messages.dropped")
+            .ToList();
+
+        droppedMeasurements.Sum(m => m.Value).Should().BeGreaterThan(0);
+
+        var tags = droppedMeasurements[0].Tags.ToDictionary(t => t.Key, t => t.Value);
+        tags.Should().ContainKey("messaging.system").WhoseValue.Should().Be("nats");
+        tags.Should().ContainKey("messaging.operation").WhoseValue.Should().Be("receive");
+    }
+
     private void AssertActivityData(string subject, IReadOnlyList<Activity> activityList, string expectedHost, string expectedClientId)
     {
         var activities = activityList.ToArray();

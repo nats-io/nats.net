@@ -42,6 +42,13 @@ internal static class Telemetry
     public static readonly Counter<long> ReceivedBytes =
         NatsMeter.CreateCounter<long>("nats.client.received.bytes", unit: "By");
 
+    // No messaging semantic convention covers drops, so this is a deliberately NATS-specific
+    // metric. Shares the consumed.messages tag set (messaging.operation=receive) so it correlates
+    // with the rest of the receive-path signals. Pending channel depth at drop time is not added
+    // as a tag because its value is unbounded; it stays available on the MessageDropped event.
+    public static readonly Counter<long> DroppedMessages =
+        NatsMeter.CreateCounter<long>("nats.client.messages.dropped", unit: "{message}");
+
     private static readonly object BoxedTrue = true;
 
     /// <summary>
