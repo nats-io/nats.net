@@ -554,6 +554,53 @@ public class OpenTelemetryTest
         tags.Should().ContainKey("messaging.operation").WhoseValue.Should().Be("receive");
     }
 
+    [Fact]
+    public async Task Inbox_subjects_collapsed_in_trace_tags()
+    {
+        using var tracker = new ActivityTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var sub = await nats.SubscribeCoreAsync<int>("foo.inbox", cancellationToken: cts.Token);
+        var reg = sub.Register(async msg => await msg.ReplyAsync(msg.Data * 2, cancellationToken: cts.Token));
+
+        var reply = await nats.RequestAsync<int, int>("foo.inbox", 21, cancellationToken: cts.Token);
+        reply.Data.Should().Be(42);
+
+        // The request's reply-to is an inbox; it must be collapsed to "inbox" rather than
+        // emitting the unique _INBOX.<nuid> value that would blow up backend tag cardinality.
+        var replyToTags = tracker.Started
+            .Select(a => a.GetTagItem("messaging.nats.message.reply_to") as string)
+            .Where(v => v is not null)
+            .ToList();
+
+        replyToTags.Should().NotBeEmpty();
+        replyToTags.Should().AllSatisfy(v => v.Should().Be("inbox"));
+
+        // No high-cardinality tag should leak a raw inbox subject.
+        string[] cardinalityTags =
+        [
+            "messaging.destination.name",
+            "messaging.destination_publish.name",
+            "messaging.nats.message.subject",
+            "messaging.nats.message.reply_to",
+        ];
+
+        foreach (var activity in tracker.Started)
+        {
+            foreach (var tag in cardinalityTags)
+            {
+                if (activity.GetTagItem(tag) is string value)
+                    value.Should().NotStartWith("_INBOX", $"{tag} should not carry a raw inbox subject");
+            }
+        }
+
+        await sub.DisposeAsync();
+        await reg;
+    }
+
     private void AssertActivityData(string subject, IReadOnlyList<Activity> activityList, string expectedHost, string expectedClientId)
     {
         var activities = activityList.ToArray();

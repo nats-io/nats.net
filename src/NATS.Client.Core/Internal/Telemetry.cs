@@ -151,7 +151,7 @@ internal static class Telemetry
             tags = new KeyValuePair<string, object?>[len];
             tags[0] = new KeyValuePair<string, object?>(Constants.SystemKey, Constants.SystemVal);
             tags[1] = new KeyValuePair<string, object?>(Constants.OpKey, Constants.OpPub);
-            tags[2] = new KeyValuePair<string, object?>(Constants.DestName, subject);
+            tags[2] = new KeyValuePair<string, object?>(Constants.DestName, LowCardinalitySubject(conn, subject));
 
             tags[3] = new KeyValuePair<string, object?>(Constants.ClientId, conn.ClientId);
             tags[4] = new KeyValuePair<string, object?>(Constants.ServerAddress, serverHost);
@@ -163,7 +163,7 @@ internal static class Telemetry
             tags[10] = new KeyValuePair<string, object?>(Constants.NetworkLocalAddress, conn.ServerInfo.ClientIp);
 
             if (replyTo is not null)
-                tags[11] = new KeyValuePair<string, object?>(Constants.ReplyTo, replyTo);
+                tags[11] = new KeyValuePair<string, object?>(Constants.ReplyTo, LowCardinalitySubject(conn, replyTo));
         }
         else
         {
@@ -260,9 +260,10 @@ internal static class Telemetry
             tags[1] = new KeyValuePair<string, object?>(Constants.OpKey, Constants.OpRec);
             tags[2] = new KeyValuePair<string, object?>(Constants.DestTemplate, subscriptionSubject);
             tags[3] = new KeyValuePair<string, object?>(Constants.DestIsTemporary, subscriptionSubject.StartsWith(conn.InboxPrefix, StringComparison.Ordinal) ? Constants.True : Constants.False);
-            tags[4] = new KeyValuePair<string, object?>(Constants.Subject, subject);
-            tags[5] = new KeyValuePair<string, object?>(Constants.DestName, subject);
-            tags[6] = new KeyValuePair<string, object?>(Constants.DestPubName, subject);
+            var lowCardinalitySubject = LowCardinalitySubject(conn, subject);
+            tags[4] = new KeyValuePair<string, object?>(Constants.Subject, lowCardinalitySubject);
+            tags[5] = new KeyValuePair<string, object?>(Constants.DestName, lowCardinalitySubject);
+            tags[6] = new KeyValuePair<string, object?>(Constants.DestPubName, lowCardinalitySubject);
             tags[7] = new KeyValuePair<string, object?>(Constants.MsgBodySize, bodySize.ToString());
             tags[8] = new KeyValuePair<string, object?>(Constants.MsgTotalSize, size.ToString());
             tags[9] = new KeyValuePair<string, object?>(Constants.ClientId, conn.ClientId);
@@ -276,7 +277,7 @@ internal static class Telemetry
 
             var index = 17;
             if (replyTo is not null)
-                tags[index++] = new KeyValuePair<string, object?>(Constants.ReplyTo, replyTo);
+                tags[index++] = new KeyValuePair<string, object?>(Constants.ReplyTo, LowCardinalitySubject(conn, replyTo));
             if (queueGroup is not null)
                 tags[index] = new KeyValuePair<string, object?>(Constants.QueueGroup, queueGroup);
         }
@@ -353,6 +354,13 @@ internal static class Telemetry
         }
     }
 
+    // Inbox subjects (_INBOX.<nuid>[.<nuid>]) are unique per request, so emitting them as
+    // indexed tag values pushes unbounded cardinality into tracing backends (Tempo, Jaeger).
+    // Collapse them to a constant, matching SpanDestinationName. The raw subject stays
+    // available to the Enrich callback via NatsInstrumentationContext.
+    private static string LowCardinalitySubject(NatsConnection conn, string subject)
+        => subject.StartsWith(conn.Opts.InboxPrefix, StringComparison.Ordinal) ? Constants.InboxName : subject;
+
     private static bool TryParseTraceContext(NatsHeaders headers, out ActivityContext context)
     {
         DistributedContextPropagator.Current.ExtractTraceIdAndState(
@@ -395,6 +403,7 @@ internal static class Telemetry
     {
         public const string True = "true";
         public const string False = "false";
+        public const string InboxName = "inbox";
         public const string RequestReplyActivityName = "request";
         public const string PublishActivityName = "publish";
         public const string SubscribeActivityName = "subscribe";
