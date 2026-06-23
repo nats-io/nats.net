@@ -61,8 +61,7 @@ echo "======================="
 
 exit_code=0
 
-# Only check against net8.0 as the target TFM
-# net6.0 has known differences with init accessors
+# Compare the netstandard surfaces against net8.0 as the baseline TFM
 check_compat "netstandard2.0" "net8.0" || exit_code=1
 check_compat "netstandard2.1" "net8.0" || exit_code=1
 
