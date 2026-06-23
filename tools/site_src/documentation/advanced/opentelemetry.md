@@ -47,6 +47,19 @@ telemetry for specific requests. When the filter returns `false`, no activity is
 
 [!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/OpenTelemetryPage.cs#filter)]
 
+When the `NATS.Client.OpenTelemetry` package is installed, `FilterSubjects` builds the predicate from
+NATS subject patterns (`*` matches one token, `>` matches one or more trailing tokens) instead of writing
+the matching by hand. Include patterns allow-list subjects; exclude patterns drop them and win over
+include. The predicate is combined (logical AND) with any filter already set:
+
+```csharp
+Sdk.CreateTracerProviderBuilder()
+    .AddNatsClientInstrumentation(options => options.FilterSubjects(
+        include: ["orders.>"],
+        exclude: ["orders.internal.>"]))
+    .Build();
+```
+
 ## Enriching Activities
 
 Use [`NatsInstrumentationOptions.Default.Enrich`](xref:NATS.Client.Core.NatsInstrumentationOptions) to add
@@ -108,3 +121,22 @@ All instruments carry these tags:
 | `network.transport` | `tcp` | Transport protocol |
 
 `messaging.client.operation.duration` adds `error.type` (full exception type name) when the operation fails.
+
+### Histogram Buckets
+
+`messaging.client.operation.duration` ships advisory bucket boundaries (`0.005s` to `10s`) through
+`InstrumentAdvice`, which the OpenTelemetry SDK applies by default, so no view is required for sensible
+latency buckets. To override them, add a view on the meter provider (this needs the `OpenTelemetry` SDK
+package, not just `OpenTelemetry.Api`):
+
+```csharp
+Sdk.CreateMeterProviderBuilder()
+    .AddNatsClientInstrumentation()
+    .AddView(
+        "messaging.client.operation.duration",
+        new ExplicitBucketHistogramConfiguration
+        {
+            Boundaries = [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5],
+        })
+    .Build();
+```
