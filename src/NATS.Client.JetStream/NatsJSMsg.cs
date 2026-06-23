@@ -1,7 +1,9 @@
 using System.Buffers;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using NATS.Client.Core;
+using NATS.Client.Core.Internal;
 using NATS.Client.JetStream.Internal;
 
 namespace NATS.Client.JetStream;
@@ -231,21 +233,37 @@ public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
         if (_msg == default)
             throw new NatsJSException("No user message, can't acknowledge");
 
-        if (opts?.DoubleAck ?? _context.Opts.DoubleAck)
+        var measure = Telemetry.OperationDuration.Enabled;
+        var start = measure ? Stopwatch.GetTimestamp() : 0L;
+        Exception? error = null;
+        try
         {
-            await Connection.RequestAsync<ReadOnlySequence<byte>, object?>(
-                subject: ReplyTo,
-                data: payload,
-                requestSerializer: NatsRawSerializer<ReadOnlySequence<byte>>.Default,
-                replySerializer: NatsRawSerializer<object?>.Default,
-                cancellationToken: cancellationToken);
+            if (opts?.DoubleAck ?? _context.Opts.DoubleAck)
+            {
+                await Connection.RequestAsync<ReadOnlySequence<byte>, object?>(
+                    subject: ReplyTo,
+                    data: payload,
+                    requestSerializer: NatsRawSerializer<ReadOnlySequence<byte>>.Default,
+                    replySerializer: NatsRawSerializer<object?>.Default,
+                    cancellationToken: cancellationToken);
+            }
+            else
+            {
+                await _msg.ReplyAsync(
+                    data: payload,
+                    serializer: NatsRawSerializer<ReadOnlySequence<byte>>.Default,
+                    cancellationToken: cancellationToken);
+            }
         }
-        else
+        catch (Exception ex)
         {
-            await _msg.ReplyAsync(
-                data: payload,
-                serializer: NatsRawSerializer<ReadOnlySequence<byte>>.Default,
-                cancellationToken: cancellationToken);
+            error = ex;
+            throw;
+        }
+        finally
+        {
+            if (measure)
+                Telemetry.RecordOperationDuration(start, Connection, Telemetry.Constants.OpAck, error);
         }
     }
 

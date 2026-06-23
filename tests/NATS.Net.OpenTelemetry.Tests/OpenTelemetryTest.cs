@@ -442,6 +442,43 @@ public class OpenTelemetryTest
         await reg;
     }
 
+    [Fact]
+    public async Task Ack_operation_duration_histogram()
+    {
+        using var meter = new MeterTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        var js = new NatsJSContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        await js.CreateStreamAsync(new StreamConfig { Name = "ack-stream", Subjects = ["ack.>"] }, cts.Token);
+        await js.CreateOrUpdateConsumerAsync("ack-stream", new ConsumerConfig("ack-consumer"), cts.Token);
+
+        await js.PublishAsync("ack.subject", "test-message", cancellationToken: cts.Token);
+
+        var consumer = await js.GetConsumerAsync("ack-stream", "ack-consumer", cts.Token);
+
+        await foreach (var msg in consumer.ConsumeAsync<string>(cancellationToken: cts.Token))
+        {
+            await msg.AckAsync(cancellationToken: cts.Token);
+            break;
+        }
+
+        var ack = meter.DoubleMeasurements
+            .Where(m => m.Name == "messaging.client.operation.duration")
+            .Where(m => m.Tags.Any(t => t.Key == "messaging.operation" && (string?)t.Value == "ack"))
+            .ToList();
+
+        ack.Should().NotBeEmpty();
+        ack[0].Value.Should().BeGreaterThan(0);
+
+        var tags = ack[0].Tags.ToDictionary(t => t.Key, t => t.Value);
+        tags.Should().ContainKey("messaging.system").WhoseValue.Should().Be("nats");
+        tags.Should().NotContainKey("error.type");
+    }
+
     private void AssertActivityData(string subject, IReadOnlyList<Activity> activityList, string expectedHost, string expectedClientId)
     {
         var activities = activityList.ToArray();

@@ -401,6 +401,7 @@ internal static class Telemetry
         public const string OpRec = "receive";
         public const string OpSub = "subscribe";
         public const string OpReq = "request";
+        public const string OpAck = "ack";
         public const string OpReconnect = "reconnect";
         public const string ErrorTypeKey = "error.type";
         public const string MsgBodySize = "messaging.message.body.size";
