@@ -181,6 +181,8 @@ public partial class NatsJSContext
                 NatsMsg<PubAckResponse> msg;
                 try
                 {
+                    // ThrowIfNoResponders=false: the 503 sentinel comes back as a message so the
+                    // retry loop below can handle it, matching the shared-inbox path.
                     msg = await Connection.RequestAsync<T, PubAckResponse>(
                         subject: subject,
                         data: data,
@@ -188,7 +190,7 @@ public partial class NatsJSContext
                         requestSerializer: serializer,
                         replySerializer: NatsJSJsonSerializer<PubAckResponse>.Default,
                         requestOpts: opts,
-                        replyOpts: new NatsSubOpts { Timeout = Opts.RequestTimeout },
+                        replyOpts: new NatsSubOpts { Timeout = Opts.RequestTimeout, ThrowIfNoResponders = false },
                         cancellationToken).ConfigureAwait(false);
                 }
                 catch (NatsNoReplyException)
@@ -432,11 +434,13 @@ public partial class NatsJSContext
             NatsMsg<NatsJSApiResult<TResponse>> msg;
             try
             {
+                // ThrowIfNoResponders=false: inspect the 503 no-responders sentinel below
+                // rather than letting RequestAsync throw, matching the shared-inbox path.
                 msg = await Connection.RequestAsync<TRequest, NatsJSApiResult<TResponse>>(
                     subject: subject,
                     data: request,
                     headers: null,
-                    replyOpts: new NatsSubOpts { Timeout = Opts.RequestTimeout },
+                    replyOpts: new NatsSubOpts { Timeout = Opts.RequestTimeout, ThrowIfNoResponders = false },
                     requestSerializer: NatsJSJsonSerializer<TRequest>.Default,
                     replySerializer: NatsJSJsonDocumentSerializer<TResponse>.Default,
                     cancellationToken: cancellationToken).ConfigureAwait(false);

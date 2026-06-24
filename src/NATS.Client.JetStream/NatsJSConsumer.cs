@@ -66,20 +66,38 @@ public class NatsJSConsumer : INatsJSConsumer
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         opts ??= _context.Opts.DefaultConsumeOpts;
+        var drainOnCancel = opts.DrainOnCancel;
         await using var cc = await ConsumeInternalAsync<T>(serializer, opts, cancellationToken).ConfigureAwait(false);
         cc.MarkReaderActive();
+
+        // When draining on cancel we keep reading buffered messages until the channel
+        // completes instead of bailing out immediately. The drain stops pulling, fences
+        // in-flight messages with a PING/PONG and completes the channel, leaving the
+        // connection usable so handlers can still ACK the messages they receive.
+        var draining = false;
+        var drainTask = default(ValueTask);
         try
         {
-            while (!cancellationToken.IsCancellationRequested)
+            while (true)
             {
                 // We have to check calls individually since we can't use yield return in try-catch blocks.
+                // WaitToReadAsync throws if the token is already canceled (even with buffered
+                // messages), so the catch below is the single place that reacts to cancellation:
+                // start the drain when DrainOnCancel is set, otherwise stop.
                 bool ready;
                 try
                 {
-                    ready = await cc.Msgs.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
+                    ready = await cc.Msgs.WaitToReadAsync(draining ? CancellationToken.None : cancellationToken).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
                 {
+                    if (drainOnCancel && !draining)
+                    {
+                        draining = true;
+                        drainTask = cc.DrainAsync();
+                        continue;
+                    }
+
                     ready = false;
                 }
                 catch (NatsConnectionFailedException)
@@ -96,8 +114,13 @@ public class NatsJSConsumer : INatsJSConsumer
                 if (!ready)
                     yield break;
 
-                while (!cancellationToken.IsCancellationRequested)
+                while (true)
                 {
+                    // Stop promptly on cancel unless we are draining, in which case we
+                    // keep reading the buffered messages until the channel completes.
+                    if (!draining && cancellationToken.IsCancellationRequested)
+                        break;
+
                     bool read;
                     NatsJSMsg<T> jsMsg;
                     try
@@ -135,6 +158,11 @@ public class NatsJSConsumer : INatsJSConsumer
         finally
         {
             cc.MarkReaderInactive();
+
+            // Observe the drain completion. DrainAsync swallows cancellation and
+            // connection errors internally, so this does not throw on the normal path.
+            if (draining)
+                await drainTask.ConfigureAwait(false);
         }
     }
 

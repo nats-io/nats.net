@@ -39,7 +39,10 @@ public class SendBufferTest
 
         Log("__________________________________");
 
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        // SharedInbox so the connection doesn't open an inbox subscription at connect;
+        // otherwise dispose tries to UNSUB it through the deliberately wedged send buffer
+        // and times out before the test can assert send cancellation.
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestReplyMode = NatsRequestReplyMode.SharedInbox });
 
         await server.Ready;
         Log($"[C] connect {server.Url}");

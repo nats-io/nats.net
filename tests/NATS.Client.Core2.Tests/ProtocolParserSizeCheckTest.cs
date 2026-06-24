@@ -204,7 +204,10 @@ public class ProtocolParserSizeCheckTest(ITestOutputHelper output)
         await using var server = new FakeServer(output);
 
         await server.Ready;
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, ConnectTimeout = TimeSpan.FromSeconds(10) });
+
+        // SharedInbox so the connection doesn't open an inbox subscription at connect;
+        // the test injects an HMSG with sid 1, which must map to the "foo" subscription.
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, ConnectTimeout = TimeSpan.FromSeconds(10), RequestReplyMode = NatsRequestReplyMode.SharedInbox });
         await nats.ConnectAsync();
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
