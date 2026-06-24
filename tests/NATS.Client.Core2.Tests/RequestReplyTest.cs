@@ -169,6 +169,7 @@ public class RequestReplyTest
 
             await msg.ReplyAsync<int?>(null); // stop iteration with a sentinel
         });
+        await nats.PingAsync();
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         const int data = 2;
@@ -197,6 +198,7 @@ public class RequestReplyTest
             await msg.ReplyAsync(msg.Data * 2);
             await msg.ReplyAsync(msg.Data * 3);
         });
+        await nats.PingAsync();
 
         var results = new[] { 8, 12 };
         var count = 0;
@@ -231,6 +233,7 @@ public class RequestReplyTest
             await Task.Delay(5_000);
             await msg.ReplyAsync(msg.Data * 4);
         });
+        await nats.PingAsync();
 
         var results = new[] { 6, 9 };
         var count = 0;
@@ -262,6 +265,7 @@ public class RequestReplyTest
             await Task.Delay(2_000);
             await msg.ReplyAsync(msg.Data * 2);
         });
+        await nats.PingAsync();
 
         var count = 0;
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -294,6 +298,7 @@ public class RequestReplyTest
             await msg.ReplyAsync(msg.Data * 4);
             await msg.ReplyAsync<int?>(null); // sentinel
         });
+        await nats.PingAsync();
 
         var results = new[] { 2, 3, 4 };
         var count = 0;
@@ -327,6 +332,7 @@ public class RequestReplyTest
             await msg.ReplyAsync(msg.Data * 4);
             await msg.ReplyAsync<int?>(null); // sentinel
         });
+        await nats.PingAsync();
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var results = new[] { 2, 3, 4 };

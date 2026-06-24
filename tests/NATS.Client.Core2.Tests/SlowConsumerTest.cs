@@ -321,7 +321,7 @@ public class SlowConsumerTest
         // Wait for more drops and the second slow consumer event
         await Retry.Until(
             "episode 2 drops",
-            () => Volatile.Read(ref droppedCount) > droppedAfterEpisode1 && Volatile.Read(ref slowConsumerCount) >= 2);
+            () => Volatile.Read(ref droppedCount) > droppedAfterEpisode1 && Volatile.Read(ref slowConsumerCount) > slowConsumerAfterEpisode1);
 
         var droppedAfterEpisode2 = Volatile.Read(ref droppedCount);
         var slowConsumerAfterEpisode2 = Volatile.Read(ref slowConsumerCount);
