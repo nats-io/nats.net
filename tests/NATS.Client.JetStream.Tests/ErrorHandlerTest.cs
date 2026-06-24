@@ -24,6 +24,7 @@ public class ErrorHandlerTest
     {
         var proxy = new NatsProxy(_server.Port);
         await using var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}", ConnectTimeout = TimeSpan.FromSeconds(10) });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
 
         var js = new NatsJSContext(nats);
@@ -97,6 +98,7 @@ public class ErrorHandlerTest
     {
         var proxy = new NatsProxy(_server.Port);
         await using var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}", ConnectTimeout = TimeSpan.FromSeconds(10) });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
 
         var js = new NatsJSContext(nats);
@@ -187,6 +189,7 @@ public class ErrorHandlerTest
     {
         var proxy = new NatsProxy(_server.Port);
         await using var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}", ConnectTimeout = TimeSpan.FromSeconds(10) });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
 
         var js = new NatsJSContext(nats);
@@ -357,6 +360,7 @@ public class ErrorHandlerTest
     {
         var proxy = new NatsProxy(_server.Port);
         await using var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}", ConnectTimeout = TimeSpan.FromSeconds(10) });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
 
         var js = new NatsJSContext(nats);

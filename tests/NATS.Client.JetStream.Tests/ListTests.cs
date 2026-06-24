@@ -1,6 +1,7 @@
 using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Models;
+using NATS.Client.TestUtilities2;
 using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.JetStream.Tests;
@@ -21,6 +22,7 @@ public class ListTests
     public async Task List_streams()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestTimeout = TimeSpan.FromSeconds(5) });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId() + "-";
         _output.WriteLine($"prefix: {prefix}");
 
@@ -95,6 +97,7 @@ public class ListTests
     public async Task List_consumers()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestTimeout = TimeSpan.FromSeconds(5) });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId() + "-";
         _output.WriteLine($"prefix: {prefix}");
         var js = new NatsJSContext(nats);

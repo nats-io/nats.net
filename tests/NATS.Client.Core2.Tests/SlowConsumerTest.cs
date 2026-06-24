@@ -1,4 +1,5 @@
 using NATS.Client.Core2.Tests;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.Core.Tests;
 
@@ -22,6 +23,7 @@ public class SlowConsumerTest
             Url = _server.Url,
             SubPendingChannelCapacity = 3,
         });
+        await nats.ConnectRetryAsync();
 
         var lost = 0;
         nats.MessageDropped += (_, e) =>
@@ -108,6 +110,7 @@ public class SlowConsumerTest
             Url = _server.Url,
             SubPendingChannelCapacity = 3,
         });
+        await nats.ConnectRetryAsync();
 
         var droppedCount = 0;
         var slowConsumerCount = 0;
@@ -206,6 +209,7 @@ public class SlowConsumerTest
             Url = _server.Url,
             SubPendingChannelCapacity = 3,
         });
+        await nats.ConnectRetryAsync();
 
         var droppedCount = 0;
         var slowConsumerCount = 0;

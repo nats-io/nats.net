@@ -12,6 +12,7 @@ public class CancellationTokenTests(NatsServerFixture server)
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         var prefix = server.GetNextId();
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
@@ -43,6 +44,7 @@ public class CancellationTokenTests(NatsServerFixture server)
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         var prefix = server.GetNextId();
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
@@ -74,6 +76,7 @@ public class CancellationTokenTests(NatsServerFixture server)
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, ConnectTimeout = TimeSpan.FromSeconds(30) });
+        await nats.ConnectRetryAsync();
         var prefix = server.GetNextId();
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
@@ -100,6 +103,7 @@ public class CancellationTokenTests(NatsServerFixture server)
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         var prefix = server.GetNextId();
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);

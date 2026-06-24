@@ -1,5 +1,6 @@
 using System.Text;
 using NATS.Client.TestUtilities;
+using NATS.Client.TestUtilities2;
 using NATS.Net;
 
 namespace NATS.Client.JetStream.Tests;
@@ -38,6 +39,7 @@ public class ConsumeResponseTest
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         await using var nats = new NatsConnection(new NatsOpts { Url = ms.Url, RequestReplyMode = mode });
+        await nats.ConnectRetryAsync();
         var js = nats.CreateJetStreamContext();
         var consumer = await js.GetConsumerAsync("x", "x", cts.Token);
 

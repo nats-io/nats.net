@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Text;
 using NATS.Client.Core2.Tests;
 using NATS.Client.Core2.Tests.ExtraUtils.FrameworkPolyfillExtensions;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.Core.Tests;
 
@@ -21,11 +22,13 @@ public class ProtocolTest
     public async Task Subscription_with_same_subject()
     {
         var nats1 = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats1.ConnectRetryAsync();
         var proxy = new NatsProxy(_server.Port);
 
         // SharedInbox so the connection doesn't open an inbox subscription at connect,
         // which would add an extra SUB frame to the proxy capture asserted below.
         var nats2 = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}", ConnectTimeout = TimeSpan.FromSeconds(10), RequestReplyMode = NatsRequestReplyMode.SharedInbox });
+        await nats2.ConnectRetryAsync();
 
         var sub1 = await nats2.SubscribeCoreAsync<int>("foo.bar");
         var sub2 = await nats2.SubscribeCoreAsync<int>("foo.bar");
@@ -119,6 +122,7 @@ public class ProtocolTest
         // SharedInbox so the connection doesn't open an inbox subscription at connect,
         // which would shift the SUB frames asserted by index below.
         var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}", ConnectTimeout = TimeSpan.FromSeconds(10), RequestReplyMode = NatsRequestReplyMode.SharedInbox });
+        await nats.ConnectRetryAsync();
         var subject = $"{_server.GetNextId()}.foo";
 
         await using var sub1 = await nats.SubscribeCoreAsync<int>(subject, queueGroup: "group1");
@@ -151,6 +155,7 @@ public class ProtocolTest
 
         var proxy = new NatsProxy(_server.Port);
         var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}", ConnectTimeout = TimeSpan.FromSeconds(10) });
+        await nats.ConnectRetryAsync();
 
         var prefix = $"{_server.GetNextId()}.foo";
 
@@ -223,6 +228,7 @@ public class ProtocolTest
         // SharedInbox so the connection doesn't open an inbox subscription at connect,
         // which would consume sid 1 and break the sid sequence asserted below.
         var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}", ConnectTimeout = TimeSpan.FromSeconds(10), RequestReplyMode = NatsRequestReplyMode.SharedInbox });
+        await nats.ConnectRetryAsync();
         var sid = 0;
 
         Log("### Auto-unsubscribe after consuming max-msgs");
@@ -350,6 +356,7 @@ public class ProtocolTest
         // SharedInbox so the connection doesn't open an inbox subscription at connect,
         // which would add an extra SUB frame to the proxy capture asserted below.
         var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}", ConnectTimeout = TimeSpan.FromSeconds(10), RequestReplyMode = NatsRequestReplyMode.SharedInbox });
+        await nats.ConnectRetryAsync();
 
         var subject = $"{_server.GetNextId()}.foo";
         var cmdSubject = $"{_server.GetNextId()}.bar";
@@ -406,6 +413,7 @@ public class ProtocolTest
     public async Task Proactively_reject_payloads_over_the_threshold_set_by_server()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 

@@ -1,4 +1,5 @@
 using NATS.Client.Core2.Tests;
+using NATS.Client.TestUtilities2;
 using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.Core.Tests;
@@ -17,6 +18,7 @@ public class MessageInterfaceTest
     public async Task Sub_custom_builder_test()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
 
         var sync = 0;
         var sub = Task.Run(async () =>

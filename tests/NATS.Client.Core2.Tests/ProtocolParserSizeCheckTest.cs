@@ -25,7 +25,7 @@ public class ProtocolParserSizeCheckTest(ITestOutputHelper output)
 
         await server.Ready;
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, LoggerFactory = logFactory, ConnectTimeout = TimeSpan.FromSeconds(30) });
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         await nats.SubscribeCoreAsync<int>("foo", cancellationToken: cts.Token);
@@ -53,7 +53,7 @@ public class ProtocolParserSizeCheckTest(ITestOutputHelper output)
 
         await server.Ready;
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, LoggerFactory = logFactory, ConnectTimeout = TimeSpan.FromSeconds(10) });
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         await nats.SubscribeCoreAsync<int>("foo", cancellationToken: cts.Token);
@@ -81,7 +81,7 @@ public class ProtocolParserSizeCheckTest(ITestOutputHelper output)
 
         await server.Ready;
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, LoggerFactory = logFactory, ConnectTimeout = TimeSpan.FromSeconds(10) });
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         await nats.SubscribeCoreAsync<int>("foo", cancellationToken: cts.Token);
@@ -109,7 +109,7 @@ public class ProtocolParserSizeCheckTest(ITestOutputHelper output)
 
         await server.Ready;
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, LoggerFactory = logFactory, ConnectTimeout = TimeSpan.FromSeconds(10) });
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         await nats.SubscribeCoreAsync<int>("foo", cancellationToken: cts.Token);
@@ -138,7 +138,7 @@ public class ProtocolParserSizeCheckTest(ITestOutputHelper output)
 
         // MaxReconnectRetry=0 because FakeServer only accepts one connection
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, LoggerFactory = logFactory, MaxReconnectRetry = 0 });
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         await nats.SubscribeCoreAsync<int>("foo", cancellationToken: cts.Token);
@@ -208,7 +208,7 @@ public class ProtocolParserSizeCheckTest(ITestOutputHelper output)
         // SharedInbox so the connection doesn't open an inbox subscription at connect;
         // the test injects an HMSG with sid 1, which must map to the "foo" subscription.
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, ConnectTimeout = TimeSpan.FromSeconds(10), RequestReplyMode = NatsRequestReplyMode.SharedInbox });
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var sub = await nats.SubscribeCoreAsync<byte[]>("foo", cancellationToken: cts.Token);

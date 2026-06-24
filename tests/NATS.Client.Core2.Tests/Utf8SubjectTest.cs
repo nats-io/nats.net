@@ -151,6 +151,7 @@ public class Utf8SubjectServerTest
     public async Task Utf8_subject_pub_sub_with_real_server()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
 
         var subject = "test.café.🔥";
         var sync = 0;
@@ -188,6 +189,7 @@ public class Utf8SubjectServerTest
     public async Task Utf8_subject_request_reply_with_real_server()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
 
         var subject = "svc.ñoño.日本語";
         var sync = 0;

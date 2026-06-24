@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using NATS.Client.TestUtilities;
+using NATS.Client.TestUtilities2;
 using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.Core.Tests;
@@ -16,6 +17,7 @@ public class ProtocolTest
         var logger = new InMemoryTestLoggerFactory(LogLevel.Error);
         var opts = new NatsOpts { Url = server.Url, LoggerFactory = logger };
         var nats = new NatsConnection(opts);
+        await nats.ConnectRetryAsync();
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
 

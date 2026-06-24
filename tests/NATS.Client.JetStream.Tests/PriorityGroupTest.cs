@@ -2,6 +2,7 @@ using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Models;
 using NATS.Client.TestUtilities;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -21,6 +22,7 @@ public class PriorityGroupTest
     public async Task Next_from_overflow_group()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         var js = new NatsJSContext(nats);
         var prefix = _server.GetNextId();
 
@@ -64,6 +66,7 @@ public class PriorityGroupTest
     public async Task Fetch_from_overflow_group()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         var js = new NatsJSContext(nats);
         var prefix = _server.GetNextId();
 
@@ -110,6 +113,7 @@ public class PriorityGroupTest
     public async Task Consume_from_overflow_group()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         var js = new NatsJSContext(nats);
         var prefix = _server.GetNextId();
 
@@ -156,6 +160,7 @@ public class PriorityGroupTest
     public async Task Fetch_from_prioritized_group_with_priority()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         var js = new NatsJSContext(nats);
         var prefix = _server.GetNextId();
 
@@ -218,6 +223,7 @@ public class PriorityGroupTest
     public async Task Consumer_with_prioritized_policy_validation()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         var js = new NatsJSContext(nats);
         var prefix = _server.GetNextId();
 

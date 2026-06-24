@@ -1,5 +1,6 @@
 using NATS.Client.Core.Tests;
 using NATS.Client.ObjectStore.Models;
+using NATS.Client.TestUtilities2;
 using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.ObjectStore.Tests;
@@ -24,7 +25,7 @@ public class SlowConsumerTest
             Url = server.Url,
             SubPendingChannelCapacity = 10,
         });
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         var js = new NatsJSContext(nats);
         var ob = new NatsObjContext(js);

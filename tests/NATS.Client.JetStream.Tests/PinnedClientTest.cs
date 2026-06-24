@@ -27,6 +27,7 @@ public class PinnedClientTest
     public async Task Pinned_client_basic_flow_with_consume()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         var js = new NatsJSContext(nats);
         var prefix = _server.GetNextId();
 
@@ -95,6 +96,7 @@ public class PinnedClientTest
     public async Task Unpin_allows_other_consumer_to_receive()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         var js = new NatsJSContext(nats);
         var prefix = _server.GetNextId();
 
@@ -257,6 +259,7 @@ public class PinnedClientTest
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         await using var nats = new NatsConnection(new NatsOpts { Url = ms.Url, RequestReplyMode = mode });
+        await nats.ConnectRetryAsync();
         var js = nats.CreateJetStreamContext();
         var consumer = (NatsJSConsumer)await js.GetConsumerAsync("x", "x", cts.Token);
 
@@ -376,6 +379,7 @@ public class PinnedClientTest
     public async Task Invalid_priority_group_returns_error()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         var js = new NatsJSContext(nats);
         var prefix = _server.GetNextId();
 
@@ -410,6 +414,7 @@ public class PinnedClientTest
     public async Task Context_unpin_consumer_async()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         var js = new NatsJSContext(nats);
         var prefix = _server.GetNextId();
 
@@ -474,6 +479,7 @@ public class PinnedClientTest
     public async Task Consumer_info_shows_priority_groups_state()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         var js = new NatsJSContext(nats);
         var prefix = _server.GetNextId();
 
@@ -538,6 +544,7 @@ public class PinnedClientMockServerTest
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         await using var nats = new NatsConnection(new NatsOpts { Url = ms.Url, ConnectTimeout = TimeSpan.FromSeconds(30) });
+        await nats.ConnectRetryAsync();
         var js = nats.CreateJetStreamContext();
         var consumer = (NatsJSConsumer)await js.GetConsumerAsync("x", "x", cts.Token);
         var headers = new NatsHeaders
@@ -578,6 +585,7 @@ public class PinnedClientMockServerTest
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         await using var nats = new NatsConnection(new NatsOpts { Url = ms.Url });
+        await nats.ConnectRetryAsync();
         var js = nats.CreateJetStreamContext();
         var consumer = (NatsJSConsumer)await js.GetConsumerAsync("x", "x", cts.Token);
 

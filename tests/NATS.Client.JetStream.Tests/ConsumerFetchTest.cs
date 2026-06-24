@@ -1,6 +1,7 @@
 using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Models;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -23,6 +24,7 @@ public class ConsumerFetchTest
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync($"{prefix}s1", new[] { $"{prefix}s1.*" }, cts.Token);
@@ -55,6 +57,7 @@ public class ConsumerFetchTest
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync($"{prefix}s1", new[] { $"{prefix}s1.*" }, cts.Token);
@@ -93,6 +96,7 @@ public class ConsumerFetchTest
             RequestReplyMode = mode,
             DrainSubscriptionsOnDispose = true,
         });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
@@ -190,6 +194,7 @@ public class ConsumerFetchTest
 
         await using (var setup = new NatsConnection(new NatsOpts { Url = _server.Url }))
         {
+            await setup.ConnectRetryAsync();
             var setupJs = new NatsJSContext(setup);
             var stream = await setupJs.CreateStreamAsync(new StreamConfig(streamName, [subject]), cts.Token);
 
@@ -205,6 +210,7 @@ public class ConsumerFetchTest
             DrainSubscriptionsOnDispose = true,
             ConsumerDrainOnDisposeTimeout = TimeSpan.FromSeconds(30),
         });
+        await nats.ConnectRetryAsync();
         var js = new NatsJSContext(nats);
         var consumer = await js.GetConsumerAsync(streamName, consumerName, cts.Token);
 
@@ -234,6 +240,7 @@ public class ConsumerFetchTest
         var consumed = await fetchTask;
 
         await using var check = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await check.ConnectRetryAsync();
         var checkJs = new NatsJSContext(check);
         var info = (await checkJs.GetConsumerAsync(streamName, consumerName, cts.Token)).Info;
 
