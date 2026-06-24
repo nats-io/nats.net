@@ -358,6 +358,9 @@ internal static class Telemetry
     // indexed tag values pushes unbounded cardinality into tracing backends (Tempo, Jaeger).
     // Collapse them to a constant, matching SpanDestinationName. The raw subject stays
     // available to the Enrich callback via NatsInstrumentationContext.
+    // Uses Opts.InboxPrefix (the bare prefix, e.g. "_INBOX") rather than conn.InboxPrefix
+    // (this connection's "_INBOX.<nuid>"): a reply-to address can belong to any connection,
+    // so the match must be broad. Do not "normalise" this to conn.InboxPrefix.
     private static string LowCardinalitySubject(NatsConnection conn, string subject)
         => subject.StartsWith(conn.Opts.InboxPrefix, StringComparison.Ordinal) ? Constants.InboxName : subject;
 

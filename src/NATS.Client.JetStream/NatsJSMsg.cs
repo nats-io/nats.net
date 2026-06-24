@@ -233,6 +233,10 @@ public readonly struct NatsJSMsg<T> : INatsJSMsg<T>
         if (_msg == default)
             throw new NatsJSException("No user message, can't acknowledge");
 
+        // All ack-protocol messages (Ack, Nak, AckProgress, AckTerminate) route through here and
+        // record under a single OpAck operation, so their durations share one histogram. This is
+        // intentional: the operation tag tracks "sent an ack-protocol reply", not the ack kind.
+        // Do not split per kind without weighing the added metric cardinality.
         var measure = Telemetry.OperationDuration.Enabled;
         var start = measure ? Stopwatch.GetTimestamp() : 0L;
         Exception? error = null;
