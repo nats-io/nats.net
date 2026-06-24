@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Text;
+using NATS.Client.TestUtilities2;
 using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.Core.Tests;
@@ -15,6 +16,7 @@ public class LowLevelApiTest
     {
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
 
         var subject = "foo.*";
         var builder = new NatsSubCustomTestBuilder(_output);

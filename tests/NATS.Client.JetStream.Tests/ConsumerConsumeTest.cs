@@ -282,6 +282,7 @@ public class ConsumerConsumeTest
             Url = _server.Url,
             DrainSubscriptionsOnDispose = true,
         });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
@@ -380,6 +381,7 @@ public class ConsumerConsumeTest
 
         await using (var setup = new NatsConnection(new NatsOpts { Url = _server.Url }))
         {
+            await setup.ConnectRetryAsync();
             var setupJs = new NatsJSContext(setup);
             var stream = await setupJs.CreateStreamAsync(new StreamConfig(streamName, [subject]), cts.Token);
 
@@ -395,6 +397,7 @@ public class ConsumerConsumeTest
             DrainSubscriptionsOnDispose = true,
             ConsumerDrainOnDisposeTimeout = TimeSpan.FromSeconds(30),
         });
+        await nats.ConnectRetryAsync();
         var js = new NatsJSContext(nats);
         var consumer = await js.GetConsumerAsync(streamName, consumerName, cts.Token);
 
@@ -423,6 +426,7 @@ public class ConsumerConsumeTest
         var consumed = await consumeTask;
 
         await using var check = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await check.ConnectRetryAsync();
         var checkJs = new NatsJSContext(check);
         var info = (await checkJs.GetConsumerAsync(streamName, consumerName, cts.Token)).Info;
 
@@ -834,7 +838,7 @@ public class ConsumerConsumeTest
     {
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
@@ -878,7 +882,7 @@ public class ConsumerConsumeTest
     {
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 
@@ -986,7 +990,7 @@ public class ConsumerConsumeTest
     {
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 

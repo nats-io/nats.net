@@ -24,6 +24,7 @@ public class RequestReplyTest
     public async Task Simple_request_reply_test()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
 
         const string subject = "foo";
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -58,6 +59,7 @@ public class RequestReplyTest
                 Url = _server.Url,
                 RequestTimeout = TimeSpan.FromSeconds(1),
             });
+            await nats.ConnectRetryAsync();
 
             var sub = await nats.SubscribeCoreAsync<int>("foo");
             var reg = sub.Register(async msg =>
@@ -76,6 +78,7 @@ public class RequestReplyTest
         // Cancellation token usage
         {
             await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+            await nats.ConnectRetryAsync();
 
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
             var sub = await nats.SubscribeCoreAsync<int>("foo");
@@ -103,6 +106,7 @@ public class RequestReplyTest
         // Default mode (Direct transport, not set explicitly) throws on no-responders,
         // preserving the pre-3.x default behavior.
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         await Assert.ThrowsAsync<NatsNoRespondersException>(async () => await nats.RequestAsync<int, int>(Guid.NewGuid().ToString(), 0));
     }
 
@@ -110,6 +114,7 @@ public class RequestReplyTest
     public async Task Request_reply_no_responders_shared_inbox_throws_test()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = NatsRequestReplyMode.SharedInbox });
+        await nats.ConnectRetryAsync();
         await Assert.ThrowsAsync<NatsNoRespondersException>(async () => await nats.RequestAsync<int, int>(Guid.NewGuid().ToString(), 0));
     }
 
@@ -119,6 +124,7 @@ public class RequestReplyTest
         // Explicitly selecting Direct preserves the pre-3.x Direct behavior: the 503 sentinel
         // comes back as a message with HasNoResponders set instead of throwing.
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = NatsRequestReplyMode.Direct });
+        await nats.ConnectRetryAsync();
         var reply = await nats.RequestAsync<int, int>(Guid.NewGuid().ToString(), 0);
         Assert.True(reply.HasNoResponders);
     }
@@ -130,6 +136,7 @@ public class RequestReplyTest
     {
         // Per-call ThrowIfNoResponders=false returns the sentinel as a message in either mode.
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
+        await nats.ConnectRetryAsync();
         var reply = await nats.RequestAsync<int, int>(Guid.NewGuid().ToString(), 0, replyOpts: new NatsSubOpts { ThrowIfNoResponders = false });
         Assert.True(reply.HasNoResponders);
     }
@@ -139,6 +146,7 @@ public class RequestReplyTest
     {
         // Per-call ThrowIfNoResponders=true forces a throw even when Direct was selected explicitly.
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = NatsRequestReplyMode.Direct });
+        await nats.ConnectRetryAsync();
         await Assert.ThrowsAsync<NatsNoRespondersException>(async () =>
             await nats.RequestAsync<int, int>(Guid.NewGuid().ToString(), 0, replyOpts: new NatsSubOpts { ThrowIfNoResponders = true }));
     }
@@ -149,6 +157,7 @@ public class RequestReplyTest
         const int msgs = 10;
 
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
 
         var sub = await nats.SubscribeCoreAsync<int>("foo");
         var reg = sub.Register(async msg =>
@@ -160,6 +169,7 @@ public class RequestReplyTest
 
             await msg.ReplyAsync<int?>(null); // stop iteration with a sentinel
         });
+        await nats.PingAsync();
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         const int data = 2;
@@ -180,6 +190,7 @@ public class RequestReplyTest
     public async Task Request_reply_many_test_overall_timeout()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
 
         var sub = await nats.SubscribeCoreAsync<int>("foo");
         var reg = sub.Register(async msg =>
@@ -187,6 +198,7 @@ public class RequestReplyTest
             await msg.ReplyAsync(msg.Data * 2);
             await msg.ReplyAsync(msg.Data * 3);
         });
+        await nats.PingAsync();
 
         var results = new[] { 8, 12 };
         var count = 0;
@@ -210,6 +222,7 @@ public class RequestReplyTest
     public async Task Request_reply_many_test_idle_timeout()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
 
         var sub = await nats.SubscribeCoreAsync<int>("foo");
         var reg = sub.Register(async msg =>
@@ -220,6 +233,7 @@ public class RequestReplyTest
             await Task.Delay(5_000);
             await msg.ReplyAsync(msg.Data * 4);
         });
+        await nats.PingAsync();
 
         var results = new[] { 6, 9 };
         var count = 0;
@@ -243,6 +257,7 @@ public class RequestReplyTest
     public async Task Request_reply_many_test_start_up_timeout()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
 
         var sub = await nats.SubscribeCoreAsync<int>("foo");
         var reg = sub.Register(async msg =>
@@ -250,6 +265,7 @@ public class RequestReplyTest
             await Task.Delay(2_000);
             await msg.ReplyAsync(msg.Data * 2);
         });
+        await nats.PingAsync();
 
         var count = 0;
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -282,6 +298,7 @@ public class RequestReplyTest
             await msg.ReplyAsync(msg.Data * 4);
             await msg.ReplyAsync<int?>(null); // sentinel
         });
+        await nats.PingAsync();
 
         var results = new[] { 2, 3, 4 };
         var count = 0;
@@ -305,6 +322,7 @@ public class RequestReplyTest
     public async Task Request_reply_many_test_sentinel()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
 
         var sub = await nats.SubscribeCoreAsync<int>("foo");
         var reg = sub.Register(async msg =>
@@ -314,6 +332,7 @@ public class RequestReplyTest
             await msg.ReplyAsync(msg.Data * 4);
             await msg.ReplyAsync<int?>(null); // sentinel
         });
+        await nats.PingAsync();
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var results = new[] { 2, 3, 4 };
@@ -338,6 +357,7 @@ public class RequestReplyTest
         }
 
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
@@ -372,7 +392,7 @@ public class RequestReplyTest
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
 
         // connect to avoid race to subscribe and publish
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         const string subject = "foo";
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
@@ -436,6 +456,7 @@ public class RequestReplyTest
     public async Task Simple_empty_request_reply_test()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
 
         const string subject = "foo";
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -461,6 +482,7 @@ public class RequestReplyTest
     public async Task Direct_request_reply_test()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = NatsRequestReplyMode.Direct });
+        await nats.ConnectRetryAsync();
         var reply = await nats.RequestAsync<string>("$JS.API.INFO", cancellationToken: default);
 
         // reply-to should be inbox with id
@@ -481,6 +503,7 @@ public class RequestReplyTest
         // Default RequestReplyMode is Direct, so the reply-to inbox carries a numeric id
         // e.g. _INBOX.Hu5HPpWesrJhvQq2NG3YJ6.1
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         Assert.Equal(NatsRequestReplyMode.Direct, nats.Opts.RequestReplyMode);
 
         var reply = await nats.RequestAsync<string>("$JS.API.INFO", cancellationToken: default);
@@ -499,6 +522,7 @@ public class RequestReplyTest
     public async Task SharedInbox_request_reply_test()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = NatsRequestReplyMode.SharedInbox });
+        await nats.ConnectRetryAsync();
         var reply = await nats.RequestAsync<string>("$JS.API.INFO", cancellationToken: default);
 
         // reply-to should be inbox
@@ -517,6 +541,7 @@ public class RequestReplyTest
     public async Task Request_reply_no_timeout_sentinels_do_not_throw(NatsRequestReplyMode mode)
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
+        await nats.ConnectRetryAsync();
 
         var subject = $"foo.{Guid.NewGuid():N}";
         await using var sub = await nats.SubscribeCoreAsync<int>(subject);
@@ -546,6 +571,7 @@ public class RequestReplyTest
     public async Task Request_reply_out_of_range_timeout_throws(NatsRequestReplyMode mode)
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
+        await nats.ConnectRetryAsync();
 
         var replyOpts = new NatsSubOpts { Timeout = TimeSpan.FromDays(50) };
 

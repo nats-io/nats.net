@@ -22,6 +22,7 @@ public class ServicesTests
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         var svc = new NatsSvcContext(nats);
 
         await using var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
@@ -57,6 +58,7 @@ public class ServicesTests
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         var svc = new NatsSvcContext(nats);
 
         await using var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
@@ -139,6 +141,7 @@ public class ServicesTests
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         var svc = new NatsSvcContext(nats);
 
         await using var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
@@ -240,6 +243,7 @@ public class ServicesTests
     {
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         var svc = new NatsSvcContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -276,6 +280,7 @@ public class ServicesTests
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         var svc = new NatsSvcContext(nats);
 
         await using var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
@@ -334,6 +339,7 @@ public class ServicesTests
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         var svc = new NatsSvcContext(nats);
 
         await using var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
@@ -358,6 +364,7 @@ public class ServicesTests
     {
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         var svc = new NatsSvcContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
@@ -392,6 +399,7 @@ public class ServicesTests
         await using var server = await NatsServerProcess.StartAsync();
         var proxy = new NatsProxy(server.Port);
         await using var nats = new NatsConnection(new NatsOpts { Url = $"127.0.0.1:{proxy.Port}" });
+        await nats.ConnectRetryAsync();
         var svc = new NatsSvcContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
@@ -532,6 +540,7 @@ public class ServicesTests
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         var svc = new NatsSvcContext(nats);
 
         await using var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
@@ -557,6 +566,7 @@ public class ServicesTests
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         var svc = new NatsSvcContext(nats);
 
         await using var s1 = await svc.AddServiceAsync(

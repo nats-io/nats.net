@@ -1,5 +1,6 @@
 using NATS.Client.Core.Tests;
 using NATS.Client.JetStream.Models;
+using NATS.Client.TestUtilities2;
 using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.KeyValueStore.Tests;
@@ -16,6 +17,7 @@ public class NatsKVContextFactoryTest
         // Arrange
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestTimeout = TimeSpan.FromSeconds(10) });
+        await nats.ConnectRetryAsync();
         var jsFactory = new NatsJSContextFactory();
         var jsContext = jsFactory.CreateContext(nats);
         var factory = new NatsKVContextFactory();

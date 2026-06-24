@@ -5,6 +5,7 @@ using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using NATS.Client.Core2.Tests;
 using NATS.Client.Serializers.Json;
+using NATS.Client.TestUtilities2;
 
 // ReSharper disable RedundantTypeArgumentsOfMethod
 // ReSharper disable ReturnTypeCanBeNotNullable
@@ -25,7 +26,7 @@ public class SerializerTest
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
 
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         await Assert.ThrowsAsync<TestSerializerException>(() =>
             nats.PublishAsync(
@@ -51,7 +52,7 @@ public class SerializerTest
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         var sub = await nats.SubscribeCoreAsync<NatsMemoryOwner<byte>>("foo", cancellationToken: cancellationToken);
         await nats.PingAsync(cancellationToken);
@@ -242,7 +243,7 @@ public class SerializerTest
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         var serializer = new TestSerializerWithEmpty<TestData>();
         var sub = await nats.SubscribeCoreAsync("foo", serializer: serializer, cancellationToken: cancellationToken);
@@ -271,7 +272,7 @@ public class SerializerTest
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         var sub = await nats.SubscribeCoreAsync<TestData>("foo", cancellationToken: cancellationToken);
 
@@ -307,7 +308,7 @@ public class SerializerTest
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         var sub1 = await nats.SubscribeCoreAsync<TestMessage1>($"{prefix}.1", cancellationToken: cancellationToken);
         var sub2 = await nats.SubscribeCoreAsync<TestMessage2>($"{prefix}.2", cancellationToken: cancellationToken);
@@ -336,7 +337,7 @@ public class SerializerTest
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         var subject = _server.GetNextId();
         var sub = await nats.SubscribeCoreAsync<string>(subject, cancellationToken: cancellationToken);

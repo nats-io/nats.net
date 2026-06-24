@@ -5,6 +5,7 @@ using NATS.Client.Core.Tests;
 using NATS.Client.Serializers.Json;
 using NATS.Client.Services.Internal;
 using NATS.Client.Services.Models;
+using NATS.Client.TestUtilities2;
 using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.Services.Tests;
@@ -22,6 +23,7 @@ public class ServicesSerializationTest
 
         // Set serializer registry to use anything but a raw bytes (NatsMemory in this case) serializer
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, SerializerRegistry = NatsJsonSerializerRegistry.Default });
+        await nats.ConnectRetryAsync();
 
         var svc = new NatsSvcContext(nats);
 
@@ -49,6 +51,7 @@ public class ServicesSerializationTest
     {
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, SerializerRegistry = NatsJsonSerializerRegistry.Default });
+        await nats.ConnectRetryAsync();
 
         var svc = new NatsSvcContext(nats);
 
