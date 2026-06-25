@@ -34,7 +34,7 @@ public class LearnJetStreamReadingBackRead(NatsServerFixture fixture, ITestOutpu
         // Create the durable consumer to read from
         await js.CreateOrUpdateConsumerAsync("ORDERS", new ConsumerConfig("orders-reader")
         {
-            AckPolicy = ConsumerConfigAckPolicy.None,
+            AckPolicy = ConsumerConfigAckPolicy.Explicit,
             DeliverPolicy = ConsumerConfigDeliverPolicy.All,
         });
 
@@ -56,10 +56,12 @@ public class LearnJetStreamReadingBackRead(NatsServerFixture fixture, ITestOutpu
             {
                 output.WriteLine($"stream {msg.Metadata?.Sequence.Stream} consumer {msg.Metadata?.Sequence.Consumer}: {msg.Data}");
                 read++;
+
+                // Acknowledge each message so the consumer advances past it
+                await msg.AckAsync();
             }
         }
 
-        // Ack policy is None, so there's nothing to acknowledge
         // NATS-DOC-END
         Assert.Equal(3, read);
     }
