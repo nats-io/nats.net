@@ -1,0 +1,41 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+        <TargetFrameworks Condition="'$(OS)' == 'Windows_NT'">$(TargetFrameworks);net481</TargetFrameworks>
+        <RuntimeIdentifiers Condition="'$(OS)' == 'Windows_NT'">any;win-x86</RuntimeIdentifiers>
+        <Nullable>enable</Nullable>
+        <IsPackable>false</IsPackable>
+        <NoWarn>$(NoWarn);CS8002</NoWarn>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <RunSettingsFilePath>$(MSBuildProjectDirectory)\..\xunit.runsettings</RunSettingsFilePath>
+        <IsTestProject>true</IsTestProject>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="FluentAssertions" Version="[7,8)" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+        <PackageReference Include="xunit.v3" Version="1.0.1" />
+        <PackageReference Include="xunit.runner.visualstudio" Version="3.0.1">
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+            <PrivateAssets>all</PrivateAssets>
+        </PackageReference>
+        <PackageReference Include="coverlet.collector" Version="6.0.4">
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+            <PrivateAssets>all</PrivateAssets>
+        </PackageReference>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Using Include="Xunit" />
+        <Using Include="FluentAssertions" />
+    </ItemGroup>
+
+    <!-- Deliberately references ONLY the Abstractions package: this project guards the use case
+         from issue #851 that a third party (e.g. a CloudEvents adapter) can build and deconstruct
+         NATS messages with just this small dependency and no transitive dependency on Core. -->
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\NATS.Client.Abstractions\NATS.Client.Abstractions.csproj" />
+    </ItemGroup>
+
+</Project>
