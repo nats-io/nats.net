@@ -374,7 +374,12 @@ public abstract class NatsSubBase
             // the hand-off to the subscription channel. received.bytes follows the same
             // convention. Messages dropped by cancellation, channel closure, or serializer
             // exceptions are not counted.
-            if (Telemetry.ConsumedMessages.Enabled || Telemetry.ReceivedBytes.Enabled)
+            //
+            // NATS status/control frames (no-responder 503s and JetStream heartbeats,
+            // flow-control, and protocol notifications) are consumed internally and never
+            // reach the application, so they are excluded from both counters. They are
+            // identifiable by the inline status code on the "NATS/1.0 <code>" header line.
+            if ((Telemetry.ConsumedMessages.Enabled || Telemetry.ReceivedBytes.Enabled) && !IsStatusMsg(headersBuffer))
             {
                 var tags = Telemetry.BuildMetricTags(Connection, Telemetry.Constants.OpRec);
                 if (Telemetry.ConsumedMessages.Enabled)
@@ -424,6 +429,21 @@ public abstract class NatsSubBase
     internal static bool IsHeader503(ReadOnlySequence<byte>? headersBuffer) =>
         headersBuffer is { Length: >= 12 }
         && headersBuffer.Value.Slice(8, 4).ToSpan().SequenceEqual(NoRespondersHeaderSequence);
+
+    // A NATS status/control frame carries an inline status code on the version line
+    // ("NATS/1.0 <code>"): a space then three ASCII digits at offset 8. Regular user
+    // headers have "\r\n" at that offset, so this never matches an application message.
+    internal static bool IsStatusMsg(ReadOnlySequence<byte>? headersBuffer)
+    {
+        if (headersBuffer is not { Length: >= 12 })
+            return false;
+
+        var code = headersBuffer.Value.Slice(8, 4).ToSpan();
+        return code[0] == (byte)' '
+            && code[1] is >= (byte)'0' and <= (byte)'9'
+            && code[2] is >= (byte)'0' and <= (byte)'9'
+            && code[3] is >= (byte)'0' and <= (byte)'9';
+    }
 
     internal void ClearException() => Interlocked.Exchange(ref _exception, null);
 
