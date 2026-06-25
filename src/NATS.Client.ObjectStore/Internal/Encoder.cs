@@ -18,15 +18,6 @@ internal static class Base64UrlEncoder
     private const char Base64UrlCharacter62 = '-';
     private const char Base64UrlCharacter63 = '_';
 
-    /// <summary>
-    /// Encoding table
-    /// </summary>
-    private static readonly char[] SBase64Table = new[]
-    {
-        'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3', '4',
-        '5', '6', '7', '8', '9', Base64UrlCharacter62, Base64UrlCharacter63,
-    };
-
     public static string Sha256(ReadOnlySpan<byte> value)
     {
         Span<byte> destination = stackalloc byte[256 / 8];
@@ -59,83 +50,49 @@ internal static class Base64UrlEncoder
     }
 
     /// <summary>
-    /// Converts a subset of an array of 8-bit unsigned integers to its equivalent string representation which is encoded with base-64-url digits. Parameters specify
-    /// the subset as an offset in the input array, and the number of elements in the array to convert.
+    /// Converts the bytes to their equivalent base64url string representation.
     /// </summary>
-    /// <param name="inArray">An array of 8-bit unsigned integers.</param>
-    /// <param name="raw">Remove padding</param>
-    /// <returns>The string representation in base 64 url encoding of length elements of inArray, starting at position offset.</returns>
-    /// <exception cref="ArgumentNullException">'inArray' is null.</exception>
-    /// <exception cref="ArgumentOutOfRangeException">offset or length is negative OR offset plus length is greater than the length of inArray.</exception>
+    /// <param name="inArray">The bytes to encode.</param>
+    /// <param name="raw">Remove padding.</param>
+    /// <returns>The base64url encoding of the bytes.</returns>
     public static string Encode(Span<byte> inArray, bool raw = false)
     {
-        var offset = 0;
         var length = inArray.Length;
-
         if (length == 0)
             return string.Empty;
 
-        var lengthMod3 = length % 3;
-        var limit = length - lengthMod3;
-        var output = new char[(length + 2) / 3 * 4];
-        var table = SBase64Table;
-        int i, j = 0;
-
-        // takes 3 bytes from inArray and insert 4 bytes into output
-        for (i = offset; i < limit; i += 3)
+        // Base64.EncodeToUtf8 reads the input span directly (no array copy) and the output is
+        // ASCII, so the url-safe swap runs on the bytes and the string is built from them.
+        var base64Length = (length + 2) / 3 * 4;
+#if NETSTANDARD2_0
+        var rented = ArrayPool<byte>.Shared.Rent(base64Length);
+        try
         {
-            var d0 = inArray[i];
-            var d1 = inArray[i + 1];
-            var d2 = inArray[i + 2];
-
-            output[j + 0] = table[d0 >> 2];
-            output[j + 1] = table[((d0 & 0x03) << 4) | (d1 >> 4)];
-            output[j + 2] = table[((d1 & 0x0f) << 2) | (d2 >> 6)];
-            output[j + 3] = table[d2 & 0x3f];
-            j += 4;
+            _ = System.Buffers.Text.Base64.EncodeToUtf8(inArray, rented, out _, out var written);
+            var count = MakeUrlSafe(rented.AsSpan(0, written), raw);
+            return Encoding.ASCII.GetString(rented, 0, count);
         }
-
-        // Where we left off before
-        i = limit;
-
-        switch (lengthMod3)
+        finally
         {
-        case 2:
-            {
-                var d0 = inArray[i];
-                var d1 = inArray[i + 1];
-
-                output[j + 0] = table[d0 >> 2];
-                output[j + 1] = table[((d0 & 0x03) << 4) | (d1 >> 4)];
-                output[j + 2] = table[(d1 & 0x0f) << 2];
-                j += 3;
-            }
-
-            break;
-
-        case 1:
-            {
-                var d0 = inArray[i];
-
-                output[j + 0] = table[d0 >> 2];
-                output[j + 1] = table[(d0 & 0x03) << 4];
-                j += 2;
-            }
-
-            break;
-
-            // default or case 0: no further operations are needed.
+            ArrayPool<byte>.Shared.Return(rented);
         }
-
-        if (raw)
-            return new string(output, 0, j);
-
-        for (var k = j; k < output.Length; k++)
+#else
+        byte[]? rented = null;
+        var utf8 = base64Length <= 512
+            ? stackalloc byte[base64Length]
+            : (rented = ArrayPool<byte>.Shared.Rent(base64Length)).AsSpan(0, base64Length);
+        try
         {
-            output[k] = Base64PadCharacter;
+            _ = System.Buffers.Text.Base64.EncodeToUtf8(inArray, utf8, out _, out var written);
+            var count = MakeUrlSafe(utf8.Slice(0, written), raw);
+            return Encoding.ASCII.GetString(utf8.Slice(0, count));
         }
-
-        return new string(output);
+        finally
+        {
+            if (rented != null)
+                ArrayPool<byte>.Shared.Return(rented);
+        }
+#endif
     }
 
     /// <summary>
@@ -156,6 +113,31 @@ internal static class Base64UrlEncoder
     {
         _ = str ?? throw new ArgumentNullException(nameof(str));
         return UnsafeDecode(str);
+    }
+
+    // Translates standard base64 to base64url in place ('+' -> '-', '/' -> '_'). When raw is
+    // set, returns the length up to the first '=' so the trailing padding is dropped; otherwise
+    // returns the full length (padding kept, matching base64.URLEncoding used by other clients).
+    private static int MakeUrlSafe(Span<byte> utf8, bool raw)
+    {
+        for (var i = 0; i < utf8.Length; i++)
+        {
+            switch (utf8[i])
+            {
+            case (byte)Base64Character62:
+                utf8[i] = (byte)Base64UrlCharacter62;
+                break;
+            case (byte)Base64Character63:
+                utf8[i] = (byte)Base64UrlCharacter63;
+                break;
+            case (byte)Base64PadCharacter:
+                if (raw)
+                    return i;
+                break;
+            }
+        }
+
+        return utf8.Length;
     }
 
     private static unsafe byte[] UnsafeDecode(string str)
