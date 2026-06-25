@@ -443,6 +443,165 @@ public class OpenTelemetryTest
     }
 
     [Fact]
+    public async Task Ack_operation_duration_histogram()
+    {
+        using var meter = new MeterTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        var js = new NatsJSContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        await js.CreateStreamAsync(new StreamConfig { Name = "ack-stream", Subjects = ["ack.>"] }, cts.Token);
+        await js.CreateOrUpdateConsumerAsync("ack-stream", new ConsumerConfig("ack-consumer"), cts.Token);
+
+        await js.PublishAsync("ack.subject", "test-message", cancellationToken: cts.Token);
+
+        var consumer = await js.GetConsumerAsync("ack-stream", "ack-consumer", cts.Token);
+
+        await foreach (var msg in consumer.ConsumeAsync<string>(cancellationToken: cts.Token))
+        {
+            await msg.AckAsync(cancellationToken: cts.Token);
+            break;
+        }
+
+        var ack = meter.DoubleMeasurements
+            .Where(m => m.Name == "messaging.client.operation.duration")
+            .Where(m => m.Tags.Any(t => t.Key == "messaging.operation" && (string?)t.Value == "ack"))
+            .ToList();
+
+        ack.Should().NotBeEmpty();
+        ack[0].Value.Should().BeGreaterThan(0);
+
+        var tags = ack[0].Tags.ToDictionary(t => t.Key, t => t.Value);
+        tags.Should().ContainKey("messaging.system").WhoseValue.Should().Be("nats");
+        tags.Should().NotContainKey("error.type");
+    }
+
+    [Fact]
+    public async Task Dropped_messages_counter()
+    {
+        using var meter = new MeterTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts
+        {
+            Url = server.Url,
+            SubPendingChannelCapacity = 3,
+        });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cancellationToken = cts.Token;
+
+        var dropped = 0;
+        nats.MessageDropped += (_, _) =>
+        {
+            Interlocked.Increment(ref dropped);
+            return default;
+        };
+
+        var sync = 0;
+        var signal = new WaitSignal();
+
+        // Block the consumer after the sync message so the bounded channel overflows.
+        var subscription = Task.Run(
+            async () =>
+            {
+                await foreach (var msg in nats.SubscribeAsync<string>("drop.>", cancellationToken: cancellationToken))
+                {
+                    if (msg.Subject == "drop.sync")
+                    {
+                        Interlocked.Increment(ref sync);
+                        await signal;
+                        continue;
+                    }
+
+                    if (msg.Subject == "drop.end")
+                    {
+                        break;
+                    }
+                }
+            },
+            cancellationToken);
+
+        await Retry.Until(
+            "subscription is ready",
+            () => Volatile.Read(ref sync) > 0,
+            async () => await nats.PublishAsync("drop.sync", cancellationToken: cancellationToken));
+
+        for (var i = 0; i < 20; i++)
+        {
+            await nats.PublishAsync("drop.data", $"msg{i}", cancellationToken: cancellationToken);
+        }
+
+        await Retry.Until("messages are dropped", () => Volatile.Read(ref dropped) > 0);
+
+        signal.Pulse();
+        await Retry.Until(
+            "subscription ended",
+            () => subscription.IsCompleted,
+            async () => await nats.PublishAsync("drop.end", cancellationToken: cancellationToken));
+        await subscription;
+
+        var droppedMeasurements = meter.LongMeasurements
+            .Where(m => m.Name == "nats.client.messages.dropped")
+            .ToList();
+
+        droppedMeasurements.Sum(m => m.Value).Should().BeGreaterThan(0);
+
+        var tags = droppedMeasurements[0].Tags.ToDictionary(t => t.Key, t => t.Value);
+        tags.Should().ContainKey("messaging.system").WhoseValue.Should().Be("nats");
+        tags.Should().ContainKey("messaging.operation").WhoseValue.Should().Be("receive");
+    }
+
+    [Fact]
+    public async Task Inbox_subjects_collapsed_in_trace_tags()
+    {
+        using var tracker = new ActivityTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var sub = await nats.SubscribeCoreAsync<int>("foo.inbox", cancellationToken: cts.Token);
+        var reg = sub.Register(async msg => await msg.ReplyAsync(msg.Data * 2, cancellationToken: cts.Token));
+
+        var reply = await nats.RequestAsync<int, int>("foo.inbox", 21, cancellationToken: cts.Token);
+        reply.Data.Should().Be(42);
+
+        // The request's reply-to is an inbox; it must be collapsed to "inbox" rather than
+        // emitting the unique _INBOX.<nuid> value that would blow up backend tag cardinality.
+        var replyToTags = tracker.Started
+            .Select(a => a.GetTagItem("messaging.nats.message.reply_to") as string)
+            .Where(v => v is not null)
+            .ToList();
+
+        replyToTags.Should().NotBeEmpty();
+        replyToTags.Should().AllSatisfy(v => v.Should().Be("inbox"));
+
+        // No high-cardinality tag should leak a raw inbox subject.
+        string[] cardinalityTags =
+        [
+            "messaging.destination.name",
+            "messaging.destination_publish.name",
+            "messaging.nats.message.subject",
+            "messaging.nats.message.reply_to",
+        ];
+
+        foreach (var activity in tracker.Started)
+        {
+            foreach (var tag in cardinalityTags)
+            {
+                if (activity.GetTagItem(tag) is string value)
+                    value.Should().NotStartWith("_INBOX", $"{tag} should not carry a raw inbox subject");
+            }
+        }
+
+        await sub.DisposeAsync();
+        await reg;
+    }
+
+    [Fact]
     public async Task Consumed_counter_excludes_jetstream_control_messages()
     {
         using var meter = new MeterTracker();
