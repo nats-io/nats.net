@@ -291,6 +291,9 @@ public partial class NatsConnection : INatsConnection
     /// <inheritdoc />
     public void OnMessageDropped<T>(NatsSubBase natsSub, int pending, NatsMsg<T> msg)
     {
+        if (Telemetry.DroppedMessages.Enabled)
+            Telemetry.DroppedMessages.Add(1, Telemetry.BuildMetricTags(this, Telemetry.Constants.OpRec));
+
         var subject = msg.Subject;
         PushEvent(NatsEvent.MessageDropped, new NatsMessageDroppedEventArgs(natsSub, pending, subject, msg.ReplyTo, msg.Headers, msg.Data));
 

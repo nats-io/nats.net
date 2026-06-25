@@ -1,5 +1,6 @@
 using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.KeyValueStore.Tests;
 
@@ -27,7 +28,7 @@ public class SlowConsumerTest
             Url = _server.Url,
             SubPendingChannelCapacity = 10, // Small capacity to trigger drops quickly
         });
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         var prefix = _server.GetNextId();
         var js = new NatsJSContext(nats);

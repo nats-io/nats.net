@@ -122,6 +122,12 @@ All instruments carry these tags:
 
 `messaging.client.operation.duration` adds `error.type` (full exception type name) when the operation fails.
 
+`messaging.client.consumed.messages` and `nats.client.received.bytes` count only messages delivered to the
+application, per the OTel definition ("messages delivered to the application"). NATS status and control
+frames consumed internally by the client are excluded: no-responder `503` replies and JetStream heartbeats,
+flow-control, and protocol notifications. The two counters stay consistent, so `received.bytes / consumed.messages`
+reflects average delivered message size.
+
 ### Histogram Buckets
 
 `messaging.client.operation.duration` ships advisory bucket boundaries (`0.005s` to `10s`) through

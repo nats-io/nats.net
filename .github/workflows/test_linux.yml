@@ -66,6 +66,11 @@ jobs:
           cd tests/NATS.Client.CoreUnit.Tests
           dotnet test -c Release --no-build
 
+      - name: Test Abstractions
+        run: |
+          cd tests/NATS.Client.Abstractions.Tests
+          dotnet test -c Release --no-build
+
       - name: Test JetStream
         run: |
           killall nats-server 2> /dev/null | echo -n

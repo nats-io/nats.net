@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Security.Authentication;
 using System.Text;
+using NATS.Client.TestUtilities2;
 using Synadia.Orbit.Testing.GoHarness;
 using Synadia.Orbit.Testing.NatsServerProcessManager;
 
@@ -86,7 +87,7 @@ public class TlsPreferTest(ITestOutputHelper output)
             ConnectTimeout = TimeSpan.FromSeconds(10),
         });
 
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
         await serverTask;
         listener.Stop();
 
@@ -371,7 +372,7 @@ public class TlsPreferTest(ITestOutputHelper output)
             ConnectTimeout = TimeSpan.FromSeconds(10),
         });
 
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
         await serverTask;
         listener.Stop();
 
@@ -419,7 +420,7 @@ public class TlsPreferTest(ITestOutputHelper output)
             TlsOpts = new NatsTlsOpts { Mode = TlsMode.Disable },
         });
 
-        await natsDisable.ConnectAsync();
+        await natsDisable.ConnectRetryAsync();
         await natsDisable.PingAsync(cts.Token);
         output.WriteLine("Disable mode: connected in plaintext");
     }

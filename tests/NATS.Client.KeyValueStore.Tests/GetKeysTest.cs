@@ -1,5 +1,6 @@
 using NATS.Client.Core.Tests;
 using NATS.Client.TestUtilities;
+using NATS.Client.TestUtilities2;
 using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.KeyValueStore.Tests;
@@ -17,6 +18,7 @@ public class GetKeysTest
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats1 = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats1.ConnectRetryAsync();
         var js1 = new NatsJSContext(nats1);
         var kv1 = new NatsKVContext(js1);
         var store1 = await kv1.CreateStoreAsync(config, cancellationToken: cancellationToken);
@@ -59,6 +61,7 @@ public class GetKeysTest
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats1 = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats1.ConnectRetryAsync();
         var js1 = new NatsJSContext(nats1);
         var kv1 = new NatsKVContext(js1);
         var store1 = await kv1.CreateStoreAsync(config, cancellationToken: cancellationToken);
@@ -94,6 +97,7 @@ public class GetKeysTest
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats1 = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats1.ConnectRetryAsync();
         var js1 = new NatsJSContext(nats1);
         var kv1 = new NatsKVContext(js1);
         var store1 = await kv1.CreateStoreAsync(config, cancellationToken: cancellationToken);

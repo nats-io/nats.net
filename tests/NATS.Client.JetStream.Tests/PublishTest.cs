@@ -343,6 +343,7 @@ public class PublishTest
             LoggerFactory = logger,
             RequestReplyMode = mode,
         });
+        await nats.ConnectRetryAsync();
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         var js = new NatsJSContext(nats);
@@ -379,6 +380,7 @@ public class PublishTest
     {
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestReplyMode = mode });
+        await nats.ConnectRetryAsync();
         var js = nats.CreateJetStreamContext();
         var result = await js.TryPublishAsync("foo", 1);
         Assert.IsType<NatsJSPublishNoResponseException>(result.Error);

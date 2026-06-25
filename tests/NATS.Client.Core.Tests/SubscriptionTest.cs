@@ -1,4 +1,5 @@
 using System.Net;
+using NATS.Client.TestUtilities2;
 using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.Core.Tests;
@@ -35,6 +36,7 @@ public class SubscriptionTest
         // SharedInbox so the connection doesn't open an inbox subscription at connect,
         // which would make the SUB frame count below never settle at 1.
         var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}", SubscriptionCleanUpInterval = TimeSpan.FromSeconds(1), RequestReplyMode = NatsRequestReplyMode.SharedInbox });
+        await nats.ConnectRetryAsync();
 
         async Task Isolator()
         {
@@ -75,6 +77,7 @@ public class SubscriptionTest
         // SharedInbox so the connection doesn't open an inbox subscription at connect,
         // which would make the SUB frame count below never settle at 1.
         var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}", SubscriptionCleanUpInterval = TimeSpan.MaxValue, RequestReplyMode = NatsRequestReplyMode.SharedInbox });
+        await nats.ConnectRetryAsync();
 
         async Task Isolator()
         {
@@ -108,6 +111,7 @@ public class SubscriptionTest
     {
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         var subject = nats.NewInbox();
 
         await using var sub1 = await nats.SubscribeCoreAsync<int>(subject, opts: new NatsSubOpts { MaxMsgs = 1 });
@@ -147,6 +151,7 @@ public class SubscriptionTest
     {
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         const string subject = "foo1";
         const int maxMsgs = 99;
         var opts = new NatsSubOpts { MaxMsgs = maxMsgs };
@@ -177,6 +182,7 @@ public class SubscriptionTest
     {
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
 
         const string subject = "foo2";
         var opts = new NatsSubOpts { Timeout = TimeSpan.FromSeconds(1) };
@@ -200,6 +206,7 @@ public class SubscriptionTest
     {
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         const string subject = "foo3";
         var opts = new NatsSubOpts { IdleTimeout = TimeSpan.FromSeconds(3) };
 
@@ -231,6 +238,7 @@ public class SubscriptionTest
     {
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
 
         const string subject = "foo-max";
         var opts = new NatsSubOpts
@@ -266,6 +274,7 @@ public class SubscriptionTest
     {
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         const string subject = "foo4";
         await using var sub = await nats.SubscribeCoreAsync<int>(subject);
 
@@ -352,6 +361,7 @@ public class SubscriptionTest
     {
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 

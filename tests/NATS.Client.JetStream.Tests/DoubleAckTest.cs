@@ -1,4 +1,5 @@
 using NATS.Client.Core2.Tests;
+using NATS.Client.TestUtilities2;
 using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.JetStream.Tests;
@@ -20,6 +21,7 @@ public class DoubleAckTest
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
 
         var js = new NatsJSContext(nats);

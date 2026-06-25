@@ -510,6 +510,7 @@ public class OrderedConsumerTest
 
         await using (var setup = new NatsConnection(new NatsOpts { Url = _server.Url }))
         {
+            await setup.ConnectRetryAsync();
             var setupJs = new NatsJSContext(setup);
             await setupJs.CreateStreamAsync(new StreamConfig(streamName, [subject]), cts.Token);
 
@@ -523,6 +524,7 @@ public class OrderedConsumerTest
             DrainSubscriptionsOnDispose = true,
             ConsumerDrainOnDisposeTimeout = TimeSpan.FromSeconds(30),
         });
+        await nats.ConnectRetryAsync();
         var js = new NatsJSContext(nats);
         var stream = await js.GetStreamAsync(streamName, cancellationToken: cts.Token);
         var consumer = await stream.CreateOrderedConsumerAsync(cancellationToken: cts.Token);

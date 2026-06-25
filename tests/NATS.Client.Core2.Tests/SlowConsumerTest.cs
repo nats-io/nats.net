@@ -1,4 +1,5 @@
 using NATS.Client.Core2.Tests;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.Core.Tests;
 
@@ -22,6 +23,7 @@ public class SlowConsumerTest
             Url = _server.Url,
             SubPendingChannelCapacity = 3,
         });
+        await nats.ConnectRetryAsync();
 
         var lost = 0;
         nats.MessageDropped += (_, e) =>
@@ -108,6 +110,7 @@ public class SlowConsumerTest
             Url = _server.Url,
             SubPendingChannelCapacity = 3,
         });
+        await nats.ConnectRetryAsync();
 
         var droppedCount = 0;
         var slowConsumerCount = 0;
@@ -206,6 +209,7 @@ public class SlowConsumerTest
             Url = _server.Url,
             SubPendingChannelCapacity = 3,
         });
+        await nats.ConnectRetryAsync();
 
         var droppedCount = 0;
         var slowConsumerCount = 0;
@@ -317,7 +321,7 @@ public class SlowConsumerTest
         // Wait for more drops and the second slow consumer event
         await Retry.Until(
             "episode 2 drops",
-            () => Volatile.Read(ref droppedCount) > droppedAfterEpisode1 && Volatile.Read(ref slowConsumerCount) >= 2);
+            () => Volatile.Read(ref droppedCount) > droppedAfterEpisode1 && Volatile.Read(ref slowConsumerCount) > slowConsumerAfterEpisode1);
 
         var droppedAfterEpisode2 = Volatile.Read(ref droppedCount);
         var slowConsumerAfterEpisode2 = Volatile.Read(ref slowConsumerCount);

@@ -8,6 +8,7 @@ using NATS.Client.ObjectStore.Internal;
 using NATS.Client.ObjectStore.Models;
 using NATS.Client.Serializers.Json;
 using NATS.Client.TestUtilities;
+using NATS.Client.TestUtilities2;
 using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.ObjectStore.Tests;
@@ -26,6 +27,7 @@ public class ObjectStoreTest
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         var js = new NatsJSContext(nats);
         var ob = new NatsObjContext(js);
 
@@ -53,6 +55,7 @@ public class ObjectStoreTest
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         var js = new NatsJSContext(nats);
         var ob = new NatsObjContext(js);
 
@@ -135,6 +138,7 @@ public class ObjectStoreTest
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         var js = new NatsJSContext(nats);
         var ob = new NatsObjContext(js);
 
@@ -189,6 +193,7 @@ public class ObjectStoreTest
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         var js = new NatsJSContext(nats);
         var ob = new NatsObjContext(js);
 
@@ -227,6 +232,7 @@ public class ObjectStoreTest
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         var js = new NatsJSContext(nats);
         var obj = new NatsObjContext(js);
 
@@ -258,6 +264,7 @@ public class ObjectStoreTest
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         var js = new NatsJSContext(nats);
         var obj = new NatsObjContext(js);
 
@@ -305,6 +312,7 @@ public class ObjectStoreTest
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         var js = new NatsJSContext(nats);
         var obj = new NatsObjContext(js);
 
@@ -344,6 +352,7 @@ public class ObjectStoreTest
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         var js = new NatsJSContext(nats);
         var obj = new NatsObjContext(js);
 
@@ -402,6 +411,7 @@ public class ObjectStoreTest
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         var js = new NatsJSContext(nats);
         var obj = new NatsObjContext(js);
 
@@ -441,6 +451,7 @@ public class ObjectStoreTest
     {
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         var js = new NatsJSContext(nats);
         var obj = new NatsObjContext(js);
 
@@ -473,6 +484,7 @@ public class ObjectStoreTest
             Url = server.Url,
             SerializerRegistry = NatsJsonSerializerRegistry.Default,
         });
+        await nats.ConnectRetryAsync();
         var js = new NatsJSContext(nats);
         var ob = new NatsObjContext(js);
 
@@ -508,6 +520,7 @@ public class ObjectStoreTest
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         var js = new NatsJSContext(nats);
         var obj = new NatsObjContext(js);
 
@@ -540,6 +553,7 @@ public class ObjectStoreTest
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         var js = new NatsJSContext(nats);
         var obj = new NatsObjContext(js);
 
@@ -564,6 +578,7 @@ public class ObjectStoreTest
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         var js = new NatsJSContext(nats);
         var ob = new NatsObjContext(js);
 
@@ -632,6 +647,7 @@ public class ObjectStoreTest
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         var js = new NatsJSContext(nats);
         var obj = new NatsObjContext(js);
 
@@ -673,6 +689,7 @@ public class ObjectStoreTest
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         var js = new NatsJSContext(nats);
         var ob = new NatsObjContext(js);
 

@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using System.Threading.Channels;
 using NATS.Client.Core.Tests;
+using NATS.Client.TestUtilities2;
 using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.JetStream.Tests;
@@ -18,6 +19,7 @@ public class NatsJSContextFactoryTest
         // Arrange
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestTimeout = TimeSpan.FromSeconds(10) });
+        await nats.ConnectRetryAsync();
         var factory = new NatsJSContextFactory();
 
         // Act
@@ -33,6 +35,7 @@ public class NatsJSContextFactoryTest
         // Arrange
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestTimeout = TimeSpan.FromSeconds(10) });
+        await nats.ConnectRetryAsync();
         var factory = new NatsJSContextFactory();
         var opts = new NatsJSOpts(nats.Opts);
 

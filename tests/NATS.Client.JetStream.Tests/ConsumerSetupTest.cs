@@ -3,6 +3,7 @@ using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Models;
 using NATS.Client.TestUtilities;
+using NATS.Client.TestUtilities2;
 using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.JetStream.Tests;
@@ -25,6 +26,7 @@ public class ConsumerSetupTest
     public async Task Create_push_consumer(NatsRequestReplyMode mode)
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
         var js = new NatsJSContext(nats);
 
@@ -57,6 +59,7 @@ public class ConsumerSetupTest
     public async Task Create_paused_consumer()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
         var js = new NatsJSContextFactory().CreateContext(nats);
 
@@ -90,6 +93,7 @@ public class ConsumerSetupTest
     public async Task Consumer_config(NatsRequestReplyMode mode)
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
         var js = new NatsJSContextFactory().CreateContext(nats);
 
