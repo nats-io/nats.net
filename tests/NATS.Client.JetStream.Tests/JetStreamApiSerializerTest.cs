@@ -4,6 +4,7 @@ using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
+using NATS.Client.TestUtilities2;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace NATS.Client.JetStream.Tests;
@@ -24,6 +25,7 @@ public class JetStreamApiSerializerTest
     public async Task Should_respect_buffers_lifecycle()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
         var js = new NatsJSContext(nats);
         var apiSubject = $"{prefix}.js.fake.api";

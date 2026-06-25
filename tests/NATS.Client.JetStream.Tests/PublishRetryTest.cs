@@ -24,6 +24,7 @@ public class PublishRetryTest
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = mode });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
 
         // Without telemetry

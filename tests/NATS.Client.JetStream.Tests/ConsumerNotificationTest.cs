@@ -3,6 +3,7 @@ using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Models;
 using NATS.Client.TestUtilities;
+using NATS.Client.TestUtilities2;
 using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.JetStream.Tests;
@@ -24,6 +25,7 @@ public class ConsumerNotificationTest
     {
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         var js = new NatsJSContext(nats);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -97,6 +99,7 @@ public class ConsumerNotificationTest
     public async Task Exceeded_max_errors()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
         var js = new NatsJSContext(nats);
 

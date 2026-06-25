@@ -38,6 +38,7 @@ public class StreamDomainAdjustmentTest(NatsServerFixture server)
         });
 
         await using var nats = new NatsConnection(new NatsOpts { Url = ms.Url });
+        await nats.ConnectRetryAsync();
         var js = new NatsJSContext(nats);
 
         // Configure a stream with Source that has Domain set

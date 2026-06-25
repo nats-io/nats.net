@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Tests;
 using NATS.Client.TestUtilities;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.Core2.Tests;
 
@@ -29,6 +30,7 @@ public class ErrorHandlerTest
             LoggerFactory = logger,
             AuthOpts = new NatsAuthOpts { Username = "u" },
         });
+        await nats.ConnectRetryAsync();
 
         var errors = new List<NatsServerErrorEventArgs>();
 

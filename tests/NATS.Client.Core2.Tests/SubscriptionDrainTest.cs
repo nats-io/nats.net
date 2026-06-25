@@ -1,4 +1,5 @@
 using NATS.Client.Core2.Tests;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.Core.Tests;
 
@@ -16,6 +17,7 @@ public class SubscriptionDrainTest
     public async Task Drain_preserves_buffered_messages_and_completes_channel()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var cancellationToken = cts.Token;
 
@@ -44,6 +46,7 @@ public class SubscriptionDrainTest
     public async Task Drain_delivers_messages_still_in_flight_after_unsub()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var cancellationToken = cts.Token;
 
@@ -76,6 +79,7 @@ public class SubscriptionDrainTest
     public async Task Drain_stops_new_messages_but_connection_stays_usable()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var cancellationToken = cts.Token;
 
@@ -109,6 +113,7 @@ public class SubscriptionDrainTest
     public async Task Drain_is_idempotent_and_dispose_after_drain_is_safe()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var cancellationToken = cts.Token;
 

@@ -1,6 +1,7 @@
 using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Models;
 using NATS.Client.TestUtilities;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.JetStream.Tests;
 
@@ -22,6 +23,7 @@ public class DirectGetTest
         // https://github.com/nats-io/nats-server/commit/ce309b79d99552996e18dce47dc04bdc730c0d84
         // When we fail to deliver a message through a service import respond with no responders.
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
         var js = new NatsJSContext(nats);
 
@@ -42,6 +44,7 @@ public class DirectGetTest
     public async Task Direct_get_returns_no_reply()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
         var js = new NatsJSContext(nats);
 

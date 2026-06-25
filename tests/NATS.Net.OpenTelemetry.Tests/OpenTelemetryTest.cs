@@ -601,6 +601,48 @@ public class OpenTelemetryTest
         await reg;
     }
 
+    [Fact]
+    public async Task Consumed_counter_excludes_jetstream_control_messages()
+    {
+        using var meter = new MeterTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        var js = new NatsJSContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        await js.CreateStreamAsync(new StreamConfig { Name = "ctrl-stream", Subjects = ["ctrl.>"] }, cts.Token);
+        await js.CreateOrUpdateConsumerAsync("ctrl-stream", new ConsumerConfig("ctrl-consumer"), cts.Token);
+
+        for (var i = 0; i < 3; i++)
+            await js.PublishAsync("ctrl.subject", i, cancellationToken: cts.Token);
+
+        var consumer = await js.GetConsumerAsync("ctrl-stream", "ctrl-consumer", cts.Token);
+
+        // consumed.messages is connection-wide and already includes the PubAck and JS API
+        // replies from the setup above, so measure the delta across the fetch only.
+        long Consumed() => meter.LongMeasurements
+            .Where(m => m.Name == "messaging.client.consumed.messages")
+            .Sum(m => m.Value);
+
+        var before = Consumed();
+
+        // MaxMsgs greater than the 3 available, with a short expiry: the server delivers the
+        // 3 data messages on the fetch subscription and then a status frame to end the batch.
+        // Only the 3 data messages were delivered to the application, so the delta must be 3.
+        var received = 0;
+        await foreach (var msg in consumer.FetchAsync<int>(
+            new NatsJSFetchOpts { MaxMsgs = 10, Expires = TimeSpan.FromSeconds(2) },
+            cancellationToken: cts.Token))
+        {
+            received++;
+        }
+
+        received.Should().Be(3);
+        (Consumed() - before).Should().Be(3);
+    }
+
     private void AssertActivityData(string subject, IReadOnlyList<Activity> activityList, string expectedHost, string expectedClientId)
     {
         var activities = activityList.ToArray();
