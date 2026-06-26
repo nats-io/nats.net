@@ -36,7 +36,7 @@ jobs:
           dotnet-version: |
             6.x
             8.x
-            9.x
+            10.x
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -82,6 +82,12 @@ jobs:
         run: |
           cd tests/NATS.Client.Abstractions.Tests
           dotnet test -c Release --no-build
+
+      # net481 covers the netstandard2.0 branch; run TFMs serially as the platform tests do
+      - name: Test Object Store Encoder
+        run: |
+          cd tests/NATS.Client.ObjectStore.Encoder.Tests
+          dotnet test -c Release --no-build -p:TestTfmsInParallel=false
 
       - name: Test JetStream
         run: |

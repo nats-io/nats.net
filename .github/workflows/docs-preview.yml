@@ -24,7 +24,7 @@ jobs:
           dotnet-version: |
             6.x
             8.x
-            9.x
+            10.x
 
       - run: dotnet build
       - run: dotnet tool update -g docfx
