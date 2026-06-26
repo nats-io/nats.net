@@ -135,6 +135,12 @@ internal static class Base64UrlEncoder
                     return i;
                 break;
             }
+        utf8.Replace((byte)Base64Character62, (byte)Base64UrlCharacter62);
+        utf8.Replace((byte)Base64Character63, (byte)Base64UrlCharacter63);
+
+        if (raw && utf8.EndsWith((byte)Base64PadCharacter))
+        {
+            return utf8.LastIndexOfAnyExcept((byte)Base64PadCharacter) + 1;
         }
 
         return utf8.Length;
