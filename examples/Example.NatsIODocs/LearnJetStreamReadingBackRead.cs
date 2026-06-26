@@ -32,7 +32,7 @@ public class LearnJetStreamReadingBackRead(NatsServerFixture fixture, ITestOutpu
         await js.PublishAsync(subject: "orders.shipped", data: """{"order_id":"ord_8w2k","customer":"acme-co"}""");
 
         // Create the durable consumer to read from
-        await js.CreateOrUpdateConsumerAsync("ORDERS", new ConsumerConfig("orders-reader")
+        await js.CreateOrUpdateConsumerAsync("ORDERS", new ConsumerConfig("billing")
         {
             AckPolicy = ConsumerConfigAckPolicy.Explicit,
             DeliverPolicy = ConsumerConfigDeliverPolicy.All,
@@ -42,7 +42,7 @@ public class LearnJetStreamReadingBackRead(NatsServerFixture fixture, ITestOutpu
 
         // NATS-DOC-START
         // Bind to the existing durable consumer
-        var consumer = await js.GetConsumerAsync("ORDERS", "orders-reader");
+        var consumer = await js.GetConsumerAsync("ORDERS", "billing");
 
         // Read exactly what the stream is holding, no count assumed up front
         long pending = (long)consumer.Info.NumPending;
