@@ -33,7 +33,7 @@ public class LearnJetStreamReadingBackCreate(NatsServerFixture fixture, ITestOut
 
         // NATS-DOC-START
         // Create a durable consumer that delivers every stored message from the start
-        var consumer = await js.CreateOrUpdateConsumerAsync("ORDERS", new ConsumerConfig("orders-reader")
+        var consumer = await js.CreateOrUpdateConsumerAsync("ORDERS", new ConsumerConfig("billing")
         {
             AckPolicy = ConsumerConfigAckPolicy.Explicit,
             DeliverPolicy = ConsumerConfigDeliverPolicy.All,
@@ -42,6 +42,6 @@ public class LearnJetStreamReadingBackCreate(NatsServerFixture fixture, ITestOut
         output.WriteLine($"Created durable consumer {consumer.Info.Config.Name} on stream ORDERS");
 
         // NATS-DOC-END
-        Assert.Equal("orders-reader", consumer.Info.Config.Name);
+        Assert.Equal("billing", consumer.Info.Config.Name);
     }
 }
