@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <!--
-      Micro-benchmark for Base64UrlEncoder. The two distinct encoder implementations are the
-      lookup-table path (all pre-net9 builds, represented by net8.0) and the Base64Url path
-      (net9+, represented by net10.0). Run with: dotnet run -c Release -f net10.0
+      Lean BenchmarkDotNet host: minimal dependencies (only the projects under test + BDN), kept
+      separate from MicroBenchmark which pulls in heavier third-party packages. Add focused
+      micro-benchmarks here. Run with: dotnet run -c Release -f net10.0 (pass a BDN filter such as *).
     -->
     <PropertyGroup>
         <OutputType>Exe</OutputType>

@@ -27,7 +27,7 @@
   <Folder Name="/sandbox/">
     <Project Path="sandbox/ConsoleApp/ConsoleApp.csproj" />
     <Project Path="sandbox/MicroBenchmark/MicroBenchmark.csproj" />
-    <Project Path="sandbox/NATS.Client.ObjectStore.Encoder.Benchmarks/NATS.Client.ObjectStore.Encoder.Benchmarks.csproj" />
+    <Project Path="sandbox/MicroBench2/MicroBench2.csproj" />
     <Project Path="sandbox/MinimumWebApp/MinimumWebApp.csproj" />
   </Folder>
   <Folder Name="/Solution Items/">

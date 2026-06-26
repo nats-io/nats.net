@@ -2,11 +2,11 @@ using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 using NATS.Client.ObjectStore.Internal;
 
-namespace NATS.Client.ObjectStore.Encoder.Benchmarks;
+namespace MicroBench2;
 
 [MemoryDiagnoser]
-[SimpleJob(RuntimeMoniker.Net80)]
-[SimpleJob(RuntimeMoniker.Net10_0)]
+[ShortRunJob(RuntimeMoniker.Net80)]
+[ShortRunJob(RuntimeMoniker.Net10_0)]
 public class Base64UrlEncoderBenchmarks
 {
     private const char PadChar = '=';
