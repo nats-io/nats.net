@@ -1,5 +1,5 @@
 using System.Buffers;
-#if NETSTANDARD2_0 || NET9_0_OR_GREATER
+#if NET9_0_OR_GREATER
 using System.Buffers.Text;
 #endif
 using System.Security.Cryptography;
@@ -20,6 +20,16 @@ internal static class Base64UrlEncoder
     private const char Base64Character63 = '/';
     private const char Base64UrlCharacter62 = '-';
     private const char Base64UrlCharacter63 = '_';
+
+#if !NET9_0_OR_GREATER
+    // base64url alphabet (the 63rd/64th entries are '-'/'_'), so the table encodes url-safe directly.
+    private static readonly char[] SBase64Table =
+    {
+        'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+        'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', Base64UrlCharacter62, Base64UrlCharacter63,
+    };
+#endif
 
     public static string Sha256(ReadOnlySpan<byte> value)
     {
@@ -86,31 +96,67 @@ internal static class Base64UrlEncoder
             if (rented != null)
                 ArrayPool<char>.Shared.Return(rented);
         }
-#elif NETSTANDARD2_0
-        // No span-based encode-to-chars on netstandard2.0: encode to ASCII bytes (read straight
-        // from the input span), run the url-safe swap on the bytes, then build the string.
-        var rented = ArrayPool<byte>.Shared.Rent(base64Length);
-        try
-        {
-            _ = Base64.EncodeToUtf8(inArray, rented, out _, out var written);
-            var count = MakeUrlSafe(rented.AsSpan(0, written), raw);
-            return Encoding.ASCII.GetString(rented, 0, count);
-        }
-        finally
-        {
-            ArrayPool<byte>.Shared.Return(rented);
-        }
 #else
-        // Encode straight to chars so the string is built without a separate ASCII transcode.
+        // Pre-net9 there is no url-safe base64 encoder, so use the lookup table (which maps directly
+        // to the url-safe alphabet). Encode into a stack/pooled buffer so only the result string is
+        // allocated.
         char[]? rented = null;
         var chars = base64Length <= 512
             ? stackalloc char[base64Length]
             : (rented = ArrayPool<char>.Shared.Rent(base64Length)).AsSpan(0, base64Length);
+        var table = SBase64Table;
         try
         {
-            _ = Convert.TryToBase64Chars(inArray, chars, out var written);
-            var count = MakeUrlSafe(chars.Slice(0, written), raw);
-            return new string(chars.Slice(0, count));
+            var lengthMod3 = length % 3;
+            var limit = length - lengthMod3;
+            var j = 0;
+
+            // Each 3 input bytes map to 4 output chars.
+            for (var i = 0; i < limit; i += 3)
+            {
+                var d0 = inArray[i];
+                var d1 = inArray[i + 1];
+                var d2 = inArray[i + 2];
+
+                chars[j + 0] = table[d0 >> 2];
+                chars[j + 1] = table[((d0 & 0x03) << 4) | (d1 >> 4)];
+                chars[j + 2] = table[((d1 & 0x0f) << 2) | (d2 >> 6)];
+                chars[j + 3] = table[d2 & 0x3f];
+                j += 4;
+            }
+
+            switch (lengthMod3)
+            {
+            case 2:
+                {
+                    var d0 = inArray[limit];
+                    var d1 = inArray[limit + 1];
+                    chars[j + 0] = table[d0 >> 2];
+                    chars[j + 1] = table[((d0 & 0x03) << 4) | (d1 >> 4)];
+                    chars[j + 2] = table[(d1 & 0x0f) << 2];
+                    j += 3;
+                }
+
+                break;
+
+            case 1:
+                {
+                    var d0 = inArray[limit];
+                    chars[j + 0] = table[d0 >> 2];
+                    chars[j + 1] = table[(d0 & 0x03) << 4];
+                    j += 2;
+                }
+
+                break;
+            }
+
+            if (!raw)
+            {
+                chars.Slice(j, base64Length - j).Fill(Base64PadCharacter);
+                j = base64Length;
+            }
+
+            return CreateString(chars.Slice(0, j));
         }
         finally
         {
@@ -140,64 +186,19 @@ internal static class Base64UrlEncoder
         return UnsafeDecode(str);
     }
 
-    // Translates standard base64 to base64url in place ('+' -> '-', '/' -> '_'). When raw is set,
-    // returns the length up to the first '=' so the trailing padding is dropped; otherwise returns
-    // the full length (padding kept, matching base64.URLEncoding used by other clients). net9+
-    // encodes url-safe via Base64Url and needs no swap, so no helper is compiled there.
+#if !NET9_0_OR_GREATER
+    // netstandard2.0 has no string(ReadOnlySpan<char>) constructor.
+    private static unsafe string CreateString(ReadOnlySpan<char> chars)
+    {
 #if NETSTANDARD2_0
-    private static int MakeUrlSafe(Span<byte> utf8, bool raw)
-    {
-        for (var i = 0; i < utf8.Length; i++)
-        {
-            switch (utf8[i])
-            {
-            case (byte)Base64Character62:
-                utf8[i] = (byte)Base64UrlCharacter62;
-                break;
-            case (byte)Base64Character63:
-                utf8[i] = (byte)Base64UrlCharacter63;
-                break;
-            case (byte)Base64PadCharacter:
-                if (raw)
-                    return i;
-                break;
-            }
-        }
+        if (chars.IsEmpty)
+            return string.Empty;
 
-        return utf8.Length;
-    }
-#elif NETSTANDARD2_1
-    private static int MakeUrlSafe(Span<char> chars, bool raw)
-    {
-        for (var i = 0; i < chars.Length; i++)
-        {
-            switch (chars[i])
-            {
-            case Base64Character62:
-                chars[i] = Base64UrlCharacter62;
-                break;
-            case Base64Character63:
-                chars[i] = Base64UrlCharacter63;
-                break;
-            case Base64PadCharacter:
-                if (raw)
-                    return i;
-                break;
-            }
-        }
-
-        return chars.Length;
-    }
-#elif !NET9_0_OR_GREATER
-    private static int MakeUrlSafe(Span<char> chars, bool raw)
-    {
-        chars.Replace(Base64Character62, Base64UrlCharacter62);
-        chars.Replace(Base64Character63, Base64UrlCharacter63);
-
-        if (raw)
-            return chars.LastIndexOfAnyExcept(Base64PadCharacter) + 1;
-
-        return chars.Length;
+        fixed (char* ptr = chars)
+            return new string(ptr, 0, chars.Length);
+#else
+        return new string(chars);
+#endif
     }
 #endif
 
