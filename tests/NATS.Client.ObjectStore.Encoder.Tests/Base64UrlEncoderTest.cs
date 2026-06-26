@@ -1,7 +1,7 @@
 using System.Text;
 using NATS.Client.ObjectStore.Internal;
 
-namespace NATS.Client.ObjectStore.Tests;
+namespace NATS.Client.ObjectStore.Encoder.Tests;
 
 public class Base64UrlEncoderTest
 {

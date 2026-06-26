@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!--
+      Micro-benchmark for Base64UrlEncoder. Multi-targets so BenchmarkDotNet can build a runner per
+      runtime and compare the compiled branches side by side: net6.0 -> netstandard2.1 (manual char
+      loop), net8.0 -> Convert.TryToBase64Chars + Span.Replace, net10.0 -> Base64Url, net481 ->
+      netstandard2.0 (manual byte loop, Windows only). Run with: dotnet run -c Release -f net10.0
+    -->
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFrameworks>net6.0;net8.0;net10.0</TargetFrameworks>
+        <TargetFrameworks Condition="'$(OS)' == 'Windows_NT'">$(TargetFrameworks);net481</TargetFrameworks>
+        <RuntimeIdentifiers Condition="'$(OS)' == 'Windows_NT'">any;win-x64</RuntimeIdentifiers>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <LangVersion>latest</LangVersion>
+        <IsPackable>false</IsPackable>
+        <CheckEolTargetFramework>false</CheckEolTargetFramework>
+        <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
+        <NoWarn>$(NoWarn);CS8002</NoWarn>
+        <DefineConstants Condition="'$(OS)' == 'Windows_NT'">$(DefineConstants);WINDOWS</DefineConstants>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\src\NATS.Client.ObjectStore\NATS.Client.ObjectStore.csproj" />
+    </ItemGroup>
+
+</Project>
