@@ -98,65 +98,73 @@ internal static class Base64UrlEncoder
         }
 #else
         // Pre-net9 there is no url-safe base64 encoder, so use the lookup table (which maps directly
-        // to the url-safe alphabet). Encode into a stack/pooled buffer so only the result string is
-        // allocated.
+        // to the url-safe alphabet). Encode into a stack/pooled buffer with an unsafe pointer loop
+        // (no bounds checks), so only the result string is allocated.
         char[]? rented = null;
         var chars = base64Length <= 512
             ? stackalloc char[base64Length]
             : (rented = ArrayPool<char>.Shared.Rent(base64Length)).AsSpan(0, base64Length);
-        var table = SBase64Table;
         try
         {
             var lengthMod3 = length % 3;
             var limit = length - lengthMod3;
             var j = 0;
 
-            // Each 3 input bytes map to 4 output chars.
-            for (var i = 0; i < limit; i += 3)
+            unsafe
             {
-                var d0 = inArray[i];
-                var d1 = inArray[i + 1];
-                var d2 = inArray[i + 2];
-
-                chars[j + 0] = table[d0 >> 2];
-                chars[j + 1] = table[((d0 & 0x03) << 4) | (d1 >> 4)];
-                chars[j + 2] = table[((d1 & 0x0f) << 2) | (d2 >> 6)];
-                chars[j + 3] = table[d2 & 0x3f];
-                j += 4;
-            }
-
-            switch (lengthMod3)
-            {
-            case 2:
+                // Pin the table and output and index them without bounds checks; inArray stays a
+                // checked span (its accesses are bounded by limit, derived from its own length).
+                fixed (char* dst = chars, tbl = SBase64Table)
                 {
-                    var d0 = inArray[limit];
-                    var d1 = inArray[limit + 1];
-                    chars[j + 0] = table[d0 >> 2];
-                    chars[j + 1] = table[((d0 & 0x03) << 4) | (d1 >> 4)];
-                    chars[j + 2] = table[(d1 & 0x0f) << 2];
-                    j += 3;
+                    // Each 3 input bytes map to 4 output chars.
+                    for (var i = 0; i < limit; i += 3)
+                    {
+                        int d0 = inArray[i];
+                        int d1 = inArray[i + 1];
+                        int d2 = inArray[i + 2];
+
+                        dst[j + 0] = tbl[d0 >> 2];
+                        dst[j + 1] = tbl[((d0 & 0x03) << 4) | (d1 >> 4)];
+                        dst[j + 2] = tbl[((d1 & 0x0f) << 2) | (d2 >> 6)];
+                        dst[j + 3] = tbl[d2 & 0x3f];
+                        j += 4;
+                    }
+
+                    switch (lengthMod3)
+                    {
+                    case 2:
+                        {
+                            int d0 = inArray[limit];
+                            int d1 = inArray[limit + 1];
+                            dst[j + 0] = tbl[d0 >> 2];
+                            dst[j + 1] = tbl[((d0 & 0x03) << 4) | (d1 >> 4)];
+                            dst[j + 2] = tbl[(d1 & 0x0f) << 2];
+                            j += 3;
+                        }
+
+                        break;
+
+                    case 1:
+                        {
+                            int d0 = inArray[limit];
+                            dst[j + 0] = tbl[d0 >> 2];
+                            dst[j + 1] = tbl[(d0 & 0x03) << 4];
+                            j += 2;
+                        }
+
+                        break;
+                    }
+
+                    if (!raw)
+                    {
+                        for (var k = j; k < base64Length; k++)
+                            dst[k] = Base64PadCharacter;
+                        j = base64Length;
+                    }
+
+                    return new string(dst, 0, j);
                 }
-
-                break;
-
-            case 1:
-                {
-                    var d0 = inArray[limit];
-                    chars[j + 0] = table[d0 >> 2];
-                    chars[j + 1] = table[(d0 & 0x03) << 4];
-                    j += 2;
-                }
-
-                break;
             }
-
-            if (!raw)
-            {
-                chars.Slice(j, base64Length - j).Fill(Base64PadCharacter);
-                j = base64Length;
-            }
-
-            return CreateString(chars.Slice(0, j));
         }
         finally
         {
@@ -185,22 +193,6 @@ internal static class Base64UrlEncoder
         _ = str ?? throw new ArgumentNullException(nameof(str));
         return UnsafeDecode(str);
     }
-
-#if !NET9_0_OR_GREATER
-    // netstandard2.0 has no string(ReadOnlySpan<char>) constructor.
-    private static unsafe string CreateString(ReadOnlySpan<char> chars)
-    {
-#if NETSTANDARD2_0
-        if (chars.IsEmpty)
-            return string.Empty;
-
-        fixed (char* ptr = chars)
-            return new string(ptr, 0, chars.Length);
-#else
-        return new string(chars);
-#endif
-    }
-#endif
 
     private static unsafe byte[] UnsafeDecode(string str)
     {
