@@ -17,4 +17,40 @@ public class NatsConnectionTelemetryTests
 
         nats.SpanDestinationName(subject).Should().Be(expected);
     }
+
+    [Fact]
+    public async Task SpanDestinationName_uses_configured_formatter()
+    {
+        var previous = NatsInstrumentationOptions.Default.SpanDestinationNameFormatter;
+        try
+        {
+            NatsInstrumentationOptions.Default.SpanDestinationNameFormatter = subject => $"custom:{subject}";
+
+            await using var nats = new NatsConnection();
+
+            nats.SpanDestinationName("foo.bar.baz").Should().Be("custom:foo.bar.baz");
+        }
+        finally
+        {
+            NatsInstrumentationOptions.Default.SpanDestinationNameFormatter = previous;
+        }
+    }
+
+    [Fact]
+    public async Task SpanDestinationName_collapses_inbox_before_configured_formatter()
+    {
+        var previous = NatsInstrumentationOptions.Default.SpanDestinationNameFormatter;
+        try
+        {
+            NatsInstrumentationOptions.Default.SpanDestinationNameFormatter = subject => $"custom:{subject}";
+
+            await using var nats = new NatsConnection();
+
+            nats.SpanDestinationName("_INBOX.abc.def").Should().Be("inbox");
+        }
+        finally
+        {
+            NatsInstrumentationOptions.Default.SpanDestinationNameFormatter = previous;
+        }
+    }
 }

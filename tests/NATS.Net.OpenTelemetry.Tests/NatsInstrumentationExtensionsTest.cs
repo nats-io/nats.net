@@ -39,17 +39,20 @@ public class NatsInstrumentationExtensionsTest
                     configured = true;
                     options.Filter = _ => true;
                     options.Enrich = (_, _) => { };
+                    options.SpanDestinationNameFormatter = subject => subject;
                 })
                 .Build();
 
             configured.Should().BeTrue();
             NatsInstrumentationOptions.Default.Filter.Should().NotBeNull();
             NatsInstrumentationOptions.Default.Enrich.Should().NotBeNull();
+            NatsInstrumentationOptions.Default.SpanDestinationNameFormatter.Should().NotBeNull();
         }
         finally
         {
             NatsInstrumentationOptions.Default.Filter = null;
             NatsInstrumentationOptions.Default.Enrich = null;
+            NatsInstrumentationOptions.Default.SpanDestinationNameFormatter = null;
         }
     }
 

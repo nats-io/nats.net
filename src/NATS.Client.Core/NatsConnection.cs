@@ -384,6 +384,9 @@ public partial class NatsConnection : INatsConnection
         if (subject.StartsWith(Opts.InboxPrefix, StringComparison.Ordinal))
             return "inbox";
 
+        if (NatsInstrumentationOptions.Default.SpanDestinationNameFormatter is { } formatter)
+            return formatter(subject);
+
         // to avoid long span names and low cardinality, only take the first two tokens
         var subjectSpan = subject.AsSpan();
         var firstSeparator = subjectSpan.IndexOf('.');
