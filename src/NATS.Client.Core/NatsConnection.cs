@@ -385,8 +385,12 @@ public partial class NatsConnection : INatsConnection
             return "inbox";
 
         // to avoid long span names and low cardinality, only take the first two tokens
-        var tokens = subject.Split('.');
-        return tokens.Length < 2 ? subject : $"{tokens[0]}.{tokens[1]}";
+        var subjectSpan = subject.AsSpan();
+        var firstSeparator = subjectSpan.IndexOf('.');
+        var secondSeparator = firstSeparator < 0 ? -1 : subjectSpan[(firstSeparator + 1)..].IndexOf('.');
+        return secondSeparator < 0
+            ? subject
+            : subjectSpan[..(firstSeparator + 1 + secondSeparator)].ToString();
     }
 
     internal NatsStats GetStats() => Counter.ToStats();
