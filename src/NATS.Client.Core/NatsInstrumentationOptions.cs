@@ -23,4 +23,12 @@ public sealed class NatsInstrumentationOptions
     /// Gets or sets an action to enrich an Activity.
     /// </summary>
     public Action<Activity, NatsInstrumentationContext>? Enrich { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that formats the destination name used in span names.
+    /// </summary>
+    /// <remarks>
+    /// The input is the raw NATS subject. This only changes activity names, not telemetry tags.
+    /// </remarks>
+    public Func<string, string>? SpanDestinationNameFormatter { get; set; }
 }

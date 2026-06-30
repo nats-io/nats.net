@@ -18,7 +18,7 @@ public static class NatsInstrumentationExtensions
 
     /// <summary>
     /// Adds the NATS .NET client <see cref="System.Diagnostics.ActivitySource"/> to the tracer provider and
-    /// configures the shared <see cref="NatsInstrumentationOptions"/> (filter and enrich callbacks).
+    /// configures the shared <see cref="NatsInstrumentationOptions"/>.
     /// </summary>
     /// <param name="builder">The <see cref="TracerProviderBuilder"/> to add the source to.</param>
     /// <param name="configure">Action that mutates the process-wide <see cref="NatsInstrumentationOptions.Default"/>.</param>
