@@ -5,6 +5,7 @@ using NATS.Client.ObjectStore.Internal;
 namespace MicroBench2;
 
 [MemoryDiagnoser]
+[ShortRunJob(RuntimeMoniker.Net481)]
 [ShortRunJob(RuntimeMoniker.Net80)]
 [ShortRunJob(RuntimeMoniker.Net10_0)]
 public class Base64UrlEncoderBenchmarks

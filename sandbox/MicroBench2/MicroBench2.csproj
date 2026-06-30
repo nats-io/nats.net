@@ -8,6 +8,8 @@
     <PropertyGroup>
         <OutputType>Exe</OutputType>
         <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+        <!-- net481 (Windows only) exercises the netstandard2.0 table branch of the encoder. -->
+        <TargetFrameworks Condition="'$(OS)' == 'Windows_NT'">$(TargetFrameworks);net481</TargetFrameworks>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <LangVersion>latest</LangVersion>
