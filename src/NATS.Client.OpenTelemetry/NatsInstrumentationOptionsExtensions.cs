@@ -98,7 +98,7 @@ public static class NatsInstrumentationOptionsExtensions
         for (var i = 0; i < pattern.Length; i++)
         {
             if (pattern[i] == ">")
-                return !exhausted; // '>' matches one or more trailing tokens, so token i must exist
+                return !exhausted; // '>' needs at least one remaining subject token; exhausted means the subject is fully consumed
 
             if (exhausted)
                 return false; // pattern has more tokens than the subject
