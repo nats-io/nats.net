@@ -115,6 +115,32 @@ public class NatsInstrumentationExtensionsTest
         options.Filter!(Context("payments.new")).Should().BeFalse(); // dropped by the pre-existing filter
     }
 
+    // Trailing dots are not valid in NATS subjects; this pins the matcher to the same
+    // behavior as the previous Split-based implementation, not protocol compliance.
+    [Theory]
+    [InlineData("foo.", true)] // trailing dot: tokens are "foo" and "", '*' matches the empty token
+    [InlineData("foo", false)] // only one token, pattern needs two
+    [InlineData("foo.bar.", false)] // three tokens ("foo", "bar", ""), pattern needs exactly two
+    public void FilterSubjects_invalid_subject_empty_trailing_token(string subject, bool expected)
+    {
+        var options = new NatsInstrumentationOptions().FilterSubjects(include: ["foo.*"]);
+
+        options.Filter!(Context(subject)).Should().Be(expected);
+    }
+
+    // Consecutive dots are not valid in NATS subjects; this pins the matcher to the same
+    // behavior as the previous Split-based implementation, not protocol compliance.
+    [Theory]
+    [InlineData("foo..bar", true)] // consecutive dots: tokens "foo", "", "bar"
+    [InlineData("foo.bar", true)]
+    [InlineData("foo", false)] // '>' needs at least one trailing token
+    public void FilterSubjects_invalid_subject_greater_than_spans_empty_tokens(string subject, bool expected)
+    {
+        var options = new NatsInstrumentationOptions().FilterSubjects(include: ["foo.>"]);
+
+        options.Filter!(Context(subject)).Should().Be(expected);
+    }
+
     [Fact]
     public void FilterSubjects_without_patterns_leaves_filter_unset()
     {
