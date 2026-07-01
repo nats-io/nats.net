@@ -27,6 +27,7 @@
   <Folder Name="/sandbox/">
     <Project Path="sandbox/ConsoleApp/ConsoleApp.csproj" />
     <Project Path="sandbox/MicroBenchmark/MicroBenchmark.csproj" />
+    <Project Path="sandbox/MicroBench2/MicroBench2.csproj" />
     <Project Path="sandbox/MinimumWebApp/MinimumWebApp.csproj" />
   </Folder>
   <Folder Name="/Solution Items/">
@@ -82,6 +83,7 @@
     <Project Path="tests/NATS.Client.CoreUnit.Tests/NATS.Client.CoreUnit.Tests.csproj" />
     <Project Path="tests/NATS.Client.JetStream.Tests/NATS.Client.JetStream.Tests.csproj" />
     <Project Path="tests/NATS.Client.KeyValueStore.Tests/NATS.Client.KeyValueStore.Tests.csproj" />
+    <Project Path="tests/NATS.Client.ObjectStore.Encoder.Tests/NATS.Client.ObjectStore.Encoder.Tests.csproj" />
     <Project Path="tests/NATS.Client.ObjectStore.Tests/NATS.Client.ObjectStore.Tests.csproj" />
     <Project Path="tests/NATS.Client.Perf/NATS.Client.Perf.csproj" />
     <Project Path="tests/NATS.Client.Platform.Windows.Tests/NATS.Client.Platform.Windows.Tests.csproj" />

@@ -44,7 +44,7 @@ jobs:
           dotnet-version: |
             6.x
             8.x
-            9.x
+            10.x
 
       - name: Build
         run: |
@@ -69,6 +69,11 @@ jobs:
       - name: Test Abstractions
         run: |
           cd tests/NATS.Client.Abstractions.Tests
+          dotnet test -c Release --no-build
+
+      - name: Test Object Store Encoder
+        run: |
+          cd tests/NATS.Client.ObjectStore.Encoder.Tests
           dotnet test -c Release --no-build
 
       - name: Test JetStream

@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!--
+      Encoder-only unit tests, isolated from the integration test project so they can multi-target
+      down to net6.0. The TFMs are chosen to pin each compiled branch of Base64UrlEncoder via NuGet
+      asset selection: net6.0 -> netstandard2.1, net8.0 -> net8.0, net10.0 -> net9+ (Base64Url), and
+      net481 -> netstandard2.0 (Windows only). net6.0/net481 are EOL but are the only in-repo way to
+      load the netstandard2.1/netstandard2.0 assets.
+    -->
+    <PropertyGroup>
+        <TargetFrameworks>net6.0;net8.0;net10.0</TargetFrameworks>
+        <TargetFrameworks Condition="'$(OS)' == 'Windows_NT'">$(TargetFrameworks);net481</TargetFrameworks>
+        <RuntimeIdentifiers Condition="'$(OS)' == 'Windows_NT'">any;win-x86</RuntimeIdentifiers>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <LangVersion>latest</LangVersion>
+        <CheckEolTargetFramework>false</CheckEolTargetFramework>
+        <!-- net6.0 exists only to load the netstandard2.1 asset; silence transitive "untested on net6.0" advisories. -->
+        <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
+        <RunSettingsFilePath>$(MSBuildProjectDirectory)\..\xunit.runsettings</RunSettingsFilePath>
+        <IsPackable>false</IsPackable>
+        <IsTestProject>true</IsTestProject>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+      <PackageReference Include="xunit.v3" Version="1.0.1" />
+      <PackageReference Include="xunit.runner.visualstudio" Version="3.0.1">
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        <PrivateAssets>all</PrivateAssets>
+      </PackageReference>
+      <PackageReference Include="coverlet.collector" Version="6.0.4">
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        <PrivateAssets>all</PrivateAssets>
+      </PackageReference>
+      <Using Include="Xunit" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\src\NATS.Client.ObjectStore\NATS.Client.ObjectStore.csproj" />
+    </ItemGroup>
+
+</Project>

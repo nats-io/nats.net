@@ -96,8 +96,8 @@ public class NatsObjStore : INatsObjStore
                 {
                     // We have to make sure to carry on consuming the channel to avoid any blocking:
                     // e.g. if the channel is full, we would be blocking the reads off the socket (this was intentionally
-                    // done ot avoid bloating the memory with a large backlog of messages or dropping messages at this level
-                    // and signal the server that we are a slow consumer); then when we make an request-reply API call to
+                    // done to avoid bloating the memory with a large backlog of messages or dropping messages at this level
+                    // and signal the server that we are a slow consumer); then when we make a request-reply API call to
                     // delete the consumer, the socket would be blocked trying to send the response back to us; so we need to
                     // keep consuming the channel to avoid this.
                     if (pushConsumer.IsDone)
@@ -127,7 +127,10 @@ public class NatsObjStore : INatsObjStore
             digest = Base64UrlEncoder.Encode(sha256.Hash);
         }
 
-        if ($"SHA-256={digest}" != info.Digest)
+        const string digestPrefix = "SHA-256=";
+        if (info.Digest == null
+            || info.Digest.StartsWith(digestPrefix, StringComparison.Ordinal) == false
+            || info.Digest.AsSpan(digestPrefix.Length).SequenceEqual(digest.AsSpan()) == false)
         {
             throw new NatsObjException("SHA-256 digest mismatch");
         }

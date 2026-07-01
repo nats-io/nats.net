@@ -44,7 +44,7 @@ jobs:
           dotnet-version: |
             6.x
             8.x
-            9.x
+            10.x
 
       - name: Build
         run: |
