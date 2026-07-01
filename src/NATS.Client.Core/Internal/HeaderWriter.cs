@@ -12,6 +12,10 @@ internal class HeaderWriter
     private const byte ByteSpace = (byte)' ';
     private const byte ByteDel = 127;
 
+#if NET8_0_OR_GREATER
+    private static readonly SearchValues<byte> ValidKeyBytes = SearchValues.Create(CreateValidKeyBytes());
+#endif
+
     private readonly Encoding _encoding;
 
     public HeaderWriter(Encoding encoding) => _encoding = encoding;
@@ -49,6 +53,22 @@ internal class HeaderWriter
         // CrLf length for empty headers
         len += CrLf.Length;
         return len;
+    }
+
+    // cannot contain ASCII Bytes <=32, 58, or >=127
+    internal static bool ValidateKey(ReadOnlySpan<byte> span)
+    {
+#if NET8_0_OR_GREATER
+        return !span.ContainsAnyExcept(ValidKeyBytes);
+#else
+        foreach (var b in span)
+        {
+            if (b <= ByteSpace || b == ByteColon || b >= ByteDel)
+                return false;
+        }
+
+        return true;
+#endif
     }
 
     internal long Write(IBufferWriter<byte> bufferWriter, NatsHeaders headers)
@@ -104,17 +124,23 @@ internal class HeaderWriter
         return len;
     }
 
-    // cannot contain ASCII Bytes <=32, 58, or 127
-    private static bool ValidateKey(ReadOnlySpan<byte> span)
+#if NET8_0_OR_GREATER
+    private static byte[] CreateValidKeyBytes()
     {
-        foreach (var b in span)
+        var bytes = new byte[ByteDel - ByteSpace - 2];
+        var index = 0;
+
+        for (var b = ByteSpace + 1; b < ByteDel; b++)
         {
-            if (b <= ByteSpace || b == ByteColon || b >= ByteDel)
-                return false;
+            if (b != ByteColon)
+            {
+                bytes[index++] = (byte)b;
+            }
         }
 
-        return true;
+        return bytes;
     }
+#endif
 
     // cannot contain CRLF
     private static bool ValidateValue(ReadOnlySpan<byte> span)
