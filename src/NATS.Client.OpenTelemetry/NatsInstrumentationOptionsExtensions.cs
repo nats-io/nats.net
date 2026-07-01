@@ -88,21 +88,38 @@ public static class NatsInstrumentationOptionsExtensions
     }
 
     // NATS subject match: '*' matches exactly one token, '>' matches one or more trailing tokens.
+    // Walks the subject token by token instead of allocating a string[] per message; the pattern is
+    // already tokenized once at configuration time.
     private static bool Matches(string subject, string[] pattern)
     {
-        var tokens = subject.Split('.');
+        var remaining = subject.AsSpan();
+        var exhausted = false;
+
         for (var i = 0; i < pattern.Length; i++)
         {
             if (pattern[i] == ">")
-                return tokens.Length > i;
+                return !exhausted; // '>' matches one or more trailing tokens, so token i must exist
 
-            if (i >= tokens.Length)
-                return false;
+            if (exhausted)
+                return false; // pattern has more tokens than the subject
 
-            if (pattern[i] != "*" && !string.Equals(pattern[i], tokens[i], StringComparison.Ordinal))
+            var dot = remaining.IndexOf('.');
+            ReadOnlySpan<char> token;
+            if (dot < 0)
+            {
+                token = remaining;
+                exhausted = true; // this was the subject's last token
+            }
+            else
+            {
+                token = remaining.Slice(0, dot);
+                remaining = remaining.Slice(dot + 1);
+            }
+
+            if (pattern[i] != "*" && !pattern[i].AsSpan().SequenceEqual(token))
                 return false;
         }
 
-        return tokens.Length == pattern.Length;
+        return exhausted; // subject and pattern must have the same token count
     }
 }

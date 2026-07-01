@@ -115,6 +115,28 @@ public class NatsInstrumentationExtensionsTest
         options.Filter!(Context("payments.new")).Should().BeFalse(); // dropped by the pre-existing filter
     }
 
+    [Theory]
+    [InlineData("foo.", true)] // trailing dot: tokens are "foo" and "", '*' matches the empty token
+    [InlineData("foo", false)] // only one token, pattern needs two
+    [InlineData("foo.bar.", false)] // three tokens ("foo", "bar", ""), pattern needs exactly two
+    public void FilterSubjects_matches_empty_trailing_token(string subject, bool expected)
+    {
+        var options = new NatsInstrumentationOptions().FilterSubjects(include: ["foo.*"]);
+
+        options.Filter!(Context(subject)).Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("foo..bar", true)] // consecutive dots: tokens "foo", "", "bar"
+    [InlineData("foo.bar", true)]
+    [InlineData("foo", false)] // '>' needs at least one trailing token
+    public void FilterSubjects_greater_than_spans_empty_tokens(string subject, bool expected)
+    {
+        var options = new NatsInstrumentationOptions().FilterSubjects(include: ["foo.>"]);
+
+        options.Filter!(Context(subject)).Should().Be(expected);
+    }
+
     [Fact]
     public void FilterSubjects_without_patterns_leaves_filter_unset()
     {
