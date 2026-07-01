@@ -283,7 +283,11 @@ internal static class Telemetry
         }
         else
         {
-            tags = new KeyValuePair<string, object?>[10];
+            var len = 9;
+            if (replyTo is not null)
+                len++;
+
+            tags = new KeyValuePair<string, object?>[len];
             tags[0] = new KeyValuePair<string, object?>(Constants.SystemKey, Constants.SystemVal);
             tags[1] = new KeyValuePair<string, object?>(Constants.OpKey, Constants.OpRec);
             tags[2] = new KeyValuePair<string, object?>(Constants.DestTemplate, subscriptionSubject);
