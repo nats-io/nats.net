@@ -1,10 +1,12 @@
 # OpenTelemetry
 
-NATS.Net has built-in distributed tracing support using [`System.Diagnostics.Activity`](https://learn.microsoft.com/dotnet/api/system.diagnostics.activity),
-the standard .NET API for OpenTelemetry. Activities are created automatically for publish and subscribe operations,
-and trace context is propagated through message headers so that send and receive spans are linked across services.
+NATS.Net has built-in distributed tracing and metrics support through `System.Diagnostics.Activity` and
+`System.Diagnostics.Metrics.Meter`, the standard .NET APIs for OpenTelemetry. Activities are created
+automatically for publish and subscribe operations, trace context is propagated through message headers
+so send and receive spans are linked across services, and a set of standard messaging metrics is emitted
+when a meter listener is attached.
 
-The activity source name is `NATS.Net`.
+The activity source name and the meter name are both `NATS.Net`.
 
 ## Setting Up Tracing
 
@@ -12,6 +14,13 @@ To collect traces, register a listener for the `NATS.Net` activity source. You c
 with an exporter (Jaeger, Zipkin, OTLP, etc.) or a plain `ActivityListener` for lightweight scenarios:
 
 [!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/OpenTelemetryPage.cs#setup)]
+
+## Setting Up Metrics
+
+Metrics are emitted through the same `NATS.Net` name. No measurements are recorded until a listener
+subscribes; the runtime cost is a single boolean check per operation when no listener is attached:
+
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/OpenTelemetryPage.cs#metrics-setup)]
 
 ## Automatic Trace Context Propagation
 
@@ -37,6 +46,19 @@ Use [`NatsInstrumentationOptions.Default.Filter`](xref:NATS.Client.Core.NatsInst
 telemetry for specific requests. When the filter returns `false`, no activity is created:
 
 [!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/OpenTelemetryPage.cs#filter)]
+
+When the `NATS.Client.OpenTelemetry` package is installed, `FilterSubjects` builds the predicate from
+NATS subject patterns (`*` matches one token, `>` matches one or more trailing tokens) instead of writing
+the matching by hand. Include patterns allow-list subjects; exclude patterns drop them and win over
+include. The predicate is combined (logical AND) with any filter already set:
+
+```csharp
+Sdk.CreateTracerProviderBuilder()
+    .AddNatsClientInstrumentation(options => options.FilterSubjects(
+        include: ["orders.>"],
+        exclude: ["orders.internal.>"]))
+    .Build();
+```
 
 ## Enriching Activities
 
@@ -72,3 +94,55 @@ Receive activities include additional attributes:
 | `messaging.message.body.size` | `1024` | Message body size in bytes |
 | `messaging.message.envelope.size` | `1280` | Total message size in bytes |
 | `messaging.consumer.group.name` | `workers` | Queue group (if used) |
+
+## Metrics
+
+The following instruments are exposed on the `NATS.Net` meter:
+
+| Name | Type | Unit | Description |
+|---|---|---|---|
+| `messaging.client.published.messages` | Counter | `{message}` | Messages published by the client |
+| `messaging.client.consumed.messages` | Counter | `{message}` | Messages received by the client |
+| `messaging.client.operation.duration` | Histogram | `s` | Duration of publish, request, and subscribe operations |
+| `nats.client.active_subscriptions` | UpDownCounter | `{subscription}` | Active `NatsSubBase` instances. Under `SharedInbox` request/reply mode each in-flight `RequestAsync` registers a transient reply subscription with the shared inbox muxer and is included here; `Direct` mode uses a reply task and is not counted |
+| `nats.client.reconnects` | Counter | `{reconnect}` | Successful reconnects since process start |
+| `nats.client.sent.bytes` | Counter | `By` | Bytes sent in published messages (body + headers) |
+| `nats.client.received.bytes` | Counter | `By` | Bytes received in consumed messages (body + headers) |
+
+All instruments carry these tags:
+
+| Tag | Example | Description |
+|---|---|---|
+| `messaging.system` | `nats` | Always `nats` |
+| `messaging.operation` | `publish` / `receive` / `subscribe` / `request` / `reconnect` | Operation type |
+| `server.address` | `localhost` | Server host |
+| `server.port` | `4222` | Server port |
+| `network.protocol.name` | `nats` | Protocol name |
+| `network.transport` | `tcp` | Transport protocol |
+
+`messaging.client.operation.duration` adds `error.type` (full exception type name) when the operation fails.
+
+`messaging.client.consumed.messages` and `nats.client.received.bytes` count only messages delivered to the
+application, per the OTel definition ("messages delivered to the application"). NATS status and control
+frames consumed internally by the client are excluded: no-responder `503` replies and JetStream heartbeats,
+flow-control, and protocol notifications. The two counters stay consistent, so `received.bytes / consumed.messages`
+reflects average delivered message size.
+
+### Histogram Buckets
+
+`messaging.client.operation.duration` ships advisory bucket boundaries (`0.005s` to `10s`) through
+`InstrumentAdvice`, which the OpenTelemetry SDK applies by default, so no view is required for sensible
+latency buckets. To override them, add a view on the meter provider (this needs the `OpenTelemetry` SDK
+package, not just `OpenTelemetry.Api`):
+
+```csharp
+Sdk.CreateMeterProviderBuilder()
+    .AddNatsClientInstrumentation()
+    .AddView(
+        "messaging.client.operation.duration",
+        new ExplicitBucketHistogramConfiguration
+        {
+            Boundaries = [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5],
+        })
+    .Build();
+```

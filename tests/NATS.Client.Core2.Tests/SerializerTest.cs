@@ -5,6 +5,7 @@ using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using NATS.Client.Core2.Tests;
 using NATS.Client.Serializers.Json;
+using NATS.Client.TestUtilities2;
 
 // ReSharper disable RedundantTypeArgumentsOfMethod
 // ReSharper disable ReturnTypeCanBeNotNullable
@@ -25,7 +26,7 @@ public class SerializerTest
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
 
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         await Assert.ThrowsAsync<TestSerializerException>(() =>
             nats.PublishAsync(
@@ -51,7 +52,7 @@ public class SerializerTest
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         var sub = await nats.SubscribeCoreAsync<NatsMemoryOwner<byte>>("foo", cancellationToken: cancellationToken);
         await nats.PingAsync(cancellationToken);
@@ -242,7 +243,7 @@ public class SerializerTest
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         var serializer = new TestSerializerWithEmpty<TestData>();
         var sub = await nats.SubscribeCoreAsync("foo", serializer: serializer, cancellationToken: cancellationToken);
@@ -271,7 +272,7 @@ public class SerializerTest
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         var sub = await nats.SubscribeCoreAsync<TestData>("foo", cancellationToken: cancellationToken);
 
@@ -307,7 +308,7 @@ public class SerializerTest
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancellationToken = cts.Token;
 
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         var sub1 = await nats.SubscribeCoreAsync<TestMessage1>($"{prefix}.1", cancellationToken: cancellationToken);
         var sub2 = await nats.SubscribeCoreAsync<TestMessage2>($"{prefix}.2", cancellationToken: cancellationToken);
@@ -322,6 +323,33 @@ public class SerializerTest
         var result2 = await sub2.Msgs.ReadAsync(cancellationToken);
         Assert.NotNull(result2.Data);
         Assert.Equal("two", result2.Data.Name);
+    }
+
+    [Fact]
+    public async Task Serializer_can_mutate_headers_during_serialization()
+    {
+        await using var nats = new NatsConnection(new NatsOpts
+        {
+            Url = _server.Url,
+            SerializerRegistry = new HeaderMutatingSerializerRegistry(),
+        });
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        await nats.ConnectRetryAsync();
+
+        var subject = _server.GetNextId();
+        var sub = await nats.SubscribeCoreAsync<string>(subject, cancellationToken: cancellationToken);
+        await nats.PingAsync(cancellationToken);
+
+        await nats.PublishAsync(subject, "hello", headers: new NatsHeaders(), cancellationToken: cancellationToken);
+
+        var msg = await sub.Msgs.ReadAsync(cancellationToken);
+
+        Assert.Equal("hello", msg.Data);
+        Assert.NotNull(msg.Headers);
+        Assert.Equal("application/json", msg.Headers["Content-Type"].ToString());
     }
 
     private static void AssertByteArray(byte[] expected, byte[] actual)
@@ -368,6 +396,30 @@ public record TestData(string Name);
 public record TestMessage1(string Name);
 
 public record TestMessage2(string Name);
+
+public class HeaderMutatingSerializerRegistry : INatsSerializerRegistry
+{
+    public INatsSerialize<T> GetSerializer<T>() => new HeaderMutatingSerializer<T>();
+
+    public INatsDeserialize<T> GetDeserializer<T>() => NatsDefaultSerializer<T>.Default;
+}
+
+public class HeaderMutatingSerializer<T> : INatsSerialize<T>, INatsSerializeWithContext<T>
+{
+    public void Serialize(IBufferWriter<byte> bufferWriter, T value)
+    {
+        var bytes = Encoding.UTF8.GetBytes(value?.ToString() ?? string.Empty);
+        bufferWriter.Write(bytes);
+    }
+
+    public void Serialize(IBufferWriter<byte> bufferWriter, T value, in NatsMsgContext context)
+    {
+        if (context.Headers != null)
+            context.Headers["Content-Type"] = "application/json";
+
+        Serialize(bufferWriter, value);
+    }
+}
 
 [JsonSerializable(typeof(TestMessage1))]
 [JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault, WriteIndented = false)]

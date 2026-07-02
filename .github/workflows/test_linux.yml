@@ -44,7 +44,7 @@ jobs:
           dotnet-version: |
             6.x
             8.x
-            9.x
+            10.x
 
       - name: Build
         run: |
@@ -64,6 +64,16 @@ jobs:
           killall nats-server 2> /dev/null | echo -n
           nats-server -v
           cd tests/NATS.Client.CoreUnit.Tests
+          dotnet test -c Release --no-build
+
+      - name: Test Abstractions
+        run: |
+          cd tests/NATS.Client.Abstractions.Tests
+          dotnet test -c Release --no-build
+
+      - name: Test Object Store Encoder
+        run: |
+          cd tests/NATS.Client.ObjectStore.Encoder.Tests
           dotnet test -c Release --no-build
 
       - name: Test JetStream

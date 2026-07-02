@@ -1,7 +1,8 @@
+using System.Security.Cryptography;
 using System.Text;
 using NATS.Client.ObjectStore.Internal;
 
-namespace NATS.Client.ObjectStore.Tests;
+namespace NATS.Client.ObjectStore.Encoder.Tests;
 
 public class Base64UrlEncoderTest
 {
@@ -35,6 +36,25 @@ public class Base64UrlEncoderTest
         var expected = Decode(input);
         Assert.Equal(expected, decoded);
         _output.WriteLine($">>{decoded}<<");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("Hello World!")]
+    [InlineData("The quick brown fox jumps over the lazy dog")]
+    public void Sha256_test(string input)
+    {
+        var data = Encoding.UTF8.GetBytes(input);
+        var actual = Base64UrlEncoder.Sha256(data);
+
+        // Independent reference: hash, then base64url-encode the 32-byte digest keeping the '=' pad.
+        using var sha256 = SHA256.Create();
+        var expected = Convert.ToBase64String(sha256.ComputeHash(data))
+            .Replace('+', '-')
+            .Replace('/', '_');
+
+        Assert.Equal(expected, actual);
+        _output.WriteLine($">>{actual}<<");
     }
 
     private string Encode(string input, bool raw = false)

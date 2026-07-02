@@ -1,4 +1,5 @@
 using NATS.Client.Core.Tests;
+using NATS.Client.TestUtilities2;
 using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.KeyValueStore.Tests;
@@ -14,6 +15,7 @@ public class KeyValueContextTest
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -33,6 +35,7 @@ public class KeyValueContextTest
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -58,6 +61,7 @@ public class KeyValueContextTest
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -81,6 +85,7 @@ public class KeyValueContextTest
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -106,6 +111,7 @@ public class KeyValueContextTest
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -125,6 +131,7 @@ public class KeyValueContextTest
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -148,6 +155,7 @@ public class KeyValueContextTest
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -170,6 +178,7 @@ public class KeyValueContextTest
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);
@@ -199,6 +208,7 @@ public class KeyValueContextTest
 
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
 
         var js = new NatsJSContext(nats);
         var kv = new NatsKVContext(js);

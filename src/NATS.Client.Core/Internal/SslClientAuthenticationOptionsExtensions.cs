@@ -40,7 +40,11 @@ internal static class SslClientAuthenticationOptionsExtensions
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
             var ephemeral = leafCert;
+#if NET10_0_OR_GREATER
+            leafCert = X509CertificateLoader.LoadPkcs12(leafCert.Export(X509ContentType.Pfx), null);
+#else
             leafCert = new X509Certificate2(leafCert.Export(X509ContentType.Pfx));
+#endif
             ephemeral.Dispose();
         }
 
@@ -53,6 +57,18 @@ internal static class SslClientAuthenticationOptionsExtensions
         X509Certificate2 leafCert;
         var intermediateCerts = new X509Certificate2Collection();
 
+#if NET10_0_OR_GREATER
+        if (password != null)
+        {
+            leafCert = X509CertificateLoader.LoadPkcs12FromFile(certBundleFile, password);
+            intermediateCerts = X509CertificateLoader.LoadPkcs12CollectionFromFile(certBundleFile, password);
+        }
+        else
+        {
+            leafCert = X509CertificateLoader.LoadPkcs12FromFile(certBundleFile, null);
+            intermediateCerts = X509CertificateLoader.LoadPkcs12CollectionFromFile(certBundleFile, null);
+        }
+#else
         if (password != null)
         {
             leafCert = new X509Certificate2(certBundleFile, password);
@@ -63,6 +79,7 @@ internal static class SslClientAuthenticationOptionsExtensions
             leafCert = new X509Certificate2(certBundleFile);
             intermediateCerts.Import(certBundleFile);
         }
+#endif
 
         // Linux does not include the leaf by default, but Windows does
         // compare leaf to first intermediate just to be sure to catch all platform differences

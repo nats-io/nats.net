@@ -163,7 +163,7 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
     {
         try
         {
-            await DrainAsync().ConfigureAwait(false);
+            await DrainOnDisposeAsync().ConfigureAwait(false);
             await base.DisposeAsync().ConfigureAwait(false);
         }
         finally

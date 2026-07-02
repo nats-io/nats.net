@@ -53,6 +53,20 @@ public class NatsHeaderTest
     }
 
     [Fact]
+    public void WriterHeaderKeyValidationByteBoundaryTests()
+    {
+        var key = new byte[] { (byte)'a', 0, (byte)'z' };
+
+        for (var b = 0; b <= byte.MaxValue; b++)
+        {
+            key[1] = (byte)b;
+            var expected = b > ' ' && b != ':' && b < 127;
+
+            Assert.Equal(expected, HeaderWriter.ValidateKey(key));
+        }
+    }
+
+    [Fact]
     public void ParserTests()
     {
         var parser = new NatsHeaderParser(Encoding.UTF8);

@@ -40,6 +40,7 @@ public class NatsKVWatcherTest
 
         var proxy = new NatsProxy(_server.Port);
         await using var nats2 = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}" });
+        await nats2.ConnectRetryAsync();
         await nats1.ConnectRetryAsync();
         var js2 = new NatsJSContext(nats2);
         var kv2 = new NatsKVContext(js2);
@@ -118,6 +119,7 @@ public class NatsKVWatcherTest
         var cancellationToken = cts.Token;
 
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
 
         var js = new NatsJSContext(nats);
@@ -162,6 +164,7 @@ public class NatsKVWatcherTest
         var cancellationToken = cts.Token;
 
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
 
         var js = new NatsJSContext(nats);
@@ -328,6 +331,7 @@ public class NatsKVWatcherTest
     public async Task Watch_push_consumer_flow_control()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
 
         var js = new NatsJSContext(nats);
@@ -368,6 +372,7 @@ public class NatsKVWatcherTest
         var cancellationToken = cts.Token;
 
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
 
         var js = new NatsJSContext(nats);
@@ -409,6 +414,7 @@ public class NatsKVWatcherTest
     public async Task Serialization_errors()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
 
         var js = new NatsJSContext(nats);
@@ -435,6 +441,7 @@ public class NatsKVWatcherTest
     public async Task Watch_with_empty_filter()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
 
         var js = new NatsJSContext(nats);
@@ -456,6 +463,7 @@ public class NatsKVWatcherTest
     public async Task Watch_with_multiple_filter_on_old_server()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
 
         var js = new NatsJSContext(nats);
@@ -485,6 +493,7 @@ public class NatsKVWatcherTest
     public async Task Watch_resume_at_revision()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
 
         var bucket = $"{prefix}Watch_resume_at_revision";
@@ -568,6 +577,7 @@ public class NatsKVWatcherTest
     public async Task Validate_watch_options()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
 
         var bucket = prefix + nameof(Validate_watch_options);
@@ -643,6 +653,7 @@ public class NatsKVWatcherTest
     public async Task ReadAfterDelete()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
 
         var js = new NatsJSContext(nats);

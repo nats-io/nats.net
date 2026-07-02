@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net8.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <!-- Reference old NuGet (same as TransientLib) -->
+    <ItemGroup>
+        <PackageReference Include="NATS.Net" Version="$(NatsAbiCheckVersion)" />
+    </ItemGroup>
+
+    <!-- Reference pre-built TransientLib.dll -->
+    <ItemGroup>
+        <ProjectReference Include="..\NATS.Client.CheckAbiTransientLib\NATS.Client.CheckAbiTransientLib.csproj">
+            <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+            <Private>false</Private>
+        </ProjectReference>
+    </ItemGroup>
+    <ItemGroup>
+        <Reference Include="NATS.Client.CheckAbiTransientLib">
+            <HintPath>..\NATS.Client.CheckAbiTransientLib\bin\$(Configuration)\net8.0\NATS.Client.CheckAbiTransientLib.dll</HintPath>
+            <Private>true</Private>
+        </Reference>
+    </ItemGroup>
+
+</Project>

@@ -13,3 +13,10 @@ NuGet packages that are compatible with AOT publishing are:
 - [NATS.Client.KeyValueStore](https://www.nuget.org/packages/NATS.Client.KeyValueStore)
 - [NATS.Client.ObjectStore](https://www.nuget.org/packages/NATS.Client.ObjectStore)
 - [NATS.Client.Services](https://www.nuget.org/packages/NATS.Client.Services)
+- [NATS.Client.Hosting](https://www.nuget.org/packages/NATS.Client.Hosting) (for dependency injection)
+
+> [!NOTE]
+> For dependency injection in AOT scenarios, use `NATS.Client.Hosting` (with its `AddNats()` method)
+> instead of `NATS.Extensions.Microsoft.DependencyInjection`. The latter depends on `NATS.Client.Simplified` which
+> includes the ad hoc JSON serializer and is not AOT-compatible.
+> See [Dependency Injection](dependency-injection.md) for a full comparison of the two DI packages.

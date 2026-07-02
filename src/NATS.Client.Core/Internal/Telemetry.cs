@@ -1,16 +1,120 @@
 using System.Diagnostics;
+using System.Diagnostics.Metrics;
 
 namespace NATS.Client.Core.Internal;
 
 // https://opentelemetry.io/docs/specs/semconv/attributes-registry/messaging/
 // https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/#messaging-attributes
+// https://opentelemetry.io/docs/specs/semconv/messaging/messaging-metrics/
 internal static class Telemetry
 {
-    public const string NatsActivitySource = "NATS.Net";
+    public const string NatsActivitySource = NatsTelemetry.SourceName;
     public static readonly ActivitySource NatsActivities = new(name: NatsActivitySource);
+
+    public static readonly Meter NatsMeter = new(name: NatsActivitySource);
+
+    public static readonly Counter<long> PublishedMessages =
+        NatsMeter.CreateCounter<long>("messaging.client.published.messages", unit: "{message}");
+
+    public static readonly Counter<long> ConsumedMessages =
+        NatsMeter.CreateCounter<long>("messaging.client.consumed.messages", unit: "{message}");
+
+    // OTel messaging semconv recommends these advisory buckets for messaging.client.operation.duration.
+    // https://opentelemetry.io/docs/specs/semconv/messaging/messaging-metrics/#metric-messagingclientoperationduration
+    public static readonly Histogram<double> OperationDuration =
+        NatsMeter.CreateHistogram<double>(
+            "messaging.client.operation.duration",
+            unit: "s",
+            advice: new InstrumentAdvice<double>
+            {
+                HistogramBucketBoundaries = new[] { 0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10 },
+            });
+
+    public static readonly UpDownCounter<long> ActiveSubscriptions =
+        NatsMeter.CreateUpDownCounter<long>("nats.client.active_subscriptions", unit: "{subscription}");
+
+    public static readonly Counter<long> Reconnects =
+        NatsMeter.CreateCounter<long>("nats.client.reconnects", unit: "{reconnect}");
+
+    public static readonly Counter<long> SentBytes =
+        NatsMeter.CreateCounter<long>("nats.client.sent.bytes", unit: "By");
+
+    public static readonly Counter<long> ReceivedBytes =
+        NatsMeter.CreateCounter<long>("nats.client.received.bytes", unit: "By");
+
+    // No messaging semantic convention covers drops, so this is a deliberately NATS-specific
+    // metric. Shares the consumed.messages tag set (messaging.operation=receive) so it correlates
+    // with the rest of the receive-path signals. Pending channel depth at drop time is not added
+    // as a tag because its value is unbounded; it stays available on the MessageDropped event.
+    public static readonly Counter<long> DroppedMessages =
+        NatsMeter.CreateCounter<long>("nats.client.messages.dropped", unit: "{message}");
+
     private static readonly object BoxedTrue = true;
 
+    /// <summary>
+    /// Don't use this for metrics.
+    /// </summary>
     public static bool HasListeners() => NatsActivities.HasListeners();
+
+    public static void RecordOperationDuration(long startTimestamp, INatsConnection? connection, string operation, Exception? error)
+    {
+        if (!OperationDuration.Enabled)
+            return;
+
+        try
+        {
+            var elapsed = (Stopwatch.GetTimestamp() - startTimestamp) / (double)Stopwatch.Frequency;
+            var tags = BuildMetricTags(connection, operation);
+            if (error is not null)
+                tags.Add(Constants.ErrorTypeKey, error.GetType().FullName ?? "unknown");
+
+            OperationDuration.Record(elapsed, tags);
+        }
+        catch
+        {
+            // Instrumentation must never break the calling operation. A buggy MeterListener
+            // or tag construction failure here would otherwise replace the in-flight messaging
+            // exception (catch/finally semantics), hiding the real failure from the caller.
+        }
+    }
+
+    public static async ValueTask MeasureOperationAsync(ValueTask task, long startTimestamp, INatsConnection? connection, string operation)
+    {
+        try
+        {
+            await task.ConfigureAwait(false);
+            RecordOperationDuration(startTimestamp, connection, operation, null);
+        }
+        catch (Exception ex)
+        {
+            RecordOperationDuration(startTimestamp, connection, operation, ex);
+            throw;
+        }
+    }
+
+    public static TagList BuildMetricTags(INatsConnection? connection, string operation)
+    {
+        var tags = default(TagList);
+
+        // MetricTagsPrefix is read off the concrete NatsConnection by design: exposing it on
+        // INatsConnection would be a breaking change for external implementers, and default
+        // interface members aren't available on netstandard2.0. Custom INatsConnection wrappers
+        // therefore fall through to the minimal tag set below. Normal usage (including via
+        // NatsJSContext) hits this branch because the runtime type is NatsConnection regardless
+        // of the static type the caller holds.
+        if (connection is NatsConnection { MetricTagsPrefix: { } prefix })
+        {
+            for (var i = 0; i < prefix.Length; i++)
+                tags.Add(prefix[i]);
+        }
+        else
+        {
+            tags.Add(Constants.SystemKey, Constants.SystemVal);
+        }
+
+        tags.Add(Constants.OpKey, operation);
+        return tags;
+    }
 
     public static Activity? StartSendActivity(
         string name,
@@ -42,23 +146,24 @@ internal static class Telemetry
             if (replyTo is not null)
                 len++;
 
-            var serverPort = conn.ServerInfo.Port.ToString();
+            var serverPort = conn.BoxedServerPort; // boxed once per ServerInfo change, reused for server.port and network.peer.port
+            var serverHost = conn.ServerHost; // grabbed once per ServerInfo change
             tags = new KeyValuePair<string, object?>[len];
             tags[0] = new KeyValuePair<string, object?>(Constants.SystemKey, Constants.SystemVal);
             tags[1] = new KeyValuePair<string, object?>(Constants.OpKey, Constants.OpPub);
-            tags[2] = new KeyValuePair<string, object?>(Constants.DestName, subject);
+            tags[2] = new KeyValuePair<string, object?>(Constants.DestName, LowCardinalitySubject(conn, subject));
 
-            tags[3] = new KeyValuePair<string, object?>(Constants.ClientId, conn.ServerInfo.ClientId.ToString());
-            tags[4] = new KeyValuePair<string, object?>(Constants.ServerAddress, conn.ServerInfo.Host);
+            tags[3] = new KeyValuePair<string, object?>(Constants.ClientId, conn.ClientId);
+            tags[4] = new KeyValuePair<string, object?>(Constants.ServerAddress, serverHost);
             tags[5] = new KeyValuePair<string, object?>(Constants.ServerPort, serverPort);
             tags[6] = new KeyValuePair<string, object?>(Constants.NetworkProtoName, "nats");
             tags[7] = new KeyValuePair<string, object?>(Constants.NetworkTransport, "tcp");
-            tags[8] = new KeyValuePair<string, object?>(Constants.NetworkPeerAddress, conn.ServerInfo.Host);
+            tags[8] = new KeyValuePair<string, object?>(Constants.NetworkPeerAddress, serverHost);
             tags[9] = new KeyValuePair<string, object?>(Constants.NetworkPeerPort, serverPort);
             tags[10] = new KeyValuePair<string, object?>(Constants.NetworkLocalAddress, conn.ServerInfo.ClientIp);
 
             if (replyTo is not null)
-                tags[11] = new KeyValuePair<string, object?>(Constants.ReplyTo, replyTo);
+                tags[11] = new KeyValuePair<string, object?>(Constants.ReplyTo, LowCardinalitySubject(conn, replyTo));
         }
         else
         {
@@ -104,11 +209,7 @@ internal static class Telemetry
                     return;
                 }
 
-                // There are cases where headers reused publicly (e.g. JetStream publish retry)
-                // there may also be cases where application can reuse the same header
-                // in which case we should still be able to overwrite headers with telemetry fields
-                // even though headers would be set to readonly before being passed down in publish methods.
-                headers.SetOverrideReadOnly(fieldName, fieldValue);
+                headers[fieldName] = fieldValue;
             });
     }
 
@@ -145,7 +246,8 @@ internal static class Telemetry
         KeyValuePair<string, object?>[] tags;
         if (connection is NatsConnection { ServerInfo: not null } conn)
         {
-            var serverPort = conn.ServerInfo.Port.ToString();
+            var serverPort = conn.BoxedServerPort; // boxed once per ServerInfo change, reused for server.port and network.peer.port
+            var serverHost = conn.ServerHost; // grabbed once per ServerInfo change
 
             var len = 17;
             if (replyTo is not null)
@@ -158,29 +260,34 @@ internal static class Telemetry
             tags[1] = new KeyValuePair<string, object?>(Constants.OpKey, Constants.OpRec);
             tags[2] = new KeyValuePair<string, object?>(Constants.DestTemplate, subscriptionSubject);
             tags[3] = new KeyValuePair<string, object?>(Constants.DestIsTemporary, subscriptionSubject.StartsWith(conn.InboxPrefix, StringComparison.Ordinal) ? Constants.True : Constants.False);
-            tags[4] = new KeyValuePair<string, object?>(Constants.Subject, subject);
-            tags[5] = new KeyValuePair<string, object?>(Constants.DestName, subject);
-            tags[6] = new KeyValuePair<string, object?>(Constants.DestPubName, subject);
+            var lowCardinalitySubject = LowCardinalitySubject(conn, subject);
+            tags[4] = new KeyValuePair<string, object?>(Constants.Subject, lowCardinalitySubject);
+            tags[5] = new KeyValuePair<string, object?>(Constants.DestName, lowCardinalitySubject);
+            tags[6] = new KeyValuePair<string, object?>(Constants.DestPubName, lowCardinalitySubject);
             tags[7] = new KeyValuePair<string, object?>(Constants.MsgBodySize, bodySize.ToString());
             tags[8] = new KeyValuePair<string, object?>(Constants.MsgTotalSize, size.ToString());
-            tags[9] = new KeyValuePair<string, object?>(Constants.ClientId, conn.ServerInfo.ClientId.ToString());
-            tags[10] = new KeyValuePair<string, object?>(Constants.ServerAddress, conn.ServerInfo.Host);
+            tags[9] = new KeyValuePair<string, object?>(Constants.ClientId, conn.ClientId);
+            tags[10] = new KeyValuePair<string, object?>(Constants.ServerAddress, serverHost);
             tags[11] = new KeyValuePair<string, object?>(Constants.ServerPort, serverPort);
             tags[12] = new KeyValuePair<string, object?>(Constants.NetworkProtoName, "nats");
             tags[13] = new KeyValuePair<string, object?>(Constants.NetworkTransport, "tcp");
-            tags[14] = new KeyValuePair<string, object?>(Constants.NetworkPeerAddress, conn.ServerInfo.Host);
+            tags[14] = new KeyValuePair<string, object?>(Constants.NetworkPeerAddress, serverHost);
             tags[15] = new KeyValuePair<string, object?>(Constants.NetworkPeerPort, serverPort);
             tags[16] = new KeyValuePair<string, object?>(Constants.NetworkLocalAddress, conn.ServerInfo.ClientIp);
 
             var index = 17;
             if (replyTo is not null)
-                tags[index++] = new KeyValuePair<string, object?>(Constants.ReplyTo, replyTo);
+                tags[index++] = new KeyValuePair<string, object?>(Constants.ReplyTo, LowCardinalitySubject(conn, replyTo));
             if (queueGroup is not null)
                 tags[index] = new KeyValuePair<string, object?>(Constants.QueueGroup, queueGroup);
         }
         else
         {
-            tags = new KeyValuePair<string, object?>[10];
+            var len = 9;
+            if (replyTo is not null)
+                len++;
+
+            tags = new KeyValuePair<string, object?>[len];
             tags[0] = new KeyValuePair<string, object?>(Constants.SystemKey, Constants.SystemVal);
             tags[1] = new KeyValuePair<string, object?>(Constants.OpKey, Constants.OpRec);
             tags[2] = new KeyValuePair<string, object?>(Constants.DestTemplate, subscriptionSubject);
@@ -251,6 +358,16 @@ internal static class Telemetry
         }
     }
 
+    // Inbox subjects (_INBOX.<nuid>[.<nuid>]) are unique per request, so emitting them as
+    // indexed tag values pushes unbounded cardinality into tracing backends (Tempo, Jaeger).
+    // Collapse them to a constant, matching SpanDestinationName. The raw subject stays
+    // available to the Enrich callback via NatsInstrumentationContext.
+    // Uses Opts.InboxPrefix (the bare prefix, e.g. "_INBOX") rather than conn.InboxPrefix
+    // (this connection's "_INBOX.<nuid>"): a reply-to address can belong to any connection,
+    // so the match must be broad. Do not "normalise" this to conn.InboxPrefix.
+    private static string LowCardinalitySubject(NatsConnection conn, string subject)
+        => subject.StartsWith(conn.Opts.InboxPrefix, StringComparison.Ordinal) ? Constants.InboxName : subject;
+
     private static bool TryParseTraceContext(NatsHeaders headers, out ActivityContext context)
     {
         DistributedContextPropagator.Current.ExtractTraceIdAndState(
@@ -286,17 +403,14 @@ internal static class Telemetry
             },
             out var traceParent,
             out var traceState);
-#if NETSTANDARD2_0_OR_GREATER || NET7_0_OR_GREATER
         return ActivityContext.TryParse(traceParent, traceState, isRemote: true, out context);
-#else
-        return ActivityContext.TryParse(traceParent, traceState, out context);
-#endif
     }
 
     public class Constants
     {
         public const string True = "true";
         public const string False = "false";
+        public const string InboxName = "inbox";
         public const string RequestReplyActivityName = "request";
         public const string PublishActivityName = "publish";
         public const string SubscribeActivityName = "subscribe";
@@ -308,6 +422,11 @@ internal static class Telemetry
         public const string OpKey = "messaging.operation";
         public const string OpPub = "publish";
         public const string OpRec = "receive";
+        public const string OpSub = "subscribe";
+        public const string OpReq = "request";
+        public const string OpAck = "ack";
+        public const string OpReconnect = "reconnect";
+        public const string ErrorTypeKey = "error.type";
         public const string MsgBodySize = "messaging.message.body.size";
         public const string MsgTotalSize = "messaging.message.envelope.size";
 

@@ -2,6 +2,9 @@ using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 using NATS.Client.Core;
 
+// SkipSubjectValidation is obsolete but still honored; this benchmark compares it on purpose.
+#pragma warning disable CS0618
+
 namespace MicroBenchmark;
 
 [MemoryDiagnoser]

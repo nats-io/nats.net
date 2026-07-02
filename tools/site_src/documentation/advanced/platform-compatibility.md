@@ -4,8 +4,8 @@ NATS.Net targets multiple .NET platforms to provide broad compatibility:
 
 - `netstandard2.0` - .NET Framework 4.6.1+, .NET Core 2.0+, Mono, Xamarin, Unity
 - `netstandard2.1` - .NET Core 3.0+
-- `net6.0` - .NET 6
 - `net8.0` - .NET 8
+- `net10.0` - .NET 10
 
 While the API surface is designed to be consistent across all target frameworks, there are some
 intentional differences due to platform capabilities. This page documents these differences.
@@ -20,7 +20,7 @@ property allows you to configure TLS client authentication options.
 | Target Framework | Type |
 |-----------------|------|
 | `netstandard2.0` | `NATS.Client.Core.SslClientAuthenticationOptions` (polyfill) |
-| `netstandard2.1`, `net6.0`, `net8.0` | `System.Net.Security.SslClientAuthenticationOptions` (BCL) |
+| `netstandard2.1`, `net8.0`, `net10.0` | `System.Net.Security.SslClientAuthenticationOptions` (BCL) |
 
 On `netstandard2.0`, the library provides a polyfill type `NATS.Client.Core.SslClientAuthenticationOptions`
 because the BCL type doesn't exist in that target framework. The polyfill provides a subset of the
@@ -42,7 +42,7 @@ If you need the full `SslClientAuthenticationOptions` functionality, consider ta
 The [`AddNats`](xref:NATS.Client.Hosting.NatsHostingExtensions.AddNats*) extension method has different
 signatures depending on the target framework:
 
-**netstandard2.0, netstandard2.1, net6.0:**
+**netstandard2.0, netstandard2.1:**
 ```csharp
 public static IServiceCollection AddNats(
     this IServiceCollection services,
@@ -51,7 +51,7 @@ public static IServiceCollection AddNats(
     Action<NatsConnection>? configureConnection = null)
 ```
 
-**net8.0:**
+**net8.0, net10.0:**
 ```csharp
 public static IServiceCollection AddNats(
     this IServiceCollection services,

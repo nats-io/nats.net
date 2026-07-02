@@ -27,6 +27,7 @@
   <Folder Name="/sandbox/">
     <Project Path="sandbox/ConsoleApp/ConsoleApp.csproj" />
     <Project Path="sandbox/MicroBenchmark/MicroBenchmark.csproj" />
+    <Project Path="sandbox/MicroBench2/MicroBench2.csproj" />
     <Project Path="sandbox/MinimumWebApp/MinimumWebApp.csproj" />
   </Folder>
   <Folder Name="/Solution Items/">
@@ -64,6 +65,7 @@
     <Project Path="src/NATS.Client.JetStream/NATS.Client.JetStream.csproj" />
     <Project Path="src/NATS.Client.KeyValueStore/NATS.Client.KeyValueStore.csproj" />
     <Project Path="src/NATS.Client.ObjectStore/NATS.Client.ObjectStore.csproj" />
+    <Project Path="src/NATS.Client.OpenTelemetry/NATS.Client.OpenTelemetry.csproj" />
     <Project Path="src/NATS.Client.Serializers.Json/NATS.Client.Serializers.Json.csproj" />
     <Project Path="src/NATS.Client.Services/NATS.Client.Services.csproj" />
     <Project Path="src/NATS.Client.Simplified/NATS.Client.Simplified.csproj" />
@@ -71,6 +73,7 @@
     <Project Path="src/NATS.Net/NATS.Net.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/NATS.Client.Abstractions.Tests/NATS.Client.Abstractions.Tests.csproj" />
     <Project Path="tests/NATS.Client.CheckAbi/NATS.Client.CheckAbi.csproj" />
     <Project Path="tests/NATS.Client.CheckAbiTransientLib/NATS.Client.CheckAbiTransientLib.csproj" />
     <Project Path="tests/NATS.Client.CheckNativeAot/NATS.Client.CheckNativeAot.csproj" />
@@ -80,6 +83,7 @@
     <Project Path="tests/NATS.Client.CoreUnit.Tests/NATS.Client.CoreUnit.Tests.csproj" />
     <Project Path="tests/NATS.Client.JetStream.Tests/NATS.Client.JetStream.Tests.csproj" />
     <Project Path="tests/NATS.Client.KeyValueStore.Tests/NATS.Client.KeyValueStore.Tests.csproj" />
+    <Project Path="tests/NATS.Client.ObjectStore.Encoder.Tests/NATS.Client.ObjectStore.Encoder.Tests.csproj" />
     <Project Path="tests/NATS.Client.ObjectStore.Tests/NATS.Client.ObjectStore.Tests.csproj" />
     <Project Path="tests/NATS.Client.Perf/NATS.Client.Perf.csproj" />
     <Project Path="tests/NATS.Client.Platform.Windows.Tests/NATS.Client.Platform.Windows.Tests.csproj" />

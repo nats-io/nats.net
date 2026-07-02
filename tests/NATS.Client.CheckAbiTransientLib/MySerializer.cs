@@ -14,6 +14,11 @@ public class MySerializer : INatsSerializer<string>
         return typeof(INatsSerialize<>).Assembly.GetName().Name!;
     }
 
+    public static string GetSerializerInterfaceAssemblyVersion()
+    {
+        return typeof(INatsSerialize<>).Assembly.GetName().Version?.ToString() ?? "(null)";
+    }
+
     public void Serialize(IBufferWriter<byte> bufferWriter, string value)
     {
         var bytes = System.Text.Encoding.UTF8.GetBytes(value);

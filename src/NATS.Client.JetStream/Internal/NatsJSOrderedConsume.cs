@@ -31,7 +31,11 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
     private readonly long _maxBytes;
     private readonly long _thresholdBytes;
 
+#if NET9_0_OR_GREATER
+    private readonly System.Threading.Lock _pendingGate = new();
+#else
     private readonly object _pendingGate = new();
+#endif
     private long _pendingMsgs;
     private long _pendingBytes;
 
@@ -136,7 +140,7 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
         _context.Connection.ConnectionDisconnected -= ConnectionOnConnectionDisconnected;
         try
         {
-            await DrainAsync().ConfigureAwait(false);
+            await DrainOnDisposeAsync().ConfigureAwait(false);
             await base.DisposeAsync().ConfigureAwait(false);
         }
         finally

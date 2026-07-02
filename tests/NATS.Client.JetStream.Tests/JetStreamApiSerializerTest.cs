@@ -4,6 +4,7 @@ using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
+using NATS.Client.TestUtilities2;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace NATS.Client.JetStream.Tests;
@@ -24,6 +25,7 @@ public class JetStreamApiSerializerTest
     public async Task Should_respect_buffers_lifecycle()
     {
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
         var js = new NatsJSContext(nats);
         var apiSubject = $"{prefix}.js.fake.api";
@@ -101,7 +103,7 @@ public class JetStreamApiSerializerTest
     public void Deserialize_value()
     {
         var serializer = NatsJSJsonDocumentSerializer<AccountInfoResponse>.Default;
-        var result = serializer.Deserialize(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes("""{"memory":1}""")));
+        var result = serializer.Deserialize(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes("""{"memory":1}""")), default);
         result.Value.Memory.Should().Be(1);
     }
 
@@ -109,7 +111,7 @@ public class JetStreamApiSerializerTest
     public void Deserialize_empty_buffer()
     {
         var serializer = NatsJSJsonDocumentSerializer<AccountInfoResponse>.Default;
-        var result = serializer.Deserialize(ReadOnlySequence<byte>.Empty);
+        var result = serializer.Deserialize(ReadOnlySequence<byte>.Empty, default);
         result.Exception.Message.Should().Be("Buffer is empty");
     }
 
@@ -117,7 +119,7 @@ public class JetStreamApiSerializerTest
     public void Deserialize_error()
     {
         var serializer = NatsJSJsonDocumentSerializer<AccountInfoResponse>.Default;
-        var result = serializer.Deserialize(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes("""{"error":{"code":2}}""")));
+        var result = serializer.Deserialize(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes("""{"error":{"code":2}}""")), default);
         result.Error.Code.Should().Be(2);
     }
 }

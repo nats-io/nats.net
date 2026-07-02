@@ -32,10 +32,10 @@ instantiate a `NatsConnection` with default options, you would only have basic s
 for `int`, `string`, and `byte[]` types, and you would need to set up the serializers for your data classes
 if you want to use e.g., JSON serialization.
 
-The other difference is that `NatsClient` sets `SubPendingChannelFullMode` internal channel option to
-`BoundedChannelFullMode.Wait` to avoid dropping messages when the subscriber's internal channel is full.
-This is a good default for most cases, but you can change it by setting the `SubPendingChannelFullMode` option
-in `NatsClient` constructor.
+`NatsClient` and `NatsConnection` share the same overflow behavior: the subscriber's internal channel
+defaults to `BoundedChannelFullMode.DropNewest`, so a slow subscriber drops the newest messages rather
+than blocking the connection. You can change it by setting the `SubPendingChannelFullMode` option in
+`NatsOpts`.
 
 [!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/IntroPage.cs#opts)]
 
@@ -92,6 +92,7 @@ essentially sent back to back after they're picked up from internal queues and b
 
 ## What's Next
 
+- [Dependency Injection](dependency-injection.md) explains the two DI packages (`NATS.Client.Hosting` and `NATS.Extensions.Microsoft.DependencyInjection`) and when to use each one.
 - [Slow Consumers](slow-consumers.md) explains how to detect and handle subscribers that can't keep up with the message rate, including the `MessageDropped` and `SlowConsumerDetected` events.
 - [Server Errors](server-errors.md) covers the `ServerError` event for observing `-ERR` messages from the server (permission denials, auth issues, server-side limits).
 - [Serialization](serialization.md) is the process of converting an object into a format that can be stored or transmitted.

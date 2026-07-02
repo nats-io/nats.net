@@ -1,4 +1,5 @@
 using NATS.Client.Core.Tests;
+using NATS.Client.TestUtilities2;
 using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.Services.Tests;
@@ -23,7 +24,7 @@ public class SlowConsumerTest
             Url = server.Url,
             SubPendingChannelCapacity = 10,
         });
-        await nats.ConnectAsync();
+        await nats.ConnectRetryAsync();
 
         var svc = new NatsSvcContext(nats);
 

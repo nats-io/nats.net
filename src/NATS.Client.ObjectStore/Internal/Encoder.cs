@@ -1,4 +1,7 @@
 using System.Buffers;
+#if NET9_0_OR_GREATER
+using System.Buffers.Text;
+#endif
 using System.Security.Cryptography;
 
 namespace NATS.Client.ObjectStore.Internal;
@@ -18,14 +21,15 @@ internal static class Base64UrlEncoder
     private const char Base64UrlCharacter62 = '-';
     private const char Base64UrlCharacter63 = '_';
 
-    /// <summary>
-    /// Encoding table
-    /// </summary>
-    private static readonly char[] SBase64Table = new[]
+#if !NET9_0_OR_GREATER
+    // base64url alphabet (the 63rd/64th entries are '-'/'_'), so the table encodes url-safe directly.
+    private static readonly char[] SBase64Table =
     {
-        'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3', '4',
-        '5', '6', '7', '8', '9', Base64UrlCharacter62, Base64UrlCharacter63,
+        'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+        'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', Base64UrlCharacter62, Base64UrlCharacter63,
     };
+#endif
 
     public static string Sha256(ReadOnlySpan<byte> value)
     {
@@ -59,83 +63,115 @@ internal static class Base64UrlEncoder
     }
 
     /// <summary>
-    /// Converts a subset of an array of 8-bit unsigned integers to its equivalent string representation which is encoded with base-64-url digits. Parameters specify
-    /// the subset as an offset in the input array, and the number of elements in the array to convert.
+    /// Converts the bytes to their equivalent base64url string representation.
     /// </summary>
-    /// <param name="inArray">An array of 8-bit unsigned integers.</param>
-    /// <param name="raw">Remove padding</param>
-    /// <returns>The string representation in base 64 url encoding of length elements of inArray, starting at position offset.</returns>
-    /// <exception cref="ArgumentNullException">'inArray' is null.</exception>
-    /// <exception cref="ArgumentOutOfRangeException">offset or length is negative OR offset plus length is greater than the length of inArray.</exception>
+    /// <param name="inArray">The bytes to encode.</param>
+    /// <param name="raw">Remove padding.</param>
+    /// <returns>The base64url encoding of the bytes.</returns>
     public static string Encode(Span<byte> inArray, bool raw = false)
     {
-        var offset = 0;
         var length = inArray.Length;
-
         if (length == 0)
             return string.Empty;
 
-        var lengthMod3 = length % 3;
-        var limit = length - lengthMod3;
-        var output = new char[(length + 2) / 3 * 4];
-        var table = SBase64Table;
-        int i, j = 0;
-
-        // takes 3 bytes from inArray and insert 4 bytes into output
-        for (i = offset; i < limit; i += 3)
+        var base64Length = (length + 2) / 3 * 4;
+#if NET9_0_OR_GREATER
+        // Base64Url encodes url-safe in a single pass (no separate swap). It omits padding, so for
+        // the default (raw == false) the trailing '=' is appended to match base64.URLEncoding.
+        char[]? rented = null;
+        var chars = base64Length <= 512
+            ? stackalloc char[base64Length]
+            : (rented = ArrayPool<char>.Shared.Rent(base64Length)).AsSpan(0, base64Length);
+        try
         {
-            var d0 = inArray[i];
-            var d1 = inArray[i + 1];
-            var d2 = inArray[i + 2];
+            var written = Base64Url.EncodeToChars(inArray, chars);
+            if (raw)
+                return new string(chars.Slice(0, written));
 
-            output[j + 0] = table[d0 >> 2];
-            output[j + 1] = table[((d0 & 0x03) << 4) | (d1 >> 4)];
-            output[j + 2] = table[((d1 & 0x0f) << 2) | (d2 >> 6)];
-            output[j + 3] = table[d2 & 0x3f];
-            j += 4;
+            chars.Slice(written, base64Length - written).Fill(Base64PadCharacter);
+            return new string(chars.Slice(0, base64Length));
         }
-
-        // Where we left off before
-        i = limit;
-
-        switch (lengthMod3)
+        finally
         {
-        case 2:
+            if (rented != null)
+                ArrayPool<char>.Shared.Return(rented);
+        }
+#else
+        // Pre-net9 there is no url-safe base64 encoder, so use the lookup table (which maps directly
+        // to the url-safe alphabet). Encode into a stack/pooled buffer with an unsafe pointer loop
+        // (no bounds checks), so only the result string is allocated.
+        char[]? rented = null;
+        var chars = base64Length <= 512
+            ? stackalloc char[base64Length]
+            : (rented = ArrayPool<char>.Shared.Rent(base64Length)).AsSpan(0, base64Length);
+        try
+        {
+            var lengthMod3 = length % 3;
+            var limit = length - lengthMod3;
+            var j = 0;
+
+            unsafe
             {
-                var d0 = inArray[i];
-                var d1 = inArray[i + 1];
+                // Pin the table and output and index them without bounds checks; inArray stays a
+                // checked span (its accesses are bounded by limit, derived from its own length).
+                fixed (char* dst = chars, tbl = SBase64Table)
+                {
+                    // Each 3 input bytes map to 4 output chars.
+                    for (var i = 0; i < limit; i += 3)
+                    {
+                        int d0 = inArray[i];
+                        int d1 = inArray[i + 1];
+                        int d2 = inArray[i + 2];
 
-                output[j + 0] = table[d0 >> 2];
-                output[j + 1] = table[((d0 & 0x03) << 4) | (d1 >> 4)];
-                output[j + 2] = table[(d1 & 0x0f) << 2];
-                j += 3;
+                        dst[j + 0] = tbl[d0 >> 2];
+                        dst[j + 1] = tbl[((d0 & 0x03) << 4) | (d1 >> 4)];
+                        dst[j + 2] = tbl[((d1 & 0x0f) << 2) | (d2 >> 6)];
+                        dst[j + 3] = tbl[d2 & 0x3f];
+                        j += 4;
+                    }
+
+                    switch (lengthMod3)
+                    {
+                    case 2:
+                        {
+                            int d0 = inArray[limit];
+                            int d1 = inArray[limit + 1];
+                            dst[j + 0] = tbl[d0 >> 2];
+                            dst[j + 1] = tbl[((d0 & 0x03) << 4) | (d1 >> 4)];
+                            dst[j + 2] = tbl[(d1 & 0x0f) << 2];
+                            j += 3;
+                        }
+
+                        break;
+
+                    case 1:
+                        {
+                            int d0 = inArray[limit];
+                            dst[j + 0] = tbl[d0 >> 2];
+                            dst[j + 1] = tbl[(d0 & 0x03) << 4];
+                            j += 2;
+                        }
+
+                        break;
+                    }
+
+                    if (!raw)
+                    {
+                        for (var k = j; k < base64Length; k++)
+                            dst[k] = Base64PadCharacter;
+                        j = base64Length;
+                    }
+
+                    return new string(dst, 0, j);
+                }
             }
-
-            break;
-
-        case 1:
-            {
-                var d0 = inArray[i];
-
-                output[j + 0] = table[d0 >> 2];
-                output[j + 1] = table[(d0 & 0x03) << 4];
-                j += 2;
-            }
-
-            break;
-
-            // default or case 0: no further operations are needed.
         }
-
-        if (raw)
-            return new string(output, 0, j);
-
-        for (var k = j; k < output.Length; k++)
+        finally
         {
-            output[k] = Base64PadCharacter;
+            if (rented != null)
+                ArrayPool<char>.Shared.Return(rented);
         }
-
-        return new string(output);
+#endif
     }
 
     /// <summary>

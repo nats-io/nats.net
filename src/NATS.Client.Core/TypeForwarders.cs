@@ -5,3 +5,5 @@ using NATS.Client.Core;
 [assembly: TypeForwardedTo(typeof(INatsSerialize<>))]
 [assembly: TypeForwardedTo(typeof(INatsDeserialize<>))]
 [assembly: TypeForwardedTo(typeof(INatsSerializerRegistry))]
+[assembly: TypeForwardedTo(typeof(INatsSocketConnection))]
+[assembly: TypeForwardedTo(typeof(INatsTlsUpgradeableSocketConnection))]

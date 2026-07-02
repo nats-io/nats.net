@@ -45,7 +45,7 @@ jobs:
           dotnet-version: |
             6.x
             8.x
-            9.x
+            10.x
 
       - name: Release Build
         run: dotnet build -c Release tests/NATS.Client.Perf/NATS.Client.Perf.csproj

@@ -24,6 +24,7 @@ public class ErrorHandlerTest
     {
         var proxy = new NatsProxy(_server.Port);
         await using var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}", ConnectTimeout = TimeSpan.FromSeconds(10) });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
 
         var js = new NatsJSContext(nats);
@@ -97,6 +98,7 @@ public class ErrorHandlerTest
     {
         var proxy = new NatsProxy(_server.Port);
         await using var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}", ConnectTimeout = TimeSpan.FromSeconds(10) });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
 
         var js = new NatsJSContext(nats);
@@ -187,11 +189,12 @@ public class ErrorHandlerTest
     {
         var proxy = new NatsProxy(_server.Port);
         await using var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}", ConnectTimeout = TimeSpan.FromSeconds(10) });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
 
         var js = new NatsJSContext(nats);
 
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 
         var stream = await js.CreateStreamAsync(new StreamConfig($"{prefix}s1", new[] { $"{prefix}s1.*" }), cts.Token);
         var consumer = (NatsJSOrderedConsumer)await stream.CreateOrderedConsumerAsync(cancellationToken: cts.Token);
@@ -233,7 +236,11 @@ public class ErrorHandlerTest
         var stream2 = await js.CreateStreamAsync(new StreamConfig($"{prefix}s2", new[] { $"{prefix}s2.*" }), cts.Token);
         var consumer2 = (NatsJSOrderedConsumer)await stream2.CreateOrderedConsumerAsync(cancellationToken: cts.Token);
 
-        // reduce heartbeat time out to increase the chance of receiving notification.
+        // Short idle heartbeat so the client-side timeout (2x idle) fires quickly, and a long
+        // expiry so the server-side request timeout (408) does not race the heartbeat timeout.
+        // Under CI thread-pool contention the heartbeat Timer callback can be delayed by several
+        // seconds; with expiry close to the heartbeat timeout the fetch would otherwise end via
+        // the 408 before the notification fires, yielding zero notifications.
         var opts2 = new NatsJSFetchOpts
         {
             MaxMsgs = 10,
@@ -246,7 +253,7 @@ public class ErrorHandlerTest
 
                 return Task.CompletedTask;
             },
-            Expires = TimeSpan.FromSeconds(5),
+            Expires = TimeSpan.FromSeconds(20),
             IdleHeartbeat = TimeSpan.FromSeconds(1),
         };
 
@@ -353,6 +360,7 @@ public class ErrorHandlerTest
     {
         var proxy = new NatsProxy(_server.Port);
         await using var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}", ConnectTimeout = TimeSpan.FromSeconds(10) });
+        await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId();
 
         var js = new NatsJSContext(nats);

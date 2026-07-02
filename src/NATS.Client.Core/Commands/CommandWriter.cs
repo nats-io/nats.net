@@ -36,7 +36,11 @@ internal sealed class CommandWriter : IAsyncDisposable
     private readonly NatsConnection _connection;
     private readonly ObjectPool _pool;
     private readonly int _arrayPoolInitialSize;
+#if NET9_0_OR_GREATER
+    private readonly System.Threading.Lock _lock = new();
+#else
     private readonly object _lock = new();
+#endif
     private readonly CancellationTokenSource _cts;
     private readonly ConnectionStatsCounter _counter;
     private readonly Memory<byte> _consolidateMem = new byte[SendMemSize].AsMemory();
@@ -334,16 +338,31 @@ internal sealed class CommandWriter : IAsyncDisposable
 
         try
         {
+            if (value != null)
+                serializer.Serialize(payloadBuffer, value, new NatsMsgContext(subject, replyTo, headers));
+
             if (headers != null)
                 _headerWriter.Write(headersBuffer!, headers);
-
-            if (value != null)
-                serializer.Serialize(payloadBuffer, value);
 
             var size = payloadBuffer.WrittenMemory.Length + (headersBuffer?.WrittenMemory.Length ?? 0);
             if (_connection.ServerInfo is { } info && size > info.MaxPayload)
             {
                 throw new NatsPayloadTooLargeException($"Payload size {size} exceeds server's maximum payload size {info.MaxPayload}");
+            }
+
+            // Per OTel messaging semconv, messaging.client.published.messages counts publish
+            // attempts, not successful wire writes -- so we increment here, before the
+            // _semLock / _disposed / state-machine paths that might fail to enqueue.
+            // sent.bytes follows the same "attempted" convention for consistency. Operators
+            // wanting a "successfully published" view subtract operation.duration samples
+            // that carry an error.type tag.
+            if (Telemetry.PublishedMessages.Enabled || Telemetry.SentBytes.Enabled)
+            {
+                var tags = Telemetry.BuildMetricTags(_connection, Telemetry.Constants.OpPub);
+                if (Telemetry.PublishedMessages.Enabled)
+                    Telemetry.PublishedMessages.Add(1, tags);
+                if (Telemetry.SentBytes.Enabled)
+                    Telemetry.SentBytes.Add(size, tags);
             }
         }
         catch
@@ -957,7 +976,11 @@ internal sealed class CommandWriter : IAsyncDisposable
     private class PartialSendFailureCounter
     {
         private const int MaxRetry = 1;
+#if NET9_0_OR_GREATER
+        private readonly System.Threading.Lock _gate = new();
+#else
         private readonly object _gate = new();
+#endif
         private int _count;
 
         public bool Failed()

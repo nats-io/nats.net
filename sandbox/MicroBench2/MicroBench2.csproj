@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!--
+      Lean BenchmarkDotNet host: minimal dependencies (only the projects under test + BDN), kept
+      separate from MicroBenchmark which pulls in heavier third-party packages. Add focused
+      micro-benchmarks here. Run with: dotnet run -c Release -f net10.0 (pass a BDN filter such as *).
+    -->
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+        <!-- net481 (Windows only) exercises the netstandard2.0 table branch of the encoder. -->
+        <TargetFrameworks Condition="'$(OS)' == 'Windows_NT'">$(TargetFrameworks);net481</TargetFrameworks>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <LangVersion>latest</LangVersion>
+        <IsPackable>false</IsPackable>
+        <NoWarn>$(NoWarn);CS8002</NoWarn>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\src\NATS.Client.ObjectStore\NATS.Client.ObjectStore.csproj" />
+    </ItemGroup>
+
+</Project>

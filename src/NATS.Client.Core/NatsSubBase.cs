@@ -32,7 +32,11 @@ public abstract class NatsSubBase
 {
     private static readonly byte[] NoRespondersHeaderSequence = { (byte)' ', (byte)'5', (byte)'0', (byte)'3' };
     private readonly ILogger _logger;
+#if NET9_0_OR_GREATER
+    private readonly System.Threading.Lock _gate = new();
+#else
     private readonly object _gate = new();
+#endif
     private readonly bool _debug;
     private readonly INatsSubscriptionManager _manager;
     private readonly Timer? _timeoutTimer;
@@ -50,6 +54,7 @@ public abstract class NatsSubBase
     private int _pendingMsgs;
     private Exception? _exception;
     private int _isSlowConsumer;
+    private int _telemetryActive;
     private TaskCompletionSource? _readerExited;
 
     /// <summary>
@@ -69,7 +74,9 @@ public abstract class NatsSubBase
         NatsSubOpts? opts,
         CancellationToken cancellationToken = default)
     {
+#pragma warning disable CS0618 // SkipSubjectValidation is obsolete but still honored
         if (!connection.Opts.SkipSubjectValidation)
+#pragma warning restore CS0618
         {
             SubjectValidator.ValidateSubject(subject);
             SubjectValidator.ValidateQueueGroup(queueGroup);
@@ -204,6 +211,25 @@ public abstract class NatsSubBase
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous operation.</returns>
     public virtual ValueTask ReadyAsync()
     {
+        // nats.client.active_subscriptions counts every NatsSubBase that reaches Ready,
+        // regardless of whether it corresponds to a wire-level SUB. Under SharedInbox
+        // request/reply mode each in-flight RequestAsync registers a transient reply
+        // NatsSub with the shared inbox muxer (no extra wire SUB) and that registration
+        // still bumps the gauge. Operator dashboards should expect oscillation under
+        // request load. Direct mode uses ReplyTask and does not increment.
+        if (Telemetry.ActiveSubscriptions.Enabled)
+        {
+            var emit = false;
+            lock (_gate)
+            {
+                if (!_unsubscribed && Interlocked.Exchange(ref _telemetryActive, 1) == 0)
+                    emit = true;
+            }
+
+            if (emit)
+                Telemetry.ActiveSubscriptions.Add(1, Telemetry.BuildMetricTags(Connection, Telemetry.Constants.OpSub));
+        }
+
         // Let idle timer start with the first message, in case
         // we're allowed to wait longer for the first message.
         if (_startUpTimeoutTimer == null)
@@ -229,6 +255,8 @@ public abstract class NatsSubBase
             _unsubscribed = true;
         }
 
+        DecrementActiveSubscription();
+
         _timeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
         _idleTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
         _startUpTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
@@ -249,6 +277,29 @@ public abstract class NatsSubBase
 
         return _manager.RemoveAsync(this);
     }
+
+    /// <summary>
+    /// Drains the subscription: sends UNSUB so the server stops delivering new
+    /// messages, waits for a PING/PONG round-trip so messages already in flight
+    /// are received, then completes the message channel. Buffered messages stay
+    /// available to read and the connection remains usable.
+    /// </summary>
+    /// <remarks>
+    /// Unlike <see cref="UnsubscribeAsync"/>, which completes the channel right
+    /// away and can drop messages still in the socket buffer, drain fences inbound
+    /// delivery with a PING/PONG so buffered messages are preserved. The fence is
+    /// best-effort and bounded by <paramref name="cancellationToken"/> and
+    /// <see cref="NatsOpts.DrainPingTimeout"/>.
+    /// <para>
+    /// Cancellation only shortens the PING/PONG fence wait; it cannot abort the
+    /// drain. Once <see cref="DrainAsync"/> is entered the subscription is always
+    /// committed to the drained state, and cancelling the token does not throw or
+    /// keep the subscription alive.
+    /// </para>
+    /// </remarks>
+    /// <param name="cancellationToken">Bounds the best-effort PING/PONG fence wait, which lasts at most <see cref="NatsOpts.DrainPingTimeout"/>; the token can only shorten it, not extend it past that timeout. Cancellation does not abort the drain.</param>
+    /// <returns>A <see cref="ValueTask"/> that represents the asynchronous drain operation.</returns>
+    public virtual ValueTask DrainAsync(CancellationToken cancellationToken = default) => DrainCoreAsync(cancellationToken);
 
     /// <summary>
     /// Disposes the instance asynchronously.
@@ -317,6 +368,28 @@ public abstract class NatsSubBase
         {
             // Need to await to handle any exceptions
             await ReceiveInternalAsync(subject, replyTo, headersBuffer, payloadBuffer).ConfigureAwait(false);
+
+            // Per OTel messaging semconv, consumed.messages counts messages "delivered to
+            // the application", so we only record after ReceiveInternalAsync has completed
+            // the hand-off to the subscription channel. received.bytes follows the same
+            // convention. Messages dropped by cancellation, channel closure, or serializer
+            // exceptions are not counted.
+            //
+            // NATS status/control frames (no-responder 503s and JetStream heartbeats,
+            // flow-control, and protocol notifications) are consumed internally and never
+            // reach the application, so they are excluded from both counters. They are
+            // identifiable by the inline status code on the "NATS/1.0 <code>" header line.
+            if ((Telemetry.ConsumedMessages.Enabled || Telemetry.ReceivedBytes.Enabled) && !IsStatusMsg(headersBuffer))
+            {
+                var tags = Telemetry.BuildMetricTags(Connection, Telemetry.Constants.OpRec);
+                if (Telemetry.ConsumedMessages.Enabled)
+                    Telemetry.ConsumedMessages.Add(1, tags);
+                if (Telemetry.ReceivedBytes.Enabled)
+                {
+                    var bytes = payloadBuffer.Length + (headersBuffer?.Length ?? 0);
+                    Telemetry.ReceivedBytes.Add(bytes, tags);
+                }
+            }
         }
         catch (TaskCanceledException)
         {
@@ -357,13 +430,27 @@ public abstract class NatsSubBase
         headersBuffer is { Length: >= 12 }
         && headersBuffer.Value.Slice(8, 4).ToSpan().SequenceEqual(NoRespondersHeaderSequence);
 
+    // A NATS status/control frame carries an inline status code on the version line
+    // ("NATS/1.0 <code>"): a space then three ASCII digits at offset 8. Regular user
+    // headers have "\r\n" at that offset, so this never matches an application message.
+    internal static bool IsStatusMsg(ReadOnlySequence<byte>? headersBuffer)
+    {
+        if (headersBuffer is not { Length: >= 12 })
+            return false;
+
+        var code = headersBuffer.Value.Slice(8, 4).ToSpan();
+        return code[0] == (byte)' '
+            && code[1] is >= (byte)'0' and <= (byte)'9'
+            && code[2] is >= (byte)'0' and <= (byte)'9'
+            && code[3] is >= (byte)'0' and <= (byte)'9';
+    }
+
     internal void ClearException() => Interlocked.Exchange(ref _exception, null);
 
     /// <summary>
-    /// Sends UNSUB to the server, waits for PING/PONG round-trip to ensure
-    /// all in-flight messages are processed, then completes the channel.
-    /// This avoids the race where TryComplete() closes the channel while
-    /// the socket reader is still delivering messages.
+    /// Dispose-path drain. Runs the same UNSUB plus PING/PONG fence as
+    /// <see cref="DrainAsync"/>, then waits for an active user reader to drain
+    /// the channel before returning.
     /// </summary>
     /// <remarks>
     /// No-op unless <see cref="NatsOpts.DrainSubscriptionsOnDispose"/> is
@@ -372,62 +459,12 @@ public abstract class NatsSubBase
     /// <see cref="NatsConnection.DisposeAsync"/>).
     /// </remarks>
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous drain operation.</returns>
-    internal async ValueTask DrainAsync()
+    internal async ValueTask DrainOnDisposeAsync()
     {
         if (!Connection.Opts.DrainSubscriptionsOnDispose)
             return;
 
-        var needsUnsub = false;
-        lock (_gate)
-        {
-            if (!_unsubscribed)
-            {
-                _unsubscribed = true;
-                needsUnsub = true;
-            }
-        }
-
-        if (needsUnsub)
-        {
-            _timeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-            _idleTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-            _startUpTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-
-            // For the built-in SubscriptionManager: send UNSUB but keep the SID in the routing
-            // table until after the PING/PONG round-trip, so messages already in the socket
-            // buffer are delivered before the channel is completed.
-            // For external managers: fall back to RemoveAsync (routing removed before PING).
-            var mgr = _manager as SubscriptionManager;
-            var sid = mgr != null
-                ? await mgr.UnsubscribeForDrainAsync(this).ConfigureAwait(false)
-                : -1;
-            if (mgr == null)
-                await _manager.RemoveAsync(this).ConfigureAwait(false);
-
-            // PING/PONG round-trip: after we get the PONG back, we know the server
-            // has processed our UNSUB and the socket reader has processed all messages
-            // that were in-flight before the UNSUB was received by the server.
-            try
-            {
-                using var pingCts = new CancellationTokenSource(Connection.Opts.DrainPingTimeout);
-                await Connection.PingAsync(pingCts.Token).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                // Timeout via DrainPingTimeout. Expected on dispose path.
-            }
-            catch (NatsException)
-            {
-                // Connection failed or disconnected during drain. Drain is best-effort.
-            }
-
-            // Remove from routing now that no more messages can arrive for this SID.
-            if (sid != -1)
-                mgr?.RemoveFromRouting(sid);
-
-            // Now it's safe to complete the channel, no more messages will arrive.
-            TryComplete();
-        }
+        await DrainCoreAsync(CancellationToken.None).ConfigureAwait(false);
 
         // Always wait for an active user reader to drain the channel before
         // returning, even if the subscription was already ended (e.g. via
@@ -496,6 +533,18 @@ public abstract class NatsSubBase
     /// <param name="payloadBuffer">Raw payload bytes.</param>
     /// <returns></returns>
     protected abstract ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer);
+
+    /// <summary>
+    /// Stops any subclass-owned delivery machinery (e.g. a JetStream pull loop or
+    /// idle-heartbeat timer) as the first step of a drain, before the UNSUB and the
+    /// PING/PONG fence. The base implementation is a no-op; subclasses that keep
+    /// pulling or run a timer that can complete the message channel must override this
+    /// so drain does not leave that machinery running or let it skip the fence.
+    /// Called on both the explicit drain and the dispose-drain path; must be idempotent.
+    /// </summary>
+    protected virtual void StopDelivery()
+    {
+    }
 
     /// <summary>
     /// Waits for the user-side reader to exit so buffered messages can be
@@ -602,6 +651,93 @@ public abstract class NatsSubBase
         UnsubscribeAsync();
 #pragma warning restore VSTHRD110
 #pragma warning restore CA2012
+    }
+
+    private void DecrementActiveSubscription()
+    {
+        if (Interlocked.Exchange(ref _telemetryActive, 0) == 1)
+            Telemetry.ActiveSubscriptions.Add(-1, Telemetry.BuildMetricTags(Connection, Telemetry.Constants.OpSub));
+    }
+
+    /// <summary>
+    /// Sends UNSUB to the server, waits for a PING/PONG round-trip to ensure all
+    /// in-flight messages are processed, then completes the channel. This avoids
+    /// the race where TryComplete() closes the channel while the socket reader is
+    /// still delivering messages. Idempotent: a no-op once the subscription has
+    /// already been unsubscribed.
+    /// </summary>
+    private async ValueTask DrainCoreAsync(CancellationToken cancellationToken)
+    {
+        var needsUnsub = false;
+        lock (_gate)
+        {
+            if (!_unsubscribed)
+            {
+                _unsubscribed = true;
+                needsUnsub = true;
+            }
+        }
+
+        if (!needsUnsub)
+            return;
+
+        var mgr = _manager as SubscriptionManager;
+        var sid = -1;
+        try
+        {
+            DecrementActiveSubscription();
+
+            // Stop the subclass-owned delivery engine (e.g. a JetStream pull/heartbeat loop)
+            // and disarm the lifecycle timers before the fence so they can't keep pulling or
+            // complete the channel ahead of it. These run inside the try so that if any of
+            // them throw (e.g. a timer disposed by a racing DisposeAsync) the finally below
+            // still completes the channel and no reader is left waiting forever.
+            StopDelivery();
+            _timeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+            _idleTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+            _startUpTimeoutTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+
+            // For the built-in SubscriptionManager: send UNSUB but keep the SID in the routing
+            // table until after the PING/PONG round-trip, so messages already in the socket
+            // buffer are delivered before the channel is completed.
+            // For external managers: fall back to RemoveAsync (routing removed before PING).
+            if (mgr != null)
+                sid = await mgr.UnsubscribeForDrainAsync(this).ConfigureAwait(false);
+            else
+                await _manager.RemoveAsync(this).ConfigureAwait(false);
+
+            // PING/PONG round-trip: after we get the PONG back, we know the server
+            // has processed our UNSUB and the socket reader has processed all messages
+            // that were in-flight before the UNSUB was received by the server.
+            using var pingCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            pingCts.CancelAfter(Connection.Opts.DrainPingTimeout);
+            await Connection.PingAsync(pingCts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Drain ping timed out (DrainPingTimeout) or was cancelled. Drain is best-effort.
+        }
+        catch (NatsException)
+        {
+            // Connection failed or disconnected during drain. Drain is best-effort.
+        }
+        catch (ObjectDisposedException)
+        {
+            // The connection or its command writer was disposed mid-drain (e.g. a connection
+            // dispose racing an explicit drain). Drain is best-effort; fall through and still
+            // complete the channel below.
+        }
+        finally
+        {
+            // Remove from routing now that no more messages can arrive for this SID, then
+            // complete the channel. This runs even if anything in the try threw, so a reader
+            // blocked on the channel (e.g. the drain-on-cancel consume loop reading with
+            // CancellationToken.None) is never left waiting forever.
+            if (sid != -1)
+                mgr?.RemoveFromRouting(sid);
+
+            TryComplete();
+        }
     }
 
     private async ValueTask WaitForReaderDrainCoreAsync(Task task, TimeSpan timeout)

@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using NATS.Client.Core.Tests;
 using NATS.Client.ObjectStore.Models;
+using NATS.Client.TestUtilities2;
 using Synadia.Orbit.Testing.NatsServerProcessManager;
 
 namespace NATS.Client.ObjectStore.Tests;
@@ -13,6 +14,7 @@ public class CompatTest
     {
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
         var js = new NatsJSContext(nats);
         var ob = new NatsObjContext(js);
 

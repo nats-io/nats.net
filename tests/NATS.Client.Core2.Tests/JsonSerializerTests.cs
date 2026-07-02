@@ -1,5 +1,6 @@
 using NATS.Client.Core2.Tests;
 using NATS.Client.Serializers.Json;
+using NATS.Client.TestUtilities2;
 
 namespace NATS.Client.Core.Tests;
 
@@ -24,6 +25,7 @@ public class JsonSerializerTests
             SerializerRegistry = NatsJsonSerializerRegistry.Default,
         };
         await using var nats = new NatsConnection(natsOpts);
+        await nats.ConnectRetryAsync();
 
         // in local runs server start is taking too long when running
         // the whole suite.
@@ -39,6 +41,7 @@ public class JsonSerializerTests
 
         // Default serializer won't work with random types
         await using var nats1 = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats1.ConnectRetryAsync();
 
         var exception = await Assert.ThrowsAsync<NatsException>(() => nats1.PublishAsync(
             subject: "would.not.work",
