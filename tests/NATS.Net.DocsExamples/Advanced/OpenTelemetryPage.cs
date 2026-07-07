@@ -141,5 +141,29 @@ public class OpenTelemetryPage
             };
             #endregion
         }
+
+        {
+            #region baggage
+            // Baggage propagation is off by default because baggage can carry
+            // sensitive or high-cardinality data. Opt in explicitly:
+            NatsInstrumentationOptions.Default.PropagateBaggage = true;
+
+            // Optionally allow-list which baggage keys cross the NATS boundary:
+            NatsInstrumentationOptions.Default.BaggageKeyFilter = key => key is "tenant.id" or "correlation.id";
+
+            // Received baggage is restored onto the receive activity and also
+            // exposed on the Filter/Enrich callback context:
+            NatsInstrumentationOptions.Default.Enrich = (activity, context) =>
+            {
+                if (context.Baggage is { } baggage)
+                {
+                    foreach (var entry in baggage)
+                    {
+                        Console.WriteLine($"baggage: {entry.Key}={entry.Value}");
+                    }
+                }
+            };
+            #endregion
+        }
     }
 }

@@ -19,11 +19,15 @@ public static class NatsMsgTelemetryExtensions
         if (!Telemetry.HasListeners())
             return null;
 
-        return Telemetry.NatsActivities.StartActivity(
+        var activity = Telemetry.NatsActivities.StartActivity(
             name,
             kind: ActivityKind.Internal,
             parentContext: msg.Headers.GetActivityContext(),
             tags: tags);
+
+        Telemetry.CopyBaggage(msg.Headers?.Activity, activity);
+
+        return activity;
     }
 
     /// <summary>Gets the activity context carried by the NatsHeaders.</summary>

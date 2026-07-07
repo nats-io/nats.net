@@ -20,11 +20,15 @@ public static class NatsJSTelemetryExtensions
         if (!Telemetry.HasListeners())
             return null;
 
-        return Telemetry.NatsActivities.StartActivity(
+        var activity = Telemetry.NatsActivities.StartActivity(
             name,
             kind: ActivityKind.Internal,
             parentContext: msg.Headers.GetActivityContext(),
             tags: tags);
+
+        Telemetry.CopyBaggage(msg.Headers?.Activity, activity);
+
+        return activity;
     }
 
     /// <summary>Start an activity under the INatsJSMsg associated activity.</summary>
@@ -40,10 +44,14 @@ public static class NatsJSTelemetryExtensions
         if (!Telemetry.HasListeners())
             return null;
 
-        return Telemetry.NatsActivities.StartActivity(
+        var activity = Telemetry.NatsActivities.StartActivity(
             name,
             kind: ActivityKind.Internal,
             parentContext: msg.Headers.GetActivityContext(),
             tags: tags);
+
+        Telemetry.CopyBaggage(msg.Headers?.Activity, activity);
+
+        return activity;
     }
 }
