@@ -39,8 +39,9 @@ If you need the full `SslClientAuthenticationOptions` functionality, consider ta
 
 ### Keyed Services
 
-The [`AddNats`](xref:NATS.Client.Hosting.NatsHostingExtensions.AddNats*) extension method has different
-signatures depending on the target framework:
+[Keyed dependency injection services](https://learn.microsoft.com/en-us/dotnet/core/extensions/dependency-injection#keyed-services)
+were introduced in .NET 8, so the [`AddNats`](xref:NATS.Client.Hosting.NatsHostingExtensions.AddNats*)
+extension method gains a `key` parameter on newer target frameworks:
 
 **netstandard2.0, netstandard2.1:**
 ```csharp
@@ -61,18 +62,8 @@ public static IServiceCollection AddNats(
     object? key = null)  // Additional parameter for keyed services
 ```
 
-[Keyed dependency injection services](https://learn.microsoft.com/en-us/dotnet/core/extensions/dependency-injection#keyed-services)
-were introduced in .NET 8. The `key` parameter allows you to register multiple NATS connections
-with different keys:
-
-```csharp
-// .NET 8+ only
-services.AddNats(key: "primary", configureOpts: opts => opts with { Url = "nats://primary:4222" });
-services.AddNats(key: "secondary", configureOpts: opts => opts with { Url = "nats://secondary:4222" });
-
-// Inject with [FromKeyedServices("primary")]
-public class MyService([FromKeyedServices("primary")] INatsConnection primaryNats) { }
-```
+See [Dependency Injection](dependency-injection.md) for how to register and inject keyed connections
+with both DI packages.
 
 ## API Compatibility Checking
 

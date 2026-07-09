@@ -10,13 +10,25 @@ using NATS.Net;
 
 namespace NATS.Extensions.Microsoft.DependencyInjection;
 
+/// <summary>
+/// Mutable holder for the <see cref="NatsOpts"/> and connection configuration built up by <see cref="NatsBuilder"/>.
+/// </summary>
 public class NatsOptsBuilder
 {
+    /// <summary>
+    /// Gets or sets the options used to create the connection.
+    /// </summary>
     public NatsOpts Opts { get; set; } = NatsOpts.Default;
 
+    /// <summary>
+    /// Gets or sets an optional callback invoked on each connection after it is created.
+    /// </summary>
     public Action<IServiceProvider, NatsConnection>? ConfigureConnection { get; set; }
 }
 
+/// <summary>
+/// Fluent builder for configuring the NATS client registered by <c>AddNatsClient</c>.
+/// </summary>
 public class NatsBuilder
 {
     private readonly IServiceCollection _services;
@@ -25,6 +37,10 @@ public class NatsBuilder
     private object? _diKey = null;
     private string _optionsName = Options.DefaultName;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="NatsBuilder"/> class.
+    /// </summary>
+    /// <param name="services">The service collection the client is registered on.</param>
     public NatsBuilder(IServiceCollection services)
     {
         _services = services;
@@ -45,6 +61,11 @@ public class NatsBuilder
             }
         });
 
+    /// <summary>
+    /// Sets the connection pool size.
+    /// </summary>
+    /// <param name="size">Number of connections in the pool. Values below 1 are treated as 1.</param>
+    /// <returns>Builder to allow method chaining.</returns>
     public NatsBuilder WithPoolSize(int size)
     {
         _poolSizeConfigurer = _ => Math.Max(size, 1);
@@ -52,6 +73,11 @@ public class NatsBuilder
         return this;
     }
 
+    /// <summary>
+    /// Sets the connection pool size using a factory resolved from the service provider.
+    /// </summary>
+    /// <param name="sizeConfigurer">Callback returning the pool size. Values below 1 are treated as 1.</param>
+    /// <returns>Builder to allow method chaining.</returns>
     public NatsBuilder WithPoolSize(Func<IServiceProvider, int> sizeConfigurer)
     {
         _poolSizeConfigurer = sp => Math.Max(sizeConfigurer(sp), 1);
@@ -59,6 +85,11 @@ public class NatsBuilder
         return this;
     }
 
+    /// <summary>
+    /// Configures the underlying <see cref="NatsOptsBuilder"/> options.
+    /// </summary>
+    /// <param name="configure">Callback to configure the options builder.</param>
+    /// <returns>Builder to allow method chaining.</returns>
     public NatsBuilder ConfigureOptions(Action<OptionsBuilder<NatsOptsBuilder>> configure)
     {
         configure(Builder);
@@ -76,6 +107,11 @@ public class NatsBuilder
         ConfigureOptions(builder => builder.Configure<IServiceProvider>((opts, provider) =>
             opts.Opts = optsFactory(provider, opts.Opts)));
 
+    /// <summary>
+    /// Registers a callback invoked on each connection after it is created, with access to the service provider.
+    /// </summary>
+    /// <param name="configureConnection">Callback to configure the connection.</param>
+    /// <returns>Builder to allow method chaining.</returns>
     public NatsBuilder ConfigureConnection(Action<IServiceProvider, NatsConnection> configureConnection) =>
         ConfigureOptions(builder =>
             builder.Configure<IServiceProvider>((opts, provider) =>
@@ -89,6 +125,11 @@ public class NatsBuilder
                 };
             }));
 
+    /// <summary>
+    /// Registers a callback invoked on each connection after it is created.
+    /// </summary>
+    /// <param name="configureConnection">Callback to configure the connection.</param>
+    /// <returns>Builder to allow method chaining.</returns>
     public NatsBuilder ConfigureConnection(Action<NatsConnection> configureConnection) =>
         ConfigureConnection((_, connection) => configureConnection(connection));
 
@@ -108,6 +149,12 @@ public class NatsBuilder
             }));
 
 #if NET8_0_OR_GREATER
+    /// <summary>
+    /// Registers the client as a keyed service so multiple connections can be resolved by key (.NET 8+).
+    /// </summary>
+    /// <param name="key">The service key.</param>
+    /// <returns>Builder to allow method chaining.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when called after options have already been configured.</exception>
     public NatsBuilder WithKey(object key)
     {
         if (_builder != null)

@@ -8,9 +8,15 @@ namespace NATS.Client.Hosting;
 public static class NatsHostingExtensions
 {
     /// <summary>
-    /// Add NatsConnection/Pool to ServiceCollection. When poolSize = 1, registered `NatsConnection` and `INatsConnection` as singleton.
-    /// Others, registered `NatsConnectionPool` as singleton, `NatsConnection` and `INatsConnection` as transient(get from pool).
+    /// Registers a NATS connection on the service collection with minimal dependencies and no JSON serializer.
     /// </summary>
+    /// <remarks>
+    /// When <c>poolSize</c> is 1, <c>NatsConnection</c> and <c>INatsConnection</c> are registered as singletons.
+    /// For a larger pool, <c>NatsConnectionPool</c> is registered as a singleton and <c>NatsConnection</c>/
+    /// <c>INatsConnection</c> as transient, resolved from the pool. This package suits AOT and tight dependency
+    /// footprints; it does not register <c>INatsClient</c> or enable ad hoc JSON serialization. For those, use
+    /// <c>NATS.Extensions.Microsoft.DependencyInjection</c> and its <c>AddNatsClient</c> method instead.
+    /// </remarks>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.SpacingRules", "SA1001:Commas should not be preceded by whitespace", Justification = "Required for conditional build.")]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.SpacingRules", "SA1009:Closing parenthesis should not be preceded by a space", Justification = "Required for conditional build.")]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.ReadabilityRules", "SA1111:Closing parenthesis should be on the same line as the last parameter", Justification = "Required for conditional build.")]
