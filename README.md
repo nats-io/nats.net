@@ -8,8 +8,10 @@
 # NATS .NET
 
 > [!IMPORTANT]
-> **NATS .NET v3 is in development on the [`release/3.0`](https://github.com/nats-io/nats.net/tree/release/3.0) branch!**
-> v3 adds .NET 10 support and drops .NET 6.0. Target frameworks: `netstandard2.0`, `netstandard2.1`, `net8.0`, `net10.0`.
+> **NATS .NET v3 is released!**
+> v3 adds OpenTelemetry tracing and metrics, .NET 10 support, and drops .NET 6.0.
+> Target frameworks: `netstandard2.0`, `netstandard2.1`, `net8.0`, `net10.0`.
+> See the [v3.0.0 release notes](https://github.com/nats-io/nats.net/releases/tag/v3.0.0) for what's new and upgrade notes.
 
 NATS .NET is the .NET client for NATS, a distributed messaging system.
 It provides pub/sub and request/reply (Core NATS), streaming and persistence (JetStream),
@@ -114,14 +116,16 @@ Head over to [NATS documentation](https://docs.nats.io/nats-concepts/overview) f
 
 ## Packages
 
-- **NATS.Net**: Meta package that includes all other packages except extensions
+- **NATS.Net**: Meta package that includes all other packages except `NATS.Client.OpenTelemetry`
 - **NATS.Client.Core**: [Core NATS](https://docs.nats.io/nats-concepts/core-nats)
+- **NATS.Client.Abstractions**: serialization and transport interfaces with minimal dependencies
 - **NATS.Client.JetStream**: [JetStream](https://docs.nats.io/nats-concepts/jetstream)
 - **NATS.Client.KeyValueStore**: [Key/Value Store](https://docs.nats.io/nats-concepts/jetstream/key-value-store)
 - **NATS.Client.ObjectStore**: [Object Store](https://docs.nats.io/nats-concepts/jetstream/obj_store)
 - **NATS.Client.Services**: [Services](https://docs.nats.io/using-nats/developer/services)
 - **NATS.Client.Simplified**: simplify common use cases especially for beginners
 - **NATS.Client.Serializers.Json**: JSON serializer for ad-hoc types
+- **NATS.Client.OpenTelemetry**: OpenTelemetry instrumentation (tracing and metrics)
 - **NATS.Client.Hosting**: DI integration for AOT-compatible and minimal-dependency scenarios
 - **NATS.Extensions.Microsoft.DependencyInjection**: DI integration with ad-hoc JSON serialization enabled by default
 
