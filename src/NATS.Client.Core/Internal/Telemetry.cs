@@ -463,10 +463,12 @@ internal static class Telemetry
         {
             headers[Constants.BaggageHeader] = sb.ToString();
         }
-        else if (hadBaggage)
+        else if (hadBaggage || options.BaggageSource is not null)
         {
-            // The source had baggage but every entry was filtered out or unusable: remove any
-            // baggage header the ambient propagator may have written unfiltered during Inject.
+            // Either the source had baggage but every entry was filtered out or unusable, or a
+            // BaggageSource is configured and returned nothing. In both cases remove any baggage
+            // header the ambient propagator may have written unfiltered during Inject: a configured
+            // BaggageSource is authoritative, so Activity.Baggage must not leak onto the wire.
             headers.Remove(Constants.BaggageHeader);
         }
     }

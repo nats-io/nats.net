@@ -174,25 +174,26 @@ public class TelemetryBaggageTest : IDisposable
     }
 
     [Fact]
-    public void Enabled_baggage_source_returning_null_leaves_headers_untouched()
+    public void Enabled_baggage_source_returning_null_removes_header()
     {
         NatsInstrumentationOptions.Default.PropagateBaggage = true;
         NatsInstrumentationOptions.Default.BaggageSource = () => null!;
 
         // Pin a no-output propagator so the ambient (DiagnosticSource 10+ W3C) propagator
-        // cannot overwrite the app-set header during Inject; only this feature's behavior
-        // (leave untouched when the source yields no baggage) is under test here.
+        // cannot overwrite the header during Inject; only this feature's behavior is under test.
         var previousPropagator = DistributedContextPropagator.Current;
         DistributedContextPropagator.Current = DistributedContextPropagator.CreateNoOutputPropagator();
 
         var activity = StartActivity(("act", "1"));
         try
         {
+            // A configured BaggageSource is authoritative: when it yields no baggage for this
+            // message, any pre-existing baggage header (app-set or ambient-written) must be
+            // removed rather than leaked onto the wire.
             var headers = new NatsHeaders { [Telemetry.Constants.BaggageHeader] = "app=1" };
             Telemetry.AddTraceContextHeaders(activity, ref headers);
 
-            headers!.TryGetValue(Telemetry.Constants.BaggageHeader, out var values).Should().BeTrue();
-            values.ToString().Should().Be("app=1");
+            headers!.ContainsKey(Telemetry.Constants.BaggageHeader).Should().BeFalse();
         }
         finally
         {

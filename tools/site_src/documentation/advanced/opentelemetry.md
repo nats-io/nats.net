@@ -73,7 +73,8 @@ custom tags to every activity:
 a correlation ID, etc.) to a trace and have it flow across service boundaries alongside trace context.
 
 Baggage propagation is off by default. Baggage can carry sensitive (PII) or high-cardinality data, and
-NATS servers default to a 4KB header size limit, so it needs to be an explicit opt-in:
+message headers count against size limits (core headers toward the `max_payload`, 1MB by default;
+JetStream caps the header block at 64KB), so it needs to be an explicit opt-in:
 
 [!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/OpenTelemetryPage.cs#baggage)]
 
