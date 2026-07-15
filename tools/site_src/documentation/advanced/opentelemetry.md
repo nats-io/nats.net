@@ -67,6 +67,47 @@ custom tags to every activity:
 
 [!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/OpenTelemetryPage.cs#enrich)]
 
+## Baggage Propagation
+
+[W3C Baggage](https://www.w3.org/TR/baggage/) lets you attach arbitrary key/value context (a tenant ID,
+a correlation ID, etc.) to a trace and have it flow across service boundaries alongside trace context.
+
+Baggage propagation is off by default. Baggage can carry sensitive (PII) or high-cardinality data, and
+message headers count against size limits (core headers toward the `max_payload`, 1MB by default;
+JetStream caps the header block at 64KB), so it needs to be an explicit opt-in:
+
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/OpenTelemetryPage.cs#baggage)]
+
+When enabled, baggage is written to the message as a W3C `baggage` header on publish and, on receive,
+extracted from that header, restored onto the receive activity's `Activity.Baggage`, and exposed via
+[`NatsInstrumentationContext.Baggage`](xref:NATS.Client.Core.NatsInstrumentationContext) to the `Filter`
+and `Enrich` callbacks. Child activities created with `StartActivity` also inherit the restored baggage.
+
+By default the send-side baggage is read from the current send activity's `Activity.Baggage`. If your
+application keeps baggage elsewhere — for example OpenTelemetry's `Baggage.Current` API — use
+[`NatsInstrumentationOptions.Default.BaggageSource`](xref:NATS.Client.Core.NatsInstrumentationOptions) to
+bridge it (requires the `OpenTelemetry.Api` package):
+
+```csharp
+NatsInstrumentationOptions.Default.BaggageSource = () => Baggage.Current.GetBaggage();
+```
+
+When `PropagateBaggage` is enabled and the source has baggage, NATS.Net owns the `baggage` header: it
+overwrites any existing value, or removes the header entirely if `BaggageKeyFilter` rejects every key.
+If the source has no baggage, an application-set `baggage` header passes through untouched.
+
+Like trace context, injecting baggage requires a send activity to exist — there must be a listener on
+the `NATS.Net` source that isn't filtered out.
+
+> [!NOTE]
+> Independent of this feature, the ambient `DistributedContextPropagator` also writes `Activity` baggage
+> during trace-context injection: the legacy propagator (the default up to `System.Diagnostics.DiagnosticSource` 9)
+> writes a non-standard `Correlation-Context` header, and the W3C propagator (the default from
+> `System.Diagnostics.DiagnosticSource` 10 / .NET 10) writes an unfiltered W3C `baggage` header. Enabling
+> `PropagateBaggage` makes NATS.Net take ownership of the `baggage` header (so `BaggageKeyFilter` applies);
+> applications that want strict control over the wire format should configure
+> `DistributedContextPropagator.Current` (e.g. `CreateNoOutputPropagator()` or a custom propagator).
+
 ## Semantic Conventions
 
 NATS.Net follows the [OpenTelemetry Semantic Conventions for Messaging](https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/).

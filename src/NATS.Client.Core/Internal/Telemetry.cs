@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using System.Text;
 
 namespace NATS.Client.Core.Internal;
 
@@ -50,6 +51,37 @@ internal static class Telemetry
         NatsMeter.CreateCounter<long>("nats.client.messages.dropped", unit: "{message}");
 
     private static readonly object BoxedTrue = true;
+
+    private static readonly DistributedContextPropagator.PropagatorGetterCallback HeadersGetter =
+        static (object? carrier, string fieldName, out string? fieldValue, out IEnumerable<string>? fieldValues) =>
+        {
+            if (carrier is not NatsHeaders headers)
+            {
+                Debug.Assert(false, "This should never be hit.");
+                fieldValue = null;
+                fieldValues = null;
+                return;
+            }
+
+            if (headers.TryGetValue(fieldName, out var values))
+            {
+                if (values.Count == 1)
+                {
+                    fieldValue = values[0];
+                    fieldValues = null;
+                }
+                else
+                {
+                    fieldValue = null;
+                    fieldValues = values;
+                }
+            }
+            else
+            {
+                fieldValue = null;
+                fieldValues = null;
+            }
+        };
 
     /// <summary>
     /// Don't use this for metrics.
@@ -136,7 +168,8 @@ internal static class Telemetry
             Connection: connection,
             ParentContext: parentContext);
 
-        if (NatsInstrumentationOptions.Default.Filter is { } filter && !filter(instrumentationContext))
+        var options = NatsInstrumentationOptions.Default;
+        if (options.Filter is { } filter && !filter(instrumentationContext))
             return null;
 
         KeyValuePair<string, object?>[] tags;
@@ -187,7 +220,7 @@ internal static class Telemetry
             tags: tags);
 
         if (activity is not null)
-            NatsInstrumentationOptions.Default.Enrich?.Invoke(activity, instrumentationContext);
+            options.Enrich?.Invoke(activity, instrumentationContext);
 
         return activity;
     }
@@ -211,6 +244,10 @@ internal static class Telemetry
 
                 headers[fieldName] = fieldValue;
             });
+
+        var options = NatsInstrumentationOptions.Default;
+        if (options.PropagateBaggage)
+            InjectBaggage(activity, headers, options);
     }
 
     public static Activity? StartReceiveActivity(
@@ -230,6 +267,11 @@ internal static class Telemetry
         if (headers is null || !TryParseTraceContext(headers, out var context))
             context = default;
 
+        var options = NatsInstrumentationOptions.Default;
+        IReadOnlyList<KeyValuePair<string, string?>>? baggage = null;
+        if (options.PropagateBaggage && headers is not null)
+            baggage = ExtractBaggage(headers, options.BaggageKeyFilter);
+
         var instrumentationContext = new NatsInstrumentationContext(
             Subject: subject,
             Headers: headers,
@@ -238,9 +280,10 @@ internal static class Telemetry
             BodySize: bodySize,
             Size: size,
             Connection: connection,
-            ParentContext: context);
+            ParentContext: context)
+        { Baggage = baggage };
 
-        if (NatsInstrumentationOptions.Default.Filter is { } filter && !filter(instrumentationContext))
+        if (options.Filter is { } filter && !filter(instrumentationContext))
             return null;
 
         KeyValuePair<string, object?>[] tags;
@@ -309,7 +352,17 @@ internal static class Telemetry
             tags: tags);
 
         if (activity is not null)
-            NatsInstrumentationOptions.Default.Enrich?.Invoke(activity, instrumentationContext);
+        {
+            if (baggage is not null)
+            {
+                // Propagators return entries in reverse header order by design so that
+                // AddBaggage's prepend semantics restore the original order.
+                foreach (var item in baggage)
+                    activity.AddBaggage(item.Key, item.Value);
+            }
+
+            options.Enrich?.Invoke(activity, instrumentationContext);
+        }
 
         return activity;
     }
@@ -358,6 +411,17 @@ internal static class Telemetry
         }
     }
 
+    internal static void CopyBaggage(Activity? from, Activity? to)
+    {
+        if (from is null || to is null || !NatsInstrumentationOptions.Default.PropagateBaggage)
+            return;
+
+        // from.Baggage enumerates newest-first and AddBaggage prepends, so relative
+        // order may differ from the source activity; consumers must not rely on order.
+        foreach (var item in from.Baggage)
+            to.AddBaggage(item.Key, item.Value);
+    }
+
     // Inbox subjects (_INBOX.<nuid>[.<nuid>]) are unique per request, so emitting them as
     // indexed tag values pushes unbounded cardinality into tracing backends (Tempo, Jaeger).
     // Collapse them to a constant, matching SpanDestinationName. The raw subject stays
@@ -368,39 +432,73 @@ internal static class Telemetry
     private static string LowCardinalitySubject(NatsConnection conn, string subject)
         => subject.StartsWith(conn.Opts.InboxPrefix, StringComparison.Ordinal) ? Constants.InboxName : subject;
 
+    private static void InjectBaggage(Activity activity, NatsHeaders headers, NatsInstrumentationOptions options)
+    {
+        var source = options.BaggageSource is { } baggageSource ? baggageSource() : activity.Baggage;
+        var keyFilter = options.BaggageKeyFilter;
+
+        StringBuilder? sb = null;
+        var hadBaggage = false;
+        if (source is not null)
+        {
+            foreach (var item in source)
+            {
+                hadBaggage = true;
+
+                if (string.IsNullOrEmpty(item.Key) || item.Value is null)
+                    continue;
+
+                if (keyFilter is not null && !keyFilter(item.Key))
+                    continue;
+
+                sb ??= new StringBuilder();
+                if (sb.Length > 0)
+                    sb.Append(", ");
+
+                sb.Append(Uri.EscapeDataString(item.Key)).Append('=').Append(Uri.EscapeDataString(item.Value));
+            }
+        }
+
+        if (sb is not null)
+        {
+            headers[Constants.BaggageHeader] = sb.ToString();
+        }
+        else if (hadBaggage || options.BaggageSource is not null)
+        {
+            // Either the source had baggage but every entry was filtered out or unusable, or a
+            // BaggageSource is configured and returned nothing. In both cases remove any baggage
+            // header the ambient propagator may have written unfiltered during Inject: a configured
+            // BaggageSource is authoritative, so Activity.Baggage must not leak onto the wire.
+            headers.Remove(Constants.BaggageHeader);
+        }
+    }
+
+    private static IReadOnlyList<KeyValuePair<string, string?>>? ExtractBaggage(NatsHeaders headers, Func<string, bool>? keyFilter)
+    {
+        var extracted = DistributedContextPropagator.Current.ExtractBaggage(headers, HeadersGetter);
+        if (extracted is null)
+            return null;
+
+        List<KeyValuePair<string, string?>>? list = null;
+        foreach (var item in extracted)
+        {
+            if (string.IsNullOrEmpty(item.Key))
+                continue;
+
+            if (keyFilter is not null && !keyFilter(item.Key))
+                continue;
+
+            (list ??= new List<KeyValuePair<string, string?>>()).Add(item);
+        }
+
+        return list;
+    }
+
     private static bool TryParseTraceContext(NatsHeaders headers, out ActivityContext context)
     {
         DistributedContextPropagator.Current.ExtractTraceIdAndState(
             carrier: headers,
-            getter: static (object? carrier, string fieldName, out string? fieldValue, out IEnumerable<string>? fieldValues) =>
-            {
-                if (carrier is not NatsHeaders headers)
-                {
-                    Debug.Assert(false, "This should never be hit.");
-                    fieldValue = null;
-                    fieldValues = null;
-                    return;
-                }
-
-                if (headers.TryGetValue(fieldName, out var values))
-                {
-                    if (values.Count == 1)
-                    {
-                        fieldValue = values[0];
-                        fieldValues = null;
-                    }
-                    else
-                    {
-                        fieldValue = null;
-                        fieldValues = values;
-                    }
-                }
-                else
-                {
-                    fieldValue = null;
-                    fieldValues = null;
-                }
-            },
+            getter: HeadersGetter,
             out var traceParent,
             out var traceState);
         return ActivityContext.TryParse(traceParent, traceState, isRemote: true, out context);
@@ -415,6 +513,8 @@ internal static class Telemetry
         public const string PublishActivityName = "publish";
         public const string SubscribeActivityName = "subscribe";
         public const string ReceiveActivityName = "receive";
+
+        public const string BaggageHeader = "baggage";
 
         public const string SystemKey = "messaging.system";
         public const string SystemVal = "nats";

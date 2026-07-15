@@ -5,6 +5,9 @@ using OpenTelemetry.Trace;
 
 namespace NATS.Client.Core.Tests;
 
+// Shares a collection with OpenTelemetryBaggageTest: both mutate the process-global
+// NatsInstrumentationOptions.Default and would race if xunit ran the classes in parallel.
+[Collection("nats-instrumentation-options")]
 public class NatsInstrumentationExtensionsTest
 {
     [Fact]
