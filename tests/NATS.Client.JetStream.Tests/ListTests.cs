@@ -167,4 +167,99 @@ public class ListTests
             Assert.Equal(0, count);
         }
     }
+
+    [Fact]
+    public async Task List_streams_throws_when_cancelled()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestTimeout = TimeSpan.FromSeconds(5) });
+        await nats.ConnectRetryAsync();
+        var prefix = _server.GetNextId() + "-";
+        var js = new NatsJSContext(nats);
+
+        using var setupCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        for (var i = 0; i < 3; i++)
+        {
+            await js.CreateStreamAsync(new StreamConfig($"{prefix}s{i}", [$"{prefix}s{i}.*"]), setupCts.Token);
+        }
+
+        // Cancelled before the first request: must throw instead of returning an empty list.
+        using (var cts = new CancellationTokenSource())
+        {
+            cts.Cancel();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            {
+                await foreach (var unused in js.ListStreamsAsync(cancellationToken: cts.Token))
+                {
+                }
+            });
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            {
+                await foreach (var unused in js.ListStreamNamesAsync(cancellationToken: cts.Token))
+                {
+                }
+            });
+        }
+
+        // Cancelled during enumeration: must throw instead of ending silently.
+        using (var cts = new CancellationTokenSource())
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            {
+                await foreach (var unused in js.ListStreamNamesAsync(cancellationToken: cts.Token))
+                {
+                    cts.Cancel();
+                }
+            });
+        }
+    }
+
+    [Fact]
+    public async Task List_consumers_throws_when_cancelled()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestTimeout = TimeSpan.FromSeconds(5) });
+        await nats.ConnectRetryAsync();
+        var prefix = _server.GetNextId() + "-";
+        var js = new NatsJSContext(nats);
+
+        using var setupCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        var stream = await js.CreateStreamAsync(new StreamConfig($"{prefix}s1", [$"{prefix}s1.*"]), setupCts.Token);
+        for (var i = 0; i < 3; i++)
+        {
+            await js.CreateOrUpdateConsumerAsync($"{prefix}s1", new ConsumerConfig($"{prefix}c{i}"), setupCts.Token);
+        }
+
+        // Cancelled before the first request: must throw instead of returning an empty list.
+        using (var cts = new CancellationTokenSource())
+        {
+            cts.Cancel();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            {
+                await foreach (var unused in stream.ListConsumersAsync(cts.Token))
+                {
+                }
+            });
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            {
+                await foreach (var unused in stream.ListConsumerNamesAsync(cts.Token))
+                {
+                }
+            });
+        }
+
+        // Cancelled during enumeration: must throw instead of ending silently.
+        using (var cts = new CancellationTokenSource())
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            {
+                await foreach (var unused in stream.ListConsumerNamesAsync(cts.Token))
+                {
+                    cts.Cancel();
+                }
+            });
+        }
+    }
 }

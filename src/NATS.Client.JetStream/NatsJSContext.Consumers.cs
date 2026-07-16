@@ -71,8 +71,9 @@ public partial class NatsJSContext : INatsJSContext
     {
         ThrowIfInvalidStreamName(stream);
         var offset = 0;
-        while (!cancellationToken.IsCancellationRequested)
+        while (true)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var response = await JSRequestResponseAsync<ConsumerListRequest, ConsumerListResponse>(
                 subject: $"{Opts.Prefix}.CONSUMER.LIST.{stream}",
                 new ConsumerListRequest { Offset = offset },
@@ -97,8 +98,9 @@ public partial class NatsJSContext : INatsJSContext
     {
         ThrowIfInvalidStreamName(stream);
         var offset = 0;
-        while (!cancellationToken.IsCancellationRequested)
+        while (true)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var response = await JSRequestResponseAsync<ConsumerNamesRequest, ConsumerNamesResponse>(
                 subject: $"{Opts.Prefix}.CONSUMER.NAMES.{stream}",
                 new ConsumerNamesRequest { Offset = offset },

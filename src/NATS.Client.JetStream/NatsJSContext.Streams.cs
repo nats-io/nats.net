@@ -184,8 +184,9 @@ public partial class NatsJSContext
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var offset = 0;
-        while (!cancellationToken.IsCancellationRequested)
+        while (true)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var response = await JSRequestResponseAsync<StreamListRequest, StreamListResponse>(
                 subject: $"{Opts.Prefix}.STREAM.LIST",
                 request: new StreamListRequest
@@ -214,8 +215,9 @@ public partial class NatsJSContext
     public async IAsyncEnumerable<string> ListStreamNamesAsync(string? subject = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var offset = 0;
-        while (!cancellationToken.IsCancellationRequested)
+        while (true)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var response = await JSRequestResponseAsync<StreamNamesRequest, StreamNamesResponse>(
                 subject: $"{Opts.Prefix}.STREAM.NAMES",
                 request: new StreamNamesRequest
