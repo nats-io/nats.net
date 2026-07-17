@@ -186,7 +186,11 @@ public partial class NatsJSContext
         var offset = 0;
         while (true)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            if (Opts.ThrowOnListCancellation)
+                cancellationToken.ThrowIfCancellationRequested();
+            else if (cancellationToken.IsCancellationRequested)
+                yield break;
+
             var response = await JSRequestResponseAsync<StreamListRequest, StreamListResponse>(
                 subject: $"{Opts.Prefix}.STREAM.LIST",
                 request: new StreamListRequest
@@ -217,7 +221,11 @@ public partial class NatsJSContext
         var offset = 0;
         while (true)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            if (Opts.ThrowOnListCancellation)
+                cancellationToken.ThrowIfCancellationRequested();
+            else if (cancellationToken.IsCancellationRequested)
+                yield break;
+
             var response = await JSRequestResponseAsync<StreamNamesRequest, StreamNamesResponse>(
                 subject: $"{Opts.Prefix}.STREAM.NAMES",
                 request: new StreamNamesRequest

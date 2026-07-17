@@ -60,6 +60,17 @@ public record NatsJSOpts
     /// Default next options to be used in next calls in this context.
     /// </summary>
     public NatsJSNextOpts DefaultNextOpts { get; init; } = new();
+
+    /// <summary>
+    /// When <c>true</c>, cancelling a paginated list enumeration (streams, consumers, and their names)
+    /// throws <see cref="OperationCanceledException"/> instead of ending the enumeration silently.
+    /// </summary>
+    /// <remarks>
+    /// Defaults to <c>false</c> for backwards compatibility, which ends the enumeration without throwing.
+    /// Setting this to <c>true</c> matches the conventional <see cref="IAsyncEnumerable{T}"/> cancellation
+    /// contract and lets callers distinguish a complete list from one truncated by cancellation.
+    /// </remarks>
+    public bool ThrowOnListCancellation { get; init; } = false;
 }
 
 public record NatsJSOrderedConsumerOpts

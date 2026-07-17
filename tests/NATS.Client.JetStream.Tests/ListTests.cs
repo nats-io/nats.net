@@ -174,7 +174,7 @@ public class ListTests
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestTimeout = TimeSpan.FromSeconds(5) });
         await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId() + "-";
-        var js = new NatsJSContext(nats);
+        var js = new NatsJSContext(nats, new NatsJSOpts(nats.Opts) { ThrowOnListCancellation = true });
 
         using var setupCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         for (var i = 0; i < 3; i++)
@@ -221,7 +221,7 @@ public class ListTests
         await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestTimeout = TimeSpan.FromSeconds(5) });
         await nats.ConnectRetryAsync();
         var prefix = _server.GetNextId() + "-";
-        var js = new NatsJSContext(nats);
+        var js = new NatsJSContext(nats, new NatsJSOpts(nats.Opts) { ThrowOnListCancellation = true });
 
         using var setupCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         var stream = await js.CreateStreamAsync(new StreamConfig($"{prefix}s1", [$"{prefix}s1.*"]), setupCts.Token);
@@ -260,6 +260,46 @@ public class ListTests
                     cts.Cancel();
                 }
             });
+        }
+    }
+
+    [Fact]
+    public async Task List_ends_silently_when_cancelled_by_default()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestTimeout = TimeSpan.FromSeconds(5) });
+        await nats.ConnectRetryAsync();
+        var prefix = _server.GetNextId() + "-";
+
+        // Default context: ThrowOnListCancellation is false, preserving the pre-3.0.x silent behavior.
+        var js = new NatsJSContext(nats);
+
+        using var setupCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        var stream = await js.CreateStreamAsync(new StreamConfig($"{prefix}s1", [$"{prefix}s1.*"]), setupCts.Token);
+        for (var i = 0; i < 3; i++)
+        {
+            await js.CreateOrUpdateConsumerAsync($"{prefix}s1", new ConsumerConfig($"{prefix}c{i}"), setupCts.Token);
+        }
+
+        // Cancelled before the first request: ends silently, yielding nothing.
+        using (var cts = new CancellationTokenSource())
+        {
+            cts.Cancel();
+
+            var count = 0;
+            await foreach (var unused in js.ListStreamNamesAsync(cancellationToken: cts.Token))
+            {
+                count++;
+            }
+
+            Assert.Equal(0, count);
+
+            count = 0;
+            await foreach (var unused in stream.ListConsumerNamesAsync(cts.Token))
+            {
+                count++;
+            }
+
+            Assert.Equal(0, count);
         }
     }
 }
