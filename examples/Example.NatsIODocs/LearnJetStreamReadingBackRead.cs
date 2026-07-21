@@ -45,7 +45,7 @@ public class LearnJetStreamReadingBackRead(NatsServerFixture fixture, ITestOutpu
         var consumer = await js.GetConsumerAsync("ORDERS", "billing");
 
         // Read exactly what the stream is holding, no count assumed up front
-        long pending = (long)consumer.Info.NumPending;
+        var pending = (long)consumer.Info.NumPending;
         if (pending == 0)
         {
             output.WriteLine("nothing to read");
