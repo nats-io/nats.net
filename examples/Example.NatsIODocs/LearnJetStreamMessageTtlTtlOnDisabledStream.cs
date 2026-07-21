@@ -37,10 +37,14 @@ public class LearnJetStreamMessageTtlTtlOnDisabledStream(NatsServerFixture fixtu
 
         try
         {
-            await js.PublishAsync(
+            var ack = await js.PublishAsync(
                 subject: "no-ttl.canceled",
                 data: """{"order_id":"ord_8w2k","reason":"customer_request"}""",
                 headers: headers);
+
+            // PublishAsync returns the server's answer; EnsureSuccess turns a
+            // rejection into an exception instead of leaving it unchecked.
+            ack.EnsureSuccess();
         }
         catch (NatsJSApiException ex)
         {

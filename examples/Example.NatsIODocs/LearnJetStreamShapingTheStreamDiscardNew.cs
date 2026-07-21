@@ -45,7 +45,11 @@ public class LearnJetStreamShapingTheStreamDiscardNew(NatsServerFixture fixture,
         // succeeding silently. Handle it in the publisher.
         try
         {
-            await js.PublishAsync(subject: "orders.created", data: """{"order_id":"ord_5k1m"}""");
+            var ack = await js.PublishAsync(subject: "orders.created", data: """{"order_id":"ord_5k1m"}""");
+
+            // PublishAsync returns the server's answer; EnsureSuccess turns a
+            // rejection into an exception instead of leaving it unchecked.
+            ack.EnsureSuccess();
         }
         catch (NatsJSApiException e)
         {

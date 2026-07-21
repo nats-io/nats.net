@@ -13,6 +13,20 @@ public class LearnJetStreamMirrorsAndSourcesMirrorLag(NatsServerFixture fixture,
         await using var client = new NatsClient(fixture.Server.Url);
         var js = client.CreateJetStreamContext();
 
+        // Start from clean streams (the test server is shared across the collection);
+        // the mirror must go before its upstream.
+        foreach (var name in new[] { "ORDERS-ARCHIVE", "ORDERS" })
+        {
+            try
+            {
+                await js.DeleteStreamAsync(name);
+            }
+            catch (NatsJSApiException)
+            {
+                // Stream doesn't exist yet, nothing to delete
+            }
+        }
+
         // Make sure the upstream and the mirror exist before we ask about lag
         await js.CreateStreamAsync(new StreamConfig(name: "ORDERS", subjects: ["orders.>"]));
         await js.CreateStreamAsync(new StreamConfig(name: "ORDERS-ARCHIVE", subjects: [])
