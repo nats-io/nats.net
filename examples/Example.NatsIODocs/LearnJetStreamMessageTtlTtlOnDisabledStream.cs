@@ -38,7 +38,7 @@ public class LearnJetStreamMessageTtlTtlOnDisabledStream(NatsServerFixture fixtu
         try
         {
             await js.PublishAsync(
-                subject: "no-ttl.cancelled",
+                subject: "no-ttl.canceled",
                 data: """{"order_id":"ord_8w2k","reason":"customer_request"}""",
                 headers: headers);
         }

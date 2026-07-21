@@ -38,7 +38,7 @@ public class LearnJetStreamMessageTtlPublishWithTtl(NatsServerFixture fixture, I
         var headers = new NatsHeaders { ["Nats-TTL"] = "60s" };
 
         var ack = await js.PublishAsync(
-            subject: "orders.cancelled",
+            subject: "orders.canceled",
             data: """{"order_id":"ord_8w2k","reason":"customer_request"}""",
             headers: headers);
 
