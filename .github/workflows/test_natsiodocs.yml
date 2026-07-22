@@ -28,7 +28,10 @@ jobs:
       - name: Setup dotnet
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.x
+          dotnet-version: |
+            6.x
+            8.x
+            10.x
 
       - name: Set up Go
         uses: actions/setup-go@v5
