@@ -46,13 +46,14 @@ public class QueueGroupsMixedSubscribers(NatsServerFixture fixture, ITestOutputH
             }
         });
 
-        // Let subscription tasks start
+        // Give the subscription tasks time to start before publishing
         await Task.Delay(1000);
 
         // Audit and metrics see every message; one worker processes each
         await client.PublishAsync("orders.new", "Order 123");
 
         // NATS-DOC-END
+        // Give the subscriber time to receive before the client is disposed
         await Task.Delay(1000);
     }
 }

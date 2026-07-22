@@ -1,3 +1,5 @@
+using System.Globalization;
+using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Models;
 using NATS.Net;
@@ -10,7 +12,11 @@ public class LearnJetStreamPublishingConfirmStored(NatsServerFixture fixture, IT
     [Fact]
     public async Task RunAsync()
     {
-        await using var client = new NatsClient(fixture.Server.Url);
+        await using var client = new NatsClient(new NatsOpts
+        {
+            Url = fixture.Server.Url,
+            SerializerRegistry = SnakeCaseJsonSerializerRegistry.Default,
+        });
         var js = client.CreateJetStreamContext();
 
         // The ORDERS stream captures every subject under `orders.`
@@ -18,9 +24,9 @@ public class LearnJetStreamPublishingConfirmStored(NatsServerFixture fixture, IT
 
         // NATS-DOC-START
         // Publish an order and read the ack
-        var ack = await js.PublishAsync(
+        var ack = await js.PublishAsync<Order>(
             subject: "orders.created",
-            data: """{"order_id":"ord_8w2k","customer":"acme-co","total_cents":4200,"ts":"2026-05-22T10:14:22Z"}""");
+            data: new Order(OrderId: "ord_8w2k", Customer: "acme-co", TotalCents: 4200, Timestamp: DateTimeOffset.Parse("2026-05-22T10:14:22Z", CultureInfo.InvariantCulture)));
 
         // Throw if the stream rejected the message; otherwise the ack confirms storage
         ack.EnsureSuccess();

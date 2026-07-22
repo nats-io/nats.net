@@ -37,7 +37,7 @@ public class SubjectsSingleWildcard(NatsServerFixture fixture, ITestOutputHelper
             }
         });
 
-        // Let subscription tasks start
+        // Give the subscription tasks time to start before publishing
         await Task.Delay(1000);
 
         // Publish to specific subjects
@@ -47,6 +47,7 @@ public class SubjectsSingleWildcard(NatsServerFixture fixture, ITestOutputHelper
         await client.PublishAsync("orders.retail.shipped", "Order R65321");
 
         // NATS-DOC-END
+        // Give the subscriber time to receive before the client is disposed
         await Task.Delay(1000);
     }
 }

@@ -1,3 +1,4 @@
+using System.Globalization;
 using NATS.Client.Core;
 using NATS.Net;
 
@@ -9,16 +10,22 @@ public class LearnCoreNatsRequestReplyRequest(NatsServerFixture fixture, ITestOu
     [Fact]
     public async Task RunAsync()
     {
-        await using var client = new NatsClient(fixture.Server.Url);
+        await using var client = new NatsClient(new NatsOpts
+        {
+            Url = fixture.Server.Url,
+            SerializerRegistry = SnakeCaseJsonSerializerRegistry.Default,
+        });
 
         // A running inventory service so the request gets an answer.
         _ = Task.Run(async () =>
         {
-            await foreach (var msg in client.SubscribeAsync<string>("orders.inventory.check"))
+            await foreach (var msg in client.SubscribeAsync<Order>("orders.inventory.check"))
             {
-                await msg.ReplyAsync("""{"in_stock":true,"warehouse":"us-east"}""");
+                await msg.ReplyAsync(new InventoryReply(InStock: true, Warehouse: "us-east"));
             }
         });
+
+        // Give the subscription task time to start before publishing
         await Task.Delay(1000);
 
         // NATS-DOC-START
@@ -26,10 +33,10 @@ public class LearnCoreNatsRequestReplyRequest(NatsServerFixture fixture, ITestOu
         // creates a private inbox, sends the request, and waits for one reply.
         // RequestAsync throws NatsNoRespondersException immediately when nothing is
         // subscribed on the subject.
-        var order = """{"order_id":"ord_8w2k","customer":"acme-co","total_cents":4200,"ts":"2026-05-22T10:14:22Z"}""";
+        var order = new Order(OrderId: "ord_8w2k", Customer: "acme-co", TotalCents: 4200, Timestamp: DateTimeOffset.Parse("2026-05-22T10:14:22Z", CultureInfo.InvariantCulture));
         try
         {
-            var reply = await client.RequestAsync<string, string>("orders.inventory.check", order);
+            var reply = await client.RequestAsync<Order, InventoryReply>("orders.inventory.check", order);
             output.WriteLine($"inventory replied: {reply.Data}");
         }
         catch (NatsNoRespondersException)

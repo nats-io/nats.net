@@ -21,7 +21,7 @@ public class RequestReplyBasic(NatsServerFixture fixture, ITestOutputHelper outp
             }
         });
 
-        // Let the subscription task start
+        // Give the subscription task time to start before publishing
         await Task.Delay(1000);
 
         // Make a request

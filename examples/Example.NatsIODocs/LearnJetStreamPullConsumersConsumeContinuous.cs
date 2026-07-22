@@ -1,3 +1,4 @@
+using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Models;
 using NATS.Net;
@@ -10,7 +11,11 @@ public class LearnJetStreamPullConsumersConsumeContinuous(NatsServerFixture fixt
     [Fact]
     public async Task RunAsync()
     {
-        await using var client = new NatsClient(fixture.Server.Url);
+        await using var client = new NatsClient(new NatsOpts
+        {
+            Url = fixture.Server.Url,
+            SerializerRegistry = SnakeCaseJsonSerializerRegistry.Default,
+        });
         var js = client.CreateJetStreamContext();
 
         // Start from a clean stream (the test server is shared across the collection)
@@ -24,8 +29,8 @@ public class LearnJetStreamPullConsumersConsumeContinuous(NatsServerFixture fixt
         }
 
         await js.CreateStreamAsync(new StreamConfig(name: "ORDERS", subjects: ["orders.>"]));
-        await js.PublishAsync(subject: "orders.shipped", data: """{"order_id":"ord_8w2k","customer":"acme-co"}""");
-        await js.PublishAsync(subject: "orders.shipped", data: """{"order_id":"ord_2zr9","customer":"globex"}""");
+        await js.PublishAsync<Order>(subject: "orders.shipped", data: new Order(OrderId: "ord_8w2k", Customer: "acme-co"));
+        await js.PublishAsync<Order>(subject: "orders.shipped", data: new Order(OrderId: "ord_2zr9", Customer: "globex"));
 
         await js.CreateOrUpdateConsumerAsync("ORDERS", new ConsumerConfig("shipping")
         {
@@ -42,7 +47,7 @@ public class LearnJetStreamPullConsumersConsumeContinuous(NatsServerFixture fixt
         // ConsumeAsync sets up a continuous flow: it keeps pull requests open and
         // yields each order as soon as it lands in the stream. It runs until you
         // stop it, no fetch loop to write by hand.
-        await foreach (var msg in consumer.ConsumeAsync<string>())
+        await foreach (var msg in consumer.ConsumeAsync<Order>())
         {
             output.WriteLine($"shipping {msg.Data}");
             await msg.AckAsync();

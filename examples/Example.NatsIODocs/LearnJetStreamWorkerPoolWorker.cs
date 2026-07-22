@@ -1,3 +1,4 @@
+using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Models;
 using NATS.Net;
@@ -10,7 +11,11 @@ public class LearnJetStreamWorkerPoolWorker(NatsServerFixture fixture, ITestOutp
     [Fact]
     public async Task RunAsync()
     {
-        await using var client = new NatsClient(fixture.Server.Url);
+        await using var client = new NatsClient(new NatsOpts
+        {
+            Url = fixture.Server.Url,
+            SerializerRegistry = SnakeCaseJsonSerializerRegistry.Default,
+        });
         var js = client.CreateJetStreamContext();
 
         // Start from a clean stream (the test server is shared across the collection)
@@ -26,9 +31,9 @@ public class LearnJetStreamWorkerPoolWorker(NatsServerFixture fixture, ITestOutp
         await js.CreateStreamAsync(new StreamConfig(name: "ORDERS", subjects: ["orders.>"]));
 
         // A handful of orders for the pool to work through
-        await js.PublishAsync(subject: "orders.shipped", data: """{"order_id":"ord_8w2k","customer":"acme-co"}""");
-        await js.PublishAsync(subject: "orders.shipped", data: """{"order_id":"ord_2zr9","customer":"globex"}""");
-        await js.PublishAsync(subject: "orders.shipped", data: """{"order_id":"ord_5k1m","customer":"initech"}""");
+        await js.PublishAsync<Order>(subject: "orders.shipped", data: new Order(OrderId: "ord_8w2k", Customer: "acme-co"));
+        await js.PublishAsync<Order>(subject: "orders.shipped", data: new Order(OrderId: "ord_2zr9", Customer: "globex"));
+        await js.PublishAsync<Order>(subject: "orders.shipped", data: new Order(OrderId: "ord_5k1m", Customer: "initech"));
 
         await js.CreateOrUpdateConsumerAsync("ORDERS", new ConsumerConfig("shipping")
         {
@@ -46,7 +51,7 @@ public class LearnJetStreamWorkerPoolWorker(NatsServerFixture fixture, ITestOutp
         // same program in several processes: they all share the one "shipping"
         // consumer, and the server splits the stored orders across them, one
         // order to one worker.
-        await foreach (var msg in consumer.ConsumeAsync<string>())
+        await foreach (var msg in consumer.ConsumeAsync<Order>())
         {
             output.WriteLine($"shipping {msg.Data}");
             await msg.AckAsync();

@@ -24,7 +24,7 @@ public class RequestReplyHeaders(NatsServerFixture fixture, ITestOutputHelper ou
             }
         });
 
-        // Let the subscription register
+        // Give the subscription task time to start before publishing
         await Task.Delay(1000);
 
         // NATS-DOC-START

@@ -1,3 +1,4 @@
+using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Models;
 using NATS.Net;
@@ -10,7 +11,11 @@ public class LearnJetStreamGetDirectDirectRead(NatsServerFixture fixture, ITestO
     [Fact]
     public async Task RunAsync()
     {
-        await using var client = new NatsClient(fixture.Server.Url);
+        await using var client = new NatsClient(new NatsOpts
+        {
+            Url = fixture.Server.Url,
+            SerializerRegistry = SnakeCaseJsonSerializerRegistry.Default,
+        });
         var js = client.CreateJetStreamContext();
 
         // Start from a clean stream (the test server is shared across the collection)
@@ -28,17 +33,17 @@ public class LearnJetStreamGetDirectDirectRead(NatsServerFixture fixture, ITestO
         await js.CreateStreamAsync(new StreamConfig(name: "ORDERS", subjects: ["orders.>"]) { AllowDirect = true });
 
         // Seed a few orders so there's something at each stream sequence
-        await js.PublishAsync(subject: "orders.created", data: """{"order_id":"ord_8w2k","customer":"acme-co"}""");
-        await js.PublishAsync(subject: "orders.shipped", data: """{"order_id":"ord_8w2k","customer":"acme-co"}""");
-        await js.PublishAsync(subject: "orders.created", data: """{"order_id":"ord_2zr9","customer":"globex"}""");
-        await js.PublishAsync(subject: "orders.shipped", data: """{"order_id":"ord_2zr9","customer":"globex"}""");
+        await js.PublishAsync<Order>(subject: "orders.created", data: new Order(OrderId: "ord_8w2k", Customer: "acme-co"));
+        await js.PublishAsync<Order>(subject: "orders.shipped", data: new Order(OrderId: "ord_8w2k", Customer: "acme-co"));
+        await js.PublishAsync<Order>(subject: "orders.created", data: new Order(OrderId: "ord_2zr9", Customer: "globex"));
+        await js.PublishAsync<Order>(subject: "orders.shipped", data: new Order(OrderId: "ord_2zr9", Customer: "globex"));
 
         var stream = await js.GetStreamAsync("ORDERS");
 
         // NATS-DOC-START
         // Read sequence 1 with a direct get. Any replica can serve this, not
         // just the stream leader. The original subject comes back as a header.
-        var msg = await stream.GetDirectAsync<string>(new StreamMsgGetRequest { Seq = 1 });
+        var msg = await stream.GetDirectAsync<Order>(new StreamMsgGetRequest { Seq = 1 });
 
         msg.Headers!.TryGetLastValue("Nats-Subject", out var subject);
         output.WriteLine($"Subject: {subject}");

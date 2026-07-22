@@ -16,12 +16,13 @@ public class RequestReplyTimeout(NatsServerFixture fixture, ITestOutputHelper ou
         {
             await foreach (var msg in client.SubscribeAsync<string>("service"))
             {
+                // Simulate a slow service that replies after the caller's timeout
                 await Task.Delay(TimeSpan.FromSeconds(5));
                 await msg.ReplyAsync("late reply");
             }
         });
 
-        // Let the subscription register
+        // Give the subscription task time to start before publishing
         await Task.Delay(1000);
 
         // NATS-DOC-START

@@ -1,3 +1,4 @@
+using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Models;
 using NATS.Net;
@@ -10,7 +11,11 @@ public class LearnJetStreamShapingTheStreamDiscardNew(NatsServerFixture fixture,
     [Fact]
     public async Task RunAsync()
     {
-        await using var client = new NatsClient(fixture.Server.Url);
+        await using var client = new NatsClient(new NatsOpts
+        {
+            Url = fixture.Server.Url,
+            SerializerRegistry = SnakeCaseJsonSerializerRegistry.Default,
+        });
         var js = client.CreateJetStreamContext();
 
         // Start from a clean stream (the test server is shared across the collection)
@@ -26,8 +31,8 @@ public class LearnJetStreamShapingTheStreamDiscardNew(NatsServerFixture fixture,
         await js.CreateStreamAsync(new StreamConfig(name: "ORDERS", subjects: ["orders.>"]));
 
         // A couple of orders so the capped stream is already over its limit
-        await js.PublishAsync(subject: "orders.created", data: """{"order_id":"ord_8w2k"}""");
-        await js.PublishAsync(subject: "orders.created", data: """{"order_id":"ord_2zr9"}""");
+        await js.PublishAsync<Order>(subject: "orders.created", data: new Order(OrderId: "ord_8w2k"));
+        await js.PublishAsync<Order>(subject: "orders.created", data: new Order(OrderId: "ord_2zr9"));
 
         var rejected = false;
 
@@ -45,7 +50,7 @@ public class LearnJetStreamShapingTheStreamDiscardNew(NatsServerFixture fixture,
         // succeeding silently. Handle it in the publisher.
         try
         {
-            var ack = await js.PublishAsync(subject: "orders.created", data: """{"order_id":"ord_5k1m"}""");
+            var ack = await js.PublishAsync<Order>(subject: "orders.created", data: new Order(OrderId: "ord_5k1m"));
 
             // PublishAsync returns the server's answer; EnsureSuccess turns a
             // rejection into an exception instead of leaving it unchecked.

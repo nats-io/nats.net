@@ -1,3 +1,4 @@
+using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Models;
 using NATS.Net;
@@ -10,7 +11,11 @@ public class LearnJetStreamYourFirstConsumerNext(NatsServerFixture fixture, ITes
     [Fact]
     public async Task RunAsync()
     {
-        await using var client = new NatsClient(fixture.Server.Url);
+        await using var client = new NatsClient(new NatsOpts
+        {
+            Url = fixture.Server.Url,
+            SerializerRegistry = SnakeCaseJsonSerializerRegistry.Default,
+        });
         var js = client.CreateJetStreamContext();
 
         // Start from a clean stream (the test server is shared across the collection)
@@ -27,7 +32,7 @@ public class LearnJetStreamYourFirstConsumerNext(NatsServerFixture fixture, ITes
         await js.CreateStreamAsync(new StreamConfig(name: "ORDERS", subjects: ["orders.>"]));
 
         // Publish an order so the consumer has something to pull
-        await js.PublishAsync(subject: "orders.created", data: """{"order_id":"ord_8w2k","customer":"acme-co"}""");
+        await js.PublishAsync<Order>(subject: "orders.created", data: new Order(OrderId: "ord_8w2k", Customer: "acme-co"));
 
         // Create the durable pull consumer to read from
         await js.CreateOrUpdateConsumerAsync("ORDERS", new ConsumerConfig("shipping")
@@ -41,7 +46,7 @@ public class LearnJetStreamYourFirstConsumerNext(NatsServerFixture fixture, ITes
         var consumer = await js.GetConsumerAsync("ORDERS", "shipping");
 
         // Pull one message and look at it
-        var msg = await consumer.NextAsync<string>();
+        var msg = await consumer.NextAsync<Order>();
         if (msg is { } order)
         {
             output.WriteLine($"{order.Subject}: {order.Data}");

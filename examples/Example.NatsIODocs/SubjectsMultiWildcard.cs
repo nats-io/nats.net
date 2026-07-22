@@ -38,7 +38,7 @@ public class SubjectsMultiWildcard(NatsServerFixture fixture, ITestOutputHelper 
             }
         });
 
-        // Let subscription tasks start
+        // Give the subscription tasks time to start before publishing
         await Task.Delay(1000);
 
         // Publish to specific subjects
@@ -48,6 +48,7 @@ public class SubjectsMultiWildcard(NatsServerFixture fixture, ITestOutputHelper 
         await client.PublishAsync("sensor.alarm.water.critical", "basement,16:43");
 
         // NATS-DOC-END
+        // Give the subscriber time to receive before the client is disposed
         await Task.Delay(1000);
     }
 }

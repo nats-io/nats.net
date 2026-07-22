@@ -25,7 +25,7 @@ public class QueueGroupsRequestReply(NatsServerFixture fixture, ITestOutputHelpe
             });
         }
 
-        // Let subscription tasks start
+        // Give the subscription tasks time to start before publishing
         await Task.Delay(1000);
 
         // Make 10 requests; the queue group balances them across instances

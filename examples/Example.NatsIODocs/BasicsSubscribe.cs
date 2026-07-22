@@ -21,6 +21,7 @@ public class BasicsSubscribe(NatsServerFixture fixture, ITestOutputHelper output
             // NATS-DOC-END
         });
 
+        // Give the subscription task time to start before publishing
         await Task.Delay(1000);
         await client.PublishAsync("weather.updates", "sunny");
     }

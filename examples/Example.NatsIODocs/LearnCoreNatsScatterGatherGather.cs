@@ -1,3 +1,5 @@
+using System.Globalization;
+using NATS.Client.Core;
 using NATS.Net;
 
 namespace Example.NatsIODocs;
@@ -8,20 +10,25 @@ public class LearnCoreNatsScatterGatherGather(NatsServerFixture fixture, ITestOu
     [Fact]
     public async Task RunAsync()
     {
-        await using var client = new NatsClient(fixture.Server.Url);
+        await using var client = new NatsClient(new NatsOpts
+        {
+            Url = fixture.Server.Url,
+            SerializerRegistry = SnakeCaseJsonSerializerRegistry.Default,
+        });
 
         // Three shipping-quote providers, each answering on shipping.quote.
         for (var i = 0; i < 3; i++)
         {
             _ = Task.Run(async () =>
             {
-                await foreach (var msg in client.SubscribeAsync<string>("shipping.quote"))
+                await foreach (var msg in client.SubscribeAsync<Order>("shipping.quote"))
                 {
-                    await msg.ReplyAsync("""{"carrier":"carrier-a","quote_cents":1500}""");
+                    await msg.ReplyAsync(new ShippingQuote(Carrier: "carrier-a", QuoteCents: 1500));
                 }
             });
         }
 
+        // Give the subscription tasks time to start before publishing
         await Task.Delay(1000);
 
         // NATS-DOC-START
@@ -29,12 +36,12 @@ public class LearnCoreNatsScatterGatherGather(NatsServerFixture fixture, ITestOu
         // replies. Subscribe to a private inbox, publish the request with that inbox
         // as the reply subject, then collect quotes until they stop arriving and
         // pick the cheapest.
-        var order = """{"order_id":"ord_8w2k","customer":"acme-co","total_cents":4200,"ts":"2026-05-22T10:14:22Z"}""";
+        var order = new Order(OrderId: "ord_8w2k", Customer: "acme-co", TotalCents: 4200, Timestamp: DateTimeOffset.Parse("2026-05-22T10:14:22Z", CultureInfo.InvariantCulture));
         var inbox = client.Connection.NewInbox();
-        await using var sub = await client.Connection.SubscribeCoreAsync<string>(inbox);
-        await client.PublishAsync("shipping.quote", order, replyTo: inbox);
+        await using var sub = await client.Connection.SubscribeCoreAsync<ShippingQuote>(inbox);
+        await client.PublishAsync<Order>("shipping.quote", order, replyTo: inbox);
 
-        var quotes = new List<string>();
+        var quotes = new List<ShippingQuote>();
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(300));
         try
         {

@@ -1,3 +1,4 @@
+using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Models;
 using NATS.Net;
@@ -10,7 +11,11 @@ public class LearnJetStreamWorkerPoolRedeliveryCount(NatsServerFixture fixture, 
     [Fact]
     public async Task RunAsync()
     {
-        await using var client = new NatsClient(fixture.Server.Url);
+        await using var client = new NatsClient(new NatsOpts
+        {
+            Url = fixture.Server.Url,
+            SerializerRegistry = SnakeCaseJsonSerializerRegistry.Default,
+        });
         var js = client.CreateJetStreamContext();
 
         // Start from a clean stream (the test server is shared across the collection)
@@ -24,8 +29,8 @@ public class LearnJetStreamWorkerPoolRedeliveryCount(NatsServerFixture fixture, 
         }
 
         await js.CreateStreamAsync(new StreamConfig(name: "ORDERS", subjects: ["orders.>"]));
-        await js.PublishAsync(subject: "orders.shipped", data: """{"order_id":"ord_8w2k","customer":"acme-co"}""");
-        await js.PublishAsync(subject: "orders.shipped", data: """{"order_id":"ord_2zr9","customer":"globex"}""");
+        await js.PublishAsync<Order>(subject: "orders.shipped", data: new Order(OrderId: "ord_8w2k", Customer: "acme-co"));
+        await js.PublishAsync<Order>(subject: "orders.shipped", data: new Order(OrderId: "ord_2zr9", Customer: "globex"));
 
         await js.CreateOrUpdateConsumerAsync("ORDERS", new ConsumerConfig("shipping")
         {
@@ -43,7 +48,7 @@ public class LearnJetStreamWorkerPoolRedeliveryCount(NatsServerFixture fixture, 
         // above one means a redelivery: the server handed this order out before,
         // but a worker crashed or ran past AckWait before acking. Key your side
         // effects by order_id so handling the same order twice is harmless.
-        await foreach (var msg in consumer.FetchAsync<string>(
+        await foreach (var msg in consumer.FetchAsync<Order>(
                            opts: new NatsJSFetchOpts { MaxMsgs = 10, Expires = TimeSpan.FromSeconds(2) }))
         {
             var delivered = msg.Metadata?.NumDelivered ?? 0;

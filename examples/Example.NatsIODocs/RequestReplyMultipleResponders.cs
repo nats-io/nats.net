@@ -28,7 +28,7 @@ public class RequestReplyMultipleResponders(NatsServerFixture fixture, ITestOutp
             }
         });
 
-        // Let the subscriptions register
+        // Give the subscription tasks time to start before publishing
         await Task.Delay(1000);
 
         var reply = await client.RequestAsync<string>("calc.add");

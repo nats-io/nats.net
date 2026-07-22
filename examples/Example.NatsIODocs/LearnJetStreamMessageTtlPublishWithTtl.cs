@@ -11,7 +11,11 @@ public class LearnJetStreamMessageTtlPublishWithTtl(NatsServerFixture fixture, I
     [Fact]
     public async Task RunAsync()
     {
-        await using var client = new NatsClient(fixture.Server.Url);
+        await using var client = new NatsClient(new NatsOpts
+        {
+            Url = fixture.Server.Url,
+            SerializerRegistry = SnakeCaseJsonSerializerRegistry.Default,
+        });
         var js = client.CreateJetStreamContext();
 
         // Start from a clean stream (the test server is shared across the collection)
@@ -37,9 +41,9 @@ public class LearnJetStreamMessageTtlPublishWithTtl(NatsServerFixture fixture, I
         // rest of the stream keeps its normal retention.
         var headers = new NatsHeaders { ["Nats-TTL"] = "60s" };
 
-        var ack = await js.PublishAsync(
+        var ack = await js.PublishAsync<OrderCancellation>(
             subject: "orders.canceled",
-            data: """{"order_id":"ord_8w2k","reason":"customer_request"}""",
+            data: new OrderCancellation(OrderId: "ord_8w2k", Reason: "customer_request"),
             headers: headers);
 
         output.WriteLine($"Stored in {ack.Stream} at sequence {ack.Seq}");

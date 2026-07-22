@@ -1,3 +1,4 @@
+using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Models;
 using NATS.Net;
@@ -10,7 +11,11 @@ public class LearnJetStreamRetentionPoliciesWorkQueueCreate(NatsServerFixture fi
     [Fact]
     public async Task RunAsync()
     {
-        await using var client = new NatsClient(fixture.Server.Url);
+        await using var client = new NatsClient(new NatsOpts
+        {
+            Url = fixture.Server.Url,
+            SerializerRegistry = SnakeCaseJsonSerializerRegistry.Default,
+        });
         var js = client.CreateJetStreamContext();
 
         // Start from a clean stream (the test server is shared across the collection)
@@ -34,7 +39,7 @@ public class LearnJetStreamRetentionPoliciesWorkQueueCreate(NatsServerFixture fi
         output.WriteLine($"FULFILLMENT retention is {stream.Info.Config.Retention}");
 
         // One paid order waiting to ship to a US address
-        await js.PublishAsync(subject: "fulfill.us", data: """{"order_id":"ord_8w2k","customer":"acme-co"}""");
+        await js.PublishAsync<Order>(subject: "fulfill.us", data: new Order(OrderId: "ord_8w2k", Customer: "acme-co"));
 
         // A durable pull consumer the shipping workers share
         var consumer = await js.CreateOrUpdateConsumerAsync("FULFILLMENT", new ConsumerConfig("shippers")
@@ -44,7 +49,7 @@ public class LearnJetStreamRetentionPoliciesWorkQueueCreate(NatsServerFixture fi
 
         // Fetch the one order and ack it. DoubleAck waits for the server to confirm
         // the ack, so the WorkQueue removal has happened before we read the count.
-        await foreach (var msg in consumer.FetchAsync<string>(opts: new NatsJSFetchOpts { MaxMsgs = 1 }))
+        await foreach (var msg in consumer.FetchAsync<Order>(opts: new NatsJSFetchOpts { MaxMsgs = 1 }))
         {
             output.WriteLine($"shipping {msg.Data}");
             await msg.AckAsync(new AckOpts { DoubleAck = true });

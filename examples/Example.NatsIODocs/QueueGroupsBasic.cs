@@ -36,7 +36,7 @@ public class QueueGroupsBasic(NatsServerFixture fixture, ITestOutputHelper outpu
             }
         });
 
-        // Let subscription tasks start
+        // Give the subscription tasks time to start before publishing
         await Task.Delay(1000);
 
         // Publish messages once all subscriptions are set up
@@ -46,6 +46,7 @@ public class QueueGroupsBasic(NatsServerFixture fixture, ITestOutputHelper outpu
         }
 
         // NATS-DOC-END
+        // Give the subscriber time to receive before the client is disposed
         await Task.Delay(1000);
     }
 }

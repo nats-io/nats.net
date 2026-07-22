@@ -23,7 +23,7 @@ public class RequestReplyCalculator(NatsServerFixture fixture, ITestOutputHelper
             }
         });
 
-        // Let the subscription register
+        // Give the subscription task time to start before publishing
         await Task.Delay(1000);
 
         var reply1 = await client.RequestAsync<int[], int>("calc.sum", [5, 3, 1]);
