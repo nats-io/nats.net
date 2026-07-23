@@ -156,4 +156,34 @@ public class SubscriptionEventsTest
 
         Assert.Equal("callback failed", exception.Message);
     }
+
+    [Fact]
+    public async Task OnSubscribed_exception_propagates_for_async_enumerable()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cancellationToken = cts.Token;
+        var subject = $"foo.{Guid.NewGuid():N}";
+
+        var opts = new NatsSubOpts
+        {
+            Events = new NatsSubEvents
+            {
+                OnSubscribed = _ => throw new InvalidOperationException("callback failed"),
+            },
+        };
+
+        // The subscription is only established when enumeration begins, so the
+        // callback exception surfaces on the first MoveNextAsync call.
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        {
+            await foreach (var unused in nats.SubscribeAsync<int>(subject, opts: opts, cancellationToken: cancellationToken))
+            {
+            }
+        });
+
+        Assert.Equal("callback failed", exception.Message);
+    }
 }

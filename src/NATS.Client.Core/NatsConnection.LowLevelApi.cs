@@ -23,7 +23,16 @@ public partial class NatsConnection
             }
             catch
             {
-                await sub.DisposeAsync().ConfigureAwait(false);
+                try
+                {
+                    await sub.DisposeAsync().ConfigureAwait(false);
+                }
+                catch
+                {
+                    // Best-effort cleanup: DisposeAsync rethrows the subscription's own
+                    // exception if one was recorded; prefer surfacing the callback's.
+                }
+
                 throw;
             }
         }
