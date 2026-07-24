@@ -20,6 +20,7 @@ public interface INatsSerializer<T> : INatsSerialize<T>, INatsDeserialize<T>
 /// Serializer interface for NATS messages.
 /// </summary>
 /// <typeparam name="T">Serialized object type</typeparam>
+/// <seealso cref="INatsSerializeWithContext{T}"/>
 public interface INatsSerialize<in T>
 {
     /// <summary>
@@ -34,6 +35,7 @@ public interface INatsSerialize<in T>
 /// Deserializer interface for NATS messages.
 /// </summary>
 /// <typeparam name="T">Deserialized object type</typeparam>
+/// <seealso cref="INatsDeserializeWithContext{T}"/>
 public interface INatsDeserialize<out T>
 {
     /// <summary>
@@ -47,7 +49,13 @@ public interface INatsDeserialize<out T>
 /// <summary>
 /// Extended serializer interface with access to message context during serialization.
 /// </summary>
+/// <remarks>
+/// The context carries the message <see cref="NatsMsgContext.Subject"/>, <see cref="NatsMsgContext.ReplyTo"/>
+/// and <see cref="NatsMsgContext.Headers"/>. To mutate headers during serialization the caller must pass a
+/// non-null headers instance to the publish call; see <see cref="NatsSerializationExtensions"/>.
+/// </remarks>
 /// <typeparam name="T">Serialized object type</typeparam>
+/// <seealso cref="NatsMsgContext"/>
 public interface INatsSerializeWithContext<in T> : INatsSerialize<T>
 {
     /// <summary>
@@ -62,7 +70,13 @@ public interface INatsSerializeWithContext<in T> : INatsSerialize<T>
 /// <summary>
 /// Extended deserializer interface with access to message context during deserialization.
 /// </summary>
+/// <remarks>
+/// The context carries the message <see cref="NatsMsgContext.Subject"/>, which can be used as a type
+/// discriminator when the schema is fixed per family of subjects rather than per stream (for example
+/// dispatching <c>orders.created.*</c> and <c>orders.cancelled.*</c> to different types).
+/// </remarks>
 /// <typeparam name="T">Deserialized object type</typeparam>
+/// <seealso cref="NatsMsgContext"/>
 public interface INatsDeserializeWithContext<out T> : INatsDeserialize<T>
 {
     /// <summary>
