@@ -321,6 +321,52 @@ public class MyHeaderAwareSerializer<T> : INatsSerializer<T>, INatsSerializerWit
 }
 #endregion
 
+#region subject-aware-deserializer
+public record OrderCreated
+{
+    public int OrderId { get; set; }
+}
+
+public record OrderCancelled
+{
+    public int OrderId { get; set; }
+
+    public string? Reason { get; set; }
+}
+
+[JsonSerializable(typeof(OrderCreated))]
+[JsonSerializable(typeof(OrderCancelled))]
+internal partial class OrderEventJsonContext : JsonSerializerContext
+{
+}
+
+// Picks the type to deserialize based on the message subject, for streams
+// where the schema is fixed per family of subjects rather than per stream,
+// e.g. orders.created.123 -> OrderCreated, orders.cancelled.123 -> OrderCancelled
+public class OrderEventDeserializer : INatsDeserializeWithContext<object>
+{
+    private readonly NatsJsonContextSerializer<OrderCreated> _created = new(OrderEventJsonContext.Default);
+    private readonly NatsJsonContextSerializer<OrderCancelled> _cancelled = new(OrderEventJsonContext.Default);
+
+    public object? Deserialize(in ReadOnlySequence<byte> buffer) =>
+        throw new NatsException("Subject is required to determine the event type");
+
+    public object? Deserialize(in ReadOnlySequence<byte> buffer, in NatsMsgContext context)
+    {
+        string[] tokens = context.Subject.Split('.');
+
+        return tokens.Length > 1
+            ? tokens[1] switch
+            {
+                "created" => _created.Deserialize(buffer),
+                "cancelled" => _cancelled.Deserialize(buffer),
+                _ => throw new NatsException($"Unknown event type in subject: {context.Subject}"),
+            }
+            : throw new NatsException($"Unexpected subject: {context.Subject}");
+    }
+}
+#endregion
+
 // Fake protobuf message.
 // Normally, this would be generated using protobuf compiler.
 public class Greeting : IBufferMessage
