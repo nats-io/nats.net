@@ -68,13 +68,20 @@ public class DisposeUnobservedExceptionTests(ITestOutputHelper output)
                     var n = Interlocked.Increment(ref pingCount);
                     if (n == 1)
                     {
-                        // initial handshake: reply PONG, then drop the socket
+                        // initial handshake: reply PONG so the connection opens.
+                        // Don't drop the socket here: ConnectAsync must observe the
+                        // Open state first, otherwise it re-waits for a reconnect
+                        // that never succeeds and the test hangs.
                         await client.Writer.WriteAsync("PONG\r\n");
                         await client.Writer.FlushAsync();
-                        client.Close();
                     }
 
                     // subsequent PINGs: stay silent so PONG wait times out
+                }
+                else if (cmd is { Name: "PUB", Subject: "drop.connection" })
+                {
+                    // deterministic disconnect once the test is fully set up
+                    client.Close();
                 }
             },
             logger: m => output.WriteLine(m),
@@ -113,6 +120,10 @@ public class DisposeUnobservedExceptionTests(ITestOutputHelper output)
             // Subscribe so WriteReconnectCommandsAsync has work to do on the reconnect
             // attempt that gets orphaned.
             _ = await nats.SubscribeCoreAsync<int>("regression.test");
+
+            // Tell the mock server to drop the socket, pushing the client into the
+            // reconnect loop where every PONG wait times out.
+            await nats.PublishAsync("drop.connection");
 
             // Wait long enough for at least one reconnect attempt to time out.
             await Task.Delay(1500);
