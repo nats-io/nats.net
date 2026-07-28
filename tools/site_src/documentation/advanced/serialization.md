@@ -99,6 +99,14 @@ Here is an example of a serializer that writes a content-type header during seri
 
 [!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/SerializationPage.cs#header-aware-serializer)]
 
+Note that the library does not create a headers instance on your behalf when publishing:
+a context-aware serializer can only add headers if the caller passed a headers instance to the publish call.
+
+The context also carries the message subject, which can be used as a type discriminator
+when the schema is fixed per family of subjects rather than per stream:
+
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/SerializationPage.cs#subject-aware-deserializer)]
+
 ## Using Multiple Serializers (chaining)
 
 You can also chain multiple serializers together to support multiple serialization formats. The first serializer in the
