@@ -3,6 +3,10 @@
         <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>
         <NoWarn>$(NoWarn);CS1591;SA0001</NoWarn>
+
+        <!--  Audit the full dependency graph, not just direct references. The default 'direct' mode
+              cannot see a vulnerable package pulled in by a dependency, which is where they usually are.  -->
+        <NuGetAuditMode>all</NuGetAuditMode>
         <SignAssembly>true</SignAssembly>
         <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)opensource.snk</AssemblyOriginatorKeyFile>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>

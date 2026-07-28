@@ -16,6 +16,9 @@
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
         <PackageReference Include="ZLogger" Version="2.5.10" />
         <PackageReference Include="ProcessX" Version="1.5.6" />
+
+        <!--  ConsoleAppFramework 4.x pulls Microsoft.Extensions.Hosting 6.0.0, which resolves a vulnerable System.Text.Json  -->
+        <PackageReference Include="System.Text.Json" Version="8.0.5" />
     </ItemGroup>
 
     <ItemGroup>

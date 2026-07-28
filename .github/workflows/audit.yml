@@ -1,0 +1,50 @@
+name: Dependency Audit
+
+on:
+  schedule:
+    # Mondays 06:00 UTC
+    - cron: '0 6 * * 1'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: audit ${{ matrix.branch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Add a release branch here once its dependency closure is clean, otherwise
+        # this job is red from the first run and everyone learns to ignore it.
+        branch:
+          - main
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+      NUGET_XMLDOC_MODE: skip
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.branch }}
+
+      - name: Setup dotnet
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            6.x
+            8.x
+            10.x
+
+      # Audit runs at restore, so a branch nobody builds is never checked. This picks up
+      # advisories published against dependencies that have not themselves changed.
+      # Passed on the command line rather than read from Directory.Build.props so that
+      # release branches predating that property are still audited.
+      - name: Audit dependencies
+        run: >
+          dotnet restore NATS.Net.slnx --force
+          -p:NuGetAudit=true
+          -p:NuGetAuditMode=all
+          -p:NuGetAuditLevel=low
