@@ -82,4 +82,11 @@ public record NatsSubOpts
     /// Allows Configuration of <see cref="Channel"/> options for a subscription.
     /// </summary>
     public NatsSubChannelOpts? ChannelOpts { get; init; }
+
+    /// <summary>
+    /// Callbacks invoked at points in the subscription's lifecycle,
+    /// for example <see cref="NatsSubEvents.OnSubscribed"/> when the
+    /// subscription has been established.
+    /// </summary>
+    public NatsSubEvents? Events { get; init; }
 }

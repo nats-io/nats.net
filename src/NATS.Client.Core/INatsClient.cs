@@ -59,9 +59,18 @@ public interface INatsClient : IAsyncDisposable
     /// <typeparam name="T">Specifies the type of data that may be received from the NATS Server.</typeparam>
     /// <returns>An asynchronous enumerable of <see cref="NatsMsg{T}"/> objects</returns>
     /// <remarks>
+    /// <para>
     /// Subscribers with the same queue group name, become a queue group,
     /// and only one randomly chosen subscriber of the queue group will
     /// consume a message each time a message is received by the queue group.
+    /// </para>
+    /// <para>
+    /// The subscription is not established until the returned enumerable is iterated.
+    /// To find out when the subscription has been established, set
+    /// <see cref="NatsSubEvents.OnSubscribed"/> using <see cref="NatsSubOpts.Events"/>,
+    /// or use <see cref="INatsConnection.SubscribeCoreAsync{T}"/> which completes
+    /// once the subscription has been established.
+    /// </para>
     /// </remarks>
     IAsyncEnumerable<NatsMsg<T>> SubscribeAsync<T>(string subject, string? queueGroup = default, INatsDeserialize<T>? serializer = default, NatsSubOpts? opts = default, CancellationToken cancellationToken = default);
 
