@@ -25,7 +25,9 @@ public sealed class NatsInstrumentationOptions
     /// <remarks>
     /// The return value for the filter function is interpreted as follows:
     /// - If filter returns `true`, the request is collected.
-    /// - If filter returns `false` or throws an exception the request is NOT collected.
+    /// - If filter returns `false`, the request is NOT collected.
+    /// The filter must not throw. Exceptions are not caught: they propagate out of the
+    /// publish call, and out of message construction on the receive path.
     /// </remarks>
     public Func<NatsInstrumentationContext, bool>? Filter
     {
@@ -36,6 +38,11 @@ public sealed class NatsInstrumentationOptions
     /// <summary>
     /// Gets or sets an action to enrich an Activity.
     /// </summary>
+    /// <remarks>
+    /// Runs after the activity is created and its tags are set, so it can also overwrite
+    /// tags the client set (for example to redact a subject). The action must not throw:
+    /// exceptions are not caught and propagate to the caller.
+    /// </remarks>
     public Action<Activity, NatsInstrumentationContext>? Enrich
     {
         get => _enrich;
@@ -47,6 +54,10 @@ public sealed class NatsInstrumentationOptions
     /// </summary>
     /// <remarks>
     /// The input is the raw NATS subject. This only changes activity names, not telemetry tags.
+    /// The returned value is used as-is, replacing the default first-two-tokens truncation.
+    /// Inbox subjects are collapsed to <c>inbox</c> before this runs, so the formatter is
+    /// never called for them. The formatter must not throw: exceptions are not caught and
+    /// propagate to the caller.
     /// </remarks>
     public Func<string, string>? SpanDestinationNameFormatter
     {
