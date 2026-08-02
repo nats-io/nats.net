@@ -421,7 +421,7 @@ internal class NatsJSOrderedPushConsumer<T>
             DeliverPolicy = _opts.DeliverPolicy,
             AckPolicy = ConsumerConfigAckPolicy.None,
             DeliverSubject = _sub.Subject,
-            FilterSubject = _filter,
+            FilterSubject = _opts.FilterSubjects is not { Length: > 0 } && !string.IsNullOrEmpty(_filter) ? _filter : null,
             FilterSubjects = _opts.FilterSubjects,
             FlowControl = true,
             IdleHeartbeat = _opts.IdleHeartbeat,
