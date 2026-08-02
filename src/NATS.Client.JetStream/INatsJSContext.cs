@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using NATS.Client.Core;
 using NATS.Client.JetStream.Models;
 
@@ -26,6 +25,70 @@ public interface INatsJSContext
     /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
     /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
     ValueTask<INatsJSConsumer> CreateOrderedConsumerAsync(
+        string stream,
+        NatsJSOrderedConsumerOpts? opts = default,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Creates a new push consumer that delivers messages to a client subscription on a generated subject.
+    /// </summary>
+    /// <param name="stream">Name of the stream to create the consumer under.</param>
+    /// <param name="opts">Push consumer options.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>The NATS JetStream push consumer object which can be used retrieving data from the stream with <see cref="INatsJSConsumer.ConsumeAsync{T}"/>.</returns>
+    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
+    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
+    /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
+    ValueTask<INatsJSPushConsumer> CreatePushConsumerAsync(
+        string stream,
+        NatsJSPushConsumerOpts? opts = default,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Creates a new push consumer if it doesn't exist or updates an existing one with the same name.
+    /// </summary>
+    /// <param name="stream">Name of the stream to create or update the consumer under.</param>
+    /// <param name="opts">Push consumer options.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>The NATS JetStream push consumer object which can be used to retrieve data from the stream with <see cref="INatsJSConsumer.ConsumeAsync{T}"/>.</returns>
+    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
+    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
+    /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
+    ValueTask<INatsJSPushConsumer> CreateOrUpdatePushConsumerAsync(
+        string stream,
+        NatsJSPushConsumerOpts? opts = default,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets an existing push consumer from the server and creates a <see cref="INatsJSPushConsumer"/> handle for it.
+    /// </summary>
+    /// <param name="stream">Name of the stream the consumer is associated with.</param>
+    /// <param name="consumer">Consumer name.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>The NATS JetStream push consumer object which can be used to retrieve data from the stream with <see cref="INatsJSConsumer.ConsumeAsync{T}"/>.</returns>
+    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
+    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
+    /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
+    /// <remarks>This method returns a push consumer only if the existing consumer has a delivery subject configured.</remarks>
+    ValueTask<INatsJSPushConsumer> GetPushConsumerAsync(
+        string stream,
+        string consumer,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Creates a new ordered push consumer that ensures messages are delivered in the exact order they were
+    /// published to the stream, recreating the underlying ephemeral consumer if it skips or mismatches sequences.
+    /// </summary>
+    /// <param name="stream">Name of the stream to create the consumer under.</param>
+    /// <param name="opts">Ordered consumer options.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>The NATS JetStream push consumer object which can be used to retrieve ordered data from the stream with <see cref="INatsJSConsumer.ConsumeAsync{T}"/>.</returns>
+    /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
+    /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
+    ValueTask<INatsJSPushConsumer> CreateOrderedPushConsumerAsync(
         string stream,
         NatsJSOrderedConsumerOpts? opts = default,
         CancellationToken cancellationToken = default);
