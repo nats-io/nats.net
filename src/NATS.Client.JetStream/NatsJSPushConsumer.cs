@@ -209,10 +209,10 @@ public class NatsJSPushConsumer : INatsJSPushConsumer
             cancellationToken).ConfigureAwait(false);
 
     /// <inheritdoc />
-    public async ValueTask UnpinAsync(string group, CancellationToken cancellationToken = default)
+    public ValueTask UnpinAsync(string group, CancellationToken cancellationToken = default)
     {
         ThrowIfDeleted();
-        await _context.UnpinConsumerAsync(_stream, _consumer, group, cancellationToken).ConfigureAwait(false);
+        throw NatsJSProtocolException.ConsumerIsPushBased();
     }
 
     private void ThrowIfDeleted()
