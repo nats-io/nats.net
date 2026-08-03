@@ -259,4 +259,283 @@ public class PushConsumerTest(NatsServerFixture server)
 
         Assert.Equal(3, count);
     }
+
+    [Fact]
+    public async Task Push_consume_deliver_group()
+    {
+        await using var nats1 = server.CreateNatsConnection();
+        await using var nats2 = server.CreateNatsConnection();
+        await using var nats3 = server.CreateNatsConnection();
+        await Task.WhenAll(nats1.ConnectRetryAsync(), nats2.ConnectRetryAsync(), nats3.ConnectRetryAsync());
+        var prefix = server.GetNextId();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var js = new NatsJSContext(nats1);
+        await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
+
+        var opts = new NatsJSPushConsumerOpts
+        {
+            Name = $"{prefix}c1",
+            DeliverGroup = $"{prefix}workers",
+            AckWait = TimeSpan.FromSeconds(30),
+        };
+        var consumer1 = (NatsJSPushConsumer)await js.CreatePushConsumerAsync($"{prefix}s1", opts, cts.Token);
+
+        const int total = 51;
+        for (var i = 0; i < total; i++)
+            await js.PublishAsync($"{prefix}s1.foo", i, cancellationToken: cts.Token);
+
+        var js2 = new NatsJSContext(nats2);
+        var js3 = new NatsJSContext(nats3);
+        var consumer2 = (NatsJSPushConsumer)await js2.GetPushConsumerAsync($"{prefix}s1", $"{prefix}c1", cts.Token);
+        var consumer3 = (NatsJSPushConsumer)await js3.GetPushConsumerAsync($"{prefix}s1", $"{prefix}c1", cts.Token);
+
+        var result = new int[total];
+        var totalCount = 0;
+        var consumeCts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+
+        async Task Worker(INatsJSPushConsumer c)
+        {
+            await foreach (var msg in c.ConsumeAsync<int>(cancellationToken: consumeCts.Token))
+            {
+                Interlocked.Increment(ref result[msg.Data]);
+                Interlocked.Increment(ref totalCount);
+                await msg.AckAsync(cancellationToken: cts.Token);
+            }
+        }
+
+        await Task.WhenAll(Worker(consumer1), Worker(consumer2), Worker(consumer3));
+
+        for (var i = 0; i < total; i++)
+            Assert.True(result[i] >= 1, $"Message {i} was received {result[i]} times (expected at least 1)");
+
+        Assert.True(totalCount >= total, $"Expected at least {total}, got {totalCount}");
+    }
+
+    [Fact]
+    public async Task Push_consume_ack_none()
+    {
+        await using var nats = server.CreateNatsConnection();
+        await nats.ConnectRetryAsync();
+        var prefix = server.GetNextId();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var js = new NatsJSContext(nats);
+        await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
+
+        var consumer = await js.CreatePushConsumerAsync(
+            $"{prefix}s1",
+            new NatsJSPushConsumerOpts { Name = $"{prefix}c1", AckPolicy = ConsumerConfigAckPolicy.None },
+            cts.Token);
+
+        for (var i = 0; i < 10; i++)
+            await js.PublishAsync($"{prefix}s1.foo", i, cancellationToken: cts.Token);
+
+        var count = 0;
+        await foreach (var msg in consumer.ConsumeAsync<int>(cancellationToken: cts.Token))
+        {
+            Assert.Equal(count, msg.Data);
+            count++;
+            if (count == 10)
+                break;
+        }
+
+        Assert.Equal(10, count);
+    }
+
+    [Fact]
+    public async Task Push_consume_max_deliver_redelivery()
+    {
+        await using var nats = server.CreateNatsConnection();
+        await nats.ConnectRetryAsync();
+        var prefix = server.GetNextId();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var js = new NatsJSContext(nats);
+        await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
+
+        var consumer = (NatsJSPushConsumer)await js.CreatePushConsumerAsync(
+            $"{prefix}s1",
+            new NatsJSPushConsumerOpts
+            {
+                Name = $"{prefix}c1",
+                AckWait = TimeSpan.FromMilliseconds(100),
+                MaxDeliver = 5,
+            },
+            cts.Token);
+
+        await js.PublishAsync($"{prefix}s1.foo", 42, cancellationToken: cts.Token);
+
+        var deliveries = 0;
+        var consumeCts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        await foreach (var msg in consumer.ConsumeAsync<int>(cancellationToken: consumeCts.Token))
+        {
+            deliveries++;
+            if (deliveries == 5)
+            {
+                await msg.AckAsync(cancellationToken: cts.Token);
+                break;
+            }
+
+            // Don't ack — wait for redelivery after AckWait
+        }
+
+        Assert.True(deliveries >= 5, $"Expected at least 5 deliveries, got {deliveries}");
+    }
+
+    [Fact]
+    public async Task Push_consume_late_ack_redelivery()
+    {
+        await using var nats = server.CreateNatsConnection();
+        await nats.ConnectRetryAsync();
+        var prefix = server.GetNextId();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var js = new NatsJSContext(nats);
+        await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
+
+        var consumer = (NatsJSPushConsumer)await js.CreatePushConsumerAsync(
+            $"{prefix}s1",
+            new NatsJSPushConsumerOpts { Name = $"{prefix}c1", AckWait = TimeSpan.FromMilliseconds(300) },
+            cts.Token);
+
+        await js.PublishAsync($"{prefix}s1.foo", 99, cancellationToken: cts.Token);
+
+        var deliveries = 0;
+        var consumeCts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        await foreach (var msg in consumer.ConsumeAsync<int>(cancellationToken: consumeCts.Token))
+        {
+            deliveries++;
+            if (deliveries == 1)
+            {
+                // Wait past AckWait without acking → server redelivers
+                await Task.Delay(TimeSpan.FromMilliseconds(600), cts.Token);
+            }
+            else if (deliveries == 2)
+            {
+                await msg.AckAsync(cancellationToken: cts.Token);
+                break;
+            }
+        }
+
+        Assert.True(deliveries >= 2, $"Expected at least 2 deliveries, got {deliveries}");
+    }
+
+    [Fact]
+    public async Task Push_unpin_throws()
+    {
+        await using var nats = server.CreateNatsConnection();
+        await nats.ConnectRetryAsync();
+        var prefix = server.GetNextId();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var js = new NatsJSContext(nats);
+        await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
+        var consumer = await js.CreatePushConsumerAsync($"{prefix}s1", new NatsJSPushConsumerOpts { Name = $"{prefix}c1" }, cts.Token);
+
+        await Assert.ThrowsAsync<NatsJSProtocolException>(async () => await consumer.UnpinAsync("group", cts.Token));
+    }
+
+    [Fact]
+    public async Task Push_consume_headers_only()
+    {
+        await using var nats = server.CreateNatsConnection();
+        await nats.ConnectRetryAsync();
+        var prefix = server.GetNextId();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var js = new NatsJSContext(nats);
+        await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
+
+        var consumer = await js.CreatePushConsumerAsync(
+            $"{prefix}s1",
+            new NatsJSPushConsumerOpts { Name = $"{prefix}c1", HeadersOnly = true },
+            cts.Token);
+
+        for (var i = 0; i < 5; i++)
+            await js.PublishAsync($"{prefix}s1.foo", i, cancellationToken: cts.Token);
+
+        var count = 0;
+        await foreach (var msg in consumer.ConsumeAsync<byte[]>(cancellationToken: cts.Token))
+        {
+            Assert.NotNull(msg.Headers);
+            count++;
+            await msg.AckAsync(cancellationToken: cts.Token);
+            if (count == 5)
+                break;
+        }
+
+        Assert.Equal(5, count);
+    }
+
+    [Fact]
+    public async Task Push_consume_deliver_policy_by_start_seq()
+    {
+        await using var nats = server.CreateNatsConnection();
+        await nats.ConnectRetryAsync();
+        var prefix = server.GetNextId();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var js = new NatsJSContext(nats);
+        await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
+
+        for (var i = 0; i < 10; i++)
+            await js.PublishAsync($"{prefix}s1.foo", i, cancellationToken: cts.Token);
+
+        // Consumer sequence is 1-based: OptStartSeq=5 → start from 5th message
+        var pushConsumer = await js.CreatePushConsumerAsync(
+            $"{prefix}s1",
+            new NatsJSPushConsumerOpts
+            {
+                Name = $"{prefix}c1",
+                DeliverPolicy = ConsumerConfigDeliverPolicy.ByStartSequence,
+                OptStartSeq = 5,
+            },
+            cts.Token);
+
+        var count = 0;
+        await foreach (var msg in pushConsumer.ConsumeAsync<int>(cancellationToken: cts.Token))
+        {
+            Assert.Equal(count + 4, msg.Data);
+            await msg.AckAsync(cancellationToken: cts.Token);
+            count++;
+            if (count == 6)
+                break;
+        }
+
+        Assert.Equal(6, count);
+    }
+
+    [Fact]
+    public async Task Push_consume_deliver_policy_last()
+    {
+        await using var nats = server.CreateNatsConnection();
+        await nats.ConnectRetryAsync();
+        var prefix = server.GetNextId();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var js = new NatsJSContext(nats);
+        await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
+
+        for (var i = 0; i < 10; i++)
+            await js.PublishAsync($"{prefix}s1.foo", i, cancellationToken: cts.Token);
+
+        // DeliverPolicy=Last → only the most recent message
+        var pushConsumer = await js.CreatePushConsumerAsync(
+            $"{prefix}s1",
+            new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverPolicy = ConsumerConfigDeliverPolicy.Last },
+            cts.Token);
+
+        var count = 0;
+        await foreach (var msg in pushConsumer.ConsumeAsync<int>(cancellationToken: cts.Token))
+        {
+            Assert.Equal(9, msg.Data);
+            await msg.AckAsync(cancellationToken: cts.Token);
+            count++;
+            if (count == 1)
+                break;
+        }
+
+        Assert.Equal(1, count);
+    }
 }

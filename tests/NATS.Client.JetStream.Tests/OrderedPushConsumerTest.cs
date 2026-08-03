@@ -162,4 +162,45 @@ public class OrderedPushConsumerTest(NatsServerFixture server)
 
         await server.DisposeAsync();
     }
+
+    [Fact]
+    public async Task Consumer_deleted_recreate()
+    {
+        await using var nats = server.CreateNatsConnection();
+        await nats.ConnectRetryAsync();
+        var prefix = server.GetNextId();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var js = new NatsJSContext(nats);
+        await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
+
+        for (var i = 0; i < 20; i++)
+            await js.PublishAsync($"{prefix}s1.foo", i, cancellationToken: cts.Token);
+
+        var consumer = (NatsJSOrderedPushConsumer)await js.CreateOrderedPushConsumerAsync($"{prefix}s1", cancellationToken: cts.Token);
+
+        var count = 0;
+        var deleted = false;
+        await foreach (var msg in consumer.ConsumeAsync<int>(cancellationToken: cts.Token))
+        {
+            Assert.Equal(count, msg.Data);
+            count++;
+
+            // Delete all ephemeral consumers on the stream to trigger recreate
+            if (count == 5 && !deleted)
+            {
+                var names = new List<string>();
+                await foreach (var name in js.ListConsumerNamesAsync($"{prefix}s1", cancellationToken: cts.Token))
+                    names.Add(name);
+                foreach (var name in names)
+                    await js.DeleteConsumerAsync($"{prefix}s1", name, cts.Token);
+                deleted = true;
+            }
+
+            if (count == 20)
+                break;
+        }
+
+        Assert.Equal(20, count);
+    }
 }
