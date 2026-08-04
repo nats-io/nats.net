@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
@@ -25,7 +26,12 @@ public partial class NatsConnection
         var replyTo = NewInbox();
 
         replySerializer ??= Opts.SerializerRegistry.GetDeserializer<TReply>();
-        var sub = new NatsSub<TReply>(this, _subscriptionManager.InboxSubBuilder, replyTo, queueGroup: default, replyOpts, replySerializer);
+        var sub = new NatsSub<TReply>(this, _subscriptionManager.InboxSubBuilder, replyTo, queueGroup: default, replyOpts, replySerializer)
+        {
+            // Captured on the calling thread while the request activity is current, so
+            // replies arriving without trace context are traced under their request.
+            ReplyParentContext = Activity.Current?.Context ?? default,
+        };
         await AddSubAsync(sub, cancellationToken).ConfigureAwait(false);
 
         requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();

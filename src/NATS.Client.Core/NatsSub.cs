@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Diagnostics;
 using System.Runtime.ExceptionServices;
 using System.Threading.Channels;
 using NATS.Client.Core.Internal;
@@ -30,6 +31,13 @@ public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
 
     public ChannelReader<NatsMsg<T>> Msgs { get; }
 
+    /// <summary>
+    /// Parent for receive activities when a message carries no trace context. Set only on
+    /// the reply subscription of a request so replies are traced under their request;
+    /// stays default for ordinary subscriptions, which have no such causal link.
+    /// </summary>
+    internal ActivityContext ReplyParentContext { get; set; }
+
     private INatsDeserialize<T> Serializer { get; }
 
     protected override async ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
@@ -41,7 +49,8 @@ public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
             payloadBuffer,
             Connection,
             Connection.HeaderParser,
-            Serializer);
+            Serializer,
+            ReplyParentContext);
 
         await _msgs.Writer.WriteAsync(natsMsg).ConfigureAwait(false);
 

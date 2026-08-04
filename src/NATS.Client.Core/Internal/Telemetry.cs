@@ -259,13 +259,19 @@ internal static class Telemetry
         string? replyTo,
         long bodySize,
         long size,
-        NatsHeaders? headers)
+        NatsHeaders? headers,
+        ActivityContext fallbackParentContext = default)
     {
         if (!NatsActivities.HasListeners())
             return null;
 
+        // Trace context carried by the message always wins: it is the real causal link,
+        // possibly from another process. The fallback is for messages that carry none but
+        // whose cause is known locally, i.e. a reply to a request this client is waiting
+        // on. It is an ActivityContext (ids only) rather than an Activity, so parenting
+        // never creates an object reference between activities.
         if (headers is null || !TryParseTraceContext(headers, out var context))
-            context = default;
+            context = fallbackParentContext;
 
         var options = NatsInstrumentationOptions.Default;
         IReadOnlyList<KeyValuePair<string, string?>>? baggage = null;
@@ -346,7 +352,7 @@ internal static class Telemetry
         }
 
         // A receive activity's parent comes exclusively from the message's trace
-        // context. The ambient
+        // context, or from the request this is a reply to. The ambient
         // Activity.Current here is unrelated: receive activities are created on the
         // connection's read loop (or on contexts inheriting from it), where Current
         // is whatever ran last, typically a previous message's activity. Letting

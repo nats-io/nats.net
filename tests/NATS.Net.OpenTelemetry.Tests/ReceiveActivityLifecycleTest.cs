@@ -41,6 +41,38 @@ public class ReceiveActivityLifecycleTest
     }
 
     [Fact]
+    public async Task Reply_receive_activity_is_traced_under_its_request()
+    {
+        using var tracker = new ActivityTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts
+        {
+            Url = server.Url,
+            RequestReplyMode = NatsRequestReplyMode.Direct,
+        });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        // Connect outside any activity so the read loop cannot capture one, leaving the
+        // request context as the only thing that can parent the reply.
+        await nats.ConnectAsync();
+
+        var js = new NatsJSContext(nats);
+        await js.GetAccountInfoAsync(cts.Token);
+
+        var request = tracker.Started.Single(a => a.OperationName.EndsWith(" request", StringComparison.Ordinal));
+        var receive = tracker.Started.Single(a => a.Kind == ActivityKind.Consumer);
+
+        // The reply carries no trace context of its own, so it takes the request as
+        // parent: one trace covering the request, its publish and the reply.
+        receive.TraceId.Should().Be(request.TraceId);
+        receive.ParentSpanId.Should().Be(request.SpanId);
+
+        // Parented by context, not by reference; a reference is what leaked.
+        receive.Parent.Should().BeNull();
+    }
+
+    [Fact]
     public async Task Receive_activities_do_not_join_the_trace_ambient_at_connect_time()
     {
         using var tracker = new ActivityTracker();

@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Buffers.Text;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Text;
 
 namespace NATS.Client.Core.Internal;
@@ -19,17 +20,19 @@ internal sealed class ReplyTask<T> : ReplyTaskBase, IDisposable
     private readonly TimeSpan _requestTimeout;
     private readonly bool _throwIfNoResponders;
     private readonly TaskCompletionSource _tcs;
+    private readonly ActivityContext _requestContext;
     private NatsMsg<T> _msg;
     private long _replyBytes;
     private bool _isNoResponders;
 
-    public ReplyTask(ReplyTaskFactory factory, long id, string subject, NatsConnection connection, INatsDeserialize<T> deserializer, TimeSpan requestTimeout, bool throwIfNoResponders)
+    public ReplyTask(ReplyTaskFactory factory, long id, string subject, NatsConnection connection, INatsDeserialize<T> deserializer, TimeSpan requestTimeout, bool throwIfNoResponders, ActivityContext requestContext)
     {
         _factory = factory;
         _id = id;
         Subject = subject;
         _connection = connection;
         _deserializer = deserializer;
+        _requestContext = requestContext;
         _requestTimeout = TimeoutValidation.Validate(requestTimeout, nameof(requestTimeout), Timeout.InfiniteTimeSpan);
         _throwIfNoResponders = throwIfNoResponders;
         _tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -92,7 +95,10 @@ internal sealed class ReplyTask<T> : ReplyTaskBase, IDisposable
     {
         lock (_gate)
         {
-            _msg = NatsMsg<T>.Build(Subject, replyTo, headersBuffer, payload, _connection, _connection.HeaderParser, _deserializer);
+            // A server reply carries no trace context, so without the request's context
+            // the receive activity would be a root span disconnected from the request it
+            // belongs to.
+            _msg = NatsMsg<T>.Build(Subject, replyTo, headersBuffer, payload, _connection, _connection.HeaderParser, _deserializer, _requestContext);
             _isNoResponders = payload.Length == 0 && NatsSubBase.IsHeader503(headersBuffer);
             _replyBytes = payload.Length + (headersBuffer?.Length ?? 0);
         }
@@ -158,7 +164,12 @@ internal sealed class ReplyTaskFactory
             subject = _inboxPrefixString + id;
         }
 
-        var rt = new ReplyTask<TReply>(this, id, subject, _connection, deserializer, requestTimeout ?? _requestTimeout, throwIfNoResponders);
+        // Captured on the calling thread while the request activity is current, so it
+        // names the request this reply belongs to. Unlike the read loop's ambient
+        // context, this is a deterministic causal link rather than whatever ran last.
+        var requestContext = Activity.Current?.Context ?? default;
+
+        var rt = new ReplyTask<TReply>(this, id, subject, _connection, deserializer, requestTimeout ?? _requestTimeout, throwIfNoResponders, requestContext);
         _replies.TryAdd(id, rt);
         return rt;
     }
