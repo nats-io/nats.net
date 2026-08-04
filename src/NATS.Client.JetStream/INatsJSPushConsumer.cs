@@ -17,9 +17,10 @@ namespace NATS.Client.JetStream;
 /// </para>
 /// <para>
 /// A push consumer does not support pull-based operations such as
-/// <see cref="INatsJSConsumer.NextAsync{T}"/>, <see cref="INatsJSConsumer.FetchAsync{T}"/>
-/// or <see cref="INatsJSConsumer.FetchNoWaitAsync{T}"/> which are only available for pull
-/// (work-queue) consumers and throw <see cref="NatsJSProtocolException"/> when called.
+/// <see cref="INatsJSConsumer.NextAsync{T}"/>, <see cref="INatsJSConsumer.FetchAsync{T}"/>,
+/// <see cref="INatsJSConsumer.FetchNoWaitAsync{T}"/> or <see cref="INatsJSConsumer.UnpinAsync"/>
+/// which are only available for pull (work-queue) consumers and throw
+/// <see cref="NatsJSProtocolException"/> when called.
 /// </para>
 /// </remarks>
 public interface INatsJSPushConsumer : INatsJSConsumer;
