@@ -345,11 +345,28 @@ internal static class Telemetry
                 tags[9] = new KeyValuePair<string, object?>(Constants.ReplyTo, replyTo);
         }
 
+        // A receive activity's parent comes exclusively from the message's trace
+        // context. The ambient
+        // Activity.Current here is unrelated: receive activities are created on the
+        // connection's read loop (or on contexts inheriting from it), where Current
+        // is whatever ran last, typically a previous message's activity. Letting
+        // StartActivity fall back to it as parent chains unrelated messages together,
+        // and leaving the new activity in Current roots the whole chain through the
+        // read loop's AsyncLocal for the connection's lifetime. Clear Current around
+        // the start call and restore it so the caller's execution context is left
+        // exactly as it was.
+        var ambient = Activity.Current;
+        if (ambient is not null)
+            Activity.Current = null;
+
         var activity = NatsActivities.StartActivity(
             name,
             kind: ActivityKind.Consumer,
             parentContext: context,
             tags: tags);
+
+        if (!ReferenceEquals(Activity.Current, ambient))
+            Activity.Current = ambient;
 
         if (activity is not null)
         {
