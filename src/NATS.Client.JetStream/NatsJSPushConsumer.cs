@@ -94,7 +94,7 @@ public class NatsJSPushConsumer : INatsJSPushConsumer
             context: _context,
             subject: deliverSubject,
             queueGroup: Info.Config.DeliverGroup,
-            idleHeartbeat: Info.Config.IdleHeartbeat == TimeSpan.Zero ? TimeSpan.FromSeconds(5) : Info.Config.IdleHeartbeat,
+            idleHeartbeat: Info.Config.IdleHeartbeat,
             notificationHandler: opts?.NotificationHandler,
             serializer: serializer,
             opts: subOpts,
