@@ -365,14 +365,20 @@ internal static class Telemetry
         if (ambient is not null)
             Activity.Current = null;
 
-        var activity = NatsActivities.StartActivity(
-            name,
-            kind: ActivityKind.Consumer,
-            parentContext: context,
-            tags: tags);
-
-        if (!ReferenceEquals(Activity.Current, ambient))
-            Activity.Current = ambient;
+        Activity? activity;
+        try
+        {
+            activity = NatsActivities.StartActivity(
+                name,
+                kind: ActivityKind.Consumer,
+                parentContext: context,
+                tags: tags);
+        }
+        finally
+        {
+            if (!ReferenceEquals(Activity.Current, ambient))
+                Activity.Current = ambient;
+        }
 
         if (activity is not null)
         {
