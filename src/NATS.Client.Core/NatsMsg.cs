@@ -334,7 +334,7 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
         INatsConnection? connection,
         NatsHeaderParser headerParser,
         INatsDeserialize<T> serializer)
-        => Build(subject, replyTo, headersBuffer, payloadBuffer, connection, headerParser, serializer, default);
+        => BuildInternal(subject, replyTo, headersBuffer, payloadBuffer, connection, headerParser, serializer, default);
 
     /// <summary>
     /// Builds a new instance of a <see cref="NatsMsg{T}"/> with the specified parameters.
@@ -357,7 +357,7 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
     /// </param>
     /// <returns>A new <see cref="NatsMsg{T}"/> instance containing the provided data.</returns>
     /// <exception cref="NatsException">Thrown if there is an error during the processing of the message.</exception>
-    public static NatsMsg<T> Build(
+    internal static NatsMsg<T> BuildInternal(
         string subject,
         string? replyTo,
         in ReadOnlySequence<byte>? headersBuffer,

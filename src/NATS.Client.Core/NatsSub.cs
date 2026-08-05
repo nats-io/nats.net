@@ -42,7 +42,7 @@ public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
 
     protected override async ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
     {
-        var natsMsg = NatsMsg<T>.Build(
+        var natsMsg = NatsMsg<T>.BuildInternal(
             subject,
             replyTo,
             headersBuffer,

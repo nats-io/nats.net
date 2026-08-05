@@ -98,7 +98,7 @@ internal sealed class ReplyTask<T> : ReplyTaskBase, IDisposable
             // A server reply carries no trace context, so without the request's context
             // the receive activity would be a root span disconnected from the request it
             // belongs to.
-            _msg = NatsMsg<T>.Build(Subject, replyTo, headersBuffer, payload, _connection, _connection.HeaderParser, _deserializer, _requestContext);
+            _msg = NatsMsg<T>.BuildInternal(Subject, replyTo, headersBuffer, payload, _connection, _connection.HeaderParser, _deserializer, _requestContext);
             _isNoResponders = payload.Length == 0 && NatsSubBase.IsHeader503(headersBuffer);
             _replyBytes = payload.Length + (headersBuffer?.Length ?? 0);
         }
