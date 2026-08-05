@@ -93,6 +93,20 @@ public record NatsJSPushConsumerOpts
     public long MaxAckPending { get; init; }
 
     /// <summary>
+    /// A duration instructing the server to clean up the consumer once the deliver subject
+    /// has no interest for that amount of time.
+    /// </summary>
+    /// <remarks>
+    /// If not set, ephemeral consumers (no <see cref="Name"/> or <see cref="DurableName"/>)
+    /// are automatically deleted by the server roughly 5 seconds after the deliver subject
+    /// loses interest (for example when the client unsubscribes or disconnects for longer
+    /// than the threshold). Durable consumers are never deleted automatically unless this
+    /// value is set. Set to <see cref="TimeSpan.Zero"/> to explicitly disable the deletion
+    /// of a durable consumer.
+    /// </remarks>
+    public TimeSpan? InactiveThreshold { get; init; }
+
+    /// <summary>
     /// Amount of idle time the server should wait before sending a heartbeat.
     /// </summary>
     /// <remarks>
@@ -124,15 +138,6 @@ public record NatsJSPushConsumerOpts
     /// <c>Nats-Msg-Size</c> header with the size of the removed payload.
     /// </summary>
     public bool HeadersOnly { get; init; }
-
-    /// <summary>
-    /// Timeout for cleanup operations during disposal (e.g. deleting ephemeral consumers).
-    /// </summary>
-    /// <remarks>
-    /// Defaults to 5 seconds. If the server is slow or unresponsive, disposal will not block
-    /// longer than this.
-    /// </remarks>
-    public TimeSpan CleanupTimeout { get; init; } = TimeSpan.FromSeconds(5);
 
     /// <summary>
     /// Options affecting the underlying subscription created for the delivery subject.

@@ -108,6 +108,11 @@ public partial class NatsJSContext : INatsJSContext
             config.MaxAckPending = opts.MaxAckPending;
         }
 
+        if (opts.InactiveThreshold is { } inactiveThreshold)
+        {
+            config.InactiveThreshold = inactiveThreshold;
+        }
+
         var consumer = await CreateOrUpdateConsumerInternalAsync(stream, config, action, cancellationToken);
         return new NatsJSPushConsumer(this, consumer.Info);
     }

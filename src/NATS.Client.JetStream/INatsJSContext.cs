@@ -32,6 +32,15 @@ public interface INatsJSContext
     /// <summary>
     /// Creates a new push consumer that delivers messages to a client subscription on a generated subject.
     /// </summary>
+    /// <remarks>
+    /// Ephemeral push consumers (no <see cref="NatsJSPushConsumerOpts.Name"/> or
+    /// <see cref="NatsJSPushConsumerOpts.DurableName"/>) are automatically deleted by the server roughly
+    /// 5 seconds after the delivery subject loses interest. This means the consumer is also removed if
+    /// <see cref="INatsJSConsumer.ConsumeAsync{T}"/> is not started within that window after creation, or
+    /// if the connection stays disconnected longer than the threshold. Use a durable consumer, a
+    /// <see cref="NatsJSPushConsumerOpts.DeliverGroup"/> or a longer
+    /// <see cref="NatsJSPushConsumerOpts.InactiveThreshold"/> for consumption that may be delayed.
+    /// </remarks>
     /// <param name="stream">Name of the stream to create the consumer under.</param>
     /// <param name="opts">Push consumer options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>

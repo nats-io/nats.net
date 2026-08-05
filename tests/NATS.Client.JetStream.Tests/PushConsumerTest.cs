@@ -27,6 +27,7 @@ public class PushConsumerTest(NatsServerFixture server)
                 AckPolicy = ConsumerConfigAckPolicy.Explicit,
                 IdleHeartbeat = TimeSpan.FromSeconds(10),
                 FlowControl = true,
+                InactiveThreshold = TimeSpan.FromMinutes(5),
             },
             cancellationToken: cts.Token);
 
@@ -37,6 +38,7 @@ public class PushConsumerTest(NatsServerFixture server)
         Assert.Equal(ConsumerConfigAckPolicy.Explicit, info.Config.AckPolicy);
         Assert.Equal(TimeSpan.FromSeconds(10), info.Config.IdleHeartbeat);
         Assert.True(info.Config.FlowControl);
+        Assert.Equal(TimeSpan.FromMinutes(5), info.Config.InactiveThreshold);
         Assert.NotNull(info.Config.DeliverSubject);
         Assert.StartsWith("_", info.Config.DeliverSubject);
     }
@@ -227,6 +229,35 @@ public class PushConsumerTest(NatsServerFixture server)
             {
             }
         });
+    }
+
+    [Fact]
+    public async Task Push_consumer_ephemeral_auto_deleted()
+    {
+        await using var nats = server.CreateNatsConnection();
+        await nats.ConnectRetryAsync();
+        var prefix = server.GetNextId();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var js = new NatsJSContext(nats);
+        await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
+
+        // Ephemeral push consumer (no Name/DurableName). Since ConsumeAsync is never
+        // started, the deliver subject has no interest and the server should delete
+        // the consumer after its default inactive threshold (~5 seconds).
+        var consumer = await js.CreatePushConsumerAsync(
+            $"{prefix}s1",
+            new NatsJSPushConsumerOpts { Name = $"{prefix}c1" },
+            cts.Token);
+
+        var name = consumer.Info.Config.Name;
+        Assert.Equal($"{prefix}c1", name);
+
+        await Task.Delay(TimeSpan.FromSeconds(8), cts.Token);
+
+        var ex = await Assert.ThrowsAsync<NatsJSApiException>(
+            () => js.GetPushConsumerAsync($"{prefix}s1", name!, cts.Token).AsTask());
+        Assert.Equal(10014, ex.Error.ErrCode);
     }
 
     [Fact]

@@ -203,4 +203,56 @@ public class OrderedPushConsumerTest(NatsServerFixture server)
 
         Assert.Equal(20, count);
     }
+
+    [Fact]
+    public async Task Consume_consumer_config_has_inactive_threshold()
+    {
+        await using var nats = server.CreateNatsConnection();
+        await nats.ConnectRetryAsync();
+        var prefix = server.GetNextId();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var js = new NatsJSContext(nats);
+        await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
+
+        for (var i = 0; i < 5; i++)
+            await js.PublishAsync($"{prefix}s1.foo", i, cancellationToken: cts.Token);
+
+        var consumer = (NatsJSOrderedPushConsumer)await js.CreateOrderedPushConsumerAsync($"{prefix}s1", cancellationToken: cts.Token);
+
+        var count = 0;
+        var found = false;
+        var consumeCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
+        await foreach (var msg in consumer.ConsumeAsync<int>(cancellationToken: consumeCts.Token))
+        {
+            Assert.Equal(count, msg.Data);
+            count++;
+
+            // Once the first message is delivered, the internal ephemeral consumer
+            // exists on the server. Its config must carry the ordered consumer's
+            // InactiveThreshold default (5 minutes) so it survives reconnects.
+            if (count == 1)
+            {
+                var names = new List<string>();
+                await foreach (var name in js.ListConsumerNamesAsync($"{prefix}s1", cancellationToken: cts.Token))
+                    names.Add(name);
+
+                foreach (var name in names)
+                {
+                    var info = await js.GetConsumerAsync($"{prefix}s1", name, cts.Token);
+                    if (info.Info.Config.FlowControl && info.Info.Config.AckPolicy == ConsumerConfigAckPolicy.None)
+                    {
+                        Assert.Equal(TimeSpan.FromMinutes(5), info.Info.Config.InactiveThreshold);
+                        found = true;
+                    }
+                }
+
+                consumeCts.Cancel();
+                break;
+            }
+        }
+
+        Assert.True(count >= 1);
+        Assert.True(found);
+    }
 }

@@ -46,6 +46,14 @@ internal record NatsJSOrderedPushConsumerOpts
     public TimeSpan CleanupTimeout { get; init; } = TimeSpan.FromSeconds(5);
 
     /// <summary>
+    /// A duration instructing the server to clean up the consumer once the deliver subject
+    /// has no interest for that amount of time. This protects ordered consumers from being
+    /// deleted by the server during reconnects that last longer than the server's default
+    /// 5 second threshold for ephemeral consumers.
+    /// </summary>
+    public TimeSpan InactiveThreshold { get; init; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>
     /// A single subject to filter the consumer by.
     /// </summary>
     public string? FilterSubject { get; init; }
@@ -425,6 +433,7 @@ internal class NatsJSOrderedPushConsumer<T>
             FilterSubjects = _opts.FilterSubjects,
             FlowControl = true,
             IdleHeartbeat = _opts.IdleHeartbeat,
+            InactiveThreshold = _opts.InactiveThreshold,
             AckWait = TimeSpan.FromHours(22),
             MaxDeliver = 1,
             MemStorage = true,

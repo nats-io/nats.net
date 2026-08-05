@@ -70,6 +70,7 @@ public class NatsJSOrderedPushConsumer : INatsJSPushConsumer
                 ReplayPolicy = _opts.ReplayPolicy,
                 HeadersOnly = _opts.HeadersOnly,
                 FilterSubjects = _opts.FilterSubjects,
+                InactiveThreshold = _opts.InactiveThreshold,
             };
 
             NatsJSOrderedPushConsumer<T>? pushConsumer = null;
