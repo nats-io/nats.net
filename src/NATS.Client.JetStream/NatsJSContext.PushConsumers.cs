@@ -1,3 +1,4 @@
+using NATS.Client.Core;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
@@ -114,6 +115,8 @@ public partial class NatsJSContext : INatsJSContext
         }
 
         var consumer = await CreateOrUpdateConsumerInternalAsync(stream, config, action, cancellationToken);
-        return new NatsJSPushConsumer(this, consumer.Info);
+        var subOpts = opts.SubOpts ?? new NatsSubOpts { ChannelOpts = new NatsSubChannelOpts { Capacity = 1_000 } };
+
+        return new NatsJSPushConsumer(this, consumer.Info, subOpts);
     }
 }

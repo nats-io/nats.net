@@ -27,14 +27,16 @@ public class NatsJSPushConsumer : INatsJSPushConsumer
     private readonly NatsJSContext _context;
     private readonly string _stream;
     private readonly string _consumer;
+    private readonly NatsSubOpts? _subOpts;
     private volatile bool _deleted;
 
-    internal NatsJSPushConsumer(NatsJSContext context, ConsumerInfo info)
+    internal NatsJSPushConsumer(NatsJSContext context, ConsumerInfo info, NatsSubOpts? subOpts = null)
     {
         _context = context;
         Info = info;
         _stream = Info.StreamName;
         _consumer = Info.Name;
+        _subOpts = subOpts;
     }
 
     /// <inheritdoc />
@@ -57,6 +59,13 @@ public class NatsJSPushConsumer : INatsJSPushConsumer
     /// <summary>
     /// Starts an enumerator consuming messages from this push consumer.
     /// </summary>
+    /// <remarks>
+    /// Each call creates a new subscription on the consumer's deliver subject. For non-queue
+    /// push consumers (no <see cref="NatsJSPushConsumerOpts.DeliverGroup"/>) this means every
+    /// message is delivered to every active enumeration. Use a single <c>await foreach</c> loop
+    /// per consumer instance, or create separate consumer instances via
+    /// <see cref="INatsJSContext.GetPushConsumerAsync"/> to consume concurrently.
+    /// </remarks>
     /// <param name="serializer">Serializer to use for the message type.</param>
     /// <param name="opts">Consume options for the underlying subscription.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the call.</param>
@@ -79,16 +88,7 @@ public class NatsJSPushConsumer : INatsJSPushConsumer
 
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
-        var subOpts = new NatsSubOpts
-        {
-            ChannelOpts = new NatsSubChannelOpts
-            {
-                // Keep capacity large enough not to block the socket reads.
-                // Uses connection's default FullMode (typically DropNewest) to avoid
-                // blocking the main NATS TCP connection on slow consumers.
-                Capacity = 1_000,
-            },
-        };
+        var subOpts = _subOpts;
 
         var sub = new NatsJSPushConsume<T>(
             context: _context,

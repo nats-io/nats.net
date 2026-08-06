@@ -3,7 +3,6 @@ using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.Core.Internal;
-using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Internal;
 
@@ -64,6 +63,9 @@ internal class NatsJSPushConsume<T> : NatsSubBase
                 // the heartbeat callback complete the channel (CompleteStop) and skip the
                 // fence, which would drop in-flight messages the drain is meant to preserve.
                 if (self._draining)
+                    return;
+
+                if (self.Connection.ConnectionState == NatsConnectionState.Reconnecting)
                     return;
 
                 self._notificationChannel?.Notify(NatsJSTimeoutNotification.Default);
