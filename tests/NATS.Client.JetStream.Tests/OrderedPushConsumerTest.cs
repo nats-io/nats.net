@@ -228,9 +228,6 @@ public class OrderedPushConsumerTest(NatsServerFixture server)
             Assert.Equal(count, msg.Data);
             count++;
 
-            // Once the first message is delivered, the internal ephemeral consumer
-            // exists on the server. Its config must carry the ordered consumer's
-            // InactiveThreshold default (5 minutes) so it survives reconnects.
             if (count == 1)
             {
                 var names = new List<string>();

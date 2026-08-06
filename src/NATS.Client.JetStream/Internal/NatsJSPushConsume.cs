@@ -59,9 +59,6 @@ internal class NatsJSPushConsume<T> : NatsSubBase
             {
                 var self = (NatsJSPushConsume<T>)state!;
 
-                // A drain is completing the subscription behind a PING/PONG fence. Don't let
-                // the heartbeat callback complete the channel (CompleteStop) and skip the
-                // fence, which would drop in-flight messages the drain is meant to preserve.
                 if (self._draining)
                     return;
 
@@ -78,7 +75,6 @@ internal class NatsJSPushConsume<T> : NatsSubBase
 
                 if (self.Connection.ConnectionState == NatsConnectionState.Failed)
                 {
-                    // Connection has permanently failed, complete the channel with exception
                     self._userMsgs.Writer.TryComplete(new NatsConnectionFailedException("Connection is in failed state"));
                     self.CompleteStop();
                     return;
@@ -96,8 +92,6 @@ internal class NatsJSPushConsume<T> : NatsSubBase
             Timeout.Infinite,
             Timeout.Infinite);
 
-        // This channel is used to pass messages to the user from the subscription.
-        // Uses connection's channel options (default DropNewest) to avoid blocking socket reads.
         _userMsgs = Channel.CreateBounded<NatsJSMsg<T>>(
             Connection.GetBoundedChannelOpts(opts?.ChannelOpts),
             msg => Connection.OnMessageDropped(this, _userMsgs?.Reader.Count ?? 0, msg.Msg));
@@ -110,8 +104,6 @@ internal class NatsJSPushConsume<T> : NatsSubBase
 
     public void ResetHeartbeatTimer()
     {
-        // Once draining, the heartbeat timer stays stopped so it can't re-arm and complete
-        // the channel ahead of the drain fence.
         if (_draining)
             return;
 
@@ -142,9 +134,6 @@ internal class NatsJSPushConsume<T> : NatsSubBase
 
     protected override void StopDelivery()
     {
-        // Mark draining first so the heartbeat callback, its re-arm, and CompleteStop
-        // defer to the drain fence, then stop the timer so it can't complete the channel
-        // during the drain.
         _draining = true;
         StopHeartbeatTimer();
     }
@@ -159,7 +148,6 @@ internal class NatsJSPushConsume<T> : NatsSubBase
 
         if (subject == Subject)
         {
-            // Control message (e.g. idle heartbeat or flow control) from the server.
             if (headersBuffer.HasValue)
             {
                 var headers = new NatsHeaders();
@@ -167,8 +155,6 @@ internal class NatsJSPushConsume<T> : NatsSubBase
                 {
                     if (headers.TryGetValue("Nats-Consumer-Stalled", out var flowControlReplyTo))
                     {
-                        // Client is not reading fast enough. Send a flow control reply so the server
-                        // continues to send messages.
                         await Connection.PublishAsync(flowControlReplyTo, cancellationToken: _cancellationToken);
                     }
 
@@ -191,8 +177,6 @@ internal class NatsJSPushConsume<T> : NatsSubBase
 
                     if (headers is { Code: 100, Message: NatsHeaders.Messages.IdleHeartbeat })
                     {
-                        // No action is required for idle heartbeat notifications.
-                        // This branch is intentionally left empty.
                     }
                     else if (headers.HasTerminalJSError())
                     {
@@ -216,7 +200,6 @@ internal class NatsJSPushConsume<T> : NatsSubBase
         }
         else
         {
-            // Actual JetStream message delivered by the push consumer.
             var msg = new NatsJSMsg<T>(
                 NatsMsg<T>.Build(
                     subject,
@@ -228,9 +211,6 @@ internal class NatsJSPushConsume<T> : NatsSubBase
                     _serializer),
                 _context);
 
-            // We can't pass cancellation token here because we need to hand
-            // the message to the user to be processed. Writer will be completed
-            // when the user calls Stop() or when the subscription is closed.
             await _userMsgs.Writer.WriteAsync(msg).ConfigureAwait(false);
 
             ResetSlowConsumer(_userMsgs.Reader.Count);
@@ -249,14 +229,11 @@ internal class NatsJSPushConsume<T> : NatsSubBase
             _logger.LogDebug(NatsJSLogEvents.Stopping, "No more messages in-flight, stopping");
         }
 
-        // Schedule on the thread pool to avoid potential deadlocks.
         ThreadPool.UnsafeQueueUserWorkItem(
             static state =>
             {
                 var self = (NatsJSPushConsume<T>)state!;
 
-                // If a drain started after this stop was queued, leave completion to the
-                // drain fence rather than dropping in-flight messages here.
                 if (self._draining)
                     return;
 

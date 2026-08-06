@@ -242,9 +242,6 @@ public class PushConsumerTest(NatsServerFixture server)
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
 
-        // Ephemeral push consumer (no Name/DurableName). Since ConsumeAsync is never
-        // started, the deliver subject has no interest and the server should delete
-        // the consumer after its default inactive threshold (~5 seconds).
         var consumer = await js.CreatePushConsumerAsync(
             $"{prefix}s1",
             new NatsJSPushConsumerOpts { Name = $"{prefix}c1" },
