@@ -55,8 +55,10 @@ public class NatsJSOrderedPushConsumer : INatsJSPushConsumer
     {
         cancellationToken.ThrowIfCancellationRequested();
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
-        cancellationToken = CancellationTokenSource.CreateLinkedTokenSource(_cancellationToken, cancellationToken).Token;
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(_cancellationToken, cancellationToken);
+        cancellationToken = linkedCts.Token;
 
+        var retry = 0;
         while (!cancellationToken.IsCancellationRequested)
         {
             if (_context.Connection is NatsConnection { IsDisposed: true })
@@ -75,6 +77,7 @@ public class NatsJSOrderedPushConsumer : INatsJSPushConsumer
 
             NatsJSOrderedPushConsumer<T>? pushConsumer = null;
             ChannelReader<NatsJSMsg<T>> reader = default!;
+            var errored = false;
 
             try
             {
@@ -85,43 +88,49 @@ public class NatsJSOrderedPushConsumer : INatsJSPushConsumer
             }
             catch (NatsJSProtocolException)
             {
+                errored = true;
                 if (pushConsumer != null)
                     await pushConsumer.DisposeAsync();
-                continue;
             }
 
-            try
+            if (!errored)
             {
-                while (true)
+                try
                 {
-                    bool read;
-
-                    // We have to check calls individually since we can't yield return in try-catch blocks.
-                    try
+                    while (true)
                     {
-                        read = await reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
-                        if (!read)
+                        try
+                        {
+                            var read = await reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
+                            if (!read)
+                                break;
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            yield break;
+                        }
+                        catch (NatsJSProtocolException)
+                        {
+                            errored = true;
                             break;
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        break;
-                    }
-                    catch (NatsJSProtocolException)
-                    {
-                        break;
-                    }
+                        }
 
-                    while (reader.TryRead(out var msg))
-                    {
-                        yield return msg;
+                        while (reader.TryRead(out var msg))
+                        {
+                            yield return msg;
+                        }
                     }
                 }
+                finally
+                {
+                    if (pushConsumer != null)
+                        await pushConsumer.DisposeAsync();
+                }
             }
-            finally
+
+            if (errored)
             {
-                if (pushConsumer != null)
-                    await pushConsumer.DisposeAsync();
+                await _context.Connection.Opts.BackoffWithJitterAsync(retry++, cancellationToken);
             }
         }
     }
