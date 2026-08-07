@@ -30,7 +30,7 @@ public class ReceiveActivityLifecycleTest
             await js.GetAccountInfoAsync(cts.Token);
         }
 
-        var consumers = tracker.Started.Where(a => a.Kind == ActivityKind.Consumer).ToList();
+        var consumers = tracker.StartedFor(server.Port).Where(a => a.Kind == ActivityKind.Consumer).ToList();
         consumers.Should().HaveCount(5);
         consumers.Should().AllSatisfy(a => a.Parent.Should().BeNull(
             "receive activities must parent only by context, never by holding the ambient Activity"));
@@ -38,6 +38,8 @@ public class ReceiveActivityLifecycleTest
         // Each reply belongs to its own request, so they must land in five distinct
         // traces. Chaining would collapse them into one.
         consumers.Select(a => a.TraceId).Distinct().Should().HaveCount(5);
+
+        tracker.AssertAllStopped(server.Port);
     }
 
     [Fact]
@@ -60,8 +62,9 @@ public class ReceiveActivityLifecycleTest
         var js = new NatsJSContext(nats);
         await js.GetAccountInfoAsync(cts.Token);
 
-        var request = tracker.Started.Single(a => a.OperationName.EndsWith(" request", StringComparison.Ordinal));
-        var receive = tracker.Started.Single(a => a.Kind == ActivityKind.Consumer);
+        var activities = tracker.StartedFor(server.Port);
+        var request = activities.Single(a => a.OperationName.EndsWith(" request", StringComparison.Ordinal));
+        var receive = activities.Single(a => a.Kind == ActivityKind.Consumer);
 
         // The reply carries no trace context of its own, so it takes the request as
         // parent: one trace covering the request, its publish and the reply.
@@ -70,6 +73,8 @@ public class ReceiveActivityLifecycleTest
 
         // Parented by context, not by reference; a reference is what leaked.
         receive.Parent.Should().BeNull();
+
+        tracker.AssertAllStopped(server.Port);
     }
 
     [Fact]
@@ -109,10 +114,12 @@ public class ReceiveActivityLifecycleTest
             await js.GetAccountInfoAsync(cts.Token);
         }
 
-        var receives = tracker.Started.Where(a => a.Kind == ActivityKind.Consumer).ToList();
+        var receives = tracker.StartedFor(server.Port).Where(a => a.Kind == ActivityKind.Consumer).ToList();
         receives.Should().NotBeEmpty();
         receives.Should().AllSatisfy(a => a.TraceId.Should().NotBe(
             ambient.TraceId,
             "receive activities must not inherit the trace that happened to be current when the connection was established"));
+
+        tracker.AssertAllStopped(server.Port);
     }
 }

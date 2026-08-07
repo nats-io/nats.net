@@ -30,7 +30,7 @@ public class OpenTelemetryTest
         var expectedHost = new Uri(server.Url).Host;
         var expectedClientId = nats.ServerInfo!.ClientId.ToString();
         AssertActivityData("foo", tracker.Started, expectedHost, expectedClientId);
-        tracker.AssertAllStopped();
+        tracker.AssertAllStopped(server.Port);
     }
 
     [Fact]
@@ -74,7 +74,7 @@ public class OpenTelemetryTest
         // Verify the parent relationship (consume activity should have publish as parent via trace context)
         Assert.Equal(publishActivity.TraceId, consumeActivity.TraceId);
 
-        tracker.AssertAllStopped();
+        tracker.AssertAllStopped(server.Port);
     }
 
     [Fact]
@@ -436,7 +436,7 @@ public class OpenTelemetryTest
         var reply = await nats.RequestAsync<int, int>("foo.direct", 21, cancellationToken: cts.Token);
         Assert.Equal(42, reply.Data);
 
-        tracker.AssertAllStopped();
+        tracker.AssertAllStopped(server.Port);
 
         await sub.DisposeAsync();
         await reg;
