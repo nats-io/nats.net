@@ -52,6 +52,8 @@ public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
             Serializer,
             ReplyParentContext);
 
+        ReceiveActivity = natsMsg.Headers?.Activity;
+
         await _msgs.Writer.WriteAsync(natsMsg).ConfigureAwait(false);
 
         ResetSlowConsumer(_msgs.Reader.Count);

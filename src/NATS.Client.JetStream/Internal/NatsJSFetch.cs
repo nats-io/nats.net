@@ -288,6 +288,8 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
                     _serializer),
                 _context);
 
+            ReceiveActivity = msg.Headers?.Activity;
+
             NatsJSExtensionsInternal.TrySetPinIdFromHeaders(msg.Headers, _jsConsumer);
 
             _pendingMsgs--;

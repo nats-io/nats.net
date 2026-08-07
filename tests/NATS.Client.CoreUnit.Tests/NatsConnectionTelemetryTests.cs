@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Diagnostics;
 using System.Text;
+using System.Threading.Channels;
 using NATS.Client.Core.Internal;
 
 namespace NATS.Client.CoreUnit.Tests;
@@ -231,6 +232,80 @@ public class NatsConnectionTelemetryTests
     }
 
     [Fact]
+    public async Task Dropping_a_message_ends_its_receive_activity()
+    {
+        // A message evicted from a full subscription channel never reaches a consumer, so the
+        // read that would have ended its receive activity never happens.
+        var subject = $"drop.{Guid.NewGuid():N}";
+        var started = new List<Activity>();
+
+        // The listener is process-global, so only count activities for this test's subject.
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == Telemetry.NatsActivitySource,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+            ActivityStarted = a =>
+            {
+                if (a.GetTagItem(Telemetry.Constants.DestName) is string name && name == subject)
+                {
+                    lock (started)
+                        started.Add(a);
+                }
+            },
+        };
+        ActivitySource.AddActivityListener(listener);
+
+        await using var nats = new NatsConnection();
+        var opts = new NatsSubOpts { ChannelOpts = new NatsSubChannelOpts { Capacity = 1, FullMode = BoundedChannelFullMode.DropOldest } };
+        var sub = new NatsSub<string>(nats, new NoopSubscriptionManager(), subject, queueGroup: null, opts, NatsDefaultSerializer<string>.Default);
+
+        await sub.ReceiveAsync(subject, replyTo: null, headersBuffer: null, payloadBuffer: new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes("first")));
+        await sub.ReceiveAsync(subject, replyTo: null, headersBuffer: null, payloadBuffer: new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes("second")));
+
+        // Only the second message is still in the channel; the first one was evicted.
+        sub.Msgs.TryRead(out var kept).Should().BeTrue();
+        kept.Data.Should().Be("second");
+        sub.Msgs.TryRead(out _).Should().BeFalse();
+
+        started.Should().HaveCount(2);
+        started.Should().AllSatisfy(a => a.IsStopped.Should().BeTrue(
+            "the kept message is ended by the read and the dropped one when it is evicted"));
+    }
+
+    [Fact]
+    public async Task Receive_failure_is_recorded_on_the_receive_activity_of_the_failing_message()
+    {
+        // Before receive activities were kept off the ambient context, the failing message's
+        // activity happened to be Activity.Current in the handler below. It no longer is, so
+        // the exception has to be recorded against the activity the message actually carries,
+        // and that activity has to be ended: it never reaches a consumer to be ended there.
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == Telemetry.NatsActivitySource || source.Name == "test-app",
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+        };
+        ActivitySource.AddActivityListener(listener);
+
+        await using var nats = new NatsConnection();
+        var sub = new ThrowingSub(nats);
+
+        using var appSource = new ActivitySource("test-app");
+        using var app = appSource.StartActivity("app");
+
+        await sub.ReceiveAsync("foo.bar", replyTo: null, headersBuffer: null, payloadBuffer: new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes("hi")));
+
+        var activity = sub.BuiltActivity;
+        activity.Should().NotBeNull();
+        activity!.Status.Should().Be(ActivityStatusCode.Error);
+        activity.Events.Should().Contain(e => e.Name == "exception");
+        activity.IsStopped.Should().BeTrue("a message that never reaches a consumer has nowhere else to be ended");
+
+        app.Should().NotBeNull();
+        app!.Status.Should().Be(ActivityStatusCode.Unset, "the application's span did not fail");
+        Activity.Current.Should().BeSameAs(app);
+    }
+
+    [Fact]
     public async Task SpanDestinationName_uses_configured_formatter()
     {
         var previous = NatsInstrumentationOptions.Default.SpanDestinationNameFormatter;
@@ -269,5 +344,31 @@ public class NatsConnectionTelemetryTests
     private sealed class NoopSubscriptionManager : INatsSubscriptionManager
     {
         public ValueTask RemoveAsync(NatsSubBase sub) => default;
+    }
+
+    // Stands in for the receive paths that can fail after building the message, such as the
+    // JetStream subscriptions parsing consumer metadata off the reply subject.
+    private sealed class ThrowingSub : NatsSubBase
+    {
+        public ThrowingSub(INatsConnection connection)
+            : base(connection, new NoopSubscriptionManager(), "foo.bar", queueGroup: null, opts: null)
+        {
+        }
+
+        public Activity? BuiltActivity { get; private set; }
+
+        protected override ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
+        {
+            var msg = NatsMsg<string>.Build(subject, replyTo, headersBuffer, payloadBuffer, Connection, Connection.HeaderParser, NatsDefaultSerializer<string>.Default);
+            BuiltActivity = msg.Headers?.Activity;
+            ReceiveActivity = BuiltActivity;
+
+            // Not a SystemException: those are deliberately left to propagate out of ReceiveAsync.
+            throw new NatsException("receive failed");
+        }
+
+        protected override void TryComplete()
+        {
+        }
     }
 }
