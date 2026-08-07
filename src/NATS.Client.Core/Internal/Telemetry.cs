@@ -259,13 +259,19 @@ internal static class Telemetry
         string? replyTo,
         long bodySize,
         long size,
-        NatsHeaders? headers)
+        NatsHeaders? headers,
+        ActivityContext fallbackParentContext = default)
     {
         if (!NatsActivities.HasListeners())
             return null;
 
+        // Trace context carried by the message always wins: it is the real causal link,
+        // possibly from another process. The fallback is for messages that carry none but
+        // whose cause is known locally, i.e. a reply to a request this client is waiting
+        // on. It is an ActivityContext (ids only) rather than an Activity, so parenting
+        // never creates an object reference between activities.
         if (headers is null || !TryParseTraceContext(headers, out var context))
-            context = default;
+            context = fallbackParentContext;
 
         var options = NatsInstrumentationOptions.Default;
         IReadOnlyList<KeyValuePair<string, string?>>? baggage = null;
@@ -345,11 +351,33 @@ internal static class Telemetry
                 tags[9] = new KeyValuePair<string, object?>(Constants.ReplyTo, replyTo);
         }
 
-        var activity = NatsActivities.StartActivity(
-            name,
-            kind: ActivityKind.Consumer,
-            parentContext: context,
-            tags: tags);
+        // A receive activity's parent comes exclusively from the message's trace
+        // context, or from the request this is a reply to. The ambient
+        // Activity.Current here is unrelated: receive activities are created on the
+        // connection's read loop (or on contexts inheriting from it), where Current
+        // is whatever ran last, typically a previous message's activity. Letting
+        // StartActivity fall back to it as parent chains unrelated messages together,
+        // and leaving the new activity in Current roots the whole chain through the
+        // read loop's AsyncLocal for the connection's lifetime. Clear Current around
+        // the start call and restore it so the caller's execution context is left
+        // exactly as it was.
+        var ambient = Activity.Current;
+        if (ambient is not null)
+            Activity.Current = null;
+
+        Activity? activity;
+        try
+        {
+            activity = NatsActivities.StartActivity(
+                name,
+                kind: ActivityKind.Consumer,
+                parentContext: context,
+                tags: tags);
+        }
+        finally
+        {
+            RestoreCurrentActivity(ambient);
+        }
 
         if (activity is not null)
         {
@@ -365,6 +393,50 @@ internal static class Telemetry
         }
 
         return activity;
+    }
+
+    /// <summary>
+    /// Puts back an <see cref="Activity.Current"/> saved earlier, falling back to its nearest
+    /// ancestor that is still running if the saved activity has since stopped.
+    /// </summary>
+    /// <remarks>
+    /// Activity.Current's setter silently refuses a finished activity, so assigning back a saved
+    /// ambient that stopped in the meantime does nothing and leaves Current pointing at whatever
+    /// was set since. The read loop's execution context is a snapshot holding the activity that
+    /// was current when the connection was created, which the application is free to stop at any
+    /// point, so this is a normal case rather than an edge one. Walking up to the closest living
+    /// ancestor keeps as much of the caller's context as the platform allows, and matches what
+    /// the OpenTelemetry API does when it deactivates a span it started as a root.
+    /// </remarks>
+    public static void RestoreCurrentActivity(Activity? ambient)
+    {
+        if (ReferenceEquals(Activity.Current, ambient))
+            return;
+
+        while (ambient is { IsStopped: true })
+            ambient = ambient.Parent;
+
+        Activity.Current = ambient;
+    }
+
+    /// <summary>
+    /// Ends a receive activity without disturbing <see cref="Activity.Current"/>.
+    /// </summary>
+    /// <remarks>
+    /// Activity.Stop() sets Current to whichever activity was current when the activity being
+    /// stopped was started, and it does so whether or not that activity is current on this
+    /// execution context. Receive activities are started with Current deliberately cleared, so
+    /// stopping one sets Current to null: ending a message's activity as the application reads
+    /// it would detach the span the application had current.
+    /// </remarks>
+    public static void EndActivity(Activity? activity)
+    {
+        if (activity is null)
+            return;
+
+        var ambient = Activity.Current;
+        activity.Dispose();
+        RestoreCurrentActivity(ambient);
     }
 
     public static void SetException(Activity? activity, Exception exception)

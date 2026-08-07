@@ -60,8 +60,9 @@ public partial class NatsConnection
                         await PublishAsync(subject, data, headers, rt.Subject, requestSerializer, requestOpts, cancellationToken).ConfigureAwait(false);
                         var msg = await rt.GetResultAsync(cancellationToken).ConfigureAwait(false);
 
-                        // Dispose activity from headers to avoid leaking it
-                        msg.Headers?.Activity?.Dispose();
+                        // End the activity from the headers to avoid leaking it. Direct mode
+                        // materializes the reply on the read loop, so nothing else ends it.
+                        Telemetry.EndActivity(msg.Headers?.Activity);
 
                         return msg;
                     }

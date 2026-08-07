@@ -484,6 +484,8 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                     _serializer),
                 _context);
 
+            ReceiveActivity = msg.Headers?.Activity;
+
             NatsJSExtensionsInternal.TrySetPinIdFromHeaders(msg.Headers, _jsConsumer);
 
             // We can't pass cancellation token here because we need to hand
