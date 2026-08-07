@@ -67,6 +67,47 @@ custom tags to every activity:
 
 [!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/OpenTelemetryPage.cs#enrich)]
 
+`Enrich` runs after the activity is created and its tags are set, so `SetTag` overwrites tags the
+client set as well as adding new ones. That makes it the only way to change tag values; see
+[Span Names and Subject Redaction](#span-names-and-subject-redaction).
+
+## Span Names and Subject Redaction
+
+Activity names are `<destination> <operation>`, for example `orders.new publish`. The destination is
+derived from the subject: by default only the first two tokens are used, to keep span names short and
+their cardinality low, so `orders.new.eu.12345` becomes `orders.new`. Inbox subjects
+(`_INBOX.<nuid>...`) are collapsed to the constant `inbox`.
+
+Use [`NatsInstrumentationOptions.Default.SpanDestinationNameFormatter`](xref:NATS.Client.Core.NatsInstrumentationOptions)
+to control that yourself, for example when a subject carries an identifier in one of the first two
+tokens. The input is the raw subject and the return value is used as-is, replacing the two-token
+truncation rather than being truncated afterwards. Inbox collapsing happens first, so the formatter is
+never called for an inbox subject. It applies to publish, request, subscribe and receive spans:
+
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/OpenTelemetryPage.cs#redaction)]
+
+The formatter changes span names only, never tags. These tags carry subject values and can only be
+changed through `Enrich`:
+
+| Tag | Spans | Inbox collapsed |
+|---|---|---|
+| `messaging.destination.name` | publish, request, subscribe, receive | yes |
+| `messaging.destination_publish.name` | receive | yes |
+| `messaging.nats.message.subject` | receive | yes |
+| `messaging.nats.message.reply_to` | publish, receive, both only when the message has a reply-to | yes |
+| `messaging.destination.template` | receive | no |
+
+"Inbox collapsed" means a subject under the inbox prefix is reported as `inbox` instead of the unique
+value. `messaging.destination.template` is the exception: it carries the raw subject, so a request/reply
+reply span reports the full `_INBOX.<nuid>.<nuid>`. Redact or drop it if that matters to you.
+
+Metrics carry no subject on any instrument, so nothing needs redacting there.
+
+> [!IMPORTANT]
+> `Filter`, `Enrich` and `SpanDestinationNameFormatter` must not throw. Exceptions from them are not
+> caught: they propagate out of the publish call, and out of message construction on the receive path.
+> Wrap anything that can fail (a regex, a dictionary lookup, a parse) in your own try/catch.
+
 ## Baggage Propagation
 
 [W3C Baggage](https://www.w3.org/TR/baggage/) lets you attach arbitrary key/value context (a tenant ID,
@@ -117,7 +158,8 @@ The following attributes are set on activities:
 |---|---|---|
 | `messaging.system` | `nats` | Always `nats` |
 | `messaging.operation` | `publish` / `receive` | Operation type |
-| `messaging.destination.name` | `orders.new` | Subject name |
+| `messaging.destination.name` | `orders.new` | Subject name, inbox subjects reported as `inbox` |
+| `messaging.nats.message.reply_to` | `orders.reply` | Reply-to subject, on publish and receive spans only and only when the message has one, inbox subjects reported as `inbox` |
 | `messaging.client_id` | `42` | NATS client ID |
 | `server.address` | `localhost` | Server host |
 | `server.port` | `4222` | Server port |
@@ -131,10 +173,12 @@ Receive activities include additional attributes:
 
 | Attribute | Example | Description |
 |---|---|---|
-| `messaging.destination.template` | `orders.*` | Subscription subject pattern |
+| `messaging.nats.message.subject` | `orders.new` | Subject the message was delivered on, inbox subjects reported as `inbox` |
+| `messaging.destination_publish.name` | `orders.new` | Subject the message was published to, inbox subjects reported as `inbox` |
+| `messaging.destination.template` | `orders.new` | Delivered subject, raw and never collapsed, so a reply span carries the full inbox subject |
+| `messaging.destination.temporary` | `false` | `true` when the subject is under this connection's inbox prefix |
 | `messaging.message.body.size` | `1024` | Message body size in bytes |
 | `messaging.message.envelope.size` | `1280` | Total message size in bytes |
-| `messaging.consumer.group.name` | `workers` | Queue group (if used) |
 
 ## Metrics
 

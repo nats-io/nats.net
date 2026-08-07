@@ -143,6 +143,37 @@ public class OpenTelemetryPage
         }
 
         {
+            #region redaction
+            // Span names contain the first two subject tokens by default. Use
+            // SpanDestinationNameFormatter to control that, for example to keep only
+            // the leading token so no identifier reaches the span name.
+            NatsInstrumentationOptions.Default.SpanDestinationNameFormatter = subject =>
+            {
+                int firstDot = subject.IndexOf('.');
+                return firstDot < 0 ? subject : subject.Substring(0, firstDot);
+            };
+
+            // The formatter does not touch tags. Subject-bearing tags are redacted with
+            // Enrich, which runs after the client has set them, so SetTag overwrites.
+            NatsInstrumentationOptions.Default.Enrich = (activity, context) =>
+            {
+                foreach (string tag in new[]
+                         {
+                             "messaging.destination.name",
+                             "messaging.destination_publish.name",
+                             "messaging.destination.template",
+                             "messaging.nats.message.subject",
+                             "messaging.nats.message.reply_to",
+                         })
+                {
+                    if (activity.GetTagItem(tag) is not null)
+                        activity.SetTag(tag, "redacted");
+                }
+            };
+            #endregion
+        }
+
+        {
             #region baggage
             // Baggage propagation is off by default because baggage can carry
             // sensitive or high-cardinality data. Opt in explicitly:
