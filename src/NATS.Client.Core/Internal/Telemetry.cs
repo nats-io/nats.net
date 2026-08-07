@@ -376,8 +376,7 @@ internal static class Telemetry
         }
         finally
         {
-            if (!ReferenceEquals(Activity.Current, ambient))
-                Activity.Current = ambient;
+            RestoreCurrentActivity(ambient);
         }
 
         if (activity is not null)
@@ -394,6 +393,50 @@ internal static class Telemetry
         }
 
         return activity;
+    }
+
+    /// <summary>
+    /// Puts back an <see cref="Activity.Current"/> saved earlier, falling back to its nearest
+    /// ancestor that is still running if the saved activity has since stopped.
+    /// </summary>
+    /// <remarks>
+    /// Activity.Current's setter silently refuses a finished activity, so assigning back a saved
+    /// ambient that stopped in the meantime does nothing and leaves Current pointing at whatever
+    /// was set since. The read loop's execution context is a snapshot holding the activity that
+    /// was current when the connection was created, which the application is free to stop at any
+    /// point, so this is a normal case rather than an edge one. Walking up to the closest living
+    /// ancestor keeps as much of the caller's context as the platform allows, and matches what
+    /// the OpenTelemetry API does when it deactivates a span it started as a root.
+    /// </remarks>
+    public static void RestoreCurrentActivity(Activity? ambient)
+    {
+        if (ReferenceEquals(Activity.Current, ambient))
+            return;
+
+        while (ambient is { IsStopped: true })
+            ambient = ambient.Parent;
+
+        Activity.Current = ambient;
+    }
+
+    /// <summary>
+    /// Ends a receive activity without disturbing <see cref="Activity.Current"/>.
+    /// </summary>
+    /// <remarks>
+    /// Activity.Stop() sets Current to whichever activity was current when the activity being
+    /// stopped was started, and it does so whether or not that activity is current on this
+    /// execution context. Receive activities are started with Current deliberately cleared, so
+    /// stopping one sets Current to null: ending a message's activity as the application reads
+    /// it would detach the span the application had current.
+    /// </remarks>
+    public static void EndActivity(Activity? activity)
+    {
+        if (activity is null)
+            return;
+
+        var ambient = Activity.Current;
+        activity.Dispose();
+        RestoreCurrentActivity(ambient);
     }
 
     public static void SetException(Activity? activity, Exception exception)

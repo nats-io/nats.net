@@ -1,4 +1,6 @@
+using System.Buffers;
 using System.Diagnostics;
+using System.Text;
 using NATS.Client.Core.Internal;
 
 namespace NATS.Client.CoreUnit.Tests;
@@ -95,6 +97,140 @@ public class NatsConnectionTelemetryTests
     }
 
     [Fact]
+    public async Task StartReceiveActivity_clears_current_when_the_ambient_activity_has_stopped()
+    {
+        // The read loop captures Activity.Current when it starts, so it can hold an activity
+        // the application later stops. Activity.Current's setter silently refuses to make a
+        // finished activity current again, which makes restoring the saved ambient a no-op
+        // and leaves the receive activity in Current on the read loop for good.
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == Telemetry.NatsActivitySource || source.Name == "test-ambient",
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+        };
+        ActivitySource.AddActivityListener(listener);
+
+        await using var nats = new NatsConnection();
+
+        using var ambientSource = new ActivitySource("test-ambient");
+        using var ambient = ambientSource.StartActivity("ambient");
+        ambient.Should().NotBeNull();
+
+        // Capture the execution context while the ambient activity is still running, the way
+        // the read loop does, then stop the activity from outside that context.
+        var gate = new SemaphoreSlim(0);
+        var probe = Task.Run(async () =>
+        {
+            await gate.WaitAsync().ConfigureAwait(false);
+
+            Activity.Current.Should().BeSameAs(ambient, "the captured context still holds the activity after it stops");
+
+            using var activity = Telemetry.StartReceiveActivity(
+                nats,
+                name: "receive",
+                subscriptionSubject: "foo.bar",
+                queueGroup: null,
+                subject: "foo.bar",
+                replyTo: null,
+                bodySize: 0,
+                size: 0,
+                headers: null);
+
+            activity.Should().NotBeNull();
+
+            return Activity.Current;
+        });
+
+        ambient!.Stop();
+        gate.Release();
+
+        var current = await probe;
+
+        current.Should().BeNull("a stopped ambient cannot be restored, so Current must be cleared instead of left holding the receive activity");
+    }
+
+    [Fact]
+    public async Task StartReceiveActivity_restores_the_nearest_running_ancestor_of_a_stopped_ambient()
+    {
+        // Clearing Current outright is only necessary as far up as the stopped activities go.
+        // If the saved ambient stopped but its parent is still running, that parent is the
+        // closest thing to the context the caller had.
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == Telemetry.NatsActivitySource || source.Name == "test-ambient",
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+        };
+        ActivitySource.AddActivityListener(listener);
+
+        await using var nats = new NatsConnection();
+
+        using var ambientSource = new ActivitySource("test-ambient");
+        using var outer = ambientSource.StartActivity("outer");
+        using var inner = ambientSource.StartActivity("inner");
+        inner!.Parent.Should().BeSameAs(outer);
+
+        var gate = new SemaphoreSlim(0);
+        var probe = Task.Run(async () =>
+        {
+            await gate.WaitAsync().ConfigureAwait(false);
+
+            using var activity = Telemetry.StartReceiveActivity(
+                nats,
+                name: "receive",
+                subscriptionSubject: "foo.bar",
+                queueGroup: null,
+                subject: "foo.bar",
+                replyTo: null,
+                bodySize: 0,
+                size: 0,
+                headers: null);
+
+            activity.Should().NotBeNull();
+
+            return Activity.Current;
+        });
+
+        // Only the inner activity stops; the outer one is still running.
+        inner.Stop();
+        gate.Release();
+
+        var current = await probe;
+
+        current.Should().BeSameAs(outer);
+    }
+
+    [Fact]
+    public async Task Reading_a_message_leaves_the_consumer_current_activity_untouched()
+    {
+        // Activity.Stop() sets Current to the activity's Parent whether or not the activity
+        // is current on this context. Receive activities are parented by context and so have
+        // no Parent, which means ending one as the consumer reads its message would clear
+        // whatever span the application had current.
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == Telemetry.NatsActivitySource || source.Name == "test-app",
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+        };
+        ActivitySource.AddActivityListener(listener);
+
+        await using var nats = new NatsConnection();
+        var sub = new NatsSub<string>(nats, new NoopSubscriptionManager(), "foo.bar", queueGroup: null, opts: null, NatsDefaultSerializer<string>.Default);
+
+        // Hand a message off the way the read loop does: no ambient activity current.
+        await sub.ReceiveAsync("foo.bar", replyTo: null, headersBuffer: null, payloadBuffer: new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes("hi")));
+
+        using var appSource = new ActivitySource("test-app");
+        using var app = appSource.StartActivity("app");
+        Activity.Current.Should().BeSameAs(app);
+
+        sub.Msgs.TryRead(out var msg).Should().BeTrue();
+
+        msg.Headers?.Activity.Should().NotBeNull();
+        msg.Headers!.Activity!.IsStopped.Should().BeTrue("reading the message ends its receive activity");
+        Activity.Current.Should().BeSameAs(app);
+    }
+
+    [Fact]
     public async Task SpanDestinationName_uses_configured_formatter()
     {
         var previous = NatsInstrumentationOptions.Default.SpanDestinationNameFormatter;
@@ -128,5 +264,10 @@ public class NatsConnectionTelemetryTests
         {
             NatsInstrumentationOptions.Default.SpanDestinationNameFormatter = previous;
         }
+    }
+
+    private sealed class NoopSubscriptionManager : INatsSubscriptionManager
+    {
+        public ValueTask RemoveAsync(NatsSubBase sub) => default;
     }
 }
