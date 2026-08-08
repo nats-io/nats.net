@@ -2,7 +2,6 @@ using System.Buffers;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
-using NATS.Client.Core.Internal;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream.Internal;
@@ -45,6 +44,39 @@ internal record NatsJSOrderedPushConsumerOpts
     /// If the server is slow or unresponsive, disposal will not block longer than this.
     /// </summary>
     public TimeSpan CleanupTimeout { get; init; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// A duration instructing the server to clean up the consumer once the deliver subject
+    /// has no interest for that amount of time. This protects ordered consumers from being
+    /// deleted by the server during reconnects that last longer than the server's default
+    /// 5 second threshold for ephemeral consumers.
+    /// </summary>
+    public TimeSpan InactiveThreshold { get; init; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// A single subject to filter the consumer by.
+    /// </summary>
+    public string? FilterSubject { get; init; }
+
+    /// <summary>
+    /// Multiple subjects to filter the consumer by.
+    /// </summary>
+    public string[]? FilterSubjects { get; init; }
+
+    /// <summary>
+    /// Start sequence for the consumer.
+    /// </summary>
+    public ulong OptStartSeq { get; init; }
+
+    /// <summary>
+    /// Start time for the consumer.
+    /// </summary>
+    public DateTimeOffset OptStartTime { get; init; }
+
+    /// <summary>
+    /// Replay policy for the consumer.
+    /// </summary>
+    public ConsumerConfigReplayPolicy ReplayPolicy { get; init; } = ConsumerConfigReplayPolicy.Instant;
 }
 
 internal class NatsJSOrderedPushConsumer<T>
@@ -86,7 +118,7 @@ internal class NatsJSOrderedPushConsumer<T>
         _debug = _logger.IsEnabled(LogLevel.Debug);
         _context = context;
         _stream = stream;
-        _filter = filter;
+        _filter = opts.FilterSubject ?? filter;
         _serializer = serializer;
         _opts = opts;
         _subOpts = subOpts;
@@ -394,21 +426,23 @@ internal class NatsJSOrderedPushConsumer<T>
         var config = new ConsumerConfig
         {
             Name = Consumer,
-            DeliverPolicy = ConsumerConfigDeliverPolicy.All,
+            DeliverPolicy = _opts.DeliverPolicy,
             AckPolicy = ConsumerConfigAckPolicy.None,
             DeliverSubject = _sub.Subject,
-            FilterSubject = _filter,
+            FilterSubject = _opts.FilterSubjects is not { Length: > 0 } && !string.IsNullOrEmpty(_filter) ? _filter : null,
+            FilterSubjects = _opts.FilterSubjects,
             FlowControl = true,
             IdleHeartbeat = _opts.IdleHeartbeat,
+            InactiveThreshold = _opts.InactiveThreshold,
             AckWait = TimeSpan.FromHours(22),
             MaxDeliver = 1,
             MemStorage = true,
             NumReplicas = 1,
-            ReplayPolicy = ConsumerConfigReplayPolicy.Instant,
+            ReplayPolicy = _opts.ReplayPolicy,
+            OptStartSeq = _opts.OptStartSeq,
+            OptStartTime = _opts.OptStartTime,
+            HeadersOnly = _opts.HeadersOnly,
         };
-
-        config.DeliverPolicy = _opts.DeliverPolicy;
-        config.HeadersOnly = _opts.HeadersOnly;
 
         if (sequence > 0)
         {
