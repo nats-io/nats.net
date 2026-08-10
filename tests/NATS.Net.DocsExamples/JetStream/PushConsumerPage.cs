@@ -29,6 +29,28 @@ public class PushConsumerPage
         {
         }
 
+        try
+        {
+            await using NatsConnection nats1 = new();
+            NatsJSContext js1 = new(nats1);
+            await js1.DeleteStreamAsync("ORDERS");
+            await Task.Delay(1000);
+        }
+        catch (NatsJSApiException)
+        {
+        }
+
+        try
+        {
+            await using NatsConnection nats1 = new();
+            NatsJSContext js1 = new(nats1);
+            await js1.DeleteStreamAsync("SHOP_ORDERS");
+            await Task.Delay(1000);
+        }
+        catch (NatsJSApiException)
+        {
+        }
+
         #region push-connection
         await using NatsClient nc = new();
         INatsJSContext js = nc.CreateJetStreamContext();
