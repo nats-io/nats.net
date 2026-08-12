@@ -211,7 +211,7 @@ public class NatsObjStore : INatsObjStore
                     {
 #if NETSTANDARD2_0
                         int read;
-                        if (MemoryMarshal.TryGetArray((ReadOnlyMemory<byte>)memory, out var segment) == false)
+                        if (MemoryMarshal.TryGetArray((ReadOnlyMemory<byte>)memory, out var segment))
                         {
                             read = await hashedStream.ReadAsync(segment.Array!, segment.Offset, segment.Count, cancellationToken);
                         }
@@ -220,9 +220,8 @@ public class NatsObjStore : INatsObjStore
                             var bytes = ArrayPool<byte>.Shared.Rent(memory.Length);
                             try
                             {
-                                segment = new ArraySegment<byte>(bytes, 0, memory.Length);
-                                read = await hashedStream.ReadAsync(segment.Array!, segment.Offset, segment.Count, cancellationToken);
-                                segment.Array.AsMemory(0, read).CopyTo(memory);
+                                read = await hashedStream.ReadAsync(bytes, 0, memory.Length, cancellationToken);
+                                bytes.AsMemory(0, read).CopyTo(memory);
                             }
                             finally
                             {
