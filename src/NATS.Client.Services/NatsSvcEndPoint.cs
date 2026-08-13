@@ -196,7 +196,7 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
         Exception? exception;
         try
         {
-            msg = NatsMsg<T>.Build(subject, replyTo, headersBuffer, payloadBuffer, _nats, _nats.HeaderParser, _serializer);
+            msg = NatsMsg<T>.BuildInternal(subject, replyTo, headersBuffer, payloadBuffer, _nats, _nats.HeaderParser, _serializer, replyParentContext: default, subscriptionSubject: Subject, queueGroup: QueueGroup);
             exception = msg.Error;
         }
         catch (Exception e)

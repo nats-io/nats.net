@@ -54,7 +54,9 @@ internal class NatsKVWatchSub<T> : NatsSubBase
         ReadOnlySequence<byte>? headersBuffer,
         ReadOnlySequence<byte> payloadBuffer)
     {
-        var msg = new NatsJSMsg<T>(NatsMsg<T>.Build(subject, replyTo, headersBuffer, payloadBuffer, _nats, _headerParser, _serializer), _context);
+        var msg = new NatsJSMsg<T>(
+            NatsMsg<T>.BuildInternal(subject, replyTo, headersBuffer, payloadBuffer, _nats, _headerParser, _serializer, replyParentContext: default, subscriptionSubject: Subject, queueGroup: QueueGroup),
+            _context);
 
         // Handed to the base class so a message that never makes it onto the command channel
         // still has its receive activity ended. Once it is on the channel the watcher's

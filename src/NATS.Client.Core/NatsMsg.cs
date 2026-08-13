@@ -355,6 +355,12 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
     /// Set by the request/reply paths so a reply is traced under the request that caused it.
     /// Pass <c>default</c> for messages that are not replies.
     /// </param>
+    /// <param name="subscriptionSubject">
+    /// The subject the subscription was created with, which is the low cardinality template
+    /// the delivered subject matched. Defaults to the delivered subject when the caller has no
+    /// subscription to hand.
+    /// </param>
+    /// <param name="queueGroup">The subscription's queue group, if it joined one.</param>
     /// <returns>A new <see cref="NatsMsg{T}"/> instance containing the provided data.</returns>
     /// <exception cref="NatsException">Thrown if there is an error during the processing of the message.</exception>
     internal static NatsMsg<T> BuildInternal(
@@ -365,7 +371,9 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
         INatsConnection? connection,
         NatsHeaderParser headerParser,
         INatsDeserialize<T> serializer,
-        ActivityContext replyParentContext)
+        ActivityContext replyParentContext,
+        string? subscriptionSubject = null,
+        string? queueGroup = null)
     {
         NatsHeaders? headers = null;
         var flags = NatsMsgFlags.None;
@@ -413,8 +421,8 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
             var activity = Telemetry.StartReceiveActivity(
                 connection,
                 name: activityName,
-                subscriptionSubject: subject,
-                queueGroup: null,
+                subscriptionSubject: subscriptionSubject ?? subject,
+                queueGroup: queueGroup,
                 subject: subject,
                 replyTo: replyTo,
                 bodySize: payloadBuffer.Length,

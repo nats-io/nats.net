@@ -353,7 +353,13 @@ internal static class Telemetry
             tags = new KeyValuePair<string, object?>[len];
             tags[0] = new KeyValuePair<string, object?>(Constants.SystemKey, Constants.SystemVal);
             tags[1] = new KeyValuePair<string, object?>(Constants.OpKey, Constants.OpRec);
-            tags[2] = new KeyValuePair<string, object?>(Constants.DestTemplate, subscriptionSubject);
+
+            // Collapsed like the other subject tags. A request/reply subscription's subject is
+            // a unique _INBOX.<nuid>, and destination.template is meant to be a low cardinality
+            // template of the destination rather than a concrete name. Temporariness is decided
+            // from the raw subject, before collapsing, and against this connection's own inbox
+            // prefix rather than the bare one.
+            tags[2] = new KeyValuePair<string, object?>(Constants.DestTemplate, LowCardinalitySubject(conn, subscriptionSubject));
             tags[3] = new KeyValuePair<string, object?>(Constants.DestIsTemporary, subscriptionSubject.StartsWith(conn.InboxPrefix, StringComparison.Ordinal) ? Constants.True : Constants.False);
             var lowCardinalitySubject = LowCardinalitySubject(conn, subject);
             tags[4] = new KeyValuePair<string, object?>(Constants.Subject, lowCardinalitySubject);
@@ -378,23 +384,31 @@ internal static class Telemetry
         }
         else
         {
-            var len = 9;
+            // Matches the branch above: the queue group tag is only present when there is a
+            // queue group. It used to be written unconditionally here, landing as a null valued
+            // tag that exporters drop, which was harmless only for as long as the tag could
+            // never fire at all.
+            var len = 8;
             if (replyTo is not null)
+                len++;
+            if (queueGroup is not null)
                 len++;
 
             tags = new KeyValuePair<string, object?>[len];
             tags[0] = new KeyValuePair<string, object?>(Constants.SystemKey, Constants.SystemVal);
             tags[1] = new KeyValuePair<string, object?>(Constants.OpKey, Constants.OpRec);
             tags[2] = new KeyValuePair<string, object?>(Constants.DestTemplate, subscriptionSubject);
-            tags[3] = new KeyValuePair<string, object?>(Constants.QueueGroup, queueGroup);
-            tags[4] = new KeyValuePair<string, object?>(Constants.Subject, subject);
-            tags[5] = new KeyValuePair<string, object?>(Constants.DestName, subject);
-            tags[6] = new KeyValuePair<string, object?>(Constants.DestPubName, subject);
-            tags[7] = new KeyValuePair<string, object?>(Constants.MsgBodySize, bodySize.ToString());
-            tags[8] = new KeyValuePair<string, object?>(Constants.MsgTotalSize, size.ToString());
+            tags[3] = new KeyValuePair<string, object?>(Constants.Subject, subject);
+            tags[4] = new KeyValuePair<string, object?>(Constants.DestName, subject);
+            tags[5] = new KeyValuePair<string, object?>(Constants.DestPubName, subject);
+            tags[6] = new KeyValuePair<string, object?>(Constants.MsgBodySize, bodySize.ToString());
+            tags[7] = new KeyValuePair<string, object?>(Constants.MsgTotalSize, size.ToString());
 
+            var index = 8;
             if (replyTo is not null)
-                tags[9] = new KeyValuePair<string, object?>(Constants.ReplyTo, replyTo);
+                tags[index++] = new KeyValuePair<string, object?>(Constants.ReplyTo, replyTo);
+            if (queueGroup is not null)
+                tags[index] = new KeyValuePair<string, object?>(Constants.QueueGroup, queueGroup);
         }
 
         // A receive activity's parent comes exclusively from the message's trace

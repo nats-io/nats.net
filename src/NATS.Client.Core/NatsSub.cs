@@ -50,7 +50,9 @@ public sealed class NatsSub<T> : NatsSubBase, INatsSub<T>
             Connection,
             Connection.HeaderParser,
             Serializer,
-            ReplyParentContext);
+            ReplyParentContext,
+            subscriptionSubject: Subject,
+            queueGroup: QueueGroup);
 
         ReceiveActivity = natsMsg.Headers?.Activity;
 
