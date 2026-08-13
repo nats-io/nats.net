@@ -245,9 +245,11 @@ public class SlowConsumerTest
             }
         }
 
+#if !NETFRAMEWORK
         public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
         {
             return new ValueTask(WriteAsync(buffer.ToArray(), 0, buffer.Length, cancellationToken));
         }
+#endif
     }
 }
