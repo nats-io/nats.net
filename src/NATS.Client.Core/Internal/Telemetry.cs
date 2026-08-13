@@ -148,6 +148,29 @@ internal static class Telemetry
         return tags;
     }
 
+    /// <summary>
+    /// Starts the activity representing a request, under which the reply subscription, the
+    /// publish and the reply's receive activity all nest.
+    /// </summary>
+    /// <remarks>
+    /// RequestAsync is not the only entry point into request/reply. RequestManyAsync and the
+    /// JetStream shared-inbox paths drive CreateRequestSubAsync directly, and without a request
+    /// activity current each of the spans they produce becomes a root of its own trace, with the
+    /// reply's receive activity having nothing to parent under. They call this instead of
+    /// reproducing the naming.
+    /// </remarks>
+    public static Activity? StartRequestActivity(INatsConnection? connection, string subject)
+    {
+        if (!NatsActivities.HasListeners())
+            return null;
+
+        var name = connection is NatsConnection nats
+            ? $"{nats.SpanDestinationName(subject)} {Constants.RequestReplyActivityName}"
+            : Constants.RequestReplyActivityName;
+
+        return StartSendActivity(name, connection, subject, replyTo: null);
+    }
+
     public static Activity? StartSendActivity(
         string name,
         INatsConnection? connection,

@@ -48,7 +48,7 @@ public partial class NatsConnection
         {
             if (Telemetry.HasListeners())
             {
-                using var activity = Telemetry.StartSendActivity($"{SpanDestinationName(subject)} {Telemetry.Constants.RequestReplyActivityName}", this, subject, null);
+                using var activity = Telemetry.StartRequestActivity(this, subject);
                 try
                 {
                     replyOpts = SetReplyOptsDefaults(replyOpts);
@@ -188,6 +188,12 @@ public partial class NatsConnection
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         replyOpts = SetReplyManyOptsDefaults(replyOpts);
+
+        // RequestMany started no request activity, so the reply subscription, the publish and
+        // every reply's receive activity were roots of three or more separate traces. The
+        // subscription is created inside this scope so that it and the replies nest under it.
+        using var activity = Telemetry.StartRequestActivity(this, subject);
+
         await using var sub = await CreateRequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
             .ConfigureAwait(false);
 
