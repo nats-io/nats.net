@@ -58,13 +58,10 @@ public partial class NatsConnection
                         using var rt = _replyTaskFactory.CreateReplyTask(replySerializer, replyOpts.Timeout, replyOpts.ThrowIfNoResponders ?? true);
                         requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
                         await PublishAsync(subject, data, headers, rt.Subject, requestSerializer, requestOpts, cancellationToken).ConfigureAwait(false);
-                        var msg = await rt.GetResultAsync(cancellationToken).ConfigureAwait(false);
 
-                        // End the activity from the headers to avoid leaking it. Direct mode
-                        // materializes the reply on the read loop, so nothing else ends it.
-                        Telemetry.EndActivity(msg.Headers?.Activity);
-
-                        return msg;
+                        // ReplyTask owns the reply's receive activity and ends it on every
+                        // exit, so this branch and the untraced one below behave the same.
+                        return await rt.GetResultAsync(cancellationToken).ConfigureAwait(false);
                     }
 
                     await using var sub1 = await CreateRequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
