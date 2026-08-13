@@ -288,13 +288,36 @@ internal static class Telemetry
         if (!NatsActivities.HasListeners())
             return null;
 
-        // Trace context carried by the message always wins: it is the real causal link,
+        // Trace context carried by the message normally wins: it is the real causal link,
         // possibly from another process. The fallback is for messages that carry none but
         // whose cause is known locally, i.e. a reply to a request this client is waiting
         // on. It is an ActivityContext (ids only) rather than an Activity, so parenting
         // never creates an object reference between activities.
+        ActivityLink[]? links = null;
         if (headers is null || !TryParseTraceContext(headers, out var context))
+        {
             context = fallbackParentContext;
+        }
+        else if (fallbackParentContext != default && context.TraceId != fallbackParentContext.TraceId)
+        {
+            // A reply carrying trace context from a different trace than the request waiting
+            // on it is not a responder continuing the caller's trace: it is a stored message
+            // replayed verbatim, headers and all, by something like a JetStream direct get.
+            // Its traceparent belongs to whatever wrote the value, possibly long ago.
+            //
+            // Parenting under it would take the receive span out of the reader's trace and
+            // attach it to the writer's, once per read for the life of the value. Backends
+            // treat a trace as complete after a period of inactivity, so a span arriving
+            // minutes later is dropped or rendered as an orphan: the read's trace loses a
+            // span and the write's trace gains nothing usable. Parent from the request and
+            // record the message's context as a link, which is the mechanism for pointing at
+            // a different and possibly stale trace without claiming the two are one.
+            //
+            // A responder that continues the caller's trace shares its trace id and so is
+            // unaffected.
+            links = new[] { new ActivityLink(context) };
+            context = fallbackParentContext;
+        }
 
         var options = NatsInstrumentationOptions.Default;
         IReadOnlyList<KeyValuePair<string, string?>>? baggage = null;
@@ -395,7 +418,8 @@ internal static class Telemetry
                 name,
                 kind: ActivityKind.Consumer,
                 parentContext: context,
-                tags: tags);
+                tags: tags,
+                links: links);
         }
         finally
         {
