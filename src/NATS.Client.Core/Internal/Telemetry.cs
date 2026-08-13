@@ -599,6 +599,15 @@ internal static class Telemetry
         if (options.Enrich is not { } enrich)
             return;
 
+        // Send and receive agree on what the callback sees. StartActivity leaves a send activity
+        // in Activity.Current, but receive activities are deliberately kept off the ambient
+        // context, so the receive path has to put it there for the call and take it back out.
+        // On the send path the activity is already current and this costs nothing.
+        var ambient = Activity.Current;
+        var restore = !ReferenceEquals(ambient, activity);
+        if (restore)
+            Activity.Current = activity;
+
         try
         {
             enrich(activity, context);
@@ -606,6 +615,11 @@ internal static class Telemetry
         catch
         {
             // Deliberately ignored, see above.
+        }
+        finally
+        {
+            if (restore)
+                RestoreCurrentActivity(ambient);
         }
     }
 

@@ -410,6 +410,7 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
                    + (headersBuffer?.Length ?? 0)
                    + payloadBuffer.Length;
 
+        Activity? receiveActivity = null;
         if (Telemetry.HasListeners())
         {
             var activityName = connection is NatsConnection nats
@@ -418,7 +419,7 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
 
             headers ??= new NatsHeaders();
 
-            var activity = Telemetry.StartReceiveActivity(
+            receiveActivity = Telemetry.StartReceiveActivity(
                 connection,
                 name: activityName,
                 subscriptionSubject: subscriptionSubject ?? subject,
@@ -430,15 +431,24 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
                 headers: headers,
                 fallbackParentContext: replyParentContext);
 
-            if (activity is not null)
+            if (receiveActivity is not null)
             {
-                headers.Activity = activity;
+                headers.Activity = receiveActivity;
             }
         }
 
         T? data;
         if (headers?.Error == null)
         {
+            // Deserialization is part of receiving the message, so a deserializer that starts
+            // its own span should nest under the receive activity. Receive activities are kept
+            // off the ambient context because they are created on the read loop, so it has to
+            // be put there for the call and taken back out. Only paid when tracing is on and
+            // the message was not filtered out.
+            var ambient = Activity.Current;
+            if (receiveActivity is not null)
+                Activity.Current = receiveActivity;
+
             try
             {
                 data = serializer.Deserialize(payloadBuffer, new NatsMsgContext(subject, replyTo, headers));
@@ -448,6 +458,11 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
                 headers ??= new NatsHeaders();
                 headers.Error = new NatsDeserializeException(payloadBuffer.ToArray(), e);
                 data = default;
+            }
+            finally
+            {
+                if (receiveActivity is not null)
+                    Telemetry.RestoreCurrentActivity(ambient);
             }
         }
         else

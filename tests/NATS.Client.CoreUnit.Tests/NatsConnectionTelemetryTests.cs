@@ -443,6 +443,95 @@ public class NatsConnectionTelemetryTests
         }
     }
 
+    [Fact]
+    public async Task Enrich_sees_the_receive_activity_as_current()
+    {
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == Telemetry.NatsActivitySource,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+        };
+        ActivitySource.AddActivityListener(listener);
+
+        var previous = NatsInstrumentationOptions.Default.Enrich;
+        try
+        {
+            Activity? seen = null;
+            NatsInstrumentationOptions.Default.Enrich = (_, _) => seen = Activity.Current;
+
+            await using var nats = new NatsConnection();
+
+            using var activity = Telemetry.StartReceiveActivity(
+                nats,
+                name: "receive",
+                subscriptionSubject: "foo.bar",
+                queueGroup: null,
+                subject: "foo.bar",
+                replyTo: null,
+                bodySize: 0,
+                size: 0,
+                headers: null);
+
+            activity.Should().NotBeNull();
+
+            // Send and receive must agree on what the callback sees. The send path leaves its
+            // activity current, so the receive path makes its own current for the call.
+            seen.Should().BeSameAs(activity);
+
+            // ...and puts the ambient context back afterwards, which is the whole reason
+            // receive activities are kept off it in the first place.
+            Activity.Current.Should().BeNull();
+        }
+        finally
+        {
+            NatsInstrumentationOptions.Default.Enrich = previous;
+        }
+    }
+
+    [Fact]
+    public async Task Deserializer_runs_under_the_receive_activity()
+    {
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == Telemetry.NatsActivitySource,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+        };
+        ActivitySource.AddActivityListener(listener);
+
+        await using var nats = new NatsConnection();
+
+        var deserializer = new CurrentActivityCapturingDeserializer();
+
+        var msg = NatsMsg<string>.Build(
+            "foo.bar",
+            replyTo: null,
+            headersBuffer: null,
+            payloadBuffer: new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes("hello")),
+            nats,
+            nats.HeaderParser,
+            deserializer);
+
+        var activity = msg.Headers?.Activity;
+        activity.Should().NotBeNull();
+
+        // A deserializer that starts its own span belongs under the receive span. Without this
+        // it became a child of whatever the caller happened to hold, or a root.
+        deserializer.Seen.Should().BeSameAs(activity);
+
+        Activity.Current.Should().BeNull("the read loop's ambient context must be left as it was");
+    }
+
+    private sealed class CurrentActivityCapturingDeserializer : INatsDeserialize<string>
+    {
+        public Activity? Seen { get; private set; }
+
+        public string Deserialize(in ReadOnlySequence<byte> buffer)
+        {
+            Seen = Activity.Current;
+            return Encoding.UTF8.GetString(buffer.ToArray());
+        }
+    }
+
     private sealed class NoopSubscriptionManager : INatsSubscriptionManager
     {
         public ValueTask RemoveAsync(NatsSubBase sub) => default;
