@@ -606,6 +606,49 @@ public class OpenTelemetryTest
     }
 
     [Fact]
+    public async Task Send_spans_are_tagged_with_the_operation_they_perform()
+    {
+        using var tracker = new ActivityTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        await using var sub = await nats.SubscribeCoreAsync<int>("op.demo", cancellationToken: cts.Token);
+        var reg = sub.Register(async msg => await msg.ReplyAsync(msg.Data * 2, cancellationToken: cts.Token));
+
+        await nats.PublishAsync("op.plain", 1, cancellationToken: cts.Token);
+        var reply = await nats.RequestAsync<int, int>("op.demo", 21, cancellationToken: cts.Token);
+        reply.Data.Should().Be(42);
+
+        var activities = tracker.StartedFor(server.Port);
+
+        // messaging.operation used to be hardcoded to publish on every send-side span, so it
+        // disagreed with the metric describing the same operation: operation.duration is
+        // tagged request for RequestAsync and subscribe for SubscribeAsync. Neither filtering
+        // nor joining on the attribute worked.
+        var subscribe = activities.Single(a => a.OperationName == "op.demo subscribe");
+        subscribe.GetTagItem("messaging.operation").Should().Be("subscribe");
+
+        // Nothing is produced by a subscribe; it is a control plane call to the server.
+        subscribe.Kind.Should().Be(ActivityKind.Client);
+
+        var request = activities.Single(a => a.OperationName == "op.demo request");
+        request.GetTagItem("messaging.operation").Should().Be("request");
+        request.Kind.Should().Be(ActivityKind.Producer);
+
+        var publish = activities.Single(a => a.OperationName == "op.plain publish");
+        publish.GetTagItem("messaging.operation").Should().Be("publish");
+        publish.Kind.Should().Be(ActivityKind.Producer);
+
+        activities.Where(a => a.Kind == ActivityKind.Consumer)
+            .Should().AllSatisfy(a => a.GetTagItem("messaging.operation").Should().Be("receive"));
+
+        await sub.DisposeAsync();
+        await reg;
+    }
+
+    [Fact]
     public async Task Receive_span_carries_subscription_subject_and_queue_group()
     {
         using var tracker = new ActivityTracker();

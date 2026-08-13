@@ -168,14 +168,22 @@ internal static class Telemetry
             ? $"{nats.SpanDestinationName(subject)} {Constants.RequestReplyActivityName}"
             : Constants.RequestReplyActivityName;
 
-        return StartSendActivity(name, connection, subject, replyTo: null);
+        return StartSendActivity(name, connection, subject, replyTo: null, operation: Constants.OpReq);
     }
 
+    // operation is the value for the messaging.operation tag. It is not always publish: this
+    // starts the span for subscribe and request too, and those have to agree with the metrics
+    // describing the same operation, which have always used distinct values.
+    //
+    // kind is Producer for the operations that put a message on the wire. Subscribe passes
+    // Client because it produces nothing; it is a control plane call to the server.
     public static Activity? StartSendActivity(
         string name,
         INatsConnection? connection,
         string subject,
         string? replyTo,
+        string operation,
+        ActivityKind kind = ActivityKind.Producer,
         ActivityContext parentContext = default)
     {
         if (!NatsActivities.HasListeners())
@@ -206,7 +214,7 @@ internal static class Telemetry
             var serverHost = conn.ServerHost; // grabbed once per ServerInfo change
             tags = new KeyValuePair<string, object?>[len];
             tags[0] = new KeyValuePair<string, object?>(Constants.SystemKey, Constants.SystemVal);
-            tags[1] = new KeyValuePair<string, object?>(Constants.OpKey, Constants.OpPub);
+            tags[1] = new KeyValuePair<string, object?>(Constants.OpKey, operation);
             tags[2] = new KeyValuePair<string, object?>(Constants.DestName, LowCardinalitySubject(conn, subject));
 
             tags[3] = new KeyValuePair<string, object?>(Constants.ClientId, conn.ClientId);
@@ -229,7 +237,7 @@ internal static class Telemetry
 
             tags = new KeyValuePair<string, object?>[len];
             tags[0] = new KeyValuePair<string, object?>(Constants.SystemKey, Constants.SystemVal);
-            tags[1] = new KeyValuePair<string, object?>(Constants.OpKey, Constants.OpPub);
+            tags[1] = new KeyValuePair<string, object?>(Constants.OpKey, operation);
             tags[2] = new KeyValuePair<string, object?>(Constants.DestName, subject);
 
             if (replyTo is not null)
@@ -238,7 +246,7 @@ internal static class Telemetry
 
         var activity = NatsActivities.StartActivity(
             name,
-            kind: ActivityKind.Producer,
+            kind: kind,
             parentContext: parentContext,
             tags: tags);
 
