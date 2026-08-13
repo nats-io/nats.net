@@ -390,7 +390,18 @@ public partial class NatsConnection : INatsConnection
             return "inbox";
 
         if (NatsInstrumentationOptions.Default.SpanDestinationNameFormatter is { } formatter)
-            return formatter(subject);
+        {
+            try
+            {
+                return formatter(subject);
+            }
+            catch
+            {
+                // A formatter is only choosing a span name. Letting it throw would take out the
+                // publish, or the message build on receive, which is never a trade worth making
+                // for a name. Fall through to the default below.
+            }
+        }
 
         // to avoid long span names and low cardinality, only take the first two tokens
         var subjectSpan = subject.AsSpan();

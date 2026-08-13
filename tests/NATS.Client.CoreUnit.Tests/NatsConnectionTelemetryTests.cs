@@ -341,6 +341,108 @@ public class NatsConnectionTelemetryTests
         }
     }
 
+    [Fact]
+    public async Task SpanDestinationName_falls_back_to_default_when_formatter_throws()
+    {
+        var previous = NatsInstrumentationOptions.Default.SpanDestinationNameFormatter;
+        try
+        {
+            NatsInstrumentationOptions.Default.SpanDestinationNameFormatter = _ => throw new InvalidOperationException("boom");
+
+            await using var nats = new NatsConnection();
+
+            // A formatter only chooses a span name. It used to propagate out of publish and out
+            // of message construction on receive, so a bug in it broke messaging.
+            nats.SpanDestinationName("foo.bar.baz").Should().Be("foo.bar");
+        }
+        finally
+        {
+            NatsInstrumentationOptions.Default.SpanDestinationNameFormatter = previous;
+        }
+    }
+
+    [Fact]
+    public async Task Throwing_filter_means_the_request_is_not_collected()
+    {
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == Telemetry.NatsActivitySource,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+        };
+        ActivitySource.AddActivityListener(listener);
+
+        var previous = NatsInstrumentationOptions.Default.Filter;
+        try
+        {
+            NatsInstrumentationOptions.Default.Filter = _ => throw new InvalidOperationException("boom");
+
+            await using var nats = new NatsConnection();
+
+            // What the Filter documentation has always claimed: "If filter returns false or
+            // throws an exception the request is NOT collected." There was no try/catch.
+            Telemetry.StartReceiveActivity(
+                nats,
+                name: "receive",
+                subscriptionSubject: "foo.bar",
+                queueGroup: null,
+                subject: "foo.bar",
+                replyTo: null,
+                bodySize: 0,
+                size: 0,
+                headers: null).Should().BeNull();
+
+            Telemetry.StartSendActivity("foo.bar publish", nats, "foo.bar", replyTo: null, operation: Telemetry.Constants.OpPub)
+                .Should().BeNull();
+        }
+        finally
+        {
+            NatsInstrumentationOptions.Default.Filter = previous;
+        }
+    }
+
+    [Fact]
+    public async Task Throwing_enrich_leaves_the_activity_usable()
+    {
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == Telemetry.NatsActivitySource,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+        };
+        ActivitySource.AddActivityListener(listener);
+
+        var previous = NatsInstrumentationOptions.Default.Enrich;
+        try
+        {
+            NatsInstrumentationOptions.Default.Enrich = (activity, _) =>
+            {
+                activity.SetTag("set.before.throwing", "yes");
+                throw new InvalidOperationException("boom");
+            };
+
+            await using var nats = new NatsConnection();
+
+            using var activity = Telemetry.StartReceiveActivity(
+                nats,
+                name: "receive",
+                subscriptionSubject: "foo.bar",
+                queueGroup: null,
+                subject: "foo.bar",
+                replyTo: null,
+                bodySize: 0,
+                size: 0,
+                headers: null);
+
+            // Enrichment is decoration on an activity that is already complete. Failing the
+            // message build for the sake of a tag is never the right trade.
+            activity.Should().NotBeNull();
+            activity!.GetTagItem("set.before.throwing").Should().Be("yes");
+        }
+        finally
+        {
+            NatsInstrumentationOptions.Default.Enrich = previous;
+        }
+    }
+
     private sealed class NoopSubscriptionManager : INatsSubscriptionManager
     {
         public ValueTask RemoveAsync(NatsSubBase sub) => default;

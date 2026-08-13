@@ -200,7 +200,7 @@ internal static class Telemetry
             ParentContext: parentContext);
 
         var options = NatsInstrumentationOptions.Default;
-        if (options.Filter is { } filter && !filter(instrumentationContext))
+        if (!ShouldCollect(options, instrumentationContext))
             return null;
 
         KeyValuePair<string, object?>[] tags;
@@ -251,7 +251,7 @@ internal static class Telemetry
             tags: tags);
 
         if (activity is not null)
-            options.Enrich?.Invoke(activity, instrumentationContext);
+            Enrich(options, activity, instrumentationContext);
 
         return activity;
     }
@@ -343,7 +343,7 @@ internal static class Telemetry
             ParentContext: context)
         { Baggage = baggage };
 
-        if (options.Filter is { } filter && !filter(instrumentationContext))
+        if (!ShouldCollect(options, instrumentationContext))
             return null;
 
         KeyValuePair<string, object?>[] tags;
@@ -458,7 +458,7 @@ internal static class Telemetry
                     activity.AddBaggage(item.Key, item.Value);
             }
 
-            options.Enrich?.Invoke(activity, instrumentationContext);
+            Enrich(options, activity, instrumentationContext);
         }
 
         return activity;
@@ -561,6 +561,52 @@ internal static class Telemetry
         // order may differ from the source activity; consumers must not rely on order.
         foreach (var item in from.Baggage)
             to.AddBaggage(item.Key, item.Value);
+    }
+
+    /// <summary>
+    /// Applies <see cref="NatsInstrumentationOptions.Filter"/>, treating a throwing filter as a
+    /// decision not to collect.
+    /// </summary>
+    /// <remarks>
+    /// This is what the Filter documentation has always promised. Without the guard the
+    /// exception propagated out of publish, and out of message construction on receive, so a
+    /// filter bug broke messaging rather than telemetry.
+    /// </remarks>
+    private static bool ShouldCollect(NatsInstrumentationOptions options, in NatsInstrumentationContext context)
+    {
+        if (options.Filter is not { } filter)
+            return true;
+
+        try
+        {
+            return filter(context);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Applies <see cref="NatsInstrumentationOptions.Enrich"/>, swallowing anything it throws.
+    /// </summary>
+    /// <remarks>
+    /// Enrichment is decoration on top of an activity that is otherwise complete. Letting it
+    /// escape would fail the publish or the message build for the sake of a tag.
+    /// </remarks>
+    private static void Enrich(NatsInstrumentationOptions options, Activity activity, in NatsInstrumentationContext context)
+    {
+        if (options.Enrich is not { } enrich)
+            return;
+
+        try
+        {
+            enrich(activity, context);
+        }
+        catch
+        {
+            // Deliberately ignored, see above.
+        }
     }
 
     // Inbox subjects (_INBOX.<nuid>[.<nuid>]) are unique per request, so emitting them as
