@@ -273,15 +273,20 @@ public class ReceiveActivityLifecycleTest
             .Should().Contain(a => (a.GetTagItem("messaging.nats.message.subject") as string ?? string.Empty).StartsWith("$O.blobs", StringComparison.Ordinal));
     }
 
-    [Fact]
-    public async Task Reply_from_a_different_trace_is_linked_rather_than_parented()
+    // Both modes supply a request context for a reply that carries none, and so both reach
+    // the branch under test: direct mode from ReplyTask, shared inbox from the reply
+    // subscription's ReplyParentContext. The dispatch paths differ, the decision does not.
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Reply_from_a_different_trace_is_linked_rather_than_parented(NatsRequestReplyMode mode)
     {
         using var tracker = new ActivityTracker();
         await using var server = await NatsServerProcess.StartAsync();
         await using var nats = new NatsConnection(new NatsOpts
         {
             Url = server.Url,
-            RequestReplyMode = NatsRequestReplyMode.Direct,
+            RequestReplyMode = mode,
         });
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
