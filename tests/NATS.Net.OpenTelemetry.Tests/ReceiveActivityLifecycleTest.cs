@@ -274,6 +274,75 @@ public class ReceiveActivityLifecycleTest
     }
 
     [Fact]
+    public async Task Reply_from_a_different_trace_is_linked_rather_than_parented()
+    {
+        using var tracker = new ActivityTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts
+        {
+            Url = server.Url,
+            RequestReplyMode = NatsRequestReplyMode.Direct,
+        });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await nats.ConnectAsync();
+
+        using var storedListener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == "test-stored-write",
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+        };
+        ActivitySource.AddActivityListener(storedListener);
+        using var storedSource = new ActivitySource("test-stored-write");
+
+        // A trace of its own, unrelated to the request about to be made. This stands in for
+        // the traceparent stored alongside a value and replayed verbatim by something like a
+        // JetStream direct get, written by whoever put the value there and possibly long ago.
+        var storedContext = new ActivityContext(
+            ActivityTraceId.CreateRandom(),
+            ActivitySpanId.CreateRandom(),
+            ActivityTraceFlags.Recorded);
+
+        var sub = await nats.SubscribeCoreAsync<int>("stored.get", cancellationToken: cts.Token);
+        var reg = sub.Register(async msg =>
+        {
+            // Replying while this is current puts its trace context, not the caller's, in the
+            // reply's headers, which is what the replayed message does.
+            using var stored = storedSource.StartActivity("stored-write", ActivityKind.Producer, storedContext);
+            await msg.ReplyAsync(msg.Data, cancellationToken: cts.Token);
+        });
+
+        var reply = await nats.RequestAsync<int, int>("stored.get", 1, cancellationToken: cts.Token);
+        reply.Data.Should().Be(1);
+
+        var activities = tracker.StartedFor(server.Port);
+        var request = activities.Single(a => a.OperationName.EndsWith(" request", StringComparison.Ordinal));
+
+        // The other consumer activity is the responder receiving the request itself.
+        var replyReceive = activities
+            .Where(a => a.Kind == ActivityKind.Consumer)
+            .Single(a => a.GetTagItem("messaging.nats.message.subject") as string != "stored.get");
+
+        // Following the reply's own trace context would move the receive span into the
+        // writer's trace, once per read for the life of the value. Backends treat a trace as
+        // complete after a period of inactivity, so a span arriving minutes later is dropped
+        // or orphaned: the read's trace loses a span and the write's gains nothing usable.
+        replyReceive.TraceId.Should().Be(request.TraceId);
+        replyReceive.ParentSpanId.Should().Be(request.SpanId);
+        replyReceive.TraceId.Should().NotBe(storedContext.TraceId);
+
+        // The message's context is still worth keeping, as a link: the mechanism for pointing
+        // at a different and possibly stale trace without claiming the two are one.
+        replyReceive.Links.Select(l => l.Context.TraceId)
+            .Should().ContainSingle().Which.Should().Be(storedContext.TraceId);
+
+        tracker.AssertAllStopped(server.Port);
+
+        await sub.DisposeAsync();
+        await reg;
+    }
+
+    [Fact]
     public async Task Direct_mode_ends_the_reply_activity_when_no_responders_throws()
     {
         using var tracker = new ActivityTracker();
