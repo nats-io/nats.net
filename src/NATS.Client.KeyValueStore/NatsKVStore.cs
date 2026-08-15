@@ -50,6 +50,7 @@ public class NatsKVStore : INatsKVStore
     private static readonly NatsKVException MissingSequenceHeaderException = new("Missing sequence header");
     private static readonly NatsKVException MissingTimestampHeaderException = new("Missing timestamp header");
     private static readonly NatsKVException MissingHeadersException = new("Missing headers");
+    private static readonly NatsKVException InvalidHeadersException = new("Can't parse headers");
     private static readonly NatsKVException UnexpectedSubjectException = new("Unexpected subject");
     private static readonly NatsKVException UnexpectedNumberOfOperationHeadersException = new("Unexpected number of operation headers");
     private static readonly NatsKVException InvalidSequenceException = new("Can't parse sequence header");
@@ -331,30 +332,9 @@ public class NatsKVStore : INatsKVStore
                 if (!DateTimeOffset.TryParse(timestampValue, out var timestamp))
                     return InvalidTimestampException;
 
-                var operation = NatsKVOperation.Put;
-                if (headers.TryGetValue(KVOperation, out var operationValues))
+                if (TryGetOperation(headers, out var operation) is { } operationError)
                 {
-                    if (operationValues.Count != 1)
-                        return UnexpectedNumberOfOperationHeadersException;
-
-                    if (!Enum.TryParse(operationValues[0], ignoreCase: true, out operation))
-                        return InvalidOperationException;
-                }
-                else if (headers.TryGetValue(NatsMarkerReason, out var markerReasonValues))
-                {
-                    var reason = markerReasonValues.Last();
-                    if (reason is "MaxAge" or "Purge")
-                    {
-                        operation = NatsKVOperation.Purge;
-                    }
-                    else if (reason is "Remove")
-                    {
-                        operation = NatsKVOperation.Del;
-                    }
-                    else
-                    {
-                        return InvalidOperationException;
-                    }
+                    return operationError;
                 }
 
                 if (operation is NatsKVOperation.Del or NatsKVOperation.Purge)
@@ -386,10 +366,42 @@ public class NatsKVStore : INatsKVStore
 
             if (revision != default)
             {
-                if (string.Equals(response.Message.Subject, keySubject, StringComparison.Ordinal))
+                if (!string.Equals(response.Message.Subject, keySubject, StringComparison.Ordinal))
                 {
                     return UnexpectedSubjectException;
                 }
+            }
+
+            // Non-direct get carries headers base64 encoded on the response, so decode them here
+            // to honor delete and purge markers the same way the direct path does.
+            var operation = NatsKVOperation.Put;
+            if (response.Message.Hdrs is { Length: > 0 } encodedHeaders)
+            {
+                byte[] headerBytes;
+                try
+                {
+                    headerBytes = Convert.FromBase64String(encodedHeaders);
+                }
+                catch (FormatException)
+                {
+                    return InvalidHeadersException;
+                }
+
+                var headers = new NatsHeaders();
+                if (!JetStreamContext.Connection.HeaderParser.ParseHeaders(new SequenceReader<byte>(new ReadOnlySequence<byte>(headerBytes)), headers))
+                {
+                    return InvalidHeadersException;
+                }
+
+                if (TryGetOperation(headers, out operation) is { } operationError)
+                {
+                    return operationError;
+                }
+            }
+
+            if (operation is NatsKVOperation.Del or NatsKVOperation.Purge)
+            {
+                return new NatsKVKeyDeletedException(response.Message.Seq);
             }
 
             T? data;
@@ -417,6 +429,7 @@ public class NatsKVStore : INatsKVStore
             {
                 Created = response.Message.Time,
                 Revision = response.Message.Seq,
+                Operation = operation,
                 Value = data,
                 UsedDirectGet = false,
                 Error = deserializeException,
@@ -727,6 +740,39 @@ public class NatsKVStore : INatsKVStore
         }
 
         return NatsResult.Default;
+    }
+
+    // Shared by the direct and non-direct get paths so both classify delete and purge markers the same.
+    private static Exception? TryGetOperation(NatsHeaders headers, out NatsKVOperation operation)
+    {
+        operation = NatsKVOperation.Put;
+
+        if (headers.TryGetValue(KVOperation, out var operationValues))
+        {
+            if (operationValues.Count != 1)
+                return UnexpectedNumberOfOperationHeadersException;
+
+            if (!Enum.TryParse(operationValues[0], ignoreCase: true, out operation))
+                return InvalidOperationException;
+        }
+        else if (headers.TryGetValue(NatsMarkerReason, out var markerReasonValues))
+        {
+            var reason = markerReasonValues.Last();
+            if (reason is "MaxAge" or "Purge")
+            {
+                operation = NatsKVOperation.Purge;
+            }
+            else if (reason is "Remove")
+            {
+                operation = NatsKVOperation.Del;
+            }
+            else
+            {
+                return InvalidOperationException;
+            }
+        }
+
+        return null;
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
