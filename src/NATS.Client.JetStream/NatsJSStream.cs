@@ -1,5 +1,4 @@
 using NATS.Client.Core;
-using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
 
 namespace NATS.Client.JetStream;
@@ -170,6 +169,23 @@ public class NatsJSStream : INatsJSStream
             subject: $"{_context.Opts.Prefix}.STREAM.INFO.{_name}",
             request: null,
             cancellationToken).ConfigureAwait(false);
+
+    public async ValueTask<NatsStreamMsg<T>> GetAutoAsync<T>(StreamMsgGetRequest request, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
+    {
+        serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
+
+        if (Info is { Config.AllowDirect: true })
+        {
+            var msg = await GetDirectAsync(request, serializer, cancellationToken).ConfigureAwait(false);
+            if (msg.Headers is not { Code: 404 })
+            {
+                return NatsStreamMsg<T>.FromDirect(msg);
+            }
+        }
+
+        var response = await GetAsync(request, cancellationToken).ConfigureAwait(false);
+        return NatsStreamMsg<T>.FromStreamResponse(response, serializer);
+    }
 
     public ValueTask<NatsMsg<T>> GetDirectAsync<T>(StreamMsgGetRequest request, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
