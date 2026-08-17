@@ -33,7 +33,10 @@ internal record NatsJSOrderedPushConsumerOpts
     /// <summary>
     /// Idle heartbeat interval
     /// </summary>
-    public TimeSpan IdleHeartbeat { get; init; } = TimeSpan.FromSeconds(5);
+    /// <remarks>
+    /// When not set, the server does not send heartbeats.
+    /// </remarks>
+    public TimeSpan? IdleHeartbeat { get; init; } = TimeSpan.FromSeconds(5);
 
     public ConsumerConfigDeliverPolicy DeliverPolicy { get; init; } = ConsumerConfigDeliverPolicy.All;
 
@@ -124,7 +127,9 @@ internal class NatsJSOrderedPushConsumer<T>
         _subOpts = subOpts;
         _cancellationToken = cancellationToken;
         _nats = context.Connection;
-        _hbTimeout = (int)new TimeSpan(opts.IdleHeartbeat.Ticks * 2).TotalMilliseconds;
+        _hbTimeout = opts.IdleHeartbeat is { } idleHeartbeat && idleHeartbeat > TimeSpan.Zero
+            ? (int)new TimeSpan(idleHeartbeat.Ticks * 2).TotalMilliseconds
+            : 0;
         _consumer = NewNuid();
 
         _nats.ConnectionDisconnected += OnDisconnected;
@@ -430,19 +435,39 @@ internal class NatsJSOrderedPushConsumer<T>
             AckPolicy = ConsumerConfigAckPolicy.None,
             DeliverSubject = _sub.Subject,
             FilterSubject = _opts.FilterSubjects is not { Length: > 0 } && !string.IsNullOrEmpty(_filter) ? _filter : null,
-            FilterSubjects = _opts.FilterSubjects,
             FlowControl = true,
-            IdleHeartbeat = _opts.IdleHeartbeat,
-            InactiveThreshold = _opts.InactiveThreshold,
             AckWait = TimeSpan.FromHours(22),
             MaxDeliver = 1,
             MemStorage = true,
             NumReplicas = 1,
             ReplayPolicy = _opts.ReplayPolicy,
-            OptStartSeq = _opts.OptStartSeq,
-            OptStartTime = _opts.OptStartTime,
             HeadersOnly = _opts.HeadersOnly,
         };
+
+        if (_opts.FilterSubjects is { Length: > 0 })
+        {
+            config.FilterSubjects = _opts.FilterSubjects;
+        }
+
+        if (_opts.InactiveThreshold is { } inactiveThreshold)
+        {
+            config.InactiveThreshold = inactiveThreshold;
+        }
+
+        if (_opts.IdleHeartbeat is { } idleHeartbeat && idleHeartbeat > TimeSpan.Zero)
+        {
+            config.IdleHeartbeat = idleHeartbeat;
+        }
+
+        if (_opts.OptStartSeq > 0)
+        {
+            config.OptStartSeq = _opts.OptStartSeq;
+        }
+
+        if (_opts.OptStartTime != default)
+        {
+            config.OptStartTime = _opts.OptStartTime;
+        }
 
         if (sequence > 0)
         {

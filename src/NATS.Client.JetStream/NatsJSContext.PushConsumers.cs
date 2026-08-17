@@ -64,6 +64,13 @@ public partial class NatsJSContext : INatsJSContext
         ConsumerCreateAction action,
         CancellationToken cancellationToken)
     {
+        var deliverSubject = opts.DeliverSubject ?? NewBaseInbox();
+
+        if (string.IsNullOrWhiteSpace(deliverSubject))
+        {
+            throw new NatsJSException("A push consumer requires a non-empty deliver subject.");
+        }
+
         var config = new ConsumerConfig
         {
             Name = opts.Name,
@@ -72,10 +79,9 @@ public partial class NatsJSContext : INatsJSContext
             FilterSubject = opts.FilterSubject,
             DeliverPolicy = opts.DeliverPolicy,
             AckPolicy = opts.AckPolicy,
-            IdleHeartbeat = opts.IdleHeartbeat,
             FlowControl = opts.FlowControl,
             HeadersOnly = opts.HeadersOnly,
-            DeliverSubject = NewBaseInbox(),
+            DeliverSubject = deliverSubject,
             DeliverGroup = opts.DeliverGroup,
         };
 
@@ -114,9 +120,14 @@ public partial class NatsJSContext : INatsJSContext
             config.InactiveThreshold = inactiveThreshold;
         }
 
+        if (opts.IdleHeartbeat is { } idleHeartbeat)
+        {
+            config.IdleHeartbeat = idleHeartbeat;
+        }
+
         var consumer = await CreateOrUpdateConsumerInternalAsync(stream, config, action, cancellationToken);
         var subOpts = opts.SubOpts ?? new NatsSubOpts { ChannelOpts = new NatsSubChannelOpts { Capacity = 1_000 } };
 
-        return new NatsJSPushConsumer(this, consumer.Info, subOpts);
+        return new NatsJSPushConsumer(this, consumer.Info, subOpts, opts.NotificationHandler);
     }
 }

@@ -71,7 +71,7 @@ public class NatsJSOrderedPushConsumer : INatsJSPushConsumer
                 OptStartTime = _opts.OptStartTime,
                 ReplayPolicy = _opts.ReplayPolicy,
                 HeadersOnly = _opts.HeadersOnly,
-                FilterSubjects = _opts.FilterSubjects,
+                FilterSubjects = _opts.FilterSubjects is { Length: > 0 } ? _opts.FilterSubjects : null,
                 InactiveThreshold = _opts.InactiveThreshold,
             };
 

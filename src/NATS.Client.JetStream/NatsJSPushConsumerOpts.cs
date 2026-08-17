@@ -34,6 +34,12 @@ public record NatsJSPushConsumerOpts
     public string? DurableName { get; init; }
 
     /// <summary>
+    /// The delivery subject for the push consumer. The server uses this subject
+    /// to deliver messages to the client. When not set, a new inbox is generated.
+    /// </summary>
+    public string? DeliverSubject { get; init; }
+
+    /// <summary>
     /// A short description of the purpose of this consumer.
     /// </summary>
     public string? Description { get; init; }
@@ -110,9 +116,9 @@ public record NatsJSPushConsumerOpts
     /// Amount of idle time the server should wait before sending a heartbeat.
     /// </summary>
     /// <remarks>
-    /// Defaults to 5 seconds.
+    /// When not set, the server does not send heartbeats.
     /// </remarks>
-    public TimeSpan IdleHeartbeat { get; init; } = TimeSpan.FromSeconds(5);
+    public TimeSpan? IdleHeartbeat { get; init; }
 
     /// <summary>
     /// Sends a control message to the consumer's deliver subject to regulate the rate of message delivery.
@@ -121,9 +127,9 @@ public record NatsJSPushConsumerOpts
     /// When <c>true</c> the server will send flow control messages with a command status
     /// header and a reply subject when the consumer's delivery buffer is getting full. The
     /// client must respond to these messages to continue receiving messages. Defaults to
-    /// <c>true</c>.
+    /// <c>false</c>.
     /// </remarks>
-    public bool FlowControl { get; init; } = true;
+    public bool FlowControl { get; init; }
 
     /// <summary>
     /// The name of a deliver group (queue) for load balancing across multiple subscribers.

@@ -28,15 +28,17 @@ public class NatsJSPushConsumer : INatsJSPushConsumer
     private readonly string _stream;
     private readonly string _consumer;
     private readonly NatsSubOpts? _subOpts;
+    private readonly Func<INatsJSNotification, CancellationToken, Task>? _notificationHandler;
     private volatile bool _deleted;
 
-    internal NatsJSPushConsumer(NatsJSContext context, ConsumerInfo info, NatsSubOpts? subOpts = null)
+    internal NatsJSPushConsumer(NatsJSContext context, ConsumerInfo info, NatsSubOpts? subOpts = null, Func<INatsJSNotification, CancellationToken, Task>? notificationHandler = null)
     {
         _context = context;
         Info = info;
         _stream = Info.StreamName;
         _consumer = Info.Name;
         _subOpts = subOpts;
+        _notificationHandler = notificationHandler;
     }
 
     /// <inheritdoc />
@@ -88,14 +90,16 @@ public class NatsJSPushConsumer : INatsJSPushConsumer
 
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
+        var idleHeartbeat = Info.Config.IdleHeartbeat == TimeSpan.Zero ? TimeSpan.FromSeconds(5) : Info.Config.IdleHeartbeat;
+
         var subOpts = _subOpts;
 
         var sub = new NatsJSPushConsume<T>(
             context: _context,
             subject: deliverSubject,
             queueGroup: Info.Config.DeliverGroup,
-            idleHeartbeat: Info.Config.IdleHeartbeat,
-            notificationHandler: opts?.NotificationHandler,
+            idleHeartbeat: idleHeartbeat,
+            notificationHandler: _notificationHandler ?? opts?.NotificationHandler,
             serializer: serializer,
             opts: subOpts,
             cancellationToken: cancellationToken);
