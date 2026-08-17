@@ -5,7 +5,7 @@
              the netstandard2.0-specific code paths (e.g. the PutAsync read loop). -->
         <TargetFrameworks>net8.0</TargetFrameworks>
         <TargetFrameworks Condition="'$(OS)' == 'Windows_NT'">$(TargetFrameworks);net481</TargetFrameworks>
-        <RuntimeIdentifiers>any;win-x86</RuntimeIdentifiers>
+        <RuntimeIdentifiers Condition="'$(OS)' == 'Windows_NT'">any;win-x86</RuntimeIdentifiers>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <NoWarn>$(NoWarn);CS8002</NoWarn>

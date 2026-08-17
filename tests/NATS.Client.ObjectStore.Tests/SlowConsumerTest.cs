@@ -46,7 +46,7 @@ public class SlowConsumerTest
         const int chunkSize = 1024;
         const int objectSize = 128 * 1024; // 128KB = 128 chunks
         var largeData = new byte[objectSize];
-        Random.Shared.NextBytes(largeData);
+        RandomCompat.Shared.NextBytes(largeData);
 
         var meta = new ObjectMetadata
         {
