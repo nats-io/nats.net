@@ -67,6 +67,56 @@ custom tags to every activity:
 
 [!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/OpenTelemetryPage.cs#enrich)]
 
+Use the `Activity` passed as the first argument rather than `Activity.Current`. Both are the same thing on
+the send path, but receive activities are created on the connection's read loop and are deliberately kept
+off the ambient context, so `Activity.Current` on the receive path is not the activity being enriched.
+
+`Filter`, `Enrich` and `SpanDestinationNameFormatter` all run inside publish and inside message
+construction on receive, so none of them is allowed to break the operation it is instrumenting. A `Filter`
+that throws means the operation is not collected, an `Enrich` that throws is ignored and leaves the
+activity with whatever it set before throwing, and a formatter that throws falls back to the default span
+name.
+
+## Span Names and Redacting Subjects
+
+Span names are `<destination> <operation>`, for example `orders.new publish`. The destination defaults to
+the first two tokens of the subject, so `orders.new.eu.de` becomes `orders.new`, and inbox subjects are
+collapsed to the constant `inbox` before anything else runs.
+
+If you need spans but not subjects in their names, set
+[`NatsInstrumentationOptions.Default.SpanDestinationNameFormatter`](xref:NATS.Client.Core.NatsInstrumentationOptions):
+
+```csharp
+NatsInstrumentationOptions.Default.SpanDestinationNameFormatter =
+    subject => subject.StartsWith("tenant.") ? "tenant" : subject;
+```
+
+The formatter replaces the default two-token truncation rather than running after it, so a formatter that
+returns the subject unchanged produces full-subject span names and it is up to you to keep them low
+cardinality. It never sees inbox subjects, which are already collapsed.
+
+The formatter only affects span names. Subjects also appear in tags, which the formatter does not touch:
+
+| Tag | Contents |
+|---|---|
+| `messaging.destination.name` | Delivered subject, inbox collapsed |
+| `messaging.destination_publish.name` | Delivered subject, inbox collapsed |
+| `messaging.nats.message.subject` | Delivered subject, inbox collapsed |
+| `messaging.destination.template` | Subscription subject, inbox collapsed |
+| `messaging.nats.message.reply_to` | Reply-to subject, inbox collapsed |
+
+To remove or rewrite those, use `Enrich`, which runs after the tags are set:
+
+```csharp
+NatsInstrumentationOptions.Default.Enrich = (activity, _) =>
+{
+    activity.SetTag("messaging.destination.name", "redacted");
+    activity.SetTag("messaging.nats.message.subject", "redacted");
+};
+```
+
+Metrics carry no subject at all, so nothing needs redacting there.
+
 ## Baggage Propagation
 
 [W3C Baggage](https://www.w3.org/TR/baggage/) lets you attach arbitrary key/value context (a tenant ID,
@@ -116,8 +166,9 @@ The following attributes are set on activities:
 | Attribute | Example | Description |
 |---|---|---|
 | `messaging.system` | `nats` | Always `nats` |
-| `messaging.operation` | `publish` / `receive` | Operation type |
+| `messaging.operation` | `publish` / `subscribe` / `request` / `receive` | Operation type, matching the value the metrics use for the same operation |
 | `messaging.destination.name` | `orders.new` | Subject name |
+| `messaging.nats.message.reply_to` | `inbox` | Reply-to subject, if the message has one |
 | `messaging.client_id` | `42` | NATS client ID |
 | `server.address` | `localhost` | Server host |
 | `server.port` | `4222` | Server port |
@@ -127,14 +178,38 @@ The following attributes are set on activities:
 | `network.peer.port` | `4222` | Remote port |
 | `network.local.address` | `127.0.0.1` | Local IP |
 
+Span kind is `Producer` for `publish` and `request`, `Consumer` for `receive`, and `Client` for
+`subscribe`, which produces nothing and is a control plane call to the server.
+
 Receive activities include additional attributes:
 
 | Attribute | Example | Description |
 |---|---|---|
-| `messaging.destination.template` | `orders.*` | Subscription subject pattern |
+| `messaging.destination.template` | `orders.*` | Subject the subscription was created with |
+| `messaging.destination.temporary` | `false` | `true` when the subscription is on this connection's inbox |
+| `messaging.destination_publish.name` | `orders.new` | Subject the message was published to |
+| `messaging.nats.message.subject` | `orders.new` | Delivered subject |
 | `messaging.message.body.size` | `1024` | Message body size in bytes |
 | `messaging.message.envelope.size` | `1280` | Total message size in bytes |
-| `messaging.consumer.group.name` | `workers` | Queue group (if used) |
+| `messaging.consumer.group.name` | `workers` | Queue group, omitted when the subscription joined none |
+
+Every subject-valued tag has inbox subjects collapsed to `inbox`; see
+[Span Names and Redacting Subjects](#span-names-and-redacting-subjects).
+
+### Replies Carrying Stored Trace Context
+
+A receive activity normally takes its parent from the trace context carried in the message headers, and
+falls back to the request it is a reply to when the message carries none.
+
+Messages returned verbatim from storage are the exception. A JetStream direct get replays the stored
+message headers, including the `traceparent` written when the value was published, which may be hours
+old and belong to a trace the backend has long since closed. When a reply carries a trace id different
+from the request waiting on it, the receive span is parented from the request and the message's context
+is recorded as a [span link](https://opentelemetry.io/docs/concepts/signals/traces/#span-links) instead.
+The read stays in one trace and the connection to the write is still visible.
+
+A responder that continues the caller's trace shares its trace id, so ordinary request/reply is
+unaffected.
 
 ## Metrics
 
@@ -149,6 +224,7 @@ The following instruments are exposed on the `NATS.Net` meter:
 | `nats.client.reconnects` | Counter | `{reconnect}` | Successful reconnects since process start |
 | `nats.client.sent.bytes` | Counter | `By` | Bytes sent in published messages (body + headers) |
 | `nats.client.received.bytes` | Counter | `By` | Bytes received in consumed messages (body + headers) |
+| `nats.client.messages.dropped` | Counter | `{message}` | Messages evicted from a full subscription channel (slow consumer) |
 
 All instruments carry these tags:
 
@@ -168,6 +244,11 @@ application, per the OTel definition ("messages delivered to the application"). 
 frames consumed internally by the client are excluded: no-responder `503` replies and JetStream heartbeats,
 flow-control, and protocol notifications. The two counters stay consistent, so `received.bytes / consumed.messages`
 reflects average delivered message size.
+
+`nats.client.received.bytes` is a NATS-specific counter with no semantic convention to match, and the bytes
+of an excluded status frame were physically on the wire, so it could be argued either way. Deliberately
+excluding them keeps it aligned with `consumed.messages`, which is what makes the ratio above meaningful.
+Use `nats.client.messages.dropped` and the connection's own statistics if you need wire-level accounting.
 
 ### Histogram Buckets
 

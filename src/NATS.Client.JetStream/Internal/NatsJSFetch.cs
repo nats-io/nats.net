@@ -278,14 +278,17 @@ internal class NatsJSFetch<TMsg> : NatsSubBase
         else
         {
             var msg = new NatsJSMsg<TMsg>(
-                NatsMsg<TMsg>.Build(
+                NatsMsg<TMsg>.BuildInternal(
                     subject,
                     replyTo,
                     headersBuffer,
                     payloadBuffer,
                     Connection,
                     Connection.HeaderParser,
-                    _serializer),
+                    _serializer,
+                    replyParentContext: default,
+                    subscriptionSubject: Subject,
+                    queueGroup: QueueGroup),
                 _context);
 
             ReceiveActivity = msg.Headers?.Activity;

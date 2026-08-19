@@ -36,6 +36,18 @@ public sealed class NatsInstrumentationOptions
     /// <summary>
     /// Gets or sets an action to enrich an Activity.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// An exception thrown here is caught and ignored; the activity keeps whatever the callback
+    /// managed to set before it threw.
+    /// </para>
+    /// <para>
+    /// Use the <see cref="Activity"/> argument rather than <see cref="Activity.Current"/>. On the
+    /// send path the new activity is current, but on the receive path it is not: receive
+    /// activities are created on the connection's read loop and are deliberately kept off the
+    /// ambient context.
+    /// </para>
+    /// </remarks>
     public Action<Activity, NatsInstrumentationContext>? Enrich
     {
         get => _enrich;
@@ -46,7 +58,17 @@ public sealed class NatsInstrumentationOptions
     /// Gets or sets a function that formats the destination name used in span names.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// The input is the raw NATS subject. This only changes activity names, not telemetry tags.
+    /// </para>
+    /// <para>
+    /// It replaces the default two-token truncation entirely, so a formatter is responsible for
+    /// keeping the names it returns low cardinality. Inbox subjects never reach it: they are
+    /// collapsed to <c>inbox</c> first.
+    /// </para>
+    /// <para>
+    /// An exception thrown here is caught and the default naming is used for that span.
+    /// </para>
     /// </remarks>
     public Func<string, string>? SpanDestinationNameFormatter
     {

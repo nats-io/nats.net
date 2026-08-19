@@ -196,7 +196,7 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
         Exception? exception;
         try
         {
-            msg = NatsMsg<T>.Build(subject, replyTo, headersBuffer, payloadBuffer, _nats, _nats.HeaderParser, _serializer);
+            msg = NatsMsg<T>.BuildInternal(subject, replyTo, headersBuffer, payloadBuffer, _nats, _nats.HeaderParser, _serializer, replyParentContext: default, subscriptionSubject: Subject, queueGroup: QueueGroup);
             exception = msg.Error;
         }
         catch (Exception e)
@@ -208,6 +208,11 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
             // so handler can reply with an error.
             msg = new NatsMsg<T>(subject, replyTo, subject.Length + (replyTo?.Length ?? 0), default, default, _nats);
         }
+
+        // Hand the receive activity to the base class so a failure part way through the
+        // hand-off is recorded against the right span, and so a message that never reaches
+        // the handler loop still has its activity ended.
+        ReceiveActivity = msg.Headers?.Activity;
 
         if (exception is not null)
         {
@@ -230,12 +235,26 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
             {
                 Interlocked.Increment(ref _requests);
                 stopwatch.Restart();
+
+                // The endpoint is the server side of the request, so this message's receive
+                // activity is the span its handling belongs to. Make it current for the
+                // duration of the handler so spans the handler starts nest under it: receive
+                // activities are kept off the ambient context because they are created on the
+                // read loop, but this is the handler loop's own task and the ambient value is
+                // put back below.
+                var activity = svcMsg.Headers?.Activity;
+                var ambient = Activity.Current;
+                if (activity is not null)
+                    Activity.Current = activity;
+
                 try
                 {
                     await _handler(svcMsg).ConfigureAwait(false);
                 }
                 catch (Exception e)
                 {
+                    Telemetry.SetException(activity, e);
+
                     int code;
                     string message;
                     string body;
@@ -276,6 +295,14 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
                 finally
                 {
                     Interlocked.Add(ref _processingTime, ToNanos(stopwatch.Elapsed));
+
+                    // Restore before ending: EndActivity preserves whatever is current, and
+                    // right now that is the activity about to be stopped.
+                    Telemetry.RestoreCurrentActivity(ambient);
+
+                    // The endpoint consumes the message itself rather than handing it to an
+                    // ActivityEndingMsgReader, so nothing downstream would ever end this.
+                    Telemetry.EndActivity(activity);
                 }
             }
         }

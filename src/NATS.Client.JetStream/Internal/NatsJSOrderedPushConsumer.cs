@@ -317,6 +317,16 @@ internal class NatsJSOrderedPushConsumer<T>
                     {
                         _logger.LogWarning(NatsJSLogEvents.Internal, e, "Command error");
                     }
+                    finally
+                    {
+                        // Nothing downstream ends this receive activity: the message goes to an
+                        // internal consumer (the object store) rather than through an
+                        // ActivityEndingMsgReader. End it here, once the command loop is done
+                        // with it on whichever branch it took. _msgChannel is bounded to 1, so
+                        // for messages that are forwarded this is the point the reader picked
+                        // the previous one up. Ready commands carry no headers, so no-op.
+                        Telemetry.EndActivity(command.Msg.Headers?.Activity);
+                    }
                 }
             }
         }
@@ -498,7 +508,15 @@ internal class NatsJSOrderedPushConsumerSub<T> : NatsSubBase
         ReadOnlySequence<byte>? headersBuffer,
         ReadOnlySequence<byte> payloadBuffer)
     {
-        var msg = new NatsJSMsg<T>(NatsMsg<T>.Build(subject, replyTo, headersBuffer, payloadBuffer, _nats, _headerParser, _serializer), _context);
+        var msg = new NatsJSMsg<T>(
+            NatsMsg<T>.BuildInternal(subject, replyTo, headersBuffer, payloadBuffer, _nats, _headerParser, _serializer, replyParentContext: default, subscriptionSubject: Subject, queueGroup: QueueGroup),
+            _context);
+
+        // Handed to the base class so a message that never makes it onto the command channel
+        // still has its receive activity ended. Once it is on the channel the command loop
+        // owns it.
+        ReceiveActivity = msg.Headers?.Activity;
+
         await _commandChannel.Writer.WriteAsync(new NatsJSOrderedPushConsumerMsg<T> { Command = NatsJSOrderedPushConsumerCommand.Msg, Msg = msg }, _cancellationToken).ConfigureAwait(false);
 
         ResetSlowConsumer(_commandChannel.Reader.Count);

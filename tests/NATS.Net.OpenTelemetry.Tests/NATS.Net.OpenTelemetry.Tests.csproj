@@ -35,6 +35,9 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\NATS.Client.JetStream\NATS.Client.JetStream.csproj" />
+        <ProjectReference Include="..\..\src\NATS.Client.KeyValueStore\NATS.Client.KeyValueStore.csproj" />
+        <ProjectReference Include="..\..\src\NATS.Client.ObjectStore\NATS.Client.ObjectStore.csproj" />
+        <ProjectReference Include="..\..\src\NATS.Client.Services\NATS.Client.Services.csproj" />
         <ProjectReference Include="..\..\src\NATS.Client.OpenTelemetry\NATS.Client.OpenTelemetry.csproj" />
         <ProjectReference Include="..\..\src\NATS.Client.Serializers.Json\NATS.Client.Serializers.Json.csproj" />
         <ProjectReference Include="..\NATS.Client.TestUtilities\NATS.Client.TestUtilities.csproj" />
