@@ -42,10 +42,10 @@ public sealed class NatsInstrumentationOptions
     /// managed to set before it threw.
     /// </para>
     /// <para>
-    /// Use the <see cref="Activity"/> argument rather than <see cref="Activity.Current"/>. On the
-    /// send path the new activity is current, but on the receive path it is not: receive
-    /// activities are created on the connection's read loop and are deliberately kept off the
-    /// ambient context.
+    /// The activity is also <see cref="Activity.Current"/> for the duration of the callback, on the
+    /// receive path as well as the send path. Receive activities are created on the connection's
+    /// read loop and are kept off the ambient context otherwise, so the receive path makes the
+    /// activity current for the call and puts the read loop's context back afterwards.
     /// </para>
     /// </remarks>
     public Action<Activity, NatsInstrumentationContext>? Enrich

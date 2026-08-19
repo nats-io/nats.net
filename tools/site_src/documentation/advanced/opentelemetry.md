@@ -67,9 +67,10 @@ custom tags to every activity:
 
 [!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/OpenTelemetryPage.cs#enrich)]
 
-Use the `Activity` passed as the first argument rather than `Activity.Current`. Both are the same thing on
-the send path, but receive activities are created on the connection's read loop and are deliberately kept
-off the ambient context, so `Activity.Current` on the receive path is not the activity being enriched.
+The activity passed as the first argument is also `Activity.Current` for the duration of the callback, on
+the receive path as well as the send path, so helpers that read the ambient activity work inside `Enrich`.
+That holds for the callback only: receive activities are created on the connection's read loop and are kept
+off the ambient context otherwise, and the read loop's own context is put back when the callback returns.
 
 `Filter`, `Enrich` and `SpanDestinationNameFormatter` all run inside publish and inside message
 construction on receive, so none of them is allowed to break the operation it is instrumenting. A `Filter`
@@ -86,10 +87,7 @@ collapsed to the constant `inbox` before anything else runs.
 If you need spans but not subjects in their names, set
 [`NatsInstrumentationOptions.Default.SpanDestinationNameFormatter`](xref:NATS.Client.Core.NatsInstrumentationOptions):
 
-```csharp
-NatsInstrumentationOptions.Default.SpanDestinationNameFormatter =
-    subject => subject.StartsWith("tenant.") ? "tenant" : subject;
-```
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/OpenTelemetryPage.cs#redaction-span-names)]
 
 The formatter replaces the default two-token truncation rather than running after it, so a formatter that
 returns the subject unchanged produces full-subject span names and it is up to you to keep them low
@@ -107,13 +105,7 @@ The formatter only affects span names. Subjects also appear in tags, which the f
 
 To remove or rewrite those, use `Enrich`, which runs after the tags are set:
 
-```csharp
-NatsInstrumentationOptions.Default.Enrich = (activity, _) =>
-{
-    activity.SetTag("messaging.destination.name", "redacted");
-    activity.SetTag("messaging.nats.message.subject", "redacted");
-};
-```
+[!code-csharp[](../../../../tests/NATS.Net.DocsExamples/Advanced/OpenTelemetryPage.cs#redaction-tags)]
 
 Metrics carry no subject at all, so nothing needs redacting there.
 
@@ -181,6 +173,15 @@ The following attributes are set on activities:
 Span kind is `Producer` for `publish` and `request`, `Consumer` for `receive`, and `Client` for
 `subscribe`, which produces nothing and is a control plane call to the server.
 
+A receive activity is created for every message the client takes off the wire, whether it is handed to the
+application (core subscriptions, JetStream consume and fetch, service endpoints), consumed by the client
+itself (key/value watchers, object store reads), or a status frame the client handles internally
+(no-responder `503` replies, JetStream heartbeats and flow control). It ends when whatever owns the message
+is done with it, which for a subscription is the read that hands the message to the application.
+
+`messaging.client.consumed.messages` is narrower: it counts only messages delivered to the application, so
+receive span counts and that counter are expected to disagree.
+
 Receive activities include additional attributes:
 
 | Attribute | Example | Description |
@@ -195,6 +196,17 @@ Receive activities include additional attributes:
 
 Every subject-valued tag has inbox subjects collapsed to `inbox`; see
 [Span Names and Redacting Subjects](#span-names-and-redacting-subjects).
+
+### Service Endpoint Spans
+
+A service endpoint is the server side of a request, so its receive activity is the span the handling belongs
+to and not just the delivery. It stays open until the handler returns, so its duration covers handler time,
+and it is `Activity.Current` while the handler runs, so activities the handler starts nest under it without
+any wiring.
+
+An exception out of the handler is recorded on that span as an `exception` event and sets its status to
+`Error`. That includes `NatsSvcEndpointException`, which is also the way an endpoint reports an error back
+to the caller.
 
 ### Replies Carrying Stored Trace Context
 
