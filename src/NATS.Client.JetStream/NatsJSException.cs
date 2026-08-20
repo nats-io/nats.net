@@ -133,3 +133,17 @@ public class NatsJSConnectionException : NatsJSException
 
     public string Reason { get; }
 }
+
+/// <summary>
+/// The exception that is thrown when a JetStream message is not found.
+/// </summary>
+public class NatsJSNoMessageFoundException : NatsJSException
+{
+    /// <summary>
+    /// Create JetStream no message found exception.
+    /// </summary>
+    public NatsJSNoMessageFoundException()
+        : base("Message not found")
+    {
+    }
+}

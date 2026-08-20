@@ -113,4 +113,17 @@ public interface INatsJSStream
     ValueTask<NatsMsg<T>> GetDirectAsync<T>(StreamMsgGetRequest request, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default);
 
     ValueTask<StreamMsgGetResponse> GetAsync(StreamMsgGetRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves a message from the stream using direct get if the stream allows it, falling back to the standard stream get API.
+    /// </summary>
+    /// <typeparam name="T">The type to deserialize the message data into.</typeparam>
+    /// <param name="request">The request specifying which message to retrieve.</param>
+    /// <param name="serializer">The deserializer to use for the message data.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>A <see cref="NatsStreamMsg{T}"/> containing the message data and metadata.</returns>
+    /// <exception cref="NatsJSNoMessageFoundException">The message was not found.</exception>
+    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
+    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    ValueTask<NatsStreamMsg<T>> GetAutoAsync<T>(StreamMsgGetRequest request, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default);
 }
