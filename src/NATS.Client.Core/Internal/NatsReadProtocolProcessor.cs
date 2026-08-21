@@ -213,7 +213,7 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                             if (payloadSlice.Length < 2)
                             {
                                 _socketReader.AdvanceTo(payloadBegin);
-                                buffer = await _socketReader.ReadAtLeastAsync(2).ConfigureAwait(false); // \r\n
+                                buffer = await _socketReader.ReadAtLeastAsync(2 - (int)payloadSlice.Length).ConfigureAwait(false); // \r\n
                                 buffer = buffer.Slice(2);
                             }
                             else
