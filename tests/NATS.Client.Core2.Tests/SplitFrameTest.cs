@@ -75,7 +75,7 @@ public class SplitFrameTest(ITestOutputHelper output)
         public async Task SendRawAsync(string data)
         {
             await _accepted.Task.ConfigureAwait(false);
-            _output.WriteLine($"[S] SND: {data.Replace("\r", "\r").Replace("\n", "\n")}");
+            _output.WriteLine($"[S] SND: {data.Replace("\r", "\\r").Replace("\n", "\\n")}");
             var bytes = Encoding.ASCII.GetBytes(data);
             await _stream!.WriteAsync(bytes, 0, bytes.Length, _cts.Token);
             await _stream.FlushAsync(_cts.Token);
