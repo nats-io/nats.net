@@ -85,7 +85,7 @@ public class SplitFrameTest(ITestOutputHelper output)
         {
             lock (_subs)
             {
-                if (!_subs.TryGetValue(subject, out var tcs))
+            _output.WriteLine($"[S] SND: {data.Replace("\r", "\\r").Replace("\n", "\\n")}");
                 {
                     tcs = new TaskCompletionSource<string>();
                     _subs[subject] = tcs;
