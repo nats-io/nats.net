@@ -74,6 +74,7 @@ public class PushConsumerPage
         INatsJSPushConsumer consumer = await js.CreateOrUpdatePushConsumerAsync(stream: "PUSH_ORDERS", new NatsJSPushConsumerOpts
         {
             Name = "order_push_processor",
+            DeliverSubject = nc.Connection.NewInbox(),
             FilterSubject = "orders.>",
             AckPolicy = ConsumerConfigAckPolicy.Explicit,
             IdleHeartbeat = TimeSpan.FromSeconds(5),

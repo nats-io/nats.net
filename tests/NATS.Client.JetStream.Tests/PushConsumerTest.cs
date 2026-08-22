@@ -18,11 +18,13 @@ public class PushConsumerTest(NatsServerFixture server)
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
 
+        var deliverSubject = nats.NewInbox();
         var consumer = await js.CreatePushConsumerAsync(
             stream: $"{prefix}s1",
             opts: new NatsJSPushConsumerOpts
             {
                 Name = $"{prefix}c1",
+                DeliverSubject = deliverSubject,
                 FilterSubject = $"{prefix}s1.foo",
                 AckPolicy = ConsumerConfigAckPolicy.Explicit,
                 IdleHeartbeat = TimeSpan.FromSeconds(10),
@@ -39,8 +41,7 @@ public class PushConsumerTest(NatsServerFixture server)
         Assert.Equal(TimeSpan.FromSeconds(10), info.Config.IdleHeartbeat);
         Assert.True(info.Config.FlowControl);
         Assert.Equal(TimeSpan.FromMinutes(5), info.Config.InactiveThreshold);
-        Assert.NotNull(info.Config.DeliverSubject);
-        Assert.StartsWith("_", info.Config.DeliverSubject);
+        Assert.Equal(deliverSubject, info.Config.DeliverSubject);
     }
 
     [Fact]
@@ -56,14 +57,14 @@ public class PushConsumerTest(NatsServerFixture server)
 
         var consumer1 = await js.CreatePushConsumerAsync(
             stream: $"{prefix}s1",
-            opts: new NatsJSPushConsumerOpts { Name = $"{prefix}c1", FilterSubject = $"{prefix}s1.a" },
+            opts: new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = nats.NewInbox(), FilterSubject = $"{prefix}s1.a" },
             cancellationToken: cts.Token);
 
         Assert.Equal($"{prefix}s1.a", consumer1.Info.Config.FilterSubject);
 
         var consumer2 = await js.CreateOrUpdatePushConsumerAsync(
             stream: $"{prefix}s1",
-            opts: new NatsJSPushConsumerOpts { Name = $"{prefix}c1", FilterSubject = $"{prefix}s1.b" },
+            opts: new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = nats.NewInbox(), FilterSubject = $"{prefix}s1.b" },
             cancellationToken: cts.Token);
 
         Assert.Equal($"{prefix}c1", consumer2.Info.Config.Name);
@@ -80,7 +81,7 @@ public class PushConsumerTest(NatsServerFixture server)
 
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
-        await js.CreatePushConsumerAsync($"{prefix}s1", new NatsJSPushConsumerOpts { Name = $"{prefix}c1" }, cts.Token);
+        await js.CreatePushConsumerAsync($"{prefix}s1", new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = nats.NewInbox() }, cts.Token);
 
         var consumer = await js.GetPushConsumerAsync($"{prefix}s1", $"{prefix}c1", cts.Token);
         Assert.Equal($"{prefix}c1", consumer.Info.Config.Name);
@@ -123,6 +124,15 @@ public class PushConsumerTest(NatsServerFixture server)
     }
 
     [Fact]
+    public async Task Create_push_consumer_without_deliver_subject_throws()
+    {
+        var js = new NatsJSContext(new NatsConnection());
+
+        await Assert.ThrowsAsync<NatsJSException>(
+            () => js.CreatePushConsumerAsync("stream", new NatsJSPushConsumerOpts { Name = "c1" }).AsTask());
+    }
+
+    [Fact]
     public async Task Push_consume_msgs()
     {
         await using var nats = server.CreateNatsConnection();
@@ -139,7 +149,7 @@ public class PushConsumerTest(NatsServerFixture server)
             ack.EnsureSuccess();
         }
 
-        var consumer = await js.CreatePushConsumerAsync($"{prefix}s1", new NatsJSPushConsumerOpts { Name = $"{prefix}c1" }, cts.Token);
+        var consumer = await js.CreatePushConsumerAsync($"{prefix}s1", new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = nats.NewInbox() }, cts.Token);
         var count = 0;
         await foreach (var msg in consumer.ConsumeAsync(serializer: TestDataJsonSerializer<TestData>.Default, cancellationToken: cts.Token))
         {
@@ -171,7 +181,7 @@ public class PushConsumerTest(NatsServerFixture server)
 
         var consumer = await js.CreatePushConsumerAsync(
             $"{prefix}s1",
-            new NatsJSPushConsumerOpts { Name = $"{prefix}c1", FilterSubject = $"{prefix}s1.bar" },
+            new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = nats.NewInbox(), FilterSubject = $"{prefix}s1.bar" },
             cts.Token);
 
         var count = 0;
@@ -197,7 +207,7 @@ public class PushConsumerTest(NatsServerFixture server)
 
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
-        var consumer = await js.CreatePushConsumerAsync($"{prefix}s1", new NatsJSPushConsumerOpts { Name = $"{prefix}c1" }, cts.Token);
+        var consumer = await js.CreatePushConsumerAsync($"{prefix}s1", new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = nats.NewInbox() }, cts.Token);
 
         var ex = Assert.Throws<NatsJSProtocolException>(() => consumer.FetchAsync<int>(new NatsJSFetchOpts { MaxMsgs = 1 }, cancellationToken: cts.Token));
         Assert.Equal("Consumer is push based", ex.HeaderMessageText);
@@ -219,7 +229,7 @@ public class PushConsumerTest(NatsServerFixture server)
 
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
-        var consumer = (NatsJSPushConsumer)await js.CreatePushConsumerAsync($"{prefix}s1", new NatsJSPushConsumerOpts { Name = $"{prefix}c1" }, cts.Token);
+        var consumer = (NatsJSPushConsumer)await js.CreatePushConsumerAsync($"{prefix}s1", new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = nats.NewInbox() }, cts.Token);
 
         await consumer.DeleteAsync(cts.Token);
 
@@ -244,7 +254,7 @@ public class PushConsumerTest(NatsServerFixture server)
 
         var consumer = await js.CreatePushConsumerAsync(
             $"{prefix}s1",
-            new NatsJSPushConsumerOpts { Name = $"{prefix}c1" },
+            new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = nats.NewInbox() },
             cts.Token);
 
         var name = consumer.Info.Config.Name;
@@ -271,7 +281,7 @@ public class PushConsumerTest(NatsServerFixture server)
         for (var i = 0; i < 5; i++)
             await js.PublishAsync($"{prefix}s1.foo", i, cancellationToken: cts.Token);
 
-        var consumer = await js.CreatePushConsumerAsync($"{prefix}s1", new NatsJSPushConsumerOpts { Name = $"{prefix}c1" }, cts.Token);
+        var consumer = await js.CreatePushConsumerAsync($"{prefix}s1", new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = nats.NewInbox() }, cts.Token);
 
         var count = 0;
         var consumeCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
@@ -304,6 +314,7 @@ public class PushConsumerTest(NatsServerFixture server)
         var opts = new NatsJSPushConsumerOpts
         {
             Name = $"{prefix}c1",
+            DeliverSubject = nats1.NewInbox(),
             DeliverGroup = $"{prefix}workers",
             AckWait = TimeSpan.FromSeconds(30),
         };
@@ -353,7 +364,7 @@ public class PushConsumerTest(NatsServerFixture server)
 
         var consumer = await js.CreatePushConsumerAsync(
             $"{prefix}s1",
-            new NatsJSPushConsumerOpts { Name = $"{prefix}c1", AckPolicy = ConsumerConfigAckPolicy.None },
+            new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = nats.NewInbox(), AckPolicy = ConsumerConfigAckPolicy.None },
             cts.Token);
 
         for (var i = 0; i < 10; i++)
@@ -387,6 +398,7 @@ public class PushConsumerTest(NatsServerFixture server)
             new NatsJSPushConsumerOpts
             {
                 Name = $"{prefix}c1",
+                DeliverSubject = nats.NewInbox(),
                 AckWait = TimeSpan.FromMilliseconds(100),
                 MaxDeliver = 5,
             },
@@ -424,7 +436,7 @@ public class PushConsumerTest(NatsServerFixture server)
 
         var consumer = (NatsJSPushConsumer)await js.CreatePushConsumerAsync(
             $"{prefix}s1",
-            new NatsJSPushConsumerOpts { Name = $"{prefix}c1", AckWait = TimeSpan.FromMilliseconds(300) },
+            new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = nats.NewInbox(), AckWait = TimeSpan.FromMilliseconds(300) },
             cts.Token);
 
         await js.PublishAsync($"{prefix}s1.foo", 99, cancellationToken: cts.Token);
@@ -459,7 +471,7 @@ public class PushConsumerTest(NatsServerFixture server)
 
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
-        var consumer = await js.CreatePushConsumerAsync($"{prefix}s1", new NatsJSPushConsumerOpts { Name = $"{prefix}c1" }, cts.Token);
+        var consumer = await js.CreatePushConsumerAsync($"{prefix}s1", new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = nats.NewInbox() }, cts.Token);
 
         await Assert.ThrowsAsync<NatsJSProtocolException>(async () => await consumer.UnpinAsync("group", cts.Token));
     }
@@ -477,7 +489,7 @@ public class PushConsumerTest(NatsServerFixture server)
 
         var consumer = await js.CreatePushConsumerAsync(
             $"{prefix}s1",
-            new NatsJSPushConsumerOpts { Name = $"{prefix}c1", HeadersOnly = true },
+            new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = nats.NewInbox(), HeadersOnly = true },
             cts.Token);
 
         for (var i = 0; i < 5; i++)
@@ -516,6 +528,7 @@ public class PushConsumerTest(NatsServerFixture server)
             new NatsJSPushConsumerOpts
             {
                 Name = $"{prefix}c1",
+                DeliverSubject = nats.NewInbox(),
                 DeliverPolicy = ConsumerConfigDeliverPolicy.ByStartSequence,
                 OptStartSeq = 5,
             },
@@ -551,7 +564,7 @@ public class PushConsumerTest(NatsServerFixture server)
         // DeliverPolicy=Last → only the most recent message
         var pushConsumer = await js.CreatePushConsumerAsync(
             $"{prefix}s1",
-            new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverPolicy = ConsumerConfigDeliverPolicy.Last },
+            new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = nats.NewInbox(), DeliverPolicy = ConsumerConfigDeliverPolicy.Last },
             cts.Token);
 
         var count = 0;

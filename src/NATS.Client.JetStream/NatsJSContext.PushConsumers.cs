@@ -64,9 +64,7 @@ public partial class NatsJSContext : INatsJSContext
         ConsumerCreateAction action,
         CancellationToken cancellationToken)
     {
-        var deliverSubject = opts.DeliverSubject ?? NewBaseInbox();
-
-        if (string.IsNullOrWhiteSpace(deliverSubject))
+        if (string.IsNullOrWhiteSpace(opts.DeliverSubject))
         {
             throw new NatsJSException("A push consumer requires a non-empty deliver subject.");
         }
@@ -81,7 +79,7 @@ public partial class NatsJSContext : INatsJSContext
             AckPolicy = opts.AckPolicy,
             FlowControl = opts.FlowControl,
             HeadersOnly = opts.HeadersOnly,
-            DeliverSubject = deliverSubject,
+            DeliverSubject = opts.DeliverSubject,
             DeliverGroup = opts.DeliverGroup,
         };
 
