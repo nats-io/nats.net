@@ -183,6 +183,13 @@ public record ConsumerConfig
     public bool Direct { get; set; }
 
     /// <summary>
+    /// Marks a consumer the server created to source an interest or work queue stream, not for general use by clients, internal use only
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("sourcing")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Sourcing { get; set; }
+
+    /// <summary>
     /// Delivers only the headers of messages in the stream and not the bodies. Additionally adds Nats-Msg-Size header to indicate the size of the removed payload
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("headers_only")]

@@ -78,4 +78,54 @@ public class ParseJsonTests
         Assert.Equal(256 * 1024, result.ChunkSize);
         Assert.Equal(16 * 1024 * 1024, result.WindowSize);
     }
+
+    [Fact]
+    public void Consumer_info_should_parse_sourcing_consumers()
+    {
+        // Consumers the server creates to source an interest or work queue stream are
+        // marked 'sourcing' and are allowed the flow control ack policy.
+        const string json = """
+                            {
+                              "type": "io.nats.jetstream.api.v1.consumer_info_response",
+                              "stream_name": "s1",
+                              "name": "c1",
+                              "created": "2026-08-27T10:00:00Z",
+                              "config": {
+                                "name": "c1",
+                                "deliver_policy": "all",
+                                "ack_policy": "flow_control",
+                                "replay_policy": "instant",
+                                "sourcing": true
+                              },
+                              "delivered": {"consumer_seq": 0, "stream_seq": 0},
+                              "ack_floor": {"consumer_seq": 0, "stream_seq": 0},
+                              "num_ack_pending": 0,
+                              "num_redelivered": 0,
+                              "num_waiting": 0,
+                              "num_pending": 0
+                            }
+                            """;
+
+        var serializer = NatsJSJsonSerializer<ConsumerInfoResponse>.Default;
+        var result = serializer.Deserialize(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(json)));
+
+        Assert.NotNull(result);
+        Assert.True(result.Config.Sourcing);
+        Assert.False(result.Config.Direct);
+        Assert.Equal(ConsumerConfigAckPolicy.FlowControl, result.Config.AckPolicy);
+    }
+
+    [Fact]
+    public void Consumer_config_should_omit_sourcing_when_not_set()
+    {
+        var serializer = NatsJSJsonSerializer<ConsumerConfig>.Default;
+
+        var bw = new NatsBufferWriter<byte>();
+        serializer.Serialize(bw, new ConsumerConfig());
+        Assert.DoesNotContain("sourcing", Encoding.UTF8.GetString(bw.WrittenSpan.ToArray()));
+
+        bw = new NatsBufferWriter<byte>();
+        serializer.Serialize(bw, new ConsumerConfig { Sourcing = true });
+        Assert.Contains("\"sourcing\":true", Encoding.UTF8.GetString(bw.WrittenSpan.ToArray()));
+    }
 }
