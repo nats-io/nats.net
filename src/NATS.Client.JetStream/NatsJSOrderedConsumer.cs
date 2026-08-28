@@ -389,10 +389,10 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
     /// </summary>
     /// <param name="seq">Stream sequence to reset to.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
-    /// <returns>Never returns.</returns>
-    /// <exception cref="NotSupportedException">Always thrown.</exception>
+    /// <returns>A faulted task.</returns>
+    /// <exception cref="NotSupportedException">Always.</exception>
     public ValueTask<ConsumerResetResponse> ResetAsync(ulong seq = 0, CancellationToken cancellationToken = default)
-        => throw new NotSupportedException("Ordered consumers cannot be reset; they recreate their underlying consumer to seek.");
+        => new(Task.FromException<ConsumerResetResponse>(new NotSupportedException("Ordered consumers cannot be reset; they recreate their underlying consumer to seek.")));
 
     private async Task<NatsJSConsumer> RecreateConsumer(string consumer, ulong seq, CancellationToken cancellationToken)
     {
