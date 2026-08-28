@@ -358,7 +358,7 @@ public abstract class NatsSubBase
     /// <param name="replyTo">Reply subject received for this subscription.</param>
     /// <param name="headersBuffer">Headers buffer received for this subscription.</param>
     /// <param name="payloadBuffer">Payload buffer received for this subscription.</param>
-    public virtual async ValueTask ReceiveAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer)
+    public virtual async ValueTask ReceiveAsync(string subject, string? replyTo, ReadOnlySequence<byte> headersBuffer, ReadOnlySequence<byte> payloadBuffer)
     {
         ResetIdleTimeout();
 
@@ -429,9 +429,10 @@ public abstract class NatsSubBase
             payloadBuffer.CopyTo(payload.Span);
 
             Memory<byte> headers = default;
-            if (headersBuffer != null)
+            if (headersBuffer.Length > 0)
             {
-                headers = new Memory<byte>(new byte[headersBuffer.Value.Length]);
+                headers = new Memory<byte>(new byte[headersBuffer.Length]);
+                headersBuffer.CopyTo(headers.Span);
             }
 
             SetException(new NatsSubException($"Message error: {e.Message}", ExceptionDispatchInfo.Capture(e), payload, headers));
@@ -454,9 +455,9 @@ public abstract class NatsSubBase
         }
     }
 
-    internal static bool IsHeader503(ReadOnlySequence<byte>? headersBuffer) =>
+    internal static bool IsHeader503(ReadOnlySequence<byte> headersBuffer) =>
         headersBuffer is { Length: >= 12 }
-        && headersBuffer.Value.Slice(8, 4).ToSpan().SequenceEqual(NoRespondersHeaderSequence);
+        && headersBuffer.Slice(8, 4).ToSpan().SequenceEqual(NoRespondersHeaderSequence);
 
     // A NATS status/control frame carries an inline status code on the version line
     // ("NATS/1.0 <code>"): a space then three ASCII digits at offset 8. Regular user
@@ -560,7 +561,7 @@ public abstract class NatsSubBase
     /// <param name="headersBuffer">Raw headers bytes. You can use <see cref="NatsConnection"/> <see cref="NatsHeaderParser"/> to decode them.</param>
     /// <param name="payloadBuffer">Raw payload bytes.</param>
     /// <returns></returns>
-    protected abstract ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte>? headersBuffer, ReadOnlySequence<byte> payloadBuffer);
+    protected abstract ValueTask ReceiveInternalAsync(string subject, string? replyTo, ReadOnlySequence<byte> headersBuffer, ReadOnlySequence<byte> payloadBuffer);
 
     /// <summary>
     /// Stops any subclass-owned delivery machinery (e.g. a JetStream pull loop or

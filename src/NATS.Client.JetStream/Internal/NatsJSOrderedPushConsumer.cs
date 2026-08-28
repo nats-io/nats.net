@@ -505,7 +505,7 @@ internal class NatsJSOrderedPushConsumerSub<T> : NatsSubBase
     protected override async ValueTask ReceiveInternalAsync(
         string subject,
         string? replyTo,
-        ReadOnlySequence<byte>? headersBuffer,
+        ReadOnlySequence<byte> headersBuffer,
         ReadOnlySequence<byte> payloadBuffer)
     {
         var msg = new NatsJSMsg<T>(
