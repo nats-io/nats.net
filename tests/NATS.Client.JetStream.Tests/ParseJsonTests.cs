@@ -78,4 +78,56 @@ public class ParseJsonTests
         Assert.Equal(256 * 1024, result.ChunkSize);
         Assert.Equal(16 * 1024 * 1024, result.WindowSize);
     }
+
+    [Fact]
+    public void Stream_list_response_should_parse_offline_streams()
+    {
+        // A stream that needs a higher API level than the server has is reported in
+        // 'offline' rather than 'streams', and its name is repeated in 'missing'.
+        const string json = """
+                            {
+                              "type": "io.nats.jetstream.api.v1.stream_list_response",
+                              "total": 0,
+                              "offset": 0,
+                              "limit": 256,
+                              "streams": [],
+                              "missing": ["s1"],
+                              "offline": {"s1": "unsupported required api level 99, server supports 2"}
+                            }
+                            """;
+
+        var serializer = NatsJSJsonSerializer<StreamListResponse>.Default;
+        var result = serializer.Deserialize(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(json)));
+
+        Assert.NotNull(result);
+        Assert.Empty(result.Streams);
+        Assert.Equal(["s1"], result.Missing);
+        Assert.NotNull(result.Offline);
+        Assert.Equal("unsupported required api level 99, server supports 2", result.Offline["s1"]);
+    }
+
+    [Fact]
+    public void Consumer_list_response_should_parse_offline_consumers()
+    {
+        const string json = """
+                            {
+                              "type": "io.nats.jetstream.api.v1.consumer_list_response",
+                              "total": 0,
+                              "offset": 0,
+                              "limit": 256,
+                              "consumers": [],
+                              "missing": ["c1"],
+                              "offline": {"c1": "unsupported required api level 99, server supports 2"}
+                            }
+                            """;
+
+        var serializer = NatsJSJsonSerializer<ConsumerListResponse>.Default;
+        var result = serializer.Deserialize(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(json)));
+
+        Assert.NotNull(result);
+        Assert.Empty(result.Consumers);
+        Assert.Equal(["c1"], result.Missing);
+        Assert.NotNull(result.Offline);
+        Assert.Equal("unsupported required api level 99, server supports 2", result.Offline["c1"]);
+    }
 }
