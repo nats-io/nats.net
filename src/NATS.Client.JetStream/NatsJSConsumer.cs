@@ -381,6 +381,17 @@ public class NatsJSConsumer : INatsJSConsumer
         SetPinId(null);
     }
 
+    /// <inheritdoc />
+    public async ValueTask<ConsumerResetResponse> ResetAsync(ulong seq = 0, CancellationToken cancellationToken = default)
+    {
+        ThrowIfDeleted();
+        var response = await _context.ResetConsumerAsync(_stream, _consumer, seq, cancellationToken).ConfigureAwait(false);
+
+        // The reset response is a superset of consumer info.
+        Info = response;
+        return response;
+    }
+
     /// <summary>
     /// Gets the current pin ID for pinned client priority policy.
     /// </summary>

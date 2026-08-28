@@ -384,6 +384,16 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     public ValueTask UnpinAsync(string group, CancellationToken cancellationToken = default) => default;
 
+    /// <summary>
+    /// Not supported for ordered consumers, which recreate their underlying ephemeral consumer to seek.
+    /// </summary>
+    /// <param name="seq">Stream sequence to reset to.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>Never returns.</returns>
+    /// <exception cref="NotSupportedException">Always thrown.</exception>
+    public ValueTask<ConsumerResetResponse> ResetAsync(ulong seq = 0, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("Ordered consumers cannot be reset; they recreate their underlying consumer to seek.");
+
     private async Task<NatsJSConsumer> RecreateConsumer(string consumer, ulong seq, CancellationToken cancellationToken)
     {
         var consumerOpts = _opts;

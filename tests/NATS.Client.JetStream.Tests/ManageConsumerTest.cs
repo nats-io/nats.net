@@ -245,6 +245,94 @@ public class ManageConsumerTest
         }
     }
 
+    [SkipIfNatsServer(versionEarlierThan: "2.14")]
+    public async Task Reset_consumer_from_stream()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
+        var prefix = _server.GetNextId();
+        var js = new NatsJSContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var stream = await js.CreateStreamAsync(new StreamConfig($"{prefix}s1", [$"{prefix}s1.*"]), cts.Token);
+
+        for (var i = 1; i <= 5; i++)
+        {
+            var ack = await js.PublishAsync($"{prefix}s1.x", i, cancellationToken: cts.Token);
+            ack.EnsureSuccess();
+        }
+
+        var consumer = await stream.CreateOrUpdateConsumerAsync(new ConsumerConfig($"{prefix}c1"), cts.Token);
+
+        var resetResponse = await stream.ResetConsumerAsync($"{prefix}c1", seq: 3, cts.Token);
+        Assert.Equal(3ul, resetResponse.ResetSeq);
+        Assert.Equal($"{prefix}c1", resetResponse.Name);
+
+        var next = await consumer.NextAsync<int>(cancellationToken: cts.Token);
+        Assert.NotNull(next);
+        Assert.Equal(3ul, next!.Metadata!.Value.Sequence.Stream);
+        Assert.Equal(3, next.Data);
+    }
+
+    [SkipIfNatsServer(versionEarlierThan: "2.14")]
+    public async Task Reset_consumer_from_consumer()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
+        var prefix = _server.GetNextId();
+        var js = new NatsJSContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        await js.CreateStreamAsync(new StreamConfig($"{prefix}s1", [$"{prefix}s1.*"]), cts.Token);
+
+        for (var i = 1; i <= 5; i++)
+        {
+            var ack = await js.PublishAsync($"{prefix}s1.x", i, cancellationToken: cts.Token);
+            ack.EnsureSuccess();
+        }
+
+        var consumer = await js.CreateOrUpdateConsumerAsync($"{prefix}s1", new ConsumerConfig($"{prefix}c1"), cts.Token);
+
+        var fetchOpts = new NatsJSFetchOpts { MaxMsgs = 2, Expires = TimeSpan.FromSeconds(5) };
+        await foreach (var msg in consumer.FetchAsync<int>(opts: fetchOpts, cancellationToken: cts.Token))
+        {
+            await msg.AckAsync(new AckOpts { DoubleAck = true }, cancellationToken: cts.Token);
+        }
+
+        await consumer.RefreshAsync(cts.Token);
+        Assert.Equal(2ul, consumer.Info.AckFloor.StreamSeq);
+
+        var resetResponse = await consumer.ResetAsync(seq: 4, cancellationToken: cts.Token);
+        Assert.Equal(4ul, resetResponse.ResetSeq);
+
+        // Info is refreshed from the reset response without a further INFO call.
+        Assert.Equal($"{prefix}c1", consumer.Info.Name);
+        Assert.Equal(3ul, consumer.Info.AckFloor.StreamSeq);
+
+        var next = await consumer.NextAsync<int>(cancellationToken: cts.Token);
+        Assert.NotNull(next);
+        Assert.Equal(4ul, next!.Metadata!.Value.Sequence.Stream);
+        Assert.Equal(4, next.Data);
+    }
+
+    [Fact]
+    public async Task Reset_ordered_consumer_is_not_supported()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats.ConnectRetryAsync();
+        var prefix = _server.GetNextId();
+        var js = new NatsJSContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var stream = await js.CreateStreamAsync(new StreamConfig($"{prefix}s1", [$"{prefix}s1.*"]), cts.Token);
+        var consumer = await stream.CreateOrderedConsumerAsync(cancellationToken: cts.Token);
+
+        await Assert.ThrowsAsync<NotSupportedException>(async () => await consumer.ResetAsync(cancellationToken: cts.Token));
+    }
+
     [SkipIfNatsServer(versionEarlierThan: "2.10")]
     public async Task Consumer_create_update_action()
     {
