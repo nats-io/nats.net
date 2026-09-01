@@ -14,13 +14,14 @@ namespace NATS.Client.Serializers.Json;
 public sealed class NatsJsonSerializer<T> : INatsSerializer<T>
 {
     // ReSharper disable once StaticMemberInGenericType
-    private static readonly JsonWriterOptions JsonWriterOpts = new() { Indented = false, SkipValidation = true, };
+    private static readonly JsonWriterOptions DefaultJsonWriterOpts = new() { Indented = false, SkipValidation = true, };
 
     // ReSharper disable once StaticMemberInGenericType
     [ThreadStatic]
     private static Utf8JsonWriter? _jsonWriter;
 
     private readonly JsonSerializerOptions _opts;
+    private readonly JsonWriterOptions? _writerOpts;
 
     /// <summary>
     /// Reflection-based JSON serializer for NATS.
@@ -44,6 +45,17 @@ public sealed class NatsJsonSerializer<T> : INatsSerializer<T>
     public NatsJsonSerializer(JsonSerializerOptions opts) => _opts = opts;
 
     /// <summary>
+    /// Creates a new instance of <see cref="NatsJsonSerializer{T}"/> with the specified options and writer options.
+    /// </summary>
+    /// <param name="opts">Serialization options</param>
+    /// <param name="writerOpts">Writer options</param>
+    public NatsJsonSerializer(JsonSerializerOptions opts, JsonWriterOptions writerOpts)
+    {
+        _opts = opts;
+        _writerOpts = writerOpts;
+    }
+
+    /// <summary>
     /// Default instance of <see cref="NatsJsonSerializer{T}"/> with option set to ignore <c>null</c> values when writing.
     /// </summary>
     public static NatsJsonSerializer<T> Default { get; } = new();
@@ -55,9 +67,13 @@ public sealed class NatsJsonSerializer<T> : INatsSerializer<T>
     public void Serialize(IBufferWriter<byte> bufferWriter, T? value)
     {
         Utf8JsonWriter writer;
-        if (_jsonWriter == null)
+        if (_writerOpts != null)
         {
-            writer = _jsonWriter = new Utf8JsonWriter(bufferWriter, JsonWriterOpts);
+            writer = new Utf8JsonWriter(bufferWriter, _writerOpts.Value);
+        }
+        else if (_jsonWriter == null)
+        {
+            writer = _jsonWriter = new Utf8JsonWriter(bufferWriter, DefaultJsonWriterOpts);
         }
         else
         {
@@ -67,7 +83,8 @@ public sealed class NatsJsonSerializer<T> : INatsSerializer<T>
 
         JsonSerializer.Serialize(writer, value, _opts);
 
-        writer.Reset(NullBufferWriter.Instance);
+        if (ReferenceEquals(writer, _jsonWriter))
+            writer.Reset(NullBufferWriter.Instance);
     }
 
     /// <inheritdoc />
