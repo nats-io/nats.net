@@ -606,6 +606,9 @@ public class NatsKVStore : INatsKVStore
 
             if (timeLimited && entry.Created > limit)
             {
+                if (opts.RetainRecentlyDeletedKeyHistory)
+                    continue;
+
                 request.Keep = 1;
             }
 
