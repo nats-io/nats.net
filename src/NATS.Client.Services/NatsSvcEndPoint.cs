@@ -62,6 +62,11 @@ public interface INatsSvcEndpoint : IAsyncDisposable
     /// consume a message each time a message is received by the queue group.
     /// </remarks>
     string? QueueGroup { get; }
+
+    /// <summary>
+    /// Gracefully stop and retire this endpoint, without affecting any other endpoint on the same service.
+    /// </summary>
+    ValueTask StopAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -94,6 +99,13 @@ public abstract class NatsSvcEndpointBase : NatsSubBase, INatsSvcEndpoint
 
     /// <inheritdoc/>
     public abstract string Name { get; }
+
+    /// <inheritdoc/>
+    public virtual async ValueTask StopAsync(CancellationToken cancellationToken = default)
+    {
+        await DrainAsync(cancellationToken).ConfigureAwait(false);
+        await DisposeAsync().ConfigureAwait(false);
+    }
 
     internal abstract void IncrementErrors();
 
@@ -171,6 +183,13 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
 
     /// <inheritdoc/>
     public override IDictionary<string, string>? Metadata { get; }
+
+    /// <inheritdoc/>
+    public override async ValueTask DrainAsync(CancellationToken cancellationToken = default)
+    {
+        await base.DrainAsync(cancellationToken).ConfigureAwait(false);
+        await _handlerTask.ConfigureAwait(false);
+    }
 
     /// <inheritdoc/>
     public override async ValueTask DisposeAsync()

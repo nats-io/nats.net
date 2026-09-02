@@ -102,11 +102,15 @@ public class NatsSvcServer : INatsSvcServer
     /// <param name="serializer">Serializer to use when deserializing incoming messages (defaults to connection's serializer).</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to stop the endpoint.</param>
     /// <typeparam name="T">Serialization type for messages received.</typeparam>
-    /// <returns>A <seealso cref="ValueTask"/> representing the asynchronous operation.</returns>
+    /// <returns>The endpoint that was added.</returns>
     /// <remarks>
     /// One of name or subject must be specified.
+    /// <para>
+    /// Use <see cref="INatsSvcEndpoint.StopAsync(CancellationToken)"/> on the returned endpoint to retire
+    /// it gracefully without affecting the other endpoints on this service
+    /// </para>
     /// </remarks>
-    public ValueTask AddEndpointAsync<T>(Func<NatsSvcMsg<T>, ValueTask> handler, string? name = default, string? subject = default, string? queueGroup = default, IDictionary<string, string>? metadata = default, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
+    public ValueTask<INatsSvcEndpoint> AddEndpointAsync<T>(Func<NatsSvcMsg<T>, ValueTask> handler, string? name = default, string? subject = default, string? queueGroup = default, IDictionary<string, string>? metadata = default, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
     {
         queueGroup ??= _config.UseQueueGroup ? _config.QueueGroup : null;
         return AddEndpointInternalAsync<T>(handler, name, subject, queueGroup, metadata, serializer, cancellationToken);
@@ -216,7 +220,7 @@ public class NatsSvcServer : INatsSvcServer
         }
     }
 
-    private async ValueTask AddEndpointInternalAsync<T>(Func<NatsSvcMsg<T>, ValueTask> handler, string? name, string? subject, string? queueGroup, IDictionary<string, string>? metadata, INatsDeserialize<T>? serializer, CancellationToken cancellationToken)
+    private async ValueTask<INatsSvcEndpoint> AddEndpointInternalAsync<T>(Func<NatsSvcMsg<T>, ValueTask> handler, string? name, string? subject, string? queueGroup, IDictionary<string, string>? metadata, INatsDeserialize<T>? serializer, CancellationToken cancellationToken)
     {
         serializer ??= _nats.Opts.SerializerRegistry.GetDeserializer<T>();
 
@@ -234,6 +238,8 @@ public class NatsSvcServer : INatsSvcServer
         }
 
         await ep.StartAsync(cancellationToken).ConfigureAwait(false);
+
+        return new RegisteredNatsSvcEndpoint(ep, () => ((ICollection<KeyValuePair<string, INatsSvcEndpoint>>)_endPoints).Remove(new(ep.Name, ep)));
     }
 
     private async Task MsgLoop()
@@ -334,11 +340,15 @@ public class NatsSvcServer : INatsSvcServer
         /// <param name="serializer">Serializer to use when deserializing incoming messages (defaults to connection's serializer).</param>
         /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to stop the endpoint.</param>
         /// <typeparam name="T">Serialization type for messages received.</typeparam>
-        /// <returns>A <seealso cref="ValueTask"/> representing the asynchronous operation.</returns>
+        /// <returns>The endpoint that was added.</returns>
         /// <remarks>
         /// One of name or subject must be specified.
+        /// <para>
+        /// Use <see cref="INatsSvcEndpoint.StopAsync(CancellationToken)"/> on the returned endpoint to
+        /// retire it gracefully without affecting the other endpoints on this service.
+        /// </para>
         /// </remarks>
-        public ValueTask AddEndpointAsync<T>(Func<NatsSvcMsg<T>, ValueTask> handler, string? name = default, string? subject = default, string? queueGroup = default, IDictionary<string, string>? metadata = default, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
+        public ValueTask<INatsSvcEndpoint> AddEndpointAsync<T>(Func<NatsSvcMsg<T>, ValueTask> handler, string? name = default, string? subject = default, string? queueGroup = default, IDictionary<string, string>? metadata = default, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default)
         {
             subject ??= name;
             var epSubject = subject != null ? $"{GroupName}{_dot}{subject}" : null;
@@ -372,6 +382,39 @@ public class NatsSvcServer : INatsSvcServer
                     throw new NatsSvcException("Invalid group name (must be a valid NATS subject)");
                 }
             }
+        }
+    }
+
+    private class RegisteredNatsSvcEndpoint(INatsSvcEndpoint underlying, Action deregister) : INatsSvcEndpoint
+    {
+        public long Requests => underlying.Requests;
+
+        public long ProcessingTime => underlying.ProcessingTime;
+
+        public long Errors => underlying.Errors;
+
+        public string? LastError => underlying.LastError;
+
+        public long AverageProcessingTime => underlying.AverageProcessingTime;
+
+        public IDictionary<string, string>? Metadata => underlying.Metadata;
+
+        public string Name => underlying.Name;
+
+        public string Subject => underlying.Subject;
+
+        public string? QueueGroup => underlying.QueueGroup;
+
+        public async ValueTask DisposeAsync()
+        {
+            await underlying.DisposeAsync();
+            deregister();
+        }
+
+        public async ValueTask StopAsync(CancellationToken cancellationToken = default)
+        {
+            await underlying.StopAsync(cancellationToken);
+            deregister();
         }
     }
 }

@@ -26,11 +26,15 @@ public interface INatsSvcServer : IAsyncDisposable
     /// <param name="serializer">Serializer to use when deserializing incoming messages (defaults to connection's serializer).</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to stop the endpoint.</param>
     /// <typeparam name="T">Serialization type for messages received.</typeparam>
-    /// <returns>A <seealso cref="ValueTask"/> representing the asynchronous operation.</returns>
+    /// <returns>The endpoint that was added.</returns>
     /// <remarks>
     /// One of name or subject must be specified.
+    /// <para>
+    /// Use <see cref="INatsSvcEndpoint.StopAsync(CancellationToken)"/> on the returned endpoint to retire
+    /// it gracefully without affecting the other endpoints on this service
+    /// </para>
     /// </remarks>
-    ValueTask AddEndpointAsync<T>(Func<NatsSvcMsg<T>, ValueTask> handler, string? name = default, string? subject = default, string? queueGroup = default, IDictionary<string, string>? metadata = default, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default);
+    ValueTask<INatsSvcEndpoint> AddEndpointAsync<T>(Func<NatsSvcMsg<T>, ValueTask> handler, string? name = default, string? subject = default, string? queueGroup = default, IDictionary<string, string>? metadata = default, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Adds a new service group with optional queue group.
