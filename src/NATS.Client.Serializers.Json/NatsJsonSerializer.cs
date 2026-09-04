@@ -1,6 +1,5 @@
 using System.Buffers;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using NATS.Client.Core;
 
 namespace NATS.Client.Serializers.Json;
@@ -9,22 +8,17 @@ namespace NATS.Client.Serializers.Json;
 /// Reflection based JSON serializer for NATS.
 /// </summary>
 /// <remarks>
-/// This serializer is not suitable for native AOT deployments since it might rely on reflection
+/// A new <see cref="Utf8JsonWriter"/> is allocated on every serialization.
+/// This serializer is not suitable for native AOT deployments since it might rely on reflection.
 /// </remarks>
 public sealed class NatsJsonSerializer<T> : INatsSerializer<T>
 {
-    // ReSharper disable once StaticMemberInGenericType
-    private static readonly JsonWriterOptions DefaultJsonWriterOpts = new() { Indented = false, SkipValidation = true, };
-
-    // ReSharper disable once StaticMemberInGenericType
-    [ThreadStatic]
-    private static Utf8JsonWriter? _jsonWriter;
-
     private readonly JsonSerializerOptions _opts;
-    private readonly JsonWriterOptions? _writerOpts;
+    private readonly JsonWriterOptions _writerOpts;
 
     /// <summary>
     /// Reflection-based JSON serializer for NATS.
+    /// A shared <see cref="Utf8JsonWriter"/> is reused and reset on every serialization.
     /// </summary>
     /// <remarks>
     /// This serializer is not suitable for native AOT deployments since it might rely on reflection
@@ -42,7 +36,10 @@ public sealed class NatsJsonSerializer<T> : INatsSerializer<T>
     /// Creates a new instance of <see cref="NatsJsonSerializer{T}"/> with the specified options.
     /// </summary>
     /// <param name="opts">Serialization options</param>
-    public NatsJsonSerializer(JsonSerializerOptions opts) => _opts = opts;
+    public NatsJsonSerializer(JsonSerializerOptions opts)
+        : this(opts, new JsonWriterOptions { Encoder = opts.Encoder, Indented = false, SkipValidation = true })
+    {
+    }
 
     /// <summary>
     /// Creates a new instance of <see cref="NatsJsonSerializer{T}"/> with the specified options and writer options.
@@ -66,25 +63,9 @@ public sealed class NatsJsonSerializer<T> : INatsSerializer<T>
     /// <inheritdoc />
     public void Serialize(IBufferWriter<byte> bufferWriter, T? value)
     {
-        Utf8JsonWriter writer;
-        if (_writerOpts != null)
-        {
-            writer = new Utf8JsonWriter(bufferWriter, _writerOpts.Value);
-        }
-        else if (_jsonWriter == null)
-        {
-            writer = _jsonWriter = new Utf8JsonWriter(bufferWriter, DefaultJsonWriterOpts);
-        }
-        else
-        {
-            writer = _jsonWriter;
-            writer.Reset(bufferWriter);
-        }
+        using var writer = new Utf8JsonWriter(bufferWriter, _writerOpts);
 
         JsonSerializer.Serialize(writer, value, _opts);
-
-        if (ReferenceEquals(writer, _jsonWriter))
-            writer.Reset(NullBufferWriter.Instance);
     }
 
     /// <inheritdoc />
@@ -97,19 +78,6 @@ public sealed class NatsJsonSerializer<T> : INatsSerializer<T>
 
         var reader = new Utf8JsonReader(buffer); // Utf8JsonReader is ref struct, no allocate.
         return JsonSerializer.Deserialize<T>(ref reader, _opts);
-    }
-
-    private sealed class NullBufferWriter : IBufferWriter<byte>
-    {
-        internal static readonly IBufferWriter<byte> Instance = new NullBufferWriter();
-
-        public void Advance(int count)
-        {
-        }
-
-        public Memory<byte> GetMemory(int sizeHint = 0) => Array.Empty<byte>();
-
-        public Span<byte> GetSpan(int sizeHint = 0) => Array.Empty<byte>();
     }
 }
 
