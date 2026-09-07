@@ -104,9 +104,12 @@ public class ListTests
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 
-        var stream = await js.CreateStreamAsync(new StreamConfig($"{prefix}s1", [$"{prefix}s1.*"]), cts.Token);
-
         const int total = 1200;
+
+        // Streams that do not set MaxConsumers get the server default, which is 1000 from
+        // nats-server 2.15 onwards. Listing only pages past JSApiNamesLimit (1024) if there
+        // are more consumers than that, so the stream needs a limit of its own.
+        var stream = await js.CreateStreamAsync(new StreamConfig($"{prefix}s1", [$"{prefix}s1.*"]) { MaxConsumers = total }, cts.Token);
 
         for (var i = 0; i < total; i++)
         {
