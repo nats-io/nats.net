@@ -134,6 +134,115 @@ public class ServicesTests
     }
 
     [Fact]
+    public async Task Remove_end_point()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
+        var svc = new NatsSvcContext(nats);
+
+        await using var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
+
+        await s1.AddEndpointAsync<int>(
+            name: "e1",
+            handler: async m => await m.ReplyAsync(1, cancellationToken: cancellationToken),
+            cancellationToken: cancellationToken);
+
+        await s1.AddEndpointAsync<int>(
+            name: "e2",
+            handler: async m => await m.ReplyAsync(2, cancellationToken: cancellationToken),
+            cancellationToken: cancellationToken);
+
+        Assert.Equal(1, (await nats.RequestAsync<int, int>("e1", 0, cancellationToken: cancellationToken)).Data);
+
+        await s1.RemoveEndpointAsync("e1", cancellationToken);
+
+        // The removed endpoint is gone from the service, the other one is untouched.
+        var info1 = (await nats.FindServicesAsync("$SRV.INFO", 1, NatsSrvJsonSerializer<InfoResponse>.Default, cancellationToken)).First();
+        foreach (var info in new[] { info1, s1.GetInfo() })
+        {
+            Assert.Equal("e2", Assert.Single(info.Endpoints).Name);
+        }
+
+        Assert.Equal("e2", Assert.Single(s1.GetStats().Endpoints).Name);
+
+        await Assert.ThrowsAsync<NatsNoRespondersException>(async () =>
+            await nats.RequestAsync<int, int>("e1", 0, cancellationToken: cancellationToken));
+
+        Assert.Equal(2, (await nats.RequestAsync<int, int>("e2", 0, cancellationToken: cancellationToken)).Data);
+
+        // The name is free again.
+        await s1.AddEndpointAsync<int>(
+            name: "e1",
+            handler: async m => await m.ReplyAsync(11, cancellationToken: cancellationToken),
+            cancellationToken: cancellationToken);
+
+        Assert.Equal(11, (await nats.RequestAsync<int, int>("e1", 0, cancellationToken: cancellationToken)).Data);
+    }
+
+    [Fact]
+    public async Task Remove_end_point_drains_in_flight_messages()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
+        var svc = new NatsSvcContext(nats);
+
+        await using var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
+
+        var handlerStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseHandler = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        await s1.AddEndpointAsync<int>(
+            name: "e1",
+            handler: async m =>
+            {
+                handlerStarted.TrySetResult();
+                await releaseHandler.Task;
+                await m.ReplyAsync(m.Data * m.Data, cancellationToken: cancellationToken);
+            },
+            cancellationToken: cancellationToken);
+
+        var replyTask = nats.RequestAsync<int, int>("e1", 6, cancellationToken: cancellationToken).AsTask();
+
+        await handlerStarted.Task;
+
+        // Removal must wait for the message already being handled.
+        var removeTask = s1.RemoveEndpointAsync("e1", cancellationToken).AsTask();
+        Assert.False(removeTask.IsCompleted);
+
+        releaseHandler.SetResult();
+
+        await removeTask;
+        Assert.Equal(36, (await replyTask).Data);
+    }
+
+    [Fact]
+    public async Task Remove_end_point_that_does_not_exist()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
+        var svc = new NatsSvcContext(nats);
+
+        await using var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
+
+        var exception = await Assert.ThrowsAsync<NatsSvcException>(async () =>
+            await s1.RemoveEndpointAsync("e1", cancellationToken));
+
+        Assert.Equal("Endpoint 'e1' does not exist", exception.Message);
+    }
+
+    [Fact]
     public async Task Add_groups_metadata_and_stats()
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));

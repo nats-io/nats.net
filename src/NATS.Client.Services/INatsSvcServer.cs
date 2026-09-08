@@ -26,15 +26,27 @@ public interface INatsSvcServer : IAsyncDisposable
     /// <param name="serializer">Serializer to use when deserializing incoming messages (defaults to connection's serializer).</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to stop the endpoint.</param>
     /// <typeparam name="T">Serialization type for messages received.</typeparam>
-    /// <returns>The endpoint that was added.</returns>
+    /// <returns>A <seealso cref="ValueTask"/> representing the asynchronous operation.</returns>
     /// <remarks>
     /// One of name or subject must be specified.
+    /// </remarks>
+    ValueTask AddEndpointAsync<T>(Func<NatsSvcMsg<T>, ValueTask> handler, string? name = default, string? subject = default, string? queueGroup = default, IDictionary<string, string>? metadata = default, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Removes an endpoint by name, draining and disposing it.
+    /// </summary>
+    /// <param name="name">Name of the endpoint to remove.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to bound the drain operation.</param>
+    /// <returns>A <seealso cref="ValueTask"/> representing the asynchronous operation.</returns>
+    /// <remarks>
+    /// The endpoint stops receiving new messages, then any messages it has already received are
+    /// handled before it is disposed. Other endpoints on this service are unaffected.
     /// <para>
-    /// Use <see cref="INatsSvcEndpoint.StopAsync(CancellationToken)"/> on the returned endpoint to retire
-    /// it gracefully without affecting the other endpoints on this service
+    /// Endpoints added through a <see cref="NatsSvcServer.Group"/> are removed by their endpoint
+    /// name, without the group prefix.
     /// </para>
     /// </remarks>
-    ValueTask<INatsSvcEndpoint> AddEndpointAsync<T>(Func<NatsSvcMsg<T>, ValueTask> handler, string? name = default, string? subject = default, string? queueGroup = default, IDictionary<string, string>? metadata = default, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default);
+    ValueTask RemoveEndpointAsync(string name, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Adds a new service group with optional queue group.
