@@ -228,4 +228,54 @@ public class NatsHeaderTest
 
         Assert.Equal(expected.Length, bytesLength);
     }
+
+    [Fact]
+    public void ParserCaseInsensitiveByDefaultTests()
+    {
+        var parser = new NatsHeaderParser(Encoding.UTF8);
+        var text = "NATS/1.0\r\nX-Trace: alpha\r\nx-trace: bravo\r\n\r\n";
+        var input = new SequenceReader<byte>(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(text)));
+        var headers = new NatsHeaders();
+        parser.ParseHeaders(input, headers);
+
+        Assert.False(parser.CaseSensitiveHeaders);
+        Assert.Single(headers);
+        Assert.Equal(new[] { "alpha", "bravo" }, headers["X-Trace"].ToArray());
+    }
+
+    [Fact]
+    public void ParserCaseSensitiveTests()
+    {
+        var parser = new NatsHeaderParser(Encoding.UTF8, caseSensitiveHeaders: true);
+        var text = "NATS/1.0\r\nX-Trace: alpha\r\nx-trace: bravo\r\n\r\n";
+        var input = new SequenceReader<byte>(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(text)));
+        var headers = new NatsHeaders(caseSensitive: true);
+        parser.ParseHeaders(input, headers);
+
+        Assert.True(parser.CaseSensitiveHeaders);
+        Assert.Equal(2, headers.Count);
+        Assert.Equal("alpha", headers["X-Trace"]);
+        Assert.Equal("bravo", headers["x-trace"]);
+    }
+
+    [Fact]
+    public async Task WriterCaseSensitiveTests()
+    {
+        var headers = new NatsHeaders(caseSensitive: true)
+        {
+            ["X-Trace"] = "alpha",
+            ["x-trace"] = "bravo",
+        };
+        var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
+        var writer = new HeaderWriter(Encoding.UTF8);
+        var written = writer.Write(pipe.Writer, headers);
+
+        var text = "NATS/1.0\r\nX-Trace: alpha\r\nx-trace: bravo\r\n\r\n";
+        var expected = new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(text));
+
+        Assert.Equal(expected.Length, written);
+        await pipe.Writer.FlushAsync();
+        var result = await pipe.Reader.ReadAtLeastAsync((int)written);
+        Assert.True(expected.ToSpan().SequenceEqual(result.Buffer.ToSpan()));
+    }
 }

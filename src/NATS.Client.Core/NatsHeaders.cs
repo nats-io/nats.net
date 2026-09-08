@@ -76,6 +76,10 @@ public class NatsHeaders : INatsHeaders
     private static readonly IEnumerator<KeyValuePair<string, StringValues>> EmptyIEnumeratorType = default(Enumerator);
     private static readonly IEnumerator EmptyIEnumerator = default(Enumerator);
 
+    // Only used when this instance creates its own store; a caller-supplied store keeps its own comparer.
+    // TODO: next major version should default to StringComparer.Ordinal per ADR-4, making case-insensitive the opt-in.
+    private readonly IEqualityComparer<string> _comparer = StringComparer.OrdinalIgnoreCase;
+
     public int Version => 1;
 
     public int Code { get; internal set; }
@@ -109,6 +113,15 @@ public class NatsHeaders : INatsHeaders
         EnsureStore(capacity);
     }
 
+    /// <summary>
+    /// Initializes a new instance of <see cref="NatsHeaders"/>.
+    /// </summary>
+    /// <param name="caseSensitive">Whether header names are matched case-sensitively, as ADR-4 requires.</param>
+    public NatsHeaders(bool caseSensitive)
+    {
+        _comparer = caseSensitive ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase;
+    }
+
     internal Activity? Activity { get; set; }
 
     private Dictionary<string, StringValues>? Store { get; set; }
@@ -118,7 +131,7 @@ public class NatsHeaders : INatsHeaders
     {
         if (Store == null)
         {
-            Store = new Dictionary<string, StringValues>(capacity, StringComparer.OrdinalIgnoreCase);
+            Store = new Dictionary<string, StringValues>(capacity, _comparer);
         }
     }
 

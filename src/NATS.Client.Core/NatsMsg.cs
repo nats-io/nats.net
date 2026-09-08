@@ -389,7 +389,7 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
 
         if (headersBuffer != null)
         {
-            headers = new NatsHeaders();
+            headers = new NatsHeaders(headerParser.CaseSensitiveHeaders);
 
             try
             {
