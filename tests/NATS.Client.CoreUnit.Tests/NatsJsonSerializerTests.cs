@@ -77,66 +77,75 @@ public class NatsJsonSerializerTests
     }
 
     [Fact]
-    public void Serialize_WithoutWriterOptions_IgnoresEncoderFromSerializerOptions()
+    public void Serialize_WithoutWriterOptions_EscapesNonAsciiByDefault()
     {
-        // The encoder on JsonSerializerOptions is not used when writing to a Utf8JsonWriter,
-        // so by default non-ASCII characters are still escaped. See
-        // https://github.com/nats-io/nats.net/issues/1219
-        var opts = new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
-        var serializer = new NatsJsonSerializer<DefaultOptsPayload>(opts);
+        var serializer = new NatsJsonSerializer<Payload>(new JsonSerializerOptions());
 
-        var json = Serialize(serializer, new DefaultOptsPayload { Name = "café" });
+        var json = Serialize(serializer, new Payload { Name = "café" });
 
         Assert.DoesNotContain("café", json);
         Assert.Contains("00E9", json, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void Serialize_WithWriterOptions_UsesGivenEncoder()
+    public void Serialize_WithoutWriterOptions_UsesEncoderFromSerializerOptions()
     {
-        var writerOpts = new JsonWriterOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping, SkipValidation = true };
-        var serializer = new NatsJsonSerializer<WriterOptsPayload>(new JsonSerializerOptions(), writerOpts);
+        // The encoder on JsonSerializerOptions is not picked up by Utf8JsonWriter on its own,
+        // so it is forwarded to the writer options. See
+        // https://github.com/nats-io/nats.net/issues/1219
+        var opts = new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+        var serializer = new NatsJsonSerializer<Payload>(opts);
 
-        var json = Serialize(serializer, new WriterOptsPayload { Name = "café" });
+        var json = Serialize(serializer, new Payload { Name = "café" });
 
         Assert.Equal("""{"Name":"café"}""", json);
     }
 
     [Fact]
-    public void Serialize_WithWriterOptions_ReusesInstanceAcrossCalls()
+    public void Serialize_WithWriterOptions_UsesGivenEncoder()
     {
         var writerOpts = new JsonWriterOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping, SkipValidation = true };
-        var serializer = new NatsJsonSerializer<RepeatedWriterOptsPayload>(new JsonSerializerOptions(), writerOpts);
+        var serializer = new NatsJsonSerializer<Payload>(new JsonSerializerOptions(), writerOpts);
+
+        var json = Serialize(serializer, new Payload { Name = "café" });
+
+        Assert.Equal("""{"Name":"café"}""", json);
+    }
+
+    [Fact]
+    public void Serialize_WithWriterOptions_HonoursOptionsOnEveryCall()
+    {
+        var writerOpts = new JsonWriterOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping, SkipValidation = true };
+        var serializer = new NatsJsonSerializer<Payload>(new JsonSerializerOptions(), writerOpts);
 
         for (var i = 0; i < 3; i++)
         {
-            Assert.Equal("""{"Name":"café"}""", Serialize(serializer, new RepeatedWriterOptsPayload { Name = "café" }));
+            Assert.Equal("""{"Name":"café"}""", Serialize(serializer, new Payload { Name = "café" }));
         }
     }
 
     [Fact]
     public void Serialize_WithWriterOptions_UsesGivenIndentation()
     {
-        var serializer = new NatsJsonSerializer<IndentedOptsPayload>(new JsonSerializerOptions(), new JsonWriterOptions { Indented = true, SkipValidation = true });
+        var serializer = new NatsJsonSerializer<Payload>(new JsonSerializerOptions(), new JsonWriterOptions { Indented = true, SkipValidation = true });
 
-        Assert.Contains("\n", Serialize(serializer, new IndentedOptsPayload { Name = "a" }));
+        Assert.Contains("\n", Serialize(serializer, new Payload { Name = "a" }));
 
         // The default writer options stay compact
-        Assert.Equal("""{"Name":"a"}""", Serialize(new NatsJsonSerializer<IndentedOptsPayload>(new JsonSerializerOptions()), new IndentedOptsPayload { Name = "a" }));
+        Assert.Equal("""{"Name":"a"}""", Serialize(new NatsJsonSerializer<Payload>(new JsonSerializerOptions()), new Payload { Name = "a" }));
     }
 
     [Fact]
-    public void Serialize_WithWriterOptions_IsNotAffectedByOtherInstancesOnSameThread()
+    public void Serialize_WithWriterOptions_IsNotAffectedByOtherInstances()
     {
-        // NatsJsonSerializer<T> caches a Utf8JsonWriter in a [ThreadStatic] field shared by every
-        // instance for a given T, and Utf8JsonWriter.Reset() does not change the writer's options.
-        // Each serializer must still honour its own writer options, whichever ran first.
-        var defaultSerializer = new NatsJsonSerializer<SharedWriterPayload>(new JsonSerializerOptions());
-        var relaxedSerializer = new NatsJsonSerializer<SharedWriterPayload>(
+        // Each serializer must honour its own writer options, whichever ran first, so writer
+        // state must never be shared between instances.
+        var defaultSerializer = new NatsJsonSerializer<Payload>(new JsonSerializerOptions());
+        var relaxedSerializer = new NatsJsonSerializer<Payload>(
             new JsonSerializerOptions(),
             new JsonWriterOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping, SkipValidation = true });
 
-        var obj = new SharedWriterPayload { Name = "café" };
+        var obj = new Payload { Name = "café" };
 
         Assert.DoesNotContain("café", Serialize(defaultSerializer, obj));
         Assert.Equal("""{"Name":"café"}""", Serialize(relaxedSerializer, obj));
@@ -160,27 +169,7 @@ public class NatsJsonSerializerTests
         public required string? Name { get; init; }
     }
 
-    private class DefaultOptsPayload
-    {
-        public string? Name { get; init; }
-    }
-
-    private class WriterOptsPayload
-    {
-        public string? Name { get; init; }
-    }
-
-    private class RepeatedWriterOptsPayload
-    {
-        public string? Name { get; init; }
-    }
-
-    private class IndentedOptsPayload
-    {
-        public string? Name { get; init; }
-    }
-
-    private class SharedWriterPayload
+    private class Payload
     {
         public string? Name { get; init; }
     }

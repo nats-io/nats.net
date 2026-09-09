@@ -18,7 +18,6 @@ public sealed class NatsJsonSerializer<T> : INatsSerializer<T>
 
     /// <summary>
     /// Reflection-based JSON serializer for NATS.
-    /// A shared <see cref="Utf8JsonWriter"/> is reused and reset on every serialization.
     /// </summary>
     /// <remarks>
     /// This serializer is not suitable for native AOT deployments since it might rely on reflection
