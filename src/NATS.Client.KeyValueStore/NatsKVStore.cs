@@ -362,6 +362,10 @@ public class NatsKVStore : INatsKVStore
         }
         else
         {
+            // A missing message surfaces here as NatsJSApiException ("no message found"), not as
+            // NatsKVKeyNotFoundException like the direct path above returns for a 404. nats.go maps
+            // ErrMsgNotFound to ErrKeyNotFound on both paths; aligning would change the exception
+            // type callers already see, so it is left as is for now.
             var response = await _stream.GetAsync(request, cancellationToken);
 
             if (revision != default)
