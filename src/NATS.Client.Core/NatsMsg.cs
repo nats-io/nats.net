@@ -355,6 +355,12 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
     /// Set by the request/reply paths so a reply is traced under the request that caused it.
     /// Pass <c>default</c> for messages that are not replies.
     /// </param>
+    /// <param name="subscriptionSubject">
+    /// The subject the subscription was created with, which is the low cardinality template
+    /// the delivered subject matched. Defaults to the delivered subject when the caller has no
+    /// subscription to hand.
+    /// </param>
+    /// <param name="queueGroup">The subscription's queue group, if it joined one.</param>
     /// <returns>A new <see cref="NatsMsg{T}"/> instance containing the provided data.</returns>
     /// <exception cref="NatsException">Thrown if there is an error during the processing of the message.</exception>
     internal static NatsMsg<T> BuildInternal(
@@ -365,7 +371,9 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
         INatsConnection? connection,
         NatsHeaderParser headerParser,
         INatsDeserialize<T> serializer,
-        ActivityContext replyParentContext)
+        ActivityContext replyParentContext,
+        string? subscriptionSubject = null,
+        string? queueGroup = null)
     {
         NatsHeaders? headers = null;
         var flags = NatsMsgFlags.None;
@@ -402,6 +410,7 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
                    + (headersBuffer?.Length ?? 0)
                    + payloadBuffer.Length;
 
+        Activity? receiveActivity = null;
         if (Telemetry.HasListeners())
         {
             var activityName = connection is NatsConnection nats
@@ -410,11 +419,11 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
 
             headers ??= new NatsHeaders();
 
-            var activity = Telemetry.StartReceiveActivity(
+            receiveActivity = Telemetry.StartReceiveActivity(
                 connection,
                 name: activityName,
-                subscriptionSubject: subject,
-                queueGroup: null,
+                subscriptionSubject: subscriptionSubject ?? subject,
+                queueGroup: queueGroup,
                 subject: subject,
                 replyTo: replyTo,
                 bodySize: payloadBuffer.Length,
@@ -422,15 +431,24 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
                 headers: headers,
                 fallbackParentContext: replyParentContext);
 
-            if (activity is not null)
+            if (receiveActivity is not null)
             {
-                headers.Activity = activity;
+                headers.Activity = receiveActivity;
             }
         }
 
         T? data;
         if (headers?.Error == null)
         {
+            // Deserialization is part of receiving the message, so a deserializer that starts
+            // its own span should nest under the receive activity. Receive activities are kept
+            // off the ambient context because they are created on the read loop, so it has to
+            // be put there for the call and taken back out. Only paid when tracing is on and
+            // the message was not filtered out.
+            var ambient = Activity.Current;
+            if (receiveActivity is not null)
+                Activity.Current = receiveActivity;
+
             try
             {
                 data = serializer.Deserialize(payloadBuffer, new NatsMsgContext(subject, replyTo, headers));
@@ -440,6 +458,11 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
                 headers ??= new NatsHeaders();
                 headers.Error = new NatsDeserializeException(payloadBuffer.ToArray(), e);
                 data = default;
+            }
+            finally
+            {
+                if (receiveActivity is not null)
+                    Telemetry.RestoreCurrentActivity(ambient);
             }
         }
         else

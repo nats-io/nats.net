@@ -394,6 +394,67 @@ public class KeyValueStoreTest
     [Theory]
     [InlineData(NatsRequestReplyMode.Direct)]
     [InlineData(NatsRequestReplyMode.SharedInbox)]
+    public async Task Purge_deletes_retaining_recently_deleted_key_history(NatsRequestReplyMode mode)
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestReplyMode = mode });
+        await nats.ConnectRetryAsync();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var store = await kv.CreateStoreAsync(new NatsKVConfig("kv1") { History = 10 }, cancellationToken: cancellationToken);
+
+        async Task<int> HistoryCountAsync(string key)
+        {
+            var count = 0;
+            await foreach (var entry in store.HistoryAsync<string>(key, cancellationToken: cancellationToken))
+            {
+                count++;
+                _output.WriteLine($"{entry}");
+            }
+
+            return count;
+        }
+
+        // k1 is deleted outside of the delete markers threshold used below, k2 within it
+        await store.PutAsync("k1", "v1", cancellationToken: cancellationToken);
+        await store.PutAsync("k1", "v2", cancellationToken: cancellationToken);
+        await store.PutAsync("k1", "v3", cancellationToken: cancellationToken);
+        await store.DeleteAsync("k1", cancellationToken: cancellationToken);
+
+        await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+
+        await store.PutAsync("k2", "v1", cancellationToken: cancellationToken);
+        await store.PutAsync("k2", "v2", cancellationToken: cancellationToken);
+        await store.PutAsync("k2", "v3", cancellationToken: cancellationToken);
+        await store.DeleteAsync("k2", cancellationToken: cancellationToken);
+
+        Assert.Equal(4, await HistoryCountAsync("k1"));
+        Assert.Equal(4, await HistoryCountAsync("k2"));
+
+        _output.WriteLine("PURGE DELETES RETAINING RECENTLY DELETED KEY HISTORY");
+        var opts = new NatsKVPurgeOpts { DeleteMarkersThreshold = TimeSpan.FromSeconds(1), RetainRecentlyDeletedKeyHistory = true };
+        await store.PurgeDeletesAsync(opts: opts, cancellationToken: cancellationToken);
+
+        // k1 was deleted before the threshold so it's gone entirely, k2 is untouched
+        Assert.Equal(0, await HistoryCountAsync("k1"));
+        Assert.Equal(4, await HistoryCountAsync("k2"));
+
+        _output.WriteLine("PURGE DELETES WITHOUT RETAINING RECENTLY DELETED KEY HISTORY");
+        await store.PurgeDeletesAsync(opts: opts with { RetainRecentlyDeletedKeyHistory = false }, cancellationToken: cancellationToken);
+
+        // k2 is still within the threshold, so only its delete marker is kept
+        Assert.Equal(0, await HistoryCountAsync("k1"));
+        Assert.Equal(1, await HistoryCountAsync("k2"));
+    }
+
+    [Theory]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
     public async Task Update_with_revisions(NatsRequestReplyMode mode)
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));

@@ -122,6 +122,17 @@ public interface INatsJSConsumer
     ValueTask UnpinAsync(string group, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Reset this consumer's delivery state and update this consumer.
+    /// </summary>
+    /// <param name="seq">Stream sequence to reset to. Zero (the default) resets the consumer to its current ack floor.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>The reset response, including the consumer info and the sequence the consumer was reset to.</returns>
+    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
+    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <remarks>This feature is only available on NATS server v2.14 and later.</remarks>
+    ValueTask<ConsumerResetResponse> ResetAsync(ulong seq = 0, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Consume a set number of messages from the stream using this consumer.
     /// Returns immediately if no messages are available.
     /// </summary>

@@ -92,6 +92,15 @@ jobs:
           cd tests/NATS.Client.ObjectStore.Encoder.Tests
           dotnet test -c Release --no-build -p:TestTfmsInParallel=false
 
+      # net481 resolves the netstandard2.0 build of the client, the only TFM that compiles the
+      # PutAsync read loop; NetStandardPutPathTest is what actually asserts against it
+      - name: Test Object Store
+        run: |
+          tasklist | grep -i nats-server && taskkill -F -IM nats-server.exe
+          nats-server.exe -v
+          cd tests/NATS.Client.ObjectStore.Tests
+          dotnet test -c Release --no-build -p:TestTfmsInParallel=false
+
       - name: Test JetStream
         run: |
             tasklist | grep -i nats-server && taskkill -F -IM nats-server.exe

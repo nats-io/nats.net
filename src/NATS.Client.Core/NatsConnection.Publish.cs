@@ -22,7 +22,7 @@ public partial class NatsConnection
         ValueTask task;
         if (Telemetry.HasListeners())
         {
-            using var activity = Telemetry.StartSendActivity($"{SpanDestinationName(subject)} {Telemetry.Constants.PublishActivityName}", this, subject, replyTo);
+            using var activity = Telemetry.StartSendActivity($"{SpanDestinationName(subject)} {Telemetry.Constants.PublishActivityName}", this, subject, replyTo, Telemetry.Constants.OpPub);
             Telemetry.AddTraceContextHeaders(activity, ref headers);
             try
             {
@@ -74,7 +74,7 @@ public partial class NatsConnection
         ValueTask task;
         if (Telemetry.HasListeners())
         {
-            using var activity = Telemetry.StartSendActivity($"{SpanDestinationName(subject)} {Telemetry.Constants.PublishActivityName}", this, subject, replyTo);
+            using var activity = Telemetry.StartSendActivity($"{SpanDestinationName(subject)} {Telemetry.Constants.PublishActivityName}", this, subject, replyTo, Telemetry.Constants.OpPub);
             Telemetry.AddTraceContextHeaders(activity, ref headers);
             try
             {

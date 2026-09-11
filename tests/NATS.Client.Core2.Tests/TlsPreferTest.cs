@@ -31,6 +31,8 @@ public class TlsPreferTest(ITestOutputHelper output)
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
 
         var connectLine = string.Empty;
+        var handshakeDone = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var handshakeReg = cts.Token.Register(() => handshakeDone.TrySetCanceled());
 
         var serverTask = Task.Run(
             async () =>
@@ -71,6 +73,20 @@ public class TlsPreferTest(ITestOutputHelper output)
                         break; // handshake complete
                     }
                 }
+
+                handshakeDone.TrySetResult();
+
+                // Hold the socket open until the test is done with it. Closing here races
+                // ConnectAsync: the client reconnects on a dropped connection, and a
+                // reconnect that starts before ConnectAsync returns leaves it waiting on a
+                // connection this listener will never accept, since its one accept is spent.
+                try
+                {
+                    await Task.Delay(Timeout.Infinite, cts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                }
             },
             cts.Token);
 
@@ -88,6 +104,8 @@ public class TlsPreferTest(ITestOutputHelper output)
         });
 
         await nats.ConnectRetryAsync();
+        await handshakeDone.Task;
+        cts.Cancel();
         await serverTask;
         listener.Stop();
 
@@ -325,6 +343,8 @@ public class TlsPreferTest(ITestOutputHelper output)
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
 
         var connectLine = string.Empty;
+        var handshakeDone = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var handshakeReg = cts.Token.Register(() => handshakeDone.TrySetCanceled());
 
         var serverTask = Task.Run(
             async () =>
@@ -362,6 +382,17 @@ public class TlsPreferTest(ITestOutputHelper output)
                         break;
                     }
                 }
+
+                handshakeDone.TrySetResult();
+
+                // Hold the socket open until the test is done with it, as above.
+                try
+                {
+                    await Task.Delay(Timeout.Infinite, cts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                }
             },
             cts.Token);
 
@@ -373,6 +404,8 @@ public class TlsPreferTest(ITestOutputHelper output)
         });
 
         await nats.ConnectRetryAsync();
+        await handshakeDone.Task;
+        cts.Cancel();
         await serverTask;
         listener.Stop();
 

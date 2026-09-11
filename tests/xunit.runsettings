@@ -5,5 +5,11 @@
     </RunConfiguration>
     <xUnit>
         <MaxParallelThreads>1</MaxParallelThreads>
+        <!--  A test that outlives TestSessionTimeout aborts the whole assembly, and the abort
+              prints no per-test output, so the hung test is unidentifiable from CI logs alone.
+              These two name it every 60s instead. LongRunningTestSeconds is delivered as a
+              diagnostic message, so it does nothing unless DiagnosticMessages is also set.  -->
+        <DiagnosticMessages>true</DiagnosticMessages>
+        <LongRunningTestSeconds>60</LongRunningTestSeconds>
     </xUnit>
 </RunSettings>

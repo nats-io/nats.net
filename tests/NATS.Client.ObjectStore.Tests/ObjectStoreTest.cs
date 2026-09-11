@@ -80,7 +80,7 @@ public class ObjectStoreTest
 
             var data = await store.GetInfoAsync("k1", cancellationToken: cancellationToken);
 
-            var sha = Base64UrlEncoder.Encode(SHA256.HashData(buffer));
+            var sha = Base64UrlEncoder.Encode(Sha256Compat.HashData(buffer));
             var size = buffer.Length;
             var chunks = Math.Ceiling(size / 10.0);
 
@@ -100,7 +100,7 @@ public class ObjectStoreTest
 
             var data = await store.GetInfoAsync("k2", cancellationToken: cancellationToken);
 
-            var sha = Base64UrlEncoder.Encode(SHA256.HashData(buffer));
+            var sha = Base64UrlEncoder.Encode(Sha256Compat.HashData(buffer));
             var size = buffer.Length;
             var chunks = Math.Ceiling(size / 10.0);
 
@@ -239,19 +239,19 @@ public class ObjectStoreTest
         var store = await obj.CreateObjectStoreAsync(new NatsObjConfig("b1"), cancellationToken);
 
         var data = new byte[1024 * 1024 * 10];
-        Random.Shared.NextBytes(data);
+        RandomCompat.Shared.NextBytes(data);
 
         const string filename = $"_tmp_test_file_{nameof(Put_and_get_large_file)}.bin";
         var filename1 = $"{filename}.1";
 
-        await File.WriteAllBytesAsync(filename, data, cancellationToken);
+        await FileCompat.WriteAllBytesAsync(filename, data, cancellationToken);
 
-        await store.PutAsync("my/random/data.bin", File.OpenRead(filename), cancellationToken: cancellationToken);
+        await store.PutAsync("my/random/data.bin", FileCompat.OpenRead(filename), cancellationToken: cancellationToken);
 
-        await store.GetAsync("my/random/data.bin", File.OpenWrite(filename1), cancellationToken: cancellationToken);
+        await store.GetAsync("my/random/data.bin", FileCompat.OpenWrite(filename1), cancellationToken: cancellationToken);
 
-        var hash = Convert.ToBase64String(SHA256.HashData(await File.ReadAllBytesAsync(filename, cancellationToken)));
-        var hash1 = Convert.ToBase64String(SHA256.HashData(await File.ReadAllBytesAsync(filename1, cancellationToken)));
+        var hash = Convert.ToBase64String(Sha256Compat.HashData(await FileCompat.ReadAllBytesAsync(filename, cancellationToken)));
+        var hash1 = Convert.ToBase64String(Sha256Compat.HashData(await FileCompat.ReadAllBytesAsync(filename1, cancellationToken)));
 
         Assert.Equal(hash, hash1);
     }
@@ -527,12 +527,12 @@ public class ObjectStoreTest
         var store = await obj.CreateObjectStoreAsync(new NatsObjConfig("b1"), cancellationToken);
 
         var data = new byte[1024];
-        Random.Shared.NextBytes(data);
+        RandomCompat.Shared.NextBytes(data);
 
         const string filename = $"_tmp_test_file_{nameof(Put_with_activity)}.bin";
-        await File.WriteAllBytesAsync(filename, data, cancellationToken);
+        await FileCompat.WriteAllBytesAsync(filename, data, cancellationToken);
 
-        await store.PutAsync("my/random/data_1.bin", File.OpenRead(filename), cancellationToken: cancellationToken);
+        await store.PutAsync("my/random/data_1.bin", FileCompat.OpenRead(filename), cancellationToken: cancellationToken);
     }
 
     [Fact]
@@ -560,14 +560,14 @@ public class ObjectStoreTest
         var store = await obj.CreateObjectStoreAsync(new NatsObjConfig("b1"), cancellationToken);
 
         var data = new byte[1024];
-        Random.Shared.NextBytes(data);
+        RandomCompat.Shared.NextBytes(data);
 
         const string filename = $"_tmp_test_file_{nameof(Put_multiple_times_with_activity)}.bin";
-        await File.WriteAllBytesAsync(filename, data, cancellationToken);
+        await FileCompat.WriteAllBytesAsync(filename, data, cancellationToken);
 
-        await store.PutAsync("my/random/data_1.bin", File.OpenRead(filename), cancellationToken: cancellationToken);
-        await store.PutAsync("my/random/data_2.bin", File.OpenRead(filename), cancellationToken: cancellationToken);
-        await store.PutAsync("my/random/data_3.bin", File.OpenRead(filename), cancellationToken: cancellationToken);
+        await store.PutAsync("my/random/data_1.bin", FileCompat.OpenRead(filename), cancellationToken: cancellationToken);
+        await store.PutAsync("my/random/data_2.bin", FileCompat.OpenRead(filename), cancellationToken: cancellationToken);
+        await store.PutAsync("my/random/data_3.bin", FileCompat.OpenRead(filename), cancellationToken: cancellationToken);
     }
 
     [Fact]

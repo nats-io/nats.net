@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
+using NATS.Client.Core.Internal;
 using NATS.Client.JetStream.Internal;
 using NATS.Client.JetStream.Models;
 
@@ -217,6 +218,11 @@ public partial class NatsJSContext
                 return msg.Data;
             }
 
+            // The Direct branch above goes through RequestAsync, which starts this. Driving
+            // CreateRequestSubAsync directly does not, so without it the subscribe, publish and
+            // receive spans are three separate traces. One per attempt: a retry is a new request.
+            using var activity = Telemetry.StartRequestActivity(Connection, subject);
+
             await using var sub = await Connection.CreateRequestSubAsync<T, PubAckResponse>(
                     subject: subject,
                     data: data,
@@ -320,6 +326,13 @@ public partial class NatsJSContext
         }
 
         opts ??= NatsJSPubOpts.Default;
+
+        // Scoped to issuing the request rather than to the future, which the caller may hold
+        // for any length of time and is not obliged to dispose. CreateRequestSubAsync captures
+        // this activity's context (ids only) onto the reply subscription, so the ack's receive
+        // span still parents under this one when it arrives after the span has ended, which is
+        // ordinary for asynchronous messaging.
+        using var activity = Telemetry.StartRequestActivity(Connection, subject);
 
         var sub = await Connection.CreateRequestSubAsync<T, PubAckResponse>(
                     subject: subject,
@@ -476,6 +489,11 @@ public partial class NatsJSContext
 
             return new NatsJSResponse<TResponse>(msg.Data.Value, null);
         }
+
+        // The Direct branch above goes through RequestAsync, which starts this. Without it
+        // every JetStream API call in SharedInbox mode produced a subscribe, a publish and a
+        // receive span in three unrelated traces.
+        using var activity = Telemetry.StartRequestActivity(Connection, subject);
 
         await using var sub = await Connection.CreateRequestSubAsync<TRequest, NatsJSApiResult<TResponse>>(
                 subject: subject,

@@ -48,7 +48,7 @@ public partial class NatsConnection
         {
             if (Telemetry.HasListeners())
             {
-                using var activity = Telemetry.StartSendActivity($"{SpanDestinationName(subject)} {Telemetry.Constants.RequestReplyActivityName}", this, subject, null);
+                using var activity = Telemetry.StartRequestActivity(this, subject);
                 try
                 {
                     replyOpts = SetReplyOptsDefaults(replyOpts);
@@ -58,13 +58,10 @@ public partial class NatsConnection
                         using var rt = _replyTaskFactory.CreateReplyTask(replySerializer, replyOpts.Timeout, replyOpts.ThrowIfNoResponders ?? true);
                         requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();
                         await PublishAsync(subject, data, headers, rt.Subject, requestSerializer, requestOpts, cancellationToken).ConfigureAwait(false);
-                        var msg = await rt.GetResultAsync(cancellationToken).ConfigureAwait(false);
 
-                        // End the activity from the headers to avoid leaking it. Direct mode
-                        // materializes the reply on the read loop, so nothing else ends it.
-                        Telemetry.EndActivity(msg.Headers?.Activity);
-
-                        return msg;
+                        // ReplyTask owns the reply's receive activity and ends it on every
+                        // exit, so this branch and the untraced one below behave the same.
+                        return await rt.GetResultAsync(cancellationToken).ConfigureAwait(false);
                     }
 
                     await using var sub1 = await CreateRequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
@@ -191,6 +188,12 @@ public partial class NatsConnection
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         replyOpts = SetReplyManyOptsDefaults(replyOpts);
+
+        // RequestMany started no request activity, so the reply subscription, the publish and
+        // every reply's receive activity were roots of three or more separate traces. The
+        // subscription is created inside this scope so that it and the replies nest under it.
+        using var activity = Telemetry.StartRequestActivity(this, subject);
+
         await using var sub = await CreateRequestSubAsync<TRequest, TReply>(subject, data, headers, requestSerializer, replySerializer, requestOpts, replyOpts, cancellationToken)
             .ConfigureAwait(false);
 
