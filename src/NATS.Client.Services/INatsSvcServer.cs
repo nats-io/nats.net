@@ -33,6 +33,22 @@ public interface INatsSvcServer : IAsyncDisposable
     ValueTask AddEndpointAsync<T>(Func<NatsSvcMsg<T>, ValueTask> handler, string? name = default, string? subject = default, string? queueGroup = default, IDictionary<string, string>? metadata = default, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Removes an endpoint by name, draining and disposing it.
+    /// </summary>
+    /// <param name="name">Name of the endpoint to remove.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to bound the drain operation.</param>
+    /// <returns>A <seealso cref="ValueTask"/> representing the asynchronous operation.</returns>
+    /// <remarks>
+    /// The endpoint stops receiving new messages, then any messages it has already received are
+    /// handled before it is disposed. Other endpoints on this service are unaffected.
+    /// <para>
+    /// Endpoints added through a <see cref="NatsSvcServer.Group"/> are removed by their endpoint
+    /// name, without the group prefix.
+    /// </para>
+    /// </remarks>
+    ValueTask RemoveEndpointAsync(string name, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Adds a new service group with optional queue group.
     /// </summary>
     /// <param name="name">Name of the group.</param>

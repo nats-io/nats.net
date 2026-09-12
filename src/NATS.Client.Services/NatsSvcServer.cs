@@ -21,7 +21,7 @@ public class NatsSvcServer : INatsSvcServer
     private readonly Channel<SvcMsg> _channel;
     private readonly Task _taskMsgLoop;
     private readonly List<SvcListener> _svcListeners = new();
-    private readonly ConcurrentDictionary<string, INatsSvcEndpoint> _endPoints = new();
+    private readonly ConcurrentDictionary<string, NatsSvcEndpointBase> _endPoints = new();
     private readonly string _started;
     private readonly CancellationTokenSource _cts;
 
@@ -110,6 +110,32 @@ public class NatsSvcServer : INatsSvcServer
     {
         queueGroup ??= _config.UseQueueGroup ? _config.QueueGroup : null;
         return AddEndpointInternalAsync<T>(handler, name, subject, queueGroup, metadata, serializer, cancellationToken);
+    }
+
+    /// <summary>
+    /// Removes an endpoint by name, draining and disposing it.
+    /// </summary>
+    /// <param name="name">Name of the endpoint to remove.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to bound the drain operation.</param>
+    /// <returns>A <seealso cref="ValueTask"/> representing the asynchronous operation.</returns>
+    /// <remarks>
+    /// The endpoint stops receiving new messages, then any messages it has already received are
+    /// handled before it is disposed. Other endpoints on this service are unaffected.
+    /// <para>
+    /// Endpoints added through a <see cref="Group"/> are removed by their endpoint name, without
+    /// the group prefix.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="NatsSvcException">There is no endpoint with that name.</exception>
+    public async ValueTask RemoveEndpointAsync(string name, CancellationToken cancellationToken = default)
+    {
+        if (!_endPoints.TryRemove(name, out var ep))
+        {
+            throw new NatsSvcException($"Endpoint '{name}' does not exist");
+        }
+
+        await ep.DrainAsync(cancellationToken).ConfigureAwait(false);
+        await ep.DisposeAsync().ConfigureAwait(false);
     }
 
     /// <summary>
