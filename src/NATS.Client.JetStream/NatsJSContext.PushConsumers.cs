@@ -28,6 +28,12 @@ public partial class NatsJSContext : INatsJSContext
     }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// The returned consumer uses default channel options. To customize subscription options
+    /// or provide a notification handler, call <see cref="NatsJSPushConsumer.ConsumeAsync{T}"/>
+    /// with <see cref="NatsJSConsumeOpts"/> specifying <c>SubOpts</c>
+    /// and <c>NotificationHandler</c>.
+    /// </remarks>
     public async ValueTask<INatsJSPushConsumer> GetPushConsumerAsync(
         string stream,
         string consumer,
@@ -81,6 +87,7 @@ public partial class NatsJSContext : INatsJSContext
             HeadersOnly = opts.HeadersOnly,
             DeliverSubject = opts.DeliverSubject,
             DeliverGroup = opts.DeliverGroup,
+            ReplayPolicy = opts.ReplayPolicy,
         };
 
         if (opts.FilterSubjects is { Count: > 0 } filterSubjects)
@@ -121,6 +128,21 @@ public partial class NatsJSContext : INatsJSContext
         if (opts.IdleHeartbeat is { } idleHeartbeat)
         {
             config.IdleHeartbeat = idleHeartbeat;
+        }
+
+        if (opts.RateLimitBps > 0)
+        {
+            config.RateLimitBps = opts.RateLimitBps;
+        }
+
+        if (opts.Backoff is { Count: > 0 } backoff)
+        {
+            config.Backoff = backoff;
+        }
+
+        if (opts.Metadata is { Count: > 0 } metadata)
+        {
+            config.Metadata = metadata;
         }
 
         var consumer = await CreateOrUpdateConsumerInternalAsync(stream, config, action, cancellationToken);

@@ -155,4 +155,27 @@ public record NatsJSPushConsumerOpts
     /// operational updates or state changes during the consumer's lifecycle.
     /// </summary>
     public Func<INatsJSNotification, CancellationToken, Task>? NotificationHandler { get; init; }
+
+    /// <summary>
+    /// The replay policy for the consumer.
+    /// </summary>
+    /// <remarks>
+    /// Defaults to <see cref="ConsumerConfigReplayPolicy.Instant"/>.
+    /// </remarks>
+    public ConsumerConfigReplayPolicy ReplayPolicy { get; init; } = ConsumerConfigReplayPolicy.Instant;
+
+    /// <summary>
+    /// An optional list of retry intervals for failed message deliveries.
+    /// </summary>
+    public ICollection<TimeSpan>? Backoff { get; init; }
+
+    /// <summary>
+    /// Optional metadata for the consumer as key-value pairs.
+    /// </summary>
+    public IDictionary<string, string>? Metadata { get; init; }
+
+    /// <summary>
+    /// The rate limit in bits per second for message delivery.
+    /// </summary>
+    public long RateLimitBps { get; init; }
 }
