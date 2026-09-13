@@ -107,6 +107,7 @@ internal class NatsJSOrderedPushConsumer<T>
     private string _consumer;
     private volatile NatsJSOrderedPushConsumerSub<T>? _sub;
     private int _done;
+    private volatile bool _creationFailed;
 
     public NatsJSOrderedPushConsumer(
         INatsJSContext context,
@@ -188,6 +189,8 @@ internal class NatsJSOrderedPushConsumer<T>
 
     public bool IsDone => Volatile.Read(ref _done) > 0;
 
+    public ConsumerInfo? Info { get; private set; }
+
     private string Consumer
     {
         get => Volatile.Read(ref _consumer);
@@ -266,6 +269,9 @@ internal class NatsJSOrderedPushConsumer<T>
         {
             while (await _commandChannel.Reader.WaitToReadAsync(_cancellationToken))
             {
+                if (_creationFailed)
+                    break;
+
                 while (_commandChannel.Reader.TryRead(out var command))
                 {
                     try
@@ -380,7 +386,10 @@ internal class NatsJSOrderedPushConsumer<T>
                     }
                     catch (Exception e)
                     {
+                        _creationFailed = true;
+                        _msgChannel.Writer.TryComplete(e);
                         _logger.LogWarning(NatsJSLogEvents.RecreateConsumer, e, "Consumer create error");
+                        return;
                     }
                 }
             }
@@ -475,10 +484,12 @@ internal class NatsJSOrderedPushConsumer<T>
             config.OptStartSeq = sequence + 1;
         }
 
-        await _context.CreateOrUpdateConsumerAsync(
+        var consumerInfo = await _context.CreateOrUpdateConsumerAsync(
             _stream,
             config,
             cancellationToken: _cancellationToken);
+
+        Info = consumerInfo.Info;
 
         if (_debug)
         {
