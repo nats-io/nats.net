@@ -90,15 +90,13 @@ public class NatsJSPushConsumer : INatsJSPushConsumer
 
         serializer ??= _context.Connection.Opts.SerializerRegistry.GetDeserializer<T>();
 
-        var idleHeartbeat = Info.Config.IdleHeartbeat == TimeSpan.Zero ? TimeSpan.FromSeconds(5) : Info.Config.IdleHeartbeat;
-
         var subOpts = _subOpts;
 
         var sub = new NatsJSPushConsume<T>(
             context: _context,
             subject: deliverSubject,
             queueGroup: Info.Config.DeliverGroup,
-            idleHeartbeat: idleHeartbeat,
+            idleHeartbeat: Info.Config.IdleHeartbeat,
             notificationHandler: _notificationHandler ?? opts?.NotificationHandler,
             serializer: serializer,
             opts: subOpts,
