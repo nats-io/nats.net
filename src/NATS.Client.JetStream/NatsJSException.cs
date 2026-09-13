@@ -57,7 +57,7 @@ public class NatsJSProtocolException : NatsJSException
     /// Returns an exception describing a push based consumer when a pull based operation is attempted.
     /// </summary>
     public static NatsJSProtocolException ConsumerIsPushBased() =>
-        new(100, NatsHeaders.Messages.ConsumerIsPushBased, "Consumer is push based");
+        new(409, NatsHeaders.Messages.ConsumerIsPushBased, "Consumer is push based");
 }
 
 /// <summary>

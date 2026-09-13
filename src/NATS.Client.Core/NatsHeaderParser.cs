@@ -101,6 +101,7 @@ public class NatsHeaderParser
             }
             else if (headerLine.SequenceEqual(NatsHeaders.MessageConsumerIsPushBased))
             {
+                headers.Code = 409;
                 headers.Message = NatsHeaders.Messages.ConsumerIsPushBased;
                 headers.MessageText = NatsHeaders.MessageConsumerIsPushBasedStr;
             }
