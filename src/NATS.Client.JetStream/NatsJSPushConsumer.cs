@@ -220,6 +220,25 @@ public class NatsJSPushConsumer : INatsJSPushConsumer
         throw NatsJSProtocolException.ConsumerIsPushBased();
     }
 
+    /// <summary>
+    /// Reset this consumer's delivery state and update this consumer.
+    /// </summary>
+    /// <param name="seq">Stream sequence to reset to. Zero (the default) resets the consumer to its current ack floor.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>The reset response, including the consumer info and the sequence the consumer was reset to.</returns>
+    /// <exception cref="NatsJSException">There was an issue retrieving the response or this consumer object isn't valid anymore because it was deleted earlier.</exception>
+    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <remarks>This feature is only available on NATS server v2.14 and later.</remarks>
+    public async ValueTask<ConsumerResetResponse> ResetAsync(ulong seq = 0, CancellationToken cancellationToken = default)
+    {
+        ThrowIfDeleted();
+        var response = await _context.ResetConsumerAsync(_stream, _consumer, seq, cancellationToken).ConfigureAwait(false);
+
+        // The reset response is a superset of consumer info.
+        Info = response;
+        return response;
+    }
+
     private void ThrowIfDeleted()
     {
         if (_deleted)

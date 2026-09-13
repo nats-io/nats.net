@@ -174,4 +174,14 @@ public class NatsJSOrderedPushConsumer : INatsJSPushConsumer
     /// <param name="group">The priority group name to unpin.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     public ValueTask UnpinAsync(string group, CancellationToken cancellationToken = default) => default;
+
+    /// <summary>
+    /// Not supported for ordered consumers, which recreate their underlying ephemeral consumer to seek.
+    /// </summary>
+    /// <param name="seq">Stream sequence to reset to.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>A faulted task.</returns>
+    /// <exception cref="NotSupportedException">Always.</exception>
+    public ValueTask<ConsumerResetResponse> ResetAsync(ulong seq = 0, CancellationToken cancellationToken = default)
+        => new(Task.FromException<ConsumerResetResponse>(new NotSupportedException("Ordered consumers cannot be reset; they recreate their underlying consumer to seek.")));
 }
