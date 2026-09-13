@@ -347,6 +347,16 @@ internal sealed class NatsKVWatcher<T> : IAsyncDisposable
                     {
                         _logger.LogWarning(NatsKVLogEvents.Internal, e, "Command error");
                     }
+                    finally
+                    {
+                        // The watcher consumes the message itself rather than handing it to the
+                        // application, so there is no ActivityEndingMsgReader to end its receive
+                        // activity and nothing else ever would. This is the equivalent point:
+                        // the command loop is done with the message, whichever branch it took.
+                        // Ready commands carry a default message with no headers, so this is a
+                        // no-op for them.
+                        Telemetry.EndActivity(command.Msg.Headers?.Activity);
+                    }
                 }
             }
         }

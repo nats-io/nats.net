@@ -20,4 +20,12 @@ public record StreamListResponse : IterableResponse
     [System.Text.Json.Serialization.JsonPropertyName("missing")]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public ICollection<string>? Missing { get; set; }
+
+    /// <summary>
+    /// Streams that are offline, keyed by Stream name with the reason as the value. A Stream goes offline when it
+    /// requires a higher API level than the server supports. Offline Streams are also listed in <see cref="Missing"/>.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("offline")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public IDictionary<string, string>? Offline { get; set; }
 }

@@ -24,6 +24,8 @@ internal sealed class ReplyTask<T> : ReplyTaskBase, IDisposable
     private NatsMsg<T> _msg;
     private long _replyBytes;
     private bool _isNoResponders;
+    private Activity? _activity;
+    private bool _disposed;
 
     public ReplyTask(ReplyTaskFactory factory, long id, string subject, NatsConnection connection, INatsDeserialize<T> deserializer, TimeSpan requestTimeout, bool throwIfNoResponders, ActivityContext requestContext)
     {
@@ -49,50 +51,61 @@ internal sealed class ReplyTask<T> : ReplyTaskBase, IDisposable
     {
         try
         {
-            await _tcs.Task
-                .WaitAsync(_requestTimeout, cancellationToken)
-                .ConfigureAwait(false);
-        }
-        catch (TimeoutException)
-        {
-            NatsNoReplyException.Throw();
-        }
+            try
+            {
+                await _tcs.Task
+                    .WaitAsync(_requestTimeout, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+                NatsNoReplyException.Throw();
+            }
 
-        NatsMsg<T> msg;
-        long bytes;
-        bool isNoResponders;
-        lock (_gate)
-        {
-            msg = _msg;
-            bytes = _replyBytes;
-            isNoResponders = _isNoResponders;
-        }
+            NatsMsg<T> msg;
+            long bytes;
+            bool isNoResponders;
+            lock (_gate)
+            {
+                msg = _msg;
+                bytes = _replyBytes;
+                isNoResponders = _isNoResponders;
+            }
 
-        // Match the SharedInbox path: when ThrowIfNoResponders is set, a 503 sentinel
-        // surfaces as NatsNoRespondersException rather than an empty message.
-        if (isNoResponders && _throwIfNoResponders)
-        {
-            throw new NatsNoRespondersException();
-        }
+            // Match the SharedInbox path: when ThrowIfNoResponders is set, a 503 sentinel
+            // surfaces as NatsNoRespondersException rather than an empty message.
+            if (isNoResponders && _throwIfNoResponders)
+            {
+                throw new NatsNoRespondersException();
+            }
 
-        // Count only messages actually delivered to the caller. Late replies that arrive
-        // after a timeout still hit SetResult, but the user never sees them, so the
-        // counters belong here on the success path, not in SetResult. 503 NoResponders
-        // sentinels are also excluded for parity with the SharedInbox path.
-        if (!isNoResponders && (Telemetry.ConsumedMessages.Enabled || Telemetry.ReceivedBytes.Enabled))
-        {
-            var tags = Telemetry.BuildMetricTags(_connection, Telemetry.Constants.OpRec);
-            if (Telemetry.ConsumedMessages.Enabled)
-                Telemetry.ConsumedMessages.Add(1, tags);
-            if (Telemetry.ReceivedBytes.Enabled)
-                Telemetry.ReceivedBytes.Add(bytes, tags);
-        }
+            // Count only messages actually delivered to the caller. Late replies that arrive
+            // after a timeout still hit SetResult, but the user never sees them, so the
+            // counters belong here on the success path, not in SetResult. 503 NoResponders
+            // sentinels are also excluded for parity with the SharedInbox path.
+            if (!isNoResponders && (Telemetry.ConsumedMessages.Enabled || Telemetry.ReceivedBytes.Enabled))
+            {
+                var tags = Telemetry.BuildMetricTags(_connection, Telemetry.Constants.OpRec);
+                if (Telemetry.ConsumedMessages.Enabled)
+                    Telemetry.ConsumedMessages.Add(1, tags);
+                if (Telemetry.ReceivedBytes.Enabled)
+                    Telemetry.ReceivedBytes.Add(bytes, tags);
+            }
 
-        return msg;
+            return msg;
+        }
+        finally
+        {
+            // Every exit ends the activity, not just the one that returns a message. The
+            // 503 sentinel and a reply that lands after the request timed out both leave
+            // here by throwing, and a span that is never stopped is never exported.
+            EndReceiveActivity();
+        }
     }
 
     public override void SetResult(string? replyTo, ReadOnlySequence<byte> payload, ReadOnlySequence<byte>? headersBuffer)
     {
+        Activity? orphaned = null;
         lock (_gate)
         {
             // A server reply carries no trace context, so without the request's context
@@ -101,12 +114,50 @@ internal sealed class ReplyTask<T> : ReplyTaskBase, IDisposable
             _msg = NatsMsg<T>.BuildInternal(Subject, replyTo, headersBuffer, payload, _connection, _connection.HeaderParser, _deserializer, _requestContext);
             _isNoResponders = payload.Length == 0 && NatsSubBase.IsHeader503(headersBuffer);
             _replyBytes = payload.Length + (headersBuffer?.Length ?? 0);
+
+            // Direct mode builds the reply on the read loop, so there is no
+            // ActivityEndingMsgReader behind it. The reply task owns the activity from here.
+            _activity = _msg.Headers?.Activity;
+
+            // Nothing will come back for it if the caller has already gone: a reply
+            // dispatched just as the request was disposed still reaches this far.
+            if (_disposed)
+            {
+                orphaned = _activity;
+                _activity = null;
+            }
         }
+
+        Telemetry.EndActivity(orphaned);
 
         _tcs.TrySetResult();
     }
 
-    public void Dispose() => _factory.Return(_id);
+    public void Dispose()
+    {
+        // Return first so no further reply can be dispatched to this task, then close the
+        // window on one that got in just before.
+        _factory.Return(_id);
+
+        lock (_gate)
+        {
+            _disposed = true;
+        }
+
+        EndReceiveActivity();
+    }
+
+    private void EndReceiveActivity()
+    {
+        Activity? activity;
+        lock (_gate)
+        {
+            activity = _activity;
+            _activity = null;
+        }
+
+        Telemetry.EndActivity(activity);
+    }
 }
 
 internal abstract class ReplyTaskBase

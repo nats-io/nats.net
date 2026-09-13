@@ -586,6 +586,10 @@ public class OpenTelemetryTest
             "messaging.destination_publish.name",
             "messaging.nats.message.subject",
             "messaging.nats.message.reply_to",
+
+            // Now carries the subscription's subject, which for a reply subscription is the
+            // unique inbox, so it needs the same collapsing as the rest.
+            "messaging.destination.template",
         ];
 
         foreach (var activity in tracker.Started)
@@ -599,6 +603,96 @@ public class OpenTelemetryTest
 
         await sub.DisposeAsync();
         await reg;
+    }
+
+    [Fact]
+    public async Task Send_spans_are_tagged_with_the_operation_they_perform()
+    {
+        using var tracker = new ActivityTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        await using var sub = await nats.SubscribeCoreAsync<int>("op.demo", cancellationToken: cts.Token);
+        var reg = sub.Register(async msg => await msg.ReplyAsync(msg.Data * 2, cancellationToken: cts.Token));
+
+        await nats.PublishAsync("op.plain", 1, cancellationToken: cts.Token);
+        var reply = await nats.RequestAsync<int, int>("op.demo", 21, cancellationToken: cts.Token);
+        reply.Data.Should().Be(42);
+
+        var activities = tracker.StartedFor(server.Port);
+
+        // messaging.operation used to be hardcoded to publish on every send-side span, so it
+        // disagreed with the metric describing the same operation: operation.duration is
+        // tagged request for RequestAsync and subscribe for SubscribeAsync. Neither filtering
+        // nor joining on the attribute worked.
+        var subscribe = activities.Single(a => a.OperationName == "op.demo subscribe");
+        subscribe.GetTagItem("messaging.operation").Should().Be("subscribe");
+
+        // Nothing is produced by a subscribe; it is a control plane call to the server.
+        subscribe.Kind.Should().Be(ActivityKind.Client);
+
+        var request = activities.Single(a => a.OperationName == "op.demo request");
+        request.GetTagItem("messaging.operation").Should().Be("request");
+        request.Kind.Should().Be(ActivityKind.Producer);
+
+        var publish = activities.Single(a => a.OperationName == "op.plain publish");
+        publish.GetTagItem("messaging.operation").Should().Be("publish");
+        publish.Kind.Should().Be(ActivityKind.Producer);
+
+        activities.Where(a => a.Kind == ActivityKind.Consumer)
+            .Should().AllSatisfy(a => a.GetTagItem("messaging.operation").Should().Be("receive"));
+
+        await sub.DisposeAsync();
+        await reg;
+    }
+
+    [Fact]
+    public async Task Receive_span_carries_subscription_subject_and_queue_group()
+    {
+        using var tracker = new ActivityTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        await using var sub = await nats.SubscribeCoreAsync<int>("orders.*", queueGroup: "workers", cancellationToken: cts.Token);
+        await nats.PingAsync(cts.Token);
+        await nats.PublishAsync("orders.new", 1, cancellationToken: cts.Token);
+
+        var msg = await sub.Msgs.ReadAsync(cts.Token);
+        msg.Data.Should().Be(1);
+
+        var receive = tracker.StartedFor(server.Port).Single(a => a.Kind == ActivityKind.Consumer);
+
+        // The template is the subscription's subject, not the concrete delivered subject.
+        // It used to be given the delivered subject, which is not a template at all.
+        receive.GetTagItem("messaging.destination.template").Should().Be("orders.*");
+        receive.GetTagItem("messaging.nats.message.subject").Should().Be("orders.new");
+
+        // Could never be emitted before, because the queue group was hardcoded to null.
+        receive.GetTagItem("messaging.consumer.group.name").Should().Be("workers");
+    }
+
+    [Fact]
+    public async Task Receive_span_omits_queue_group_tag_when_there_is_none()
+    {
+        using var tracker = new ActivityTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        await using var sub = await nats.SubscribeCoreAsync<int>("plain.subject", cancellationToken: cts.Token);
+        await nats.PingAsync(cts.Token);
+        await nats.PublishAsync("plain.subject", 1, cancellationToken: cts.Token);
+
+        var msg = await sub.Msgs.ReadAsync(cts.Token);
+        msg.Data.Should().Be(1);
+
+        var receive = tracker.StartedFor(server.Port).Single(a => a.Kind == ActivityKind.Consumer);
+        receive.GetTagItem("messaging.consumer.group.name").Should().BeNull();
     }
 
     [Fact]

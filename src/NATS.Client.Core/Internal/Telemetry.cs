@@ -148,11 +148,42 @@ internal static class Telemetry
         return tags;
     }
 
+    /// <summary>
+    /// Starts the activity representing a request, under which the reply subscription, the
+    /// publish and the reply's receive activity all nest.
+    /// </summary>
+    /// <remarks>
+    /// RequestAsync is not the only entry point into request/reply. RequestManyAsync and the
+    /// JetStream shared-inbox paths drive CreateRequestSubAsync directly, and without a request
+    /// activity current each of the spans they produce becomes a root of its own trace, with the
+    /// reply's receive activity having nothing to parent under. They call this instead of
+    /// reproducing the naming.
+    /// </remarks>
+    public static Activity? StartRequestActivity(INatsConnection? connection, string subject)
+    {
+        if (!NatsActivities.HasListeners())
+            return null;
+
+        var name = connection is NatsConnection nats
+            ? $"{nats.SpanDestinationName(subject)} {Constants.RequestReplyActivityName}"
+            : Constants.RequestReplyActivityName;
+
+        return StartSendActivity(name, connection, subject, replyTo: null, operation: Constants.OpReq);
+    }
+
+    // operation is the value for the messaging.operation tag. It is not always publish: this
+    // starts the span for subscribe and request too, and those have to agree with the metrics
+    // describing the same operation, which have always used distinct values.
+    //
+    // kind is Producer for the operations that put a message on the wire. Subscribe passes
+    // Client because it produces nothing; it is a control plane call to the server.
     public static Activity? StartSendActivity(
         string name,
         INatsConnection? connection,
         string subject,
         string? replyTo,
+        string operation,
+        ActivityKind kind = ActivityKind.Producer,
         ActivityContext parentContext = default)
     {
         if (!NatsActivities.HasListeners())
@@ -169,7 +200,7 @@ internal static class Telemetry
             ParentContext: parentContext);
 
         var options = NatsInstrumentationOptions.Default;
-        if (options.Filter is { } filter && !filter(instrumentationContext))
+        if (!ShouldCollect(options, instrumentationContext))
             return null;
 
         KeyValuePair<string, object?>[] tags;
@@ -183,7 +214,7 @@ internal static class Telemetry
             var serverHost = conn.ServerHost; // grabbed once per ServerInfo change
             tags = new KeyValuePair<string, object?>[len];
             tags[0] = new KeyValuePair<string, object?>(Constants.SystemKey, Constants.SystemVal);
-            tags[1] = new KeyValuePair<string, object?>(Constants.OpKey, Constants.OpPub);
+            tags[1] = new KeyValuePair<string, object?>(Constants.OpKey, operation);
             tags[2] = new KeyValuePair<string, object?>(Constants.DestName, LowCardinalitySubject(conn, subject));
 
             tags[3] = new KeyValuePair<string, object?>(Constants.ClientId, conn.ClientId);
@@ -206,7 +237,7 @@ internal static class Telemetry
 
             tags = new KeyValuePair<string, object?>[len];
             tags[0] = new KeyValuePair<string, object?>(Constants.SystemKey, Constants.SystemVal);
-            tags[1] = new KeyValuePair<string, object?>(Constants.OpKey, Constants.OpPub);
+            tags[1] = new KeyValuePair<string, object?>(Constants.OpKey, operation);
             tags[2] = new KeyValuePair<string, object?>(Constants.DestName, subject);
 
             if (replyTo is not null)
@@ -215,12 +246,12 @@ internal static class Telemetry
 
         var activity = NatsActivities.StartActivity(
             name,
-            kind: ActivityKind.Producer,
+            kind: kind,
             parentContext: parentContext,
             tags: tags);
 
         if (activity is not null)
-            options.Enrich?.Invoke(activity, instrumentationContext);
+            Enrich(options, activity, instrumentationContext);
 
         return activity;
     }
@@ -265,13 +296,36 @@ internal static class Telemetry
         if (!NatsActivities.HasListeners())
             return null;
 
-        // Trace context carried by the message always wins: it is the real causal link,
+        // Trace context carried by the message normally wins: it is the real causal link,
         // possibly from another process. The fallback is for messages that carry none but
         // whose cause is known locally, i.e. a reply to a request this client is waiting
         // on. It is an ActivityContext (ids only) rather than an Activity, so parenting
         // never creates an object reference between activities.
+        ActivityLink[]? links = null;
         if (headers is null || !TryParseTraceContext(headers, out var context))
+        {
             context = fallbackParentContext;
+        }
+        else if (fallbackParentContext != default && context.TraceId != fallbackParentContext.TraceId)
+        {
+            // A reply carrying trace context from a different trace than the request waiting
+            // on it is not a responder continuing the caller's trace: it is a stored message
+            // replayed verbatim, headers and all, by something like a JetStream direct get.
+            // Its traceparent belongs to whatever wrote the value, possibly long ago.
+            //
+            // Parenting under it would take the receive span out of the reader's trace and
+            // attach it to the writer's, once per read for the life of the value. Backends
+            // treat a trace as complete after a period of inactivity, so a span arriving
+            // minutes later is dropped or rendered as an orphan: the read's trace loses a
+            // span and the write's trace gains nothing usable. Parent from the request and
+            // record the message's context as a link, which is the mechanism for pointing at
+            // a different and possibly stale trace without claiming the two are one.
+            //
+            // A responder that continues the caller's trace shares its trace id and so is
+            // unaffected.
+            links = new[] { new ActivityLink(context) };
+            context = fallbackParentContext;
+        }
 
         var options = NatsInstrumentationOptions.Default;
         IReadOnlyList<KeyValuePair<string, string?>>? baggage = null;
@@ -289,7 +343,7 @@ internal static class Telemetry
             ParentContext: context)
         { Baggage = baggage };
 
-        if (options.Filter is { } filter && !filter(instrumentationContext))
+        if (!ShouldCollect(options, instrumentationContext))
             return null;
 
         KeyValuePair<string, object?>[] tags;
@@ -307,7 +361,13 @@ internal static class Telemetry
             tags = new KeyValuePair<string, object?>[len];
             tags[0] = new KeyValuePair<string, object?>(Constants.SystemKey, Constants.SystemVal);
             tags[1] = new KeyValuePair<string, object?>(Constants.OpKey, Constants.OpRec);
-            tags[2] = new KeyValuePair<string, object?>(Constants.DestTemplate, subscriptionSubject);
+
+            // Collapsed like the other subject tags. A request/reply subscription's subject is
+            // a unique _INBOX.<nuid>, and destination.template is meant to be a low cardinality
+            // template of the destination rather than a concrete name. Temporariness is decided
+            // from the raw subject, before collapsing, and against this connection's own inbox
+            // prefix rather than the bare one.
+            tags[2] = new KeyValuePair<string, object?>(Constants.DestTemplate, LowCardinalitySubject(conn, subscriptionSubject));
             tags[3] = new KeyValuePair<string, object?>(Constants.DestIsTemporary, subscriptionSubject.StartsWith(conn.InboxPrefix, StringComparison.Ordinal) ? Constants.True : Constants.False);
             var lowCardinalitySubject = LowCardinalitySubject(conn, subject);
             tags[4] = new KeyValuePair<string, object?>(Constants.Subject, lowCardinalitySubject);
@@ -332,23 +392,31 @@ internal static class Telemetry
         }
         else
         {
-            var len = 9;
+            // Matches the branch above: the queue group tag is only present when there is a
+            // queue group. It used to be written unconditionally here, landing as a null valued
+            // tag that exporters drop, which was harmless only for as long as the tag could
+            // never fire at all.
+            var len = 8;
             if (replyTo is not null)
+                len++;
+            if (queueGroup is not null)
                 len++;
 
             tags = new KeyValuePair<string, object?>[len];
             tags[0] = new KeyValuePair<string, object?>(Constants.SystemKey, Constants.SystemVal);
             tags[1] = new KeyValuePair<string, object?>(Constants.OpKey, Constants.OpRec);
             tags[2] = new KeyValuePair<string, object?>(Constants.DestTemplate, subscriptionSubject);
-            tags[3] = new KeyValuePair<string, object?>(Constants.QueueGroup, queueGroup);
-            tags[4] = new KeyValuePair<string, object?>(Constants.Subject, subject);
-            tags[5] = new KeyValuePair<string, object?>(Constants.DestName, subject);
-            tags[6] = new KeyValuePair<string, object?>(Constants.DestPubName, subject);
-            tags[7] = new KeyValuePair<string, object?>(Constants.MsgBodySize, bodySize.ToString());
-            tags[8] = new KeyValuePair<string, object?>(Constants.MsgTotalSize, size.ToString());
+            tags[3] = new KeyValuePair<string, object?>(Constants.Subject, subject);
+            tags[4] = new KeyValuePair<string, object?>(Constants.DestName, subject);
+            tags[5] = new KeyValuePair<string, object?>(Constants.DestPubName, subject);
+            tags[6] = new KeyValuePair<string, object?>(Constants.MsgBodySize, bodySize.ToString());
+            tags[7] = new KeyValuePair<string, object?>(Constants.MsgTotalSize, size.ToString());
 
+            var index = 8;
             if (replyTo is not null)
-                tags[9] = new KeyValuePair<string, object?>(Constants.ReplyTo, replyTo);
+                tags[index++] = new KeyValuePair<string, object?>(Constants.ReplyTo, replyTo);
+            if (queueGroup is not null)
+                tags[index] = new KeyValuePair<string, object?>(Constants.QueueGroup, queueGroup);
         }
 
         // A receive activity's parent comes exclusively from the message's trace
@@ -372,7 +440,8 @@ internal static class Telemetry
                 name,
                 kind: ActivityKind.Consumer,
                 parentContext: context,
-                tags: tags);
+                tags: tags,
+                links: links);
         }
         finally
         {
@@ -389,7 +458,7 @@ internal static class Telemetry
                     activity.AddBaggage(item.Key, item.Value);
             }
 
-            options.Enrich?.Invoke(activity, instrumentationContext);
+            Enrich(options, activity, instrumentationContext);
         }
 
         return activity;
@@ -492,6 +561,66 @@ internal static class Telemetry
         // order may differ from the source activity; consumers must not rely on order.
         foreach (var item in from.Baggage)
             to.AddBaggage(item.Key, item.Value);
+    }
+
+    /// <summary>
+    /// Applies <see cref="NatsInstrumentationOptions.Filter"/>, treating a throwing filter as a
+    /// decision not to collect.
+    /// </summary>
+    /// <remarks>
+    /// This is what the Filter documentation has always promised. Without the guard the
+    /// exception propagated out of publish, and out of message construction on receive, so a
+    /// filter bug broke messaging rather than telemetry.
+    /// </remarks>
+    private static bool ShouldCollect(NatsInstrumentationOptions options, in NatsInstrumentationContext context)
+    {
+        if (options.Filter is not { } filter)
+            return true;
+
+        try
+        {
+            return filter(context);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Applies <see cref="NatsInstrumentationOptions.Enrich"/>, swallowing anything it throws.
+    /// </summary>
+    /// <remarks>
+    /// Enrichment is decoration on top of an activity that is otherwise complete. Letting it
+    /// escape would fail the publish or the message build for the sake of a tag.
+    /// </remarks>
+    private static void Enrich(NatsInstrumentationOptions options, Activity activity, in NatsInstrumentationContext context)
+    {
+        if (options.Enrich is not { } enrich)
+            return;
+
+        // Send and receive agree on what the callback sees. StartActivity leaves a send activity
+        // in Activity.Current, but receive activities are deliberately kept off the ambient
+        // context, so the receive path has to put it there for the call and take it back out.
+        // On the send path the activity is already current and this costs nothing.
+        var ambient = Activity.Current;
+        var restore = !ReferenceEquals(ambient, activity);
+        if (restore)
+            Activity.Current = activity;
+
+        try
+        {
+            enrich(activity, context);
+        }
+        catch
+        {
+            // Deliberately ignored, see above.
+        }
+        finally
+        {
+            if (restore)
+                RestoreCurrentActivity(ambient);
+        }
     }
 
     // Inbox subjects (_INBOX.<nuid>[.<nuid>]) are unique per request, so emitting them as

@@ -143,6 +143,35 @@ public class OpenTelemetryPage
         }
 
         {
+            #region redaction-span-names
+            // Span names carry the first two subject tokens by default. A formatter replaces
+            // that truncation rather than running after it, so it is up to you to keep the
+            // names it returns low cardinality.
+            NatsInstrumentationOptions.Default.SpanDestinationNameFormatter = subject =>
+                subject.StartsWith("tenant.", StringComparison.Ordinal) ? "tenant" : subject;
+            #endregion
+        }
+
+        {
+            #region redaction-tags
+            // The formatter does not touch tags. Enrich runs after the client has set them,
+            // so SetTag overwrites the ones carrying subjects.
+            NatsInstrumentationOptions.Default.Enrich = (activity, _) =>
+            {
+                activity.SetTag("messaging.destination.name", "redacted");
+                activity.SetTag("messaging.nats.message.subject", "redacted");
+            };
+            #endregion
+        }
+
+        {
+            // Not shown on the page: put the shared options back so the examples below run
+            // with the defaults.
+            NatsInstrumentationOptions.Default.SpanDestinationNameFormatter = null;
+            NatsInstrumentationOptions.Default.Enrich = null;
+        }
+
+        {
             #region baggage
             // Baggage propagation is off by default because baggage can carry
             // sensitive or high-cardinality data. Opt in explicitly:

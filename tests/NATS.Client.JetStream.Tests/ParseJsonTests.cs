@@ -78,4 +78,106 @@ public class ParseJsonTests
         Assert.Equal(256 * 1024, result.ChunkSize);
         Assert.Equal(16 * 1024 * 1024, result.WindowSize);
     }
+
+    [Fact]
+    public void Consumer_info_should_parse_sourcing_consumers()
+    {
+        // Consumers the server creates to source an interest or work queue stream are
+        // marked 'sourcing' and are allowed the flow control ack policy.
+        const string json = """
+                            {
+                              "type": "io.nats.jetstream.api.v1.consumer_info_response",
+                              "stream_name": "s1",
+                              "name": "c1",
+                              "created": "2026-08-27T10:00:00Z",
+                              "config": {
+                                "name": "c1",
+                                "deliver_policy": "all",
+                                "ack_policy": "flow_control",
+                                "replay_policy": "instant",
+                                "sourcing": true
+                              },
+                              "delivered": {"consumer_seq": 0, "stream_seq": 0},
+                              "ack_floor": {"consumer_seq": 0, "stream_seq": 0},
+                              "num_ack_pending": 0,
+                              "num_redelivered": 0,
+                              "num_waiting": 0,
+                              "num_pending": 0
+                            }
+                            """;
+
+        var serializer = NatsJSJsonSerializer<ConsumerInfoResponse>.Default;
+        var result = serializer.Deserialize(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(json)));
+
+        Assert.NotNull(result);
+        Assert.True(result.Config.Sourcing);
+        Assert.False(result.Config.Direct);
+        Assert.Equal(ConsumerConfigAckPolicy.FlowControl, result.Config.AckPolicy);
+    }
+
+    [Fact]
+    public void Consumer_config_should_omit_sourcing_when_not_set()
+    {
+        var serializer = NatsJSJsonSerializer<ConsumerConfig>.Default;
+
+        var bw = new NatsBufferWriter<byte>();
+        serializer.Serialize(bw, new ConsumerConfig());
+        Assert.DoesNotContain("sourcing", Encoding.UTF8.GetString(bw.WrittenSpan.ToArray()));
+
+        bw = new NatsBufferWriter<byte>();
+        serializer.Serialize(bw, new ConsumerConfig { Sourcing = true });
+        Assert.Contains("\"sourcing\":true", Encoding.UTF8.GetString(bw.WrittenSpan.ToArray()));
+    }
+
+    [Fact]
+    public void Stream_list_response_should_parse_offline_streams()
+    {
+        // A stream that needs a higher API level than the server has is reported in
+        // 'offline' rather than 'streams', and its name is repeated in 'missing'.
+        const string json = """
+                            {
+                              "type": "io.nats.jetstream.api.v1.stream_list_response",
+                              "total": 0,
+                              "offset": 0,
+                              "limit": 256,
+                              "streams": [],
+                              "missing": ["s1"],
+                              "offline": {"s1": "unsupported required api level 99, server supports 2"}
+                            }
+                            """;
+
+        var serializer = NatsJSJsonSerializer<StreamListResponse>.Default;
+        var result = serializer.Deserialize(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(json)));
+
+        Assert.NotNull(result);
+        Assert.Empty(result.Streams);
+        Assert.Equal(["s1"], result.Missing);
+        Assert.NotNull(result.Offline);
+        Assert.Equal("unsupported required api level 99, server supports 2", result.Offline["s1"]);
+    }
+
+    [Fact]
+    public void Consumer_list_response_should_parse_offline_consumers()
+    {
+        const string json = """
+                            {
+                              "type": "io.nats.jetstream.api.v1.consumer_list_response",
+                              "total": 0,
+                              "offset": 0,
+                              "limit": 256,
+                              "consumers": [],
+                              "missing": ["c1"],
+                              "offline": {"c1": "unsupported required api level 99, server supports 2"}
+                            }
+                            """;
+
+        var serializer = NatsJSJsonSerializer<ConsumerListResponse>.Default;
+        var result = serializer.Deserialize(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(json)));
+
+        Assert.NotNull(result);
+        Assert.Empty(result.Consumers);
+        Assert.Equal(["c1"], result.Missing);
+        Assert.NotNull(result.Offline);
+        Assert.Equal("unsupported required api level 99, server supports 2", result.Offline["c1"]);
+    }
 }

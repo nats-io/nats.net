@@ -160,6 +160,22 @@ public class NatsJSStream : INatsJSStream
     }
 
     /// <summary>
+    /// Reset a consumer's delivery state on this stream.
+    /// </summary>
+    /// <param name="consumer">Consumer name to be reset.</param>
+    /// <param name="seq">Stream sequence to reset to. Zero (the default) resets the consumer to its current ack floor.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>The reset response, including the consumer info and the sequence the consumer was reset to.</returns>
+    /// <exception cref="NatsJSException">There is an error retrieving the response or this stream object isn't valid anymore because it was deleted earlier.</exception>
+    /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
+    /// <remarks>This feature is only available on NATS server v2.14 and later.</remarks>
+    public ValueTask<ConsumerResetResponse> ResetConsumerAsync(string consumer, ulong seq = 0, CancellationToken cancellationToken = default)
+    {
+        ThrowIfDeleted();
+        return _context.ResetConsumerAsync(_name, consumer, seq, cancellationToken);
+    }
+
+    /// <summary>
     /// Retrieve the stream info from the server and update this stream.
     /// </summary>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>

@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
@@ -57,7 +58,13 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
     {
         if (Telemetry.HasListeners())
         {
-            using var activity = Telemetry.StartSendActivity($"{_connection.SpanDestinationName(sub.Subject)} {Telemetry.Constants.SubscribeActivityName}", _connection, sub.Subject, null);
+            using var activity = Telemetry.StartSendActivity(
+                $"{_connection.SpanDestinationName(sub.Subject)} {Telemetry.Constants.SubscribeActivityName}",
+                _connection,
+                sub.Subject,
+                replyTo: null,
+                operation: Telemetry.Constants.OpSub,
+                kind: ActivityKind.Client);
             try
             {
                 if (IsInboxSubject(sub.Subject))
