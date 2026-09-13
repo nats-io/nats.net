@@ -332,7 +332,45 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
         in ReadOnlySequence<byte> payloadBuffer,
         INatsConnection? connection,
         NatsHeaderParser headerParser,
-        INatsDeserialize<T> serializer)
+        INatsDeserialize<T> serializer) =>
+        BuildInternal(
+            subject,
+            replyTo,
+            headersBuffer,
+            payloadBuffer,
+            connection,
+            headerParser,
+            serializer,
+            subscriptionSubject: subject,
+            queueGroup: null);
+
+    /// <summary>
+    /// Builds a new instance of a <see cref="NatsMsg{T}"/> with the specified parameters.
+    /// </summary>
+    /// <remarks>
+    /// (INTERNAL API) This method is intended for internal use only.
+    /// </remarks>
+    /// <param name="subject">The subject string associated with the message.</param>
+    /// <param name="replyTo">The optional reply-to subject string.</param>
+    /// <param name="headersBuffer">The optional buffer containing the message headers.</param>
+    /// <param name="payloadBuffer">The buffer containing the message payload.</param>
+    /// <param name="connection">The connection associated with the message.</param>
+    /// <param name="headerParser">The parser for processing message headers.</param>
+    /// <param name="serializer">The deserializer for the message payload.</param>
+    /// <param name="subscriptionSubject">The subscription subject associated with the message.</param>
+    /// <param name="queueGroup">The optional queue group associated with the message.</param>
+    /// <returns>A new <see cref="NatsMsg{T}"/> instance containing the provided data.</returns>
+    /// <exception cref="NatsException">Thrown if there is an error during the processing of the message.</exception>
+    internal static NatsMsg<T> BuildInternal(
+        string subject,
+        string? replyTo,
+        in ReadOnlySequence<byte>? headersBuffer,
+        in ReadOnlySequence<byte> payloadBuffer,
+        INatsConnection? connection,
+        NatsHeaderParser headerParser,
+        INatsDeserialize<T> serializer,
+        string subscriptionSubject,
+        string? queueGroup)
     {
         NatsHeaders? headers = null;
         var flags = NatsMsgFlags.None;
@@ -352,7 +390,6 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
 
             try
             {
-                // Parsing can also throw an exception.
                 if (!headerParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), headers))
                 {
                     throw new NatsException("Error parsing headers");
@@ -380,8 +417,8 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
             var activity = Telemetry.StartReceiveActivity(
                 connection,
                 name: activityName,
-                subscriptionSubject: subject,
-                queueGroup: null,
+                subscriptionSubject: subscriptionSubject,
+                queueGroup: queueGroup,
                 subject: subject,
                 replyTo: replyTo,
                 bodySize: payloadBuffer.Length,

@@ -167,19 +167,7 @@ internal class NatsJSPushConsume<T> : NatsSubBase
 
                     if (headers is { Code: 100, MessageText: "FlowControl Request" })
                     {
-#pragma warning disable CS0618 // Type or member is obsolete
-                        var msg = new NatsJSMsg<T>(
-                            NatsMsg<T>.Build(
-                                subject,
-                                replyTo,
-                                headersBuffer,
-                                payloadBuffer,
-                                Connection,
-                                Connection.HeaderParser,
-                                _serializer),
-                            _context);
-                        await msg.ReplyAsync(cancellationToken: _cancellationToken);
-#pragma warning restore CS0618 // Type or member is obsolete
+                        await Connection.PublishAsync(replyTo!, cancellationToken: _cancellationToken);
                     }
 
                     if (headers is { Code: 100, Message: NatsHeaders.Messages.IdleHeartbeat })
@@ -208,17 +196,19 @@ internal class NatsJSPushConsume<T> : NatsSubBase
         else
         {
             var msg = new NatsJSMsg<T>(
-                NatsMsg<T>.Build(
+                NatsMsg<T>.BuildInternal(
                     subject,
                     replyTo,
                     headersBuffer,
                     payloadBuffer,
                     Connection,
                     Connection.HeaderParser,
-                    _serializer),
+                    _serializer,
+                    Subject,
+                    QueueGroup),
                 _context);
 
-            await _userMsgs.Writer.WriteAsync(msg).ConfigureAwait(false);
+            await _userMsgs.Writer.WriteAsync(msg, _cancellationToken).ConfigureAwait(false);
 
             ResetSlowConsumer(_userMsgs.Reader.Count);
         }
