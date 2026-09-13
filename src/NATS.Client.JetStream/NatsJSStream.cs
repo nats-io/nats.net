@@ -201,7 +201,31 @@ public class NatsJSStream : INatsJSStream
         _context.JSRequestResponseAsync<StreamMsgGetRequest, StreamMsgGetResponse>(
             subject: $"{_context.Opts.Prefix}.STREAM.MSG.GET.{_name}",
             request: request,
-            cancellationToken);
+            cancellationToken: cancellationToken);
+
+    public ValueTask<INatsJSPushConsumer> CreatePushConsumerAsync(NatsJSPushConsumerOpts? opts = default, CancellationToken cancellationToken = default)
+    {
+        ThrowIfDeleted();
+        return _context.CreatePushConsumerAsync(_name, opts, cancellationToken);
+    }
+
+    public ValueTask<INatsJSPushConsumer> CreateOrUpdatePushConsumerAsync(NatsJSPushConsumerOpts? opts = default, CancellationToken cancellationToken = default)
+    {
+        ThrowIfDeleted();
+        return _context.CreateOrUpdatePushConsumerAsync(_name, opts, cancellationToken);
+    }
+
+    public ValueTask<INatsJSPushConsumer> GetPushConsumerAsync(string consumer, CancellationToken cancellationToken = default)
+    {
+        ThrowIfDeleted();
+        return _context.GetPushConsumerAsync(_name, consumer, cancellationToken);
+    }
+
+    public ValueTask<INatsJSPushConsumer> CreateOrderedPushConsumerAsync(NatsJSOrderedConsumerOpts? opts = default, CancellationToken cancellationToken = default)
+    {
+        ThrowIfDeleted();
+        return _context.CreateOrderedPushConsumerAsync(_name, opts, cancellationToken);
+    }
 
     private void ThrowIfDeleted()
     {
