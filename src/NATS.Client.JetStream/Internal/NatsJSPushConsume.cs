@@ -181,11 +181,13 @@ internal class NatsJSPushConsume<T> : NatsSubBase
                     else if (headers.Code != 100 || headers.Message != NatsHeaders.Messages.Text)
                     {
                         _logger.LogWarning(NatsJSLogEvents.ProtocolMessage, "Unhandled control message: {Code} {Description}", headers.Code, headers.MessageText);
+                        _notificationChannel?.Notify(new NatsJSProtocolNotification("Unhandled control message", headers.Code, headers.MessageText));
                     }
                 }
                 else
                 {
                     _logger.LogError(NatsJSLogEvents.ProtocolMessage, "Can't parse control message headers");
+                    _notificationChannel?.Notify(new NatsJSProtocolNotification("Can't parse control message headers", 0, string.Empty));
                 }
             }
             else
