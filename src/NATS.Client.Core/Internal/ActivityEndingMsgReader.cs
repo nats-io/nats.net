@@ -9,7 +9,11 @@ namespace NATS.Client.Core.Internal;
 // 2. Keep the NatsSubBase from being garbage collected as long as calls interacting
 //    with the _inner channel are being made
 // To achieve (1):
-// Calls that result in a read from the _inner channel should msg.Headers?.Activity?.Dispose()
+// Calls that result in a read from the _inner channel should Telemetry.EndActivity(msg.Headers?.Activity).
+// Ending it goes through Telemetry rather than Dispose() directly because Activity.Stop()
+// would otherwise clear the caller's Activity.Current: reads happen on the consumer's
+// execution context, and Stop() restores whatever was current when the activity started,
+// which for a receive activity is nothing.
 // To achieve (2):
 // Synchronous calls should call GC.KeepAlive(_sub); immediately before returning
 // Asynchronous calls should allocate a GCHandle.Alloc(_sub) at the start of the method,
@@ -70,7 +74,7 @@ internal sealed class ActivityEndingMsgReader<T> : ChannelReader<T>
         if (!_inner.TryRead(out item))
             return false;
 
-        item.Headers?.Activity?.Dispose();
+        Telemetry.EndActivity(item.Headers?.Activity);
 
         GC.KeepAlive(_sub);
         return true;
@@ -95,7 +99,7 @@ internal sealed class ActivityEndingMsgReader<T> : ChannelReader<T>
         try
         {
             var msg = await _inner.ReadAsync(cancellationToken).ConfigureAwait(false);
-            msg.Headers?.Activity?.Dispose();
+            Telemetry.EndActivity(msg.Headers?.Activity);
             return msg;
         }
         finally
@@ -123,7 +127,7 @@ internal sealed class ActivityEndingMsgReader<T> : ChannelReader<T>
             {
                 while (_inner.TryRead(out var msg))
                 {
-                    msg.Headers?.Activity?.Dispose();
+                    Telemetry.EndActivity(msg.Headers?.Activity);
                     yield return msg;
                 }
             }

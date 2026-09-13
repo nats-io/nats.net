@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using NATS.Client.Core.Commands;
@@ -332,23 +333,15 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
         in ReadOnlySequence<byte> payloadBuffer,
         INatsConnection? connection,
         NatsHeaderParser headerParser,
-        INatsDeserialize<T> serializer) =>
-        BuildInternal(
-            subject,
-            replyTo,
-            headersBuffer,
-            payloadBuffer,
-            connection,
-            headerParser,
-            serializer,
-            subscriptionSubject: subject,
-            queueGroup: null);
+        INatsDeserialize<T> serializer)
+        => BuildInternal(subject, replyTo, headersBuffer, payloadBuffer, connection, headerParser, serializer, default);
 
     /// <summary>
     /// Builds a new instance of a <see cref="NatsMsg{T}"/> with the specified parameters.
     /// </summary>
     /// <remarks>
-    /// (INTERNAL API) This method is intended for internal use only.
+    /// (INTERNAL API) This method is intended for internal use only. it doesn't have the same
+    /// guarantees as the public API. it may change in future versions with no notice.
     /// </remarks>
     /// <param name="subject">The subject string associated with the message.</param>
     /// <param name="replyTo">The optional reply-to subject string.</param>
@@ -357,8 +350,11 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
     /// <param name="connection">The connection associated with the message.</param>
     /// <param name="headerParser">The parser for processing message headers.</param>
     /// <param name="serializer">The deserializer for the message payload.</param>
-    /// <param name="subscriptionSubject">The subscription subject associated with the message.</param>
-    /// <param name="queueGroup">The optional queue group associated with the message.</param>
+    /// <param name="replyParentContext">
+    /// Parent for the receive activity when the message carries no trace context of its own.
+    /// Set by the request/reply paths so a reply is traced under the request that caused it.
+    /// Pass <c>default</c> for messages that are not replies.
+    /// </param>
     /// <returns>A new <see cref="NatsMsg{T}"/> instance containing the provided data.</returns>
     /// <exception cref="NatsException">Thrown if there is an error during the processing of the message.</exception>
     internal static NatsMsg<T> BuildInternal(
@@ -369,8 +365,7 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
         INatsConnection? connection,
         NatsHeaderParser headerParser,
         INatsDeserialize<T> serializer,
-        string subscriptionSubject,
-        string? queueGroup)
+        ActivityContext replyParentContext)
     {
         NatsHeaders? headers = null;
         var flags = NatsMsgFlags.None;
@@ -417,13 +412,14 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
             var activity = Telemetry.StartReceiveActivity(
                 connection,
                 name: activityName,
-                subscriptionSubject: subscriptionSubject,
-                queueGroup: queueGroup,
+                subscriptionSubject: subject,
+                queueGroup: default,
                 subject: subject,
                 replyTo: replyTo,
                 bodySize: payloadBuffer.Length,
                 size: size,
-                headers: headers);
+                headers: headers,
+                fallbackParentContext: replyParentContext);
 
             if (activity is not null)
             {

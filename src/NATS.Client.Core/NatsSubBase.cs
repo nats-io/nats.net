@@ -200,6 +200,18 @@ public abstract class NatsSubBase
     internal NatsSubOpts? Opts { get; private set; }
 
     /// <summary>
+    /// Receive activity of the message currently being handed off, so that a failure part way
+    /// through can be recorded against the right span. Set by <see cref="ReceiveInternalAsync"/>
+    /// implementations once they have built the message; <see cref="ReceiveAsync"/> clears it.
+    /// </summary>
+    /// <remarks>
+    /// Receive activities are deliberately kept out of <see cref="Activity.Current"/>, so the
+    /// failing message's activity has to be passed along explicitly. A plain property is enough
+    /// because the read loop delivers to a given subscription one message at a time.
+    /// </remarks>
+    internal Activity? ReceiveActivity { get; set; }
+
+    /// <summary>
     /// Represents a connection to the NATS server.
     /// </summary>
     protected INatsConnection Connection { get; }
@@ -364,10 +376,12 @@ public abstract class NatsSubBase
             }
         }
 
+        var handedOff = false;
         try
         {
             // Need to await to handle any exceptions
             await ReceiveInternalAsync(subject, replyTo, headersBuffer, payloadBuffer).ConfigureAwait(false);
+            handedOff = true;
 
             // Per OTel messaging semconv, consumed.messages counts messages "delivered to
             // the application", so we only record after ReceiveInternalAsync has completed
@@ -422,7 +436,21 @@ public abstract class NatsSubBase
 
             SetException(new NatsSubException($"Message error: {e.Message}", ExceptionDispatchInfo.Capture(e), payload, headers));
 
-            Telemetry.SetException(Activity.Current, e);
+            // The failing message's receive activity, not Activity.Current: receive activities
+            // are kept off the ambient context, which here holds whatever the read loop's
+            // execution context was created with.
+            Telemetry.SetException(ReceiveActivity, e);
+        }
+        finally
+        {
+            var activity = ReceiveActivity;
+            ReceiveActivity = null;
+
+            // A message that was never handed off has no consumer to read it, and it is the
+            // read from the subscription channel that ends a receive activity. Nothing else
+            // would ever end this one.
+            if (!handedOff)
+                Telemetry.EndActivity(activity);
         }
     }
 

@@ -291,6 +291,8 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
                     _serializer),
                 _context);
 
+            ReceiveActivity = msg.Headers?.Activity;
+
             lock (_pendingGate)
             {
                 if (_pendingMsgs > 0)

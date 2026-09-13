@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using NATS.Client.Core.Internal;
 
 namespace NATS.Client.Core;
@@ -25,7 +26,16 @@ public partial class NatsConnection
         var replyTo = NewInbox();
 
         replySerializer ??= Opts.SerializerRegistry.GetDeserializer<TReply>();
-        var sub = new NatsSub<TReply>(this, _subscriptionManager.InboxSubBuilder, replyTo, queueGroup: default, replyOpts, replySerializer);
+        var sub = new NatsSub<TReply>(this, _subscriptionManager.InboxSubBuilder, replyTo, queueGroup: default, replyOpts, replySerializer)
+        {
+            // Set from the caller's current activity. On the request path that starts a NATS
+            // request activity this is that activity, so replies arriving without trace
+            // context are traced under their request. Paths that start no request activity,
+            // RequestMany and the JetStream shared-inbox publish and API calls, supply their
+            // caller's ambient span instead: a weaker link, but still the work that caused
+            // the request. Only ids are captured, so this never keeps an activity alive.
+            ReplyParentContext = Activity.Current?.Context ?? default,
+        };
         await AddSubAsync(sub, cancellationToken).ConfigureAwait(false);
 
         requestSerializer ??= Opts.SerializerRegistry.GetSerializer<TRequest>();

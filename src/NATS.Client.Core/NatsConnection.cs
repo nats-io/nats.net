@@ -294,6 +294,11 @@ public partial class NatsConnection : INatsConnection
         if (Telemetry.DroppedMessages.Enabled)
             Telemetry.DroppedMessages.Add(1, Telemetry.BuildMetricTags(this, Telemetry.Constants.OpRec));
 
+        // A dropped message never reaches a consumer, and it is the read from the subscription
+        // channel that ends a receive activity. This is the only place the dropped message is
+        // still in hand, so it is the last chance to end its activity.
+        Telemetry.EndActivity(msg.Headers?.Activity);
+
         var subject = msg.Subject;
         PushEvent(NatsEvent.MessageDropped, new NatsMessageDroppedEventArgs(natsSub, pending, subject, msg.ReplyTo, msg.Headers, msg.Data));
 

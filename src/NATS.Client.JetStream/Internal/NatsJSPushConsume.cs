@@ -206,8 +206,7 @@ internal class NatsJSPushConsume<T> : NatsSubBase
                     Connection,
                     Connection.HeaderParser,
                     _serializer,
-                    Subject,
-                    QueueGroup),
+                    default),
                 _context);
 
             await _userMsgs.Writer.WriteAsync(msg, _cancellationToken).ConfigureAwait(false);
