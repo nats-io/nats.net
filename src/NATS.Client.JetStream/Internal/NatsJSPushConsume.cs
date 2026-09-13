@@ -24,6 +24,7 @@ internal class NatsJSPushConsume<T> : NatsSubBase
     private readonly Timer _timer;
     private readonly int _hbTimeout;
     private volatile bool _draining;
+    private bool _wasDisconnected;
 
     public NatsJSPushConsume(
         NatsJSContext context,
@@ -96,6 +97,9 @@ internal class NatsJSPushConsume<T> : NatsSubBase
             Connection.GetBoundedChannelOpts(opts?.ChannelOpts),
             msg => Connection.OnMessageDropped(this, _userMsgs?.Reader.Count ?? 0, msg.Msg));
         Msgs = new ActivityEndingMsgReader<NatsJSMsg<T>>(_userMsgs.Reader, this);
+
+        Connection.ConnectionDisconnected += OnConnectionDisconnected;
+        Connection.ConnectionOpened += OnConnectionOpened;
     }
 
     public ChannelReader<NatsJSMsg<T>> Msgs { get; }
@@ -129,6 +133,9 @@ internal class NatsJSPushConsume<T> : NatsSubBase
             {
                 await _notificationChannel.DisposeAsync();
             }
+
+            Connection.ConnectionDisconnected -= OnConnectionDisconnected;
+            Connection.ConnectionOpened -= OnConnectionOpened;
         }
     }
 
@@ -220,6 +227,24 @@ internal class NatsJSPushConsume<T> : NatsSubBase
     protected override void TryComplete()
     {
         _userMsgs.Writer.TryComplete();
+    }
+
+    private ValueTask OnConnectionDisconnected(object? sender, NatsEventArgs args)
+    {
+        _wasDisconnected = true;
+        StopHeartbeatTimer();
+        return default;
+    }
+
+    private ValueTask OnConnectionOpened(object? sender, NatsEventArgs args)
+    {
+        if (_wasDisconnected && _hbTimeout > 0 && !_draining)
+        {
+            _wasDisconnected = false;
+            ResetHeartbeatTimer();
+        }
+
+        return default;
     }
 
     private void CompleteStop()

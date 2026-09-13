@@ -104,6 +104,9 @@ public class NatsJSPushConsumer : INatsJSPushConsumer
 
         await _context.Connection.AddSubAsync(sub: sub, cancellationToken).ConfigureAwait(false);
 
+        if (Info.Config.IdleHeartbeat > TimeSpan.Zero)
+            sub.ResetHeartbeatTimer();
+
         await using (sub)
         {
             sub.MarkReaderActive();
