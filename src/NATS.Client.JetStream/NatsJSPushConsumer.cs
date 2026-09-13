@@ -147,7 +147,7 @@ public class NatsJSPushConsumer : INatsJSPushConsumer
                             break;
 
                         // if yield is blocked by the application code, we don't want
-                        // heartbeat timer kicking in and issuing a spurious flow control.
+                        // heartbeat timer kicking in and issuing a spurious idle-timeout notification while caller is blocked
                         sub.StopHeartbeatTimer();
                         yield return jsMsg;
                         sub.ResetHeartbeatTimer();
