@@ -8,11 +8,20 @@ namespace NATS.Client.Serializers.Json;
 /// Reflection based JSON serializer for NATS.
 /// </summary>
 /// <remarks>
-/// A new <see cref="Utf8JsonWriter"/> is allocated on every serialization.
 /// This serializer is not suitable for native AOT deployments since it might rely on reflection.
 /// </remarks>
 public sealed class NatsJsonSerializer<T> : INatsSerializer<T>
 {
+    // ReSharper disable once StaticMemberInGenericType
+    [ThreadStatic]
+    private static Utf8JsonWriter? _jsonWriter;
+
+    // A writer bakes in the options it was created with, so the cached one can only be
+    // reused by the instance that created it.
+    // ReSharper disable once StaticMemberInGenericType
+    [ThreadStatic]
+    private static object? _jsonWriterOwner;
+
     private readonly JsonSerializerOptions _opts;
     private readonly JsonWriterOptions _writerOpts;
 
@@ -62,9 +71,22 @@ public sealed class NatsJsonSerializer<T> : INatsSerializer<T>
     /// <inheritdoc />
     public void Serialize(IBufferWriter<byte> bufferWriter, T? value)
     {
-        using var writer = new Utf8JsonWriter(bufferWriter, _writerOpts);
+        Utf8JsonWriter writer;
+        if (_jsonWriter == null || !ReferenceEquals(_jsonWriterOwner, this))
+        {
+            _jsonWriter?.Dispose();
+            writer = _jsonWriter = new Utf8JsonWriter(bufferWriter, _writerOpts);
+            _jsonWriterOwner = this;
+        }
+        else
+        {
+            writer = _jsonWriter;
+            writer.Reset(bufferWriter);
+        }
 
         JsonSerializer.Serialize(writer, value, _opts);
+
+        writer.Reset(NullBufferWriter.Instance);
     }
 
     /// <inheritdoc />
@@ -77,6 +99,19 @@ public sealed class NatsJsonSerializer<T> : INatsSerializer<T>
 
         var reader = new Utf8JsonReader(buffer); // Utf8JsonReader is ref struct, no allocate.
         return JsonSerializer.Deserialize<T>(ref reader, _opts);
+    }
+
+    private sealed class NullBufferWriter : IBufferWriter<byte>
+    {
+        internal static readonly IBufferWriter<byte> Instance = new NullBufferWriter();
+
+        public void Advance(int count)
+        {
+        }
+
+        public Memory<byte> GetMemory(int sizeHint = 0) => Array.Empty<byte>();
+
+        public Span<byte> GetSpan(int sizeHint = 0) => Array.Empty<byte>();
     }
 }
 
