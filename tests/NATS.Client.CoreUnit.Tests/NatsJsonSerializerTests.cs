@@ -152,6 +152,67 @@ public class NatsJsonSerializerTests
         Assert.DoesNotContain("café", Serialize(defaultSerializer, obj));
     }
 
+    [Fact]
+    public void Serialize_ReusesWriterAcrossCalls()
+    {
+        // Serializing is on the hot path of every NatsClient publish, so the writer is cached
+        // per thread. Allocating one per call costs around 120 bytes a message.
+        var serializer = new NatsJsonSerializer<Payload>(new JsonSerializerOptions());
+        var payload = new Payload { Name = "abc" };
+        var bufferWriter = new ArrayBufferWriter<byte>();
+
+        for (var i = 0; i < 100; i++)
+        {
+            bufferWriter.Clear();
+            serializer.Serialize(bufferWriter, payload, default);
+        }
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < 1000; i++)
+        {
+            bufferWriter.Clear();
+            serializer.Serialize(bufferWriter, payload, default);
+        }
+
+        var perCall = (GC.GetAllocatedBytesForCurrentThread() - before) / 1000d;
+
+        Assert.True(perCall < 64, $"expected the cached writer to be reused, allocated {perCall} bytes per call");
+    }
+
+    [Fact]
+    public void Serialize_WriterIsNotSharedAcrossThreads()
+    {
+        var serializer = new NatsJsonSerializer<Payload>(
+            new JsonSerializerOptions(),
+            new JsonWriterOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping, SkipValidation = true });
+
+        var threads = new Thread[8];
+        var failures = new System.Collections.Concurrent.ConcurrentQueue<string>();
+
+        for (var t = 0; t < threads.Length; t++)
+        {
+            threads[t] = new Thread(() =>
+            {
+                for (var i = 0; i < 200; i++)
+                {
+                    var json = Serialize(serializer, new Payload { Name = "café" });
+                    if (json != """{"Name":"café"}""")
+                    {
+                        failures.Enqueue(json);
+                    }
+                }
+            });
+            threads[t].Start();
+        }
+
+        foreach (var thread in threads)
+        {
+            thread.Join();
+        }
+
+        Assert.Empty(failures);
+    }
+
     private static string Serialize<T>(NatsJsonSerializer<T> serializer, T value)
     {
         var bufferWriter = new ArrayBufferWriter<byte>();
