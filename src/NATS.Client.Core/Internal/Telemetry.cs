@@ -256,12 +256,12 @@ internal static class Telemetry
         return activity;
     }
 
-    public static void AddTraceContextHeaders(Activity? activity, ref NatsHeaders? headers)
+    public static void AddTraceContextHeaders(Activity? activity, ref NatsHeaders? headers, bool caseSensitiveHeaders)
     {
         if (activity is null)
             return;
 
-        headers ??= new NatsHeaders();
+        headers ??= new NatsHeaders(caseSensitiveHeaders);
         DistributedContextPropagator.Current.Inject(
             activity: activity,
             carrier: headers,

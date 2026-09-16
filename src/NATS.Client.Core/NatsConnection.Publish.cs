@@ -23,7 +23,7 @@ public partial class NatsConnection
         if (Telemetry.HasListeners())
         {
             using var activity = Telemetry.StartSendActivity($"{SpanDestinationName(subject)} {Telemetry.Constants.PublishActivityName}", this, subject, replyTo, Telemetry.Constants.OpPub);
-            Telemetry.AddTraceContextHeaders(activity, ref headers);
+            Telemetry.AddTraceContextHeaders(activity, ref headers, Opts.CaseSensitiveHeaders);
             try
             {
                 task = ConnectionState != NatsConnectionState.Open
@@ -75,7 +75,7 @@ public partial class NatsConnection
         if (Telemetry.HasListeners())
         {
             using var activity = Telemetry.StartSendActivity($"{SpanDestinationName(subject)} {Telemetry.Constants.PublishActivityName}", this, subject, replyTo, Telemetry.Constants.OpPub);
-            Telemetry.AddTraceContextHeaders(activity, ref headers);
+            Telemetry.AddTraceContextHeaders(activity, ref headers, Opts.CaseSensitiveHeaders);
             try
             {
                 serializer ??= Opts.SerializerRegistry.GetSerializer<T>();

@@ -148,12 +148,13 @@ public sealed record NatsOpts
     public Encoding HeaderEncoding { get; init; } = Encoding.ASCII;
 
     /// <summary>
-    /// Gets or sets whether header names of received messages are matched case-sensitively. (default: false)
+    /// Gets or sets whether header names are matched case-sensitively in headers the client creates. (default: false)
     /// </summary>
     /// <remarks>
-    /// ADR-4 defines header operations as case-sensitive, but the default is kept case-insensitive
-    /// here so existing applications are not broken. Publishers opt in per message by constructing
-    /// <see cref="NatsHeaders"/> with <c>caseSensitive: true</c>.
+    /// Applies to received messages and to headers the client creates on your behalf, such as trace
+    /// context on publish. ADR-4 defines header operations as case-sensitive, but the default is kept
+    /// case-insensitive here so existing applications are not broken. Headers you construct yourself
+    /// opt in via <see cref="NatsHeaders"/> with <c>caseSensitive: true</c>.
     /// TODO: next major version should make case-sensitive the default and reverse this option.
     /// </remarks>
     public bool CaseSensitiveHeaders { get; init; } = false;

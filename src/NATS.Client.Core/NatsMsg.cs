@@ -417,7 +417,7 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
                 ? $"{nats.SpanDestinationName(subject)} {Telemetry.Constants.ReceiveActivityName}"
                 : Telemetry.Constants.ReceiveActivityName;
 
-            headers ??= new NatsHeaders();
+            headers ??= new NatsHeaders(headerParser.CaseSensitiveHeaders);
 
             receiveActivity = Telemetry.StartReceiveActivity(
                 connection,
@@ -455,7 +455,7 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
             }
             catch (Exception e)
             {
-                headers ??= new NatsHeaders();
+                headers ??= new NatsHeaders(headerParser.CaseSensitiveHeaders);
                 headers.Error = new NatsDeserializeException(payloadBuffer.ToArray(), e);
                 data = default;
             }

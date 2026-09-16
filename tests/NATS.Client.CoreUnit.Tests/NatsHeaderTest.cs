@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Diagnostics;
 using System.IO.Pipelines;
 using System.Text;
 
@@ -277,5 +278,102 @@ public class NatsHeaderTest
         await pipe.Writer.FlushAsync();
         var result = await pipe.Reader.ReadAtLeastAsync((int)written);
         Assert.True(expected.ToSpan().SequenceEqual(result.Buffer.ToSpan()));
+    }
+
+    [Fact]
+    public async Task OptsCaseSensitiveHeadersTests()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { CaseSensitiveHeaders = true });
+        Assert.True(nats.HeaderParser.CaseSensitiveHeaders);
+
+        var msg = BuildMsg(nats, "NATS/1.0\r\nX-Trace: alpha\r\nx-trace: bravo\r\n\r\n");
+
+        Assert.NotNull(msg.Headers);
+        Assert.Equal(2, msg.Headers!.Count);
+        Assert.Equal("alpha", msg.Headers["X-Trace"]);
+        Assert.Equal("bravo", msg.Headers["x-trace"]);
+    }
+
+    [Fact]
+    public async Task OptsCaseInsensitiveHeadersByDefaultTests()
+    {
+        await using var nats = new NatsConnection(new NatsOpts());
+        Assert.False(nats.HeaderParser.CaseSensitiveHeaders);
+
+        var msg = BuildMsg(nats, "NATS/1.0\r\nX-Trace: alpha\r\nx-trace: bravo\r\n\r\n");
+
+        Assert.NotNull(msg.Headers);
+        Assert.Single(msg.Headers!);
+        Assert.Equal(new[] { "alpha", "bravo" }, msg.Headers!["X-Trace"].ToArray());
+    }
+
+    [Fact]
+    public async Task OptsCaseSensitiveHeadersDeserializeErrorTests()
+    {
+        await using var nats = new NatsConnection(new NatsOpts { CaseSensitiveHeaders = true });
+
+        // No headers on the wire, so the only NatsHeaders is the one the error path creates.
+        var msg = NatsMsg<byte[]>.Build(
+            "foo",
+            replyTo: null,
+            headersBuffer: null,
+            payloadBuffer: new ReadOnlySequence<byte>(new byte[] { 42 }),
+            connection: nats,
+            headerParser: nats.HeaderParser,
+            serializer: new ThrowingDeserializer());
+
+        Assert.NotNull(msg.Headers);
+        Assert.IsType<NatsDeserializeException>(msg.Headers!.Error);
+
+        msg.Headers["X-Trace"] = "alpha";
+        msg.Headers["x-trace"] = "bravo";
+        Assert.Equal(2, msg.Headers.Count);
+    }
+
+    [Fact]
+    public void OptsCaseSensitiveHeadersTelemetryTests()
+    {
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == Telemetry.NatsActivitySource,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+        };
+        ActivitySource.AddActivityListener(listener);
+
+        using var activity = Telemetry.StartReceiveActivity(
+            connection: null,
+            name: "receive",
+            subscriptionSubject: "foo",
+            queueGroup: null,
+            subject: "foo",
+            replyTo: null,
+            bodySize: 0,
+            size: 0,
+            headers: null);
+        Assert.NotNull(activity);
+
+        // Publishing with tracing on creates the headers when the caller supplied none.
+        NatsHeaders? headers = null;
+        Telemetry.AddTraceContextHeaders(activity, ref headers, caseSensitiveHeaders: true);
+
+        Assert.NotNull(headers);
+        headers!["X-Trace"] = "alpha";
+        headers["x-trace"] = "bravo";
+        Assert.Equal("alpha", headers["X-Trace"]);
+        Assert.Equal("bravo", headers["x-trace"]);
+    }
+
+    private static NatsMsg<byte[]> BuildMsg(NatsConnection nats, string headers) => NatsMsg<byte[]>.Build(
+        "foo",
+        replyTo: null,
+        headersBuffer: new ReadOnlySequence<byte>(Encoding.ASCII.GetBytes(headers)),
+        payloadBuffer: new ReadOnlySequence<byte>(Array.Empty<byte>()),
+        connection: nats,
+        headerParser: nats.HeaderParser,
+        serializer: NatsRawSerializer<byte[]>.Default);
+
+    private class ThrowingDeserializer : INatsDeserialize<byte[]>
+    {
+        public byte[]? Deserialize(in ReadOnlySequence<byte> buffer) => throw new InvalidOperationException("boom");
     }
 }
