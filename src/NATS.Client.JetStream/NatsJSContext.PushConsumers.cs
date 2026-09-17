@@ -29,10 +29,13 @@ public partial class NatsJSContext : INatsJSContext
 
     /// <inheritdoc />
     /// <remarks>
-    /// The returned consumer uses default channel options. To customize subscription options
-    /// or provide a notification handler, call <see cref="NatsJSPushConsumer.ConsumeAsync{T}"/>
-    /// with <see cref="NatsJSConsumeOpts"/> specifying <c>SubOpts</c>
-    /// and <c>NotificationHandler</c>.
+    /// The returned consumer is created without subscription options, so the underlying
+    /// message channel uses default options: channel options (e.g. capacity) can only be
+    /// customized when the consumer is created via <see cref="CreatePushConsumerAsync"/>
+    /// with <see cref="NatsJSPushConsumerOpts.SubOpts"/>. A notification handler can be
+    /// provided at consumption time by calling <see cref="NatsJSPushConsumer.ConsumeAsync{T}"/>
+    /// with <see cref="NatsJSConsumeOpts"/> specifying
+    /// <see cref="NatsJSConsumeOpts.NotificationHandler"/>.
     /// </remarks>
     public async ValueTask<INatsJSPushConsumer> GetPushConsumerAsync(
         string stream,

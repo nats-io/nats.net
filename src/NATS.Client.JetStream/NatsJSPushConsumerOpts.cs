@@ -35,8 +35,9 @@ public record NatsJSPushConsumerOpts
     public string? DurableName { get; init; }
 
     /// <summary>
-    /// The delivery subject for the push consumer. The server uses this subject
-    /// to deliver messages to the client. When not set, a new inbox is generated.
+    /// The subject the server delivers messages to. Required: consumer creation throws
+    /// <see cref="NatsJSException"/> when it's not set. Callers typically pass an inbox
+    /// generated with <see cref="INatsJSContext.NewBaseInbox"/>.
     /// </summary>
     public string? DeliverSubject { get; init; }
 

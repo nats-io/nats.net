@@ -30,7 +30,8 @@ public interface INatsJSContext
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Creates a new push consumer that delivers messages to a client subscription on a generated subject.
+    /// Creates a new push consumer that delivers messages to the subject given in
+    /// <see cref="NatsJSPushConsumerOpts.DeliverSubject"/>.
     /// </summary>
     /// <remarks>
     /// Ephemeral push consumers (no <see cref="NatsJSPushConsumerOpts.Name"/> or
@@ -45,7 +46,7 @@ public interface INatsJSContext
     /// <param name="opts">Push consumer options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>The NATS JetStream push consumer object which can be used retrieving data from the stream with <see cref="INatsJSConsumer.ConsumeAsync{T}"/>.</returns>
-    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
+    /// <exception cref="NatsJSException">There was an issue retrieving the response, or <see cref="NatsJSPushConsumerOpts.DeliverSubject"/> is not set.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
     /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
@@ -61,7 +62,7 @@ public interface INatsJSContext
     /// <param name="opts">Push consumer options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     /// <returns>The NATS JetStream push consumer object which can be used to retrieve data from the stream with <see cref="INatsJSConsumer.ConsumeAsync{T}"/>.</returns>
-    /// <exception cref="NatsJSException">There was an issue retrieving the response.</exception>
+    /// <exception cref="NatsJSException">There was an issue retrieving the response, or <see cref="NatsJSPushConsumerOpts.DeliverSubject"/> is not set.</exception>
     /// <exception cref="NatsJSApiException">Server responded with an error.</exception>
     /// <exception cref="ArgumentException">The <paramref name="stream"/> name is invalid.</exception>
     /// <exception cref="ArgumentNullException">The <paramref name="stream"/> name is <c>null</c>.</exception>
