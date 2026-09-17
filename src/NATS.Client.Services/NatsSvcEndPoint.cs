@@ -173,6 +173,13 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
     public override IDictionary<string, string>? Metadata { get; }
 
     /// <inheritdoc/>
+    public override async ValueTask DrainAsync(CancellationToken cancellationToken = default)
+    {
+        await base.DrainAsync(cancellationToken).ConfigureAwait(false);
+        await _handlerTask.ConfigureAwait(false);
+    }
+
+    /// <inheritdoc/>
     public override async ValueTask DisposeAsync()
     {
         await base.DisposeAsync();
