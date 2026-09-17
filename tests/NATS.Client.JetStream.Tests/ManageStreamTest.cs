@@ -633,21 +633,23 @@ public class ManageStreamTest
             {
                 await foreach (var msg in sub.Msgs.ReadAllAsync(cts.Token))
                 {
-                    // Final message has no reply subject — signals end of snapshot
-                    if (string.IsNullOrEmpty(msg.ReplyTo))
+                    // The snapshot ends with an empty payload. The reply subject cannot be
+                    // used to detect the end: the server sends the last, partial chunk
+                    // without one, so stopping there drops the tail of the archive.
+                    if (msg.Data is not { Length: > 0 })
                     {
                         break;
                     }
 
-                    if (msg.Data != null)
-                    {
-                        chunkCount++;
-                        totalBytes += msg.Data.Length;
-                        snapshotData.Add(msg.Data);
-                    }
+                    chunkCount++;
+                    totalBytes += msg.Data.Length;
+                    snapshotData.Add(msg.Data);
 
-                    // Ack the chunk so the server sends the next one
-                    await nats.PublishAsync(msg.ReplyTo!, cancellationToken: cts.Token);
+                    // Ack the chunk so the server sends the next one.
+                    if (!string.IsNullOrEmpty(msg.ReplyTo))
+                    {
+                        await nats.PublishAsync(msg.ReplyTo!, cancellationToken: cts.Token);
+                    }
                 }
             },
             cts.Token);
@@ -687,5 +689,35 @@ public class ManageStreamTest
         Assert.Equal(0xFF, allBytes[0]);
         Assert.Equal(0x06, allBytes[1]);
         Assert.Equal("S2sTwO", magic);
+
+        // Restore the snapshot over the deleted stream. The checks above only look at
+        // the start of the archive, so they pass on a truncated snapshot; the restore
+        // is what makes a missing chunk visible.
+        await js.DeleteStreamAsync(streamName, cts.Token);
+
+        var restore = await js.JSRequestResponseAsync<StreamRestoreRequest, StreamRestoreResponse>(
+            subject: $"{js.Opts.Prefix}.STREAM.RESTORE.{streamName}",
+            new StreamRestoreRequest { Config = response.Config, State = response.State },
+            cts.Token);
+
+        foreach (var chunk in snapshotData)
+        {
+            var ack = await nats.RequestAsync<byte[], byte[]>(restore.DeliverSubject, chunk, cancellationToken: cts.Token);
+            Assert.DoesNotContain("\"error\"", System.Text.Encoding.UTF8.GetString(ack.Data ?? Array.Empty<byte>()));
+        }
+
+        // An empty payload ends the restore and returns the created stream.
+        var final = await nats.RequestAsync<byte[], byte[]>(restore.DeliverSubject, Array.Empty<byte>(), cancellationToken: cts.Token);
+        Assert.DoesNotContain("\"error\"", System.Text.Encoding.UTF8.GetString(final.Data ?? Array.Empty<byte>()));
+
+        var restored = await js.GetStreamAsync(streamName, cancellationToken: cts.Token);
+        Assert.Equal(messageCount, (int)restored.Info.State.Messages);
+
+        for (var i = 0; i < messageCount; i++)
+        {
+            var stored = await restored.GetAsync(new StreamMsgGetRequest { Seq = (ulong)(i + 1) }, cts.Token);
+            Assert.Equal($"{streamName}.data", stored.Message.Subject);
+            Assert.Equal($"message-{i}", System.Text.Encoding.UTF8.GetString(stored.Message.Data.Span));
+        }
     }
 }
