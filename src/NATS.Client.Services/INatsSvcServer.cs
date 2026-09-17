@@ -36,14 +36,17 @@ public interface INatsSvcServer : IAsyncDisposable
     /// Removes an endpoint by name, draining and disposing it.
     /// </summary>
     /// <param name="name">Name of the endpoint to remove.</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to bound the drain operation.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to bound the drain operation's PING/PONG fence</param>
     /// <returns>A <seealso cref="ValueTask"/> representing the asynchronous operation.</returns>
     /// <remarks>
     /// The endpoint stops receiving new messages, then any messages it has already received are
     /// handled before it is disposed. Other endpoints on this service are unaffected.
     /// <para>
-    /// Endpoints added through a <see cref="NatsSvcServer.Group"/> are removed by their endpoint
-    /// name, without the group prefix.
+    /// An endpoint is named by the <c>name</c> it was added with. An endpoint added without a
+    /// name takes its name from its subject with dots replaced by dashes, and for an endpoint
+    /// added through a <see cref="NatsSvcServer.Group"/> that subject includes the group prefix.
+    /// So on a group <c>g1</c>, an endpoint added as <c>name: "e1"</c> is removed as <c>e1</c>,
+    /// but one added as <c>subject: "s1"</c> with no name is removed as <c>g1-s1</c>.
     /// </para>
     /// </remarks>
     ValueTask RemoveEndpointAsync(string name, CancellationToken cancellationToken = default);

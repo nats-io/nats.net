@@ -116,7 +116,7 @@ public class NatsSvcServer : INatsSvcServer
     /// Removes an endpoint by name, draining and disposing it.
     /// </summary>
     /// <param name="name">Name of the endpoint to remove.</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to bound the drain operation.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to bound the drain operation's PING/PONG fence</param>
     /// <returns>A <seealso cref="ValueTask"/> representing the asynchronous operation.</returns>
     /// <remarks>
     /// The endpoint stops receiving new messages, then any messages it has already received are
@@ -134,8 +134,14 @@ public class NatsSvcServer : INatsSvcServer
             throw new NatsSvcException($"Endpoint '{name}' does not exist");
         }
 
-        await ep.DrainAsync(cancellationToken).ConfigureAwait(false);
-        await ep.DisposeAsync().ConfigureAwait(false);
+        try
+        {
+            await ep.DrainAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            await ep.DisposeAsync().ConfigureAwait(false);
+        }
     }
 
     /// <summary>
