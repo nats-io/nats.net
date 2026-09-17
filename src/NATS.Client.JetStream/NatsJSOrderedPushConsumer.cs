@@ -72,6 +72,7 @@ public class NatsJSOrderedPushConsumer : INatsJSPushConsumer
         cancellationToken = linkedCts.Token;
 
         var retry = 0;
+        ulong seq = 0;
         while (!cancellationToken.IsCancellationRequested)
         {
             if (_context.Connection is NatsConnection { IsDisposed: true })
@@ -87,7 +88,18 @@ public class NatsJSOrderedPushConsumer : INatsJSPushConsumer
                 FilterSubjects = _opts.FilterSubjects is { Length: > 0 } ? _opts.FilterSubjects : null,
                 InactiveThreshold = _opts.InactiveThreshold,
                 NotificationHandler = opts?.NotificationHandler,
+                OnConsumerCreated = info => Info = info,
             };
+
+            if (seq > 0)
+            {
+                internalOpts = internalOpts with
+                {
+                    OptStartSeq = seq + 1,
+                    DeliverPolicy = ConsumerConfigDeliverPolicy.ByStartSequence,
+                    OptStartTime = default,
+                };
+            }
 
             NatsJSOrderedPushConsumer<T>? pushConsumer = null;
             ChannelReader<NatsJSMsg<T>> reader = default!;
@@ -131,6 +143,11 @@ public class NatsJSOrderedPushConsumer : INatsJSPushConsumer
 
                         while (reader.TryRead(out var msg))
                         {
+                            if (msg.Metadata is { } metadata)
+                            {
+                                seq = metadata.Sequence.Stream;
+                            }
+
                             yield return msg;
                         }
                     }

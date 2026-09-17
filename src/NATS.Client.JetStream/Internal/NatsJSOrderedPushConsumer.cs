@@ -86,6 +86,12 @@ internal record NatsJSOrderedPushConsumerOpts
     /// A handler function invoked for notifications related to consumption.
     /// </summary>
     public Func<INatsJSNotification, CancellationToken, Task>? NotificationHandler { get; init; }
+
+    /// <summary>
+    /// A callback invoked with the <see cref="ConsumerInfo"/> of the consumer after it is created
+    /// (both for the initial creation and every recreation).
+    /// </summary>
+    public Action<ConsumerInfo>? OnConsumerCreated { get; init; }
 }
 
 internal class NatsJSOrderedPushConsumer<T>
@@ -519,6 +525,7 @@ internal class NatsJSOrderedPushConsumer<T>
             cancellationToken: _cancellationToken);
 
         Info = consumerInfo.Info;
+        _opts.OnConsumerCreated?.Invoke(consumerInfo.Info);
 
         if (_debug)
         {
