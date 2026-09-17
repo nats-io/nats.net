@@ -717,7 +717,7 @@ public class ManageStreamTest
         {
             var stored = await restored.GetAsync(new StreamMsgGetRequest { Seq = (ulong)(i + 1) }, cts.Token);
             Assert.Equal($"{streamName}.data", stored.Message.Subject);
-            Assert.Equal($"message-{i}", System.Text.Encoding.UTF8.GetString(stored.Message.Data.Span));
+            Assert.Equal($"message-{i}", System.Text.Encoding.UTF8.GetString(stored.Message.Data.ToArray()));
         }
     }
 }
