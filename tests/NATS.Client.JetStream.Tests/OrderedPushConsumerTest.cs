@@ -1,3 +1,4 @@
+using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Models;
 using NATS.Client.TestUtilities2;
@@ -251,5 +252,58 @@ public class OrderedPushConsumerTest(NatsServerFixture server)
 
         Assert.True(count >= 1);
         Assert.True(found);
+    }
+
+    [Fact]
+    public async Task Consume_timeout_notification()
+    {
+        var proxy = new NatsProxy(server.Port);
+        await using var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}", ConnectTimeout = TimeSpan.FromSeconds(10) });
+        await nats.ConnectRetryAsync();
+        var prefix = server.GetNextId();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var js = new NatsJSContext(nats);
+        await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
+
+        var consumer = (NatsJSOrderedPushConsumer)await js.CreateOrderedPushConsumerAsync($"{prefix}s1", cancellationToken: cts.Token);
+
+        var timeouts = 0;
+        var consumeCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
+        var consumeOpts = new NatsJSConsumeOpts
+        {
+            NotificationHandler = (notification, _) =>
+            {
+                if (notification is NatsJSTimeoutNotification)
+                    Interlocked.Increment(ref timeouts);
+                return Task.CompletedTask;
+            },
+        };
+
+        var consumeTask = Task.Run(async () =>
+        {
+            await foreach (var msg in consumer.ConsumeAsync<int>(opts: consumeOpts, cancellationToken: consumeCts.Token))
+            {
+                _ = msg;
+            }
+        });
+
+        // Let the consumer start so the timeout timer is armed.
+        await Task.Delay(1_000, cts.Token);
+
+        // Swallow heartbeats so the client sees silence and the timeout notification fires.
+        proxy.ServerInterceptors.Add(m => m?.Contains("Idle Heartbeat") ?? false ? null : m);
+
+        // Idle heartbeat defaults to 5s, so the timeout notification is expected after ~10s of silence.
+        var deadline = DateTime.UtcNow.AddSeconds(25);
+        while (Volatile.Read(ref timeouts) < 1)
+        {
+            Assert.True(DateTime.UtcNow < deadline, $"timed out waiting for the notification, got {timeouts}");
+            await Task.Delay(100, cts.Token);
+        }
+
+        consumeCts.Cancel();
+        await Task.WhenAny(consumeTask, Task.Delay(TimeSpan.FromSeconds(5)));
+        Assert.True(Volatile.Read(ref timeouts) >= 1);
     }
 }

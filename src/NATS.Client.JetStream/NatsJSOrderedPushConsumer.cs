@@ -47,6 +47,19 @@ public class NatsJSOrderedPushConsumer : INatsJSPushConsumer
     /// </summary>
     public ConsumerInfo Info { get; private set; }
 
+    /// <summary>
+    /// Starts consuming messages from the ordered push consumer.
+    /// </summary>
+    /// <typeparam name="T">Message type to deserialize.</typeparam>
+    /// <param name="serializer">Serializer to use for the message type.</param>
+    /// <param name="opts">Consume options. Only <see cref="NatsJSConsumeOpts.NotificationHandler"/> is applicable:
+    /// it receives <see cref="NatsJSTimeoutNotification"/> when no messages or heartbeats arrive within twice
+    /// the idle heartbeat interval (default 5 seconds, i.e. 10 seconds of silence), at which point the underlying
+    /// consumer is recreated automatically. The remaining options (e.g. <c>MaxMsgs</c>, <c>Expires</c>,
+    /// <c>IdleHeartbeat</c>, <c>ThresholdMsgs</c>, <c>ThresholdBytes</c>) control pull-consumer behavior
+    /// and are not applicable to ordered push consumers.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel consume operations.</param>
+    /// <returns>An asynchronous enumerable of messages.</returns>
     /// <inheritdoc />
     public async IAsyncEnumerable<INatsJSMsg<T>> ConsumeAsync<T>(
         INatsDeserialize<T>? serializer = default,
@@ -73,6 +86,7 @@ public class NatsJSOrderedPushConsumer : INatsJSPushConsumer
                 HeadersOnly = _opts.HeadersOnly,
                 FilterSubjects = _opts.FilterSubjects is { Length: > 0 } ? _opts.FilterSubjects : null,
                 InactiveThreshold = _opts.InactiveThreshold,
+                NotificationHandler = opts?.NotificationHandler,
             };
 
             NatsJSOrderedPushConsumer<T>? pushConsumer = null;

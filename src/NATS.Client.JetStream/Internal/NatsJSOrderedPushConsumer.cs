@@ -81,6 +81,11 @@ internal record NatsJSOrderedPushConsumerOpts
     /// Replay policy for the consumer.
     /// </summary>
     public ConsumerConfigReplayPolicy ReplayPolicy { get; init; } = ConsumerConfigReplayPolicy.Instant;
+
+    /// <summary>
+    /// A handler function invoked for notifications related to consumption.
+    /// </summary>
+    public Func<INatsJSNotification, CancellationToken, Task>? NotificationHandler { get; init; }
 }
 
 internal class NatsJSOrderedPushConsumer<T>
@@ -99,6 +104,7 @@ internal class NatsJSOrderedPushConsumer<T>
     private readonly Channel<NatsJSMsg<T>> _msgChannel;
     private readonly Channel<string> _consumerCreateChannel;
     private readonly Timer _timer;
+    private readonly NatsJSNotificationChannel? _notificationChannel;
     private readonly int _hbTimeout;
     private readonly Task _consumerCreateTask;
     private readonly Task _commandTask;
@@ -129,6 +135,12 @@ internal class NatsJSOrderedPushConsumer<T>
         _subOpts = subOpts;
         _cancellationToken = cancellationToken;
         _nats = context.Connection;
+
+        if (opts.NotificationHandler is { } handler)
+        {
+            _notificationChannel = new NatsJSNotificationChannel(handler, e => _msgChannel?.Writer.TryComplete(e), cancellationToken);
+        }
+
         _hbTimeout = opts.IdleHeartbeat is { } idleHeartbeat && idleHeartbeat > TimeSpan.Zero
             ? (int)new TimeSpan(idleHeartbeat.Ticks * 2).TotalMilliseconds
             : 0;
@@ -141,6 +153,7 @@ internal class NatsJSOrderedPushConsumer<T>
             {
                 var self = (NatsJSOrderedPushConsumer<T>)state!;
                 self.CreateSub("idle-heartbeat-timeout");
+                self._notificationChannel?.Notify(NatsJSTimeoutNotification.Default);
                 if (self._debug)
                 {
                     self._logger.LogDebug(
@@ -207,6 +220,11 @@ internal class NatsJSOrderedPushConsumer<T>
 #else
         await _timer.DisposeAsync().ConfigureAwait(false);
 #endif
+
+        if (_notificationChannel is { } notificationChannel)
+        {
+            await notificationChannel.DisposeAsync().ConfigureAwait(false);
+        }
 
         // For correctly Dispose,
         // first stop the consumer Creation operations and then the command execution operations.
