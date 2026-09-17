@@ -256,7 +256,7 @@ internal static class Telemetry
         return activity;
     }
 
-    public static void AddTraceContextHeaders(Activity? activity, ref NatsHeaders? headers, bool caseSensitiveHeaders)
+    public static void AddTraceContextHeaders(Activity? activity, ref NatsHeaders? headers, bool caseSensitiveHeaders = false)
     {
         if (activity is null)
             return;
