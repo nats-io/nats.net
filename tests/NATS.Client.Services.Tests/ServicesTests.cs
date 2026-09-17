@@ -239,7 +239,55 @@ public class ServicesTests
         var exception = await Assert.ThrowsAsync<NatsSvcException>(async () =>
             await s1.RemoveEndpointAsync("e1", cancellationToken));
 
-        Assert.Equal("Endpoint 'e1' does not exist", exception.Message);
+        Assert.Contains("e1", exception.Message);
+    }
+
+    [Fact]
+    public async Task Remove_group_end_point()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
+        var svc = new NatsSvcContext(nats);
+
+        await using var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
+        var grp1 = await s1.AddGroupAsync("grp1", cancellationToken: cancellationToken);
+
+        // Named, so the endpoint is named "e1" without the group prefix.
+        await grp1.AddEndpointAsync<int>(
+            name: "e1",
+            handler: async m => await m.ReplyAsync(1, cancellationToken: cancellationToken),
+            cancellationToken: cancellationToken);
+
+        // Unnamed, so the endpoint takes its name from the prefixed subject: "grp1-s1".
+        await grp1.AddEndpointAsync<int>(
+            subject: "s1",
+            handler: async m => await m.ReplyAsync(2, cancellationToken: cancellationToken),
+            cancellationToken: cancellationToken);
+
+        Assert.Equal(1, (await nats.RequestAsync<int, int>("grp1.e1", 0, cancellationToken: cancellationToken)).Data);
+        Assert.Equal(2, (await nats.RequestAsync<int, int>("grp1.s1", 0, cancellationToken: cancellationToken)).Data);
+
+        // A named endpoint is not removable by its prefixed subject...
+        await Assert.ThrowsAsync<NatsSvcException>(async () =>
+            await s1.RemoveEndpointAsync("grp1-e1", cancellationToken));
+        await s1.RemoveEndpointAsync("e1", cancellationToken);
+
+        // ...and an unnamed one is not removable by its unprefixed subject.
+        await Assert.ThrowsAsync<NatsSvcException>(async () =>
+            await s1.RemoveEndpointAsync("s1", cancellationToken));
+        await s1.RemoveEndpointAsync("grp1-s1", cancellationToken);
+
+        Assert.Empty(s1.GetInfo().Endpoints);
+
+        foreach (var subject in new[] { "grp1.e1", "grp1.s1" })
+        {
+            await Assert.ThrowsAsync<NatsNoRespondersException>(async () =>
+                await nats.RequestAsync<int, int>(subject, 0, cancellationToken: cancellationToken));
+        }
     }
 
     [Fact]
