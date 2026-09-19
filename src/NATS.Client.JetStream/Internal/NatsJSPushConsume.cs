@@ -112,7 +112,7 @@ internal class NatsJSPushConsume<T> : NatsSubBase
             return;
 
         if (_hbTimeout > 0)
-            _timer.Change(_hbTimeout, Timeout.Infinite);
+            _timer.Change(_hbTimeout, _hbTimeout);
     }
 
     public override async ValueTask DisposeAsync()
@@ -206,8 +206,15 @@ internal class NatsJSPushConsume<T> : NatsSubBase
                     Connection,
                     Connection.HeaderParser,
                     _serializer,
-                    default),
+                    replyParentContext: default,
+                    subscriptionSubject: Subject,
+                    queueGroup: QueueGroup),
                 _context);
+
+            // Handed to the base class so a message that never makes it onto the user channel
+            // still has its receive activity ended. Once it is on the channel the consumer
+            // owns it.
+            ReceiveActivity = msg.Headers?.Activity;
 
             await _userMsgs.Writer.WriteAsync(msg, _cancellationToken).ConfigureAwait(false);
 

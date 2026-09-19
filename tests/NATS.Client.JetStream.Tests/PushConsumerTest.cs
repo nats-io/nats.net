@@ -1,3 +1,4 @@
+using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
 using NATS.Client.JetStream.Models;
 using NATS.Client.TestUtilities2;
@@ -18,7 +19,7 @@ public class PushConsumerTest(NatsServerFixture server)
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
 
-        var deliverSubject = nats.NewInbox();
+        var deliverSubject = js.NewBaseInbox();
         var consumer = await js.CreatePushConsumerAsync(
             stream: $"{prefix}s1",
             opts: new NatsJSPushConsumerOpts
@@ -57,14 +58,14 @@ public class PushConsumerTest(NatsServerFixture server)
 
         var consumer1 = await js.CreatePushConsumerAsync(
             stream: $"{prefix}s1",
-            opts: new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = nats.NewInbox(), FilterSubject = $"{prefix}s1.a" },
+            opts: new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = js.NewBaseInbox(), FilterSubject = $"{prefix}s1.a" },
             cancellationToken: cts.Token);
 
         Assert.Equal($"{prefix}s1.a", consumer1.Info.Config.FilterSubject);
 
         var consumer2 = await js.CreateOrUpdatePushConsumerAsync(
             stream: $"{prefix}s1",
-            opts: new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = nats.NewInbox(), FilterSubject = $"{prefix}s1.b" },
+            opts: new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = js.NewBaseInbox(), FilterSubject = $"{prefix}s1.b" },
             cancellationToken: cts.Token);
 
         Assert.Equal($"{prefix}c1", consumer2.Info.Config.Name);
@@ -81,7 +82,7 @@ public class PushConsumerTest(NatsServerFixture server)
 
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
-        await js.CreatePushConsumerAsync($"{prefix}s1", new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = nats.NewInbox() }, cts.Token);
+        await js.CreatePushConsumerAsync($"{prefix}s1", new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = js.NewBaseInbox() }, cts.Token);
 
         var consumer = await js.GetPushConsumerAsync($"{prefix}s1", $"{prefix}c1", cts.Token);
         Assert.Equal($"{prefix}c1", consumer.Info.Config.Name);
@@ -149,7 +150,7 @@ public class PushConsumerTest(NatsServerFixture server)
             ack.EnsureSuccess();
         }
 
-        var consumer = await js.CreatePushConsumerAsync($"{prefix}s1", new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = nats.NewInbox() }, cts.Token);
+        var consumer = await js.CreatePushConsumerAsync($"{prefix}s1", new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = js.NewBaseInbox() }, cts.Token);
         var count = 0;
         await foreach (var msg in consumer.ConsumeAsync(serializer: TestDataJsonSerializer<TestData>.Default, cancellationToken: cts.Token))
         {
@@ -181,7 +182,7 @@ public class PushConsumerTest(NatsServerFixture server)
 
         var consumer = await js.CreatePushConsumerAsync(
             $"{prefix}s1",
-            new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = nats.NewInbox(), FilterSubject = $"{prefix}s1.bar" },
+            new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = js.NewBaseInbox(), FilterSubject = $"{prefix}s1.bar" },
             cts.Token);
 
         var count = 0;
@@ -207,7 +208,7 @@ public class PushConsumerTest(NatsServerFixture server)
 
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
-        var consumer = await js.CreatePushConsumerAsync($"{prefix}s1", new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = nats.NewInbox() }, cts.Token);
+        var consumer = await js.CreatePushConsumerAsync($"{prefix}s1", new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = js.NewBaseInbox() }, cts.Token);
 
         var ex = Assert.Throws<NatsJSProtocolException>(() => consumer.FetchAsync<int>(new NatsJSFetchOpts { MaxMsgs = 1 }, cancellationToken: cts.Token));
         Assert.Equal("Consumer is push based", ex.HeaderMessageText);
@@ -229,7 +230,7 @@ public class PushConsumerTest(NatsServerFixture server)
 
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
-        var consumer = (NatsJSPushConsumer)await js.CreatePushConsumerAsync($"{prefix}s1", new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = nats.NewInbox() }, cts.Token);
+        var consumer = (NatsJSPushConsumer)await js.CreatePushConsumerAsync($"{prefix}s1", new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = js.NewBaseInbox() }, cts.Token);
 
         await consumer.DeleteAsync(cts.Token);
 
@@ -254,7 +255,7 @@ public class PushConsumerTest(NatsServerFixture server)
 
         var consumer = await js.CreatePushConsumerAsync(
             $"{prefix}s1",
-            new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = nats.NewInbox() },
+            new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = js.NewBaseInbox() },
             cts.Token);
 
         var name = consumer.Info.Config.Name;
@@ -281,7 +282,7 @@ public class PushConsumerTest(NatsServerFixture server)
         for (var i = 0; i < 5; i++)
             await js.PublishAsync($"{prefix}s1.foo", i, cancellationToken: cts.Token);
 
-        var consumer = await js.CreatePushConsumerAsync($"{prefix}s1", new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = nats.NewInbox() }, cts.Token);
+        var consumer = await js.CreatePushConsumerAsync($"{prefix}s1", new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = js.NewBaseInbox() }, cts.Token);
 
         var count = 0;
         var consumeCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
@@ -314,7 +315,7 @@ public class PushConsumerTest(NatsServerFixture server)
         var opts = new NatsJSPushConsumerOpts
         {
             Name = $"{prefix}c1",
-            DeliverSubject = nats1.NewInbox(),
+            DeliverSubject = js.NewBaseInbox(),
             DeliverGroup = $"{prefix}workers",
             AckWait = TimeSpan.FromSeconds(30),
         };
@@ -364,7 +365,7 @@ public class PushConsumerTest(NatsServerFixture server)
 
         var consumer = await js.CreatePushConsumerAsync(
             $"{prefix}s1",
-            new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = nats.NewInbox(), AckPolicy = ConsumerConfigAckPolicy.None },
+            new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = js.NewBaseInbox(), AckPolicy = ConsumerConfigAckPolicy.None },
             cts.Token);
 
         for (var i = 0; i < 10; i++)
@@ -398,7 +399,7 @@ public class PushConsumerTest(NatsServerFixture server)
             new NatsJSPushConsumerOpts
             {
                 Name = $"{prefix}c1",
-                DeliverSubject = nats.NewInbox(),
+                DeliverSubject = js.NewBaseInbox(),
                 AckWait = TimeSpan.FromMilliseconds(100),
                 MaxDeliver = 5,
             },
@@ -436,7 +437,7 @@ public class PushConsumerTest(NatsServerFixture server)
 
         var consumer = (NatsJSPushConsumer)await js.CreatePushConsumerAsync(
             $"{prefix}s1",
-            new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = nats.NewInbox(), AckWait = TimeSpan.FromMilliseconds(300) },
+            new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = js.NewBaseInbox(), AckWait = TimeSpan.FromMilliseconds(300) },
             cts.Token);
 
         await js.PublishAsync($"{prefix}s1.foo", 99, cancellationToken: cts.Token);
@@ -471,7 +472,7 @@ public class PushConsumerTest(NatsServerFixture server)
 
         var js = new NatsJSContext(nats);
         await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
-        var consumer = await js.CreatePushConsumerAsync($"{prefix}s1", new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = nats.NewInbox() }, cts.Token);
+        var consumer = await js.CreatePushConsumerAsync($"{prefix}s1", new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = js.NewBaseInbox() }, cts.Token);
 
         await Assert.ThrowsAsync<NatsJSProtocolException>(async () => await consumer.UnpinAsync("group", cts.Token));
     }
@@ -489,7 +490,7 @@ public class PushConsumerTest(NatsServerFixture server)
 
         var consumer = await js.CreatePushConsumerAsync(
             $"{prefix}s1",
-            new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = nats.NewInbox(), HeadersOnly = true },
+            new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = js.NewBaseInbox(), HeadersOnly = true },
             cts.Token);
 
         for (var i = 0; i < 5; i++)
@@ -528,7 +529,7 @@ public class PushConsumerTest(NatsServerFixture server)
             new NatsJSPushConsumerOpts
             {
                 Name = $"{prefix}c1",
-                DeliverSubject = nats.NewInbox(),
+                DeliverSubject = js.NewBaseInbox(),
                 DeliverPolicy = ConsumerConfigDeliverPolicy.ByStartSequence,
                 OptStartSeq = 5,
             },
@@ -564,7 +565,7 @@ public class PushConsumerTest(NatsServerFixture server)
         // DeliverPolicy=Last → only the most recent message
         var pushConsumer = await js.CreatePushConsumerAsync(
             $"{prefix}s1",
-            new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = nats.NewInbox(), DeliverPolicy = ConsumerConfigDeliverPolicy.Last },
+            new NatsJSPushConsumerOpts { Name = $"{prefix}c1", DeliverSubject = js.NewBaseInbox(), DeliverPolicy = ConsumerConfigDeliverPolicy.Last },
             cts.Token);
 
         var count = 0;
@@ -578,5 +579,67 @@ public class PushConsumerTest(NatsServerFixture server)
         }
 
         Assert.Equal(1, count);
+    }
+
+    [Fact]
+    public async Task Push_consume_timeout_notification_periodic()
+    {
+        var proxy = new NatsProxy(server.Port);
+        await using var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}", ConnectTimeout = TimeSpan.FromSeconds(10) });
+        await nats.ConnectRetryAsync();
+        var prefix = server.GetNextId();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var js = new NatsJSContext(nats);
+        await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
+
+        var consumer = await js.CreatePushConsumerAsync(
+            $"{prefix}s1",
+            new NatsJSPushConsumerOpts
+            {
+                Name = $"{prefix}c1",
+                DeliverSubject = js.NewBaseInbox(),
+                IdleHeartbeat = TimeSpan.FromSeconds(1),
+            },
+            cts.Token);
+
+        var timeouts = 0;
+        var consumeCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
+        var consumeOpts = new NatsJSConsumeOpts
+        {
+            NotificationHandler = (notification, _) =>
+            {
+                if (notification is NatsJSTimeoutNotification)
+                    Interlocked.Increment(ref timeouts);
+                return Task.CompletedTask;
+            },
+        };
+
+        var consumeTask = Task.Run(async () =>
+        {
+            await foreach (var msg in consumer.ConsumeAsync<int>(opts: consumeOpts, cancellationToken: consumeCts.Token))
+            {
+                _ = msg;
+            }
+        });
+
+        // Let the consumer start so the timeout timer is armed.
+        await Task.Delay(1_000, cts.Token);
+
+        // Swallow heartbeats so the client sees silence and the timeout notification fires.
+        proxy.ServerInterceptors.Add(m => m?.Contains("Idle Heartbeat") ?? false ? null : m);
+
+        // Idle heartbeat is 1s, so the timeout notification fires every ~2s of silence;
+        // waiting for two notifications proves the timer re-arms itself periodically.
+        var deadline = DateTime.UtcNow.AddSeconds(20);
+        while (Volatile.Read(ref timeouts) < 2)
+        {
+            Assert.True(DateTime.UtcNow < deadline, $"timed out waiting for the notifications, got {timeouts}");
+            await Task.Delay(100, cts.Token);
+        }
+
+        consumeCts.Cancel();
+        await Task.WhenAny(consumeTask, Task.Delay(TimeSpan.FromSeconds(5)));
+        Assert.True(Volatile.Read(ref timeouts) >= 2);
     }
 }
